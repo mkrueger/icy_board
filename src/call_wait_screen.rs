@@ -5,11 +5,16 @@ use std::{
     time::{Duration, Instant},
 };
 
-use chrono::{format, Local, Timelike};
+use chrono::{Local, Timelike};
 use crossterm::{
     event::{self, Event, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
+};
+use icy_board_engine::icy_board::text_messages::{
+    DOSBUSY, DOSBUSYDESC, DOSNOTBUSY, DOSNOTBUSYDESC, LASTCALLER, NUMCALLS, NUMDOWN, NUMMESSAGES,
+    NUMUP, SYSOPBUSY, SYSOPBUSYDESC, SYSOPNOTBUSY, SYSOPNOTBUSYDESC, SYSTEMAVAIL, USERBUSY,
+    USERBUSYDESC, USERNOTBUSY, USERNOTBUSYDESC,
 };
 use icy_ppe::Res;
 use ratatui::{
@@ -43,35 +48,41 @@ pub struct App {
     icy_board: Arc<Mutex<IcyBoard>>,
     buttons: Vec<Button>,
     call_stat: CallStat,
+
+    last_caller_txt: String,
+    calls_txt: String,
+    msgs_txt: String,
+    dls_txt: String,
+    uls_txt: String,
+    sysavail_txt: String,
 }
 
 impl App {
     pub fn new(icy_board: IcyBoard) -> Res<Self> {
         let buttons = vec![
             Button {
-                title: "User - Busy".to_string(),
-                description: "Log in as a regular user. Callers will get a busy signal."
-                    .to_string(),
+                title: icy_board.display_text.get_display_text(USERBUSY)?,
+                description: icy_board.display_text.get_display_text(USERBUSYDESC)?,
             },
             Button {
-                title: "Sysop - Busy".to_string(),
-                description: "Log in as the Sysop. Callers will get a busy signal.".to_string(),
+                title: icy_board.display_text.get_display_text(SYSOPBUSY)?,
+                description: icy_board.display_text.get_display_text(SYSOPBUSYDESC)?,
             },
             Button {
-                title: "Exit - Busy".to_string(),
-                description: "Drop to OS. Callers will get a busy signal.".to_string(),
+                title: icy_board.display_text.get_display_text(DOSBUSY)?,
+                description: icy_board.display_text.get_display_text(DOSBUSYDESC)?,
             },
             Button {
-                title: "User - Not Busy".to_string(),
-                description: "Log in as a regular user. RING Alert will be activated.".to_string(),
+                title: icy_board.display_text.get_display_text(USERNOTBUSY)?,
+                description: icy_board.display_text.get_display_text(USERNOTBUSYDESC)?,
             },
             Button {
-                title: "Sysop - Not Busy".to_string(),
-                description: "Log in as the Sysop. RING Alert will be activated.".to_string(),
+                title: icy_board.display_text.get_display_text(SYSOPNOTBUSY)?,
+                description: icy_board.display_text.get_display_text(SYSOPNOTBUSYDESC)?,
             },
             Button {
-                title: "Exit - Not Busy".to_string(),
-                description: "Drop to OS. RING Alert will be activated.".to_string(),
+                title: icy_board.display_text.get_display_text(DOSNOTBUSY)?,
+                description: icy_board.display_text.get_display_text(DOSNOTBUSYDESC)?,
             },
         ];
 
@@ -81,9 +92,15 @@ impl App {
             x: 0,
             y: 0,
             selected: None,
-            icy_board: Arc::new(Mutex::new(icy_board)),
             call_stat,
             buttons,
+            last_caller_txt: icy_board.display_text.get_display_text(LASTCALLER)?,
+            calls_txt: icy_board.display_text.get_display_text(NUMCALLS)?,
+            msgs_txt: icy_board.display_text.get_display_text(NUMMESSAGES)?,
+            dls_txt: icy_board.display_text.get_display_text(NUMDOWN)?,
+            uls_txt: icy_board.display_text.get_display_text(NUMUP)?,
+            sysavail_txt: icy_board.display_text.get_display_text(SYSTEMAVAIL)?,
+            icy_board: Arc::new(Mutex::new(icy_board)),
         })
     }
 
@@ -140,6 +157,13 @@ impl App {
         Canvas::default()
         .marker(Marker::Block)
         .paint(move |ctx| {
+
+            // draw node
+            let node_txt = format!("Node {}", self.icy_board.lock().borrow().as_ref().unwrap().data.node_num);
+            ctx.print(4.0 + (width - node_txt.len() as f64)  / 2.0,  height - 1.0,
+            Line::from(node_txt).style(Style::new()
+            .fg(DOS_WHITE)));
+
             render_button(ctx, 4.0, height - 2.0, width - 7.0, &self.icy_board.lock().borrow().as_ref().unwrap().data.board_name, SelectState::Selected);
 
             let x_padding = 7.0;
@@ -170,19 +194,19 @@ impl App {
 
             //self.icy_board.lock().borrow().as_ref().unwrap().data.stat
 
-            render_label(ctx, 4.0, separator_y - 2.0, width - 7.0, "Waiting for call on Port 128.0.0.1:4711...");
-            render_label(ctx, 4.0, separator_y - 4.0, width - 7.0, format!("Last Caller: {}", self.call_stat.last_caller).as_str());
+            render_label(ctx, 4.0, separator_y - 2.0, width - 7.0, &self.sysavail_txt);
+            render_label(ctx, 4.0, separator_y - 4.0, width - 7.0, format!("{} {}", self.last_caller_txt, self.call_stat.last_caller).as_str());
 
             let label_padding = 5.0;
             let label_size = 14.0;
 
-            render_label(ctx, 4.0, separator_y - 6.0, label_size, format!("Calls: {}", self.call_stat.new_calls).as_str());
+            render_label(ctx, 4.0, separator_y - 6.0, label_size, format!("{} {}", self.calls_txt, self.call_stat.new_calls).as_str());
 
-            render_label(ctx, 4.0 + label_padding * 1.0 + label_size, separator_y - 6.0, label_size, format!("Msgs: {}", self.call_stat.new_msgs).as_str());
+            render_label(ctx, 4.0 + label_padding * 1.0 + label_size, separator_y - 6.0, label_size, format!("{} {}", self.msgs_txt, self.call_stat.new_msgs).as_str());
 
-            render_label(ctx, 4.0 + label_padding * 2.0 + label_size * 2.0, separator_y - 6.0, label_size, format!("D/Ls: {}", self.call_stat.total_dn).as_str());
+            render_label(ctx, 4.0 + label_padding * 2.0 + label_size * 2.0, separator_y - 6.0, label_size, format!("{} {}", self.dls_txt, self.call_stat.total_dn).as_str());
 
-            render_label(ctx, 4.0 + label_padding * 3.0 + label_size * 3.0, separator_y - 6.0, label_size, format!("U/Ls: {}", self.call_stat.total_up).as_str());
+            render_label(ctx, 4.0 + label_padding * 3.0 + label_size * 3.0, separator_y - 6.0, label_size, format!("{} {}", self.uls_txt, self.call_stat.total_up).as_str());
 
         }).background_color(DOS_BLUE)
         .x_bounds([0.0, width])

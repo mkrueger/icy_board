@@ -1,9 +1,10 @@
-use std::{collections::HashMap, fs, io::Cursor, path::PathBuf};
+use std::{collections::HashMap, fs, path::PathBuf};
 
 use call_wait_screen::App;
 use clap::Parser;
 use icy_board_engine::icy_board::{
-    conferences::ConferenceHeader, data::IcyBoardData, user_inf::UserInf, users::UserRecord, User,
+    conferences::ConferenceHeader, data::IcyBoardData, text_messages::DisplayText,
+    user_inf::UserInf, users::UserRecord, User,
 };
 use icy_ppe::Res;
 use qfile::{QFilePath, QTraitSync};
@@ -34,6 +35,7 @@ pub struct IcyBoard {
     pub users: Vec<User>,
     pub data: IcyBoardData,
     pub conferences: Vec<ConferenceHeader>,
+    pub display_text: DisplayText,
 
     paths: HashMap<String, String>,
 }
@@ -99,6 +101,7 @@ impl IcyBoard {
             users,
             data,
             conferences,
+            display_text: DisplayText::default(),
             paths,
         };
 
@@ -116,6 +119,8 @@ impl IcyBoard {
         let max_conferences = res.data.num_conf as usize;
         let conferences = ConferenceHeader::load(&r, max_conferences)?;
         res.conferences = conferences;
+        let txt = fs::read(res.resolve_file(&res.data.path.text_loc) + "/PCBTEXT")?;
+        res.display_text = DisplayText::parse_file(&txt)?;
 
         Ok(res)
     }
