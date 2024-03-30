@@ -11,10 +11,14 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use icy_board_engine::icy_board::text_messages::{
-    DOSBUSY, DOSBUSYDESC, DOSNOTBUSY, DOSNOTBUSYDESC, LASTCALLER, NUMCALLS, NUMDOWN, NUMMESSAGES,
-    NUMUP, SYSOPBUSY, SYSOPBUSYDESC, SYSOPNOTBUSY, SYSOPNOTBUSYDESC, SYSTEMAVAIL, USERBUSY,
-    USERBUSYDESC, USERNOTBUSY, USERNOTBUSYDESC,
+use icy_board_engine::icy_board::{
+    state::{functions::display_flags, IcyBoardState},
+    text_messages::{
+        DOSBUSY, DOSBUSYDESC, DOSNOTBUSY, DOSNOTBUSYDESC, LASTCALLER, MENUCOMMAND, NUMCALLS,
+        NUMDOWN, NUMMESSAGES, NUMUP, SYSOPBUSY, SYSOPBUSYDESC, SYSOPNOTBUSY, SYSOPNOTBUSYDESC,
+        SYSTEMAVAIL, USERBUSY, USERBUSYDESC, USERNOTBUSY, USERNOTBUSYDESC,
+    },
+    IcyBoard, IcyBoardError,
 };
 use icy_ppe::Res;
 use ratatui::{
@@ -26,26 +30,36 @@ use ratatui::{
     },
 };
 
-use crate::{call_stat::CallStat, IcyBoard, VERSION};
+use crate::{call_stat::CallStat, VERSION};
 
-const DOS_BLACK: Color = Color::Rgb(0, 0, 0);
-const DOS_RED: Color = Color::Rgb(0xAA, 0, 0);
-const DOS_BLUE: Color = Color::Rgb(0, 0, 0xAA);
-const DOS_CYAN: Color = Color::Rgb(0, 0xAA, 0xAA);
-const DOS_GRAY: Color = Color::Rgb(0xAA, 0xAA, 0xAA);
-const DOS_YELLOW: Color = Color::Rgb(0xFF, 0xFF, 0x55);
-const DOS_WHITE: Color = Color::Rgb(0xFF, 0xFF, 0xFF);
+pub const DOS_BLACK: Color = Color::Rgb(0, 0, 0);
+pub const DOS_BLUE: Color = Color::Rgb(0, 0, 0xAA);
+pub const DOS_GREEN: Color = Color::Rgb(0, 0xAA, 0);
+pub const DOS_CYAN: Color = Color::Rgb(0, 0xAA, 0xAA);
+pub const DOS_RED: Color = Color::Rgb(0xAA, 0, 0);
+pub const DOS_MAGENTA: Color = Color::Rgb(0xAA, 0, 0xAA);
+pub const DOS_BROWN: Color = Color::Rgb(0xAA, 0x55, 0);
+pub const DOS_LIGHTGRAY: Color = Color::Rgb(0xAA, 0xAA, 0xAA);
+
+pub const DOS_DARKGRAY: Color = Color::Rgb(0x55, 0x55, 0x55);
+pub const DOS_LIGHT_BLUE: Color = Color::Rgb(0x55, 0x55, 0xFF);
+pub const DOS_LIGHT_GREEN: Color = Color::Rgb(0x55, 0xFF, 0x55);
+pub const DOS_LIGHT_CYAN: Color = Color::Rgb(0x55, 0xFF, 0xFF);
+pub const DOS_LIGHT_RED: Color = Color::Rgb(0xFF, 0x55, 0x55);
+pub const DOS_LIGHT_MAGENTA: Color = Color::Rgb(0xFF, 0x55, 0xFF);
+pub const DOS_YELLOW: Color = Color::Rgb(0xFF, 0xFF, 0x55);
+pub const DOS_WHITE: Color = Color::Rgb(0xFF, 0xFF, 0xFF);
 
 struct Button {
     pub title: String,
     pub description: String,
 }
 
-pub struct App {
+pub struct CallWaitScreen {
     x: i32,
     y: i32,
     selected: Option<Instant>,
-    icy_board: Arc<Mutex<IcyBoard>>,
+    board: Arc<Mutex<IcyBoard>>,
     buttons: Vec<Button>,
     call_stat: CallStat,
 
@@ -57,86 +71,184 @@ pub struct App {
     sysavail_txt: String,
 }
 
-impl App {
-    pub fn new(icy_board: IcyBoard) -> Res<Self> {
-        let buttons = vec![
-            Button {
-                title: icy_board.display_text.get_display_text(USERBUSY)?,
-                description: icy_board.display_text.get_display_text(USERBUSYDESC)?,
-            },
-            Button {
-                title: icy_board.display_text.get_display_text(SYSOPBUSY)?,
-                description: icy_board.display_text.get_display_text(SYSOPBUSYDESC)?,
-            },
-            Button {
-                title: icy_board.display_text.get_display_text(DOSBUSY)?,
-                description: icy_board.display_text.get_display_text(DOSBUSYDESC)?,
-            },
-            Button {
-                title: icy_board.display_text.get_display_text(USERNOTBUSY)?,
-                description: icy_board.display_text.get_display_text(USERNOTBUSYDESC)?,
-            },
-            Button {
-                title: icy_board.display_text.get_display_text(SYSOPNOTBUSY)?,
-                description: icy_board.display_text.get_display_text(SYSOPNOTBUSYDESC)?,
-            },
-            Button {
-                title: icy_board.display_text.get_display_text(DOSNOTBUSY)?,
-                description: icy_board.display_text.get_display_text(DOSNOTBUSYDESC)?,
-            },
-        ];
+pub struct IcyBoardCommand {
+    pub state: IcyBoardState,
+}
+const MASK_COMMAND: &str  = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;':,.<>?/\\\" ";
 
-        let file_name = icy_board.resolve_file(icy_board.data.stats_file.as_str());
+impl IcyBoardCommand {
+    pub fn new(state: IcyBoardState) -> Self {
+        Self { state }
+    }
+
+    pub fn do_command(&mut self) -> Res<()> {
+        let current_conference = self.state.session.current_conference.number;
+
+        let menu_file = if let Some(conference) = self
+            .state
+            .board
+            .lock()
+            .as_ref()
+            .unwrap()
+            .conferences
+            .get(current_conference as usize)
+        {
+            if self.state.session.is_sysop {
+                &conference.sysop_menu
+            } else {
+                &conference.users_menu
+            }
+            .clone()
+        } else {
+            return Ok(());
+        };
+
+        self.state.display_file(&menu_file)?;
+
+        let _command =
+            self.state
+                .input_field(MENUCOMMAND, 40, MASK_COMMAND, display_flags::NEWLINE)?;
+        Ok(())
+    }
+}
+
+impl CallWaitScreen {
+    pub fn new(board: Arc<Mutex<IcyBoard>>) -> Res<Self> {
+        let buttons;
+
+        if let Ok(board) = board.lock().as_ref() {
+            buttons = vec![
+                Button {
+                    title: board.display_text.get_display_text(USERBUSY)?.text,
+                    description: board.display_text.get_display_text(USERBUSYDESC)?.text,
+                },
+                Button {
+                    title: board.display_text.get_display_text(SYSOPBUSY)?.text,
+                    description: board.display_text.get_display_text(SYSOPBUSYDESC)?.text,
+                },
+                Button {
+                    title: board.display_text.get_display_text(DOSBUSY)?.text,
+                    description: board.display_text.get_display_text(DOSBUSYDESC)?.text,
+                },
+                Button {
+                    title: board.display_text.get_display_text(USERNOTBUSY)?.text,
+                    description: board.display_text.get_display_text(USERNOTBUSYDESC)?.text,
+                },
+                Button {
+                    title: board.display_text.get_display_text(SYSOPNOTBUSY)?.text,
+                    description: board.display_text.get_display_text(SYSOPNOTBUSYDESC)?.text,
+                },
+                Button {
+                    title: board.display_text.get_display_text(DOSNOTBUSY)?.text,
+                    description: board.display_text.get_display_text(DOSNOTBUSYDESC)?.text,
+                },
+            ];
+        } else {
+            return Err(Box::new(IcyBoardError::Error(
+                "Board is locked".to_string(),
+            )));
+        }
+
+        let file = board.lock().as_ref().unwrap().data.stats_file.to_string();
+        let file_name = board.lock().as_ref().unwrap().resolve_file(&file);
         let call_stat = CallStat::load(&file_name)?;
+        let last_caller_txt = board
+            .lock()
+            .as_ref()
+            .unwrap()
+            .display_text
+            .get_display_text(LASTCALLER)?
+            .text;
+        let calls_txt = board
+            .lock()
+            .as_ref()
+            .unwrap()
+            .display_text
+            .get_display_text(NUMCALLS)?
+            .text;
+        let msgs_txt = board
+            .lock()
+            .as_ref()
+            .unwrap()
+            .display_text
+            .get_display_text(NUMMESSAGES)?
+            .text;
+        let dls_txt = board
+            .lock()
+            .as_ref()
+            .unwrap()
+            .display_text
+            .get_display_text(NUMDOWN)?
+            .text;
+        let uls_txt = board
+            .lock()
+            .as_ref()
+            .unwrap()
+            .display_text
+            .get_display_text(NUMUP)?
+            .text;
+        let sysavail_txt = board
+            .lock()
+            .as_ref()
+            .unwrap()
+            .display_text
+            .get_display_text(SYSTEMAVAIL)?
+            .text;
+
         Ok(Self {
             x: 0,
             y: 0,
             selected: None,
             call_stat,
             buttons,
-            last_caller_txt: icy_board.display_text.get_display_text(LASTCALLER)?,
-            calls_txt: icy_board.display_text.get_display_text(NUMCALLS)?,
-            msgs_txt: icy_board.display_text.get_display_text(NUMMESSAGES)?,
-            dls_txt: icy_board.display_text.get_display_text(NUMDOWN)?,
-            uls_txt: icy_board.display_text.get_display_text(NUMUP)?,
-            sysavail_txt: icy_board.display_text.get_display_text(SYSTEMAVAIL)?,
-            icy_board: Arc::new(Mutex::new(icy_board)),
+            last_caller_txt,
+            calls_txt,
+            msgs_txt,
+            dls_txt,
+            uls_txt,
+            sysavail_txt,
+            board,
         })
     }
 
-    pub fn run(icy_board: IcyBoard) -> Res<()> {
+    pub fn run(&mut self) -> Res<()> {
         let mut terminal = init_terminal()?;
-        let mut app = Self::new(icy_board)?;
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(16);
         loop {
-            let _ = terminal.draw(|frame| app.ui(frame));
+            let _ = terminal.draw(|frame| self.ui(frame));
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
-            if event::poll(timeout)? && app.selected.is_none() {
+            if event::poll(timeout)? && self.selected.is_none() {
                 if let Event::Key(key) = event::read()? {
                     match key.code {
                         KeyCode::Char('q') => break,
-                        KeyCode::Down | KeyCode::Char('j') => app.y = (app.y + 1).min(1),
-                        KeyCode::Up | KeyCode::Char('k') => app.y = (app.y - 1).max(0),
-                        KeyCode::Right | KeyCode::Char('l') => app.x = (app.x + 1).min(2),
-                        KeyCode::Left | KeyCode::Char('h') => app.x = (app.x - 1).max(0),
-
+                        KeyCode::Down | KeyCode::Char('j') => self.y = (self.y + 1).min(1),
+                        KeyCode::Up | KeyCode::Char('k') => self.y = (self.y - 1).max(0),
+                        KeyCode::Right | KeyCode::Char('l') => self.x = (self.x + 1).min(2),
+                        KeyCode::Left | KeyCode::Char('h') => self.x = (self.x - 1).max(0),
                         KeyCode::Enter => {
-                            app.selected = Some(Instant::now());
+                            self.selected = Some(Instant::now());
                         }
                         _ => {}
                     }
                 }
             }
 
-            if let Some(selected) = app.selected {
+            if let Some(selected) = self.selected {
                 if selected.elapsed() >= Duration::from_millis(500) {
+                    match self.y * 3 + self.x {
+                        0 | 1 | 3 | 4 => {}
+                        _ => {
+                            restore_terminal()?;
+                            return Ok(());
+                        }
+                    }
                     break;
                 }
             }
 
             if last_tick.elapsed() >= tick_rate {
-                //     app.on_tick();
+                //     self.on_tick();
                 last_tick = Instant::now();
             }
         }
@@ -159,12 +271,12 @@ impl App {
         .paint(move |ctx| {
 
             // draw node
-            let node_txt = format!("Node {}", self.icy_board.lock().borrow().as_ref().unwrap().data.node_num);
+            let node_txt = format!("Node {}", self.board.lock().borrow().as_ref().unwrap().data.node_num);
             ctx.print(4.0 + (width - node_txt.len() as f64)  / 2.0,  height - 1.0,
             Line::from(node_txt).style(Style::new()
             .fg(DOS_WHITE)));
 
-            render_button(ctx, 4.0, height - 2.0, width - 7.0, &self.icy_board.lock().borrow().as_ref().unwrap().data.board_name, SelectState::Selected);
+            render_button(ctx, 4.0, height - 2.0, width - 7.0, &self.board.lock().borrow().as_ref().unwrap().data.board_name, SelectState::Selected);
 
             let x_padding = 7.0;
             let y_padding = -2.0;
@@ -264,8 +376,8 @@ impl SelectState {
     pub fn get_bg(&self) -> Color {
         match self {
             SelectState::None => DOS_RED,
-            SelectState::Selected => DOS_GRAY,
-            SelectState::Pressed => DOS_GRAY,
+            SelectState::Selected => DOS_LIGHTGRAY,
+            SelectState::Pressed => DOS_LIGHTGRAY,
         }
     }
 }
@@ -312,19 +424,19 @@ fn render_button(
             ctx.print(
                 x + 1.0 + i as f64,
                 y,
-                Line::from("▄").style(Style::new().fg(DOS_GRAY)),
+                Line::from("▄").style(Style::new().fg(DOS_LIGHTGRAY)),
             );
             ctx.print(
                 x + 1.0 + i as f64,
                 y - 1.0,
-                Line::from("▀").style(Style::new().fg(DOS_GRAY)),
+                Line::from("▀").style(Style::new().fg(DOS_LIGHTGRAY)),
             );
         }
 
         ctx.print(
             x + width + 1.0,
             y,
-            Line::from("▄").style(Style::new().fg(DOS_GRAY)),
+            Line::from("▄").style(Style::new().fg(DOS_LIGHTGRAY)),
         );
     }
 }
@@ -366,7 +478,7 @@ fn init_terminal() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
     Terminal::new(CrosstermBackend::new(stdout()))
 }
 
-fn restore_terminal() -> io::Result<()> {
+pub fn restore_terminal() -> io::Result<()> {
     disable_raw_mode()?;
     stdout().execute(LeaveAlternateScreen)?;
     Ok(())
