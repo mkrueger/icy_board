@@ -12,11 +12,10 @@ use crossterm::{
     ExecutableCommand,
 };
 use icy_board_engine::icy_board::{
-    state::{functions::display_flags, IcyBoardState},
     text_messages::{
-        DOSBUSY, DOSBUSYDESC, DOSNOTBUSY, DOSNOTBUSYDESC, LASTCALLER, MENUCOMMAND, NUMCALLS,
-        NUMDOWN, NUMMESSAGES, NUMUP, SYSOPBUSY, SYSOPBUSYDESC, SYSOPNOTBUSY, SYSOPNOTBUSYDESC,
-        SYSTEMAVAIL, USERBUSY, USERBUSYDESC, USERNOTBUSY, USERNOTBUSYDESC,
+        DOSBUSY, DOSBUSYDESC, DOSNOTBUSY, DOSNOTBUSYDESC, LASTCALLER, NUMCALLS, NUMDOWN,
+        NUMMESSAGES, NUMUP, SYSOPBUSY, SYSOPBUSYDESC, SYSOPNOTBUSY, SYSOPNOTBUSYDESC, SYSTEMAVAIL,
+        USERBUSY, USERBUSYDESC, USERNOTBUSY, USERNOTBUSYDESC,
     },
     IcyBoard, IcyBoardError,
 };
@@ -34,25 +33,33 @@ use crate::{call_stat::CallStat, VERSION};
 
 pub const DOS_BLACK: Color = Color::Rgb(0, 0, 0);
 pub const DOS_BLUE: Color = Color::Rgb(0, 0, 0xAA);
-pub const DOS_GREEN: Color = Color::Rgb(0, 0xAA, 0);
+// pub const DOS_GREEN: Color = Color::Rgb(0, 0xAA, 0);
 pub const DOS_CYAN: Color = Color::Rgb(0, 0xAA, 0xAA);
 pub const DOS_RED: Color = Color::Rgb(0xAA, 0, 0);
-pub const DOS_MAGENTA: Color = Color::Rgb(0xAA, 0, 0xAA);
-pub const DOS_BROWN: Color = Color::Rgb(0xAA, 0x55, 0);
+// pub const DOS_MAGENTA: Color = Color::Rgb(0xAA, 0, 0xAA);
+// pub const DOS_BROWN: Color = Color::Rgb(0xAA, 0x55, 0);
 pub const DOS_LIGHTGRAY: Color = Color::Rgb(0xAA, 0xAA, 0xAA);
 
-pub const DOS_DARKGRAY: Color = Color::Rgb(0x55, 0x55, 0x55);
-pub const DOS_LIGHT_BLUE: Color = Color::Rgb(0x55, 0x55, 0xFF);
+// pub const DOS_DARKGRAY: Color = Color::Rgb(0x55, 0x55, 0x55);
+// pub const DOS_LIGHT_BLUE: Color = Color::Rgb(0x55, 0x55, 0xFF);
 pub const DOS_LIGHT_GREEN: Color = Color::Rgb(0x55, 0xFF, 0x55);
-pub const DOS_LIGHT_CYAN: Color = Color::Rgb(0x55, 0xFF, 0xFF);
-pub const DOS_LIGHT_RED: Color = Color::Rgb(0xFF, 0x55, 0x55);
-pub const DOS_LIGHT_MAGENTA: Color = Color::Rgb(0xFF, 0x55, 0xFF);
+// pub const DOS_LIGHT_CYAN: Color = Color::Rgb(0x55, 0xFF, 0xFF);
+// pub const DOS_LIGHT_RED: Color = Color::Rgb(0xFF, 0x55, 0x55);
+// pub const DOS_LIGHT_MAGENTA: Color = Color::Rgb(0xFF, 0x55, 0xFF);
 pub const DOS_YELLOW: Color = Color::Rgb(0xFF, 0xFF, 0x55);
 pub const DOS_WHITE: Color = Color::Rgb(0xFF, 0xFF, 0xFF);
+
+#[derive(Clone, Copy)]
+pub enum CallWaitMessage {
+    User(bool),
+    Sysop(bool),
+    Exit(bool),
+}
 
 struct Button {
     pub title: String,
     pub description: String,
+    pub message: CallWaitMessage,
 }
 
 pub struct CallWaitScreen {
@@ -71,47 +78,6 @@ pub struct CallWaitScreen {
     sysavail_txt: String,
 }
 
-pub struct IcyBoardCommand {
-    pub state: IcyBoardState,
-}
-const MASK_COMMAND: &str  = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;':,.<>?/\\\" ";
-
-impl IcyBoardCommand {
-    pub fn new(state: IcyBoardState) -> Self {
-        Self { state }
-    }
-
-    pub fn do_command(&mut self) -> Res<()> {
-        let current_conference = self.state.session.current_conference.number;
-
-        let menu_file = if let Some(conference) = self
-            .state
-            .board
-            .lock()
-            .as_ref()
-            .unwrap()
-            .conferences
-            .get(current_conference as usize)
-        {
-            if self.state.session.is_sysop {
-                &conference.sysop_menu
-            } else {
-                &conference.users_menu
-            }
-            .clone()
-        } else {
-            return Ok(());
-        };
-
-        self.state.display_file(&menu_file)?;
-
-        let _command =
-            self.state
-                .input_field(MENUCOMMAND, 40, MASK_COMMAND, display_flags::NEWLINE)?;
-        Ok(())
-    }
-}
-
 impl CallWaitScreen {
     pub fn new(board: Arc<Mutex<IcyBoard>>) -> Res<Self> {
         let buttons;
@@ -121,26 +87,32 @@ impl CallWaitScreen {
                 Button {
                     title: board.display_text.get_display_text(USERBUSY)?.text,
                     description: board.display_text.get_display_text(USERBUSYDESC)?.text,
+                    message: CallWaitMessage::User(true),
                 },
                 Button {
                     title: board.display_text.get_display_text(SYSOPBUSY)?.text,
                     description: board.display_text.get_display_text(SYSOPBUSYDESC)?.text,
+                    message: CallWaitMessage::Sysop(true),
                 },
                 Button {
                     title: board.display_text.get_display_text(DOSBUSY)?.text,
                     description: board.display_text.get_display_text(DOSBUSYDESC)?.text,
+                    message: CallWaitMessage::Exit(true),
                 },
                 Button {
                     title: board.display_text.get_display_text(USERNOTBUSY)?.text,
                     description: board.display_text.get_display_text(USERNOTBUSYDESC)?.text,
+                    message: CallWaitMessage::User(false),
                 },
                 Button {
                     title: board.display_text.get_display_text(SYSOPNOTBUSY)?.text,
                     description: board.display_text.get_display_text(SYSOPNOTBUSYDESC)?.text,
+                    message: CallWaitMessage::Sysop(false),
                 },
                 Button {
                     title: board.display_text.get_display_text(DOSNOTBUSY)?.text,
                     description: board.display_text.get_display_text(DOSNOTBUSYDESC)?.text,
+                    message: CallWaitMessage::Exit(false),
                 },
             ];
         } else {
@@ -211,7 +183,7 @@ impl CallWaitScreen {
         })
     }
 
-    pub fn run(&mut self) -> Res<()> {
+    pub fn run(&mut self) -> Res<CallWaitMessage> {
         let mut terminal = init_terminal()?;
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(16);
@@ -221,11 +193,10 @@ impl CallWaitScreen {
             if event::poll(timeout)? && self.selected.is_none() {
                 if let Event::Key(key) = event::read()? {
                     match key.code {
-                        KeyCode::Char('q') => break,
-                        KeyCode::Down | KeyCode::Char('j') => self.y = (self.y + 1).min(1),
-                        KeyCode::Up | KeyCode::Char('k') => self.y = (self.y - 1).max(0),
-                        KeyCode::Right | KeyCode::Char('l') => self.x = (self.x + 1).min(2),
-                        KeyCode::Left | KeyCode::Char('h') => self.x = (self.x - 1).max(0),
+                        KeyCode::Down | KeyCode::Char('s') => self.y = (self.y + 1).min(1),
+                        KeyCode::Up | KeyCode::Char('w') => self.y = (self.y - 1).max(0),
+                        KeyCode::Right | KeyCode::Char('d') => self.x = (self.x + 1).min(2),
+                        KeyCode::Left | KeyCode::Char('a') => self.x = (self.x - 1).max(0),
                         KeyCode::Enter => {
                             self.selected = Some(Instant::now());
                         }
@@ -236,14 +207,7 @@ impl CallWaitScreen {
 
             if let Some(selected) = self.selected {
                 if selected.elapsed() >= Duration::from_millis(500) {
-                    match self.y * 3 + self.x {
-                        0 | 1 | 3 | 4 => {}
-                        _ => {
-                            restore_terminal()?;
-                            return Ok(());
-                        }
-                    }
-                    break;
+                    return Ok(self.buttons[(self.y * 3 + self.x) as usize].message);
                 }
             }
 
@@ -252,8 +216,6 @@ impl CallWaitScreen {
                 last_tick = Instant::now();
             }
         }
-        restore_terminal()?;
-        Ok(())
     }
 
     fn ui(&self, frame: &mut Frame) {

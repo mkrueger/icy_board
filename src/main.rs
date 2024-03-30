@@ -1,17 +1,22 @@
 use std::{
     collections::VecDeque,
+    io::stdout,
+    process,
     sync::{Arc, Mutex},
 };
 
-use call_wait_screen::{CallWaitScreen, IcyBoardCommand};
+use bbs::IcyBoardCommand;
+use call_wait_screen::{CallWaitMessage, CallWaitScreen};
 use clap::Parser;
+use crossterm::{terminal::Clear, ExecutableCommand};
 use icy_board_engine::icy_board::{state::IcyBoardState, IcyBoard};
 use icy_engine_output::{IcyEngineOutput, Screen};
 use semver::Version;
-use tui::Tui;
+use tui::{print_exit_screen, Tui};
 
 use crate::call_wait_screen::restore_terminal;
 
+pub mod bbs;
 pub mod call_stat;
 mod call_wait_screen;
 mod icy_engine_output;
@@ -34,10 +39,33 @@ fn main() {
     match IcyBoard::load(&arguments.file) {
         Ok(icy_board) => {
             let board = Arc::new(Mutex::new(icy_board));
-            let mut app = CallWaitScreen::new(board.clone()).unwrap();
-            if let Err(err) = app.run() {
-                println!("Error: {}", err);
+            loop {
+                let mut app = CallWaitScreen::new(board.clone()).unwrap();
+                match app.run() {
+                    Ok(msg) => {
+                        run_message(msg, board.clone());
+                    }
+                    Err(err) => {
+                        restore_terminal().unwrap();
+                        println!("Error: {}", err);
+                    }
+                }
             }
+        }
+        Err(e) => {
+            restore_terminal().unwrap();
+            println!("Error: {}", e);
+        }
+    }
+}
+
+fn run_message(msg: CallWaitMessage, board: Arc<Mutex<IcyBoard>>) {
+    match msg {
+        CallWaitMessage::User(_) | CallWaitMessage::Sysop(_) => {
+            stdout()
+                .execute(Clear(crossterm::terminal::ClearType::All))
+                .unwrap();
+
             let screen = Arc::new(Mutex::new(Screen::new()));
             let input_buffer = Arc::new(Mutex::new(VecDeque::new()));
             let io = Arc::new(Mutex::new(IcyEngineOutput::new(
@@ -54,11 +82,13 @@ fn main() {
             if let Err(err) = tui.run() {
                 restore_terminal().unwrap();
                 println!("Error: {}", err);
+                process::exit(1);
             }
         }
-        Err(e) => {
+        CallWaitMessage::Exit(_) => {
             restore_terminal().unwrap();
-            println!("Error: {}", e);
+            print_exit_screen();
+            process::exit(0);
         }
     }
 }

@@ -1,6 +1,6 @@
 use std::{
-    borrow::BorrowMut,
     collections::VecDeque,
+    error::Error,
     io::{self, stdout, Stdout},
     sync::{Arc, Mutex},
     thread,
@@ -11,18 +11,13 @@ use chrono::{Datelike, Local, Timelike};
 use crossterm::{
     cursor::MoveTo,
     event::{self, Event, KeyCode, KeyModifiers},
-    execute,
-    style::{SetAttribute, SetBackgroundColor, SetForegroundColor},
     terminal::{
         disable_raw_mode, enable_raw_mode, Clear, EnterAlternateScreen, LeaveAlternateScreen,
     },
     ExecutableCommand,
 };
 
-use icy_board_engine::icy_board::{
-    state::{ConferenceType, Session},
-    IcyBoard,
-};
+use icy_board_engine::icy_board::{state::Session, IcyBoard, IcyBoardError};
 use icy_engine::{ansi, TextPane};
 use icy_ppe::Res;
 use ratatui::{
@@ -31,7 +26,8 @@ use ratatui::{
 };
 
 use crate::{
-    call_wait_screen::{IcyBoardCommand, DOS_BLACK, DOS_BLUE, DOS_LIGHT_GREEN, DOS_WHITE},
+    bbs::IcyBoardCommand,
+    call_wait_screen::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GREEN, DOS_WHITE},
     icy_engine_output::Screen,
 };
 
@@ -42,6 +38,7 @@ pub struct Tui {
     session: Arc<Mutex<Session>>,
 
     status_bar: usize,
+    handle: Option<thread::JoinHandle<Result<(), String>>>,
 }
 
 impl Tui {
@@ -53,21 +50,19 @@ impl Tui {
         let board = cmd.state.board.clone();
         let session = Arc::new(Mutex::new(cmd.state.session.clone()));
         let cmd = Arc::new(Mutex::new(cmd));
-        let s = screen.clone();
         let ui = session.clone();
-        thread::spawn(move || loop {
+        let join = thread::spawn(move || loop {
             if let Ok(lock) = &mut cmd.lock() {
-                lock.state
-                    .print(icy_board_engine::vm::TerminalTarget::Both, "Hello World!\n");
                 ui.lock().as_mut().unwrap().cur_user = lock.state.session.cur_user;
                 ui.lock().as_mut().unwrap().current_conference =
                     lock.state.session.current_conference.clone();
                 ui.lock().as_mut().unwrap().disp_options = lock.state.session.disp_options.clone();
                 if let Err(err) = lock.do_command() {
-                    for c in err.to_string().chars() {
-                        s.lock().unwrap().print(&mut ansi::Parser::default(), c)
-                    }
-                    return;
+                    return Err(err.to_string());
+                }
+                if lock.state.session.request_logoff {
+                    ui.lock().as_mut().unwrap().request_logoff = true;
+                    return Ok(());
                 }
             }
             thread::sleep(Duration::from_millis(20));
@@ -79,6 +74,7 @@ impl Tui {
             board,
             session,
             status_bar: 0,
+            handle: Some(join),
         }
     }
 
@@ -86,7 +82,17 @@ impl Tui {
         let mut terminal = init_terminal()?;
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(20);
-        loop {
+        while !self.session.lock().unwrap().request_logoff {
+            if self.handle.as_ref().unwrap().is_finished() {
+                restore_terminal()?;
+                let handle = self.handle.take().unwrap();
+                if let Err(err) = handle.join() {
+                    let msg = format!("{:?}", err.downcast_ref::<&str>());
+                    return Err(Box::new(IcyBoardError::ThreadCrashed(msg)));
+                }
+                return Ok(());
+            }
+
             let _ = terminal.draw(|frame| {
                 if let Ok(board) = &self.board.lock() {
                     self.ui(frame, board);
@@ -102,29 +108,6 @@ impl Tui {
                             }
                             KeyCode::Char('x') => {
                                 let _ = restore_terminal();
-                                stdout().execute(Clear(crossterm::terminal::ClearType::All))?;
-
-                                terminal
-                                    .draw(|frame| {
-                                        let mut r = frame.size();
-                                        r.height = 1;
-                                        let white = Style::default().fg(DOS_WHITE);
-                                        let green = Style::default().fg(DOS_LIGHT_GREEN);
-
-                                        let text = vec![
-                                            Span::styled("Thank you for using ", green),
-                                            Span::styled("IcyBoard", white),
-                                            Span::styled(" Professional BBS Software!", green),
-                                        ];
-                                        frame.render_widget(
-                                            Paragraph::new(Line::from(text))
-                                                .alignment(Alignment::Center)
-                                                .bg(DOS_BLUE),
-                                            r,
-                                        )
-                                    })
-                                    .unwrap();
-                                stdout().execute(MoveTo(0, 1))?;
 
                                 return Ok(());
                             }
@@ -197,6 +180,12 @@ impl Tui {
 
         let area = Rect::new(0, 24, 80, 1);
         frame.render_widget(self.status_bar(board), area);
+
+        if let Ok(b) = self.screen.lock() {
+            let p = b.caret.get_position();
+
+            frame.set_cursor(p.x as u16, (p.y - b.buffer.get_first_visible_line()) as u16);
+        }
     }
 
     fn status_bar(&self, board: &IcyBoard) -> impl Widget + '_ {
@@ -342,4 +331,32 @@ fn restore_terminal() -> io::Result<()> {
     disable_raw_mode()?;
     stdout().execute(LeaveAlternateScreen)?;
     Ok(())
+}
+
+pub fn print_exit_screen() {
+    let mut terminal = Terminal::new(CrosstermBackend::new(stdout())).unwrap();
+    stdout()
+        .execute(Clear(crossterm::terminal::ClearType::All))
+        .unwrap();
+    terminal
+        .draw(|frame| {
+            let mut r = frame.size();
+            r.height = 1;
+            let white = Style::default().fg(DOS_WHITE);
+            let green = Style::default().fg(DOS_LIGHT_GREEN);
+
+            let text = vec![
+                Span::styled("Thank you for using ", green),
+                Span::styled("IcyBoard", white),
+                Span::styled(" Professional BBS Software!", green),
+            ];
+            frame.render_widget(
+                Paragraph::new(Line::from(text))
+                    .alignment(Alignment::Center)
+                    .bg(DOS_BLUE),
+                r,
+            )
+        })
+        .unwrap();
+    stdout().execute(MoveTo(0, 1)).unwrap();
 }

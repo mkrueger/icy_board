@@ -13,7 +13,8 @@ pub struct Screen {
 }
 impl Screen {
     pub fn new() -> Screen {
-        let buffer = Buffer::new((80, 24));
+        let mut buffer = Buffer::new((80, 24));
+        buffer.is_terminal_buffer = true;
         let caret = Caret::default();
         Screen { caret, buffer }
     }

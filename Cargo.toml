@@ -24,6 +24,8 @@ chrono = "0.4.37"
 qfile = "3.0.1"
 easy_reader = "0.5.2"
 substring = "1.4.5"
+toml = "0.8.12"
+serde = "1.0.197"
 
 [profile.release]
 strip = "symbols"
