@@ -9,7 +9,7 @@ use std::{
 use chrono::{Datelike, Local, Timelike};
 use crossterm::{
     cursor::MoveTo,
-    event::{self, Event, KeyCode, KeyModifiers},
+    event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
     terminal::{
         disable_raw_mode, enable_raw_mode, Clear, EnterAlternateScreen, LeaveAlternateScreen,
     },
@@ -100,45 +100,47 @@ impl Tui {
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
             if event::poll(timeout)? {
                 if let Event::Key(key) = event::read()? {
-                    if key.modifiers.contains(KeyModifiers::ALT) {
-                        match key.code {
-                            KeyCode::Char('h') => {
-                                self.status_bar = (self.status_bar + 1) % 2;
-                            }
-                            KeyCode::Char('x') => {
-                                let _ = restore_terminal();
-
-                                return Ok(());
-                            }
-                            _ => {}
-                        }
-                    } else {
-                        match key.code {
-                            KeyCode::Char(c) => {
-                                if (c == 'x' || c == 'c')
-                                    && key.modifiers.contains(KeyModifiers::CONTROL)
-                                {
-                                    let _ = disable_raw_mode();
-                                    panic!("Ctrl-X or Ctrl-C pressed");
+                    if key.kind == KeyEventKind::Press {
+                        if key.modifiers.contains(KeyModifiers::ALT) {
+                            match key.code {
+                                KeyCode::Char('h') => {
+                                    self.status_bar = (self.status_bar + 1) % 2;
                                 }
-                                self.add_input(c.to_string().chars())
-                            }
-                            KeyCode::Enter => self.add_input("\r".chars()),
-                            KeyCode::Backspace => self.add_input("\x08".chars()),
-                            KeyCode::Esc => self.add_input("\x1B".chars()),
-                            KeyCode::Tab => self.add_input("\x09".chars()),
-                            KeyCode::Delete => self.add_input("\x7F".chars()),
+                                KeyCode::Char('x') => {
+                                    let _ = restore_terminal();
 
-                            KeyCode::Insert => self.add_input("\x1B[2~".chars()),
-                            KeyCode::Home => self.add_input("\x1B[H".chars()),
-                            KeyCode::End => self.add_input("\x1B[F".chars()),
-                            KeyCode::Up => self.add_input("\x1B[A".chars()),
-                            KeyCode::Down => self.add_input("\x1B[B".chars()),
-                            KeyCode::Right => self.add_input("\x1B[C".chars()),
-                            KeyCode::Left => self.add_input("\x1B[D".chars()),
-                            KeyCode::PageUp => self.add_input("\x1B[5~".chars()),
-                            KeyCode::PageDown => self.add_input("\x1B[6~".chars()),
-                            _ => {}
+                                    return Ok(());
+                                }
+                                _ => {}
+                            }
+                        } else {
+                            match key.code {
+                                KeyCode::Char(c) => {
+                                    if (c == 'x' || c == 'c')
+                                        && key.modifiers.contains(KeyModifiers::CONTROL)
+                                    {
+                                        let _ = disable_raw_mode();
+                                        panic!("Ctrl-X or Ctrl-C pressed");
+                                    }
+                                    self.add_input(c.to_string().chars())
+                                }
+                                KeyCode::Enter => self.add_input("\r".chars()),
+                                KeyCode::Backspace => self.add_input("\x08".chars()),
+                                KeyCode::Esc => self.add_input("\x1B".chars()),
+                                KeyCode::Tab => self.add_input("\x09".chars()),
+                                KeyCode::Delete => self.add_input("\x7F".chars()),
+
+                                KeyCode::Insert => self.add_input("\x1B[2~".chars()),
+                                KeyCode::Home => self.add_input("\x1B[H".chars()),
+                                KeyCode::End => self.add_input("\x1B[F".chars()),
+                                KeyCode::Up => self.add_input("\x1B[A".chars()),
+                                KeyCode::Down => self.add_input("\x1B[B".chars()),
+                                KeyCode::Right => self.add_input("\x1B[C".chars()),
+                                KeyCode::Left => self.add_input("\x1B[D".chars()),
+                                KeyCode::PageUp => self.add_input("\x1B[5~".chars()),
+                                KeyCode::PageDown => self.add_input("\x1B[6~".chars()),
+                                _ => {}
+                            }
                         }
                     }
                 }

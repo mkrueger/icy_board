@@ -11,6 +11,7 @@ use clap::Parser;
 use crossterm::{terminal::Clear, ExecutableCommand};
 use icy_board_engine::icy_board::{state::IcyBoardState, IcyBoard};
 use icy_engine_output::{IcyEngineOutput, Screen};
+use icy_ppe::Res;
 use semver::Version;
 use tui::{print_exit_screen, Tui};
 
@@ -34,6 +35,7 @@ lazy_static::lazy_static! {
 }
 
 fn main() {
+    init_error_hooks();
     let arguments = Cli::parse();
 
     match IcyBoard::load(&arguments.file) {
@@ -91,4 +93,19 @@ fn run_message(msg: CallWaitMessage, board: Arc<Mutex<IcyBoard>>) {
             process::exit(0);
         }
     }
+}
+
+fn init_error_hooks() -> Res<()> {
+    //let (panic, error) = HookBuilder::default().into_hooks();
+    //let panic = panic.into_panic_hook();
+    //let error = error.into_eyre_hook();
+    /*color_eyre::eyre::set_hook(Box::new(move |e| {
+        let _ = restore_terminal();
+        error(e)
+    }))?; */
+    std::panic::set_hook(Box::new(move |info| {
+        let _ = restore_terminal();
+        eprintln!("{}", info);
+    }));
+    Ok(())
 }

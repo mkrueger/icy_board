@@ -7,7 +7,7 @@ use std::{
 
 use chrono::{Local, Timelike};
 use crossterm::{
-    event::{self, Event, KeyCode},
+    event::{self, Event, KeyCode, KeyEventKind},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
@@ -187,20 +187,24 @@ impl CallWaitScreen {
         let mut terminal = init_terminal()?;
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(16);
+
         loop {
-            let _ = terminal.draw(|frame| self.ui(frame));
+            terminal.draw(|frame| self.ui(frame))?;
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
+
             if event::poll(timeout)? && self.selected.is_none() {
                 if let Event::Key(key) = event::read()? {
-                    match key.code {
-                        KeyCode::Down | KeyCode::Char('s') => self.y = (self.y + 1).min(1),
-                        KeyCode::Up | KeyCode::Char('w') => self.y = (self.y - 1).max(0),
-                        KeyCode::Right | KeyCode::Char('d') => self.x = (self.x + 1).min(2),
-                        KeyCode::Left | KeyCode::Char('a') => self.x = (self.x - 1).max(0),
-                        KeyCode::Enter => {
-                            self.selected = Some(Instant::now());
+                    if key.kind == KeyEventKind::Press {
+                        match key.code {
+                            KeyCode::Down | KeyCode::Char('s') => self.y = (self.y + 1).min(1),
+                            KeyCode::Up | KeyCode::Char('w') => self.y = (self.y - 1).max(0),
+                            KeyCode::Right | KeyCode::Char('d') => self.x = (self.x + 1).min(2),
+                            KeyCode::Left | KeyCode::Char('a') => self.x = (self.x - 1).max(0),
+                            KeyCode::Enter => {
+                                self.selected = Some(Instant::now());
+                            }
+                            _ => {}
                         }
-                        _ => {}
                     }
                 }
             }
@@ -437,10 +441,12 @@ fn render_label(ctx: &mut canvas::Context<'_>, x: f64, y: f64, width: f64, title
     );
 }
 
-fn init_terminal() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
+fn init_terminal() -> Res<Terminal<impl Backend>> {
     enable_raw_mode()?;
     stdout().execute(EnterAlternateScreen)?;
-    Terminal::new(CrosstermBackend::new(stdout()))
+    let backend = CrosstermBackend::new(stdout());
+    let terminal = Terminal::new(backend)?;
+    Ok(terminal)
 }
 
 pub fn restore_terminal() -> io::Result<()> {
