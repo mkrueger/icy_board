@@ -273,12 +273,9 @@ impl CallWaitScreen {
             render_label(ctx, 4.0, separator_y - 2.0, width - 7.0, &self.sysavail_txt);
             render_label(ctx, 4.0, separator_y - 4.0, width - 7.0, format!("{} {}", self.last_caller_txt, self.call_stat.last_caller).as_str());
 
-            let label_padding = 5.0;
-
             let label_space = width / 4.0;
             let label_size = (label_space * 14.0 / 19.0).floor();
             let left_pos = ((width + label_space - label_size - 4.0 * label_space.floor()) / 2.0).ceil();
-
 
             render_label(ctx, left_pos, separator_y - 6.0, label_size, format!("{} {}", self.calls_txt, self.call_stat.new_calls).as_str());
 

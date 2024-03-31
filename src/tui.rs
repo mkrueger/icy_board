@@ -114,7 +114,6 @@ impl Tui {
                         }
                     } else {
                         match key.code {
-                            KeyCode::Char('q') => break,
                             KeyCode::Char(c) => {
                                 if (c == 'x' || c == 'c')
                                     && key.modifiers.contains(KeyModifiers::CONTROL)
@@ -154,11 +153,20 @@ impl Tui {
     }
 
     fn ui(&self, frame: &mut Frame, board: &IcyBoard) {
-        
-        let area = Rect::new(0, 0, frame.size().width.min(80), frame.size().height.min(24));
+        let area = Rect::new(
+            0,
+            0,
+            frame.size().width.min(80),
+            frame.size().height.min(24),
+        );
         frame.render_widget(self.main_canvas(area), area);
 
-        let area = Rect::new(0, (frame.size().height - 1).min(24), frame.size().width.min(80), 1);
+        let area = Rect::new(
+            0,
+            (frame.size().height - 1).min(24),
+            frame.size().width.min(80),
+            1,
+        );
         frame.render_widget(self.status_bar(board), area);
 
         if let Ok(b) = self.screen.lock() {
@@ -270,16 +278,18 @@ impl Tui {
                     for y in 0..area.height as i32 {
                         for x in 0..area.width as i32 {
                             let c = buffer.get_char((x, y + buffer.get_first_visible_line()));
-
-                            let fg = buffer
-                                .palette
-                                .get_color(c.attribute.get_foreground())
-                                .get_rgb();
+                            let mut fg = c.attribute.get_foreground();
+                            if c.attribute.is_bold() {
+                                fg += 8;
+                            }
+                            let fg = buffer.palette.get_color(fg).get_rgb();
                             let bg = buffer
                                 .palette
                                 .get_color(c.attribute.get_background())
                                 .get_rgb();
-
+                            if c.attribute.get_foreground() == 14 {
+                                println!("{} - {:?}", c.attribute.get_foreground(), fg);
+                            }
                             let out_char = Line::from(c.ch.to_string()).style(
                                 Style::new()
                                     .bg(Color::Rgb(bg.0, bg.1, bg.2))
