@@ -1,6 +1,6 @@
 use icy_board_engine::icy_board::{
     state::{functions::display_flags, IcyBoardState},
-    text_messages::{COMMANDPROMPT, HELPPROMPT, PRESSENTER},
+    text_messages::{COMMANDPROMPT, HELPPROMPT},
     IcyBoardError,
 };
 use icy_ppe::Res;
@@ -46,12 +46,9 @@ impl IcyBoardCommand {
 
         self.state.display_file(&menu_file)?;
 
-        let command = self.state.input_field(
-            COMMANDPROMPT,
-            40,
-            MASK_COMMAND,
-            display_flags::NEWLINE | display_flags::UPCASE,
-        )?;
+        let command =
+            self.state
+                .input_field(COMMANDPROMPT, 40, MASK_COMMAND, display_flags::UPCASE)?;
 
         for action in &self.menu.actions {
             if action.commands.contains(&command) {
@@ -99,8 +96,11 @@ impl IcyBoardCommand {
                     break;
                 }
             }
-            self.state.display_file(&help_loc)?;
-            self.state.more_promt(PRESSENTER)?;
+            let res = self.state.display_file(&help_loc)?;
+
+            if res {
+                self.state.press_enter()?;
+            }
         }
 
         Ok(())

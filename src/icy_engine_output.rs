@@ -27,13 +27,16 @@ impl Screen {
 }
 
 pub struct IcyEngineOutput {
-    input_buffer: Arc<Mutex<VecDeque<char>>>,
+    input_buffer: Arc<Mutex<VecDeque<(bool, char)>>>,
     parser: ansi::Parser,
     screen: Arc<Mutex<Screen>>,
 }
 
 impl IcyEngineOutput {
-    pub fn new(screen: Arc<Mutex<Screen>>, input_buffer: Arc<Mutex<VecDeque<char>>>) -> Self {
+    pub fn new(
+        screen: Arc<Mutex<Screen>>,
+        input_buffer: Arc<Mutex<VecDeque<(bool, char)>>>,
+    ) -> Self {
         Self {
             input_buffer,
             parser: ansi::Parser::default(),
@@ -55,7 +58,7 @@ impl BoardIO for IcyEngineOutput {
     fn read(&mut self) -> Res<String> {
         let mut result = String::new();
         loop {
-            let Ok(Some(ch)) = self.get_char() else {
+            let Ok(Some((_echo, ch))) = self.get_char() else {
                 continue;
             };
             if ch == '\r' || ch == '\n' {
@@ -66,7 +69,7 @@ impl BoardIO for IcyEngineOutput {
         Ok(result)
     }
 
-    fn get_char(&mut self) -> Res<Option<char>> {
+    fn get_char(&mut self) -> Res<Option<(bool, char)>> {
         if let Some(c) = self.input_buffer.lock().unwrap().pop_front() {
             Ok(Some(c))
         } else {
@@ -79,6 +82,15 @@ impl BoardIO for IcyEngineOutput {
     }
 
     fn hangup(&mut self) -> Res<()> {
+        Ok(())
+    }
+
+    fn put_keyboard_buffer(&mut self, value: &[char]) -> Res<()> {
+        self.input_buffer
+            .lock()
+            .unwrap()
+            .extend(value.iter().map(|c| (false, *c)));
+        self.input_buffer.lock().unwrap().push_back((false, '\n'));
         Ok(())
     }
 }

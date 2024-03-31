@@ -1,6 +1,5 @@
 use std::{
     collections::VecDeque,
-    error::Error,
     io::{self, stdout, Stdout},
     sync::{Arc, Mutex},
     thread,
@@ -18,7 +17,7 @@ use crossterm::{
 };
 
 use icy_board_engine::icy_board::{state::Session, IcyBoard, IcyBoardError};
-use icy_engine::{ansi, TextPane};
+use icy_engine::TextPane;
 use icy_ppe::Res;
 use ratatui::{
     prelude::*,
@@ -33,7 +32,7 @@ use crate::{
 
 pub struct Tui {
     screen: Arc<Mutex<Screen>>,
-    input_buffer: Arc<Mutex<VecDeque<char>>>,
+    input_buffer: Arc<Mutex<VecDeque<(bool, char)>>>,
     board: Arc<Mutex<IcyBoard>>,
     session: Arc<Mutex<Session>>,
 
@@ -45,7 +44,7 @@ impl Tui {
     pub fn new(
         cmd: IcyBoardCommand,
         screen: Arc<Mutex<Screen>>,
-        input_buffer: Arc<Mutex<VecDeque<char>>>,
+        input_buffer: Arc<Mutex<VecDeque<(bool, char)>>>,
     ) -> Self {
         let board = cmd.state.board.clone();
         let session = Arc::new(Mutex::new(cmd.state.session.clone()));
@@ -123,43 +122,23 @@ impl Tui {
                                     let _ = disable_raw_mode();
                                     panic!("Ctrl-X or Ctrl-C pressed");
                                 }
-                                self.input_buffer.lock().unwrap().push_back(c)
+                                self.add_input(c.to_string().chars())
                             }
-                            KeyCode::Enter => self.input_buffer.lock().unwrap().push_back('\r'),
-                            KeyCode::Backspace => {
-                                self.input_buffer.lock().unwrap().push_back('\x08')
-                            }
-                            KeyCode::Esc => self.input_buffer.lock().unwrap().push_back('\x1B'),
-                            KeyCode::Tab => self.input_buffer.lock().unwrap().push_back('\x09'),
-                            KeyCode::Delete => self.input_buffer.lock().unwrap().push_back('\x7F'),
+                            KeyCode::Enter => self.add_input("\r".chars()),
+                            KeyCode::Backspace => self.add_input("\x08".chars()),
+                            KeyCode::Esc => self.add_input("\x1B".chars()),
+                            KeyCode::Tab => self.add_input("\x09".chars()),
+                            KeyCode::Delete => self.add_input("\x7F".chars()),
 
-                            KeyCode::Insert => {
-                                self.input_buffer.lock().unwrap().extend("\x1B[2~".chars())
-                            }
-                            KeyCode::Home => {
-                                self.input_buffer.lock().unwrap().extend("\x1B[H".chars())
-                            }
-                            KeyCode::End => {
-                                self.input_buffer.lock().unwrap().extend("\x1B[F".chars())
-                            }
-                            KeyCode::Up => {
-                                self.input_buffer.lock().unwrap().extend("\x1B[A".chars())
-                            }
-                            KeyCode::Down => {
-                                self.input_buffer.lock().unwrap().extend("\x1B[B".chars())
-                            }
-                            KeyCode::Right => {
-                                self.input_buffer.lock().unwrap().extend("\x1B[C".chars())
-                            }
-                            KeyCode::Left => {
-                                self.input_buffer.lock().unwrap().extend("\x1B[D".chars())
-                            }
-                            KeyCode::PageUp => {
-                                self.input_buffer.lock().unwrap().extend("\x1B[5~".chars())
-                            }
-                            KeyCode::PageDown => {
-                                self.input_buffer.lock().unwrap().extend("\x1B[6~".chars())
-                            }
+                            KeyCode::Insert => self.add_input("\x1B[2~".chars()),
+                            KeyCode::Home => self.add_input("\x1B[H".chars()),
+                            KeyCode::End => self.add_input("\x1B[F".chars()),
+                            KeyCode::Up => self.add_input("\x1B[A".chars()),
+                            KeyCode::Down => self.add_input("\x1B[B".chars()),
+                            KeyCode::Right => self.add_input("\x1B[C".chars()),
+                            KeyCode::Left => self.add_input("\x1B[D".chars()),
+                            KeyCode::PageUp => self.add_input("\x1B[5~".chars()),
+                            KeyCode::PageDown => self.add_input("\x1B[6~".chars()),
                             _ => {}
                         }
                     }
@@ -318,6 +297,12 @@ impl Tui {
             .background_color(Color::Black)
             .x_bounds([0.0, 80.0])
             .y_bounds([0.0, 25.0])
+    }
+
+    fn add_input(&self, c_seq: std::str::Chars<'_>) {
+        for c in c_seq {
+            self.input_buffer.lock().unwrap().push_back((true, c));
+        }
     }
 }
 
