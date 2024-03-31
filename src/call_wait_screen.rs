@@ -224,8 +224,8 @@ impl CallWaitScreen {
 
     fn main_canvas(&self, rect: Rect) -> impl Widget + '_ {
         let now = Local::now();
-        let width = rect.width as f64 - 2.0;
-        let height = rect.height as f64 - 2.0;
+        let width = rect.width as f64 - 2.0; // -2 for border
+        let height = rect.height as f64;
         let ver = VERSION.to_string();
 
         Canvas::default()
@@ -240,12 +240,14 @@ impl CallWaitScreen {
 
             render_button(ctx, 4.0, height - 2.0, width - 7.0, &self.board.lock().borrow().as_ref().unwrap().data.board_name, SelectState::Selected);
 
-            let x_padding = 7.0;
             let y_padding = -2.0;
-            let button_width = 19.0;
+            let button_space = width / 3.0;
+            let button_width = (button_space * 19.0 / 26.0).floor();
+            let left_pos = ((width + button_space - button_width - 3.0 * button_space.floor()) / 2.0).ceil();
+
             for (i, b) in self.buttons.iter().enumerate() {
                 render_button(ctx,
-                    4.0 + x_padding * (i % 3) as f64 + button_width * (i % 3) as f64,
+                    left_pos + button_space * (i % 3) as f64,
                     height - 4.0 + y_padding * (i / 3) as f64,
                     button_width,
                     &b.title,
@@ -272,15 +274,19 @@ impl CallWaitScreen {
             render_label(ctx, 4.0, separator_y - 4.0, width - 7.0, format!("{} {}", self.last_caller_txt, self.call_stat.last_caller).as_str());
 
             let label_padding = 5.0;
-            let label_size = 14.0;
 
-            render_label(ctx, 4.0, separator_y - 6.0, label_size, format!("{} {}", self.calls_txt, self.call_stat.new_calls).as_str());
+            let label_space = width / 4.0;
+            let label_size = (label_space * 14.0 / 19.0).floor();
+            let left_pos = ((width + label_space - label_size - 4.0 * label_space.floor()) / 2.0).ceil();
 
-            render_label(ctx, 4.0 + label_padding * 1.0 + label_size, separator_y - 6.0, label_size, format!("{} {}", self.msgs_txt, self.call_stat.new_msgs).as_str());
 
-            render_label(ctx, 4.0 + label_padding * 2.0 + label_size * 2.0, separator_y - 6.0, label_size, format!("{} {}", self.dls_txt, self.call_stat.total_dn).as_str());
+            render_label(ctx, left_pos, separator_y - 6.0, label_size, format!("{} {}", self.calls_txt, self.call_stat.new_calls).as_str());
 
-            render_label(ctx, 4.0 + label_padding * 3.0 + label_size * 3.0, separator_y - 6.0, label_size, format!("{} {}", self.uls_txt, self.call_stat.total_up).as_str());
+            render_label(ctx, left_pos + label_space * 1.0 , separator_y - 6.0, label_size, format!("{} {}", self.msgs_txt, self.call_stat.new_msgs).as_str());
+
+            render_label(ctx, left_pos + label_space * 2.0 , separator_y - 6.0, label_size, format!("{} {}", self.dls_txt, self.call_stat.total_dn).as_str());
+
+            render_label(ctx, left_pos + label_space * 3.0, separator_y - 6.0, label_size, format!("{} {}", self.uls_txt, self.call_stat.total_up).as_str());
 
         }).background_color(DOS_BLUE)
         .x_bounds([0.0, width])

@@ -37,9 +37,11 @@ impl IcyEngineOutput {
         screen: Arc<Mutex<Screen>>,
         input_buffer: Arc<Mutex<VecDeque<(bool, char)>>>,
     ) -> Self {
+        let mut parser = ansi::Parser::default();
+        parser.bs_is_ctrl_char = true;
         Self {
             input_buffer,
-            parser: ansi::Parser::default(),
+            parser,
             screen,
         }
     }

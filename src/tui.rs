@@ -154,10 +154,11 @@ impl Tui {
     }
 
     fn ui(&self, frame: &mut Frame, board: &IcyBoard) {
-        let area = Rect::new(0, 0, 80, 24);
-        frame.render_widget(self.main_canvas(), area);
+        
+        let area = Rect::new(0, 0, frame.size().width.min(80), frame.size().height.min(24));
+        frame.render_widget(self.main_canvas(area), area);
 
-        let area = Rect::new(0, 24, 80, 1);
+        let area = Rect::new(0, (frame.size().height - 1).min(24), frame.size().width.min(80), 1);
         frame.render_widget(self.status_bar(board), area);
 
         if let Ok(b) = self.screen.lock() {
@@ -261,14 +262,14 @@ impl Tui {
             .x_bounds([0.0, 80.0])
     }
 
-    fn main_canvas(&self) -> impl Widget + '_ {
+    fn main_canvas(&self, area: Rect) -> impl Widget + '_ {
         Canvas::default()
             .paint(move |ctx| {
                 if let Ok(screen) = self.screen.lock() {
                     let buffer = &screen.buffer;
-                    for y in 0..buffer.get_height() {
-                        for x in 0..buffer.get_width() {
-                            let c = buffer.get_char((x, y));
+                    for y in 0..area.height as i32 {
+                        for x in 0..area.width as i32 {
+                            let c = buffer.get_char((x, y + buffer.get_first_visible_line()));
 
                             let fg = buffer
                                 .palette
@@ -287,7 +288,7 @@ impl Tui {
 
                             ctx.print(
                                 x as f64 + 1.0,
-                                (buffer.get_height() - 1 - y) as f64,
+                                (area.height as i32 - 1 - y) as f64,
                                 out_char,
                             );
                         }
@@ -295,8 +296,8 @@ impl Tui {
                 }
             })
             .background_color(Color::Black)
-            .x_bounds([0.0, 80.0])
-            .y_bounds([0.0, 25.0])
+            .x_bounds([0.0, area.width as f64])
+            .y_bounds([0.0, area.height as f64])
     }
 
     fn add_input(&self, c_seq: std::str::Chars<'_>) {
