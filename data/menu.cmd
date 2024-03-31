@@ -1,4 +1,9 @@
 [[actions]]
+commands = ["A"]
+action = "ABANDON_CONFERENCE"
+help = "HLPA"
+
+[[actions]]
 commands = ["G", "BYE"]
 action = "GOODBYE"
 help = "HLPG"
@@ -12,6 +17,11 @@ help = "HLPH"
 commands = ["M"]
 action = "TOGGLE_GRAPHICS"
 help = "HLPM"
+
+[[actions]]
+commands = ["J"]
+action = "JOIN_CONFERENCE"
+help = "HLPJ"
 
 [[actions]]
 commands = ["MENU", "ME", "MEN"]

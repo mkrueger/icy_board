@@ -2,8 +2,9 @@ use icy_board_engine::{
     icy_board::{
         state::{functions::display_flags, IcyBoardState},
         text_messages::{
-            AUTODISCONNECTNOW, COMMANDPROMPT, CURPAGELEN, ENTERPAGELENGTH, EXPERTOFF, EXPERTON,
-            GRAPHICSOFF, GRAPHICSON, GRAPHICSUNAVAIL, HELPPROMPT, INVALIDENTRY, MENUSELUNAVAIL,
+            AUTODISCONNECTNOW, COMMANDPROMPT, CONFABANDONED, CONFJOINED, CURPAGELEN,
+            ENTERPAGELENGTH, EXPERTOFF, EXPERTON, GRAPHICSOFF, GRAPHICSON, GRAPHICSUNAVAIL,
+            HELPPROMPT, INVALIDCONFNUM, INVALIDENTRY, JOINCONFNUM, MENUSELUNAVAIL, NOCONFAVAILABLE,
             SECURITYVIOL, USERSCAN, USERSCANLINE, USERSHEADER,
         },
         IcyBoardError,
@@ -92,6 +93,9 @@ impl IcyBoardCommand {
     fn dispatch_action(&mut self, command: &str, clone: Option<String>) -> Res<()> {
         if let Some(act) = clone {
             match act.as_str() {
+                "ABANDON_CONFERENCE" => {
+                    self.abandon_conference(command)?;
+                }
                 "GOODBYE" => {
                     self.state
                         .hangup(icy_board_engine::vm::HangupType::Goodbye)?;
@@ -99,6 +103,9 @@ impl IcyBoardCommand {
                 "WHO" => {}
                 "HELP" => {
                     self.show_help()?;
+                }
+                "JOIN_CONFERENCE" => {
+                    self.join_conference(command)?;
                 }
                 "MENU" => {
                     self.display_menu()?;
@@ -124,8 +131,120 @@ impl IcyBoardCommand {
         Ok(())
     }
 
+    fn abandon_conference(&mut self, command: &str) -> Res<()> {
+        let required_sec = self
+            .state
+            .board
+            .lock()
+            .unwrap()
+            .data
+            .user_levels
+            .cmd_abandon_conf;
+        if !self.check_sec(command, required_sec)? {
+            return Ok(());
+        }
+        if self.state.board.lock().unwrap().conferences.is_empty() {
+            self.state.display_text(
+                NOCONFAVAILABLE,
+                display_flags::NEWLINE | display_flags::LFBEFORE,
+            )?;
+            self.state.press_enter()?;
+            return Ok(());
+        }
+        if self.state.session.current_conference.number > 0 {
+            self.state.session.op_text = format!(
+                "{} ({})",
+                self.state.session.current_conference.name,
+                self.state.session.current_conference.number
+            );
+            self.state.join_conference(0);
+            self.state.display_text(
+                CONFABANDONED,
+                display_flags::NEWLINE | display_flags::NOTBLANK,
+            )?;
+            self.state.new_line()?;
+            self.state.press_enter()?;
+        }
+
+        self.display_menu = true;
+        Ok(())
+    }
+
+    fn join_conference(&mut self, command: &str) -> Res<()> {
+        let required_sec = self
+            .state
+            .board
+            .lock()
+            .unwrap()
+            .data
+            .user_levels
+            .cmd_join_conf;
+        if !self.check_sec(command, required_sec)? {
+            return Ok(());
+        }
+        if self.state.board.lock().unwrap().conferences.is_empty() {
+            self.state.display_text(
+                NOCONFAVAILABLE,
+                display_flags::NEWLINE | display_flags::LFBEFORE,
+            )?;
+            self.state.press_enter()?;
+            return Ok(());
+        }
+        let conf_number = if let Some(token) = self.state.session.tokens.pop_front() {
+            token
+        } else {
+            let conf_menu = self.state.board.lock().unwrap().data.path.conf_menu.clone();
+            self.state.display_menu(&conf_menu)?;
+            self.state.new_line()?;
+
+            self.state.input_field(
+                JOINCONFNUM,
+                40,
+                MASK_COMMAND,
+                display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
+            )?
+        };
+        let mut joined = false;
+        if let Ok(number) = conf_number.parse::<i32>() {
+            if 0 <= number
+                && (number as usize) <= self.state.board.lock().unwrap().conferences.len()
+            {
+                self.state.join_conference(number);
+                self.state.session.op_text = format!(
+                    "{} ({})",
+                    self.state.session.current_conference.name,
+                    self.state.session.current_conference.number
+                );
+                self.state
+                    .display_text(CONFJOINED, display_flags::NEWLINE | display_flags::NOTBLANK)?;
+
+                joined = true;
+            }
+        }
+
+        if !joined {
+            self.state.session.op_text = conf_number.clone();
+            self.state.display_text(
+                INVALIDCONFNUM,
+                display_flags::NEWLINE | display_flags::NOTBLANK,
+            )?;
+        }
+
+        self.state.new_line()?;
+        self.state.press_enter()?;
+        self.display_menu = true;
+        Ok(())
+    }
+
     fn show_user_list(&mut self, command: &str) -> Res<()> {
-        let required_sec = self.state.board.lock().unwrap().data.user_levels.cmd_user;
+        let required_sec = self
+            .state
+            .board
+            .lock()
+            .unwrap()
+            .data
+            .user_levels
+            .cmd_show_user_list;
         if !self.check_sec(command, required_sec)? {
             return Ok(());
         }
@@ -174,7 +293,14 @@ impl IcyBoardCommand {
     }
 
     fn set_expert_mode(&mut self, command: &str) -> Res<()> {
-        let required_sec = self.state.board.lock().unwrap().data.user_levels.cmd_x;
+        let required_sec = self
+            .state
+            .board
+            .lock()
+            .unwrap()
+            .data
+            .user_levels
+            .cmd_xpert_mode;
         if !self.check_sec(command, required_sec)? {
             return Ok(());
         }
@@ -208,7 +334,14 @@ impl IcyBoardCommand {
     }
 
     fn toggle_graphics(&mut self, command: &str) -> Res<()> {
-        let required_sec = self.state.board.lock().unwrap().data.user_levels.cmd_m;
+        let required_sec = self
+            .state
+            .board
+            .lock()
+            .unwrap()
+            .data
+            .user_levels
+            .cmd_toggle_graphics;
         if !self.check_sec(command, required_sec)? {
             return Ok(());
         }
@@ -239,7 +372,14 @@ impl IcyBoardCommand {
     }
 
     fn set_page_len(&mut self, command: &str) -> Res<()> {
-        let required_sec = self.state.board.lock().unwrap().data.user_levels.cmd_p;
+        let required_sec = self
+            .state
+            .board
+            .lock()
+            .unwrap()
+            .data
+            .user_levels
+            .cmd_set_page_length;
         if !self.check_sec(command, required_sec)? {
             return Ok(());
         }

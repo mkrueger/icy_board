@@ -1,6 +1,6 @@
 use std::{
     borrow::Borrow,
-    io::{self, stdout, Stdout},
+    io::{self, stdout},
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };

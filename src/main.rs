@@ -35,7 +35,7 @@ lazy_static::lazy_static! {
 }
 
 fn main() {
-    init_error_hooks();
+    let _ = init_error_hooks();
     let arguments = Cli::parse();
 
     match IcyBoard::load(&arguments.file) {
