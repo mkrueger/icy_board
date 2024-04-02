@@ -16,7 +16,7 @@ use crossterm::{
     ExecutableCommand,
 };
 
-use icy_board_engine::icy_board::{state::Session, IcyBoard, IcyBoardError};
+use icy_board_engine::icy_board::{state::Session, IcyBoardError, PcbBoard};
 use icy_engine::TextPane;
 use icy_ppe::Res;
 use ratatui::{
@@ -25,7 +25,7 @@ use ratatui::{
 };
 
 use crate::{
-    bbs::IcyBoardCommand,
+    bbs::PcbBoardCommand,
     call_wait_screen::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GREEN, DOS_WHITE},
     icy_engine_output::Screen,
 };
@@ -33,7 +33,7 @@ use crate::{
 pub struct Tui {
     screen: Arc<Mutex<Screen>>,
     input_buffer: Arc<Mutex<VecDeque<(bool, char)>>>,
-    board: Arc<Mutex<IcyBoard>>,
+    board: Arc<Mutex<PcbBoard>>,
     session: Arc<Mutex<Session>>,
 
     status_bar: usize,
@@ -42,7 +42,7 @@ pub struct Tui {
 
 impl Tui {
     pub fn new(
-        cmd: IcyBoardCommand,
+        cmd: PcbBoardCommand,
         screen: Arc<Mutex<Screen>>,
         input_buffer: Arc<Mutex<VecDeque<(bool, char)>>>,
     ) -> Self {
@@ -57,7 +57,15 @@ impl Tui {
                     lock.state.session.current_conference.clone();
                 ui.lock().as_mut().unwrap().disp_options = lock.state.session.disp_options.clone();
                 if let Err(err) = lock.do_command() {
-                    return Err(err.to_string());
+                    log::error!("Error: {}", err);
+                    lock.state.set_color(4).unwrap();
+                    lock.state
+                        .print(
+                            icy_board_engine::vm::TerminalTarget::Both,
+                            &format!("\r\nError: {}\r\n\r\n", err),
+                        )
+                        .unwrap();
+                    lock.state.reset_color().unwrap();
                 }
                 if lock.state.session.request_logoff {
                     ui.lock().as_mut().unwrap().request_logoff = true;
@@ -154,7 +162,7 @@ impl Tui {
         Ok(())
     }
 
-    fn ui(&self, frame: &mut Frame, board: &IcyBoard) {
+    fn ui(&self, frame: &mut Frame, board: &PcbBoard) {
         let area = Rect::new(
             0,
             0,
@@ -178,7 +186,7 @@ impl Tui {
         }
     }
 
-    fn status_bar(&self, board: &IcyBoard) -> impl Widget + '_ {
+    fn status_bar(&self, board: &PcbBoard) -> impl Widget + '_ {
         let user_name;
         let current_conf;
         let cur_security;
@@ -188,7 +196,7 @@ impl Tui {
         let dn;
         let dnbytes;
         if let Ok(user) = self.session.lock() {
-            current_conf = user.current_conference.number;
+            current_conf = user.current_conference_number;
             cur_security = user.cur_security;
             if user.cur_user >= 0 {
                 user_name = board.users[user.cur_user as usize].user.name.clone();
@@ -345,7 +353,7 @@ pub fn print_exit_screen() {
 
             let text = vec![
                 Span::styled("Thank you for using ", green),
-                Span::styled("IcyBoard", white),
+                Span::styled("PcbBoard", white),
                 Span::styled(" Professional BBS Software!", green),
             ];
             frame.render_widget(

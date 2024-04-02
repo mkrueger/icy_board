@@ -1,5 +1,4 @@
 use std::{
-    borrow::Borrow,
     io::{self, stdout},
     sync::{Arc, Mutex},
     time::{Duration, Instant},
@@ -11,14 +10,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use icy_board_engine::icy_board::{
-    text_messages::{
-        DOSBUSY, DOSBUSYDESC, DOSNOTBUSY, DOSNOTBUSYDESC, LASTCALLER, NUMCALLS, NUMDOWN,
-        NUMMESSAGES, NUMUP, SYSOPBUSY, SYSOPBUSYDESC, SYSOPNOTBUSY, SYSOPNOTBUSYDESC, SYSTEMAVAIL,
-        USERBUSY, USERBUSYDESC, USERNOTBUSY, USERNOTBUSYDESC,
-    },
-    IcyBoard, IcyBoardError,
-};
+use icy_board_engine::icy_board::{icb_text::IceText, IcyBoardError, PcbBoard};
 use icy_ppe::Res;
 use ratatui::{
     prelude::*,
@@ -66,7 +58,7 @@ pub struct CallWaitScreen {
     x: i32,
     y: i32,
     selected: Option<Instant>,
-    board: Arc<Mutex<IcyBoard>>,
+    board: Arc<Mutex<PcbBoard>>,
     buttons: Vec<Button>,
     call_stat: CallStat,
 
@@ -79,39 +71,69 @@ pub struct CallWaitScreen {
 }
 
 impl CallWaitScreen {
-    pub fn new(board: Arc<Mutex<IcyBoard>>) -> Res<Self> {
+    pub fn new(board: Arc<Mutex<PcbBoard>>) -> Res<Self> {
         let buttons;
 
         if let Ok(board) = board.lock().as_ref() {
             buttons = vec![
                 Button {
-                    title: board.display_text.get_display_text(USERBUSY)?.text,
-                    description: board.display_text.get_display_text(USERBUSYDESC)?.text,
+                    title: board.display_text.get_display_text(IceText::UserBusy)?.text,
+                    description: board
+                        .display_text
+                        .get_display_text(IceText::UserBusyDescription)?
+                        .text,
                     message: CallWaitMessage::User(true),
                 },
                 Button {
-                    title: board.display_text.get_display_text(SYSOPBUSY)?.text,
-                    description: board.display_text.get_display_text(SYSOPBUSYDESC)?.text,
+                    title: board
+                        .display_text
+                        .get_display_text(IceText::SysopBusy)?
+                        .text,
+                    description: board
+                        .display_text
+                        .get_display_text(IceText::SysopBusyDescription)?
+                        .text,
                     message: CallWaitMessage::Sysop(true),
                 },
                 Button {
-                    title: board.display_text.get_display_text(DOSBUSY)?.text,
-                    description: board.display_text.get_display_text(DOSBUSYDESC)?.text,
+                    title: board.display_text.get_display_text(IceText::DOSBusy)?.text,
+                    description: board
+                        .display_text
+                        .get_display_text(IceText::DOSBusyDescription)?
+                        .text,
                     message: CallWaitMessage::Exit(true),
                 },
                 Button {
-                    title: board.display_text.get_display_text(USERNOTBUSY)?.text,
-                    description: board.display_text.get_display_text(USERNOTBUSYDESC)?.text,
+                    title: board
+                        .display_text
+                        .get_display_text(IceText::UserNotBusy)?
+                        .text,
+                    description: board
+                        .display_text
+                        .get_display_text(IceText::UserNotBusyDescription)?
+                        .text,
                     message: CallWaitMessage::User(false),
                 },
                 Button {
-                    title: board.display_text.get_display_text(SYSOPNOTBUSY)?.text,
-                    description: board.display_text.get_display_text(SYSOPNOTBUSYDESC)?.text,
+                    title: board
+                        .display_text
+                        .get_display_text(IceText::SysopBusy)?
+                        .text,
+                    description: board
+                        .display_text
+                        .get_display_text(IceText::SysopBusyDescription)?
+                        .text,
                     message: CallWaitMessage::Sysop(false),
                 },
                 Button {
-                    title: board.display_text.get_display_text(DOSNOTBUSY)?.text,
-                    description: board.display_text.get_display_text(DOSNOTBUSYDESC)?.text,
+                    title: board
+                        .display_text
+                        .get_display_text(IceText::DOSNotBusy)?
+                        .text,
+                    description: board
+                        .display_text
+                        .get_display_text(IceText::DOSNotBusyDescription)?
+                        .text,
                     message: CallWaitMessage::Exit(false),
                 },
             ];
@@ -121,7 +143,14 @@ impl CallWaitScreen {
             )));
         }
 
-        let file = board.lock().as_ref().unwrap().data.stats_file.to_string();
+        let file = board
+            .lock()
+            .as_ref()
+            .unwrap()
+            .data
+            .path
+            .stats_file
+            .to_string();
         let file_name = board.lock().as_ref().unwrap().resolve_file(&file);
         let call_stat = CallStat::load(&file_name)?;
         let last_caller_txt = board
@@ -129,42 +158,42 @@ impl CallWaitScreen {
             .as_ref()
             .unwrap()
             .display_text
-            .get_display_text(LASTCALLER)?
+            .get_display_text(IceText::LastCaller)?
             .text;
         let calls_txt = board
             .lock()
             .as_ref()
             .unwrap()
             .display_text
-            .get_display_text(NUMCALLS)?
+            .get_display_text(IceText::NumberCalls)?
             .text;
         let msgs_txt = board
             .lock()
             .as_ref()
             .unwrap()
             .display_text
-            .get_display_text(NUMMESSAGES)?
+            .get_display_text(IceText::NumberMessages)?
             .text;
         let dls_txt = board
             .lock()
             .as_ref()
             .unwrap()
             .display_text
-            .get_display_text(NUMDOWN)?
+            .get_display_text(IceText::NumberDownload)?
             .text;
         let uls_txt = board
             .lock()
             .as_ref()
             .unwrap()
             .display_text
-            .get_display_text(NUMUP)?
+            .get_display_text(IceText::NumberUpload)?
             .text;
         let sysavail_txt = board
             .lock()
             .as_ref()
             .unwrap()
             .display_text
-            .get_display_text(SYSTEMAVAIL)?
+            .get_display_text(IceText::SystemAvailable)?
             .text;
 
         Ok(Self {
@@ -237,12 +266,12 @@ impl CallWaitScreen {
         .paint(move |ctx| {
 
             // draw node
-            let node_txt = format!("Node {}", self.board.lock().borrow().as_ref().unwrap().data.node_num);
+            let node_txt = format!("Node {}", self.board.lock().unwrap().data.node_num);
             ctx.print(4.0 + (width - node_txt.len() as f64)  / 2.0,  height - 1.0,
             Line::from(node_txt).style(Style::new()
             .fg(DOS_WHITE)));
 
-            render_button(ctx, 4.0, height - 2.0, width - 7.0, &self.board.lock().borrow().as_ref().unwrap().data.board_name, SelectState::Selected);
+            render_button(ctx, 4.0, height - 2.0, width - 7.0, &self.board.lock().unwrap().data.board_name, SelectState::Selected);
 
             let y_padding = -2.0;
             let button_space = width / 3.0;
@@ -299,7 +328,7 @@ impl CallWaitScreen {
 
         .title_style(Style::new().fg(DOS_YELLOW))
         .title_alignment(Alignment::Center)
-        .title(format!("  IcyBoard v{}  ", ver))
+        .title(format!("  PcbBoard v{}  ", ver))
         .title(Title::from(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white())).alignment(Alignment::Right))
         .title(Title::from(Line::from("  (C) Copyright Mike Krüger, 2024, https://github.com/mkrueger/icy_board  ")
         .style(Style::new().white()))

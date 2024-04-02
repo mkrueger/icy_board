@@ -26,6 +26,13 @@ easy_reader = "0.5.2"
 substring = "1.4.5"
 toml = "0.8.12"
 serde = "1.0.197"
+walkdir = "2.5.0"
+relative-path = "1.9.2"
+
 
 [profile.release]
-strip = "symbols"
+opt-level = 'z'     # Optimize for size
+lto = true          # Enable link-time optimization
+codegen-units = 1   # Reduce number of codegen units to increase optimizations
+panic = 'abort'     # Abort on panic
+strip = true        # Strip symbols from binary*

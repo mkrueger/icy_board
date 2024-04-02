@@ -4,6 +4,11 @@ action = "ABANDON_CONFERENCE"
 help = "HLPA"
 
 [[actions]]
+commands = ["B"]
+action = "BULLETINS"
+help = "HLPB"
+
+[[actions]]
 commands = ["G", "BYE"]
 action = "GOODBYE"
 help = "HLPG"
@@ -47,4 +52,3 @@ help = "HLPWHO"
 commands = ["X"]
 action = "SET_EXPERT_MODE"
 help = "HLPX"
-
