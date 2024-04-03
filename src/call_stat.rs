@@ -6,6 +6,7 @@ use std::{
 use byteorder::{LittleEndian, ReadBytesExt};
 use icy_ppe::Res;
 
+#[derive(Default)]
 pub struct CallStat {
     pub last_caller: String,
     pub time: String,

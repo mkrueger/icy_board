@@ -10,7 +10,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use icy_board_engine::icy_board::{icb_text::IceText, IcyBoardError, PcbBoard};
+use icy_board_engine::icy_board::{icb_text::IceText, IcyBoard, IcyBoardError};
 use icy_ppe::Res;
 use ratatui::{
     prelude::*,
@@ -58,7 +58,7 @@ pub struct CallWaitScreen {
     x: i32,
     y: i32,
     selected: Option<Instant>,
-    board: Arc<Mutex<PcbBoard>>,
+    board: Arc<Mutex<IcyBoard>>,
     buttons: Vec<Button>,
     call_stat: CallStat,
 
@@ -71,7 +71,7 @@ pub struct CallWaitScreen {
 }
 
 impl CallWaitScreen {
-    pub fn new(board: Arc<Mutex<PcbBoard>>) -> Res<Self> {
+    pub fn new(board: Arc<Mutex<IcyBoard>>) -> Res<Self> {
         let buttons;
 
         if let Ok(board) = board.lock().as_ref() {
@@ -142,7 +142,7 @@ impl CallWaitScreen {
                 "Board is locked".to_string(),
             )));
         }
-
+        /*
         let file = board
             .lock()
             .as_ref()
@@ -152,7 +152,10 @@ impl CallWaitScreen {
             .stats_file
             .to_string();
         let file_name = board.lock().as_ref().unwrap().resolve_file(&file);
-        let call_stat = CallStat::load(&file_name)?;
+        let call_stat = CallStat::load(&file_name)?;*/
+
+        let call_stat = CallStat::default();
+
         let last_caller_txt = board
             .lock()
             .as_ref()
@@ -266,12 +269,12 @@ impl CallWaitScreen {
         .paint(move |ctx| {
 
             // draw node
-            let node_txt = format!("Node {}", self.board.lock().unwrap().data.node_num);
+            let node_txt = format!("Node 1");
             ctx.print(4.0 + (width - node_txt.len() as f64)  / 2.0,  height - 1.0,
             Line::from(node_txt).style(Style::new()
             .fg(DOS_WHITE)));
 
-            render_button(ctx, 4.0, height - 2.0, width - 7.0, &self.board.lock().unwrap().data.board_name, SelectState::Selected);
+            render_button(ctx, 4.0, height - 2.0, width - 7.0, &self.board.lock().unwrap().config.board_name, SelectState::Selected);
 
             let y_padding = -2.0;
             let button_space = width / 3.0;

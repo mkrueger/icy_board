@@ -1,0 +1,11 @@
+# badusers.txt
+# ------------
+# This file contains the names of users who have been banned from the system.
+# Each line contains a single name regex pattern.
+# 
+# Example:
+# FooBar\d+
+#
+# would match any user named FooBar followed by one or more digits. Like "FOOBAR69" or "FooBar1337
+#
+# Note: All regex characters need to be escaped with slash (\) like . -> \. or + -> \+

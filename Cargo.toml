@@ -18,6 +18,7 @@ ariadne = "0.4.0"
 unicase = "2.7.0"
 byteorder = "1.5.0"
 log = "0.4.21"
+fern = "0.6.2"
 ratatui = "0.26.1"
 crossterm = "0.27.0"
 chrono = "0.4.37"
@@ -28,7 +29,7 @@ toml = "0.8.12"
 serde = "1.0.197"
 walkdir = "2.5.0"
 relative-path = "1.9.2"
-
+regex = "1.10.4"
 
 [profile.release]
 opt-level = 'z'     # Optimize for size

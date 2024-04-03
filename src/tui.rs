@@ -16,7 +16,7 @@ use crossterm::{
     ExecutableCommand,
 };
 
-use icy_board_engine::icy_board::{state::Session, IcyBoardError, PcbBoard};
+use icy_board_engine::icy_board::{state::Session, IcyBoard, IcyBoardError, PcbBoard};
 use icy_engine::TextPane;
 use icy_ppe::Res;
 use ratatui::{
@@ -33,7 +33,7 @@ use crate::{
 pub struct Tui {
     screen: Arc<Mutex<Screen>>,
     input_buffer: Arc<Mutex<VecDeque<(bool, char)>>>,
-    board: Arc<Mutex<PcbBoard>>,
+    board: Arc<Mutex<IcyBoard>>,
     session: Arc<Mutex<Session>>,
 
     status_bar: usize,
@@ -162,7 +162,7 @@ impl Tui {
         Ok(())
     }
 
-    fn ui(&self, frame: &mut Frame, board: &PcbBoard) {
+    fn ui(&self, frame: &mut Frame, board: &IcyBoard) {
         let area = Rect::new(
             0,
             0,
@@ -186,7 +186,7 @@ impl Tui {
         }
     }
 
-    fn status_bar(&self, board: &PcbBoard) -> impl Widget + '_ {
+    fn status_bar(&self, board: &IcyBoard) -> impl Widget + '_ {
         let user_name;
         let current_conf;
         let cur_security;
@@ -199,12 +199,12 @@ impl Tui {
             current_conf = user.current_conference_number;
             cur_security = user.cur_security;
             if user.cur_user >= 0 {
-                user_name = board.users[user.cur_user as usize].user.name.clone();
-                times_on = board.users[user.cur_user as usize].user.num_times_on;
-                upbytes = board.users[user.cur_user as usize].user.ul_tot_upld_bytes;
-                up = board.users[user.cur_user as usize].user.num_uploads;
-                dnbytes = board.users[user.cur_user as usize].user.ul_tot_dnld_bytes;
-                dn = board.users[user.cur_user as usize].user.num_downloads;
+                user_name = board.users[user.cur_user as usize].get_name().clone();
+                times_on = board.users[user.cur_user as usize].stats.num_times_on;
+                upbytes = board.users[user.cur_user as usize].stats.ul_tot_upld_bytes;
+                up = board.users[user.cur_user as usize].stats.num_uploads;
+                dnbytes = board.users[user.cur_user as usize].stats.ul_tot_dnld_bytes;
+                dn = board.users[user.cur_user as usize].stats.num_downloads;
             } else {
                 user_name = String::new();
                 times_on = 0;

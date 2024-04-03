@@ -1,54 +1,54 @@
-[[actions]]
-commands = ["A"]
+[[commands]]
+input = ["A"]
 action = "ABANDON_CONFERENCE"
-help = "HLPA"
+help = "hlpa"
 
-[[actions]]
-commands = ["B"]
+[[commands]]
+input = ["B"]
 action = "BULLETINS"
-help = "HLPB"
+help = "hlpb"
 
-[[actions]]
-commands = ["G", "BYE"]
+[[commands]]
+input = ["G", "BYE"]
 action = "GOODBYE"
-help = "HLPG"
+help = "hlpg"
 
-[[actions]]
-commands = ["HELP", "HEL", "HE", "H", "?"]
+[[commands]]
+input = ["HELP", "HEL", "HE", "H", "?"]
 action = "HELP"
-help = "HLPH"
+help = "hlph"
 
-[[actions]]
-commands = ["M"]
+[[commands]]
+input = ["M"]
 action = "TOGGLE_GRAPHICS"
-help = "HLPM"
+help = "hlpm"
 
-[[actions]]
-commands = ["J"]
+[[commands]]
+input = ["J"]
 action = "JOIN_CONFERENCE"
-help = "HLPJ"
+help = "hlpj"
 
-[[actions]]
-commands = ["MENU", "ME", "MEN"]
+[[commands]]
+input = ["MENU", "ME", "MEN"]
 action = "MENU"
-help = "HLPMENU"
+help = "hlpmenu"
 
-[[actions]]
-commands = ["P"]
+[[commands]]
+input = ["P"]
 action = "SET_PAGE_LEN"
-help = "HLPP"
+help = "hlpp"
 
-[[actions]]
-commands = ["US", "USE", "USER", "USERS"]
+[[commands]]
+input = ["US", "USE", "USER", "USERS"]
 action = "USER_LIST"
-help = "HLPUSERS"
+help = "hlpusers"
 
-[[actions]]
-commands = ["WHO"]
+[[commands]]
+input = ["WHO"]
 action = "WHO"
-help = "HLPWHO"
+help = "hlpwho"
 
-[[actions]]
-commands = ["X"]
+[[commands]]
+input = ["X"]
 action = "SET_EXPERT_MODE"
-help = "HLPX"
+help = "hlpx"

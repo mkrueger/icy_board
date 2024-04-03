@@ -1,6 +1,7 @@
 use icy_board_engine::{
     icy_board::{
         bulletins::MASK_BULLETINS,
+        commands::{Command, CommandType},
         icb_text::IceText,
         state::{functions::display_flags, IcyBoardState},
         IcyBoardError,
@@ -9,13 +10,8 @@ use icy_board_engine::{
 };
 use icy_ppe::Res;
 
-use self::actions::{Action, Menu};
-
-pub mod actions;
-
 pub struct PcbBoardCommand {
     pub state: IcyBoardState,
-    pub menu: Menu,
     pub display_menu: bool,
 }
 const MASK_COMMAND: &str  = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;':,.<>?/\\\" ";
@@ -23,11 +19,8 @@ const MASK_NUMBER: &str = "0123456789";
 
 impl PcbBoardCommand {
     pub fn new(state: IcyBoardState) -> Self {
-        let cmd_txt = include_str!("../../data/menu.cmd");
-        let menu = Menu::read(cmd_txt);
         Self {
             state,
-            menu,
             display_menu: true,
         }
     }
@@ -52,8 +45,8 @@ impl PcbBoardCommand {
             self.state.session.tokens.push_back(cmd.to_string());
         }
 
-        for action in &self.menu.actions {
-            if action.commands.contains(&command.to_string()) {
+        for action in &self.state.session.current_conference.commands {
+            if action.input.contains(&command.to_string()) {
                 return self.dispatch_action(command, &action.clone());
             }
         }
@@ -89,48 +82,49 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    fn dispatch_action(&mut self, command: &str, action: &Action) -> Res<()> {
+    fn dispatch_action(&mut self, command: &str, action: &Command) -> Res<()> {
         if !self.check_sec(command, action.security)? {
             return Ok(());
         }
-        if let Some(act) = &action.action {
-            match act.as_str() {
-                "ABANDON_CONFERENCE" => {
-                    self.abandon_conference()?;
-                }
-                "BULLETINS" => {
-                    self.show_bulletins(action)?;
-                }
-                "GOODBYE" => {
-                    self.state
-                        .hangup(icy_board_engine::vm::HangupType::Goodbye)?;
-                }
-                "WHO" => {}
-                "HELP" => {
-                    self.show_help()?;
-                }
-                "JOIN_CONFERENCE" => {
-                    self.join_conference()?;
-                }
-                "MENU" => {
-                    self.display_menu()?;
-                    self.display_menu = false;
-                }
-                "TOGGLE_GRAPHICS" => {
-                    self.toggle_graphics()?;
-                }
-                "SET_PAGE_LEN" => {
-                    self.set_page_len()?;
-                }
-                "SET_EXPERT_MODE" => {
-                    self.set_expert_mode()?;
-                }
-                "USER_LIST" => {
-                    self.show_user_list()?;
-                }
-                _ => {
-                    return Err(Box::new(IcyBoardError::UnknownAction(act.to_string())));
-                }
+
+        match action.command_type {
+            CommandType::AbandonConference => {
+                self.abandon_conference()?;
+            }
+            CommandType::BulletinList => {
+                self.show_bulletins(action)?;
+            }
+            CommandType::Goodbye => {
+                self.state
+                    .hangup(icy_board_engine::vm::HangupType::Goodbye)?;
+            }
+            CommandType::Help => {
+                self.show_help()?;
+            }
+            CommandType::JoinConference => {
+                self.join_conference()?;
+            }
+            CommandType::ShowMenu => {
+                self.display_menu()?;
+                self.display_menu = false;
+            }
+            CommandType::ToggleGraphics => {
+                self.toggle_graphics()?;
+            }
+            CommandType::SetPageLength => {
+                self.set_page_len()?;
+            }
+            CommandType::ExpertMode => {
+                self.set_expert_mode()?;
+            }
+            CommandType::UserList => {
+                self.show_user_list()?;
+            }
+            _ => {
+                return Err(Box::new(IcyBoardError::UnknownAction(format!(
+                    "{:?}",
+                    action.command_type
+                ))));
             }
         }
         Ok(())
@@ -176,8 +170,16 @@ impl PcbBoardCommand {
         let conf_number = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
-            let conf_menu = self.state.board.lock().unwrap().data.path.conf_menu.clone();
-            self.state.display_menu(&conf_menu)?;
+            let mnu = self
+                .state
+                .board
+                .lock()
+                .unwrap()
+                .config
+                .paths
+                .conf_join_menu
+                .clone();
+            self.state.display_menu(&mnu)?;
             self.state.new_line()?;
 
             self.state.input_field(
@@ -221,7 +223,7 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    fn show_bulletins(&mut self, action: &Action) -> Res<()> {
+    fn show_bulletins(&mut self, action: &Command) -> Res<()> {
         let bulletins = self.state.load_bullettins()?;
         if bulletins.is_empty() {
             self.state.display_text(
@@ -265,9 +267,16 @@ impl PcbBoardCommand {
                 }
                 "?" | "H" => {
                     if !action.help.is_empty() {
-                        let mut help_loc =
-                            self.state.board.lock().unwrap().data.path.help_loc.clone();
-                        help_loc.push_str(&action.help);
+                        let help_loc = self
+                            .state
+                            .board
+                            .lock()
+                            .unwrap()
+                            .config
+                            .paths
+                            .help_path
+                            .clone();
+                        let help_loc = help_loc.join(&action.help);
                         self.state.display_file(&help_loc)?;
                     }
                 }
@@ -277,8 +286,7 @@ impl PcbBoardCommand {
                     }
                     if let Ok(number) = text.parse::<usize>() {
                         if let Some(bulletin) = bulletins.get(number - 1) {
-                            self.state
-                                .display_file(bulletin.file_name.to_str().unwrap())?;
+                            self.state.display_file(&bulletin.file_name)?;
                         } else {
                             self.state.display_text(
                                 IceText::InvalidBulletinNumber,
@@ -320,17 +328,16 @@ impl PcbBoardCommand {
         let mut output = String::new();
         for u in self.state.board.lock().unwrap().users.iter() {
             if text.is_empty()
-                || u.user
-                    .name
+                || u.get_name()
                     .to_ascii_uppercase()
                     .contains(&text.to_ascii_uppercase())
             {
                 output.push_str(&format!(
                     "{:<24} {:<30} {} {}\r\n",
-                    u.user.name,
-                    u.user.city,
-                    u.user.last_date_on.to_country_date(),
-                    u.user.last_time_on
+                    u.get_name(),
+                    u.city,
+                    u.last_date_on.to_country_date(),
+                    u.last_time_on
                 ));
             }
         }
@@ -354,7 +361,7 @@ impl PcbBoardCommand {
         }
         self.state.session.expert_mode = expert_mode;
         if let Some(user) = &mut self.state.current_user {
-            user.user.expert_mode = expert_mode;
+            user.flags.expert_mode = expert_mode;
         }
         if expert_mode {
             self.state.display_text(
@@ -373,7 +380,9 @@ impl PcbBoardCommand {
     }
 
     fn toggle_graphics(&mut self) -> Res<()> {
-        if self.state.board.lock().unwrap().data.non_graphics {
+        if false
+        /*self.state.board.lock().unwrap().data..non_graphics*/
+        {
             self.state.display_text(
                 IceText::GraphicsUnavailable,
                 display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -421,10 +430,10 @@ impl PcbBoardCommand {
         };
 
         if !page_len.is_empty() {
-            let page_len = page_len.parse::<i32>().unwrap_or_default();
-            self.state.session.page_len = page_len as usize;
+            let page_len = page_len.parse::<u16>().unwrap_or_default();
+            self.state.session.page_len = page_len;
             if let Some(user) = &mut self.state.current_user {
-                user.user.page_len = page_len as u8;
+                user.page_len = page_len;
             }
         }
         self.state.press_enter()?;
@@ -445,17 +454,25 @@ impl PcbBoardCommand {
             )?
         };
         if !help_cmd.is_empty() {
-            let mut help_loc = self.state.board.lock().unwrap().data.path.help_loc.clone();
+            let mut help_loc = self
+                .state
+                .board
+                .lock()
+                .unwrap()
+                .config
+                .paths
+                .help_path
+                .clone();
             let mut found = false;
-            for action in &self.menu.actions {
-                if action.commands.contains(&help_cmd) && !action.help.is_empty() {
-                    help_loc.push_str(&action.help);
+            for action in &self.state.session.current_conference.commands {
+                if action.input.contains(&help_cmd) && !action.help.is_empty() {
+                    help_loc = help_loc.join(&action.help);
                     found = true;
                     break;
                 }
             }
             if !found {
-                help_loc.push_str(format!("HLP{}", help_cmd).as_str());
+                help_loc = help_loc.join(format!("hlp{}", help_cmd).as_str());
             }
             let res = self.state.display_file(&help_loc)?;
 
@@ -480,9 +497,7 @@ impl PcbBoardCommand {
 
         self.state.session.security_violations += 1;
         if let Some(user) = &mut self.state.current_user {
-            if let Some(stats) = &mut user.inf.call_stats {
-                stats.num_sec_viol += 1;
-            }
+            user.stats.num_sec_viol += 1;
         }
         if self.state.session.security_violations > 10 {
             self.state.display_text(
