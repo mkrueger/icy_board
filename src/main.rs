@@ -11,12 +11,13 @@ use call_wait_screen::{CallWaitMessage, CallWaitScreen};
 use chrono::Local;
 use clap::{Parser, Subcommand};
 use crossterm::{terminal::Clear, ExecutableCommand};
-use icy_board_engine::icy_board::{
-    pcboard_data::PcbBoardData, state::IcyBoardState, IcyBoard, PcbBoard,
-};
+use icy_board_engine::icy_board::{state::IcyBoardState, IcyBoard};
 use icy_engine_output::{IcyEngineOutput, Screen};
 use icy_ppe::Res;
-use import::convert_pcb;
+use import::{
+    console_logger::{print_error, ConsoleLogger},
+    PCBoardImporter,
+};
 use semver::Version;
 use tui::{print_exit_screen, Tui};
 
@@ -57,18 +58,25 @@ lazy_static::lazy_static! {
 /// evlevlelvelvelv`
 
 fn main() {
-    let _ = init_error_hooks();
     let arguments = Cli::parse();
+
     match &arguments.command {
-        Commands::Import { name, out } => match PcbBoard::load(name) {
-            Ok(mut icy_board) => {
-                convert_pcb(&mut icy_board, &PathBuf::from(out)).unwrap();
+        Commands::Import { name, out } => {
+            let output = Box::<ConsoleLogger>::default();
+            match PCBoardImporter::new(name, output, PathBuf::from(out)) {
+                Ok(mut importer) => match importer.start_import() {
+                    Ok(_) => {
+                        println!("Imported successfully");
+                    }
+                    Err(e) => {
+                        print_error(e.to_string());
+                    }
+                },
+                Err(e) => {
+                    print_error(e.to_string());
+                }
             }
-            Err(e) => {
-                restore_terminal().unwrap();
-                println!("Error: {}", e);
-            }
-        },
+        }
         Commands::Run { file } => {
             start_icy_board(file);
         }
@@ -108,14 +116,14 @@ pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) {
                     }
                     Err(err) => {
                         restore_terminal().unwrap();
-                        println!("Error: {}", err);
+                        print_error(err.to_string());
                     }
                 }
             }
         }
         Err(e) => {
             restore_terminal().unwrap();
-            println!("Error: {}", e);
+            print_error(e.to_string());
         }
     }
 }

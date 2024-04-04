@@ -50,6 +50,19 @@ impl PcbBoardCommand {
                 return self.dispatch_action(command, &action.clone());
             }
         }
+
+        let mut found_cmd = None;
+        for cmd in &self.state.board.lock().unwrap().commands.commands {
+            if cmd.input.contains(&command.to_string()) {
+                found_cmd = Some(cmd.clone());
+                break;
+            }
+        }
+
+        if let Some(action) = found_cmd {
+            return self.dispatch_action(command, &action);
+        }
+
         self.state.display_text(
             IceText::InvalidEntry,
             display_flags::NEWLINE | display_flags::LFAFTER | display_flags::LFBEFORE,
