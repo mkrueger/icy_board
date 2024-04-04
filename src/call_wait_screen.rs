@@ -21,7 +21,7 @@ use ratatui::{
     },
 };
 
-use crate::{call_stat::CallStat, VERSION};
+use crate::VERSION;
 
 pub const DOS_BLACK: Color = Color::Rgb(0, 0, 0);
 pub const DOS_BLUE: Color = Color::Rgb(0, 0, 0xAA);
@@ -60,7 +60,6 @@ pub struct CallWaitScreen {
     selected: Option<Instant>,
     board: Arc<Mutex<IcyBoard>>,
     buttons: Vec<Button>,
-    call_stat: CallStat,
 
     last_caller_txt: String,
     calls_txt: String,
@@ -117,11 +116,11 @@ impl CallWaitScreen {
                 Button {
                     title: board
                         .display_text
-                        .get_display_text(IceText::SysopBusy)?
+                        .get_display_text(IceText::SysopNotBusy)?
                         .text,
                     description: board
                         .display_text
-                        .get_display_text(IceText::SysopBusyDescription)?
+                        .get_display_text(IceText::SysopNotBusyDescription)?
                         .text,
                     message: CallWaitMessage::Sysop(false),
                 },
@@ -153,8 +152,6 @@ impl CallWaitScreen {
             .to_string();
         let file_name = board.lock().as_ref().unwrap().resolve_file(&file);
         let call_stat = CallStat::load(&file_name)?;*/
-
-        let call_stat = CallStat::default();
 
         let last_caller_txt = board
             .lock()
@@ -203,7 +200,6 @@ impl CallWaitScreen {
             x: 0,
             y: 0,
             selected: None,
-            call_stat,
             buttons,
             last_caller_txt,
             calls_txt,
@@ -228,6 +224,9 @@ impl CallWaitScreen {
                 if let Event::Key(key) = event::read()? {
                     if key.kind == KeyEventKind::Press {
                         match key.code {
+                            KeyCode::Esc => {
+                                return Ok(CallWaitMessage::Exit(false));
+                            }
                             KeyCode::Down | KeyCode::Char('s') => self.y = (self.y + 1).min(1),
                             KeyCode::Up | KeyCode::Char('w') => self.y = (self.y - 1).max(0),
                             KeyCode::Right | KeyCode::Char('d') => self.x = (self.x + 1).min(2),
@@ -265,82 +264,154 @@ impl CallWaitScreen {
         let ver = VERSION.to_string();
 
         Canvas::default()
-        .marker(Marker::Block)
-        .paint(move |ctx| {
+            .marker(Marker::Block)
+            .paint(move |ctx| {
+                // draw node
+                let node_txt = "https://github.com/mkrueger/icy_board".to_string();
+                ctx.print(
+                    4.0 + (width - node_txt.len() as f64) / 2.0,
+                    height - 1.0,
+                    Line::from(node_txt).style(Style::new().fg(DOS_WHITE)),
+                );
 
-            // draw node
-            let node_txt = format!("Node 1");
-            ctx.print(4.0 + (width - node_txt.len() as f64)  / 2.0,  height - 1.0,
-            Line::from(node_txt).style(Style::new()
-            .fg(DOS_WHITE)));
+                render_button(
+                    ctx,
+                    4.0,
+                    height - 2.0,
+                    width - 7.0,
+                    &self.board.lock().unwrap().config.board_name,
+                    SelectState::Selected,
+                );
 
-            render_button(ctx, 4.0, height - 2.0, width - 7.0, &self.board.lock().unwrap().config.board_name, SelectState::Selected);
+                let y_padding = -2.0;
+                let button_space = width / 3.0;
+                let button_width = (button_space * 19.0 / 26.0).floor();
+                let left_pos = ((width + button_space - button_width - 3.0 * button_space.floor())
+                    / 2.0)
+                    .ceil();
 
-            let y_padding = -2.0;
-            let button_space = width / 3.0;
-            let button_width = (button_space * 19.0 / 26.0).floor();
-            let left_pos = ((width + button_space - button_width - 3.0 * button_space.floor()) / 2.0).ceil();
+                for (i, b) in self.buttons.iter().enumerate() {
+                    render_button(
+                        ctx,
+                        left_pos + button_space * (i % 3) as f64,
+                        height - 4.0 + y_padding * (i / 3) as f64,
+                        button_width,
+                        &b.title,
+                        self.get_select_state(i as i32),
+                    );
+                }
 
-            for (i, b) in self.buttons.iter().enumerate() {
-                render_button(ctx,
-                    left_pos + button_space * (i % 3) as f64,
-                    height - 4.0 + y_padding * (i / 3) as f64,
-                    button_width,
-                    &b.title,
-                    self.get_select_state(i as i32));
-            }
+                let selected_button = (self.y * 3 + self.x) as usize;
+                // draw description
+                ctx.print(
+                    4.0 + (width - self.buttons[selected_button].description.len() as f64) / 2.0,
+                    8.0,
+                    Line::from(self.buttons[selected_button].description.to_string()).style(
+                        Style::new()
+                            //.bg(bg)
+                            .fg(DOS_WHITE),
+                    ),
+                );
 
-            let selected_button = (self.y * 3 + self.x) as usize;
-            // draw description
-            ctx.print(4.0 + (width - self.buttons[selected_button].description.len() as f64)  / 2.0,  8.0,
-            Line::from(self.buttons[selected_button].description.to_string()).style(Style::new()
-            //.bg(bg)
-            .fg(DOS_WHITE)));
+                // draw separator
+                let separator_y = 7.0;
+                for i in 0..=(width as usize) {
+                    ctx.print(
+                        i as f64,
+                        separator_y,
+                        Line::from("═").style(Style::new().fg(DOS_WHITE)),
+                    );
+                }
 
-            // draw separator
-            let separator_y = 7.0;
-            for i in 0..=(width as usize) {
-                ctx.print(i as f64, separator_y, Line::from("═").style(Style::new()
-                .fg(DOS_WHITE)));
-            }
+                //self.icy_board.lock().borrow().as_ref().unwrap().data.stat
 
-            //self.icy_board.lock().borrow().as_ref().unwrap().data.stat
+                render_label(ctx, 4.0, separator_y - 2.0, width - 7.0, &self.sysavail_txt);
+                let call_stat = &self.board.lock().unwrap().statistics;
+                let last_caller = if let Some(lc) = call_stat.last_callers.last() {
+                    lc.clone()
+                } else {
+                    "".to_string()
+                };
+                render_label(
+                    ctx,
+                    4.0,
+                    separator_y - 4.0,
+                    width - 7.0,
+                    format!("{} {}", self.last_caller_txt, last_caller).as_str(),
+                );
 
-            render_label(ctx, 4.0, separator_y - 2.0, width - 7.0, &self.sysavail_txt);
-            render_label(ctx, 4.0, separator_y - 4.0, width - 7.0, format!("{} {}", self.last_caller_txt, self.call_stat.last_caller).as_str());
+                let label_space = width / 4.0;
+                let label_size = (label_space * 14.0 / 19.0).floor();
+                let left_pos =
+                    ((width + label_space - label_size - 4.0 * label_space.floor()) / 2.0).ceil();
 
-            let label_space = width / 4.0;
-            let label_size = (label_space * 14.0 / 19.0).floor();
-            let left_pos = ((width + label_space - label_size - 4.0 * label_space.floor()) / 2.0).ceil();
+                render_label(
+                    ctx,
+                    left_pos,
+                    separator_y - 6.0,
+                    label_size,
+                    format!("{} {}", self.calls_txt, call_stat.total.calls).as_str(),
+                );
 
-            render_label(ctx, left_pos, separator_y - 6.0, label_size, format!("{} {}", self.calls_txt, self.call_stat.new_calls).as_str());
+                render_label(
+                    ctx,
+                    left_pos + label_space * 1.0,
+                    separator_y - 6.0,
+                    label_size,
+                    format!("{} {}", self.msgs_txt, call_stat.total.messages).as_str(),
+                );
 
-            render_label(ctx, left_pos + label_space * 1.0 , separator_y - 6.0, label_size, format!("{} {}", self.msgs_txt, self.call_stat.new_msgs).as_str());
+                render_label(
+                    ctx,
+                    left_pos + label_space * 2.0,
+                    separator_y - 6.0,
+                    label_size,
+                    format!("{} {}", self.dls_txt, call_stat.total.downloads).as_str(),
+                );
 
-            render_label(ctx, left_pos + label_space * 2.0 , separator_y - 6.0, label_size, format!("{} {}", self.dls_txt, self.call_stat.total_dn).as_str());
-
-            render_label(ctx, left_pos + label_space * 3.0, separator_y - 6.0, label_size, format!("{} {}", self.uls_txt, self.call_stat.total_up).as_str());
-
-        }).background_color(DOS_BLUE)
-        .x_bounds([0.0, width])
-        .y_bounds([0.0,height])
-
-        .block(Block::default()
-
-        .title(Title::from(Line::from(format!(" {} ", now.date_naive())).style(Style::new().white())).alignment(Alignment::Left))
-
-        .title_style(Style::new().fg(DOS_YELLOW))
-        .title_alignment(Alignment::Center)
-        .title(format!("  PcbBoard v{}  ", ver))
-        .title(Title::from(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white())).alignment(Alignment::Right))
-        .title(Title::from(Line::from("  (C) Copyright Mike Krüger, 2024, https://github.com/mkrueger/icy_board  ")
-        .style(Style::new().white()))
-        .alignment(Alignment::Center)
-        .position(block::Position::Bottom))
-        .style(Style::new().bg(DOS_BLUE))
-        .border_type(BorderType::Double)
-        .border_style(Style::new().white())
-        .borders(Borders::ALL))
+                render_label(
+                    ctx,
+                    left_pos + label_space * 3.0,
+                    separator_y - 6.0,
+                    label_size,
+                    format!("{} {}", self.uls_txt, call_stat.total.uploads).as_str(),
+                );
+            })
+            .background_color(DOS_BLUE)
+            .x_bounds([0.0, width])
+            .y_bounds([0.0, height])
+            .block(
+                Block::default()
+                    .title(
+                        Title::from(
+                            Line::from(format!(" {} ", now.date_naive()))
+                                .style(Style::new().white()),
+                        )
+                        .alignment(Alignment::Left),
+                    )
+                    .title_style(Style::new().fg(DOS_YELLOW))
+                    .title_alignment(Alignment::Center)
+                    .title(format!("  IcyBoard v{}  ", ver))
+                    .title(
+                        Title::from(
+                            Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap()))
+                                .style(Style::new().white()),
+                        )
+                        .alignment(Alignment::Right),
+                    )
+                    .title(
+                        Title::from(
+                            Line::from("  (C) Copyright Mike Krüger, 2024 ")
+                                .style(Style::new().white()),
+                        )
+                        .alignment(Alignment::Center)
+                        .position(block::Position::Bottom),
+                    )
+                    .style(Style::new().bg(DOS_BLUE))
+                    .border_type(BorderType::Double)
+                    .border_style(Style::new().white())
+                    .borders(Borders::ALL),
+            )
     }
 
     fn get_select_state(&self, button: i32) -> SelectState {

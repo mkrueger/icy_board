@@ -11,7 +11,9 @@ use call_wait_screen::{CallWaitMessage, CallWaitScreen};
 use chrono::Local;
 use clap::{Parser, Subcommand};
 use crossterm::{terminal::Clear, ExecutableCommand};
-use icy_board_engine::icy_board::{menu::Menu, state::IcyBoardState, IcyBoard, PcbBoard};
+use icy_board_engine::icy_board::{
+    pcboard_data::PcbBoardData, state::IcyBoardState, IcyBoard, PcbBoard,
+};
 use icy_engine_output::{IcyEngineOutput, Screen};
 use icy_ppe::Res;
 use import::convert_pcb;
@@ -21,7 +23,6 @@ use tui::{print_exit_screen, Tui};
 use crate::call_wait_screen::restore_terminal;
 
 pub mod bbs;
-pub mod call_stat;
 mod call_wait_screen;
 mod icy_engine_output;
 mod import;
@@ -60,8 +61,8 @@ fn main() {
     let arguments = Cli::parse();
     match &arguments.command {
         Commands::Import { name, out } => match PcbBoard::load(name) {
-            Ok(icy_board) => {
-                convert_pcb(&icy_board, &PathBuf::from(out)).unwrap();
+            Ok(mut icy_board) => {
+                convert_pcb(&mut icy_board, &PathBuf::from(out)).unwrap();
             }
             Err(e) => {
                 restore_terminal().unwrap();

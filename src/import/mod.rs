@@ -1,6 +1,6 @@
 use std::{
     fs,
-    io::{stdout, BufWriter, Write},
+    io::stdout,
     path::{Path, PathBuf},
     process,
     str::FromStr,
@@ -11,7 +11,7 @@ use crossterm::{
     style::{Attribute, Color, Print, SetAttribute, SetForegroundColor},
 };
 use icy_board_engine::icy_board::{
-    commands::CommandList,
+    commands::{CommandList, CommandType},
     conferences::ConferenceBase,
     convert_to_utf8,
     icb_config::{
@@ -22,13 +22,18 @@ use icy_board_engine::icy_board::{
     read_cp437,
     sec_levels::SecurityLevelDefinitions,
     user_base::{Password, UserBase},
-    write_with_bom,
     xfer_protocols::SupportedProtocols,
     IcyBoardError, PcbBoard,
 };
-use icy_ppe::{datetime::IcbTime, tables::import_cp437_string, Res};
+use icy_board_engine::icy_board::{
+    state::functions::PPECall, statistics::Statistics, write_with_bom, IcyBoardSerializer,
+    PCBoardImporter, PCBoardRecordImporter,
+};
+use icy_ppe::{datetime::IcbTime, Res};
 use relative_path::{PathExt, RelativePathBuf};
 use walkdir::WalkDir;
+
+pub mod import_log;
 
 const REQUIRED_DIRECTORIES: [&str; 7] = [
     "gen",
@@ -40,7 +45,7 @@ const REQUIRED_DIRECTORIES: [&str; 7] = [
     "art",
 ];
 
-pub fn convert_pcb(pcb_file: &PcbBoard, output_directory: &PathBuf) -> Res<()> {
+pub fn convert_pcb(pcb_file: &mut PcbBoard, output_directory: &PathBuf) -> Res<()> {
     start_action(format!(
         "Creating directory '{}'…",
         output_directory.display()
@@ -55,6 +60,11 @@ pub fn convert_pcb(pcb_file: &PcbBoard, output_directory: &PathBuf) -> Res<()> {
 
     let o = output_directory.join("data/icbtext.toml");
     start_action(format!("Create ICBTEXT {}…", o.display()));
+
+    for entry in pcb_file.display_text.iter_mut() {
+        entry.text = scan_line_for_commands(&entry.text);
+    }
+
     check_result(pcb_file.display_text.save(&o));
 
     let o = output_directory.join("data/user_base.toml");
@@ -62,31 +72,20 @@ pub fn convert_pcb(pcb_file: &PcbBoard, output_directory: &PathBuf) -> Res<()> {
     let user_base = UserBase::import_pcboard(&pcb_file.users);
     check_result(user_base.save(&o));
 
-    let o = output_directory.join("conferences/main/commands.toml");
-    fs::write(o, include_str!("../data/menu.cmd"))?;
-    let mut conferences = ConferenceBase::import_pcboard(pcb_file);
-    conferences[0].command_file = PathBuf::from("conferences/main/commands.toml");
-
-    /* TODO: Directory conversion
-    let mut conference_directories = HashMap::new();
-    for c in conferences.entries {
-
-    }*/
-
-    let o = output_directory.join("conferences/list.toml");
-    start_action(format!("Create conferences {}…", o.display()));
-    check_result(conferences.save(&o));
-
-    let o = output_directory.join("icbcfg.toml");
+    let o = output_directory.join("icyboard.toml");
     let icb_cfg = import_pcboard_cfg(pcb_file, o.parent().unwrap())?;
     start_action(format!("Create main configutation {}…", o.display()));
     check_result(icb_cfg.save(&o));
+
+    let o = output_directory.join("config/conferences.toml");
+    start_action(format!("Create conferences {}…", o.display()));
+    let mut conferences = ConferenceBase::import_pcboard(pcb_file);
+    check_result(conferences.save(&o));
 
     let help_loc = pcb_file.resolve_file(&pcb_file.data.path.help_loc);
     let help_loc = PathBuf::from(&help_loc);
 
     let o = output_directory.join("help");
-
     if help_loc.exists() {
         start_action(format!(
             "Copy help files from {} to {}…",
@@ -108,11 +107,30 @@ pub fn convert_pcb(pcb_file: &PcbBoard, output_directory: &PathBuf) -> Res<()> {
                 }
             }
             start_action(format!("\t{} -> {}…", entry.path().display(), to.display()));
-
-            check_result(convert_to_utf8(&entry.path(), &to));
+            check_result(import_and_scan_file(&entry.path(), &to));
         }
     }
+    Ok(())
+}
 
+pub fn scan_line_for_commands(pcb: &PcbBoard, logger: &mut ImportLog, line: &str) -> String {
+    if let Some(call) = PPECall::try_parse_line(line) {
+        let resolved_file = pcb.resolve_file(&call.file);
+    }
+    line.to_string()
+}
+
+pub fn import_and_scan_file<P: AsRef<Path>, Q: AsRef<Path>>(from: &P, to: &Q) -> Res<()> {
+    let in_string = read_cp437(from)?;
+
+    let mut import = String::new();
+
+    for line in in_string.lines() {
+        import.push_str(&scan_line_for_commands(line));
+        import.push('\n');
+    }
+
+    write_with_bom(to, &import)?;
     Ok(())
 }
 
@@ -126,7 +144,7 @@ fn start_action(format: String) {
     .unwrap();
 }
 
-fn import_file(pcb: &PcbBoard, dest_path: &Path, file: &str, new_name: &str) -> Res<PathBuf> {
+fn scan_display_file(pcb: &PcbBoard, dest_path: &Path, file: &str, new_name: &str) -> Res<PathBuf> {
     if file.is_empty() {
         return Ok(PathBuf::new());
     }
@@ -145,6 +163,8 @@ fn import_file(pcb: &PcbBoard, dest_path: &Path, file: &str, new_name: &str) -> 
                 continue;
             }
             let found_name = entry.file_name().to_str().unwrap().to_ascii_uppercase();
+            //     println!("{}---{}", found_name, upper_name );
+
             if found_name.starts_with(&upper_name) {
                 let mut dest = dest_path.to_path_buf();
                 dest = dest.join(new_name);
@@ -166,7 +186,7 @@ fn import_file(pcb: &PcbBoard, dest_path: &Path, file: &str, new_name: &str) -> 
                         entry.path().display(),
                         dest.display()
                     ));
-                    check_result(convert_to_utf8(&entry.path(), &dest));
+                    check_result(import_and_scan_file(&entry.path(), &dest));
                 }
             }
         }
@@ -284,10 +304,39 @@ fn convert_cmd_lst(pcb: &PcbBoard, dest_path: &Path, file: &str, new_name: &str)
     }
     let resolved_file = pcb.resolve_file(file);
     let resolved_file = PathBuf::from(&resolved_file);
-    let res = if resolved_file.exists() {
+    let mut res = if resolved_file.exists() {
         CommandList::import_pcboard(&resolved_file)?
     } else {
         CommandList::default()
+    };
+
+    add_default_commands(pcb, &mut res);
+
+    let mut dest = dest_path.to_path_buf();
+    dest = dest.join(new_name);
+    if let Err(err) = res.save(&dest) {
+        return Err(Box::new(IcyBoardError::ErrorCreatingFile(
+            new_name.to_string(),
+            err.to_string(),
+        )));
+    }
+    Ok(PathBuf::from(new_name))
+}
+fn convert_pcbstats_lst(
+    pcb: &PcbBoard,
+    dest_path: &Path,
+    file: &str,
+    new_name: &str,
+) -> Res<PathBuf> {
+    if file.is_empty() {
+        return Ok(PathBuf::new());
+    }
+    let resolved_file = pcb.resolve_file(file);
+    let resolved_file = PathBuf::from(&resolved_file);
+    let mut res = if resolved_file.exists() {
+        Statistics::import_pcboard(&resolved_file)?
+    } else {
+        Statistics::default()
     };
     let mut dest = dest_path.to_path_buf();
     dest = dest.join(new_name);
@@ -300,16 +349,224 @@ fn convert_cmd_lst(pcb: &PcbBoard, dest_path: &Path, file: &str, new_name: &str)
     Ok(PathBuf::from(new_name))
 }
 
+fn convert_cmd(
+    name: &[&str],
+    cmd_type: CommandType,
+    security: i32,
+) -> icy_board_engine::icy_board::commands::Command {
+    icy_board_engine::icy_board::commands::Command {
+        input: name.iter().map(|s| s.to_string()).collect(),
+        help: format!("hlp{}", name[0].to_ascii_lowercase()),
+        command_type: cmd_type,
+        parameter: "".to_string(),
+        security: security as u8,
+    }
+}
+
+fn add_default_commands(pcb: &PcbBoard, cmd_list: &mut CommandList) {
+    cmd_list.push(convert_cmd(
+        &["A"],
+        CommandType::AbandonConference,
+        pcb.data.user_levels.cmd_a,
+    ));
+    cmd_list.push(convert_cmd(
+        &["B"],
+        CommandType::BulletinList,
+        pcb.data.user_levels.cmd_b,
+    ));
+    cmd_list.push(convert_cmd(
+        &["C"],
+        CommandType::CommentToSysop,
+        pcb.data.user_levels.cmd_c,
+    ));
+    cmd_list.push(convert_cmd(
+        &["D", "FLAG", "FLA", "FL", "DOWN", "DOW", "DO"],
+        CommandType::Download,
+        pcb.data.user_levels.cmd_d,
+    ));
+    cmd_list.push(convert_cmd(
+        &["E"],
+        CommandType::EnterMessage,
+        pcb.data.user_levels.cmd_e,
+    ));
+    cmd_list.push(convert_cmd(
+        &["F"],
+        CommandType::FileDirectory,
+        pcb.data.user_levels.cmd_f,
+    ));
+
+    // doesn't make sense to have a sec for that but it's in the record
+    cmd_list.push(convert_cmd(
+        &["G", "BYE", "BY"],
+        CommandType::Goodbye,
+        pcb.data.user_levels.cmd_g,
+    ));
+
+    cmd_list.push(convert_cmd(
+        &["H", "HELP", "HEL", "HE", "?"],
+        CommandType::Help,
+        pcb.data.user_levels.cmd_h,
+    ));
+    cmd_list.push(convert_cmd(
+        &["IW"],
+        CommandType::InitialWelcome,
+        pcb.data.user_levels.cmd_i,
+    ));
+    cmd_list.push(convert_cmd(
+        &["J", "JOIN", "JOI", "JO"],
+        CommandType::JoinConference,
+        pcb.data.user_levels.cmd_j,
+    ));
+    cmd_list.push(convert_cmd(
+        &["I"],
+        CommandType::MessageAreas,
+        pcb.data.user_levels.cmd_j,
+    ));
+    cmd_list.push(convert_cmd(
+        &["K"],
+        CommandType::KillMessage,
+        pcb.data.user_levels.cmd_k,
+    ));
+    cmd_list.push(convert_cmd(
+        &["L"],
+        CommandType::LocateFile,
+        pcb.data.user_levels.cmd_l,
+    ));
+    cmd_list.push(convert_cmd(
+        &["M"],
+        CommandType::ToggleGraphics,
+        pcb.data.user_levels.cmd_m,
+    ));
+    cmd_list.push(convert_cmd(
+        &["N"],
+        CommandType::NewFileScan,
+        pcb.data.user_levels.cmd_n,
+    ));
+    cmd_list.push(convert_cmd(
+        &["O"],
+        CommandType::PageSysop,
+        pcb.data.user_levels.cmd_o,
+    ));
+    cmd_list.push(convert_cmd(
+        &["P"],
+        CommandType::SetPageLength,
+        pcb.data.user_levels.cmd_p,
+    ));
+    cmd_list.push(convert_cmd(
+        &["Q"],
+        CommandType::QuickMessageScan,
+        pcb.data.user_levels.cmd_q,
+    ));
+    cmd_list.push(convert_cmd(
+        &["R"],
+        CommandType::ReadMessages,
+        pcb.data.user_levels.cmd_r,
+    ));
+    cmd_list.push(convert_cmd(
+        &["S"],
+        CommandType::ScriptQuest,
+        pcb.data.user_levels.cmd_s,
+    ));
+    cmd_list.push(convert_cmd(
+        &["T"],
+        CommandType::TransferProtocol,
+        pcb.data.user_levels.cmd_t,
+    ));
+    cmd_list.push(convert_cmd(
+        &["U"],
+        CommandType::UploadFile,
+        pcb.data.user_levels.cmd_u,
+    ));
+    cmd_list.push(convert_cmd(
+        &["V"],
+        CommandType::ViewSettings,
+        pcb.data.user_levels.cmd_v,
+    ));
+    cmd_list.push(convert_cmd(
+        &["W"],
+        CommandType::WriteUserSettings,
+        pcb.data.user_levels.cmd_w,
+    ));
+    cmd_list.push(convert_cmd(
+        &["X"],
+        CommandType::ExpertMode,
+        pcb.data.user_levels.cmd_x,
+    ));
+    cmd_list.push(convert_cmd(
+        &["Y"],
+        CommandType::PersonalMail,
+        pcb.data.user_levels.cmd_y,
+    ));
+    cmd_list.push(convert_cmd(
+        &["Z"],
+        CommandType::ZippyDirectoryScan,
+        pcb.data.user_levels.cmd_z,
+    ));
+
+    cmd_list.push(convert_cmd(
+        &["CHAT", "CHA", "CH"],
+        CommandType::GroupChat,
+        pcb.data.user_levels.cmd_chat,
+    ));
+    cmd_list.push(convert_cmd(
+        &["DOOR", "DOO", "DO", "OPEN", "OPE", "OP"],
+        CommandType::OpenDoor,
+        pcb.data.user_levels.cmd_open_door,
+    ));
+    cmd_list.push(convert_cmd(
+        &["TEST", "TES", "TE"],
+        CommandType::TestFile,
+        pcb.data.user_levels.cmd_test_file,
+    ));
+    cmd_list.push(convert_cmd(
+        &["USER", "USE", "US"],
+        CommandType::UserList,
+        pcb.data.user_levels.cmd_show_user_list,
+    ));
+    cmd_list.push(convert_cmd(
+        &["WHO", "WH"],
+        CommandType::WhoIsOnline,
+        pcb.data.user_levels.cmd_who,
+    ));
+    cmd_list.push(convert_cmd(&["MENU", "MEN", "ME"], CommandType::Menu, 0));
+    cmd_list.push(convert_cmd(
+        &["NEWS", "NEW", "NE"],
+        CommandType::DisplayNews,
+        0,
+    ));
+    cmd_list.push(convert_cmd(
+        &["LANG", "LAN", "LA"],
+        CommandType::SetLanguage,
+        0,
+    ));
+    cmd_list.push(convert_cmd(
+        &["REPLY", "REPL", "REP", "RE"],
+        CommandType::ReplyMessage,
+        0,
+    ));
+    cmd_list.push(convert_cmd(
+        &["ALIAS", "ALIA", "ALI", "AL"],
+        CommandType::EnableAlias,
+        0,
+    ));
+
+    cmd_list.push(convert_cmd(
+        &["BRDCST"],
+        CommandType::Broadcast,
+        pcb.data.sysop_security.sysop,
+    ));
+}
+
 pub fn import_pcboard_cfg(pcb: &PcbBoard, dest_path: &Path) -> Res<IcbConfig> {
-    let welcome = import_file(pcb, dest_path, &pcb.data.path.welcome_file, "art/welcome")?;
-    let newuser = import_file(pcb, dest_path, &pcb.data.path.newuser_file, "art/newuser")?;
-    let closed = import_file(pcb, dest_path, &pcb.data.path.closed_file, "art/closed")?;
-    let warning = import_file(pcb, dest_path, &pcb.data.path.warning_file, "art/warning")?;
-    let expired = import_file(pcb, dest_path, &pcb.data.path.expired_file, "art/expired")?;
-    let conf_join_menu = import_file(pcb, dest_path, &pcb.data.path.conf_menu, "art/cnfn")?;
-    let group_chat = import_file(pcb, dest_path, &pcb.data.path.group_chat, "art/group")?;
-    let chat_menu = import_file(pcb, dest_path, &pcb.data.path.chat_menu, "art/chtm")?;
-    let no_ansi = import_file(pcb, dest_path, &pcb.data.path.no_ansi, "art/noansi")?;
+    let welcome = scan_display_file(pcb, dest_path, &pcb.data.path.welcome_file, "art/welcome")?;
+    let newuser = scan_display_file(pcb, dest_path, &pcb.data.path.newuser_file, "art/newuser")?;
+    let closed = scan_display_file(pcb, dest_path, &pcb.data.path.closed_file, "art/closed")?;
+    let warning = scan_display_file(pcb, dest_path, &pcb.data.path.warning_file, "art/warning")?;
+    let expired = scan_display_file(pcb, dest_path, &pcb.data.path.expired_file, "art/expired")?;
+    let conf_join_menu = scan_display_file(pcb, dest_path, &pcb.data.path.conf_menu, "art/cnfn")?;
+    let group_chat = scan_display_file(pcb, dest_path, &pcb.data.path.group_chat, "art/group")?;
+    let chat_menu = scan_display_file(pcb, dest_path, &pcb.data.path.chat_menu, "art/chtm")?;
+    let no_ansi = scan_display_file(pcb, dest_path, &pcb.data.path.no_ansi, "art/noansi")?;
     let trashcan = convert_trashcan(
         pcb,
         dest_path,
@@ -328,7 +585,6 @@ pub fn import_pcboard_cfg(pcb: &PcbBoard, dest_path: &Path) -> Res<IcbConfig> {
         &pcb.data.path.protocol_data_file,
         "config/protocols.toml",
     )?;
-
     let security_level_file = convert_pwrd(
         pcb,
         dest_path,
@@ -340,6 +596,12 @@ pub fn import_pcboard_cfg(pcb: &PcbBoard, dest_path: &Path) -> Res<IcbConfig> {
         dest_path,
         &pcb.data.path.cmd_lst,
         "config/commands.toml",
+    )?;
+    let statistics_file = convert_pcbstats_lst(
+        pcb,
+        dest_path,
+        &pcb.data.path.stats_file,
+        "data/statistics.toml",
     )?;
 
     let pcb_data = &pcb.data;
@@ -390,7 +652,7 @@ pub fn import_pcboard_cfg(pcb: &PcbBoard, dest_path: &Path) -> Res<IcbConfig> {
             tmp_path: PathBuf::from("./tmp/"),
             icbtxt: PathBuf::from("data/icbtext.toml"),
             user_base: PathBuf::from("data/user_base.toml"),
-            conferences: PathBuf::from("conferences/list.toml"),
+            conferences: PathBuf::from("config/conferences.toml"),
             welcome,
             newuser,
             closed,
@@ -405,6 +667,7 @@ pub fn import_pcboard_cfg(pcb: &PcbBoard, dest_path: &Path) -> Res<IcbConfig> {
             security_level_file,
             language_file,
             command_file,
+            statistics_file,
         },
     })
 }

@@ -16,7 +16,7 @@ use crossterm::{
     ExecutableCommand,
 };
 
-use icy_board_engine::icy_board::{state::Session, IcyBoard, IcyBoardError, PcbBoard};
+use icy_board_engine::icy_board::{state::Session, IcyBoard, IcyBoardError};
 use icy_engine::TextPane;
 use icy_ppe::Res;
 use ratatui::{
@@ -353,7 +353,7 @@ pub fn print_exit_screen() {
 
             let text = vec![
                 Span::styled("Thank you for using ", green),
-                Span::styled("PcbBoard", white),
+                Span::styled("IcyBoard", white),
                 Span::styled(" Professional BBS Software!", green),
             ];
             frame.render_widget(
