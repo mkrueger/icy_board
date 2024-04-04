@@ -157,7 +157,31 @@ impl PCBoardImporter {
     pub fn start_import(&mut self) -> Res<()> {
         self.create_directories()?;
 
-        self.convert_hlp_files(&self.data.path.help_loc.clone(), "help")?;
+        self.copy_display_directory(
+            "help files",
+            &self.data.path.help_loc.clone(),
+            "art/help",
+            |_| true,
+        )?;
+        self.copy_display_directory(
+            "commmand display files",
+            &self.data.path.cmd_display_files_loc.clone(),
+            "art/cmd_display",
+            |_| true,
+        )?;
+        self.copy_display_directory(
+            "security files",
+            &self.data.path.sec_loc.clone(),
+            "art/secmsgs",
+            |p| {
+                let file_name = p.file_name().unwrap().to_str().unwrap();
+                file_name
+                    .chars()
+                    .next()
+                    .unwrap_or_default()
+                    .is_ascii_digit()
+            },
+        )?;
 
         let icbtext = self.convert_pcbtext(
             &(self.data.path.text_loc.clone() + "/PCBTEXT"),
@@ -257,8 +281,10 @@ impl PCBoardImporter {
                 password_storage_method: PasswordStorageMethod::PlainText,
             },
             paths: ConfigPaths {
-                help_path: PathBuf::from("./help/"),
-                tmp_path: PathBuf::from("./tmp/"),
+                help_path: PathBuf::from("help/help"),
+                security_file_path: PathBuf::from("art/secmsgs"),
+                command_display_path: PathBuf::from("art/cmd_display"),
+                tmp_path: PathBuf::from("tmp/"),
                 icbtext,
                 user_base,
                 conferences,
@@ -361,7 +387,7 @@ impl PCBoardImporter {
             .log_error(fs::create_dir(&self.output_directory).err())?;
         self.logger.created_directory(self.output_directory.clone());
 
-        const REQUIRED_DIRECTORIES: [&str; 9] = [
+        const REQUIRED_DIRECTORIES: [&str; 13] = [
             "gen",
             "conferences",
             "conferences/main",
@@ -371,6 +397,10 @@ impl PCBoardImporter {
             "config/menus",
             "help",
             "art",
+            "art/cmd_display",
+            "art/secmsgs",
+            "art/help",
+            "tmp",
         ];
 
         for dir in REQUIRED_DIRECTORIES.iter() {
@@ -666,21 +696,31 @@ impl PCBoardImporter {
         Ok(PathBuf::from(new_rel_name))
     }
 
-    fn convert_hlp_files(&mut self, help_loc: &str, rel_output: &str) -> Res<()> {
-        let help_loc = self.resolve_file(help_loc)?;
+    fn copy_display_directory<F: Fn(&Path) -> bool>(
+        &mut self,
+        category: &str,
+        dir_loc: &str,
+        rel_output: &str,
+        filter: F,
+    ) -> Res<()> {
+        let help_loc = self.resolve_file(dir_loc)?;
         let help_loc = PathBuf::from(&help_loc);
-        self.logger.log("=== Converting help files ===");
+        self.logger.log(&format!("=== Converting {} ===", category));
 
         let o = self.output_directory.join(rel_output);
         if help_loc.exists() {
             self.output.start_action(format!(
-                "Copy help files from {} to {}…",
+                "Copy {} from {} to {}…",
+                category,
                 help_loc.display(),
                 o.display()
             ));
             for entry in WalkDir::new(&help_loc) {
                 let entry = entry?;
                 if entry.path().is_dir() {
+                    continue;
+                }
+                if !filter(entry.path()) {
                     continue;
                 }
                 let rel_path = entry.path().relative_to(&help_loc).unwrap();
