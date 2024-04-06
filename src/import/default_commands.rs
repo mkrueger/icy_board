@@ -1,6 +1,7 @@
 use icy_board_engine::icy_board::{
     commands::{CommandList, CommandType},
     pcboard_data::PcbBoardData,
+    security::RequiredSecurity,
     PCBoardRecordImporter,
 };
 
@@ -14,7 +15,7 @@ fn convert_cmd(
         help: format!("hlp{}", name[0].to_ascii_lowercase()),
         command_type: cmd_type,
         parameter: "".to_string(),
-        security: security as u8,
+        security: RequiredSecurity::new(security as u8),
     }
 }
 

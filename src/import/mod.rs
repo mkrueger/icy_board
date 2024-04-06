@@ -10,6 +10,7 @@ use icy_board_engine::icy_board::{
     commands::CommandList,
     conferences::ConferenceBase,
     convert_to_utf8,
+    group_list::GroupList,
     icb_config::{
         ColorConfiguration, ConfigPaths, IcbColor, IcbConfig, PasswordStorageMethod,
         SubscriptionMode, SysopInformation, SysopSecurityLevels, UserPasswordPolicy,
@@ -192,6 +193,7 @@ impl PCBoardImporter {
         )?;
         let trashcan =
             self.convert_trashcan(&self.data.path.tcan_file.clone(), "config/badusers.txt")?;
+        let group_file = self.create_group_file("config/groups.toml")?;
 
         let welcome =
             self.convert_display_file(&self.data.path.welcome_file.clone(), "art/welcome")?;
@@ -306,6 +308,7 @@ impl PCBoardImporter {
                 language_file,
                 command_file,
                 statistics_file,
+                group_file,
             },
         };
 
@@ -566,6 +569,18 @@ impl PCBoardImporter {
         Ok(())
     }
 
+    fn create_group_file(&mut self, new_rel_name: &str) -> Res<PathBuf> {
+        let dest = self.output_directory.join(new_rel_name);
+
+        let mut groups = GroupList::default();
+        groups.add_group("sysop", "System Operators", &[1]);
+        groups.add_group("users", "Common Users", &[]);
+        groups.add_group("no_age", "Members override age check", &[]);
+        groups.save(&dest)?;
+
+        Ok(PathBuf::from(new_rel_name))
+    }
+
     fn convert_trashcan(&mut self, trashcan_file: &str, new_rel_name: &str) -> Res<PathBuf> {
         if trashcan_file.is_empty() {
             return Ok(PathBuf::new());
@@ -606,7 +621,12 @@ impl PCBoardImporter {
     }
 
     fn convert_display_file(&mut self, file: &str, new_name: &str) -> Res<PathBuf> {
+        self.logger
+            .log(&format!("search for {} ({})", file, new_name));
+
         if file.is_empty() {
+            self.logger
+                .log(&format!("Original file not defined: {}", new_name));
             return Ok(PathBuf::new());
         }
         let Ok(resolved_file) = self.resolve_file(file) else {
@@ -622,32 +642,37 @@ impl PCBoardImporter {
             .unwrap()
             .to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
+            self.logger.log(&format!("already converted ({})", file));
+
             return Ok(PathBuf::from(file));
         }
 
         let from_file = PathBuf::from(&resolved_file);
         let mut dest_path = self.output_directory.join(new_name);
         dest_path.pop();
+        let mut found = false;
+        let upper_name = from_file
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_ascii_uppercase();
 
         if let Some(parent) = from_file.parent() {
-            let upper_name = from_file
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_ascii_uppercase();
             for entry in fs::read_dir(parent)?.flatten() {
                 if !entry.path().is_file() {
                     continue;
                 }
                 let found_name = entry.file_name().to_str().unwrap().to_ascii_uppercase();
                 if found_name.starts_with(&upper_name) {
+                    found = true;
                     let mut dest = dest_path.to_path_buf();
                     dest.push(entry.file_name().to_ascii_lowercase());
                     if dest.exists() {
                         // already handled.
                         continue;
                     }
+
                     if !found_name.ends_with(".PPS")
                         && (/*found_name.ends_with(".PPE") ||*/found_name.contains('.'))
                     {
@@ -677,6 +702,14 @@ impl PCBoardImporter {
                     }
                 }
             }
+        }
+        if !found {
+            self.logger.log(&format!(
+                "searched for {}, but not found any matching file.",
+                upper_name
+            ));
+
+            return Ok(PathBuf::new());
         }
 
         self.converted_files

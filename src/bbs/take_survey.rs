@@ -35,7 +35,7 @@ impl PcbBoardCommand {
         let mut display_menu = self.state.session.tokens.is_empty();
         loop {
             if display_menu {
-                let file = self.state.session.current_conference.blt_menu.clone();
+                let file = self.state.session.current_conference.survey_menu.clone();
                 self.state.display_file(&file)?;
                 display_menu = false;
             }

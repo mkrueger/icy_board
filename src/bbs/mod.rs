@@ -2,6 +2,7 @@ use icy_board_engine::{
     icy_board::{
         commands::{Command, CommandType},
         icb_text::IceText,
+        security::RequiredSecurity,
         state::{functions::display_flags, IcyBoardState},
         IcyBoardError,
     },
@@ -87,23 +88,31 @@ impl PcbBoardCommand {
     }
 
     fn dispatch_action(&mut self, command: &str, action: &Command) -> Res<()> {
-        if !self.check_sec(command, action.security)? {
+        if !self.check_sec(command, &action.security)? {
             return Ok(());
         }
 
         match action.command_type {
             CommandType::AbandonConference => {
+                // A
                 self.abandon_conference()?;
             }
             CommandType::BulletinList => {
+                // B
                 self.show_bulletins(action)?;
             }
             CommandType::Goodbye => {
+                // G
                 self.state
                     .hangup(icy_board_engine::vm::HangupType::Goodbye)?;
             }
             CommandType::Help => {
+                // H
                 self.show_help()?;
+            }
+            CommandType::InitialWelcome => {
+                // I
+                self.initial_welcome()?;
             }
             CommandType::JoinConference => {
                 self.join_conference(action)?;
@@ -422,8 +431,8 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    fn check_sec(&mut self, command: &str, required_sec: u8) -> Res<bool> {
-        if self.state.session.cur_security >= required_sec {
+    fn check_sec(&mut self, command: &str, required_sec: &RequiredSecurity) -> Res<bool> {
+        if required_sec.user_can_access(&self.state.session) {
             return Ok(true);
         }
 
@@ -452,5 +461,25 @@ impl PcbBoardCommand {
         }
 
         Ok(false)
+    }
+
+    fn initial_welcome(&mut self) -> Res<()> {
+        let board_name = self.state.board.lock().unwrap().config.board_name.clone();
+        self.state.print(TerminalTarget::Both, &board_name)?;
+        self.state.new_line()?;
+
+        let welcome_screen = self
+            .state
+            .board
+            .lock()
+            .unwrap()
+            .config
+            .paths
+            .welcome
+            .clone();
+
+        let welcome_screen = self.state.resolve_file(&welcome_screen);
+        self.state.display_file(&welcome_screen)?;
+        Ok(())
     }
 }
