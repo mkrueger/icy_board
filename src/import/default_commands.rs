@@ -79,7 +79,7 @@ pub fn add_default_commands(data: &PcbBoardData, cmd_list: &mut CommandList) {
     ));
     cmd_list.push(convert_cmd(
         &["K"],
-        CommandType::KillMessage,
+        CommandType::DeleteMessage,
         data.user_levels.cmd_k,
     ));
     cmd_list.push(convert_cmd(
@@ -119,7 +119,7 @@ pub fn add_default_commands(data: &PcbBoardData, cmd_list: &mut CommandList) {
     ));
     cmd_list.push(convert_cmd(
         &["S"],
-        CommandType::ScriptQuest,
+        CommandType::Survey,
         data.user_levels.cmd_s,
     ));
     cmd_list.push(convert_cmd(
@@ -212,6 +212,12 @@ pub fn add_default_commands(data: &PcbBoardData, cmd_list: &mut CommandList) {
     cmd_list.push(convert_cmd(
         &["BRDCST"],
         CommandType::Broadcast,
+        data.sysop_security.sysop,
+    ));
+
+    cmd_list.push(convert_cmd(
+        &["4"],
+        CommandType::RestoreMessage,
         data.sysop_security.sysop,
     ));
 }

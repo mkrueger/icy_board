@@ -105,7 +105,7 @@ impl Tui {
             if self.handle.as_ref().unwrap().is_finished() {
                 restore_terminal()?;
                 let handle = self.handle.take().unwrap();
-                if let Err(err) = handle.join() {
+                if let Err(_err) = handle.join() {
                     return Err(Box::new(IcyBoardError::ThreadCrashed));
                 }
                 return Ok(());

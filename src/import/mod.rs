@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
-    fs::{self, File},
-    io::BufReader,
+    fs,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -20,7 +19,8 @@ use icy_board_engine::icy_board::{
     menu::Menu,
     pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader},
     pcboard_data::PcbBoardData,
-    read_cp437,
+    read_with_encoding_detection,
+    surveys::SurveyList,
     user_base::{Password, UserBase},
     user_inf::PcbUserInf,
     users::PcbUserRecord,
@@ -344,6 +344,7 @@ impl PCBoardImporter {
             let destination = self.output_directory.join(&output);
 
             let _ = fs::create_dir(&destination);
+            conf.intro_file = self.convert_conference_display_file(&output, &conf.intro_file)?;
             conf.users_menu = self.convert_conference_display_file(&output, &conf.users_menu)?;
             conf.sysop_menu = self.convert_conference_display_file(&output, &conf.sysop_menu)?;
             conf.news_file = self.convert_conference_display_file(&output, &conf.news_file)?;
@@ -356,8 +357,9 @@ impl PCBoardImporter {
 
             conf.blt_menu = self.convert_conference_display_file(&output, &conf.blt_menu)?;
             conf.blt_file = self.convert_bullettin_file(&destination, &output, &conf.blt_file)?;
-            conf.script_menu = self.convert_conference_display_file(&output, &conf.script_menu)?;
-            conf.script_file = self.convert_conference_display_file(&output, &conf.script_file)?;
+            conf.survey_menu = self.convert_conference_display_file(&output, &conf.survey_menu)?;
+            conf.survey_file =
+                self.convert_questionnaires(&destination, &output, &conf.survey_file)?;
 
             for area in conf.message_areas.iter_mut() {
                 area.filename = self.convert_message_base(&destination, &output, &area.filename)?;
@@ -373,7 +375,11 @@ impl PCBoardImporter {
     }
 
     fn convert_conference_display_file(&mut self, output: &str, file_name: &Path) -> Res<PathBuf> {
-        let resolved_file = self.resolve_file(file_name.file_name().unwrap().to_str().unwrap())?;
+        let Some(file_name) = file_name.file_name() else {
+            return Ok(PathBuf::new());
+        };
+
+        let resolved_file = self.resolve_file(file_name.to_str().unwrap())?;
 
         let name = resolved_file
             .file_name()
@@ -383,7 +389,7 @@ impl PCBoardImporter {
             .to_string()
             .to_ascii_lowercase();
         let new_name = output.to_string() + "/" + &name;
-        self.convert_display_file(file_name.file_name().unwrap().to_str().unwrap(), &new_name)
+        self.convert_display_file(file_name.to_str().unwrap(), &new_name)
     }
 
     pub fn create_directories(&mut self) -> Res<()> {
@@ -541,7 +547,7 @@ impl PCBoardImporter {
         from: &P,
         to: &Q,
     ) -> Res<()> {
-        let in_string = read_cp437(from)?;
+        let in_string = read_with_encoding_detection(from)?;
         self.output.start_action(format!(
             "\t convert '{}' to utf8 '{}'…",
             from.as_ref().display(),
@@ -580,7 +586,7 @@ impl PCBoardImporter {
             self.logger.create_new_file(dest.clone().to_string_lossy());
             return Ok(dest);
         }
-        let mut trashcan = regex::escape(&read_cp437(&resolved_file)?);
+        let mut trashcan = regex::escape(&read_with_encoding_detection(&resolved_file)?);
         if !trashcan.ends_with('\n') {
             trashcan.push('\n');
         }
@@ -892,12 +898,13 @@ impl PCBoardImporter {
             ));
             return Ok(resolved_file);
         };
+        let resolved_file = resolved_file.with_extension("toml");
 
         let destination =
             PathBuf::from(dest_path).join(resolved_file.file_name().unwrap().to_ascii_lowercase());
 
         for entry in list.iter_mut() {
-            if let Ok(new_entry) = self.resolve_file(entry.to_str().unwrap()) {
+            if let Ok(new_entry) = self.resolve_file(entry.file.to_str().unwrap()) {
                 let name = new_entry
                     .file_name()
                     .unwrap()
@@ -906,15 +913,15 @@ impl PCBoardImporter {
                     .to_string()
                     .to_ascii_lowercase();
                 let new_name = output.to_string() + "/" + &name;
-                *entry = self.convert_display_file(new_entry.to_str().unwrap(), &new_name)?;
+                entry.file = self.convert_display_file(new_entry.to_str().unwrap(), &new_name)?;
             } else {
                 self.logger.log(&format!(
                     "Warning, can't resolve bulletin entry {} in file {}",
-                    entry.display(),
+                    entry.file.display(),
                     destination.display()
                 ));
                 self.output
-                    .warning(format!("Warning, can't resolve {}", entry.display()));
+                    .warning(format!("Warning, can't resolve {}", entry.file.display()));
             }
         }
 
@@ -930,9 +937,115 @@ impl PCBoardImporter {
             .unwrap()
             .to_string()
             .to_ascii_lowercase();
-        let new_name = output.to_string() + "/" + &name;
-        self.converted_files
-            .insert(upper_file_name.clone(), new_name.to_string());
-        Ok(PathBuf::from(new_name))
+        let new_name = PathBuf::from(output.to_string() + "/" + &name);
+        self.converted_files.insert(
+            upper_file_name.clone(),
+            new_name.to_string_lossy().to_string(),
+        );
+        Ok(new_name)
+    }
+
+    fn convert_questionnaires(
+        &mut self,
+        dest_path: &Path,
+        output: &str,
+        src_file: &Path,
+    ) -> Res<PathBuf> {
+        if src_file.to_str().unwrap().is_empty() {
+            return Ok(PathBuf::new());
+        }
+        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap())?;
+        let upper_file_name = resolved_file
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_ascii_uppercase();
+        if let Some(file) = self.converted_files.get(&upper_file_name) {
+            return Ok(PathBuf::from(file));
+        }
+
+        let Ok(mut list) = SurveyList::import_pcboard(&resolved_file) else {
+            self.logger.log(&format!(
+                "Warning, can't import script questionnaires {}",
+                resolved_file.display()
+            ));
+            self.output.warning(format!(
+                "Warning, can't import script questionnaires {}",
+                resolved_file.display()
+            ));
+            return Ok(resolved_file);
+        };
+        let resolved_file = resolved_file.with_extension("toml");
+
+        let destination =
+            PathBuf::from(dest_path).join(resolved_file.file_name().unwrap().to_ascii_lowercase());
+
+        for entry in list.iter_mut() {
+            if let Ok(new_entry) = self.resolve_file(entry.question_file.to_str().unwrap()) {
+                let name = new_entry
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string()
+                    .to_ascii_lowercase();
+                let new_name = output.to_string() + "/" + &name;
+                entry.question_file =
+                    self.convert_display_file(new_entry.to_str().unwrap(), &new_name)?;
+            } else {
+                self.logger.log(&format!(
+                    "Warning, can't resolve script questionary {} in file {}",
+                    entry.question_file.display(),
+                    destination.display()
+                ));
+                self.output.warning(format!(
+                    "Warning, can't resolve {}",
+                    entry.question_file.display()
+                ));
+            }
+
+            if let Ok(new_entry) = self.resolve_file(entry.answer_file.to_str().unwrap()) {
+                let name = new_entry
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string()
+                    .to_ascii_lowercase();
+                let new_name = output.to_string() + "/" + &name;
+                entry.answer_file =
+                    self.convert_display_file(new_entry.to_str().unwrap(), &new_name)?;
+            } else {
+                self.logger.log(&format!(
+                    "Warning, can't resolve script questionary {} in file {}",
+                    entry.answer_file.display(),
+                    destination.display()
+                ));
+                self.output.warning(format!(
+                    "Warning, can't resolve {}",
+                    entry.answer_file.display()
+                ));
+            }
+        }
+
+        if destination.exists() {
+            fs::remove_file(&destination)?;
+        }
+        list.save(&destination)?;
+
+        let name = resolved_file
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string()
+            .to_ascii_lowercase();
+        let new_name = PathBuf::from(output.to_string() + "/" + &name);
+        self.converted_files.insert(
+            upper_file_name.clone(),
+            new_name.to_string_lossy().to_string(),
+        );
+        Ok(new_name)
     }
 }

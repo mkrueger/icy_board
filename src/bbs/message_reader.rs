@@ -304,7 +304,7 @@ impl PcbBoardCommand {
             match message_base.read_header(number) {
                 Ok(header) => {
                     let text = message_base.read_msg_text(&header)?;
-                    viewer.display_header(&mut self.state, &message_base, &header)?;
+                    viewer.display_header(&mut self.state, message_base, &header)?;
 
                     if header.needs_password() {
                         if self
