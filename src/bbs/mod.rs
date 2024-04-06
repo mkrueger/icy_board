@@ -9,6 +9,7 @@ use icy_board_engine::{
     vm::TerminalTarget,
 };
 use icy_ppe::Res;
+mod message_reader;
 
 pub struct PcbBoardCommand {
     pub state: IcyBoardState,
@@ -35,6 +36,7 @@ impl PcbBoardCommand {
             IceText::CommandPrompt,
             40,
             MASK_COMMAND,
+            "",
             display_flags::UPCASE,
         )?;
 
@@ -45,21 +47,7 @@ impl PcbBoardCommand {
             self.state.session.tokens.push_back(cmd.to_string());
         }
 
-        for action in &self.state.session.current_conference.commands {
-            if action.input.contains(&command.to_string()) {
-                return self.dispatch_action(command, &action.clone());
-            }
-        }
-
-        let mut found_cmd = None;
-        for cmd in &self.state.board.lock().unwrap().commands.commands {
-            if cmd.input.contains(&command.to_string()) {
-                found_cmd = Some(cmd.clone());
-                break;
-            }
-        }
-
-        if let Some(action) = found_cmd {
+        if let Some(action) = self.state.try_find_command(&command) {
             return self.dispatch_action(command, &action);
         }
 
@@ -115,7 +103,7 @@ impl PcbBoardCommand {
                 self.show_help()?;
             }
             CommandType::JoinConference => {
-                self.join_conference()?;
+                self.join_conference(action)?;
             }
             CommandType::ShowMenu => {
                 self.display_menu()?;
@@ -125,13 +113,16 @@ impl PcbBoardCommand {
                 self.toggle_graphics()?;
             }
             CommandType::SetPageLength => {
-                self.set_page_len()?;
+                self.set_page_len(action)?;
             }
             CommandType::ExpertMode => {
                 self.set_expert_mode()?;
             }
             CommandType::UserList => {
-                self.show_user_list()?;
+                self.show_user_list(action)?;
+            }
+            CommandType::ReadMessages => {
+                self.read_messages(action)?;
             }
             _ => {
                 return Err(Box::new(IcyBoardError::UnknownAction(format!(
@@ -171,7 +162,7 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    fn join_conference(&mut self) -> Res<()> {
+    fn join_conference(&mut self, action: &Command) -> Res<()> {
         if self.state.board.lock().unwrap().conferences.is_empty() {
             self.state.display_text(
                 IceText::NoConferenceAvailable,
@@ -199,6 +190,7 @@ impl PcbBoardCommand {
                 IceText::JoinConferenceNumber,
                 40,
                 MASK_COMMAND,
+                &action.help,
                 display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )?
         };
@@ -266,6 +258,7 @@ impl PcbBoardCommand {
                     },
                     12,
                     MASK_BULLETINS,
+                    &action.help,
                     display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
                 )?
             };
@@ -278,35 +271,22 @@ impl PcbBoardCommand {
                 "R" | "L" => {
                     display_menu = true;
                 }
-                "?" | "H" => {
-                    if !action.help.is_empty() {
-                        let help_loc = self
-                            .state
-                            .board
-                            .lock()
-                            .unwrap()
-                            .config
-                            .paths
-                            .help_path
-                            .clone();
-                        let help_loc = help_loc.join(&action.help);
-                        self.state.display_file(&help_loc)?;
-                    }
-                }
                 _ => {
                     if text.is_empty() {
                         break;
                     }
                     if let Ok(number) = text.parse::<usize>() {
-                        if let Some(bulletin) = bulletins.get(number - 1) {
-                            self.state.display_file(&bulletin.file_name)?;
-                        } else {
-                            self.state.display_text(
-                                IceText::InvalidBulletinNumber,
-                                display_flags::NEWLINE
-                                    | display_flags::LFBEFORE
-                                    | display_flags::LFAFTER,
-                            )?;
+                        if number > 0 {
+                            if let Some(file) = bulletins.get(number - 1) {
+                                self.state.display_file(&file)?;
+                            } else {
+                                self.state.display_text(
+                                    IceText::InvalidBulletinNumber,
+                                    display_flags::NEWLINE
+                                        | display_flags::LFBEFORE
+                                        | display_flags::LFAFTER,
+                                )?;
+                            }
                         }
                     }
                 }
@@ -318,7 +298,7 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    fn show_user_list(&mut self) -> Res<()> {
+    fn show_user_list(&mut self, action: &Command) -> Res<()> {
         self.state.new_line()?;
         let text = if let Some(token) = self.state.session.tokens.pop_front() {
             token
@@ -327,6 +307,7 @@ impl PcbBoardCommand {
                 IceText::UserScan,
                 40,
                 MASK_COMMAND,
+                &action.help,
                 display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )?
         };
@@ -421,7 +402,7 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    fn set_page_len(&mut self) -> Res<()> {
+    fn set_page_len(&mut self, action: &Command) -> Res<()> {
         let page_len = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
@@ -435,6 +416,7 @@ impl PcbBoardCommand {
                 IceText::EnterPageLength,
                 2,
                 MASK_NUMBER,
+                &action.help,
                 display_flags::FIELDLEN
                     | display_flags::NEWLINE
                     | display_flags::LFAFTER
@@ -463,6 +445,7 @@ impl PcbBoardCommand {
                 IceText::HelpPrompt,
                 8,
                 MASK_COMMAND,
+                "",
                 display_flags::UPCASE | display_flags::NEWLINE | display_flags::HIGHASCII,
             )?
         };

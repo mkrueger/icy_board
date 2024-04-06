@@ -183,7 +183,11 @@ pub fn add_default_commands(data: &PcbBoardData, cmd_list: &mut CommandList) {
         CommandType::WhoIsOnline,
         data.user_levels.cmd_who,
     ));
-    cmd_list.push(convert_cmd(&["MENU", "MEN", "ME"], CommandType::Menu, 0));
+    cmd_list.push(convert_cmd(
+        &["MENU", "MEN", "ME"],
+        CommandType::ShowMenu,
+        0,
+    ));
     cmd_list.push(convert_cmd(
         &["NEWS", "NEW", "NE"],
         CommandType::DisplayNews,

@@ -1,11 +1,13 @@
 use std::{
     collections::HashMap,
-    fs,
+    fs::{self, File},
+    io::BufReader,
     path::{Path, PathBuf},
     str::FromStr,
 };
 
 use icy_board_engine::icy_board::{
+    bulletins::BullettinList,
     commands::CommandList,
     conferences::ConferenceBase,
     convert_to_utf8,
@@ -30,6 +32,7 @@ use icy_board_engine::icy_board::{
     PCBoardRecordImporter,
 };
 use icy_ppe::{datetime::IcbTime, Res};
+use jamjam::util::echmoail::EchomailAddress;
 use qfile::{QFilePath, QTraitSync};
 use relative_path::{PathExt, RelativePathBuf};
 use walkdir::WalkDir;
@@ -281,7 +284,7 @@ impl PCBoardImporter {
                 password_storage_method: PasswordStorageMethod::PlainText,
             },
             paths: ConfigPaths {
-                help_path: PathBuf::from("help/help"),
+                help_path: PathBuf::from("art/help"),
                 security_file_path: PathBuf::from("art/secmsgs"),
                 command_display_path: PathBuf::from("art/cmd_display"),
                 tmp_path: PathBuf::from("tmp/"),
@@ -340,7 +343,7 @@ impl PCBoardImporter {
             };
             let destination = self.output_directory.join(&output);
 
-            let _ = fs::create_dir(destination);
+            let _ = fs::create_dir(&destination);
             conf.users_menu = self.convert_conference_display_file(&output, &conf.users_menu)?;
             conf.sysop_menu = self.convert_conference_display_file(&output, &conf.sysop_menu)?;
             conf.news_file = self.convert_conference_display_file(&output, &conf.news_file)?;
@@ -350,10 +353,15 @@ impl PCBoardImporter {
             conf.private_upload_location = PathBuf::from(output.to_string() + "/pr");
             conf.doors_menu = self.convert_conference_display_file(&output, &conf.doors_menu)?;
             conf.doors_file = self.convert_conference_display_file(&output, &conf.doors_file)?;
+
             conf.blt_menu = self.convert_conference_display_file(&output, &conf.blt_menu)?;
-            conf.blt_file = self.convert_conference_display_file(&output, &conf.blt_file)?;
+            conf.blt_file = self.convert_bullettin_file(&destination, &output, &conf.blt_file)?;
             conf.script_menu = self.convert_conference_display_file(&output, &conf.script_menu)?;
             conf.script_file = self.convert_conference_display_file(&output, &conf.script_file)?;
+
+            for area in conf.message_areas.iter_mut() {
+                area.filename = self.convert_message_base(&destination, &output, &area.filename)?;
+            }
         }
 
         let destination = self.output_directory.join(new_rel_name);
@@ -387,7 +395,7 @@ impl PCBoardImporter {
             .log_error(fs::create_dir(&self.output_directory).err())?;
         self.logger.created_directory(self.output_directory.clone());
 
-        const REQUIRED_DIRECTORIES: [&str; 13] = [
+        const REQUIRED_DIRECTORIES: [&str; 12] = [
             "gen",
             "conferences",
             "conferences/main",
@@ -395,7 +403,6 @@ impl PCBoardImporter {
             "data",
             "config",
             "config/menus",
-            "help",
             "art",
             "art/cmd_display",
             "art/secmsgs",
@@ -631,11 +638,18 @@ impl PCBoardImporter {
                 if found_name.starts_with(&upper_name) {
                     let mut dest = dest_path.to_path_buf();
                     dest.push(entry.file_name().to_ascii_lowercase());
+                    if dest.exists() {
+                        // already handled.
+                        continue;
+                    }
                     if !found_name.ends_with(".PPS")
                         && (/*found_name.ends_with(".PPE") ||*/found_name.contains('.'))
                     {
                         if found_name.ends_with(".MNU") {
                             let imported_menu = Menu::import_pcboard(&entry.path())?;
+                            if dest.exists() {
+                                fs::remove_file(&dest)?;
+                            }
                             imported_menu.save(&dest)?;
                             self.converted_files.insert(
                                 entry.path().display().to_string().to_ascii_uppercase(),
@@ -783,5 +797,142 @@ impl PCBoardImporter {
             )));
         }
         Ok(PathBuf::from(new_rel_name))
+    }
+
+    fn convert_message_base(
+        &mut self,
+        dest_path: &Path,
+        output: &str,
+        src_file: &Path,
+    ) -> Res<PathBuf> {
+        if src_file.to_str().unwrap().is_empty() {
+            return Ok(PathBuf::new());
+        }
+        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap())?;
+        let upper_file_name = resolved_file
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_ascii_uppercase();
+        if let Some(file) = self.converted_files.get(&upper_file_name) {
+            return Ok(PathBuf::from(file));
+        }
+
+        if !resolved_file.is_file() {
+            self.converted_files
+                .insert(upper_file_name.clone(), String::new());
+
+            self.logger.log(&format!(
+                "Can't find message base {}",
+                resolved_file.display()
+            ));
+            self.output.warning(format!(
+                "Can't find message base {}",
+                resolved_file.display()
+            ));
+            return Ok(PathBuf::new());
+        }
+
+        self.output
+            .start_action(format!("Convert message base {}…", resolved_file.display()));
+
+        let destination = dest_path.join(resolved_file.file_name().unwrap().to_ascii_lowercase());
+
+        jamjam::conversion::convert_pcboard_to_jam(
+            &resolved_file,
+            &destination,
+            &EchomailAddress::default(),
+        )?;
+
+        self.logger.log(&format!(
+            "Converted message base {} -> {}",
+            resolved_file.display(),
+            destination.display()
+        ));
+        let new_rel_name = PathBuf::from(output.to_string().to_lowercase())
+            .join(resolved_file.file_name().unwrap().to_ascii_lowercase());
+
+        self.converted_files.insert(
+            upper_file_name.clone(),
+            new_rel_name.to_str().unwrap().to_string(),
+        );
+
+        Ok(new_rel_name)
+    }
+
+    fn convert_bullettin_file(
+        &mut self,
+        dest_path: &Path,
+        output: &str,
+        src_file: &Path,
+    ) -> Res<PathBuf> {
+        if src_file.to_str().unwrap().is_empty() {
+            return Ok(PathBuf::new());
+        }
+        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap())?;
+        let upper_file_name = resolved_file
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_ascii_uppercase();
+        if let Some(file) = self.converted_files.get(&upper_file_name) {
+            return Ok(PathBuf::from(file));
+        }
+
+        let Ok(mut list) = BullettinList::import_pcboard(&resolved_file) else {
+            self.logger.log(&format!(
+                "Warning, can't import bulletin  {}",
+                resolved_file.display()
+            ));
+            self.output.warning(format!(
+                "Warning, can't import bulletin {}",
+                resolved_file.display()
+            ));
+            return Ok(resolved_file);
+        };
+
+        let destination =
+            PathBuf::from(dest_path).join(resolved_file.file_name().unwrap().to_ascii_lowercase());
+
+        for entry in list.iter_mut() {
+            if let Ok(new_entry) = self.resolve_file(entry.to_str().unwrap()) {
+                let name = new_entry
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string()
+                    .to_ascii_lowercase();
+                let new_name = output.to_string() + "/" + &name;
+                *entry = self.convert_display_file(new_entry.to_str().unwrap(), &new_name)?;
+            } else {
+                self.logger.log(&format!(
+                    "Warning, can't resolve bulletin entry {} in file {}",
+                    entry.display(),
+                    destination.display()
+                ));
+                self.output
+                    .warning(format!("Warning, can't resolve {}", entry.display()));
+            }
+        }
+
+        if destination.exists() {
+            fs::remove_file(&destination)?;
+        }
+        list.save(&destination)?;
+
+        let name = resolved_file
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string()
+            .to_ascii_lowercase();
+        let new_name = output.to_string() + "/" + &name;
+        self.converted_files
+            .insert(upper_file_name.clone(), new_name.to_string());
+        Ok(PathBuf::from(new_name))
     }
 }

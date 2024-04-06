@@ -116,14 +116,15 @@ pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) {
                     }
                     Err(err) => {
                         restore_terminal().unwrap();
+                        log::error!("while running call wait screen: {}", err.to_string());
                         print_error(err.to_string());
                     }
                 }
             }
         }
-        Err(e) => {
-            restore_terminal().unwrap();
-            print_error(e.to_string());
+        Err(err) => {
+            log::error!("while loading icy board configuration: {}", err.to_string());
+            print_error(err.to_string());
         }
     }
 }
@@ -150,6 +151,7 @@ fn run_message(msg: CallWaitMessage, board: Arc<Mutex<IcyBoard>>) {
             let mut tui = Tui::new(cmd, screen, input_buffer);
             if let Err(err) = tui.run() {
                 restore_terminal().unwrap();
+                log::error!("while running board in local mode: {}", err.to_string());
                 println!("Error: {}", err);
                 process::exit(1);
             }

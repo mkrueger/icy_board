@@ -1,6 +1,7 @@
 use std::{
     collections::VecDeque,
     io::{self, stdout, Stdout},
+    process::Termination,
     sync::{Arc, Mutex},
     thread,
     time::{Duration, Instant},
@@ -51,14 +52,23 @@ impl Tui {
         let cmd = Arc::new(Mutex::new(cmd));
         let ui = session.clone();
         let join = thread::spawn(move || loop {
+            let orig_hook = std::panic::take_hook();
+            std::panic::set_hook(Box::new(move |panic_info| {
+                log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
+                log::error!("full info: {:?}", panic_info);
+
+                orig_hook(panic_info);
+            }));
+
             if let Ok(lock) = &mut cmd.lock() {
                 ui.lock().as_mut().unwrap().cur_user = lock.state.session.cur_user;
                 ui.lock().as_mut().unwrap().current_conference =
                     lock.state.session.current_conference.clone();
                 ui.lock().as_mut().unwrap().disp_options = lock.state.session.disp_options.clone();
                 if let Err(err) = lock.do_command() {
+                    lock.state.session.disp_options.reset_printout();
                     log::error!("Error: {}", err);
-                    lock.state.set_color(4).unwrap();
+                    lock.state.set_color(4.into()).unwrap();
                     lock.state
                         .print(
                             icy_board_engine::vm::TerminalTarget::Both,
@@ -67,6 +77,8 @@ impl Tui {
                         .unwrap();
                     lock.state.reset_color().unwrap();
                 }
+                lock.state.session.disp_options.reset_printout();
+
                 if lock.state.session.request_logoff {
                     ui.lock().as_mut().unwrap().request_logoff = true;
                     return Ok(());
@@ -94,8 +106,7 @@ impl Tui {
                 restore_terminal()?;
                 let handle = self.handle.take().unwrap();
                 if let Err(err) = handle.join() {
-                    let msg = format!("{:?}", err.downcast_ref::<&str>());
-                    return Err(Box::new(IcyBoardError::ThreadCrashed(msg)));
+                    return Err(Box::new(IcyBoardError::ThreadCrashed));
                 }
                 return Ok(());
             }
