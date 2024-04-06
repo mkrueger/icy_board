@@ -259,35 +259,7 @@ impl PcbBoardCommand {
                     }
 
                     if let Ok(number) = text.parse::<u32>() {
-                        if number == 0 {
-                            continue;
-                        }
-                        match message_base.read_header(number) {
-                            Ok(header) => {
-                                let text = message_base.read_msg_text(&header)?;
-                                viewer.display_header(&mut self.state, &message_base, &header)?;
-
-                                if header.needs_password() {
-                                    if self
-                                        .state
-                                        .check_password(IceText::PasswordToReadMessage, |pwd| {
-                                            header.is_password_valid(pwd)
-                                        })?
-                                    {
-                                        viewer.display_body(&mut self.state, &text)?;
-                                    }
-                                } else {
-                                    viewer.display_body(&mut self.state, &text)?;
-                                }
-                            }
-                            Err(err) => {
-                                log::error!("Error reading message header: {}", err);
-                                self.state.display_text(
-                                    IceText::NoMailFound,
-                                    display_flags::NEWLINE | display_flags::LFAFTER,
-                                )?;
-                            }
-                        }
+                        self.read_message_number(&message_base, &viewer, number)?;
                     }
                 }
                 self.state.press_enter()?;
@@ -317,5 +289,65 @@ impl PcbBoardCommand {
                 Ok(())
             }
         }
+    }
+
+    fn read_message_number(
+        &mut self,
+        message_base: &JamMessageBase,
+        viewer: &MessageViewer,
+        number: u32,
+    ) -> Res<()> {
+        if number == 0 {
+            return Ok(());
+        }
+        loop {
+            match message_base.read_header(number) {
+                Ok(header) => {
+                    let text = message_base.read_msg_text(&header)?;
+                    viewer.display_header(&mut self.state, &message_base, &header)?;
+
+                    if header.needs_password() {
+                        if self
+                            .state
+                            .check_password(IceText::PasswordToReadMessage, |pwd| {
+                                header.is_password_valid(pwd)
+                            })?
+                        {
+                            viewer.display_body(&mut self.state, &text)?;
+                        }
+                    } else {
+                        viewer.display_body(&mut self.state, &text)?;
+                    }
+                    self.state.new_line()?;
+                }
+                Err(err) => {
+                    log::error!("Error reading message header: {}", err);
+                    self.state.display_text(
+                        IceText::NoMailFound,
+                        display_flags::NEWLINE | display_flags::LFAFTER,
+                    )?;
+                }
+            }
+            let prompt = if self.state.session.expert_mode {
+                IceText::EndOfMessageExpertmode
+            } else {
+                IceText::EndOfMessage
+            };
+            let text = self.state.input_field(
+                prompt,
+                40,
+                MASK_COMMAND,
+                "hlpendr", // TODO: Hard coded help flag!
+                display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
+            )?;
+            if text.is_empty() {
+                break;
+            }
+            if let Ok(number) = text.parse::<u32>() {
+                return self.read_message_number(message_base, viewer, number);
+            }
+        }
+
+        Ok(())
     }
 }
