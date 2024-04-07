@@ -13,7 +13,6 @@ use clap::{Parser, Subcommand};
 use crossterm::{terminal::Clear, ExecutableCommand};
 use icy_board_engine::icy_board::{state::IcyBoardState, IcyBoard};
 use icy_engine_output::{IcyEngineOutput, Screen};
-use icy_ppe::Res;
 use import::{
     console_logger::{print_error, ConsoleLogger},
     PCBoardImporter,

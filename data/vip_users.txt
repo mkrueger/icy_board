@@ -1,0 +1,4 @@
+# vip_users.txt
+# ------------
+# This file contains the names of users for which the sysop gets an information if they log on.
+#

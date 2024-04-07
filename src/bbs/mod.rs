@@ -12,6 +12,7 @@ use icy_ppe::Res;
 mod delete_message;
 mod message_reader;
 mod recover_message;
+mod set_transfer_protocol;
 mod show_bulletins;
 mod take_survey;
 
@@ -115,38 +116,55 @@ impl PcbBoardCommand {
                 self.initial_welcome()?;
             }
             CommandType::JoinConference => {
+                // J
                 self.join_conference(action)?;
             }
-            CommandType::ShowMenu => {
-                self.display_menu()?;
-                self.display_menu = false;
+            CommandType::DeleteMessage => {
+                // K
+                self.delete_message(action)?;
             }
+
             CommandType::ToggleGraphics => {
+                // M
                 self.toggle_graphics()?;
             }
             CommandType::SetPageLength => {
+                // P
                 self.set_page_len(action)?;
             }
-            CommandType::ExpertMode => {
-                self.set_expert_mode()?;
-            }
-            CommandType::UserList => {
-                self.show_user_list(action)?;
-            }
             CommandType::ReadMessages => {
+                // R
                 self.read_messages(action)?;
             }
 
             CommandType::Survey => {
+                // S
                 self.take_survey(action)?;
             }
-
-            CommandType::DeleteMessage => {
-                self.delete_message(action)?;
+            CommandType::SetTransferProtocol => {
+                // T
+                self.set_transfer_protocol(action)?;
             }
+            CommandType::ExpertMode => {
+                // X
+                self.set_expert_mode()?;
+            }
+
+            CommandType::ShowMenu => {
+                // MENU
+                self.display_menu()?;
+                self.display_menu = false;
+            }
+            CommandType::UserList => {
+                // USER
+                self.show_user_list(action)?;
+            }
+
             CommandType::RestoreMessage => {
+                // 4
                 self.restore_message(action)?;
             }
+
             _ => {
                 return Err(Box::new(IcyBoardError::UnknownAction(format!(
                     "{:?}",
@@ -464,7 +482,7 @@ impl PcbBoardCommand {
     }
 
     fn initial_welcome(&mut self) -> Res<()> {
-        let board_name = self.state.board.lock().unwrap().config.board_name.clone();
+        let board_name = self.state.board.lock().unwrap().config.board.name.clone();
         self.state.print(TerminalTarget::Both, &board_name)?;
         self.state.new_line()?;
 

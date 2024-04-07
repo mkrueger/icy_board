@@ -13,8 +13,9 @@ use icy_board_engine::icy_board::{
     file_areas::FileAreaList,
     group_list::GroupList,
     icb_config::{
-        ColorConfiguration, ConfigPaths, IcbColor, IcbConfig, PasswordStorageMethod,
-        SubscriptionMode, SysopInformation, SysopSecurityLevels, UserPasswordPolicy,
+        BoardInformation, ColorConfiguration, ConfigPaths, IcbColor, IcbConfig,
+        PasswordStorageMethod, SubscriptionMode, SysopInformation, SysopSecurityLevels,
+        UserPasswordPolicy,
     },
     icb_text::IcbTextFile,
     language::SupportedLanguages,
@@ -183,8 +184,22 @@ impl PCBoardImporter {
             &(self.data.path.text_loc.clone() + "/PCBTEXT"),
             "data/icbtext.toml",
         )?;
-        let trashcan =
-            self.convert_trashcan(&self.data.path.tcan_file.clone(), "config/badusers.txt")?;
+        let bad_users =
+            self.convert_trashcan(&self.data.path.tcan_file.clone(), "config/bad_users.txt")?;
+
+        let bad_email = self.create_file(
+            include_str!("../../data/bad_email.txt"),
+            "config/bad_email.txt",
+        )?;
+        let bad_passwords = self.create_file(
+            include_str!("../../data/bad_passwords.txt"),
+            "config/bad_passwords.txt",
+        )?;
+        let vip_users = self.create_file(
+            include_str!("../../data/bad_passwords.txt"),
+            "config/vip_users.txt",
+        )?;
+
         let group_file = self.create_group_file("config/groups.toml")?;
 
         let welcome =
@@ -263,7 +278,13 @@ impl PCBoardImporter {
                 msg_hdr_read: IcbColor::Dos(self.data.colors.msg_hdr_read as u8),
                 msg_hdr_conf: IcbColor::Dos(self.data.colors.msg_hdr_conf as u8),
             },
-            board_name: self.data.board_name.clone(),
+            board: BoardInformation {
+                name: self.data.board_name.clone(),
+                location: String::new(),
+                operator: String::new(),
+                notice: String::new(),
+                capabilities: String::new(),
+            },
             func_keys: self.data.func_keys.clone(),
             subscription_info: SubscriptionMode {
                 is_enabled: self.data.subscription_info.is_enabled,
@@ -294,19 +315,23 @@ impl PCBoardImporter {
                 group_chat,
                 chat_menu,
                 no_ansi,
-                trashcan,
                 protocol_data_file,
                 security_level_file,
                 language_file,
                 command_file,
                 statistics_file,
                 group_file,
+
+                bad_users,
+                bad_email,
+                bad_passwords,
+                vip_users,
             },
         };
 
         let destination = self.output_directory.join("icyboard.toml");
         self.output.start_action(format!(
-            "Create main configutation {}…",
+            "Create main configuration {}…",
             destination.display()
         ));
         self.logger
@@ -589,7 +614,7 @@ impl PCBoardImporter {
 
         let resolved_file = self.resolve_file(trashcan_file)?;
         let resolved_file = PathBuf::from(&resolved_file);
-        let trashcan_header = include_str!("../../data/badusers_empty.txt");
+        let trashcan_header = include_str!("../../data/bad_users.txt");
 
         let dest = self.output_directory.join(new_rel_name);
         self.output.start_action(format!(
@@ -1222,5 +1247,10 @@ impl PCBoardImporter {
             new_name.to_string_lossy().to_string(),
         );
         Ok(new_name)
+    }
+
+    fn create_file(&self, include_str: &str, new_name: &str) -> Res<PathBuf> {
+        fs::write(&new_name, include_str)?;
+        Ok(PathBuf::from(new_name))
     }
 }

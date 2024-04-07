@@ -125,7 +125,7 @@ pub fn add_default_commands(data: &PcbBoardData, cmd_list: &mut CommandList) {
     ));
     cmd_list.push(convert_cmd(
         &["T"],
-        CommandType::TransferProtocol,
+        CommandType::SetTransferProtocol,
         data.user_levels.cmd_t,
     ));
     cmd_list.push(convert_cmd(

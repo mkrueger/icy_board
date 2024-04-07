@@ -279,7 +279,7 @@ impl CallWaitScreen {
                     4.0,
                     height - 2.0,
                     width - 7.0,
-                    &self.board.lock().unwrap().config.board_name,
+                    &self.board.lock().unwrap().config.board.name,
                     SelectState::Selected,
                 );
 
