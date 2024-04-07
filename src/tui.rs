@@ -1,7 +1,6 @@
 use std::{
     collections::VecDeque,
     io::{self, stdout, Stdout},
-    process::Termination,
     sync::{Arc, Mutex},
     thread,
     time::{Duration, Instant},

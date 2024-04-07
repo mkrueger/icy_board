@@ -131,7 +131,9 @@ pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) {
 
 fn run_message(msg: CallWaitMessage, board: Arc<Mutex<IcyBoard>>) {
     match msg {
-        CallWaitMessage::User(_) | CallWaitMessage::Sysop(_) => {
+        CallWaitMessage::User(busy) | CallWaitMessage::Sysop(busy) => {
+            println!("Login {}...", busy);
+
             stdout()
                 .execute(Clear(crossterm::terminal::ClearType::All))
                 .unwrap();
@@ -156,14 +158,15 @@ fn run_message(msg: CallWaitMessage, board: Arc<Mutex<IcyBoard>>) {
                 process::exit(1);
             }
         }
-        CallWaitMessage::Exit(_) => {
+        CallWaitMessage::Exit(busy) => {
+            println!("Exiting {}...", busy);
             restore_terminal().unwrap();
             print_exit_screen();
             process::exit(0);
         }
     }
 }
-
+/*
 fn init_error_hooks() -> Res<()> {
     //let (panic, error) = HookBuilder::default().into_hooks();
     //let panic = panic.into_panic_hook();
@@ -178,3 +181,4 @@ fn init_error_hooks() -> Res<()> {
     }));
     Ok(())
 }
+*/

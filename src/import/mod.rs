@@ -10,6 +10,7 @@ use icy_board_engine::icy_board::{
     commands::CommandList,
     conferences::ConferenceBase,
     convert_to_utf8,
+    file_areas::FileAreaList,
     group_list::GroupList,
     icb_config::{
         ColorConfiguration, ConfigPaths, IcbColor, IcbConfig, PasswordStorageMethod,
@@ -53,7 +54,6 @@ pub trait OutputLogger {
 pub struct PCBoardImporter {
     pub output: Box<dyn OutputLogger>,
     pub data: PcbBoardData,
-    pub source_directory: PathBuf,
     pub output_directory: PathBuf,
     pub logger: ImportLog,
 
@@ -62,12 +62,6 @@ pub struct PCBoardImporter {
     /// 'C:\' -> '/home/user/pcboard'
     /// Difference to map_paths is that this maps source paths to other source paths.
     pub resolve_paths: HashMap<String, String>,
-
-    /// Map original paths to import paths
-    /// For example:
-    /// '/home/user/pcboard/HELP' -> '/home/user/icyboard/icb/help'
-    /// Difference to resolve_paths is that this maps destination paths.
-    pub map_paths: HashMap<String, PathBuf>,
 
     pub converted_files: HashMap<String, String>,
 }
@@ -126,9 +120,7 @@ impl PCBoardImporter {
             output,
             data,
             output_directory,
-            source_directory,
             resolve_paths: paths,
-            map_paths,
             logger: ImportLog::default(),
             converted_files: HashMap::new(),
         })
@@ -347,6 +339,10 @@ impl PCBoardImporter {
             let destination = self.output_directory.join(&output);
 
             let _ = fs::create_dir(&destination);
+            conf.attachment_location = self.copy_attachment_directory(
+                &(output.to_string() + "/attach"),
+                &conf.attachment_location,
+            )?;
             conf.intro_file = self.convert_conference_display_file(&output, &conf.intro_file)?;
             conf.users_menu = self.convert_conference_display_file(&output, &conf.users_menu)?;
             conf.sysop_menu = self.convert_conference_display_file(&output, &conf.sysop_menu)?;
@@ -363,6 +359,11 @@ impl PCBoardImporter {
             conf.survey_menu = self.convert_conference_display_file(&output, &conf.survey_menu)?;
             conf.survey_file =
                 self.convert_questionnaires(&destination, &output, &conf.survey_file)?;
+
+            conf.file_area_menu =
+                self.convert_conference_display_file(&output, &conf.file_area_menu)?;
+            conf.file_area_file =
+                self.convert_dirlist_file(&destination, &output, &conf.file_area_file)?;
 
             for area in conf.message_areas.iter_mut() {
                 area.filename = self.convert_message_base(&destination, &output, &area.filename)?;
@@ -758,7 +759,8 @@ impl PCBoardImporter {
     ) -> Res<()> {
         let help_loc = self.resolve_file(dir_loc)?;
         let help_loc = PathBuf::from(&help_loc);
-        self.logger.log(&format!("=== Converting {} ===", category));
+        self.logger
+            .log(&format!("\n=== Converting {} ===", category));
 
         let o = self.output_directory.join(rel_output);
         if help_loc.exists() {
@@ -788,9 +790,67 @@ impl PCBoardImporter {
                 self.import_and_scan_file(&entry.path(), &to)?;
             }
         }
-        self.logger.log("=== Done ===");
 
         Ok(())
+    }
+
+    fn copy_attachment_directory(
+        &mut self,
+        output: &str,
+        attachment_location: &Path,
+    ) -> Res<PathBuf> {
+        let resolved_file =
+            self.resolve_file(attachment_location.file_name().unwrap().to_str().unwrap())?;
+        let upper_file_name = resolved_file
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_ascii_uppercase();
+        if let Some(file) = self.converted_files.get(&upper_file_name) {
+            return Ok(PathBuf::from(file));
+        }
+
+        let destination = self.output_directory.join(output);
+        if !destination.exists() {
+            fs::create_dir(&destination)?;
+        }
+
+        self.logger.log(&format!(
+            "\n=== Copy attachments {} -> {} ===",
+            resolved_file.display(),
+            destination.display()
+        ));
+
+        if resolved_file.is_dir() {
+            self.output.start_action(format!(
+                "Copy attachments from {} to {}…",
+                resolved_file.display(),
+                output
+            ));
+            for entry in WalkDir::new(&resolved_file) {
+                let entry = entry?;
+                if entry.path().is_dir() {
+                    continue;
+                }
+                let rel_path = entry.path().relative_to(&resolved_file).unwrap();
+                let to = rel_path.to_logical_path(&destination);
+                if let Some(parent_dir) = to.parent() {
+                    if !parent_dir.exists() {
+                        fs::create_dir(parent_dir).unwrap();
+                    }
+                }
+                fs::copy(entry.path(), &to)?;
+                self.logger.copy_file(entry.path(), &to);
+            }
+        }
+        let new_rel_name = PathBuf::from(output.to_string());
+        self.converted_files.insert(
+            upper_file_name.clone(),
+            new_rel_name.to_str().unwrap().to_string(),
+        );
+
+        Ok(new_rel_name)
     }
 
     fn convert_data<T: PCBoardImport>(&mut self, file: &str, new_rel_name: &str) -> Res<PathBuf> {
@@ -906,6 +966,11 @@ impl PCBoardImporter {
         output: &str,
         src_file: &Path,
     ) -> Res<PathBuf> {
+        self.logger.log(&format!(
+            "\n=== Converting BLT.LST {} ===",
+            src_file.display()
+        ));
+
         if src_file.to_str().unwrap().is_empty() {
             return Ok(PathBuf::new());
         }
@@ -962,6 +1027,8 @@ impl PCBoardImporter {
             fs::remove_file(&destination)?;
         }
         list.save(&destination)?;
+        self.logger
+            .log(&format!("Wrote bulletin to {}", destination.display()));
 
         let name = resolved_file
             .file_name()
@@ -984,6 +1051,11 @@ impl PCBoardImporter {
         output: &str,
         src_file: &Path,
     ) -> Res<PathBuf> {
+        self.logger.log(&format!(
+            "\n=== Converting Script Questionnaires {} ===",
+            src_file.display()
+        ));
+
         if src_file.to_str().unwrap().is_empty() {
             return Ok(PathBuf::new());
         }
@@ -1066,6 +1138,76 @@ impl PCBoardImporter {
             fs::remove_file(&destination)?;
         }
         list.save(&destination)?;
+        self.logger
+            .log(&format!("Wrote survey to {}", destination.display()));
+
+        let name = resolved_file
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string()
+            .to_ascii_lowercase();
+        let new_name = PathBuf::from(output.to_string() + "/" + &name);
+        self.converted_files.insert(
+            upper_file_name.clone(),
+            new_name.to_string_lossy().to_string(),
+        );
+        Ok(new_name)
+    }
+
+    fn convert_dirlist_file(
+        &mut self,
+        dest_path: &Path,
+        output: &str,
+        src_file: &Path,
+    ) -> Res<PathBuf> {
+        self.logger.log(&format!(
+            "\n=== Converting DIR.LST {} ===",
+            src_file.display()
+        ));
+
+        if src_file.to_str().unwrap().is_empty() {
+            return Ok(PathBuf::new());
+        }
+        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap())?;
+        let upper_file_name = resolved_file
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_ascii_uppercase();
+        if let Some(file) = self.converted_files.get(&upper_file_name) {
+            return Ok(PathBuf::from(file));
+        }
+
+        let Ok(mut list) = FileAreaList::import_pcboard(&resolved_file) else {
+            self.logger.log(&format!(
+                "Warning, can't import dir.lst file {}",
+                resolved_file.display()
+            ));
+            self.output.warning(format!(
+                "Warning, can't import dir.lst file {}",
+                resolved_file.display()
+            ));
+            return Ok(resolved_file);
+        };
+        let resolved_file = resolved_file.with_extension("toml");
+
+        let destination =
+            PathBuf::from(dest_path).join(resolved_file.file_name().unwrap().to_ascii_lowercase());
+
+        for (i, entry) in list.iter_mut().enumerate() {
+            entry.file_base = dest_path.join(format!("dir{:02}", i));
+            entry.path = self.resolve_file(entry.path.to_str().unwrap())?;
+        }
+
+        if destination.exists() {
+            fs::remove_file(&destination)?;
+        }
+        list.save(&destination)?;
+        self.logger
+            .log(&format!("Wrote file area to {}", destination.display()));
 
         let name = resolved_file
             .file_name()

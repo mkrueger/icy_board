@@ -4,20 +4,17 @@ use std::{
 };
 
 use chrono::Local;
-use icy_board_engine::{
-    icy_board::{
-        bulletins::MASK_BULLETINS,
-        commands::Command,
-        icb_config::IcbColor,
-        icb_text::IceText,
-        read_with_encoding_detection,
-        state::functions::{display_flags, MASK_ALNUM},
-    },
-    vm::expressions::temppath,
+use icy_board_engine::icy_board::{
+    bulletins::MASK_BULLETINS,
+    commands::Command,
+    icb_config::IcbColor,
+    icb_text::IceText,
+    read_with_encoding_detection,
+    state::functions::{display_flags, MASK_ALNUM},
 };
 use icy_ppe::Res;
 
-use super::{PcbBoardCommand, MASK_COMMAND};
+use super::PcbBoardCommand;
 
 impl PcbBoardCommand {
     pub fn take_survey(&mut self, action: &Command) -> Res<()> {
