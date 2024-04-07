@@ -5,6 +5,7 @@ use std::{
     str::FromStr,
 };
 
+use dizbase::file_base_scanner::scan_file_directory;
 use icy_board_engine::icy_board::{
     bulletins::BullettinList,
     commands::CommandList,
@@ -417,7 +418,7 @@ impl PCBoardImporter {
             .unwrap()
             .to_string()
             .to_ascii_lowercase();
-        let new_name = output.to_string() + "/" + &name;
+        let new_name = format!("{}/{}", output, &name);
         self.convert_display_file(file_name.to_str().unwrap(), &new_name)
     }
 
@@ -603,7 +604,6 @@ impl PCBoardImporter {
         groups.add_group("users", "Common Users", &[]);
         groups.add_group("no_age", "Members override age check", &[]);
         groups.save(&dest)?;
-
         Ok(PathBuf::from(new_rel_name))
     }
 
@@ -1035,7 +1035,7 @@ impl PCBoardImporter {
                     .unwrap()
                     .to_string()
                     .to_ascii_lowercase();
-                let new_name = output.to_string() + "/" + &name;
+                let new_name = format!("{}/{}", output, &name);
                 entry.file = self.convert_display_file(new_entry.to_str().unwrap(), &new_name)?;
             } else {
                 self.logger.log(&format!(
@@ -1062,7 +1062,7 @@ impl PCBoardImporter {
             .unwrap()
             .to_string()
             .to_ascii_lowercase();
-        let new_name = PathBuf::from(output.to_string() + "/" + &name);
+        let new_name = PathBuf::from(format!("{}/{}", output, &name));
         self.converted_files.insert(
             upper_file_name.clone(),
             new_name.to_string_lossy().to_string(),
@@ -1120,7 +1120,7 @@ impl PCBoardImporter {
                     .unwrap()
                     .to_string()
                     .to_ascii_lowercase();
-                let new_name = output.to_string() + "/" + &name;
+                let new_name = format!("{}/{}", output, &name);
                 entry.question_file =
                     self.convert_display_file(new_entry.to_str().unwrap(), &new_name)?;
             } else {
@@ -1143,7 +1143,7 @@ impl PCBoardImporter {
                     .unwrap()
                     .to_string()
                     .to_ascii_lowercase();
-                let new_name = output.to_string() + "/" + &name;
+                let new_name = format!("{}/{}", output, &name);
                 entry.answer_file =
                     self.convert_display_file(new_entry.to_str().unwrap(), &new_name)?;
             } else {
@@ -1173,7 +1173,7 @@ impl PCBoardImporter {
             .unwrap()
             .to_string()
             .to_ascii_lowercase();
-        let new_name = PathBuf::from(output.to_string() + "/" + &name);
+        let new_name = PathBuf::from(format!("{}/{}", output, &name));
         self.converted_files.insert(
             upper_file_name.clone(),
             new_name.to_string_lossy().to_string(),
@@ -1223,8 +1223,22 @@ impl PCBoardImporter {
             PathBuf::from(dest_path).join(resolved_file.file_name().unwrap().to_ascii_lowercase());
 
         for (i, entry) in list.iter_mut().enumerate() {
-            entry.file_base = dest_path.join(format!("dir{:02}", i));
+            entry.file_base = PathBuf::from(format!("{}/dir{:02}", output, i));
             entry.path = self.resolve_file(entry.path.to_str().unwrap())?;
+            let base_path = PathBuf::from(dest_path).join(format!("dir{:02}", i));
+            self.logger.log(&format!(
+                "Create file base for {} : {}",
+                entry.path.display(),
+                base_path.display()
+            ));
+            if let Err(err) = scan_file_directory(&entry.path, &base_path) {
+                self.output.warning(format!(
+                    "Warning, can't scan file directory {}",
+                    entry.path.display()
+                ));
+                self.logger
+                    .log(&format!("Error creating file base {}", err));
+            }
         }
 
         if destination.exists() {
@@ -1241,7 +1255,7 @@ impl PCBoardImporter {
             .unwrap()
             .to_string()
             .to_ascii_lowercase();
-        let new_name = PathBuf::from(output.to_string() + "/" + &name);
+        let new_name = PathBuf::from(format!("{}/{}", output, &name));
         self.converted_files.insert(
             upper_file_name.clone(),
             new_name.to_string_lossy().to_string(),
@@ -1250,7 +1264,7 @@ impl PCBoardImporter {
     }
 
     fn create_file(&self, include_str: &str, new_name: &str) -> Res<PathBuf> {
-        fs::write(&new_name, include_str)?;
+        fs::write(self.output_directory.join(new_name), include_str)?;
         Ok(PathBuf::from(new_name))
     }
 }

@@ -14,6 +14,7 @@ mod message_reader;
 mod recover_message;
 mod set_transfer_protocol;
 mod show_bulletins;
+mod show_file_directories;
 mod take_survey;
 
 pub struct PcbBoardCommand {
@@ -102,6 +103,11 @@ impl PcbBoardCommand {
                 // B
                 self.show_bulletins(action)?;
             }
+            CommandType::FileDirectory => {
+                // F
+                self.show_file_directories(action)?;
+            }
+
             CommandType::Goodbye => {
                 // G
                 self.state
@@ -223,6 +229,8 @@ impl PcbBoardCommand {
                 .paths
                 .conf_join_menu
                 .clone();
+            let mnu = self.state.resolve_path(&mnu);
+
             self.state.display_menu(&mnu)?;
             self.state.new_line()?;
 
@@ -496,7 +504,7 @@ impl PcbBoardCommand {
             .welcome
             .clone();
 
-        let welcome_screen = self.state.resolve_file(&welcome_screen);
+        let welcome_screen = self.state.resolve_path(&welcome_screen);
         self.state.display_file(&welcome_screen)?;
         Ok(())
     }

@@ -10,6 +10,7 @@ icy_ppe = { path="../PPLEngine/icy_ppe" }
 icy_board_engine = { path="../PPLEngine/icy_board_engine" }
 icy_engine = { git ="https://github.com/mkrueger/icy_engine" }
 jamjam = { path="../jamjam" }
+dizbase = { path="../dizbase/dizbase" }
 
 lazy_static = "1.4.0"
 clap = { version="4.5.2", features = ["derive"] }
@@ -32,6 +33,9 @@ walkdir = "2.5.0"
 relative-path = "1.9.2"
 regex = "1.10.4"
 temp-file = "0.1.8"
+
+# for file view kb/mb
+humanize-bytes = "1.0.5"
 
 [profile.release]
 opt-level = 'z'     # Optimize for size

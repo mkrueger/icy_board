@@ -71,8 +71,8 @@ impl PcbBoardCommand {
     }
 
     fn start_survey(&mut self, survey: &&icy_board_engine::icy_board::surveys::Survey) -> Res<()> {
-        let question = self.state.resolve_file(&survey.question_file);
-        let answer_file = self.state.resolve_file(&survey.answer_file);
+        let question = self.state.resolve_path(&survey.question_file);
+        let answer_file = self.state.resolve_path(&survey.answer_file);
 
         let mut output = Vec::new();
         output.push("**************************************************************".to_string());

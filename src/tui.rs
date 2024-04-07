@@ -138,7 +138,7 @@ impl Tui {
                                         && key.modifiers.contains(KeyModifiers::CONTROL)
                                     {
                                         let _ = disable_raw_mode();
-                                        panic!("Ctrl-X or Ctrl-C pressed");
+                                        return Ok(());
                                     }
                                     self.add_input(c.to_string().chars())
                                 }
