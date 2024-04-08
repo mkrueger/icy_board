@@ -10,6 +10,7 @@ use icy_board_engine::{
 };
 use icy_ppe::Res;
 mod delete_message;
+mod find_files;
 mod message_reader;
 mod recover_message;
 mod set_transfer_protocol;
@@ -129,7 +130,10 @@ impl PcbBoardCommand {
                 // K
                 self.delete_message(action)?;
             }
-
+            CommandType::LocateFile => {
+                // L
+                self.find_files(action)?;
+            }
             CommandType::ToggleGraphics => {
                 // M
                 self.toggle_graphics()?;

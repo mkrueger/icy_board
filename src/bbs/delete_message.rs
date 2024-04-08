@@ -1,11 +1,10 @@
+use super::{PcbBoardCommand, MASK_COMMAND};
 use icy_board_engine::{
     icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
 };
 use icy_ppe::Res;
 use jamjam::jam::JamMessageBase;
-
-use super::{PcbBoardCommand, MASK_COMMAND};
 
 impl PcbBoardCommand {
     pub fn delete_message(&mut self, action: &Command) -> Res<()> {

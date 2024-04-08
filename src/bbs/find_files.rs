@@ -2,8 +2,12 @@ use dizbase::file_base::{metadata::MetadaType, FileBase};
 use humanize_bytes::humanize_bytes_decimal;
 use icy_board_engine::{
     icy_board::{
-        commands::Command, file_areas::FileAreaList, icb_config::IcbColor, icb_text::IceText,
-        state::functions::display_flags, IcyBoardSerializer,
+        commands::Command,
+        file_areas::FileAreaList,
+        icb_config::IcbColor,
+        icb_text::IceText,
+        state::functions::{display_flags, MASK_ALNUM, MASK_ASCII, MASK_PATH},
+        IcyBoardSerializer,
     },
     vm::TerminalTarget,
 };
@@ -13,13 +17,8 @@ use ratatui::symbols::line;
 use super::{PcbBoardCommand, MASK_COMMAND};
 
 impl PcbBoardCommand {
-    pub fn show_file_directories(&mut self, action: &Command) -> Res<()> {
-        let file_area_file = self
-            .state
-            .resolve_path(&self.state.session.current_conference.file_area_file);
-
-        let file_areas = FileAreaList::load(&file_area_file)?;
-        if file_areas.is_empty() {
+    pub fn find_files(&mut self, action: &Command) -> Res<()> {
+        if self.state.session.current_file_areas.is_empty() {
             self.state.display_text(
                 IceText::NoDirectoriesAvailable,
                 display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -27,33 +26,71 @@ impl PcbBoardCommand {
             self.state.press_enter()?;
             return Ok(());
         }
-        let directory_number = if let Some(token) = self.state.session.tokens.pop_front() {
+        let search_pattern = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
-            let mnu = self.state.session.current_conference.file_area_menu.clone();
-            let mnu = self.state.resolve_path(&mnu);
-            self.state.display_menu(&mnu)?;
-            self.state.new_line()?;
+            self.state.input_field(
+                IceText::SearchFileName,
+                40,
+                &MASK_ASCII,
+                &action.help,
+                display_flags::NEWLINE
+                    | display_flags::UPCASE
+                    | display_flags::LFBEFORE
+                    | display_flags::HIGHASCII,
+            )?
+        };
+        if search_pattern.is_empty() {
+            self.state.press_enter()?;
+            self.display_menu = true;
+            return Ok(());
+        }
 
+        let search_area = if let Some(token) = self.state.session.tokens.pop_front() {
+            token
+        } else {
             self.state.input_field(
                 if self.state.session.expert_mode {
-                    IceText::FileListCommandExpert
+                    IceText::FileNumberExpertmode
                 } else {
-                    IceText::FileListCommand
+                    IceText::FileNumberNovice
                 },
                 40,
                 MASK_COMMAND,
                 &action.help,
-                display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
+                display_flags::NEWLINE
+                    | display_flags::UPCASE
+                    | display_flags::LFBEFORE
+                    | display_flags::HIGHASCII,
             )?
         };
+        if search_area.is_empty() {
+            self.state.press_enter()?;
+            self.display_menu = true;
+            return Ok(());
+        }
+
         let mut joined = false;
-        if let Ok(number) = directory_number.parse::<i32>() {
-            if 1 <= number && (number as usize) <= file_areas.len() {
-                let area = &file_areas[number as usize - 1];
+        if search_area == "A" {
+            self.state.session.cancel_batch = false;
+            for area in 0..self.state.session.current_file_areas.len() {
+                if self.state.session.current_file_areas[area]
+                    .list_security
+                    .user_can_access(&self.state.session)
+                {
+                    self.search_file_area(action, area, search_pattern.clone())?;
+                }
+                if self.state.session.cancel_batch {
+                    break;
+                }
+            }
+            joined = true;
+        } else if let Ok(number) = search_area.parse::<i32>() {
+            if 1 <= number && (number as usize) <= self.state.session.current_file_areas.len() {
+                let area = &self.state.session.current_file_areas[number as usize - 1];
 
                 if area.list_security.user_can_access(&self.state.session) {
-                    self.display_file_area(action, &area)?;
+                    self.search_file_area(action, number as usize - 1, search_pattern)?;
                 }
 
                 joined = true;
@@ -61,7 +98,7 @@ impl PcbBoardCommand {
         }
 
         if !joined {
-            self.state.session.op_text = directory_number;
+            self.state.session.op_text = search_area;
             self.state.display_text(
                 IceText::InvalidEntry,
                 display_flags::NEWLINE | display_flags::NOTBLANK,
@@ -74,15 +111,22 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    fn display_file_area(
+    fn search_file_area(
         &mut self,
         action: &Command,
-        area: &&icy_board_engine::icy_board::file_areas::FileArea,
+        area: usize,
+        search_pattern: String,
     ) -> Res<()> {
-        let file_base_path = self.state.resolve_path(&area.file_base);
-        let Ok(base) = FileBase::open(&file_base_path) else {
+        let file_base_path = self
+            .state
+            .resolve_path(&self.state.session.current_file_areas[area].file_base);
+        let Ok(mut base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());
-            self.state.session.op_text = area.file_base.to_str().unwrap().to_string();
+            self.state.session.op_text = self.state.session.current_file_areas[area]
+                .file_base
+                .to_str()
+                .unwrap()
+                .to_string();
             self.state.display_text(
                 IceText::NotFoundOnDisk,
                 display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -90,26 +134,22 @@ impl PcbBoardCommand {
             return Ok(());
         };
 
-        self.state.clear_screen()?;
-
-        self.state.set_color(IcbColor::Dos(6))?;
+        self.state
+            .display_text(IceText::ScanningDirectory, display_flags::DEFAULT)?;
+        self.state
+            .print(TerminalTarget::Both, &format!(" {} ", area + 1))?;
+        self.state.set_color(IcbColor::Dos(10))?;
         self.state.print(
             TerminalTarget::Both,
-            "Filename       Size      Date    Description of File Contents",
-        )?;
-        self.state.new_line()?;
-        self.state.print(
-            TerminalTarget::Both,
-            "============ ========  ========  ============================================",
+            &format!("({})", self.state.session.current_file_areas[area].name),
         )?;
         self.state.new_line()?;
 
-        let mut files = base.iter();
+        base.load_headers()?;
+        let files = base.find_files(search_pattern.as_str())?;
         self.state.session.disable_auto_more = true;
-        while let Some(file) = files.next() {
-            let header = file?;
-
-            let metadata = base.read_metadata(&header)?;
+        for header in &files {
+            let metadata = base.read_metadata(header)?;
 
             let size = header.size();
             let date = header.file_date().unwrap();
@@ -148,6 +188,7 @@ impl PcbBoardCommand {
                         self.state.new_line()?;
                         printed_lines = true;
                         if self.state.session.more_requested && !self.filebase_more(action)? {
+                            self.state.session.cancel_batch = true;
                             return Ok(());
                         }
                         self.state.set_color(IcbColor::Dos(3))?;
@@ -158,23 +199,9 @@ impl PcbBoardCommand {
                 self.state.new_line()?;
             }
         }
-        self.filebase_more(action)?;
 
         self.state.session.disable_auto_more = false;
         self.state.session.more_requested = false;
         Ok(())
-    }
-
-    pub fn filebase_more(&mut self, action: &Command) -> Res<bool> {
-        let input = self.state.input_field(
-            IceText::FilesMorePrompt,
-            40,
-            MASK_COMMAND,
-            &action.help,
-            display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
-        )?;
-        self.state.session.more_requested = false;
-        self.state.session.num_lines_printed = 0;
-        Ok(input.to_ascii_uppercase() != self.state.no_char.to_string())
     }
 }

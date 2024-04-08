@@ -165,7 +165,11 @@ impl MessageViewer {
             .msg_hdr_to
             .clone();
         state.set_color(c1)?;
-        let txt = self.format_hdr_text(&self.to_line.text, &header.get_to().unwrap(), "");
+        let txt = self.format_hdr_text(
+            &self.to_line.text,
+            &header.get_to().unwrap().to_string(),
+            "",
+        );
         state.print(TerminalTarget::Both, &txt)?;
 
         let c1 = state
@@ -177,7 +181,11 @@ impl MessageViewer {
             .msg_hdr_from
             .clone();
         state.set_color(c1)?;
-        let txt = self.format_hdr_text(&self.from_line.text, &header.get_from().unwrap(), "");
+        let txt = self.format_hdr_text(
+            &self.from_line.text,
+            &header.get_from().unwrap().to_string(),
+            "",
+        );
         state.print(TerminalTarget::Both, &txt)?;
 
         let c1 = state
@@ -189,7 +197,11 @@ impl MessageViewer {
             .msg_hdr_subj
             .clone();
         state.set_color(c1)?;
-        let txt = self.format_hdr_text(&self.subj_line.text, &header.get_subject().unwrap(), "");
+        let txt = self.format_hdr_text(
+            &self.subj_line.text,
+            &header.get_subject().unwrap().to_string(),
+            "",
+        );
         state.print(TerminalTarget::Both, &txt)?;
 
         let c1 = state
@@ -303,7 +315,7 @@ impl PcbBoardCommand {
         loop {
             match message_base.read_header(number) {
                 Ok(header) => {
-                    let text = message_base.read_msg_text(&header)?;
+                    let text = message_base.read_msg_text(&header)?.to_string();
                     viewer.display_header(&mut self.state, message_base, &header)?;
 
                     if header.needs_password() {
