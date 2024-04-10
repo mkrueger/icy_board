@@ -55,19 +55,27 @@ impl PcbBoardCommand {
     }
 
     fn display_menu(&mut self) -> Res<()> {
-        let current_conference = self.state.session.current_conference_number;
-
-        let menu_file = if let Some(conference) = self.state.board.lock().as_ref().unwrap().conferences.get(current_conference as usize) {
-            if self.state.session.is_sysop {
-                &conference.sysop_menu
-            } else {
-                &conference.users_menu
-            }
-            .clone()
+        let menu_file = if self.state.session.is_sysop {
+            self.state.session.current_conference.sysop_menu.clone()
         } else {
-            return Ok(());
+            self.state.session.current_conference.users_menu.clone()
         };
         self.state.display_file(&menu_file)?;
+        Ok(())
+    }
+
+    fn display_news(&mut self) -> Res<()> {
+        let news_file = self.state.session.current_conference.news_file.clone();
+        let resolved_path = self.state.resolve_path(&news_file);
+
+        if !resolved_path.exists() {
+            self.state.display_text(IceText::NoNews, display_flags::NEWLINE)?;
+        } else {
+            self.state.display_file(&news_file)?;
+        }
+        self.state.new_line()?;
+        self.state.press_enter()?;
+        self.display_menu = true;
         Ok(())
     }
 
@@ -152,6 +160,11 @@ impl PcbBoardCommand {
                 // MENU
                 self.display_menu()?;
                 self.display_menu = false;
+            }
+
+            CommandType::DisplayNews => {
+                // MENU
+                self.display_news()?;
             }
             CommandType::UserList => {
                 // USER
