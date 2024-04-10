@@ -118,6 +118,10 @@ impl PcbBoardCommand {
                 // M
                 self.toggle_graphics()?;
             }
+            CommandType::NewFileScan => {
+                // N
+                self.find_new_files(action, 60000)?;
+            }
             CommandType::SetPageLength => {
                 // P
                 self.set_page_len(action)?;
@@ -138,6 +142,10 @@ impl PcbBoardCommand {
             CommandType::ExpertMode => {
                 // X
                 self.set_expert_mode()?;
+            }
+            CommandType::ZippyDirectoryScan => {
+                // Z
+                self.zippy_directory_scan(action)?;
             }
 
             CommandType::ShowMenu => {

@@ -170,6 +170,28 @@ impl FileBase {
     pub fn find_newer_files(&self, timestamp: u64) -> crate::Result<Vec<&FileHeader>> {
         Ok(self.file_headers.par_iter().filter(|header| header.file_date > timestamp).collect())
     }
+    pub fn find_files_with_pattern(&self, str: &str) -> crate::Result<Vec<&FileHeader>> {
+        let lc = str.to_lowercase();
+        let bytes = lc.as_bytes();
+
+        Ok(self
+            .file_headers
+            .par_iter()
+            .filter(|header| {
+                if let Ok(metadata) = self.read_metadata(header) {
+                    for m in metadata {
+                        if m.metadata_type == MetadaType::FileID {
+                            println!("found file id for {}", header.name);
+                            if find_match(m.data, bytes) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                false
+            })
+            .collect())
+    }
 
     pub fn get_headers(&self) -> &Vec<FileHeader> {
         &self.file_headers
@@ -200,6 +222,17 @@ impl FileBase {
         }
         Ok(result)
     }
+}
+
+fn find_match(data: Vec<u8>, pattern: &[u8]) -> bool {
+    let mut data = &data.to_ascii_lowercase()[..];
+    while data.len() > pattern.len() {
+        if data.starts_with(pattern) {
+            return true;
+        }
+        data = &data[1..];
+    }
+    false
 }
 
 struct FileBaseMessageIter {
