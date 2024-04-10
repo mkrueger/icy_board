@@ -1,0 +1,26 @@
+[package]
+name = "mkicbmnu"
+version = "0.1.2"
+edition.workspace = true
+authors.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+icy_board_engine = { workspace = true }
+icy_board_tui = { workspace = true }
+
+lazy_static = "1.4.0"
+semver = "1.0.20"
+thiserror = "1.0.57"
+ariadne = "0.4.0"
+unicase = "2.7.0"
+clap = { version = "4.5.4", features = ["derive"] }
+crossterm = "0.27.0"
+ratatui = "0.26.1"
+color-eyre = "0.6.3"
+itertools = "0.12.1"
+strum = "0.26"
+strum_macros = "0.26"
+
+i18n-embed-fl = "0.8.0"

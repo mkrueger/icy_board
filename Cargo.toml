@@ -11,8 +11,12 @@ members = [
 	"crates/ppld",
 	"crates/pplx",
 	"crates/ppl-lsp",
-	"crates/scandb"
-, "crates/codepages"]
+	"crates/scandb",
+	"crates/codepages", 
+	"crates/icy_board_tui",
+	"crates/mkicbmnu", 
+	
+]
 
 [workspace.package]
 version = "0.3.0"
@@ -23,6 +27,8 @@ authors = ["Mike Krüger <mkrueger@posteo.de>"]
 codepages = { path = "crates/codepages" }
 dizbase = { path = "crates/dizbase" }
 jamjam = { path = "crates/jamjam" }
+icy_board_tui = { path = "crates/icy_board_tui" }
+
 icy_ppe = { path = "crates/icy_ppe" }
 icy_board_engine = { path = "crates/icy_board_engine" }
 

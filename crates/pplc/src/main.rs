@@ -13,11 +13,11 @@ use crossterm::{
 
 use semver::Version;
 use std::{
-    ffi::OsStr,
     fs,
     io::stdout,
     path::{Path, PathBuf},
 };
+
 /// PCBoard Programming Language Compiler  
 #[derive(clap::Parser)]
 #[command(version="", about="PCBoard Programming Language Compiler", long_about = None)]
@@ -47,7 +47,7 @@ struct Cli {
     dos: bool,
 
     /// file[.pps] to compile (extension defaults to .pps if not specified)
-    file: String,
+    file: PathBuf,
 }
 
 lazy_static::lazy_static! {
@@ -66,12 +66,11 @@ fn main() {
         println!("--nouvar can't be used in conjunction with --forceuvar");
         return;
     }
-    let mut file_name = arguments.file;
-
-    let extension = Path::new(&file_name).extension().and_then(OsStr::to_str);
-    if extension.is_none() {
-        file_name.push_str(".pps");
-    }
+    let file_name = if arguments.file.extension().is_none() {
+        arguments.file.with_extension("pps")
+    } else {
+        arguments.file
+    };
 
     let encoding = if arguments.dos { Encoding::CP437 } else { Encoding::Utf8 };
 
@@ -96,7 +95,7 @@ fn main() {
             if errors.lock().unwrap().has_errors() || (errors.lock().unwrap().has_warnings() && !arguments.nowarnings) {
                 let mut error_count = 0;
                 let mut warning_count = 0;
-
+                let file_name = file_name.to_string_lossy().to_string();
                 for err in &errors.lock().unwrap().errors {
                     error_count += 1;
                     Report::build(ReportKind::Error, &file_name, err.span.start)

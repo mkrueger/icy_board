@@ -18,5 +18,5 @@ rand = "0.8.4"
 bstr = "1.9.1"
 
 [dev-dependencies]
-tempfile = "3"
 pretty_assertions = "1"
+tempfile = "3"
