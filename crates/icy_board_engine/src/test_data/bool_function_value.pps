@@ -1,0 +1,17 @@
+Declare Function Available(Integer iConf) Boolean
+
+PRINT TRUE,"-", FALSE
+if (Available(1)) then
+    print "=A"
+else 
+    print "=B"
+endif
+
+if (Available(1)) print "=A"
+
+Function Available(Integer iConf) Boolean
+    Available = FALSE
+    Available = TRUE
+EndFunc
+;;
+1-0=A=A

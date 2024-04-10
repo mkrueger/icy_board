@@ -1,0 +1,9 @@
+Declare Function AvailableRet(Integer iConf) Boolean
+
+if (AvailableRet(1))  println "=C"
+
+Function AvailableRet(Integer iConf) Boolean
+    AvailableRet = FALSE
+    RETURN
+EndFunc
+;;

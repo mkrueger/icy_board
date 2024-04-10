@@ -1,0 +1,4 @@
+OPTEXT "world"
+PRINTLN "Hello @OPTEXT@!"
+;;
+Hello world!

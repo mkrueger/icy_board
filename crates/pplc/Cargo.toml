@@ -1,0 +1,15 @@
+[package]
+name = "pplc"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+icy_ppe = { workspace = true }
+lazy_static = "1.4.0"
+semver = "1.0.20"
+thiserror = "1.0.57"
+ariadne = "0.4.0"
+unicase = "2.7.0"
+clap = { version = "4.5.4", features = ["derive"] }
+crossterm = "0.27.0"

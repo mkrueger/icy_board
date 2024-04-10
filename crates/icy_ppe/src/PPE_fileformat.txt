@@ -1,0 +1,49 @@
+PPE files have the following form:
+
+HEADER
+VARIABLE_TABLE
+CODE_SIZE
+CODE
+
+Header:
+PCBoard Programming Language Executable  <VER>\x0D\x0A\x1A
+
+<VER> is #.## for example "3.30" or "3.40"
+
+VARIABLE_TABLE
+
+A list of entries in the form:
+
+Header (encrypted):
+
+index           u16
+dims            u8
+vector_size     u16
+matrix_size     u16
+cube_size       u16
+var_type        u8
+flags           u8
+
+- flags: if bit 0 is set then the variable won't be reinitialized.
+if it's 1 then the variable will be reinitalized (locals in a function/procedure)
+
+Content:
+
+For type string:
+
+size           u16
+string         u8[size] (encrypted)
+
+Otherwise:
+garbage        u16 (VTABLE from C class - get's skipped by PCBoard, pure garbage)
+var_type       u16 - should be u8, same as var_type from above basically
+content        u64 - Constant expression that should be 
+
+CODE_SIZE
+
+u16 to define the code block size in bytes.
+If the block length differs from code_size then the block was compressed using RLE encoding.
+
+CODE
+
+u16 array of statements 

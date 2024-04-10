@@ -1,0 +1,25 @@
+STRING FOO(3)
+INTEGER P(3)
+INTEGER I
+FOO(0) ="z"
+FOO(1) ="A"
+FOO(2) ="e"
+FOO(3) ="4"
+SORT FOO, P
+
+FOR i = 0 TO 3
+PRINTLN FOO(i)
+NEXT
+
+FOR i = 0 TO 3
+PRINTLN FOO(p(i))
+NEXT
+;;
+z
+A
+e
+4
+4
+A
+e
+z

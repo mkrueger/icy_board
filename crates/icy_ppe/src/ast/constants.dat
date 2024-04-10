@@ -1,0 +1,119 @@
+TRUE, 0x01, General
+FALSE, 0x00, General
+STK_LIMIT, 6022 + 1024, General
+
+ATTACH_LIM_P, 0x03, General
+ATTACH_LIM_U, 0x02, General
+ACC_CUR_BAL, 0x04, General
+F_NET, 0x20, General
+CMAXMSGS, 0x01, General
+MAXMSGS, 0x00, General
+
+CUR_USER, 0, General
+NO_USER, -1, General
+
+ACC_STAT, 0x00, Account
+ACC_TIME, 0x01, Account
+ACC_MSGREAD, 0x02, Account
+ACC_MSGWRITE, 0x03, Account
+
+DEFS, 0x00, DispText+InputStr
+BELL, 0x00800, DispText
+LOGIT, 0x08000, DispText
+LOGITLEFT, 0x10000, DispText
+
+AUTO, 0x02000, InputStr
+ECHODOTS, 0x00001, InputStr
+ERASELINE, 0x00020, InputStr
+FIELDLEN, 0x00002, InputStr
+GUIDE, 0x00004, InputStr
+HIGHASCII, 0x01000, InputStr
+LFAFTER, 0x00100, InputStr+DispText
+LFBEFORE, 0x00080, InputStr+DispText
+NEWLINE, 0x00040, InputStr+DispText
+NOCLEAR, 0x00400, InputStr
+STACKED, 0x00010, InputStr
+UPCASE, 0x00008, InputStr
+WORDWRAP, 0x00200, InputStr
+YESNO, 0x04000, InputStr
+
+NEWBALANCE, 0x00, PcbAccount
+CHRG_CALL, 0x01, PcbAccount
+CHRG_TIME, 0x02, PcbAccount
+CHRG_PEAKTIME, 0x03, PcbAccount
+CHRG_CHAT, 0x04, PcbAccount
+CHRG_MSGREAD, 0x05, PcbAccount
+CHRG_MSGCAP, 0x06, PcbAccount
+CHRG_MSGWRITE, 0x07, PcbAccount
+CHRG_MSGECHOED, 0x08, PcbAccount
+CHRG_MSGPRIVATE, 0x09, PcbAccount
+CHRG_DOWNFILE, 0x0A, PcbAccount
+CHRG_DOWNBYTES, 0x0B, PcbAccount
+PAY_UPFILE, 0x0C, PcbAccount
+PAY_UPBYTES, 0x0D, PcbAccount
+WARNLEVEL, 0x0E, PcbAccount
+
+CRC_FILE, 0x01, Crc
+CRC_STR, 0x00, Crc
+
+START_BAL, 0x00, Account
+START_SESSION, 0x01, Account
+DEB_CALL, 0x02, Account
+DEB_TIME, 0x03, Account
+DEB_MSGREAD, 0x04, Account
+DEB_MSGCAP, 0x05, Account
+DEB_MSGWRITE, 0x06, Account
+DEB_MSGECHOED, 0x07, Account
+DEB_MSGPRIVATE, 0x08, Account
+DEB_DOWNFILE, 0x09, Account
+DEB_DOWNBYTES, 0x0A, Account
+DEB_CHAT, 0x0B, Account
+DEB_TPU, 0x0C, Account
+DEB_SPECIAL, 0x0D, Account
+CRED_UPFILE, 0x0E, Account
+CRED_UPBYTES, 0x0F, Account
+CRED_SPECIAL, 0x10, Account
+SEC_DROP, 0x11, Account
+
+F_EXP, 0x02, ConfFlag
+F_MW, 0x10, ConfFlag
+F_REG, 0x01, ConfFlag
+F_SEL, 0x04, ConfFlag
+F_SYS, 0x08, ConfFlag
+
+FCL, 0x02, StartDisp
+FNS, 0x01, StartDisp
+NC, 0x00, StartDisp
+
+GRAPH, 0x01, DispFile
+SEC, 0x02, DispFile
+LANG, 0x04, DispFile
+
+HDR_ACTIVE, 0x0E, ScanMsgHdr
+HDR_BLOCKS, 0x04, ScanMsgHdr
+HDR_DATE, 0x05, ScanMsgHdr
+HDR_ECHO, 0x0F, ScanMsgHdr
+HDR_FROM, 0x0B, ScanMsgHdr
+HDR_MSGNUM, 0x02, ScanMsgHdr
+HDR_MSGREF, 0x03, ScanMsgHdr
+HDR_PWD, 0x0D, ScanMsgHdr
+HDR_REPLY, 0x0A, ScanMsgHdr
+HDR_RPLYDATE, 0x08, ScanMsgHdr
+HDR_RPLYTIME, 0x09, ScanMsgHdr
+HDR_STATUS, 0x01, ScanMsgHdr
+HDR_SUBJ, 0x0C, ScanMsgHdr
+HDR_TIME, 0x06, ScanMsgHdr
+HDR_TO, 0x07, ScanMsgHdr
+
+O_RD, 0x00, FileAccess
+O_RW, 0x02, FileAccess
+O_WR, 0x01, FileAccess
+
+SEEK_CUR, 0x01, FileSeek
+SEEK_END, 0x02, FileSeek
+SEEK_SET, 0x00, FileSeek
+
+S_DB, 0x03, FileSec
+S_DN, 0x00, FileSec
+S_DR, 0x01, FileSec
+S_DW, 0x02, FileSec

@@ -1,0 +1,6 @@
+integer a,b
+push 5+3, 12
+pop a, b
+println a,b 
+;;
+128

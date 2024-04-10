@@ -1,0 +1,46 @@
+[package]
+name = "icy_board"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+icy_ppe = { workspace = true}
+icy_board_engine = { workspace = true}
+jamjam = { workspace = true}
+dizbase = { workspace = true}
+icy_engine = { git ="https://github.com/mkrueger/icy_engine" }
+
+lazy_static = "1.4.0"
+clap = { version="4.5.2", features = ["derive"] }
+semver = "1.0.20"
+thiserror = "1.0.57"
+ariadne = "0.4.0"
+unicase = "2.7.0"
+byteorder = "1.5.0"
+log = "0.4.21"
+fern = "0.6.2"
+ratatui = "0.26.1"
+crossterm = "0.27.0"
+chrono = "0.4.37"
+qfile = "3.0.1"
+easy_reader = "0.5.2"
+substring = "1.4.5"
+toml = "0.8.12"
+serde = "1.0.197"
+walkdir = "2.5.0"
+relative-path = "1.9.2"
+regex = "1.10.4"
+temp-file = "0.1.8"
+bstr = "1.9.1"
+
+# for file view kb/mb
+humanize-bytes = "1.0.5"
+
+[profile.release]
+opt-level = 'z'     # Optimize for size
+lto = true          # Enable link-time optimization
+codegen-units = 1   # Reduce number of codegen units to increase optimizations
+panic = 'abort'     # Abort on panic
+strip = true        # Strip symbols from binary*

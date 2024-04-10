@@ -1,0 +1,2886 @@
+# IcyBoard text file v1.0
+
+[LeaveComment]
+text = "Leave a comment for the sysop (Enter)=no"
+style = "White"
+
+[CommentFieldPrompt]
+text = " Brand of CPU you are using"
+style = "Yellow"
+
+[AccessDeniedForEvent]
+text = "Access Denied - Upcoming Event Pending ..."
+style = "Red"
+
+[TimelimitExceeded]
+text = "Time Limit Exceeded."
+style = "Red"
+
+[UnauthorizedName]
+text = "Access Denied - Unauthorized name match on @USER@!"
+style = "Red"
+
+[LockedOut]
+text = "Access Denied - You are Locked Out of this System!"
+style = "Red"
+
+[DeniedWrongPassword]
+text = "Access Denied - Excessive Password Failures!"
+style = "Red"
+
+[DeniedRefuseToRegister]
+text = "Access Denied - Refused to Complete Registration!"
+style = "Red"
+
+[DeniedPasswordFailed]
+text = "Access Denied - Remote DOS Password Failure!"
+style = "Red"
+
+[NameAlreadyInUse]
+text = "Access Denied - @USER@ is in use on another Node!"
+style = "Red"
+
+[ClosedBoard]
+text = "Sorry, @FIRST@, this is a `Closed' Board ..."
+style = "Red"
+
+[SecurityViolation]
+text = "Security Violation(s) - Disconnecting ..."
+style = "Red"
+
+[NoRoomForText]
+text = "There is presently no room for your text, @FIRST@ ..."
+style = "Red"
+
+[CantProtectMessageToAll]
+text = "A message to `ALL' cannot be protected, @FIRST@ ..."
+style = "Red"
+
+[CallerMustKnowPassword]
+text = "Callers must know p/w to read message!  Continue (Enter)=no"
+style = "Red"
+
+[WrongModemType]
+text = "Protocol Unavailable - Modem Type Wrong!"
+style = "Red"
+
+[LocalDownloadPath]
+text = "Local Download Path"
+style = "Cyan"
+
+[PasswordToReadMessage]
+text = "Password to Read Message (ENTER alone aborts)"
+style = "White"
+
+[LocalUploadPath]
+text = "Local Upload Path or Filename"
+style = "Cyan"
+
+[PrinterOffLine]
+text = "Printer Off-Line ..."
+style = "Red"
+justify = "Right"
+
+[SecurityPassword]
+text = "Enter the Security password desired"
+style = "Yellow"
+
+[ReplyToMessages]
+text = "Reply to Msgs: (#), (#), (Enter)=abort"
+style = "Green"
+
+[PathErrorInSystemConfiguration]
+text = "Path error in system configuration!"
+style = "Red"
+justify = "Right"
+
+[NotAvailableLocally]
+text = "Selection not available in local mode."
+style = "Red"
+
+[SysopLevelRemoved]
+text = "Temporary Sysop privileges removed ..."
+style = "Red"
+
+[SysopLevelGranted]
+text = "Temporary Sysop privileges granted this call only!"
+style = "Red"
+
+[GraphicsUnavailable]
+text = "Graphics mode is not available, @FIRST@ ..."
+
+[AutomaticLockout]
+text = "Automatic Lockout completed ..."
+style = "Red"
+
+[RIPModeOn]
+text = "!|*|Y01000400|c0A|@0005RIPscrip |Y01000200|c0B|@3W0Fmode on|g0006"
+style = "Red"
+
+[TextEntryFull]
+text = "Text Entry is Full ..."
+style = "Red"
+
+[ASCIINotAvailableOnBinaryFile]
+text = "ASCII transfer is not available on a binary file!"
+style = "Red"
+
+[MustEndWithCTRLZ]
+text = "NOTE: Transfer must end with a (Ctrl-Z)!"
+style = "Red"
+
+[None]
+text = "None"
+
+[NoConnect]
+text = "NO CONNECT / @OPTEXT@"
+
+[FullCountdown]
+text = "FULL COUNTDOWN"
+
+[NoCarrier]
+text = "NO CARRIER"
+
+[DiskFull]
+text = "Disk Full - System presently unavailable!"
+style = "Red"
+
+[NodesBusy]
+text = "ALL NODES ARE BUSY AT THIS TIME PLEASE TRY LATER"
+
+[AllName]
+text = "ALL"
+
+[UploadMode]
+text = "Uploading text file directly into the message editor..."
+style = "White"
+
+[Echo]
+text = "~(Echo)"
+
+[AllConfIndicator]
+text = "~(A)"
+
+[ReadonlyIndicator]
+text = "~(R/O)"
+
+[ErrorReadingSurvey]
+text = "Error reading Survey"
+style = "Red"
+justify = "Right"
+
+[MessageBaseInUse]
+text = "Error reading Message base in use!"
+style = "Red"
+
+[NoREMOTESYSFile]
+text = "Unable to exit to DOS - no REMOTE.SYS file found!"
+style = "Red"
+
+[NoRecordAvailableToUpdate]
+text = "No record available to update!"
+style = "Red"
+justify = "Right"
+
+[MessagesSuccessfullyPacked]
+text = "Messages Successfully Packed & Purified!"
+style = "Cyan"
+justify = "Right"
+
+[HandleForChat]
+text = "Enter `handle' to be used for Node Chat"
+style = "Red"
+
+[Attachment]
+text = "File Attachment: @OPTEXT@"
+style = "Red"
+
+[LongerDescription]
+text = "Enter a longer description of the file please!"
+style = "Red"
+
+[NoSurveysAvailable]
+text = "No Surveys are available, @FIRST@ ..."
+style = "Red"
+
+[ReEnterName]
+text = "(R) to re-enter your name or (C) to continue logon as a new user"
+style = "Yellow"
+
+[Register]
+text = "Would you like to register with us, @FIRST@? (Enter)=yes"
+style = "Green"
+
+[KeyboardTimeExpired]
+text = "Keyboard Time Expired!"
+style = "Red"
+
+[InvalidEntry]
+text = "Invalid Entry!  Please try again, @FIRST@ ..."
+style = "Red"
+
+[UploadsArePrivate]
+text = "Sorry, @FIRST@, uploads are Private ..."
+style = "Red"
+
+[OnlineUpgrade]
+text = "Online Registration being performed - please wait, @FIRST@ ..."
+style = "Green"
+
+[AutoDisconnectNow]
+text = "Automatic Disconnect Completed!"
+style = "Red"
+
+[FullUserNameToFind]
+text = "Full USER Name to Find (Enter)=none"
+style = "Yellow"
+
+[FileNameToDownload]
+text = "Enter the filename to Download (Enter)=none"
+style = "Yellow"
+
+[TextViewFileName]
+text = "Enter the filename to View (Enter)=none"
+style = "Yellow"
+
+[HelpPrompt]
+text = "Menu Letter/Command you need Help with (Enter)=none"
+style = "Yellow"
+
+[JoinConferenceNumber]
+text = "Conference # to join (Enter)=none"
+style = "Yellow"
+
+[NodeNumberToLogoff]
+text = "Node # to Auto-Logoff (Enter)=none"
+style = "Yellow"
+
+[NodeToView]
+text = "Node # to View, (A)ll or (Enter)=none"
+style = "Yellow"
+
+[QuestionNumberToAnswer]
+text = "Survey # to Answer (Enter)=none"
+style = "Yellow"
+
+[FileNameToUpload]
+text = "Enter the Filename to Upload (Enter)=none"
+style = "Yellow"
+
+[DOORNumber]
+text = "Enter the DOOR # to Open (Enter)=none"
+style = "Yellow"
+
+[TextToScanFor]
+text = "Enter the Text to Scan for (Enter)=none"
+style = "Yellow"
+
+[SearchFileName]
+text = "Search Filename (wildcards are OK) (Enter)=none"
+style = "Yellow"
+
+[DateToSearch]
+text = "Date as (mmddyy) to search from (Enter)="
+style = "Green"
+
+[PrivateTopic]
+text = "Private Discussion"
+
+[NotRegisteredInConference]
+text = "Sorry, @FIRST@, you are not registered in Conference @OPTEXT@"
+style = "Red"
+
+[OpenTopic]
+text = "Open Discussion"
+
+[AutoDisconnect]
+text = "CAUTION: Auto-Disconnect in (@OPTEXT@) min.!"
+style = "Red"
+
+[MessageNumberToActivate]
+text = "Message # to Activate (Enter)=none"
+style = "Green"
+
+[NoMailFound]
+text = "Sorry, @FIRST@, no mail found to read ..."
+style = "Red"
+
+[PackTheMessageBase]
+text = "Pack the message base (Enter)=no"
+style = "Green"
+
+[DeleteCallersLog]
+text = "Delete the caller log (Enter)=no"
+style = "Red"
+
+[PurgeOlderThan1980]
+text = "Purge older than (Enter)=010180"
+style = "Green"
+justify = "Right"
+
+[RenumberDuringPack]
+text = "Renumber during repack (Enter)=no"
+style = "Green"
+
+[NewLowMessageNumber]
+text = "NEW low starting Message # (Enter)=abort"
+style = "Red"
+
+[CompleteQuestion]
+text = "Complete the Survey (Enter)=no"
+style = "Green"
+
+[WantToDeleteLine]
+text = "Do you want to delete this line (Enter)=no"
+style = "Red"
+
+[PackTheUsersFile]
+text = "Pack the user file (Enter)=no"
+style = "Green"
+
+[Overwrite]
+text = "(@OPTEXT@) already exists.  Remove it (Y=Yes, N=No, C=Continue)"
+style = "Red"
+
+[ViewConferenceMembers]
+text = "View other Conference members (Enter)=no"
+style = "Green"
+
+[PurgePrivateReceived]
+text = "Purge RECEIVED+PRIVATE Msgs (Enter)=no"
+style = "Green"
+
+[ExitToDOS]
+text = "Exit to DOS (Enter)=no"
+style = "Green"
+
+[ReferenceMessagePurififcation]
+text = "Reference Message number purification proceeding ..."
+style = "Green"
+justify = "Right"
+
+[WrongPasswordEntered]
+text = "Wrong password entered, @FIRST@ ..."
+style = "Red"
+
+[NoSuchLineNumber]
+text = "There is no such line, @FIRST@ ..."
+style = "Red"
+
+[NoSuchMessageNumber]
+text = "Sorry, @FIRST@, there is no Message #"
+style = "Red"
+
+[YouCanNotKillMessage]
+text = "Sorry, @FIRST@, you cannot kill Message #"
+style = "Red"
+
+[InvalidSelection]
+text = "Invalid Selection, @FIRST@!  Please try again ..."
+style = "Red"
+
+[Paging]
+text = "Page ends in 30 seconds.  (Ctrl-K) Aborts ."
+style = "Cyan"
+
+[ChannelText]
+text = "Channel @OPTEXT@:~"
+style = "Green"
+
+[EnterNoChange]
+text = "  @FIRST@, press (Enter) for `no change' to any item ..."
+style = "Red"
+
+[ShellCompleted]
+text = "SHELL completed on (@OPTEXT@)."
+style = "White"
+
+[PageLengthSetTo]
+text = "Page Length now set to @OPTEXT@."
+style = "Green"
+
+[UserNotRegisteredInConference]
+text = "That user is not registered in this Conference ..."
+style = "Red"
+
+[SurveyInfoSaved]
+text = "@INCONF@Survey (@OPTEXT@) info saved."
+style = "White"
+
+[AutoLogoff]
+text = "Automatic Logoff Completed ..."
+style = "Red"
+
+[KeepLockedOut]
+text = "Keep `LOCKED OUT' users (Enter)=yes"
+style = "Green"
+
+[PurgeOlderThan]
+text = "Purge older than (Enter)=010180"
+style = "Green"
+
+[KeepSecurity]
+text = "Keep whose security => (Enter)=100"
+style = "Green"
+
+[UsersFilePacked]
+text = "User file successfully packed."
+style = "White"
+justify = "Right"
+
+[JoiningChannel]
+text = "Joining channel #@OPTEXT@."
+style = "White"
+
+[PasswordsDontMatch]
+text = "Sorry, @FIRST@, the two passwords do not match!"
+style = "Red"
+
+[ReEnterPassword]
+text = "Re-enter password to verify"
+style = "Yellow"
+
+[EnterUserSecurityLevel]
+text = "Enter user's Security Level"
+style = "Yellow"
+
+[BusDataPhone]
+text = "Business or data phone # is"
+style = "Yellow"
+
+[HomeVoicePhone]
+text = "   Home or voice phone # is"
+style = "Yellow"
+
+[RegisteredInConferences]
+text = "  Registered in Conferences"
+style = "Yellow"
+justify = "Right"
+
+[TimeAdjusted]
+text = "@FIRST@, your time has been adjusted for our event."
+style = "Red"
+
+[ResponseRequired]
+text = "Response to the Question is Required!"
+style = "Red"
+
+[RealNamesOnly]
+text = "Sorry, @FIRST@, only real names are allowed ..."
+style = "Red"
+
+[InsufficientSecurityToView]
+text = "Insufficient security for Viewing (@OPTEXT@)"
+style = "Red"
+
+[DOORNotAvailable]
+text = "Sorry, @FIRST@, DOOR selected is not available."
+style = "Red"
+
+[NoNetworkActive]
+text = "Sorry, @FIRST@, no Network is active."
+style = "Red"
+
+[StatusWhileAwaitingOtherCaller]
+text = "Enter (U) for status while awaiting other caller ..."
+style = "Cyan"
+justify = "Right"
+
+[RegisteredInfoSaved]
+text = "Thanks, @FIRST@, your registration information is saved."
+style = "White"
+
+[PackNotAailableFromRemote]
+text = "Sorry, @FIRST@, PACK not available from remote ..."
+style = "Red"
+justify = "Right"
+
+[ErrorSavingMessage]
+text = "Error saving message ..."
+style = "Red"
+
+[ErrorInUsersFile]
+text = "Error in user file ..."
+style = "Red"
+
+[ChannelBusy]
+text = "CHANNEL BUSY!  Please wait a moment before typing..."
+style = "Red"
+
+[SysopUnAvailable]
+text = "Sorry, the Sysop is not currently available for CHAT!"
+style = "Red"
+
+[SysopBusy]
+text = "Sysop - Busy"
+
+[UserBusy]
+text = "User - Busy"
+
+[DOSBusy]
+text = "DOS - Busy"
+
+[DOSNotBusy]
+text = "DOS - Not Busy"
+
+[TurnPrinterOn]
+text = "Printer is Off"
+
+[TurnAlarmOn]
+text = "Alarm is Off"
+
+[TurnPageOn]
+text = "Page Bell is Off"
+
+[NewHandle]
+text = "@OPTEXT@ has changed to a new handle:~"
+
+[BulletinsUpdated]
+text = "Bulletins have been updated since last time on, @FIRST@."
+style = "Red"
+
+[NoTimeForDownload]
+text = "Insufficient time remaining to download (@OPTEXT@)"
+style = "Red"
+
+[InsufficientUploadSpace]
+text = "Insufficient disk space for complete upload!"
+style = "Red"
+
+[UploadsDisabled]
+text = "Sorry, @FIRST@, uploads are currently disabled!"
+style = "Red"
+
+[Ineffect71]
+text = "7-E-1 Operation in Effect."
+style = "Red"
+
+[DOSFunction]
+text = "DOS function to execute (Enter)=none"
+style = "Yellow"
+
+[EnterLogonPassword]
+text = "Enter your logon password below to continue ..."
+style = "Yellow"
+
+[ExcessiveErrors]
+text = "Excessive Main Command Line Errors!"
+style = "Red"
+
+[AbortKeys]
+text = "(Ctrl-K) or (Ctrl-X) Aborts, (Ctrl-S) Suspends."
+style = "Red"
+
+[EnterPageLength]
+text = "Enter new length (0)=continuous, (Enter)=no change"
+style = "Yellow"
+
+[MessageBaseError]
+text = "Message Base Error!  Attempting to continue ..."
+style = "Red"
+justify = "Right"
+
+[YourPassword]
+text = "Password (Dots will echo)"
+style = "White"
+
+[WantGraphics]
+text = "Do you want graphics (Enter)=no"
+
+[ReEnterUsersName]
+text = "(R)e-enter user's name or (C)ontinue"
+style = "Yellow"
+
+[CheckingUserFile]
+text = "Checking user file - please wait ..."
+style = "Green"
+justify = "Right"
+
+[NewPassword]
+text = " Password (one word please)"
+style = "Yellow"
+
+[CheckingFileTransfer]
+text = "Checking file transfer request.  Please wait, @FIRST@ ..."
+style = "White"
+
+[DuplicateFile]
+text = "(@OPTEXT@) already exists on the system."
+style = "Red"
+
+[MessagesCanPrompt]
+text = "Msg Scan: (A)ll, (C)urrent, (S)ince, (Q)uick, (L)ong, (Enter)=abort"
+style = "Green"
+
+[JoinGroupChat]
+text = "Join Group CHAT Session (Enter)=no"
+style = "Yellow"
+
+[WaitingForEvent]
+text = "Awaiting Event Timer - All activity suspended ..."
+
+[FiveScanHeader]
+text = "Sts Msg#    Ref#    To              From            Subject"
+style = "White"
+
+[BytesLeftAre]
+text = "(@OPTEXT@) Sorry, @FIRST@, download bytes left available are @BYTESLEFT@"
+style = "Red"
+
+[EnterDescription]
+text = "Before beginning, enter a description of: @OPTEXT@"
+style = "Yellow"
+
+[SlashForPrivate]
+text = "Begin description with (/) to make upload `Private'."
+style = "Green"
+
+[ThanksForTheFiles]
+text = "Thanks for the file(s), @FIRST@!"
+style = "Yellow"
+
+[MessageCommandExpertmode]
+text = "(A) (C) (D) (E) (F) (H) (I) (L) (Q) (S) (SA) (SC) (SK) (SN) (U)"
+style = "Green"
+
+[MessageCommandNovice1]
+text = "(A)bort, (C)ont Line Editor, (D)elete, (E)dit, (F)ull Scrn Editor, (H)elp,"
+style = "Green"
+
+[ModemError]
+text = "Modem Reset Error .."
+
+[ThanksForCalling]
+text = "Thanks for calling, @FIRST@!"
+style = "Green"
+
+[UsermodeExpertmode]
+text = "(A), (C), (D), (F), (L), (P), (Q), (S), (U), (#), (+/-)"
+style = "Yellow"
+
+[UsermodeNoExpert]
+text = "A)dd, C)hange, D)el, F)ind, L)ist, P)rint, Q)uit, S)can, U)ndel, (#)"
+style = "Yellow"
+
+[To]
+text = "        To:~"
+style = "Yellow"
+
+[From]
+text = "      From:~"
+style = "Yellow"
+
+[Subject]
+text = "      Subj:~"
+style = "Yellow"
+
+[UnableToWriteUserRecord]
+text = "Unable to write USER Record - Aborting!"
+style = "Red"
+justify = "Right"
+
+[NewTopic]
+text = "@OPTEXT@ has changed the topic to:~"
+
+[NumberOfUsersPurged]
+text = "Number of Users Purged:"
+style = "Red"
+justify = "Right"
+
+[SysopChatActive]
+text = "Sysop CHAT active at~"
+style = "White"
+
+[TransferSuccessful]
+text = "Transfer Successful, @FIRST@."
+style = "White"
+
+[InvalidFileName]
+text = "(@OPTEXT@) is an invalid filename!"
+style = "Red"
+
+[ChatPromptExpertmode]
+text = "(@X0C@TIMELEFT@@X0A min. left) (H)elp, Chat Command"
+style = "Green"
+
+[ChatPromptNovice]
+text = "(@X0C@TIMELEFT@@X0A min. left) (H)elp, Chat Command"
+style = "Green"
+
+[TopicNowPrivate]
+text = "This channel is now private.  Outsiders cannot join."
+style = "White"
+
+[ChannelIsPrivate]
+text = "That channel is private.  You cannot join it at this time."
+style = "Red"
+
+[Notavailable7e1]
+text = "7-E-1 Operation Not Available!  Call using 8-N-1 Modem Settings!"
+style = "Red"
+
+[PCBPackSecurityLevelFail]
+text = "PCBPACK Security Level Fail!"
+style = "Red"
+justify = "Right"
+
+[ReloadingPCBoard]
+text = "Reloading PCBoard.  Please wait ..."
+style = "White"
+justify = "Right"
+
+[UserRecordNumberIsBad]
+text = "User Record Number Bad!"
+style = "Red"
+
+[PressESCForCommand]
+text = "Press ESC to enter command mode."
+style = "White"
+
+[AbortedUsing]
+text = " Aborted using~"
+
+[CompletedUsing]
+text = " Completed using~"
+
+[MadeTopicPrivate]
+text = "@OPTEXT@ has made the discussion private."
+
+[RingDetected]
+text = "Ring Detected -~"
+
+[SpaceToAcknowledge]
+text = "Press (Space) to acknowledge Page, (Esc) when done."
+
+[MinutesUsed]
+text = "Minutes Used: @OPTEXT@"
+style = "Cyan"
+
+[NewSubject]
+text = "Subject (Enter)=no change"
+style = "Yellow"
+
+[MessageSecurity]
+text = "Message Security (H)=help"
+style = "Red"
+
+[MessageSearchFrom]
+text = "Msg # to Begin Search from (@OPTEXT@)"
+style = "Green"
+
+[MorePrompt]
+text = "(@TIMELEFT@ min left), (H)elp, More"
+style = "Yellow"
+
+[EndOfMessage]
+text = "(@TIMELEFT@ min left), (H)elp, End of Message Command"
+style = "Green"
+
+[DesiredProtocol]
+text = "Default Protocol Desired (Enter)=no change"
+style = "Green"
+
+[MessageTo]
+text = "     To (Enter)=`ALL'"
+style = "Yellow"
+
+[MessageSubject]
+text = "Subject (Enter)=abort"
+style = "Yellow"
+
+[ErrorInFilenameRequest]
+text = "Error in filename request!"
+style = "Red"
+justify = "Right"
+
+[WelcomeBackToPCBoard]
+text = "Welcome back to PCBoard~"
+style = "Cyan"
+justify = "Right"
+
+[CreatingNewMessageIndex]
+text = "Creating New Message Index File ."
+style = "Red"
+
+[OnlineUpgradeDone]
+text = "Online update of user's record completed."
+style = "White"
+
+[Protocol7E1Error]
+text = "Only ASCII and Kermit Protocols supported at 7-E-1!"
+style = "Red"
+justify = "Right"
+
+[NumberOfMsgsPurged]
+text = "Number of Msgs Purged :"
+style = "Red"
+justify = "Right"
+
+[NumberOfBytesPurged]
+text = "Number of Bytes Purged:"
+style = "Red"
+justify = "Right"
+
+[NotInUsersFile]
+text = "@X07@OPTEXT@ @X0Cnot found in user file."
+style = "White"
+
+[TwoLinesLeft]
+text = "Two lines left before message is full, @FIRST@ ..."
+style = "Yellow"
+
+[EnteredChannel]
+text = "@OPTEXT@ has entered this channel."
+
+[LeftChannel]
+text = "@OPTEXT@ has left this channel."
+
+[ViewCallers]
+text = "(V)iew, (P)rint, (S)can, (D)elete Caller Log, (Enter)=quit"
+style = "Green"
+
+[ViewPrintUsers]
+text = "(V)iew, (P)rint Users, (Enter)=quit"
+style = "Green"
+
+[WasNotFoundInLine]
+text = ") was not found in line"
+style = "Red"
+
+[CarrierLost]
+text = "Carrier Lost ..."
+
+[EnterStarts]
+text = "(Enter) Starts, (Ctrl-X) Aborts"
+style = "Purple"
+
+[AbortsTransfer]
+text = "(Ctrl-X) Aborts Transfer"
+style = "Purple"
+
+[FileSizeIsZero]
+text = "File Size is `0' - Aborting ..."
+style = "Red"
+
+[SysopChatEnded]
+text = "Sysop CHAT ended at~"
+style = "White"
+
+[EditHeader]
+text = "Edit: (T)o, (F)rom, (S)ubject, Refer (N)um, (R)ead, (P)rotection"
+style = "Green"
+
+[EchoMessage]
+text = "`Echo' Message, (Enter)=@OPTEXT@"
+style = "White"
+
+[TextEntryCommand]
+text = "Text Entry Command"
+style = "Yellow"
+
+[FileListCommand]
+text = "(H)elp, (1-@NUMDIR@), File List Command"
+style = "Yellow"
+
+[BulletinListCommand]
+text = "(H)elp, (1-@NUMBLT@), Bulletin List Command"
+style = "Yellow"
+
+[WantsToChat]
+text = "~wants to CHAT with you on Channel @OPTEXT@."
+style = "Red"
+
+[ToRespondToChat]
+text = "Respond by typing (CHAT) (G) and then select channel @OPTEXT@."
+style = "Green"
+
+[NodeChatUPrompt]
+text = "Node CHAT: (G)roup, (U)navailable, (H)elp, (Enter)=none"
+style = "Yellow"
+
+[NodeChatAPrompt]
+text = "Node CHAT: (G)roup, (A)vailable, (H)elp, (Enter)=none"
+style = "Yellow"
+
+[NodeNotAvailable]
+text = "Sorry, @FIRST@, Node requested is not available for CHAT."
+style = "Red"
+
+[NodeChatEnded]
+text = "Node CHAT ended at @OPTEXT@"
+style = "White"
+
+[NodeChatEntered]
+text = "Node CHAT entered at @OPTEXT@"
+style = "White"
+
+[TopicForChat]
+text = "Enter a new `topic' for Channel @OPTEXT@"
+style = "Green"
+
+[RefusedToRegister]
+text = "Refused to register."
+
+[NewChannel]
+text = "Enter channel number (1-255), (L)ist channels or (Q)uit chat"
+style = "Cyan"
+
+[MonitorOff]
+text = "Monitor Mode is now off."
+style = "White"
+
+[MonitorOn]
+text = "Monitor Mode is now on."
+style = "White"
+
+[NoChannelsInUse]
+text = "There are no channels in use at this time."
+style = "Red"
+
+[MessageEnterText]
+text = "Enter your text. (Enter) alone to end.~"
+style = "Green"
+
+[OutToDOS]
+text = "Out to DOS"
+style = "Cyan"
+
+[ArchiveViewFileName]
+text = "Filename to View (Enter)=none"
+style = "Yellow"
+
+[ErrorViewingFile]
+text = "Error executing View of file (@OPTEXT@)"
+style = "Red"
+
+[ViewExecutedOnFile]
+text = "View executed on file (@OPTEXT@)"
+style = "Green"
+
+[CheckingArchiveView]
+text = "Checking View request.  Please wait, @FIRST@ ..."
+style = "White"
+
+[ChatWithSysop]
+text = "Chatting with Sysop"
+style = "Cyan"
+
+[DefaultProtocol]
+text = "Default Protocol set to~"
+style = "Green"
+
+[ErrorInPCBPROTDATFile]
+text = "Error reading PCBPROT.DAT!  Aborting ..."
+style = "Red"
+
+[AnswerScript]
+text = "Answering Script"
+style = "Cyan"
+
+[NodeToCall]
+text = "Enter the number of the node to CALL into chat"
+style = "Yellow"
+
+[GetIgnoreList]
+text = "Enter node (#) to ignore, (C)ancel or (W)ho"
+style = "Yellow"
+
+[IgnoreCancelled]
+text = "Ignore Mode Cancelled"
+style = "White"
+
+[TopicNowPublic]
+text = "This channel is now public."
+style = "White"
+
+[ReceivedMessage]
+text = "Rcvd Broadcast Message"
+style = "Cyan"
+
+[LoadingPackModule]
+text = "Loading PCBPack module.  Please wait ..."
+style = "White"
+
+[PackModuleMissing]
+text = "PCBPack module not found!  Pack request unsuccessful ..."
+style = "Red"
+
+[IgnoringNodes]
+text = "Ignoring Nodes:~"
+style = "White"
+
+[UserExists]
+text = "User already exists in the data base."
+style = "Red"
+
+[UsersFirstName]
+text = "What is the user's first name"
+style = "Yellow"
+
+[UsersLastName]
+text = " What is the user's last name"
+style = "Yellow"
+
+[YourFirstName]
+text = "What is your first name"
+style = "Yellow"
+
+[YourLastName]
+text = " What is your last name"
+style = "Yellow"
+
+[SilentOff]
+text = "Silent Mode is now off."
+style = "White"
+
+[SilentOn]
+text = "Silent Mode is now on."
+style = "White"
+
+[SendToNode]
+text = "Send private message to Node (#), (C)ancel or (S)how users"
+style = "Yellow"
+
+[AddToIndex]
+text = "Please wait - Adding @USER@ to Quick Index File ..."
+style = "Green"
+
+[CityState]
+text = "City and State calling from"
+style = "Yellow"
+
+[ExpiredDate]
+text = " Reg. Exp. Date (as mmddyy)"
+style = "Yellow"
+
+[ExpiredSecurityLevel]
+text = "   Exp. Reg. Security Level"
+style = "Yellow"
+
+[ExpiredRegisteredConference]
+text = " Exp. Reg. Conference Info."
+style = "Yellow"
+
+[SpecialComment]
+text = "Special Comment/Record Info"
+style = "Yellow"
+
+[BaudNotSupported]
+text = "Sorry, @OPTEXT@ bps is not supported ..."
+style = "Red"
+
+[BaudSupportedFrom]
+text = "@OPTEXT@ bps is supported from @OFFHOURS@."
+style = "Red"
+
+[SystemUnavailable]
+text = "System is currently unavailable ..."
+style = "Red"
+
+[UserRecordUpdated]
+text = "@FIRST@, your record has been updated with changes made."
+style = "Red"
+
+[NodeNumberToDrop]
+text = "Node # to Drop to DOS (Enter)=none"
+style = "Yellow"
+
+[NoBulletinsAvailable]
+text = "Sorry, @FIRST@, no Bulletins are presently available."
+style = "Red"
+
+[NoDOORSAvailable]
+text = "Sorry, @FIRST@, no DOORS are presently available."
+style = "Red"
+
+[NoDirectoriesAvailable]
+text = "Sorry, @FIRST@, no Directories are presently available."
+style = "Red"
+
+[NoConferenceAvailable]
+text = "Sorry, @FIRST@, no Conferences are presently available!"
+style = "Red"
+
+[UsernetUnderline]
+text = " ---   ---------------------   -----------------------------"
+style = "Yellow"
+
+[ProtocolForTransfer]
+text = "Protocol Type for Transfer, (Enter) or (N)=abort"
+style = "Green"
+
+[InvalidConferenceNumber]
+text = "(@OPTEXT@) is an invalid Conference selection!"
+style = "Red"
+
+[InvalidDOOR]
+text = "(@OPTEXT@) is an invalid DOOR selection!"
+style = "Red"
+
+[ScanningDirectory]
+text = "Scanning Directory"
+style = "White"
+
+[CurrentPageLength]
+text = "Page Length is currently set to"
+style = "Green"
+
+[BadUploadFormat]
+text = "Uploads Not Accepted on File Format (@OPTEXT@)"
+style = "Red"
+
+[UserNetHeader]
+text = " (#)   Status                  User"
+style = "Green"
+
+[GraphicsOn]
+text = "Graphics mode is now on, @FIRST@ ..."
+style = "White"
+
+[GraphicsOff]
+text = "Graphics mode is now off, @FIRST@ ..."
+
+[LogoffInfoSaved]
+text = "Logoff Information Saved."
+style = "White"
+
+[TransferAborted]
+text = "Transfer Aborted ..."
+style = "Red"
+
+[InvalidBulletinNumber]
+text = "Sorry, @FIRST@, you entered an invalid Bulletin #!"
+style = "Red"
+
+[InvalidFileNumber]
+text = "Sorry, @FIRST@, you entered an invalid Directory #!"
+style = "Red"
+
+[EventRan]
+text = "Event @OPTEXT@ ran at~"
+
+[ExitedToDOSAt]
+text = "Caller Exited to DOS at @OPTEXT@"
+
+[TextFileViewed]
+text = "Viewed Text file (@OPTEXT@)"
+
+[ScanMessageBase]
+text = "Scan Message Base Since `Last Read' (Enter)=yes"
+style = "Yellow"
+
+[NewInfo]
+text = "New Info"
+style = "Green"
+
+[TextToSend]
+text = "Enter text of private message below:"
+style = "Green"
+
+[ReceivedPrivateMessage]
+text = "PRIVATE MESSAGE!  @X0BTo respond privately use: SEND @OPTEXT@"
+style = "Red"
+
+[DefaultFileNameToDownload]
+text = "Filename to Download (Enter)=@OPTEXT@"
+style = "Yellow"
+
+[CarbonCopyTo]
+text = "Carbon Copy To (Enter)=none"
+style = "Yellow"
+
+[OpenedDOOR]
+text = "Opened Door (@OPTEXT@) at~"
+
+[NoCaller]
+text = "No Caller this Node"
+style = "Cyan"
+
+[Available]
+text = "Available for CHAT"
+style = "Cyan"
+
+[InADOOR]
+text = "Out of Code in DOOR"
+style = "Cyan"
+
+[LogoffPending]
+text = "Auto Logoff Pending"
+style = "Cyan"
+
+[RecycleBBS]
+text = "DOS Recycle Pending"
+style = "Cyan"
+
+[Unavailable]
+text = "Unavailable for CHAT"
+style = "Cyan"
+
+[Transfer]
+text = "Transferring a File"
+style = "Cyan"
+
+[EnterMessage]
+text = "Entering a Message"
+style = "Cyan"
+
+[GroupChat]
+text = "CHATTING with Group"
+style = "Cyan"
+
+[DropDOSDelayed]
+text = "Drop to DOS Pending"
+style = "Cyan"
+
+[MadeTopicPublic]
+text = "@OPTEXT@ has made the discussion public."
+
+[CantBePrivate]
+text = "Channel 1 cannot be made private."
+style = "Red"
+
+[BadDownloadPassword]
+text = "Incorrect Download Password for File (@OPTEXT@)"
+style = "Red"
+
+[BadUploadPassword]
+text = "Incorrect Upload Password for File (@OPTEXT@)"
+style = "Red"
+
+[BadViewPassword]
+text = "Incorrect View Password for File (@OPTEXT@)"
+style = "Red"
+
+[BadPasswordForDOOR]
+text = "Incorrect Password for DOOR (@OPTEXT@)"
+style = "Red"
+
+[NodeNotInChat]
+text = "That node is not in group chat!"
+style = "Red"
+
+[AnnounceCopy]
+text = "Preparing file(s) for download.  Please wait."
+style = "White"
+
+[BullettinRead]
+text = "Bulletin Read:~"
+
+[InputFileName]
+text = "Input File Name"
+style = "Red"
+
+[FileSelected]
+text = "File Selected: ~"
+style = "Yellow"
+
+[ProtocolType]
+text = "Protocol Type: ~"
+style = "Yellow"
+
+[SelectConferences]
+text = "       Select Conference(s)"
+style = "Yellow"
+
+[NotFoundOnDisk]
+text = "(@OPTEXT@) not found on disk!"
+style = "Red"
+
+[ThanksForWaiting]
+text = "I'm back!  Thanks for waiting~"
+style = "Green"
+
+[ConferenceJoined]
+text = "@OPTEXT@ Joined"
+style = "Green"
+
+[LocalPassword]
+text = "Local password"
+style = "Yellow"
+
+[MessageNumberToKill]
+text = "Enter the Message # to Kill (Enter)=none"
+style = "Green"
+
+[PunctuationError]
+text = "Punctuation Error:  Quotes may be necessary around the search criteria."
+style = "Red"
+
+[BackFromDOS]
+text = "Back from DOS at @OPTEXT@"
+
+[HelloThisIs]
+text = "Hello, this is @OPTEXT@.~~"
+style = "Green"
+
+[MessageRestored]
+text = "Message Restored:~"
+style = "White"
+
+[MessageKilled]
+text = "Message Killed:~"
+style = "Red"
+
+[CommentLeft]
+text = "Comment Left:~"
+
+[MessageLeft]
+text = "Message Left:~"
+
+[SavingComment]
+text = "Saving Comment #"
+style = "White"
+
+[SavingMessage]
+text = "Saving Message #"
+style = "White"
+
+[MorehelpEnter]
+text = "    (Enter) continues with display"
+
+[MorehelpYes]
+text = "    (Y) yes, continue with display"
+
+[MorehelpNo]
+text = "    (N) no, stop displaying this text"
+
+[MorehelpNonstop]
+text = "    (NS) continue reading in non-stop mode"
+
+[DropDOSNow]
+text = "Drop to DOS - Urgent"
+style = "Cyan"
+
+[DropNow]
+text = "Force logoff now (`N'=wait until caller logs off, then drop to DOS)"
+style = "Red"
+
+[MorehelpView]
+text = "    (V) View a file, then continue displaying files"
+
+[TotalMessagesFound]
+text = "  # Msgs Found:"
+style = "Green"
+
+[RecycleThruDOS]
+text = "Node # to Recycle through DOS (Enter)=none"
+style = "Yellow"
+
+[PasswordFailure]
+text = "Password Failure (@OPTEXT@)"
+
+[ExpertmodeOn]
+text = "Expert mode is now on, @FIRST@ ..."
+style = "White"
+
+[ExpertmodeOff]
+text = "Expert mode is now off, @FIRST@ ..."
+style = "White"
+
+[FileNumberExpertmode]
+text = "Files: (1-@NUMDIR@), (A), (U), (Enter)=none"
+style = "Yellow"
+
+[FileNumberNovice]
+text = "Files: (1-@NUMDIR@), (A)ll, (U)ploads, (Enter)=none"
+style = "Yellow"
+
+[HelpLine1]
+text = "Alt-> F=Out I=In N=Next X=DOS P=Printer T=FmFeed F1/F2=Time F9/F10=Security"
+
+[HelpLine2]
+text = "1=SyPrv 2=LkOut 3=Print 4=Bell 5=SHELL 6=Reg 7=Alarm 8=HngUp 9=Screen 10=Chat"
+
+[NetworkDelay]
+text = "Network Delay - Please Wait, @FIRST@ ..."
+style = "Red"
+
+[DownloadTime]
+text = "Download Time:~"
+style = "Yellow"
+
+[DownloadSize]
+text = "Download Size:~"
+style = "Yellow"
+
+[TotalWillBe]
+text = "Total Will Be:~"
+style = "Yellow"
+
+[UploadDrive]
+text = "Upload Drive :"
+style = "Yellow"
+
+[FreeDiskSpace]
+text = " Bytes Free Disk Space"
+style = "Green"
+
+[ThreadReadTerminated]
+text = "Thread Read Terminated ..."
+style = "Red"
+justify = "Right"
+
+[MessageNumberMemorized]
+text = "Message Number Memorized ..."
+style = "Red"
+
+[MessageSearchTerminated]
+text = "Message Text Search Terminated ..."
+style = "Red"
+justify = "Right"
+
+[InsufficientMEMForChat]
+text = "Insufficient memory for CHAT buffers."
+style = "Red"
+
+[UploadStatus]
+text = "Upload Status:"
+style = "Yellow"
+
+[ScreenEditor]
+text = "  Screened Before Posting"
+style = "Red"
+
+[PostedImmediately]
+text = "  Posted Immediately"
+style = "Red"
+
+[CallerNumber]
+text = "Caller Num.:"
+
+[CantOpenChatFile]
+text = "Unable to open CHAT file."
+style = "Red"
+
+[LastDateOne]
+text = "Lst Date On:~"
+
+[ExpiredAt]
+text = "Expire Date:~"
+
+[NumberTimesOn]
+text = "# Times On :"
+
+[PageLength]
+text = "Page Length:"
+
+[ExpertmodeModeOn]
+text = "Expert Mode: On"
+
+[ExpertmodeModeOff]
+text = "Expert Mode: Off"
+
+[SecurityLevel]
+text = "Security Lv:"
+
+[NumberDownloads]
+text = "# Downloads:"
+
+[NumberUploads]
+text = "# Uploads  :"
+
+[BytesAvailable]
+text = "Bytes Avail:"
+
+[LastMessageRead]
+text = "L/Msg. Read:"
+
+[HighMessageNumber]
+text = "High Msg. #:"
+
+[NumberActiveMessages]
+text = "Active Msgs:"
+
+[TransferProtocol]
+text = "Tr/Protocol:~"
+
+[LanguageAvailable]
+text = "Operational Languages Available:"
+style = "Yellow"
+
+[LanguageALTNotAvailable]
+text = "Alternative Language Operation Not Available."
+style = "Red"
+
+[LanguageEnterNumber]
+text = "Enter Language # to use (Enter)=no change"
+style = "Yellow"
+
+[LanguageActive]
+text = "English Language is now active."
+style = "White"
+
+[LanguageNotAvailable]
+text = "Language Requested Not Available."
+style = "Red"
+
+[Minutes]
+text = " minutes (approximate)"
+style = "Green"
+
+[ShellBatchMissing]
+text = "SHELL Batch file Missing ("
+style = "Red"
+justify = "Right"
+
+[ResetPacket]
+text = "Resetting Packet ..."
+justify = "Right"
+
+[ResetModem]
+text = "Resetting Modem ..."
+
+[SystemAvailable]
+text = "System is Ready For Callers"
+
+[MinutesLeft]
+text = " min. left)"
+style = "Yellow"
+
+[CommandPrompt]
+text = "(@X0C@TIMELEFT@@X0E min. left) @INCONF@Command"
+style = "Yellow"
+
+[Scanning]
+text = "Scanning~"
+style = "White"
+
+[ScanningMain]
+text = "Scanning Main (0)"
+style = "White"
+
+[Conference]
+text = " Conference"
+
+[Mainboard]
+text = "Main Board"
+
+[ChatFormatError]
+text = "Error in Chat File format, aborting..."
+style = "Red"
+
+[FoundName]
+text = "Found: @X07@OPTEXT@"
+style = "Red"
+
+[MessageAbort]
+text = "Abort your entry (Enter)=no"
+style = "Red"
+
+[MessageAborted]
+text = "Text Entry Aborted ..."
+style = "White"
+
+[DeleteLineNumber]
+text = "Delete Line #"
+style = "Yellow"
+
+[CanNotInsert]
+text = "Sorry, @FIRST@, unable to Insert another line!"
+style = "Red"
+
+[InsertBeforeNumber]
+text = "Before Line #"
+style = "Yellow"
+
+[EditLineNumber]
+text = "Which line do you want to edit, @FIRST@"
+style = "Yellow"
+
+[OperatorPaged]
+text = "Operator Paged at~"
+
+[HangingUpPhone]
+text = "Hanging Up Phone ..."
+justify = "Right"
+
+[GoingOffHook]
+text = "Going Off-Hook ..."
+
+[ConferenceAbandoned]
+text = "@OPTEXT@ Abandoned"
+style = "Cyan"
+
+[MenuSelectionUnavailable]
+text = "(@OPTEXT@) Menu Selection is not available, @FIRST@."
+style = "Red"
+
+[PasswordForUpload]
+text = "(@OPTEXT@) Enter the password for uploading"
+style = "Yellow"
+
+[PasswordForDOOR]
+text = "   Enter password to open the DOOR"
+style = "Yellow"
+
+[PasswordForView]
+text = "(@OPTEXT@) Enter the password for viewing"
+style = "Yellow"
+
+[PasswordForDownload]
+text = "(@OPTEXT@) Enter the password for downloading"
+style = "Yellow"
+
+[PressEnter]
+text = "Press (Enter) to continue"
+style = "Green"
+
+[InsufficientSecurityForDOOR]
+text = "Insufficient security for DOOR (@OPTEXT@)"
+style = "Red"
+
+[EditHeaderEcho]
+text = "Edit: (T)o, (F)rom, (S)ubject, Refer (N)um, (R)ead, (P)rotection, (E)cho"
+style = "Green"
+
+[NoNews]
+text = "Sorry, @FIRST@, no NEWS file is available!"
+style = "Red"
+
+[MessagesForYou]
+text = "  Msgs For You:~"
+style = "Yellow"
+
+[MessagesFromYou]
+text = " Msgs From You:~"
+style = "Yellow"
+
+[MessagesCanCommand]
+text = "(H)elp, (@OPTEXT@), Message Scan Command"
+style = "Yellow"
+
+[MessageReadCommand]
+text = "(H)elp, (@OPTEXT@), Message Read Command"
+style = "Yellow"
+
+[NotMemorized]
+text = "No message number has been memorized!"
+style = "Red"
+
+[CallAnyway]
+text = "The user may be busy.  Attempt to CALL into chat anyway"
+style = "Red"
+
+[InsufficientSecurityToDownloadFile]
+text = "Insufficient Download Security for (@OPTEXT@)"
+style = "Red"
+
+[CallersLogViewed]
+text = "Caller Log Viewed"
+style = "White"
+
+[DirectoryScan]
+text = "Directory Scan for (@OPTEXT@)"
+style = "White"
+
+[UsersFileViewed]
+text = "User File Viewed"
+style = "Red"
+
+[InsufficientSecurityForFromEdit]
+text = "Sorry, @FIRST@, Insufficient Security for `From' edit!"
+style = "Red"
+justify = "Right"
+
+[BeginUploadTest]
+text = "This system is set to test uploaded files.  This can be a lengthy process."
+style = "White"
+
+[HangupNowOrWait]
+text = "(H)ang up now, or press any other key to remain online..."
+style = "Red"
+
+[HangingUpNow]
+text = "Hanging up now.  Thank you for the upload(s)."
+style = "White"
+
+[SysopExitedToDOS]
+text = " has exited to DOS.  Please wait ..."
+style = "White"
+
+[UploadAborted]
+text = "Upload aborted ..."
+style = "Red"
+
+[OldTextNewText]
+text = "  Enter (Oldtext;Newtext) or (Enter) alone for `no change'."
+style = "Yellow"
+
+[MessageDateNumber]
+text = "Date:                               Number:"
+style = "White"
+
+[MessageToLine]
+text = "  To:"
+
+[MessageReplies]
+text = "HAS REPLIES"
+
+[MessageFrom]
+text = "From:"
+
+[MessageNA]
+text = "(N/A)"
+
+[MessageNotRead]
+text = "NO"
+
+[MessageReceiverOnly]
+text = "RECEIVER ONLY"
+
+[MessageGroupPassword]
+text = "GROUP PASSWORD"
+
+[MessageSenderPassword]
+text = "SENDER PASSWORD"
+
+[MessagePublic]
+text = "PUBLIC MESSAGE"
+
+[ContinueUpload]
+text = "Uploading will lose the Flagged Files list.  Continue with upload"
+style = "White"
+
+[ErrorCorrecting]
+text = "(Error Correcting Modem Detected)"
+
+[MessageReferNumber]
+text = "Refer#"
+
+[MessageRead]
+text = "Read:"
+
+[MessageSubjectLine]
+text = "Subj:"
+
+[NotRecNumberOne]
+text = "Not Using Sysop Record #1 - Pack not Available!"
+style = "Red"
+
+[MessageStatus]
+text = "Status:"
+
+[PackMessageBaseBeforeContinuing]
+text = "Pack Message Base Before Continuing!"
+style = "Red"
+justify = "Right"
+
+[NoMatchingPassword]
+text = "No Security Level Match in PWRD File!"
+style = "Red"
+
+[NumberFreeMessages]
+text = "Free Msg #s:"
+
+[LowMessageNumber]
+text = "Low Msg. # :"
+
+[NumberDefinedMessages]
+text = "Defined #'s:"
+
+[GenerateNewIndex]
+text = "Generate ONLY a New Index File (Enter)=no"
+style = "Green"
+
+[AssignMoreMessageBlocks]
+text = "Assign More Message BLOCKS using PCBSetup!"
+style = "Red"
+justify = "Right"
+
+[EchoDisabled]
+text = "Chat Echo disabled.  Use the ECHO command to re-enable it."
+style = "White"
+
+[EchoEnabled]
+text = "Chat Echo enabled."
+style = "White"
+
+[MovedMessageToConference]
+text = "Move Message to what Conference #"
+style = "Yellow"
+
+[MessageFile]
+text = " / FILE"
+
+[MessageMoved]
+text = "Message Moved: #"
+
+[MessageList]
+text = " / LIST"
+
+[RecentUploadS]
+text = "Recent Uploads"
+style = "Yellow"
+
+[ScrollKeys]
+text = "(Esc) Exit, (\u2191) (\u2193) (PgUp) (PgDn) (Home) (End) Scrolls, (Space) Tags/Untags"
+
+[ScrollAbove]
+text = "Scroll Lines Above Cursor:"
+
+[ScrollBelow]
+text = "Scroll Lines Below Cursor:"
+
+[GenericMessage]
+text = "(Generic Message)"
+
+[GoodbyeAfterUpload]
+text = "(G)oodbye after Batch, (A)bort, Change (P)rotocol, (Enter)=continue"
+style = "Green"
+
+[ReadyToSendBatch]
+text = "(Ready to Send in Batch Mode)"
+style = "Purple"
+
+[MessageTooWide]
+text = "The file received is wider than 79 characters."
+style = "Red"
+
+[MessageTooWideSave]
+text = "(S)ave or (A)bort message"
+style = "Yellow"
+
+[BatchTransferEnded]
+text = "Batch Transfer Ended."
+style = "White"
+
+[OutputFileName]
+text = "Output File Name"
+style = "Red"
+
+[BatchDownloadTime]
+text = "Batch Download Time:~"
+style = "Yellow"
+
+[BatchDownloadSize]
+text = "Batch Download Size:~"
+style = "Yellow"
+
+[BatchProtocol]
+text = "Batch Protocol Type: ~"
+style = "Yellow"
+
+[ResumeAll]
+text = "(A)ll Abort Detected. Continue with scan (Enter)=yes"
+style = "Green"
+
+[MessagesGeneral]
+text = "Conf:                            Read Type: GENERAL"
+style = "Green"
+
+[MessagesThread]
+text = "Conf:                            Read Type: THREAD READ"
+style = "Green"
+
+[MessagesTextScan]
+text = "Conf:                            Read Type: TEXT SCAN"
+style = "Green"
+
+[MessagesReadForYou]
+text = "Conf:                            Read Type: MAIL FOR YOU"
+style = "Green"
+
+[MessagesReadFromYou]
+text = "Conf:                            Read Type: MAIL FROM YOU"
+style = "Green"
+
+[MessagesReadToOrFrom]
+text = "Conf:                            Read Type: TO OR FROM YOU"
+style = "Green"
+
+[ByeAfterDownload]
+text = "(G)oodbye after Download, (A)bort Download (Enter)=continue"
+style = "Green"
+
+[AttachedFile]
+text = "Attached File: @X07@OPTEXT@~~"
+style = "Red"
+
+[PointersRestored]
+text = "Capture Aborted.  Read Pointers Restored ..."
+style = "Red"
+
+[ByeIn10Seconds]
+text = "Goodbye in 10 seconds. (H)ang up now or (Ctrl-K) to cancel"
+style = "Red"
+
+[CaptureFileIsEmpty]
+text = "Capture file is empty - nothing to download."
+style = "Green"
+
+[TotalMessagesInCapture]
+text = "Total Messages Captured for Download ->"
+style = "Yellow"
+
+[SendingFiles]
+text = "Sending File(s) - Start your download ..."
+style = "Purple"
+
+[LogIntoSystem]
+text = "Logging into System"
+
+[UseFullScreen]
+text = "Use Full Screen Editor"
+style = "Yellow"
+
+[RequiresAnsi]
+text = "Full Screen Editor requires ANSI capability"
+style = "Cyan"
+
+[DownloadTagged]
+text = "Download Flagged Files"
+style = "Yellow"
+
+[NewBulletins]
+text = "New Bulletin(s):"
+style = "Red"
+
+[NamesTried]
+text = "Attempted to log on as:~"
+
+[DoSoundexSearch]
+text = "Perform (S)oundex Search, (R)e-enter User's Name or (C)ontinue"
+style = "Yellow"
+
+[UseFoundName]
+text = "(U)se Found Name, (S)earch for more, (R)e-enter Name or (C)ontinue"
+style = "Yellow"
+
+[QuoteStart]
+text = "QUOTE: Starting line number, (Q) to Quit"
+style = "Yellow"
+
+[QuoteEnd]
+text = "QUOTE: Ending line number, (Q) to Quit"
+style = "Yellow"
+
+[Compressing]
+text = "Compressing capture file, please wait..."
+style = "White"
+
+[InsufficientMemory]
+text = "Insufficient Memory for Operation @OPTEXT@"
+style = "Cyan"
+
+[SysopNotBusy]
+text = "Sysop - Not Busy"
+
+[UserNotBusy]
+text = "User - Not Busy"
+
+[PCBSysMgr]
+text = "PCBSysMgr"
+
+[PCBFiler]
+text = "PCBFiler"
+
+[PCBSetup]
+text = "PCBSetup"
+
+[SetStatsLocal]
+text = "SYSTEM Statistics"
+
+[PCBMonitor]
+text = "PCBMoni"
+
+[ResetStats]
+text = "Reset Stats"
+
+[NoPrinter]
+text = "No Printer"
+
+[TurnPrinterOff]
+text = "Printer is On"
+
+[TurnAlarmOff]
+text = "Alarm is On"
+
+[TurnPageOff]
+text = "Page Bell is On"
+
+[UserBusyDescription]
+text = "Log in as a regular user.  Callers will get a busy signal."
+
+[UserNotBusyDescription]
+text = "Log in as a regular user.  RING Alert will be activated."
+
+[TogglePrinterDescription]
+text = "Toggle printer off or on.  When on, caller log is echoed to printer."
+
+[PCBSysmgrDescription]
+text = "Run PCBoard System Manager for User File maintenance."
+
+[SetStatsDescription]
+text = "Choose between System-Wide and Node-Specific Statistics Display"
+
+[SysopBusyDescription]
+text = "Log in as the Sysop.  Callers will get a busy signal."
+
+[SysopNotBusyDescription]
+text = "Log in as the Sysop.  RING Alert will be activated."
+
+[TogglePageDescription]
+text = "Toggle `Page Bell' on or off.  System will BEEP when caller pages you."
+
+[PCBFilerDescription]
+text = "Run PCBFiler for File Directory maintenance."
+
+[PCBMoniDescription]
+text = "Run PCBMoni to monitor NODE activity"
+
+[DOSBusyDescription]
+text = "Drop to DOS.  Callers will get a busy signal."
+
+[DOSNotBusyDescription]
+text = "Drop to DOS.  Callers will NOT get a busy signal.  Phone will ring!"
+
+[ToggleAlarmDescription]
+text = "Toggle `Caller Alarm' on or off.  System BEEPs as caller logs on, etc."
+
+[PCBSetupDescription]
+text = "Run PCBSetup to change PCBoard configuration."
+
+[ResetStatsDescription]
+text = "Reset Node/System Statistics to Zero"
+
+[NoModemSelected]
+text = "No Modem Selected"
+
+[LastCaller]
+text = "Last Caller:"
+
+[NumberCalls]
+text = "Calls:"
+
+[NumberMessages]
+text = "Msgs:"
+
+[NumberDownload]
+text = "D/Ls:"
+
+[NumberUpload]
+text = "U/Ls:"
+
+[EscToExit]
+text = "Press (Esc) to Exit  (Ctrl-Z) for Help"
+style = "Green"
+
+[INSForInsert]
+text = "(Ins/Ctrl-V) Mode: Overwrite"
+style = "Green"
+
+[INSForOverwrite]
+text = "(Ins/Ctrl-V) Mode: Insert"
+style = "Green"
+
+[SetLastMessageReadPointer]
+text = "(@OPTEXT@), Set your Last Message Read to"
+style = "Yellow"
+
+[LastMessageReadSetTo]
+text = "Last Message Read now set to @OPTEXT@."
+style = "Red"
+
+[Unlimited]
+text = "Unlimited"
+
+[MorehelpFlag]
+text = "    (F) Flag a file for later download, then continue displaying files"
+
+[FilesMorePrompt]
+text = "(@TIMELEFT@ min left), (H)elp, (V)iew, (F)lag, More"
+style = "Yellow"
+
+[GoodbyeAfterDownload]
+text = "(A)bort, (E)dit, (G)oodbye, (L)ist, (P)rotocol, (Enter)=continue"
+style = "Green"
+
+[EditBatch]
+text = "(A)dd a File, (R)emove a File, (L)ist Batch, (Enter)=continue"
+style = "Green"
+
+[RemoveFileNumber]
+text = "(@OPTEXT@), Remove file number(s)"
+style = "Red"
+
+[RemovedFile]
+text = "Removed from Batch: @OPTEXT@"
+style = "White"
+
+[DuplicateBatchFile]
+text = "(@OPTEXT@) duplicates a file already in the batch!"
+style = "Red"
+
+[BatchLimitReached]
+text = "Batch limit reached.  @OPTEXT@ was not added to the batch."
+style = "Red"
+
+[CLSBetweenMessages]
+text = "Clear the screen between each message"
+style = "Yellow"
+
+[FlagForDownload]
+text = "Enter the filename to flag for download (Enter)=none"
+style = "Yellow"
+
+[UsersHeader]
+text = "       User Name                  Location              Last On"
+style = "White"
+
+[UserScan]
+text = "Enter text to scan for (ENTER alone finds all registered users)"
+style = "Yellow"
+
+[SetStatsSystem]
+text = "LOCAL Statistics"
+
+[DeleteRecord]
+text = "Delete this record"
+style = "Red"
+
+[ConferenceNumbers]
+text = "Enter Conference Numbers, (S)elect All, (D)eselect All or (Q)uit"
+style = "Yellow"
+
+[ConferenceNumbers2]
+text = "Enter Conference Numbers or (Q)uit"
+style = "Yellow"
+
+[SelectConferenceFlags]
+text = "Conf. Flags (R=Reg, X=Exp Reg, S=Scan, C=Conf Sysop, N=Net Status)"
+style = "Yellow"
+
+[SelectingAll]
+text = "Selecting ALL Conferences, Please Wait"
+style = "Green"
+
+[MailWaitingIn]
+text = "@FIRST@, you have new mail waiting in the following conference(s):"
+style = "Green"
+
+[UserSearchName]
+text = "Read messages TO or FROM (enter user's name)"
+style = "Yellow"
+
+[RequireTwoNames]
+text = "Both First and Last Names are required!"
+style = "Red"
+
+[CopyMessageToConference]
+text = "Copy Message to what Conference #"
+style = "Yellow"
+
+[MessageCopied]
+text = "Message Copied: #"
+
+[CommentInstead]
+text = "Would you like to leave a comment to the Sysop instead"
+style = "Green"
+
+[FreeDownload]
+text = " FREE"
+style = "Green"
+
+[NoTimeCharge]
+text = " / NO TIME"
+style = "Green"
+
+[TestFileName]
+text = "Enter the filename to Test (Enter)=none"
+style = "Yellow"
+
+[VerifyingFile]
+text = "Verifying @OPTEXT@..."
+style = "Green"
+
+[Passed]
+text = " passed."
+style = "White"
+
+[Failed]
+text = " FAILED!"
+style = "Red"
+
+[FileVerifyFailed]
+text = "Verification FAILED on @OPTEXT@!"
+
+[PagingSysop]
+text = "Paging the Sysop"
+style = "Yellow"
+
+[ScanHeader1]
+text = "Conference                                                          To   Total"
+style = "Green"
+
+[ScanHeader2]
+text = "  #   Name                                                          You  Found"
+style = "Green"
+
+[ScanHeader3]
+text = "----- ------------------------------------------------------------ ----- -----"
+style = "Green"
+
+[SetFSEDefault]
+text = "Full Screen Editor Default: (Y)es, (N)o, (A)sk"
+style = "Yellow"
+
+[MessageReadCommandExpert]
+text = "(H)elp, (@OPTEXT@), Message Read Command"
+style = "Yellow"
+
+[FileListCommandExpert]
+text = "(H)elp, (1-@NUMDIR@), File List Command"
+style = "Yellow"
+
+[ConferenceHeader1]
+text = "Conference                                                   Last   High"
+style = "White"
+
+[ConferenceHeader2]
+text = "  #   Name                                                   Read   Num. Flags"
+style = "White"
+
+[CTTYOn]
+text = "CTTY mode is now on, @FIRST@ ..."
+style = "White"
+
+[AnsiOn]
+text = "ANSI mode is now on, @FIRST@ ..."
+style = "White"
+
+[Modem]
+text = "Modem: @OPTEXT@"
+
+[CallerNumberOpt]
+text = "Caller Number: @OPTEXT@"
+
+[CallerSecurity]
+text = "Caller Security: @OPTEXT@"
+
+[Separator]
+text = "of"
+
+[OpeningDOOR]
+text = "Loading @OPTEXT@, please wait..."
+style = "White"
+
+[WrongPassword]
+text = "Did you forget your password?"
+style = "Yellow"
+
+[WrongPasswordComment]
+text = "Would you like to leave a comment to the sysop before logging off"
+style = "White"
+
+[WrongPasswordSubject]
+text = "COMMENT: PASSWORD FAILURE"
+
+[IsThisCorrect]
+text = "Is this correct"
+style = "Yellow"
+
+[ChangeNames]
+text = "Please try using a different name.  If desired, try adding a middle initial."
+style = "White"
+
+[LockCallerOut]
+text = "Lock caller out and disconnect"
+style = "Red"
+
+[DisconnectNow]
+text = "Disconnect caller"
+style = "Red"
+
+[GiveSysopPrivate]
+text = "Give caller sysop privileges"
+style = "Red"
+
+[FilesAreFlagged]
+text = "Warning:  You have files flagged for download!"
+style = "Red"
+
+[ContinueDOOR]
+text = "Proceed with running the @OPTEXT@ door"
+style = "White"
+
+[ContinueLogoff]
+text = "Proceed with logoff"
+style = "White"
+
+[Selected]
+text = "@INCONF@has been selected."
+style = "Red"
+
+[DeSelected]
+text = "@INCONF@has been deselected."
+style = "Red"
+
+[SearchingFor]
+text = "Searching for @OPTEXT@"
+style = "Cyan"
+
+[UploadCredits]
+text = "Upload Credits: 0.0 minutes, 0 bytes"
+style = "Green"
+
+[CouldntFindInUsers]
+text = "Could not find @X07@OPTEXT@ @X0Cin the user file."
+style = "Red"
+
+[BulletinListCommandExpertmode]
+text = "(H)elp, (1-@NUMBLT@), Bulletin List Command"
+style = "Yellow"
+
+[EndOfMessageExpertmode]
+text = "(@TIMELEFT@ min left), (H)elp, End of Message Command"
+style = "Green"
+
+[MessagesCanCommandExpertmode]
+text = "(H)elp, (@OPTEXT@), Message Scan Command"
+style = "Yellow"
+
+[MaxMessagesPerConference]
+text = "(maximum per-conference limit reached)"
+style = "Red"
+
+[MaxMessages]
+text = "(maximum message limit reached)"
+style = "Red"
+
+[BiReceive]
+text = "(Rcvd Files: @RFILES@  Bytes: @RBYTES@  CPS: @RCPS@  Combined CPS: @BICPS@)"
+style = "Red"
+
+[BiReceiveLog]
+text = "Batch Upld: @RFILES@  Bytes: @RBYTES@  Avg. CPS: @RCPS@ (@BICPS@)"
+style = "Red"
+
+[ReceiveLog]
+text = "Batch Upld: @RFILES@  Bytes: @RBYTES@  Avg. CPS: @RCPS@"
+style = "Red"
+
+[SendLog]
+text = "Batch Dnld: @SFILES@  Bytes: @SBYTES@  Avg. CPS: @SCPS@"
+style = "Red"
+
+[BatchSend]
+text = "~~(Files: @SFILES@  Bytes: @SBYTES@  Avg. CPS: @SCPS@)"
+style = "Red"
+
+[BatchReceive]
+text = "~~(Files: @RFILES@  Bytes: @RBYTES@  Avg. CPS: @RCPS@)"
+style = "Red"
+
+[SendAverageCPS]
+text = "~~(Avg. CPS: @SCPS@)"
+style = "Red"
+
+[ReceiveAverageCPS]
+text = "~~(Avg. CPS: @RCPS@)"
+style = "Red"
+
+[ShowAttachCommands]
+text = "Additional Commands: (@X0FFLAG@X0A) for download, (@X0FV@X0A)iew file."
+style = "Green"
+
+[FileSize]
+text = "Size: @X07@OPTEXT@"
+style = "Red"
+
+[PickAnotherHandle]
+text = "That handle is not allowed, please pick another!"
+style = "Red"
+
+[ScrollMessageBody]
+text = "Scroll multi-screen messages"
+style = "Yellow"
+
+[UseBigHeaders]
+text = "Use long headers when reading messages"
+style = "Yellow"
+
+[MessageCommandNovice2]
+text = "(I)nsert, (L)ist Msg, (Q)uote, (S)ave, (SA)Save Attach, (U)pload Msg"
+style = "Green"
+
+[RequireReturnReceipt]
+text = "Request Return Receipt"
+style = "Green"
+
+[ReturnReceiptRequired]
+text = "Return Receipt Requested.~~"
+style = "Red"
+
+[GenerateReceipt]
+text = "Generating Receipt, please wait..."
+style = "White"
+
+[YourMessageNumber]
+text = "Your message number   : @X07"
+style = "Red"
+
+[AddressedTo]
+text = "Which was addressed to: @X07"
+style = "Red"
+
+[ReceivedOn]
+text = "Was received/read on  : @X07"
+style = "Red"
+
+[RoutedTo]
+text = "Route message to"
+style = "Green"
+
+[DefaultWideMessages]
+text = "Set editor workspace default to 79 columns"
+style = "Yellow"
+
+[ConferenceIsReadOnly]
+text = "This conference is READ-ONLY!"
+style = "Red"
+
+[NoPrivateMessages]
+text = "Private messages are not allowed in this conference."
+style = "Red"
+
+[PasswordToJoin]
+text = "Conference Password"
+style = "Yellow"
+
+[AlreadyAttached]
+text = "The message already contains a File Attachment!"
+style = "Red"
+
+[CarbonList]
+text = "Carbon List To (Enter)=none"
+style = "Yellow"
+
+[CarbonName]
+text = "cc: @OPTEXT@"
+style = "Red"
+
+[UserSearchToName]
+text = "Read messages TO (enter user's name)"
+style = "Yellow"
+
+[UserSearchFromName]
+text = "Read messages FROM (enter user's name)"
+style = "Yellow"
+
+[AttachmentMissing]
+text = "The File Attachment is missing from disk and cannot be flagged."
+style = "Red"
+
+[AttachNotAllOWed]
+text = "File Attachments are not allowed in this conference."
+style = "Red"
+
+[CarbonLimitReached]
+text = "Carbon Copy List maximum reached!"
+style = "Red"
+
+[ErrorsInPPE]
+text = "Errors encountered, PPE aborted..."
+style = "Red"
+
+[NoMemoryForPPE]
+text = "Unable to allocate memory (@OPTEXT@)."
+style = "Red"
+
+[InvalidTokenInPPE]
+text = "Invalid token encountered (@OPTEXT@)."
+style = "Red"
+
+[ErrorExecPPE]
+text = "Error occurred executing PPE (@OPTEXT@)."
+style = "Red"
+
+[EvalErrorInPPE]
+text = "An error occurred evaluating an expression."
+style = "Red"
+
+[ErrorLoadingPPE]
+text = "Error loading PPE (@OPTEXT@) from disk."
+style = "Red"
+
+[AppendErrorInPPE]
+text = "Error appending (@OPTEXT@) to answer file."
+style = "Red"
+
+[DeleteErrorInPPE]
+text = "Error deleting file (@OPTEXT@)."
+style = "Red"
+
+[UpdatingIndex]
+text = "Updating index file, please wait..."
+style = "Red"
+
+[Columns72]
+text = "(72 chars/line, @OPTEXT@ lines maximum)"
+style = "Green"
+
+[Columns79]
+text = "(79 chars/line, @OPTEXT@ lines maximum)"
+style = "Green"
+
+[Columns45]
+text = "(45 chars/line, @OPTEXT@ lines maximum)"
+style = "Green"
+
+[CarbonListMessage]
+text = "(Carbon List)"
+
+[ReadMailNow]
+text = "Read your personal mail now: (Y)es, (N)o, (A)ll new mail"
+style = "White"
+
+[ScanningForMail]
+text = "Scanning for new mail..."
+style = "Green"
+
+[ForceReadMail]
+text = "You have new mail waiting.  Please read it NOW."
+style = "White"
+
+[ScanningBulletins]
+text = "Scanning for new bulletins..."
+style = "Green"
+
+[FileRatio]
+text = "Your current Download:Upload file ratio is  : @X0F@FILERATIO@"
+style = "Green"
+
+[ByteRatio]
+text = "Your current Download:Upload byte ratio is  : @X0F@BYTERATIO@"
+style = "Green"
+
+[RatioLimit]
+text = "Your Download:Upload ratio must remain below: @X0F@OPTEXT@"
+style = "Green"
+
+[FileRatioExceeded]
+text = "Downloading @OPTEXT@ would exceed your file ratio."
+style = "Red"
+
+[ByteRatioExceeded]
+text = "Downloading @OPTEXT@ would exceed your byte ratio."
+style = "Red"
+
+[FilesDownloaded]
+text = "Number of files downloaded so far: @X0F@DLFILES@"
+style = "Green"
+
+[BytesDownloaded]
+text = "Number of bytes downloaded so far: @X0F@DLBYTES@"
+style = "Green"
+
+[DownloadLimit]
+text = "Your download limit is set at    : @X0F@OPTEXT@"
+style = "Red"
+
+[FileLimitExceeded]
+text = "Downloading @OPTEXT@ would exceed your file limit."
+style = "Red"
+
+[ByteLimitExceeded]
+text = "Downloading @OPTEXT@ would exceed your byte limit."
+style = "Red"
+
+[CreatingQWK]
+text = "Creating QWK Packet, please wait..."
+style = "White"
+
+[ErrorCompressing]
+text = "Error compressing file."
+style = "Red"
+
+[QWKCommands]
+text = "QWK Commands: (D)ownload, (U)pload"
+style = "Green"
+
+[ExtractingMessages]
+text = "Extracting messages, please wait..."
+style = "Yellow"
+
+[ErrorExtracting]
+text = "Error extracting messages."
+style = "Red"
+
+[InvalidMenuOption]
+text = "Invalid menu option type encountered (@OPTEXT@)"
+style = "Red"
+
+[MenuCommand]
+text = "@OPTEXT@ Menu Command ('MENU' for options)"
+style = "Yellow"
+
+[RunningEvent]
+text = "Running Event"
+style = "Cyan"
+
+[EventFinished]
+text = "Event finished at~"
+
+[ReplySuccessful]
+text = "Message(s) successfully inserted."
+style = "White"
+
+[ReplyFailed]
+text = "Message insertion failed."
+style = "Red"
+
+[FileNotAllowed]
+text = "Files matching (@OPTEXT@) are not allowed on this system."
+style = "Red"
+
+[EnterPackDate]
+text = "Date when message should be Packed-Out (mmddyy)"
+style = "Yellow"
+
+[DateToPackOut]
+text = "Message Pack Date: @OPTEXT@"
+style = "Red"
+
+[GetAliasName]
+text = "Alias Name (enter=no change)"
+style = "Yellow"
+
+[HidingIdentity]
+text = "Hiding identity change, please wait..."
+style = "White"
+
+[ChangedNameTo]
+text = "Changed name to @OPTEXT@."
+style = "Red"
+
+[IdentityProtected]
+text = "Your true identity is protected while you remain in this conference."
+style = "Red"
+
+[ChangedAliasTo]
+text = "Changed alias to @OPTEXT@."
+
+[AttemptedAlias]
+text = "Attempted to use @OPTEXT@ as an alias."
+
+[ShowByteRatio]
+text = "Byte Ratio :~"
+
+[ShowFileRatio]
+text = "File Ratio :~"
+
+[EnterAddress]
+text = "Please enter your Address (2 lines provided for Street Address):"
+style = "Red"
+
+[Street1]
+text = "     Street (1 of 2)"
+style = "Yellow"
+
+[Street2]
+text = "     Street (2 of 2)"
+style = "Yellow"
+
+[City]
+text = "                City"
+style = "Yellow"
+
+[State]
+text = "               State"
+style = "Yellow"
+
+[Zip]
+text = "            Zip Code"
+style = "Yellow"
+
+[Country]
+text = "             Country"
+style = "Yellow"
+
+[PreviouslyUsedPassword]
+text = "You have already used that password.  Please pick another one."
+style = "Red"
+
+[EnterVerifyText]
+text = "Enter your mother's maiden name"
+style = "Yellow"
+
+[EnterCompareText]
+text = "For verification, enter your mother's maiden name"
+style = "White"
+
+[PasswordTooShort]
+text = "Password too short!  Must be @OPTEXT@ characters or longer, try again."
+style = "Red"
+
+[NeedUniquePassword]
+text = "Your password cannot be a subset of your name, try again."
+style = "Red"
+
+[PasswordExpired]
+text = "Your password has expired.  Please enter a new password now."
+style = "Red"
+
+[PasswordWillExpired]
+text = "Your password will expire in @OPTEXT@ days.  Use the (W) command to change it."
+style = "Red"
+
+[MessagesDateTOSearch]
+text = "Date as (mmddyy) to search from (Enter)="
+style = "Green"
+
+[ReceiptLeft]
+text = "Return Receipt:~"
+
+[ForwardFrom]
+text = "Forwarded From: @X07@OPTEXT@"
+style = "Red"
+
+[ForwardBY]
+text = "Forwarded By  : @X07@OPTEXT@"
+style = "Red"
+
+[InsufficientCredits]
+text = "Insufficient Credits!  Credits Needed @OPTEXT@, Credits Left @CREDLEFT@."
+style = "Red"
+
+[CreditsUsed]
+text = "Credits Used: @CREDNOW:9R@"
+style = "Purple"
+
+[CreditsLeft]
+text = "Credits Left: @CREDLEFT:9R@"
+style = "Purple"
+
+[CreditExceeded]
+text = "You have exceeded your credit limit!"
+style = "Red"
+
+[SecurityChanged]
+text = "Your security level has been changed to @SECURITY@."
+style = "Red"
+
+[NoCost]
+text = "~NO COST"
+
+[FromReturnReceipt]
+text = "RETURN RECEIPT"
+
+[Comment]
+text = "COMMENT"
+
+[ErrorInFromName]
+text = "Error in FROM name: @OPTEXT@"
+style = "Red"
+
+[QuickScanHeader]
+text = "~Msg#    Ref#    To              From            Subject"
+style = "White"
+
+[FileFailed]
+text = "FILE FAILED VERIFICATION CHECK"
+
+[UploadedBy]
+text = "Uploaded by: @OPTEXT@"
+
+[FileNameToDownloadBatch]
+text = "(@FNUM@) Enter the filename to Download (Enter)=none"
+style = "Yellow"
+
+[FileNameToUploadBatch]
+text = "(@FNUM@) Enter the Filename to Upload (Enter)=none"
+style = "Yellow"
+
+[UserScanLine]
+text = "------------------------  ------------------------  ---------------"
+
+[NetStatus]
+text = "(Net)~"
+style = "Purple"
+
+[PersonalMessageLimit]
+text = "Set Message Capture Limit (System Max=@OPTEXT@)"
+style = "Yellow"
+
+[PersonalConferenceLimit]
+text = "Set Per-Conference Message Capture Limit (System Max=@OPTEXT@)"
+style = "Yellow"
+
+[PersonalQWKLimit]
+text = "Maximum Size to Auto-Include Personal Attachments in QWK Packet"
+style = "Yellow"
+
+[PublicQWKLimit]
+text = "Maximum Size to Auto-Include Attachments in QWK Packet"
+style = "Yellow"
+
+[DestNewsGroup]
+text = "Post-to Groups"
+style = "Green"
+
+[FollowupNewsGroup]
+text = "Follow-up Groups"
+style = "Green"
+
+[HandlingMail]
+text = "Handling Mail"
+style = "Cyan"
+
+[FilesShowPrompt]
+text = "(@TIMELEFT@ min left), (V)iew, (F)lag, (S)how, More"
+style = "Yellow"
+
+[EnterDirCommand]
+text = "Enter DIR Command"
+style = "Yellow"
+
+[NoFilesFound]
+text = "No files found."
+style = "Red"
+
+[DirectoryOf]
+text = "Directory of @OPTEXT@"
+style = "Purple"
+
+[ShortInEffect]
+text = "Short Description Mode in effect"
+style = "White"
+
+[LongInEffect]
+text = "Long Description Mode in effect"
+style = "White"
+
+[ShowLongDescription]
+text = "Show long description of what file"
+style = "Yellow"
+
+[UseShortDescription]
+text = "Set default file description to SHORT (one-line) format"
+style = "Yellow"
+
+[EnterGender]
+text = "Enter your gender (M/F)"
+style = "Yellow"
+
+[EnterBirthdate]
+text = "Enter your birthdate"
+style = "Yellow"
+
+[EnterEmail]
+text = "Enter your E-mail address"
+style = "Yellow"
+
+[EnterWebAddress]
+text = "Enter your WEB address"
+style = "Yellow"
+
+[EnterColor]
+text = "Enter color (B)lue,(G)reen,(C)yan,(R)ed,(M)agenta,(Y)ellow,(W)hite,(+/-)"
+style = "Yellow"
+
+[EnterNode]
+text = "Enter node # or Handle"
+style = "Yellow"
+
+[MessagesConfArea]
+text = "Conf:                                 Area:"

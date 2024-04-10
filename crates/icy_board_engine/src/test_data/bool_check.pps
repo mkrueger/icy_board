@@ -1,0 +1,9 @@
+BOOLEAN B
+B = TRUE
+PRINT B, ","
+B = !B
+PRINT B, ","
+B = !B
+PRINT B
+;;
+1,0,1

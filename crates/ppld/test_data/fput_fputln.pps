@@ -1,0 +1,2 @@
+FPUT 1, "A"
+FPUTLN 1, "A", "B"

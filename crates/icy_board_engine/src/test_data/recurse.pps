@@ -1,0 +1,25 @@
+DECLARE PROCEDURE FOO(VAR BYTE X)
+BYTE C
+
+FOO(C)
+PRINTLN "END:",  C
+
+PROCEDURE FOO(VAR BYTE X)
+  BYTE C2
+  C2 = X + 1
+  if (X > 3) RETURN
+  X = X * 2
+  PRINTLN C2 ,":", X
+  FOO(C2)
+  PRINTLN C2 ,":", X
+ENDPROC	
+;;
+1:0
+2:2
+3:4
+4:6
+4:6
+6:4
+4:2
+2:0
+END:0

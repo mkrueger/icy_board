@@ -1,0 +1,5 @@
+STRING S(5)
+
+PRINTLN "EMPTY:"+S(2)
+;;
+EMPTY:

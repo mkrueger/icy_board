@@ -1,0 +1,23 @@
+[package]
+name = "dizbase"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+thiserror = "1.0.58"
+log = "0.4.14"
+murmurhash64 = "0.3.1"
+chrono = "0.4.37"
+zip = "0.6"
+delharc = "0.6.0"
+unrar = "0.5.3"
+bstr = "1.9.1"
+icy_sauce = { git ="https://github.com/mkrueger/icy_sauce" }
+tempfile = "3.10.1"
+rayon = "1.10.0"
+walkdir = "2.3.1"
+
+[dev-dependencies]
+tempfile = "3"
+pretty_assertions = "1"

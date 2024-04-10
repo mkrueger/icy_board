@@ -1,0 +1,9 @@
+DECLARE FUNCTION Hello(STRING who) STRING
+
+PRINT Hello("World")
+
+FUNCTION Hello(STRING who) STRING
+    Hello = "Hello " + who
+ENDFUNC
+;;
+Hello World

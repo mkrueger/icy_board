@@ -1,0 +1,7 @@
+INTEGER i
+
+FOR i=100 TO 1 STEP -1
+    PRINTLN i ," Bottle(s) of beer on the wall, ", i, " bottle(s) of beer"
+    PRINTLN "Take one down and pass it around,"
+    PRINTLN i - 1," bottle(s) of beer on the wall"
+NEXT

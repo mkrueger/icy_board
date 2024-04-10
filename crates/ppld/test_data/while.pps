@@ -1,0 +1,5 @@
+WHILE (TRUE) PRINT "Hello"
+WHILE (TRUE) DO
+  PRINT "Hello"
+  PRINTLN "World!"
+ENDWHILE

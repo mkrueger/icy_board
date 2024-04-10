@@ -1,0 +1,21 @@
+[package]
+name = "icy_ppe"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lazy_static = "1.4.0"
+thiserror = "1.0.57"
+log = "0.4.21"
+unicase = "2.7.0"
+crossterm = "0.27.0"
+toml = "0.8.12"
+serde = "1.0.197"
+chrono = "0.4.37"
+
+# interpreter deps
+[dev-dependencies]
+stopwatch = "0.0.7"

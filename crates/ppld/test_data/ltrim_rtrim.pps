@@ -1,0 +1,3 @@
+STRING STR001
+STR001=LTRIM("fooo", " ")
+STR001=RTRIM("fooo", " ")
