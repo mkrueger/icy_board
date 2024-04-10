@@ -4,7 +4,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use bstr::BString;
 use codepages::{normalize_file, tables::get_utf8};
 use icy_sauce::SauceInformation;
 use unrar::Archive;

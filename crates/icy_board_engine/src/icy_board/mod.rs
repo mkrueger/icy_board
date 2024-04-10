@@ -255,14 +255,18 @@ impl IcyBoard {
         let mut dirs = 0;
         for conf in self.conferences.iter() {
             dirs += 1;
-            let dir_file = base_loc.join(&format!("dir{}", dirs));
-            let area_list = FileAreaList::load(&self.resolve_file(&conf.file_area_file))?;
 
-            area_list.export_pcboard(&dir_file)?;
-            let dir_file = dir_file.to_string_lossy().to_string();
-            let len = self.root_path.to_string_lossy().len() + 1;
-            let dir_file = dir_file[len..].to_string();
-            log::warn!("dir_file: {}", dir_file);
+            // Convert dir file
+            let dir_file = base_loc.join(&format!("dir{}", dirs));
+            let dir_file = if let Ok(area_list) = FileAreaList::load(&self.resolve_file(&conf.file_area_file)) {
+                area_list.export_pcboard(&dir_file)?;
+
+                let dir_file = dir_file.to_string_lossy().to_string();
+                let len = self.root_path.to_string_lossy().len() + 1;
+                dir_file[len..].to_string()
+            } else {
+                String::new()
+            };
 
             let header = PcbConferenceHeader {
                 name: conf.name.clone(),
@@ -290,9 +294,9 @@ impl IcyBoard {
                 required_security: conf.required_security.level(),
                 blt_menu: conf.blt_menu.to_string_lossy().to_string(),
                 blt_file: conf.blt_file.to_string_lossy().to_string(),
-                script_menu: conf.survey_menu.to_string_lossy().to_string(),
-                script_file: conf.survey_file.to_string_lossy().to_string(),
-                dir_menu: String::new(),
+                script_menu: String::new(), // todo
+                script_file: String::new(),
+                dir_menu: String::new(), // todo
                 dir_file: dir_file.to_string(),
                 dlpth_list_file: String::new(),
             };
@@ -324,9 +328,9 @@ impl IcyBoard {
                 drs_file: conf.doors_file.to_string_lossy().to_string(),
                 blt_menu: conf.blt_menu.to_string_lossy().to_string(),
                 blt_name_loc: conf.blt_file.to_string_lossy().to_string(),
-                scr_menu: conf.survey_menu.to_string_lossy().to_string(),
-                scr_name_loc: conf.survey_file.to_string_lossy().to_string(),
-                dir_menu: String::new(),
+                scr_menu: String::new(), // todo
+                scr_name_loc: String::new(),
+                dir_menu: String::new(), // todo
                 dir_name_loc: dir_file,
                 pth_name_loc: String::new(),
             };

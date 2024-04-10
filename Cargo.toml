@@ -20,9 +20,9 @@ edition = "2021"
 authors = ["Mike Krüger <mkrueger@posteo.de>"]
 
 [workspace.dependencies]
+codepages = { path = "crates/codepages" }
 dizbase = { path = "crates/dizbase" }
 jamjam = { path = "crates/jamjam" }
-codepages = { path = "crates/codepages" }
 icy_ppe = { path = "crates/icy_ppe" }
 icy_board_engine = { path = "crates/icy_board_engine" }
 

@@ -408,12 +408,17 @@ impl IcyBoardState {
     pub fn get_pcbdat(&self) -> Res<String> {
         if let Ok(board) = self.board.lock() {
             let path = board.resolve_file(&board.config.paths.tmp_path);
+
             let path = PathBuf::from(path);
             if !path.is_dir() {
                 fs::create_dir_all(&path)?;
             }
             let output = path.join("pcboard.dat");
-            board.export_pcboard(&output)?;
+
+            if let Err(err) = board.export_pcboard(&output) {
+                log::error!("Error writing pcbdat.dat file: {}", err);
+                return Err(err);
+            }
             Ok(output.to_str().unwrap().to_string())
         } else {
             Err("Board is locked".into())

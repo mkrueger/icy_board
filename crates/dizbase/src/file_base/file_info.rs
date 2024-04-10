@@ -1,4 +1,3 @@
-use bstr::BString;
 use chrono::Utc;
 
 use super::{
