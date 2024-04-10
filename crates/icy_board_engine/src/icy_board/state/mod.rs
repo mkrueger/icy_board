@@ -29,6 +29,14 @@ use super::{
     IcyBoard, IcyBoardSerializer,
 };
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum GraphicsMode {
+    Off,
+    Ansi,
+    Avatar,
+    Rip,
+}
+
 #[derive(Clone)]
 pub struct DisplayOptions {
     /// If true, the more prompt is automatically answered after 10 seconds.
@@ -37,7 +45,8 @@ pub struct DisplayOptions {
     /// If true, the output is not paused by the more prompt.
     pub non_stop: bool,
 
-    /// If true, the @ color codes are disabled.
+    pub grapics_mode: GraphicsMode,
+
     pub disable_color: bool,
 
     ///  flag indicating whether or not the user aborted the display of data via ^K / ^X or answering no to a MORE? prompt
@@ -58,6 +67,7 @@ impl Default for DisplayOptions {
         Self {
             auto_more: false,
             abort_printout: false,
+            grapics_mode: GraphicsMode::Ansi,
             disable_color: false,
             non_stop: false,
             display_text: true,
@@ -263,7 +273,7 @@ impl IcyBoardState {
     }
 
     fn use_graphics(&self) -> bool {
-        !self.session.disp_options.disable_color
+        self.session.disp_options.grapics_mode != GraphicsMode::Off
     }
 
     fn check_time_left(&self) {

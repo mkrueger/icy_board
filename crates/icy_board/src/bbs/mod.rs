@@ -3,7 +3,7 @@ use icy_board_engine::{
         commands::{Command, CommandType},
         icb_text::IceText,
         security::RequiredSecurity,
-        state::{functions::display_flags, IcyBoardState},
+        state::{functions::display_flags, GraphicsMode, IcyBoardState},
         IcyBoardError,
     },
     vm::TerminalTarget,
@@ -55,6 +55,7 @@ impl PcbBoardCommand {
     }
 
     fn display_menu(&mut self) -> Res<()> {
+        self.displaycmdfile("menu")?;
         let menu_file = if self.state.session.is_sysop {
             self.state.session.current_conference.sysop_menu.clone()
         } else {
@@ -65,6 +66,7 @@ impl PcbBoardCommand {
     }
 
     fn display_news(&mut self) -> Res<()> {
+        self.displaycmdfile("news")?;
         let news_file = self.state.session.current_conference.news_file.clone();
         let resolved_path = self.state.resolve_path(&news_file);
 
@@ -100,6 +102,16 @@ impl PcbBoardCommand {
 
             CommandType::Goodbye => {
                 // G
+                self.displaycmdfile("g")?;
+
+                // force logoff - no flagged files scan
+                if let Some(token) = self.state.session.tokens.pop_front() {
+                    if token.to_ascii_uppercase() == self.state.yes_char.to_string().to_ascii_uppercase() {
+                        self.state.hangup(icy_board_engine::vm::HangupType::Goodbye)?;
+                    }
+                }
+
+                // todo : check flagged files & parse input
                 self.state.hangup(icy_board_engine::vm::HangupType::Goodbye)?;
             }
             CommandType::Help => {
@@ -295,6 +307,8 @@ impl PcbBoardCommand {
     }
 
     fn set_expert_mode(&mut self) -> Res<()> {
+        self.displaycmdfile("x")?;
+
         let mut expert_mode = !self.state.session.expert_mode;
         if let Some(token) = self.state.session.tokens.pop_front() {
             let token = token.to_ascii_uppercase();
@@ -325,12 +339,50 @@ impl PcbBoardCommand {
     }
 
     fn toggle_graphics(&mut self) -> Res<()> {
-        if false
-        /*self.state.board.lock().unwrap().data..non_graphics*/
-        {
+        self.displaycmdfile("m")?;
+
+        /* no_graphics disabled atm
+        if self.state.board.lock().unwrap().config.no_graphis {
             self.state
                 .display_text(IceText::GraphicsUnavailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
-        } else {
+
+            return;
+        } */
+
+        if let Some(token) = self.state.session.tokens.pop_front() {
+            let token = token.to_ascii_uppercase();
+
+            match token.as_str() {
+                "CT" => {
+                    self.state.session.disp_options.disable_color = true;
+                    self.state.session.disp_options.grapics_mode = GraphicsMode::Off;
+                    self.state.display_text(IceText::CTTYOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                }
+                "AN" => {
+                    self.state.session.disp_options.disable_color = false;
+                    self.state.session.disp_options.grapics_mode = GraphicsMode::Ansi;
+                    self.state.display_text(IceText::AnsiOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                }
+                "AV" => {
+                    self.state.session.disp_options.disable_color = false;
+                    self.state.session.disp_options.grapics_mode = GraphicsMode::Avatar;
+                    self.state.display_text(IceText::AnsiOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                }
+                "GR" => {
+                    self.state.session.disp_options.disable_color = false;
+                    self.state.session.disp_options.grapics_mode = GraphicsMode::Ansi;
+                    self.state.display_text(IceText::GraphicsOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                }
+                "RI" => {
+                    self.state.session.disp_options.disable_color = false;
+                    self.state.session.disp_options.grapics_mode = GraphicsMode::Rip;
+                    self.state.display_text(IceText::RIPModeOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                }
+                _ => {}
+            }
+        }
+
+        {
             if !self.state.session.disp_options.disable_color {
                 self.state.reset_color()?;
             }
@@ -450,5 +502,31 @@ impl PcbBoardCommand {
         let welcome_screen = self.state.resolve_path(&welcome_screen);
         self.state.display_file(&welcome_screen)?;
         Ok(())
+    }
+
+    fn displaycmdfile(&mut self, command_file: &str) -> Res<bool> {
+        let path = self.state.board.lock().unwrap().config.paths.command_display_path.clone();
+        if !path.is_dir() {
+            return Ok(false);
+        }
+        let file = path.join(command_file);
+
+        if file.with_extension("ppe").is_file() {
+            self.state.run_ppe(&path, None)?;
+            return Ok(true);
+        }
+
+        /* TODO: Menus
+        if file.with_extension("mnu").is_file() {
+            self.state.run_ppe(&path, None)?;
+            return Ok(true);
+        }
+        */
+        if file.exists() {
+            self.state.display_file(&file)?;
+            return Ok(true);
+        }
+
+        Ok(false)
     }
 }

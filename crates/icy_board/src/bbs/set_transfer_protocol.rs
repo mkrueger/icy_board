@@ -8,6 +8,11 @@ use super::PcbBoardCommand;
 
 impl PcbBoardCommand {
     pub fn set_transfer_protocol(&mut self, _action: &Command) -> Res<()> {
+        self.displaycmdfile("preprot")?;
+        if self.displaycmdfile("prot")? {
+            return Ok(());
+        }
+
         let mut protocols = Vec::new();
         let mut valid_protocols = String::new();
         let cur_protocol = if let Some(user) = &mut self.state.current_user { user.protocol } else { ' ' };
