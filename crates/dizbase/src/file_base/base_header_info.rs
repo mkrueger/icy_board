@@ -53,11 +53,7 @@ impl FileBaseHeaderInfo {
         })
     }
 
-    pub(crate) fn create<P: AsRef<Path>>(
-        file_name: &P,
-        password: u64,
-        attributes: u32,
-    ) -> crate::Result<()> {
+    pub(crate) fn create<P: AsRef<Path>>(file_name: &P, password: u64, attributes: u32) -> crate::Result<()> {
         let now = Utc::now();
         let datecreated = now.timestamp();
 

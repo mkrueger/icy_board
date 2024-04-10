@@ -6,9 +6,7 @@ use icy_ppe::{
     Res,
 };
 
-use crate::icy_board::pcboard_data::{
-    append_bool, append_int, append_line, read_bool, read_int, read_line,
-};
+use crate::icy_board::pcboard_data::{append_bool, append_int, append_line, read_bool, read_int, read_line};
 
 /// Only for compatibility with very old PCBoard PPEs
 /// Even pcboard itself only generates that for compatiblity purposes

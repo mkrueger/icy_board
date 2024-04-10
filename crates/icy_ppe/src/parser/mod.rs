@@ -7,8 +7,7 @@ use std::{
 
 use crate::{
     ast::{
-        Ast, AstNode, BlockStatement, CommentAstNode, Constant, DimensionSpecifier,
-        FunctionDeclarationAstNode, FunctionImplementation, ParameterSpecifier,
+        Ast, AstNode, BlockStatement, CommentAstNode, Constant, DimensionSpecifier, FunctionDeclarationAstNode, FunctionImplementation, ParameterSpecifier,
         ProcedureDeclarationAstNode, ProcedureImplementation, Statement, VariableSpecifier,
     },
     executable::{FuncOpCode, FunctionDefinition, OpCode, StatementDefinition, VariableType},
@@ -223,22 +222,18 @@ impl Parser {
                 let start = self.lex.span().start;
                 if let Some(lookahed) = self.lex.next_token() {
                     if lookahed == Token::If {
-                        self.cur_token =
-                            Some(Spanned::new(Token::ElseIf, start..self.lex.span().end));
+                        self.cur_token = Some(Spanned::new(Token::ElseIf, start..self.lex.span().end));
                     } else {
-                        self.lookahead_token =
-                            Some(Spanned::new(lookahed, start..self.lex.span().end));
+                        self.lookahead_token = Some(Spanned::new(lookahed, start..self.lex.span().end));
                     }
                 }
             } else if is_case {
                 let start = self.lex.span().start;
                 if let Some(lookahed) = self.lex.next_token() {
                     if lookahed == Token::Else {
-                        self.cur_token =
-                            Some(Spanned::new(Token::Default, start..self.lex.span().end));
+                        self.cur_token = Some(Spanned::new(Token::Default, start..self.lex.span().end));
                     } else {
-                        self.lookahead_token =
-                            Some(Spanned::new(lookahed, start..self.lex.span().end));
+                        self.lookahead_token = Some(Spanned::new(lookahed, start..self.lex.span().end));
                     }
                 }
             } else if is_end {
@@ -246,34 +241,24 @@ impl Parser {
                 if let Some(lookahed) = self.lex.next_token() {
                     match lookahed {
                         Token::If => {
-                            self.cur_token =
-                                Some(Spanned::new(Token::EndIf, start..self.lex.span().end));
+                            self.cur_token = Some(Spanned::new(Token::EndIf, start..self.lex.span().end));
                         }
                         Token::While => {
-                            self.cur_token =
-                                Some(Spanned::new(Token::EndWhile, start..self.lex.span().end));
+                            self.cur_token = Some(Spanned::new(Token::EndWhile, start..self.lex.span().end));
                         }
                         Token::Select => {
-                            self.cur_token =
-                                Some(Spanned::new(Token::EndSelect, start..self.lex.span().end));
+                            self.cur_token = Some(Spanned::new(Token::EndSelect, start..self.lex.span().end));
                         }
                         Token::For => {
-                            self.cur_token =
-                                Some(Spanned::new(Token::Next, start..self.lex.span().end));
+                            self.cur_token = Some(Spanned::new(Token::Next, start..self.lex.span().end));
                         }
                         _ => {
                             let set_lookahad = if let Token::Identifier(id) = &lookahed {
                                 if *id == *PROC_TOKEN {
-                                    self.cur_token = Some(Spanned::new(
-                                        Token::EndProc,
-                                        start..self.lex.span().end,
-                                    ));
+                                    self.cur_token = Some(Spanned::new(Token::EndProc, start..self.lex.span().end));
                                     false
                                 } else if *id == *FUNC_TOKEN {
-                                    self.cur_token = Some(Spanned::new(
-                                        Token::EndFunc,
-                                        start..self.lex.span().end,
-                                    ));
+                                    self.cur_token = Some(Spanned::new(Token::EndFunc, start..self.lex.span().end));
                                     false
                                 } else {
                                     true
@@ -283,8 +268,7 @@ impl Parser {
                             };
 
                             if set_lookahad {
-                                self.lookahead_token =
-                                    Some(Spanned::new(lookahed, start..self.lex.span().end));
+                                self.lookahead_token = Some(Spanned::new(lookahed, start..self.lex.span().end));
                             }
                         }
                     }
@@ -323,10 +307,7 @@ impl Parser {
     fn report_error(&mut self, span: std::ops::Range<usize>, save_token: ParserErrorType) {
         //println!("{}", std::backtrace::Backtrace::force_capture());
         self.errors.lock().unwrap().report_error(span, save_token);
-        while self.get_cur_token().is_some()
-            && self.get_cur_token() != Some(Token::Eol)
-            && !matches!(self.get_cur_token(), Some(Token::Comment(_, _)))
-        {
+        while self.get_cur_token().is_some() && self.get_cur_token() != Some(Token::Eol) && !matches!(self.get_cur_token(), Some(Token::Comment(_, _))) {
             self.next_token();
         }
     }
@@ -372,9 +353,7 @@ impl Parser {
                 self.use_funcs = true;
                 let cmt = self.save_spanned_token();
                 self.next_token();
-                return Some(AstNode::VariableDeclaration(Statement::Comment(
-                    CommentAstNode::new(cmt),
-                )));
+                return Some(AstNode::VariableDeclaration(Statement::Comment(CommentAstNode::new(cmt))));
             }
             _ => {
                 let stmt = self.parse_statement();
@@ -386,17 +365,11 @@ impl Parser {
                     }
 
                     if self.use_funcs && !self.parsed_begin {
-                        self.report_error(
-                            self.lex.span(),
-                            ParserErrorType::NoStatementsAllowedOutsideBlock,
-                        );
+                        self.report_error(self.lex.span(), ParserErrorType::NoStatementsAllowedOutsideBlock);
                         return None;
                     }
                     if self.got_funcs && !self.use_funcs {
-                        self.report_error(
-                            self.lex.span(),
-                            ParserErrorType::NoStatementsAfterFunctions,
-                        );
+                        self.report_error(self.lex.span(), ParserErrorType::NoStatementsAfterFunctions);
                         return None;
                     }
                     if !self.got_statement && !matches!(stmt, Statement::VariableDeclaration(_)) {
@@ -405,9 +378,7 @@ impl Parser {
                             let Some(cur_token) = &self.cur_token else {
                                 break;
                             };
-                            if cur_token.token == Token::Function
-                                || cur_token.token == Token::Procedure
-                            {
+                            if cur_token.token == Token::Function || cur_token.token == Token::Procedure {
                                 break;
                             }
                             if let Some(stmt) = self.parse_statement() {
@@ -498,10 +469,7 @@ impl Parser {
     /// Panics if .
     pub fn parse_var_info(&mut self) -> Option<VariableSpecifier> {
         let Some(Token::Identifier(_)) = self.get_cur_token() else {
-            self.report_error(
-                self.lex.span(),
-                ParserErrorType::IdentifierExpected(self.save_token()),
-            );
+            self.report_error(self.lex.span(), ParserErrorType::IdentifierExpected(self.save_token()));
             return None;
         };
         let identifier_token = self.save_spanned_token();
@@ -513,10 +481,7 @@ impl Parser {
             leftpar_token = Some(self.save_spanned_token());
             self.next_token();
             let Some(Token::Const(Constant::Integer(_))) = self.get_cur_token() else {
-                self.report_error(
-                    self.lex.span(),
-                    ParserErrorType::NumberExpected(self.save_token()),
-                );
+                self.report_error(self.lex.span(), ParserErrorType::NumberExpected(self.save_token()));
                 return None;
             };
             dimensions.push(DimensionSpecifier::new(self.save_spanned_token()));
@@ -525,10 +490,7 @@ impl Parser {
             while let Some(Token::Comma) = &self.get_cur_token() {
                 self.next_token();
                 let Some(Token::Const(Constant::Integer(_))) = self.get_cur_token() else {
-                    self.report_error(
-                        self.lex.span(),
-                        ParserErrorType::NumberExpected(self.save_token()),
-                    );
+                    self.report_error(self.lex.span(), ParserErrorType::NumberExpected(self.save_token()));
 
                     return None;
                 };
@@ -537,30 +499,19 @@ impl Parser {
             }
 
             if dimensions.len() > 3 {
-                self.report_error(
-                    self.lex.span(),
-                    ParserErrorType::TooManyDimensions(dimensions.len()),
-                );
+                self.report_error(self.lex.span(), ParserErrorType::TooManyDimensions(dimensions.len()));
 
                 return None;
             }
 
             if !matches!(self.get_cur_token(), Some(Token::RPar)) {
-                self.report_error(
-                    self.lex.span(),
-                    ParserErrorType::MissingCloseParens(self.save_token()),
-                );
+                self.report_error(self.lex.span(), ParserErrorType::MissingCloseParens(self.save_token()));
                 return None;
             }
             rightpar_token = Some(self.save_spanned_token());
             self.next_token();
         }
-        Some(VariableSpecifier::new(
-            identifier_token,
-            leftpar_token,
-            dimensions,
-            rightpar_token,
-        ))
+        Some(VariableSpecifier::new(identifier_token, leftpar_token, dimensions, rightpar_token))
     }
 
     /// Returns the parse function declaration of this [`Tokenizer`].
@@ -577,20 +528,14 @@ impl Parser {
         } else if Some(Token::Function) == self.get_cur_token() {
             true
         } else {
-            self.report_error(
-                self.lex.span(),
-                ParserErrorType::InvalidDeclaration(self.save_token()),
-            );
+            self.report_error(self.lex.span(), ParserErrorType::InvalidDeclaration(self.save_token()));
             return None;
         };
         let func_or_proc_token = self.save_spanned_token();
         self.next_token();
 
         let Some(Token::Identifier(identifier)) = self.get_cur_token() else {
-            self.report_error(
-                self.lex.span(),
-                ParserErrorType::IdentifierExpected(self.save_token()),
-            );
+            self.report_error(self.lex.span(), ParserErrorType::IdentifierExpected(self.save_token()));
 
             return None;
         };
@@ -598,10 +543,7 @@ impl Parser {
         self.next_token();
 
         if self.get_cur_token() != Some(Token::LPar) {
-            self.report_error(
-                self.lex.span(),
-                ParserErrorType::MissingOpenParens(self.save_token()),
-            );
+            self.report_error(self.lex.span(), ParserErrorType::MissingOpenParens(self.save_token()));
             return None;
         }
 
@@ -612,10 +554,7 @@ impl Parser {
 
         while self.get_cur_token() != Some(Token::RPar) {
             if self.get_cur_token().is_none() {
-                self.report_error(
-                    self.lex.span(),
-                    ParserErrorType::MissingCloseParens(self.save_token()),
-                );
+                self.report_error(self.lex.span(), ParserErrorType::MissingCloseParens(self.save_token()));
 
                 return None;
             }
@@ -624,10 +563,7 @@ impl Parser {
             if let Some(Token::Identifier(id)) = self.get_cur_token() {
                 if id == Ascii::new("VAR".to_string()) {
                     if is_function {
-                        self.report_error(
-                            self.lex.span(),
-                            ParserErrorType::VarNotAllowedInFunctions,
-                        );
+                        self.report_error(self.lex.span(), ParserErrorType::VarNotAllowedInFunctions);
                     } else {
                         var_token = Some(self.save_spanned_token());
                     }
@@ -639,14 +575,9 @@ impl Parser {
                 let type_token = self.save_spanned_token();
                 self.next_token();
                 let info = self.parse_var_info()?;
-                parameters.push(ParameterSpecifier::new(
-                    var_token, type_token, var_type, info,
-                ));
+                parameters.push(ParameterSpecifier::new(var_token, type_token, var_type, info));
             } else {
-                self.report_error(
-                    self.lex.span(),
-                    ParserErrorType::TypeExpected(self.save_token()),
-                );
+                self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
                 return None;
             }
 
@@ -659,65 +590,47 @@ impl Parser {
         if !is_function {
             self.check_eol();
             if StatementDefinition::get_statement_definition(&identifier).is_some() {
-                self.report_error(
-                    identifier_token.span,
-                    ParserErrorType::StatementAlreadyDefined(self.save_token()),
-                );
+                self.report_error(identifier_token.span, ParserErrorType::StatementAlreadyDefined(self.save_token()));
                 return None;
             }
 
-            return Some(AstNode::ProcedureDeclaration(
-                ProcedureDeclarationAstNode::new(
-                    declare_token,
-                    func_or_proc_token,
-                    identifier_token,
-                    leftpar_token,
-                    parameters,
-                    rightpar_token,
-                ),
-            ));
-        }
-        if FunctionDefinition::get_function_definition(&identifier) >= 0 {
-            self.report_error(
-                identifier_token.span,
-                ParserErrorType::FunctionAlreadyDefined(self.save_token()),
-            );
-            return None;
-        }
-        let Some(return_type) = self.get_variable_type() else {
-            self.report_error(
-                self.lex.span(),
-                ParserErrorType::TypeExpected(self.save_token()),
-            );
-            return None;
-        };
-        let return_type_token = self.save_spanned_token();
-        self.next_token();
-        self.check_eol();
-        Some(AstNode::FunctionDeclaration(
-            FunctionDeclarationAstNode::new(
+            return Some(AstNode::ProcedureDeclaration(ProcedureDeclarationAstNode::new(
                 declare_token,
                 func_or_proc_token,
                 identifier_token,
                 leftpar_token,
                 parameters,
                 rightpar_token,
-                return_type_token,
-                return_type,
-            ),
-        ))
+            )));
+        }
+        if FunctionDefinition::get_function_definition(&identifier) >= 0 {
+            self.report_error(identifier_token.span, ParserErrorType::FunctionAlreadyDefined(self.save_token()));
+            return None;
+        }
+        let Some(return_type) = self.get_variable_type() else {
+            self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
+            return None;
+        };
+        let return_type_token = self.save_spanned_token();
+        self.next_token();
+        self.check_eol();
+        Some(AstNode::FunctionDeclaration(FunctionDeclarationAstNode::new(
+            declare_token,
+            func_or_proc_token,
+            identifier_token,
+            leftpar_token,
+            parameters,
+            rightpar_token,
+            return_type_token,
+            return_type,
+        )))
     }
 
     fn check_eol(&mut self) -> bool {
-        if self.get_cur_token() != Some(Token::Eol)
-            && !matches!(self.get_cur_token(), Some(Token::Comment(_, _)))
-        {
+        if self.get_cur_token() != Some(Token::Eol) && !matches!(self.get_cur_token(), Some(Token::Comment(_, _))) {
             let err_token = self.save_spanned_token();
             self.next_token();
-            self.report_error(
-                err_token.span,
-                ParserErrorType::EolExpected(err_token.token),
-            );
+            self.report_error(err_token.span, ParserErrorType::EolExpected(err_token.token));
             false
         } else {
             true
@@ -735,20 +648,14 @@ impl Parser {
             self.next_token();
 
             let Some(Token::Identifier(_)) = self.get_cur_token() else {
-                self.report_error(
-                    self.lex.span(),
-                    ParserErrorType::IdentifierExpected(self.save_token()),
-                );
+                self.report_error(self.lex.span(), ParserErrorType::IdentifierExpected(self.save_token()));
 
                 return None;
             };
             let identifier_token = self.save_spanned_token();
             self.next_token();
             if self.get_cur_token() != Some(Token::LPar) {
-                self.report_error(
-                    self.lex.span(),
-                    ParserErrorType::MissingOpenParens(self.save_token()),
-                );
+                self.report_error(self.lex.span(), ParserErrorType::MissingOpenParens(self.save_token()));
                 return None;
             }
 
@@ -759,10 +666,7 @@ impl Parser {
 
             while self.get_cur_token() != Some(Token::RPar) {
                 if self.get_cur_token().is_none() {
-                    self.report_error(
-                        self.lex.span(),
-                        ParserErrorType::MissingCloseParens(self.save_token()),
-                    );
+                    self.report_error(self.lex.span(), ParserErrorType::MissingCloseParens(self.save_token()));
 
                     return None;
                 }
@@ -779,14 +683,9 @@ impl Parser {
                     self.next_token();
 
                     let info = self.parse_var_info()?;
-                    parameters.push(ParameterSpecifier::new(
-                        var_token, type_token, var_type, info,
-                    ));
+                    parameters.push(ParameterSpecifier::new(var_token, type_token, var_type, info));
                 } else {
-                    self.report_error(
-                        self.lex.span(),
-                        ParserErrorType::TypeExpected(self.save_token()),
-                    );
+                    self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
                     return None;
                 }
 
@@ -801,9 +700,7 @@ impl Parser {
 
             let mut statements = Vec::new();
 
-            while self.get_cur_token() != Some(Token::EndProc)
-                && self.get_cur_token() != Some(Token::EndFunc)
-            {
+            while self.get_cur_token() != Some(Token::EndProc) && self.get_cur_token() != Some(Token::EndFunc) {
                 if self.get_cur_token().is_none() {
                     self.report_error(self.lex.span(), ParserErrorType::EndExpected);
                     return None;
@@ -813,10 +710,10 @@ impl Parser {
             }
             let endproc_token = self.save_spanned_token();
             if endproc_token.token == Token::EndFunc {
-                self.errors.lock().unwrap().report_warning(
-                    endproc_token.span.clone(),
-                    ParserWarningType::ProcedureClosedWithEndFunc,
-                );
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_warning(endproc_token.span.clone(), ParserWarningType::ProcedureClosedWithEndFunc);
             }
             self.next_token();
 
@@ -845,20 +742,14 @@ impl Parser {
             self.next_token();
 
             let Some(Token::Identifier(_)) = self.get_cur_token() else {
-                self.report_error(
-                    self.lex.span(),
-                    ParserErrorType::IdentifierExpected(self.save_token()),
-                );
+                self.report_error(self.lex.span(), ParserErrorType::IdentifierExpected(self.save_token()));
 
                 return None;
             };
             let identifier_token = self.save_spanned_token();
             self.next_token();
             if self.get_cur_token() != Some(Token::LPar) {
-                self.report_error(
-                    self.lex.span(),
-                    ParserErrorType::MissingOpenParens(self.save_token()),
-                );
+                self.report_error(self.lex.span(), ParserErrorType::MissingOpenParens(self.save_token()));
                 return None;
             }
 
@@ -869,19 +760,13 @@ impl Parser {
 
             while self.get_cur_token() != Some(Token::RPar) {
                 if self.get_cur_token().is_none() {
-                    self.report_error(
-                        self.lex.span(),
-                        ParserErrorType::MissingCloseParens(self.save_token()),
-                    );
+                    self.report_error(self.lex.span(), ParserErrorType::MissingCloseParens(self.save_token()));
 
                     return None;
                 }
                 if let Some(Token::Identifier(id)) = self.get_cur_token() {
                     if id == Ascii::new("VAR".to_string()) {
-                        self.report_error(
-                            self.lex.span(),
-                            ParserErrorType::VarNotAllowedInFunctions,
-                        );
+                        self.report_error(self.lex.span(), ParserErrorType::VarNotAllowedInFunctions);
                         self.next_token();
                     }
                 }
@@ -893,10 +778,7 @@ impl Parser {
                     let info = self.parse_var_info()?;
                     parameters.push(ParameterSpecifier::new(None, type_token, var_type, info));
                 } else {
-                    self.report_error(
-                        self.lex.span(),
-                        ParserErrorType::TypeExpected(self.save_token()),
-                    );
+                    self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
                     return None;
                 }
 
@@ -908,10 +790,7 @@ impl Parser {
             self.next_token();
 
             let Some(return_type) = self.get_variable_type() else {
-                self.report_error(
-                    self.lex.span(),
-                    ParserErrorType::TypeExpected(self.save_token()),
-                );
+                self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
                 return None;
             };
             let return_type_token = self.save_spanned_token();
@@ -920,9 +799,7 @@ impl Parser {
 
             let mut statements = Vec::new();
 
-            while self.get_cur_token() != Some(Token::EndProc)
-                && self.get_cur_token() != Some(Token::EndFunc)
-            {
+            while self.get_cur_token() != Some(Token::EndProc) && self.get_cur_token() != Some(Token::EndFunc) {
                 if self.get_cur_token().is_none() {
                     self.report_error(self.lex.span(), ParserErrorType::EndExpected);
                     return None;
@@ -932,10 +809,10 @@ impl Parser {
             }
             let endfunc_token = self.save_spanned_token();
             if endfunc_token.token == Token::EndProc {
-                self.errors.lock().unwrap().report_warning(
-                    endfunc_token.span.clone(),
-                    ParserWarningType::FunctionClosedWithEndProc,
-                );
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_warning(endfunc_token.span.clone(), ParserWarningType::FunctionClosedWithEndProc);
             }
             self.next_token();
 
@@ -961,12 +838,7 @@ impl Parser {
 /// # Panics
 ///
 /// Panics if .
-pub fn parse_ast(
-    file_name: PathBuf,
-    input: &str,
-    encoding: Encoding,
-    version: u16,
-) -> (Ast, Arc<Mutex<ErrorRepoter>>) {
+pub fn parse_ast(file_name: PathBuf, input: &str, encoding: Encoding, version: u16) -> (Ast, Arc<Mutex<ErrorRepoter>>) {
     let mut nodes = Vec::new();
     let mut parser = Parser::new(file_name.clone(), input, encoding, version);
     parser.next_token();
@@ -1000,22 +872,11 @@ pub struct ErrorRepoter {
 }
 
 impl ErrorRepoter {
-    pub fn report_error<T: std::error::Error + 'static + Send + Sync>(
-        &mut self,
-        span: core::ops::Range<usize>,
-        error: T,
-    ) {
-        self.errors.push(ErrorContainer {
-            error: Box::new(error),
-            span,
-        });
+    pub fn report_error<T: std::error::Error + 'static + Send + Sync>(&mut self, span: core::ops::Range<usize>, error: T) {
+        self.errors.push(ErrorContainer { error: Box::new(error), span });
     }
 
-    pub fn report_warning<T: std::error::Error + 'static + Send + Sync>(
-        &mut self,
-        span: core::ops::Range<usize>,
-        warning: T,
-    ) {
+    pub fn report_warning<T: std::error::Error + 'static + Send + Sync>(&mut self, span: core::ops::Range<usize>, warning: T) {
         self.warnings.push(ErrorContainer {
             error: Box::new(warning),
             span,

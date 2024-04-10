@@ -155,9 +155,7 @@ impl DiskIO {
         let mut first_chan = FileChannel::new();
 
         if let Some(answer_file) = answer_file {
-            let _ = first_chan
-                .file
-                .replace(Box::new(File::create(answer_file).unwrap()));
+            let _ = first_chan.file.replace(Box::new(File::create(answer_file).unwrap()));
         }
 
         DiskIO {
@@ -257,9 +255,7 @@ impl PCBoardIO for DiskIO {
                 Ok(String::new())
             } else {
                 chan.err = false;
-                Ok(line
-                    .trim_end_matches(|c| c == '\r' || c == '\n')
-                    .to_string())
+                Ok(line.trim_end_matches(|c| c == '\r' || c == '\n').to_string())
             }
         } else {
             log::error!("no file!");
@@ -306,14 +302,10 @@ impl PCBoardIO for DiskIO {
                 if let Some(reader) = &mut chan.reader {
                     match seek_pos {
                         0 => {
-                            reader
-                                .seek(SeekFrom::Start(pos as u64))
-                                .expect("seek error");
+                            reader.seek(SeekFrom::Start(pos as u64)).expect("seek error");
                         }
                         1 => {
-                            reader
-                                .seek(SeekFrom::Current(pos as i64))
-                                .expect("seek error");
+                            reader.seek(SeekFrom::Current(pos as i64)).expect("seek error");
                         }
                         2 => {
                             reader.seek(SeekFrom::End(-pos as i64)).expect("seek error");
@@ -532,11 +524,7 @@ impl PCBoardIO for MemoryIO {
                     self.channels[channel].err = true;
                     return Ok(String::new());
                 }
-                let result: String = f
-                    .chars()
-                    .skip(self.channels[channel].filepos as usize)
-                    .take_while(|c| *c != '\n')
-                    .collect();
+                let result: String = f.chars().skip(self.channels[channel].filepos as usize).take_while(|c| *c != '\n').collect();
                 self.channels[channel].filepos += result.len() as i32 + 1;
                 Ok(result)
             } else {

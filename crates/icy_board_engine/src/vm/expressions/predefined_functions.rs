@@ -3,9 +3,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::icy_board::state::functions::{
-    MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_NUM, MASK_PATH, MASK_PWD,
-};
+use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_NUM, MASK_PATH, MASK_PWD};
 use crate::vm::VirtualMachine;
 use icy_engine::update_crc32;
 use icy_ppe::ast::constant::STACK_LIMIT;
@@ -193,9 +191,7 @@ pub fn instr(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
 
 /// Returns a flag indicating if the user has aborted the display of information.
 pub fn abort(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_bool(
-        vm.icy_board_state.session.disp_options.abort_printout,
-    ))
+    Ok(VariableValue::new_bool(vm.icy_board_state.session.disp_options.abort_printout))
 }
 
 /// Trim specified characters from the beginning of a string
@@ -211,9 +207,7 @@ pub fn ltrim(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     }
     let str = vm.eval_expr(&args[0])?.as_string();
     let pat = ch.remove(0);
-    Ok(VariableValue::new_string(
-        str.trim_start_matches(pat).to_string(),
-    ))
+    Ok(VariableValue::new_string(str.trim_start_matches(pat).to_string()))
 }
 
 /// Replaces all occurences of a given character to another character in a string.
@@ -339,9 +333,7 @@ pub fn rtrim(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     let str = vm.eval_expr(&args[0])?.as_string();
 
     let pat = ch.remove(0);
-    Ok(VariableValue::new_string(
-        str.trim_end_matches(pat).to_string(),
-    ))
+    Ok(VariableValue::new_string(str.trim_end_matches(pat).to_string()))
 }
 
 /// Trim specified characters from the beginning and end of a string
@@ -390,18 +382,12 @@ pub fn u_name(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
 pub fn u_ldate(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     // vm.pcb_data.users[vm.cur_user].last_date_on
     // TODO
-    Ok(VariableValue::new(
-        VariableType::Date,
-        VariableData::default(),
-    ))
+    Ok(VariableValue::new(VariableType::Date, VariableData::default()))
 }
 
 pub fn u_ltime(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     // TODO
-    Ok(VariableValue::new(
-        VariableType::Time,
-        VariableData::default(),
-    ))
+    Ok(VariableValue::new(VariableType::Time, VariableData::default()))
 }
 
 pub fn u_ldir(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -485,14 +471,10 @@ pub fn ver(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(1540))
 }
 pub fn nochar(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_string(
-        vm.icy_board_state.no_char.to_string(),
-    ))
+    Ok(VariableValue::new_string(vm.icy_board_state.no_char.to_string()))
 }
 pub fn yeschar(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_string(
-        vm.icy_board_state.yes_char.to_string(),
-    ))
+    Ok(VariableValue::new_string(vm.icy_board_state.yes_char.to_string()))
 }
 
 pub fn inkey(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -532,9 +514,7 @@ pub fn inkey(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
 }
 
 pub fn tostring(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_string(
-        vm.eval_expr(&args[0])?.as_string(),
-    ))
+    Ok(VariableValue::new_string(vm.eval_expr(&args[0])?.as_string()))
 }
 pub fn mask_pwd(_vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_string(MASK_PWD.to_string()))
@@ -559,9 +539,7 @@ pub fn mask_ascii(_vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<VariableVa
 }
 
 pub fn curconf(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(
-        vm.icy_board_state.session.current_conference_number,
-    ))
+    Ok(VariableValue::new_int(vm.icy_board_state.session.current_conference_number))
 }
 
 pub fn pcbdat(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -595,10 +573,7 @@ pub fn readline(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue>
     let file_name = vm.resolve_file(&file_name);
 
     if let Ok(file) = fs::read(&file_name) {
-        let file = file
-            .iter()
-            .map(|x| CP437_TO_UNICODE[*x as usize])
-            .collect::<String>();
+        let file = file.iter().map(|x| CP437_TO_UNICODE[*x as usize]).collect::<String>();
 
         let line_text = file.lines().nth(line as usize - 1).unwrap_or_default();
         Ok(VariableValue::new_string(line_text.to_string()))
@@ -610,13 +585,7 @@ pub fn readline(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue>
 
 pub fn sysopsec(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(
-        vm.icy_board_state
-            .board
-            .lock()
-            .unwrap()
-            .config
-            .sysop_security_level
-            .sysop as i32,
+        vm.icy_board_state.board.lock().unwrap().config.sysop_security_level.sysop as i32,
     ))
 }
 pub fn onlocal(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -819,9 +788,7 @@ pub fn langext(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> 
     panic!("TODO")
 }
 pub fn ansion(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_bool(
-        !vm.icy_board_state.session.disp_options.disable_color,
-    ))
+    Ok(VariableValue::new_bool(!vm.icy_board_state.session.disp_options.disable_color))
 }
 pub fn valcc(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
@@ -837,9 +804,7 @@ pub fn cctype(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
 }
 
 pub fn getx(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(
-        vm.icy_board_state.get_caret_position().0 + 1,
-    ))
+    Ok(VariableValue::new_int(vm.icy_board_state.get_caret_position().0 + 1))
 }
 
 pub fn gety(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -914,16 +879,10 @@ pub fn fileinf(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> 
     let path = PathBuf::from(&file);
     match item {
         1 => Ok(VariableValue::new_bool(vm.io.file_exists(&file))),
-        2 => Ok(VariableValue::new(
-            VariableType::Date,
-            VariableData::default(),
-        )), // TODO: File date
-        3 => Ok(VariableValue::new(
-            VariableType::Time,
-            VariableData::default(),
-        )), // TODO: File time
+        2 => Ok(VariableValue::new(VariableType::Date, VariableData::default())), // TODO: File date
+        3 => Ok(VariableValue::new(VariableType::Time, VariableData::default())), // TODO: File time
         4 => Ok(VariableValue::new_int(vm.io.get_file_size(&file) as i32)),
-        5 => Ok(VariableValue::new_int(0)), // TODO: File attributes
+        5 => Ok(VariableValue::new_int(0)),                   // TODO: File attributes
         6 => Ok(VariableValue::new_string("C:".to_string())), // Drive
         7 => {
             if let Some(dir) = path.parent() {
@@ -994,28 +953,12 @@ pub fn slpath(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
 }
 pub fn helppath(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_string(
-        vm.icy_board_state
-            .board
-            .lock()
-            .unwrap()
-            .config
-            .paths
-            .help_path
-            .to_string_lossy()
-            .to_string(),
+        vm.icy_board_state.board.lock().unwrap().config.paths.help_path.to_string_lossy().to_string(),
     ))
 }
 pub fn temppath(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_string(
-        vm.icy_board_state
-            .board
-            .lock()
-            .unwrap()
-            .config
-            .paths
-            .tmp_path
-            .to_string_lossy()
-            .to_string(),
+        vm.icy_board_state.board.lock().unwrap().config.paths.tmp_path.to_string_lossy().to_string(),
     ))
 }
 pub fn modem(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1035,22 +978,12 @@ pub fn mgetbyte(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue>
     panic!("TODO")
 }
 pub fn tokcount(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(
-        vm.icy_board_state.session.tokens.len() as i32,
-    ))
+    Ok(VariableValue::new_int(vm.icy_board_state.session.tokens.len() as i32))
 }
 
 pub fn u_recnum(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     let user_name = vm.eval_expr(&args[0])?.as_string().to_uppercase();
-    for (i, user) in vm
-        .icy_board_state
-        .board
-        .lock()
-        .unwrap()
-        .users
-        .iter()
-        .enumerate()
-    {
+    for (i, user) in vm.icy_board_state.board.lock().unwrap().users.iter().enumerate() {
         if user.get_name().to_uppercase() == user_name {
             return Ok(VariableValue::new_int(i as i32));
         }
@@ -1082,97 +1015,53 @@ pub fn pagestat(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue>
     panic!("TODO")
 }
 pub fn tobigstr(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm
-        .eval_expr(&args[0])?
-        .clone()
-        .convert_to(VariableType::BigStr))
+    Ok(vm.eval_expr(&args[0])?.clone().convert_to(VariableType::BigStr))
 }
 pub fn toboolean(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm
-        .eval_expr(&args[0])?
-        .clone()
-        .convert_to(VariableType::Boolean))
+    Ok(vm.eval_expr(&args[0])?.clone().convert_to(VariableType::Boolean))
 }
 pub fn tobyte(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm
-        .eval_expr(&args[0])?
-        .clone()
-        .convert_to(VariableType::Byte))
+    Ok(vm.eval_expr(&args[0])?.clone().convert_to(VariableType::Byte))
 }
 pub fn todate(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm
-        .eval_expr(&args[0])?
-        .clone()
-        .convert_to(VariableType::Date))
+    Ok(vm.eval_expr(&args[0])?.clone().convert_to(VariableType::Date))
 }
 pub fn todreal(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm
-        .eval_expr(&args[0])?
-        .clone()
-        .convert_to(VariableType::Double))
+    Ok(vm.eval_expr(&args[0])?.clone().convert_to(VariableType::Double))
 }
 pub fn toedate(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm
-        .eval_expr(&args[0])?
-        .clone()
-        .convert_to(VariableType::EDate))
+    Ok(vm.eval_expr(&args[0])?.clone().convert_to(VariableType::EDate))
 }
 pub fn tointeger(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm
-        .eval_expr(&args[0])?
-        .clone()
-        .convert_to(VariableType::Integer))
+    Ok(vm.eval_expr(&args[0])?.clone().convert_to(VariableType::Integer))
 }
 pub fn tomoney(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm
-        .eval_expr(&args[0])?
-        .clone()
-        .convert_to(VariableType::Money))
+    Ok(vm.eval_expr(&args[0])?.clone().convert_to(VariableType::Money))
 }
 pub fn toreal(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm
-        .eval_expr(&args[0])?
-        .clone()
-        .convert_to(VariableType::Float))
+    Ok(vm.eval_expr(&args[0])?.clone().convert_to(VariableType::Float))
 }
 pub fn tosbyte(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm
-        .eval_expr(&args[0])?
-        .clone()
-        .convert_to(VariableType::SByte))
+    Ok(vm.eval_expr(&args[0])?.clone().convert_to(VariableType::SByte))
 }
 pub fn tosword(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm
-        .eval_expr(&args[0])?
-        .clone()
-        .convert_to(VariableType::SWord))
+    Ok(vm.eval_expr(&args[0])?.clone().convert_to(VariableType::SWord))
 }
 pub fn totime(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm
-        .eval_expr(&args[0])?
-        .clone()
-        .convert_to(VariableType::Time))
+    Ok(vm.eval_expr(&args[0])?.clone().convert_to(VariableType::Time))
 }
 pub fn tounsigned(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm
-        .eval_expr(&args[0])?
-        .clone()
-        .convert_to(VariableType::Unsigned))
+    Ok(vm.eval_expr(&args[0])?.clone().convert_to(VariableType::Unsigned))
 }
 pub fn toword(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm
-        .eval_expr(&args[0])?
-        .clone()
-        .convert_to(VariableType::Word))
+    Ok(vm.eval_expr(&args[0])?.clone().convert_to(VariableType::Word))
 }
 pub fn mixed(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
 pub fn alias(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_bool(
-        vm.icy_board_state.session.use_alias,
-    ))
+    Ok(VariableValue::new_bool(vm.icy_board_state.session.use_alias))
 }
 pub fn confreg(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     let conf_num = vm.eval_expr(&args[0])?.as_int() as usize;
@@ -1284,9 +1173,7 @@ pub fn outbytes(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue>
     Ok(VariableValue::new_int(0))
 }
 pub fn hiconfnum(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(
-        vm.icy_board_state.board.lock().unwrap().conferences.len() as i32 - 1,
-    ))
+    Ok(VariableValue::new_int(vm.icy_board_state.board.lock().unwrap().conferences.len() as i32 - 1))
 }
 
 pub fn inbytes(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1328,17 +1215,13 @@ pub fn actmsgnum(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue
 /// Usage: `STACKLEFT()`
 //  Val: Returns the number of bytes left on the *system* stack.
 pub fn stackleft(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(
-        STACK_LIMIT - vm.return_addresses.len() as i32,
-    ))
+    Ok(VariableValue::new_int(STACK_LIMIT - vm.return_addresses.len() as i32))
 }
 
 /// `STACKERR()`
 /// Returns a boolean value which indicates a stack error has occured
 pub fn stackerr(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_bool(
-        STACK_LIMIT > vm.return_addresses.len() as i32,
-    ))
+    Ok(VariableValue::new_bool(STACK_LIMIT > vm.return_addresses.len() as i32))
 }
 
 pub fn dgetalias(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {

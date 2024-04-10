@@ -2,18 +2,12 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     ast::{
-        Ast, AstNode, BinOp, BinaryExpression, BlockStatement, CommentAstNode, Constant,
-        ConstantExpression, Expression, FunctionCallExpression, FunctionDeclarationAstNode,
-        FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement,
-        LabelStatement, LetStatement, ParameterSpecifier, ParensExpression,
-        PredefinedCallStatement, PredefinedFunctionCallExpression, ProcedureCallStatement,
-        ProcedureDeclarationAstNode, ProcedureImplementation, Statement, UnaryExpression,
-        VariableDeclarationStatement, VariableSpecifier,
+        Ast, AstNode, BinOp, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression, FunctionCallExpression,
+        FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, LabelStatement, LetStatement,
+        ParameterSpecifier, ParensExpression, PredefinedCallStatement, PredefinedFunctionCallExpression, ProcedureCallStatement, ProcedureDeclarationAstNode,
+        ProcedureImplementation, Statement, UnaryExpression, VariableDeclarationStatement, VariableSpecifier,
     },
-    executable::{
-        DeserializationError, DeserializationErrorType, EntryType, Executable, OpCode, PPECommand,
-        PPEExpr, PPEScript, TableEntry, VariableType,
-    },
+    executable::{DeserializationError, DeserializationErrorType, EntryType, Executable, OpCode, PPECommand, PPEExpr, PPEScript, TableEntry, VariableType},
     Res,
 };
 
@@ -68,9 +62,7 @@ impl Decompiler {
 
         for statement in &self.script.statements {
             match statement.command {
-                PPECommand::Goto(label)
-                | PPECommand::Gosub(label)
-                | PPECommand::IfNot(_, label) => {
+                PPECommand::Goto(label) | PPECommand::Gosub(label) | PPECommand::IfNot(_, label) => {
                     labels.insert(label);
                 }
                 _ => {}
@@ -125,10 +117,7 @@ impl Decompiler {
             }
             if let Some(bugs) = self.script.bugged_offsets.get_mut(&statement.span.start) {
                 for bug in bugs.drain(..) {
-                    self.issues.push(DecompilerIssue {
-                        byte_offset,
-                        bug: bug.clone(),
-                    });
+                    self.issues.push(DecompilerIssue { byte_offset, bug: bug.clone() });
                     statements.push(CommentAstNode::create_empty_statement(format!(
                         " PPLC bug use detected in next statement: {bug}"
                     )));
@@ -148,44 +137,34 @@ impl Decompiler {
             "EXIT_LABEL".to_string(),
         )));*/
         if !self.functions.is_empty() {
-            statements.push(PredefinedCallStatement::create_empty_statement(
-                OpCode::END.get_definition(),
-                Vec::new(),
-            ));
+            statements.push(PredefinedCallStatement::create_empty_statement(OpCode::END.get_definition(), Vec::new()));
         }
-        ast.nodes
-            .push(AstNode::Main(BlockStatement::empty(statements)));
+        ast.nodes.push(AstNode::Main(BlockStatement::empty(statements)));
 
         ast.nodes.append(&mut self.functions);
 
         for (k, bugs) in &self.script.bugged_offsets {
             for bug in bugs {
-                ast.nodes.push(AstNode::VariableDeclaration(
-                    CommentAstNode::create_empty_statement(format!("{k:04X}: statement: {bug}")),
-                ));
+                ast.nodes.push(AstNode::VariableDeclaration(CommentAstNode::create_empty_statement(format!(
+                    "{k:04X}: statement: {bug}"
+                ))));
             }
         }
 
         if !self.script.bugged_offsets.is_empty() {
-            ast.nodes.push(AstNode::VariableDeclaration(
-                CommentAstNode::create_empty_statement(format!(
-                    " {} error(s) detected while decompiling",
-                    self.script.bugged_offsets.len(),
-                )),
-            ));
+            ast.nodes.push(AstNode::VariableDeclaration(CommentAstNode::create_empty_statement(format!(
+                " {} error(s) detected while decompiling",
+                self.script.bugged_offsets.len(),
+            ))));
 
-            ast.nodes.push(AstNode::VariableDeclaration(
-                CommentAstNode::create_empty_statement(String::new()),
-            ));
+            ast.nodes
+                .push(AstNode::VariableDeclaration(CommentAstNode::create_empty_statement(String::new())));
             ast.nodes.push(AstNode::VariableDeclaration(CommentAstNode::create_empty_statement(
                 "Some PPEs got altered to avoid decompilation. PCBoard doesn't handle unary expressions correcty.".to_string(),
             )));
-            ast.nodes.push(AstNode::VariableDeclaration(
-                CommentAstNode::create_empty_statement(
-                    "Search for 'PPLC bug' and look out for !!!<expr> or !<expr>*!<expr> cases."
-                        .to_string(),
-                ),
-            ));
+            ast.nodes.push(AstNode::VariableDeclaration(CommentAstNode::create_empty_statement(
+                "Search for 'PPLC bug' and look out for !!!<expr> or !<expr>*!<expr> cases.".to_string(),
+            )));
         }
         Ok(ast)
     }
@@ -210,28 +189,21 @@ impl Decompiler {
                     if unsafe { entry.value.data.procedure_value.start_offset } == 0 {
                         continue;
                     }
-                    self.function_lookup.insert(
-                        unsafe { entry.value.data.procedure_value.start_offset as usize },
-                        entry.header.id,
-                    );
+                    self.function_lookup
+                        .insert(unsafe { entry.value.data.procedure_value.start_offset as usize }, entry.header.id);
 
                     if entry.header.variable_type == VariableType::Function {
                         let parameters = self.generate_parameter_list(entry);
-                        let return_value = self.executable.variable_table.get_var_entry(unsafe {
-                            entry.value.data.function_value.return_var as usize
-                        });
-                        let func_decl = FunctionDeclarationAstNode::empty(
-                            unicase::Ascii::new(entry.name.clone()),
-                            parameters,
-                            return_value.header.variable_type,
-                        );
+                        let return_value = self
+                            .executable
+                            .variable_table
+                            .get_var_entry(unsafe { entry.value.data.function_value.return_var as usize });
+                        let func_decl =
+                            FunctionDeclarationAstNode::empty(unicase::Ascii::new(entry.name.clone()), parameters, return_value.header.variable_type);
                         ast.nodes.push(AstNode::FunctionDeclaration(func_decl));
                     } else {
                         let parameters = self.generate_parameter_list(entry);
-                        let proc_decl = ProcedureDeclarationAstNode::empty(
-                            unicase::Ascii::new(entry.name.clone()),
-                            parameters,
-                        );
+                        let proc_decl = ProcedureDeclarationAstNode::empty(unicase::Ascii::new(entry.name.clone()), parameters);
                         ast.nodes.push(AstNode::ProcedureDeclaration(proc_decl));
                     }
                 }
@@ -245,32 +217,21 @@ impl Decompiler {
             PPEExpr::Invalid => todo!(),
             PPEExpr::Value(id) => unsafe {
                 let Some(entry) = self.executable.variable_table.try_get_entry(*id) else {
-                    return ConstantExpression::create_empty_expression(Constant::String(format!(
-                        "ERROR IN EXPRESSION can't read table index : {:04X}",
-                        *id
-                    )));
+                    return ConstantExpression::create_empty_expression(Constant::String(format!("ERROR IN EXPRESSION can't read table index : {:04X}", *id)));
                 };
                 if entry.entry_type == EntryType::Constant {
                     let constant = match entry.value.get_type() {
-                        VariableType::BigStr | VariableType::String => {
-                            Constant::String(entry.value.as_string())
-                        }
-                        VariableType::Float => {
-                            Constant::Double(entry.value.data.float_value as f64)
-                        }
+                        VariableType::BigStr | VariableType::String => Constant::String(entry.value.as_string()),
+                        VariableType::Float => Constant::Double(entry.value.data.float_value as f64),
                         VariableType::Double => Constant::Double(entry.value.data.double_value),
                         VariableType::Boolean => Constant::Boolean(entry.value.data.bool_value),
-                        VariableType::Unsigned => {
-                            Constant::Unsigned(entry.value.data.unsigned_value)
-                        }
+                        VariableType::Unsigned => Constant::Unsigned(entry.value.data.unsigned_value),
                         //VariableType::Integer |
                         _ => Constant::Integer(entry.value.as_int()),
                     };
                     ConstantExpression::create_empty_expression(constant)
                 } else {
-                    IdentifierExpression::create_empty_expression(unicase::Ascii::new(
-                        entry.name.clone(),
-                    ))
+                    IdentifierExpression::create_empty_expression(unicase::Ascii::new(entry.name.clone()))
                 }
             },
             PPEExpr::UnaryExpression(op, expr) => {
@@ -290,81 +251,49 @@ impl Decompiler {
                 let expr = BinaryExpression::create_empty_expression(*op, left, right);
                 expr.visit_mut(&mut OptimizationVisitor::default())
             }
-            PPEExpr::Dim(id, dims) => FunctionCallExpression::create_empty_expression(
-                self.get_variable_name(*id),
-                dims.iter().map(|e| self.decompile_expression(e)).collect(),
-            ),
-            PPEExpr::PredefinedFunctionCall(f, args) => {
-                PredefinedFunctionCallExpression::create_empty_expression(
-                    f,
-                    args.iter().map(|e| self.decompile_expression(e)).collect(),
-                )
+            PPEExpr::Dim(id, dims) => {
+                FunctionCallExpression::create_empty_expression(self.get_variable_name(*id), dims.iter().map(|e| self.decompile_expression(e)).collect())
             }
-            PPEExpr::FunctionCall(f, args) => FunctionCallExpression::create_empty_expression(
-                self.get_variable_name(*f),
-                args.iter().map(|e| self.decompile_expression(e)).collect(),
-            ),
+            PPEExpr::PredefinedFunctionCall(f, args) => {
+                PredefinedFunctionCallExpression::create_empty_expression(f, args.iter().map(|e| self.decompile_expression(e)).collect())
+            }
+            PPEExpr::FunctionCall(f, args) => {
+                FunctionCallExpression::create_empty_expression(self.get_variable_name(*f), args.iter().map(|e| self.decompile_expression(e)).collect())
+            }
         }
     }
 
     fn decompile_statement(&self, statement: &PPECommand) -> Statement {
         match statement {
             PPECommand::EndFunc | PPECommand::EndProc | PPECommand::End => {
-                PredefinedCallStatement::create_empty_statement(
-                    OpCode::END.get_definition(),
-                    Vec::new(),
-                )
+                PredefinedCallStatement::create_empty_statement(OpCode::END.get_definition(), Vec::new())
             }
-            PPECommand::Return => PredefinedCallStatement::create_empty_statement(
-                OpCode::RETURN.get_definition(),
-                Vec::new(),
-            ),
-            PPECommand::Stop => PredefinedCallStatement::create_empty_statement(
-                OpCode::STOP.get_definition(),
-                Vec::new(),
-            ),
-            PPECommand::Goto(label) => {
-                GotoStatement::create_empty_statement(self.get_label_name(*label))
-            }
-            PPECommand::Gosub(label) => {
-                GosubStatement::create_empty_statement(self.get_label_name(*label))
-            }
+            PPECommand::Return => PredefinedCallStatement::create_empty_statement(OpCode::RETURN.get_definition(), Vec::new()),
+            PPECommand::Stop => PredefinedCallStatement::create_empty_statement(OpCode::STOP.get_definition(), Vec::new()),
+            PPECommand::Goto(label) => GotoStatement::create_empty_statement(self.get_label_name(*label)),
+            PPECommand::Gosub(label) => GosubStatement::create_empty_statement(self.get_label_name(*label)),
 
             PPECommand::IfNot(expr, label) => {
                 let expr = self.decompile_expression(expr);
 
-                IfStatement::create_empty_statement(
-                    expr.negate_expression(),
-                    GotoStatement::create_empty_statement(self.get_label_name(*label)),
-                )
+                IfStatement::create_empty_statement(expr.negate_expression(), GotoStatement::create_empty_statement(self.get_label_name(*label)))
             }
-            PPECommand::ProcedureCall(p, args) => ProcedureCallStatement::create_empty_statement(
-                self.get_variable_name(*p),
-                args.iter().map(|e| self.decompile_expression(e)).collect(),
-            ),
-            PPECommand::PredefinedCall(p, args) => PredefinedCallStatement::create_empty_statement(
-                p,
-                args.iter().map(|e| self.decompile_expression(e)).collect(),
-            ),
+            PPECommand::ProcedureCall(p, args) => {
+                ProcedureCallStatement::create_empty_statement(self.get_variable_name(*p), args.iter().map(|e| self.decompile_expression(e)).collect())
+            }
+            PPECommand::PredefinedCall(p, args) => {
+                PredefinedCallStatement::create_empty_statement(p, args.iter().map(|e| self.decompile_expression(e)).collect())
+            }
             PPECommand::Let(left, expr) => {
                 let (identifier, arguments) = match self.decompile_expression(left) {
-                    Expression::FunctionCall(f) => {
-                        (f.get_identifier().clone(), f.get_arguments().clone())
-                    }
+                    Expression::FunctionCall(f) => (f.get_identifier().clone(), f.get_arguments().clone()),
                     Expression::Identifier(id) => (id.get_identifier().clone(), Vec::new()),
                     x => panic!("Invalid expression {x:?}"),
                 };
                 let id = left.get_id().unwrap();
                 let mut value_expr = self.decompile_expression(expr);
 
-                if self
-                    .executable
-                    .variable_table
-                    .get_var_entry(id)
-                    .header
-                    .variable_type
-                    == VariableType::Boolean
-                {
+                if self.executable.variable_table.get_var_entry(id).header.variable_type == VariableType::Boolean {
                     value_expr = Statement::try_boolean_conversion(&value_expr);
                 }
 
@@ -391,14 +320,13 @@ impl Decompiler {
         while self.cur_ptr < self.script.statements.len() {
             let statement = &self.script.statements[self.cur_ptr];
             let byte_offset = statement.span.start * 2;
-            if matches!(statement.command, PPECommand::EndFunc)
-                || matches!(statement.command, PPECommand::EndProc)
-            {
+            if matches!(statement.command, PPECommand::EndFunc) || matches!(statement.command, PPECommand::EndProc) {
                 if entry.header.variable_type == VariableType::Function {
                     let parameters = self.generate_parameter_list(entry);
-                    let return_value = self.executable.variable_table.get_var_entry(unsafe {
-                        entry.value.data.function_value.return_var as usize
-                    });
+                    let return_value = self
+                        .executable
+                        .variable_table
+                        .get_var_entry(unsafe { entry.value.data.function_value.return_var as usize });
                     let func_impl = FunctionImplementation::empty(
                         func,
                         unicase::Ascii::new(entry.name.clone()),
@@ -409,12 +337,7 @@ impl Decompiler {
                     self.functions.push(AstNode::Function(func_impl));
                 } else {
                     let parameters = self.generate_parameter_list(entry);
-                    let proc_impl = ProcedureImplementation::empty(
-                        func,
-                        unicase::Ascii::new(entry.name.clone()),
-                        parameters,
-                        func_body,
-                    );
+                    let proc_impl = ProcedureImplementation::empty(func, unicase::Ascii::new(entry.name.clone()), parameters, func_body);
                     self.functions.push(AstNode::Procedure(proc_impl));
                 }
                 self.cur_ptr += 1;
@@ -422,17 +345,13 @@ impl Decompiler {
             }
 
             if self.label_lookup.contains_key(&(byte_offset)) {
-                func_body.push(LabelStatement::create_empty_statement(
-                    self.get_label_name(byte_offset),
-                ));
+                func_body.push(LabelStatement::create_empty_statement(self.get_label_name(byte_offset)));
             }
             func_body.push(self.decompile_statement(&statement.command));
             self.cur_ptr += 1;
         }
 
-        if self.cur_ptr < self.script.statements.len()
-            && self.script.statements[self.cur_ptr].command == PPECommand::End
-        {
+        if self.cur_ptr < self.script.statements.len() && self.script.statements[self.cur_ptr].command == PPECommand::End {
             self.cur_ptr += 1;
         }
     }
@@ -456,10 +375,7 @@ impl Decompiler {
             }
 
             for i in parameters..locals {
-                let local_var = self
-                    .executable
-                    .variable_table
-                    .get_var_entry(first_var + 1 + i);
+                let local_var = self.executable.variable_table.get_var_entry(first_var + 1 + i);
                 if local_var.entry_type == EntryType::Variable {
                     decl.push(generate_variable_declaration(local_var));
                 }
@@ -488,10 +404,7 @@ impl Decompiler {
             }
 
             for i in 0..to {
-                let param = self
-                    .executable
-                    .variable_table
-                    .get_var_entry(first_var + 1 + i);
+                let param = self.executable.variable_table.get_var_entry(first_var + 1 + i);
                 let mut dimensions = Vec::new();
                 match param.header.dim {
                     1 => {
@@ -544,20 +457,13 @@ fn generate_variable_declaration(var: &TableEntry) -> Statement {
             vec![var.header.vector_size, var.header.matrix_size]
         }
         3 => {
-            vec![
-                var.header.vector_size,
-                var.header.matrix_size,
-                var.header.cube_size,
-            ]
+            vec![var.header.vector_size, var.header.matrix_size, var.header.cube_size]
         }
         _ => Vec::new(),
     };
     VariableDeclarationStatement::create_empty_statement(
         var.header.variable_type,
-        vec![VariableSpecifier::empty(
-            unicase::Ascii::new(var.name.clone()),
-            dims,
-        )],
+        vec![VariableSpecifier::empty(unicase::Ascii::new(var.name.clone()), dims)],
     )
 }
 

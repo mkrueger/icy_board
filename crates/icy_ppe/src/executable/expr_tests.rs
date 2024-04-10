@@ -16,37 +16,24 @@ fn test_dim_serialization() {
     let val = PPEExpr::Dim(2, vec![PPEExpr::Value(2), PPEExpr::Value(3)]);
     test_serialize(&val, &[2, 2, 2, 0, 0, 3, 0, 0]);
 
-    let val = PPEExpr::Dim(
-        2,
-        vec![PPEExpr::Value(2), PPEExpr::Value(3), PPEExpr::Value(4)],
-    );
+    let val = PPEExpr::Dim(2, vec![PPEExpr::Value(2), PPEExpr::Value(3), PPEExpr::Value(4)]);
     test_serialize(&val, &[2, 3, 2, 0, 0, 3, 0, 0, 4, 0, 0]);
 }
 
 #[test]
 fn test_predefined_functions_serialization() {
     let i = -(FuncOpCode::RIGHT as i32);
-    let val = PPEExpr::PredefinedFunctionCall(
-        &FUNCTION_DEFINITIONS[i as usize],
-        vec![PPEExpr::Value(2), PPEExpr::Value(3)],
-    );
+    let val = PPEExpr::PredefinedFunctionCall(&FUNCTION_DEFINITIONS[i as usize], vec![PPEExpr::Value(2), PPEExpr::Value(3)]);
     test_serialize(&val, &[2, 0, 3, 0, FuncOpCode::RIGHT as i16]);
 
     let i = -(FuncOpCode::MID as i32);
-    let val = PPEExpr::PredefinedFunctionCall(
-        &FUNCTION_DEFINITIONS[i as usize],
-        vec![PPEExpr::Value(2), PPEExpr::Value(3), PPEExpr::Value(4)],
-    );
+    let val = PPEExpr::PredefinedFunctionCall(&FUNCTION_DEFINITIONS[i as usize], vec![PPEExpr::Value(2), PPEExpr::Value(3), PPEExpr::Value(4)]);
     test_serialize(&val, &[2, 0, 3, 0, 4, 0, FuncOpCode::MID as i16]);
 }
 
 #[test]
 fn test_binary_expression_serialization() {
-    let val = PPEExpr::BinaryExpression(
-        crate::ast::BinOp::Add,
-        Box::new(PPEExpr::Value(2)),
-        Box::new(PPEExpr::Value(3)),
-    );
+    let val = PPEExpr::BinaryExpression(crate::ast::BinOp::Add, Box::new(PPEExpr::Value(2)), Box::new(PPEExpr::Value(3)));
     test_serialize(&val, &[2, 0, 3, 0, FuncOpCode::PLUS as i16]);
 }
 
@@ -68,11 +55,7 @@ fn test_function_call_serialization() {
 }
 
 fn test_serialize(val: &PPEExpr, expected: &[i16]) {
-    assert_eq!(
-        val.get_size(),
-        expected.len(),
-        "Serialization size mismatch for {val:?}"
-    );
+    assert_eq!(val.get_size(), expected.len(), "Serialization size mismatch for {val:?}");
     let mut result = Vec::new();
     val.serialize(&mut result);
     assert_eq!(result, expected);

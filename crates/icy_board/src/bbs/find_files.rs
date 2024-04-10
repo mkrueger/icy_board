@@ -16,10 +16,8 @@ use super::{PcbBoardCommand, MASK_COMMAND};
 impl PcbBoardCommand {
     pub fn find_files(&mut self, action: &Command) -> Res<()> {
         if self.state.session.current_file_areas.is_empty() {
-            self.state.display_text(
-                IceText::NoDirectoriesAvailable,
-                display_flags::NEWLINE | display_flags::LFBEFORE,
-            )?;
+            self.state
+                .display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
             self.state.press_enter()?;
             return Ok(());
         }
@@ -31,10 +29,7 @@ impl PcbBoardCommand {
                 40,
                 &MASK_ASCII,
                 &action.help,
-                display_flags::NEWLINE
-                    | display_flags::UPCASE
-                    | display_flags::LFBEFORE
-                    | display_flags::HIGHASCII,
+                display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
             )?
         };
         if search_pattern.is_empty() {
@@ -55,10 +50,7 @@ impl PcbBoardCommand {
                 40,
                 MASK_COMMAND,
                 &action.help,
-                display_flags::NEWLINE
-                    | display_flags::UPCASE
-                    | display_flags::LFBEFORE
-                    | display_flags::HIGHASCII,
+                display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
             )?
         };
         if search_area.is_empty() {
@@ -71,10 +63,7 @@ impl PcbBoardCommand {
         if search_area == "A" {
             self.state.session.cancel_batch = false;
             for area in 0..self.state.session.current_file_areas.len() {
-                if self.state.session.current_file_areas[area]
-                    .list_security
-                    .user_can_access(&self.state.session)
-                {
+                if self.state.session.current_file_areas[area].list_security.user_can_access(&self.state.session) {
                     self.search_file_area(action, area, search_pattern.clone())?;
                 }
                 if self.state.session.cancel_batch {
@@ -96,10 +85,8 @@ impl PcbBoardCommand {
 
         if !joined {
             self.state.session.op_text = search_area;
-            self.state.display_text(
-                IceText::InvalidEntry,
-                display_flags::NEWLINE | display_flags::NOTBLANK,
-            )?;
+            self.state
+                .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::NOTBLANK)?;
         }
 
         self.state.new_line()?;
@@ -108,38 +95,21 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    fn search_file_area(
-        &mut self,
-        action: &Command,
-        area: usize,
-        search_pattern: String,
-    ) -> Res<()> {
-        let file_base_path = self
-            .state
-            .resolve_path(&self.state.session.current_file_areas[area].file_base);
+    fn search_file_area(&mut self, action: &Command, area: usize, search_pattern: String) -> Res<()> {
+        let file_base_path = self.state.resolve_path(&self.state.session.current_file_areas[area].file_base);
         let Ok(mut base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());
-            self.state.session.op_text = self.state.session.current_file_areas[area]
-                .file_base
-                .to_str()
-                .unwrap()
-                .to_string();
-            self.state.display_text(
-                IceText::NotFoundOnDisk,
-                display_flags::NEWLINE | display_flags::LFBEFORE,
-            )?;
+            self.state.session.op_text = self.state.session.current_file_areas[area].file_base.to_str().unwrap().to_string();
+            self.state
+                .display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)?;
             return Ok(());
         };
 
-        self.state
-            .display_text(IceText::ScanningDirectory, display_flags::DEFAULT)?;
-        self.state
-            .print(TerminalTarget::Both, &format!(" {} ", area + 1))?;
+        self.state.display_text(IceText::ScanningDirectory, display_flags::DEFAULT)?;
+        self.state.print(TerminalTarget::Both, &format!(" {} ", area + 1))?;
         self.state.set_color(IcbColor::Dos(10))?;
-        self.state.print(
-            TerminalTarget::Both,
-            &format!("({})", self.state.session.current_file_areas[area].name),
-        )?;
+        self.state
+            .print(TerminalTarget::Both, &format!("({})", self.state.session.current_file_areas[area].name))?;
         self.state.new_line()?;
 
         base.load_headers()?;
@@ -152,21 +122,15 @@ impl PcbBoardCommand {
             let date = header.file_date().unwrap();
             let name = header.name();
             self.state.set_color(IcbColor::Dos(14))?;
-            self.state
-                .print(TerminalTarget::Both, &format!("{:<12} ", name))?;
+            self.state.print(TerminalTarget::Both, &format!("{:<12} ", name))?;
             if name.len() > 12 {
                 self.state.new_line()?;
             }
             self.state.set_color(IcbColor::Dos(2))?;
-            self.state.print(
-                TerminalTarget::Both,
-                &format!("{:>8}  ", humanize_bytes_decimal!(size).to_string()),
-            )?;
+            self.state
+                .print(TerminalTarget::Both, &format!("{:>8}  ", humanize_bytes_decimal!(size).to_string()))?;
             self.state.set_color(IcbColor::Dos(4))?;
-            self.state.print(
-                TerminalTarget::Both,
-                &format!("{}", date.format("%m/%d/%C")),
-            )?;
+            self.state.print(TerminalTarget::Both, &format!("{}", date.format("%m/%d/%C")))?;
             self.state.set_color(IcbColor::Dos(3))?;
 
             self.state.print(TerminalTarget::Both, "  ")?;
@@ -178,8 +142,7 @@ impl PcbBoardCommand {
                     self.state.set_color(IcbColor::Dos(11))?;
                     for (i, line) in description.lines().enumerate() {
                         if i > 0 {
-                            self.state
-                                .print(TerminalTarget::Both, &format!("{:33}", " "))?;
+                            self.state.print(TerminalTarget::Both, &format!("{:33}", " "))?;
                         }
                         self.state.print(TerminalTarget::Both, line)?;
                         self.state.new_line()?;

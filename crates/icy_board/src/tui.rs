@@ -10,9 +10,7 @@ use chrono::{Datelike, Local, Timelike};
 use crossterm::{
     cursor::MoveTo,
     event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
-    terminal::{
-        disable_raw_mode, enable_raw_mode, Clear, EnterAlternateScreen, LeaveAlternateScreen,
-    },
+    terminal::{disable_raw_mode, enable_raw_mode, Clear, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 
@@ -41,11 +39,7 @@ pub struct Tui {
 }
 
 impl Tui {
-    pub fn new(
-        cmd: PcbBoardCommand,
-        screen: Arc<Mutex<Screen>>,
-        input_buffer: Arc<Mutex<VecDeque<(bool, char)>>>,
-    ) -> Self {
+    pub fn new(cmd: PcbBoardCommand, screen: Arc<Mutex<Screen>>, input_buffer: Arc<Mutex<VecDeque<(bool, char)>>>) -> Self {
         let board = cmd.state.board.clone();
         let session = Arc::new(Mutex::new(cmd.state.session.clone()));
         let cmd = Arc::new(Mutex::new(cmd));
@@ -61,18 +55,14 @@ impl Tui {
 
             if let Ok(lock) = &mut cmd.lock() {
                 ui.lock().as_mut().unwrap().cur_user = lock.state.session.cur_user;
-                ui.lock().as_mut().unwrap().current_conference =
-                    lock.state.session.current_conference.clone();
+                ui.lock().as_mut().unwrap().current_conference = lock.state.session.current_conference.clone();
                 ui.lock().as_mut().unwrap().disp_options = lock.state.session.disp_options.clone();
                 if let Err(err) = lock.do_command() {
                     lock.state.session.disp_options.reset_printout();
                     log::error!("Error: {}", err);
                     lock.state.set_color(4.into()).unwrap();
                     lock.state
-                        .print(
-                            icy_board_engine::vm::TerminalTarget::Both,
-                            &format!("\r\nError: {}\r\n\r\n", err),
-                        )
+                        .print(icy_board_engine::vm::TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err))
                         .unwrap();
                     lock.state.reset_color().unwrap();
                 }
@@ -134,9 +124,7 @@ impl Tui {
                         } else {
                             match key.code {
                                 KeyCode::Char(c) => {
-                                    if (c == 'x' || c == 'c')
-                                        && key.modifiers.contains(KeyModifiers::CONTROL)
-                                    {
+                                    if (c == 'x' || c == 'c') && key.modifiers.contains(KeyModifiers::CONTROL) {
                                         let _ = disable_raw_mode();
                                         return Ok(());
                                     }
@@ -173,20 +161,10 @@ impl Tui {
     }
 
     fn ui(&self, frame: &mut Frame, board: &IcyBoard) {
-        let area = Rect::new(
-            0,
-            0,
-            frame.size().width.min(80),
-            frame.size().height.min(24),
-        );
+        let area = Rect::new(0, 0, frame.size().width.min(80), frame.size().height.min(24));
         frame.render_widget(self.main_canvas(area), area);
 
-        let area = Rect::new(
-            0,
-            (frame.size().height - 1).min(24),
-            frame.size().width.min(80),
-            1,
-        );
+        let area = Rect::new(0, (frame.size().height - 1).min(24), frame.size().width.min(80), 1);
         frame.render_widget(self.status_bar(board), area);
 
         if let Ok(b) = self.screen.lock() {
@@ -241,17 +219,10 @@ impl Tui {
                     ctx.print(
                         0.0,
                         0.0,
-                        Line::from(format!(
-                            "(Local) {} Sec({})= {} Times On={}",
-                            user_name, current_conf, cur_security, times_on
-                        ))
-                        .style(Style::new().fg(DOS_BLACK)),
+                        Line::from(format!("(Local) {} Sec({})= {} Times On={}", user_name, current_conf, cur_security, times_on))
+                            .style(Style::new().fg(DOS_BLACK)),
                     );
-                    ctx.print(
-                        56.0,
-                        0.0,
-                        Line::from("ALT-H=Help".to_string()).style(Style::new().fg(DOS_BLACK)),
-                    );
+                    ctx.print(56.0, 0.0, Line::from("ALT-H=Help".to_string()).style(Style::new().fg(DOS_BLACK)));
 
                     let t = now.time();
                     let d = now.date_naive();
@@ -274,14 +245,7 @@ impl Tui {
                     ctx.print(
                         0.0,
                         0.0,
-                        Line::from(format!(
-                            "U/L:{} ({}kb) D/L{} ({}kb) ",
-                            up,
-                            upbytes / 1024,
-                            dn,
-                            dnbytes / 1024
-                        ))
-                        .style(Style::new().fg(DOS_BLACK)),
+                        Line::from(format!("U/L:{} ({}kb) D/L{} ({}kb) ", up, upbytes / 1024, dn, dnbytes / 1024)).style(Style::new().fg(DOS_BLACK)),
                     );
                 }
                 _ => {}
@@ -303,24 +267,13 @@ impl Tui {
                                 fg += 8;
                             }
                             let fg = buffer.palette.get_color(fg).get_rgb();
-                            let bg = buffer
-                                .palette
-                                .get_color(c.attribute.get_background())
-                                .get_rgb();
+                            let bg = buffer.palette.get_color(c.attribute.get_background()).get_rgb();
                             if c.attribute.get_foreground() == 14 {
                                 println!("{} - {:?}", c.attribute.get_foreground(), fg);
                             }
-                            let out_char = Line::from(c.ch.to_string()).style(
-                                Style::new()
-                                    .bg(Color::Rgb(bg.0, bg.1, bg.2))
-                                    .fg(Color::Rgb(fg.0, fg.1, fg.2)),
-                            );
+                            let out_char = Line::from(c.ch.to_string()).style(Style::new().bg(Color::Rgb(bg.0, bg.1, bg.2)).fg(Color::Rgb(fg.0, fg.1, fg.2)));
 
-                            ctx.print(
-                                x as f64 + 1.0,
-                                (area.height as i32 - 1 - y) as f64,
-                                out_char,
-                            );
+                            ctx.print(x as f64 + 1.0, (area.height as i32 - 1 - y) as f64, out_char);
                         }
                     }
                 }
@@ -351,9 +304,7 @@ fn restore_terminal() -> io::Result<()> {
 
 pub fn print_exit_screen() {
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout())).unwrap();
-    stdout()
-        .execute(Clear(crossterm::terminal::ClearType::All))
-        .unwrap();
+    stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
     terminal
         .draw(|frame| {
             let mut r = frame.size();
@@ -366,12 +317,7 @@ pub fn print_exit_screen() {
                 Span::styled("IcyBoard", white),
                 Span::styled(" Professional BBS Software!", green),
             ];
-            frame.render_widget(
-                Paragraph::new(Line::from(text))
-                    .alignment(Alignment::Center)
-                    .bg(DOS_BLUE),
-                r,
-            )
+            frame.render_widget(Paragraph::new(Line::from(text)).alignment(Alignment::Center).bg(DOS_BLUE), r)
         })
         .unwrap();
     stdout().execute(MoveTo(0, 1)).unwrap();

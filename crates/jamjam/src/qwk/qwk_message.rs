@@ -90,8 +90,7 @@ impl QWKMessage {
     /// # Remarks
     /// Returns default, in case of incorrect date
     pub fn date_time(&self) -> chrono::naive::NaiveDateTime {
-        chrono::NaiveDateTime::parse_from_str(&self.date_time.to_string(), "%m-%d-%y%H:%M")
-            .unwrap_or_default()
+        chrono::NaiveDateTime::parse_from_str(&self.date_time.to_string(), "%m-%d-%y%H:%M").unwrap_or_default()
     }
 
     pub fn is_deleted(&self) -> bool {

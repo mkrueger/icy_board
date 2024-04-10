@@ -19,9 +19,7 @@ use self::{
     icb_config::IcbConfig,
     icb_text::IcbTextFile,
     language::SupportedLanguages,
-    pcbconferences::{
-        PcbAdditionalConferenceHeader, PcbConferenceHeader, PcbLegacyConferenceHeader,
-    },
+    pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader, PcbLegacyConferenceHeader},
     pcboard_data::PcbBoardData,
     sec_levels::SecurityLevelDefinitions,
     statistics::Statistics,
@@ -149,63 +147,37 @@ impl IcyBoard {
         let parent_path = path.as_ref().parent().unwrap();
         let load_path = &RelativePath::from_path(&config.paths.user_base)?.to_path(parent_path);
         let users = UserBase::load(&load_path).map_err(|e| {
-            log::error!(
-                "Error loading user base: {} from {}",
-                e,
-                load_path.display()
-            );
+            log::error!("Error loading user base: {} from {}", e, load_path.display());
             e
         })?;
 
         let load_path = RelativePath::from_path(&config.paths.conferences)?.to_path(parent_path);
         let conferences = ConferenceBase::load(&load_path).map_err(|e| {
-            log::error!(
-                "Error loading conference base: {} from {}",
-                e,
-                load_path.display()
-            );
+            log::error!("Error loading conference base: {} from {}", e, load_path.display());
             e
         })?;
 
         let load_path = RelativePath::from_path(&config.paths.icbtext)?.to_path(parent_path);
         let display_text = IcbTextFile::load(&load_path).map_err(|e| {
-            log::error!(
-                "Error loading display text: {} from {}",
-                e,
-                load_path.display()
-            );
+            log::error!("Error loading display text: {} from {}", e, load_path.display());
             e
         })?;
 
         let load_path = &RelativePath::from_path(&config.paths.language_file)?.to_path(parent_path);
         let languages = SupportedLanguages::load(load_path).map_err(|e| {
-            log::error!(
-                "Error loading languages: {} from {}",
-                e,
-                load_path.display()
-            );
+            log::error!("Error loading languages: {} from {}", e, load_path.display());
             e
         })?;
 
-        let load_path =
-            RelativePath::from_path(&config.paths.protocol_data_file)?.to_path(parent_path);
+        let load_path = RelativePath::from_path(&config.paths.protocol_data_file)?.to_path(parent_path);
         let protocols = SupportedProtocols::load(&load_path).map_err(|e| {
-            log::error!(
-                "Error loading protocols: {} from {}",
-                e,
-                load_path.display()
-            );
+            log::error!("Error loading protocols: {} from {}", e, load_path.display());
             e
         })?;
 
-        let load_path =
-            RelativePath::from_path(&config.paths.security_level_file)?.to_path(parent_path);
+        let load_path = RelativePath::from_path(&config.paths.security_level_file)?.to_path(parent_path);
         let sec_levels = SecurityLevelDefinitions::load(&load_path).map_err(|e| {
-            log::error!(
-                "Error loading security levels: {} from {}",
-                e,
-                load_path.display()
-            );
+            log::error!("Error loading security levels: {} from {}", e, load_path.display());
             e
         })?;
 
@@ -215,14 +187,9 @@ impl IcyBoard {
             e
         })?;
 
-        let load_path =
-            RelativePath::from_path(&config.paths.statistics_file)?.to_path(parent_path);
+        let load_path = RelativePath::from_path(&config.paths.statistics_file)?.to_path(parent_path);
         let statistics = Statistics::load(&load_path).map_err(|e| {
-            log::error!(
-                "Error loading statistics: {} from {}",
-                e,
-                load_path.display()
-            );
+            log::error!("Error loading statistics: {} from {}", e, load_path.display());
             e
         })?;
 
@@ -263,8 +230,7 @@ impl IcyBoard {
 
         pcb_dat.num_conf = self.conferences.len() as i32 - 1;
         pcb_dat.path.sec_loc = self.resolve_file(&self.config.paths.security_level_file);
-        pcb_dat.path.cmd_display_files_loc =
-            self.resolve_file(&self.config.paths.command_display_path);
+        pcb_dat.path.cmd_display_files_loc = self.resolve_file(&self.config.paths.command_display_path);
         pcb_dat.path.welcome_file = self.resolve_file(&self.config.paths.welcome);
         pcb_dat.path.newuser_file = self.resolve_file(&self.config.paths.newuser);
         pcb_dat.path.closed_file = self.resolve_file(&self.config.paths.closed);
@@ -285,9 +251,7 @@ impl IcyBoard {
         let mut legacy_headers = Vec::new();
         let mut add_headers = Vec::new();
 
-        legacy_headers.extend(u16::to_le_bytes(
-            PcbLegacyConferenceHeader::HEADER_SIZE as u16,
-        ));
+        legacy_headers.extend(u16::to_le_bytes(PcbLegacyConferenceHeader::HEADER_SIZE as u16));
         let mut dirs = 0;
         for conf in self.conferences.iter() {
             dirs += 1;
@@ -468,13 +432,7 @@ pub fn write_with_bom<P: AsRef<Path>>(path: &P, buf: &str) -> Res<()> {
             file.write_all(&UTF8_BOM)?;
             file.write_all(buf.as_bytes())?;
         }
-        Err(e) => {
-            return Err(IcyBoardError::ErrorCreatingFile(
-                path.as_ref().to_string_lossy().to_string(),
-                e.to_string(),
-            )
-            .into())
-        }
+        Err(e) => return Err(IcyBoardError::ErrorCreatingFile(path.as_ref().to_string_lossy().to_string(), e.to_string()).into()),
     }
     Ok(())
 }
@@ -493,34 +451,16 @@ pub trait IcyBoardSerializer: serde::de::DeserializeOwned + serde::ser::Serializ
             Ok(txt) => match toml::from_str(&txt) {
                 Ok(result) => Ok(result),
                 Err(e) => {
-                    log::error!(
-                        "Loading {} toml file '{}': {}",
-                        Self::FILE_TYPE,
-                        path.as_ref().display(),
-                        e
-                    );
-                    Err(IcyError::ErrorParsingConfig(
-                        path.as_ref().to_string_lossy().to_string(),
-                        e.to_string(),
-                    )
-                    .into())
+                    log::error!("Loading {} toml file '{}': {}", Self::FILE_TYPE, path.as_ref().display(), e);
+                    Err(IcyError::ErrorParsingConfig(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
                 }
             },
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::NotFound {
                     Err(IcyError::FileNotFound(path.as_ref().to_string_lossy().to_string()).into())
                 } else {
-                    log::error!(
-                        "Loading {} file '{}': {}",
-                        Self::FILE_TYPE,
-                        path.as_ref().display(),
-                        e
-                    );
-                    Err(IcyError::ErrorLoadingFile(
-                        path.as_ref().to_string_lossy().to_string(),
-                        e.to_string(),
-                    )
-                    .into())
+                    log::error!("Loading {} file '{}': {}", Self::FILE_TYPE, path.as_ref().display(), e);
+                    Err(IcyError::ErrorLoadingFile(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
                 }
             }
         }
@@ -531,31 +471,13 @@ pub trait IcyBoardSerializer: serde::de::DeserializeOwned + serde::ser::Serializ
             Ok(txt) => match fs::write(path, txt) {
                 Ok(_) => Ok(()),
                 Err(e) => {
-                    log::error!(
-                        "Error writing {} file '{}': {}",
-                        Self::FILE_TYPE,
-                        path.as_ref().display(),
-                        e
-                    );
-                    Err(IcyError::ErrorGeneratingToml(
-                        path.as_ref().to_string_lossy().to_string(),
-                        e.to_string(),
-                    )
-                    .into())
+                    log::error!("Error writing {} file '{}': {}", Self::FILE_TYPE, path.as_ref().display(), e);
+                    Err(IcyError::ErrorGeneratingToml(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
                 }
             },
             Err(e) => {
-                log::error!(
-                    "Error generating {} toml file '{}': {}",
-                    Self::FILE_TYPE,
-                    path.as_ref().display(),
-                    e
-                );
-                Err(IcyError::ErrorGeneratingToml(
-                    path.as_ref().to_string_lossy().to_string(),
-                    e.to_string(),
-                )
-                .into())
+                log::error!("Error generating {} toml file '{}': {}", Self::FILE_TYPE, path.as_ref().display(), e);
+                Err(IcyError::ErrorGeneratingToml(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
             }
         }
     }
@@ -579,27 +501,15 @@ pub trait PCBoardRecordImporter<T>: Sized + Default {
                 let mut data = &data[..];
                 while !data.is_empty() {
                     if data.len() < Self::RECORD_SIZE {
-                        log::error!(
-                            "Importing file '{}' from pcboard binary file ended prematurely",
-                            path.as_ref().display(),
-                        );
-                        return Err(IcyBoardError::InvalidRecordSize(
-                            path.as_ref().display().to_string(),
-                            Self::RECORD_SIZE,
-                            data.len(),
-                        )
-                        .into());
+                        log::error!("Importing file '{}' from pcboard binary file ended prematurely", path.as_ref().display(),);
+                        return Err(IcyBoardError::InvalidRecordSize(path.as_ref().display().to_string(), Self::RECORD_SIZE, data.len()).into());
                     }
                     match Self::load_pcboard_record(&data[..Self::RECORD_SIZE]) {
                         Ok(value) => {
                             res.push(value);
                         }
                         Err(e) => {
-                            return Err(IcyBoardError::ImportRecordErorr(
-                                path.as_ref().display().to_string(),
-                                e.to_string(),
-                            )
-                            .into());
+                            return Err(IcyBoardError::ImportRecordErorr(path.as_ref().display().to_string(), e.to_string()).into());
                         }
                     }
 
@@ -608,16 +518,8 @@ pub trait PCBoardRecordImporter<T>: Sized + Default {
                 Ok(res)
             }
             Err(err) => {
-                log::error!(
-                    "Importing file '{}' from pcboard binary file: {}",
-                    path.as_ref().display(),
-                    err
-                );
-                Err(IcyError::ErrorLoadingFile(
-                    path.as_ref().to_string_lossy().to_string(),
-                    err.to_string(),
-                )
-                .into())
+                log::error!("Importing file '{}' from pcboard binary file: {}", path.as_ref().display(), err);
+                Err(IcyError::ErrorLoadingFile(path.as_ref().to_string_lossy().to_string(), err.to_string()).into())
             }
         }
     }
@@ -632,30 +534,14 @@ pub trait PCBoardBinImporter: Sized + Default {
         match &std::fs::read(path) {
             Ok(data) => {
                 if data.len() < Self::SIZE {
-                    log::error!(
-                        "Importing file '{}' from pcboard binary file ended prematurely",
-                        path.as_ref().display(),
-                    );
-                    return Err(IcyBoardError::InvalidRecordSize(
-                        path.as_ref().display().to_string(),
-                        Self::SIZE,
-                        data.len(),
-                    )
-                    .into());
+                    log::error!("Importing file '{}' from pcboard binary file ended prematurely", path.as_ref().display(),);
+                    return Err(IcyBoardError::InvalidRecordSize(path.as_ref().display().to_string(), Self::SIZE, data.len()).into());
                 }
                 Self::import_data(data)
             }
             Err(err) => {
-                log::error!(
-                    "Importing file '{}' from pcboard binary file: {}",
-                    path.as_ref().display(),
-                    err
-                );
-                Err(IcyError::ErrorLoadingFile(
-                    path.as_ref().to_string_lossy().to_string(),
-                    err.to_string(),
-                )
-                .into())
+                log::error!("Importing file '{}' from pcboard binary file: {}", path.as_ref().display(), err);
+                Err(IcyError::ErrorLoadingFile(path.as_ref().to_string_lossy().to_string(), err.to_string()).into())
             }
         }
     }
@@ -668,16 +554,8 @@ pub trait PCBoardTextImport: PCBoardImport {
         match read_with_encoding_detection(path) {
             Ok(data) => Self::import_data(data),
             Err(err) => {
-                log::error!(
-                    "Importing file '{}' from pcboard binary file: {}",
-                    path.as_ref().display(),
-                    err
-                );
-                Err(IcyError::ErrorLoadingFile(
-                    path.as_ref().to_string_lossy().to_string(),
-                    err.to_string(),
-                )
-                .into())
+                log::error!("Importing file '{}' from pcboard binary file: {}", path.as_ref().display(), err);
+                Err(IcyError::ErrorLoadingFile(path.as_ref().to_string_lossy().to_string(), err.to_string()).into())
             }
         }
     }

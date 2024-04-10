@@ -254,11 +254,7 @@ pub struct IcbTime {
 
 impl IcbTime {
     pub fn new(hour: u8, minute: u8, second: u8) -> Self {
-        Self {
-            hour,
-            minute,
-            second,
-        }
+        Self { hour, minute, second }
     }
 
     pub fn now() -> Self {

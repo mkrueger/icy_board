@@ -1,10 +1,7 @@
 use dizbase::file_base::{metadata::MetadaType, FileBase};
 use humanize_bytes::humanize_bytes_decimal;
 use icy_board_engine::{
-    icy_board::{
-        commands::Command, file_areas::FileAreaList, icb_config::IcbColor, icb_text::IceText,
-        state::functions::display_flags, IcyBoardSerializer,
-    },
+    icy_board::{commands::Command, file_areas::FileAreaList, icb_config::IcbColor, icb_text::IceText, state::functions::display_flags, IcyBoardSerializer},
     vm::TerminalTarget,
 };
 use icy_ppe::Res;
@@ -13,16 +10,12 @@ use super::{PcbBoardCommand, MASK_COMMAND};
 
 impl PcbBoardCommand {
     pub fn show_file_directories(&mut self, action: &Command) -> Res<()> {
-        let file_area_file = self
-            .state
-            .resolve_path(&self.state.session.current_conference.file_area_file);
+        let file_area_file = self.state.resolve_path(&self.state.session.current_conference.file_area_file);
 
         let file_areas = FileAreaList::load(&file_area_file)?;
         if file_areas.is_empty() {
-            self.state.display_text(
-                IceText::NoDirectoriesAvailable,
-                display_flags::NEWLINE | display_flags::LFBEFORE,
-            )?;
+            self.state
+                .display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
             self.state.press_enter()?;
             return Ok(());
         }
@@ -61,10 +54,8 @@ impl PcbBoardCommand {
 
         if !joined {
             self.state.session.op_text = directory_number;
-            self.state.display_text(
-                IceText::InvalidEntry,
-                display_flags::NEWLINE | display_flags::NOTBLANK,
-            )?;
+            self.state
+                .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::NOTBLANK)?;
         }
 
         self.state.new_line()?;
@@ -73,29 +64,21 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    fn display_file_area(
-        &mut self,
-        action: &Command,
-        area: &&icy_board_engine::icy_board::file_areas::FileArea,
-    ) -> Res<()> {
+    fn display_file_area(&mut self, action: &Command, area: &&icy_board_engine::icy_board::file_areas::FileArea) -> Res<()> {
         let file_base_path = self.state.resolve_path(&area.file_base);
         let Ok(base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());
             self.state.session.op_text = area.file_base.to_str().unwrap().to_string();
-            self.state.display_text(
-                IceText::NotFoundOnDisk,
-                display_flags::NEWLINE | display_flags::LFBEFORE,
-            )?;
+            self.state
+                .display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)?;
             return Ok(());
         };
 
         self.state.clear_screen()?;
 
         self.state.set_color(IcbColor::Dos(6))?;
-        self.state.print(
-            TerminalTarget::Both,
-            "Filename       Size      Date    Description of File Contents",
-        )?;
+        self.state
+            .print(TerminalTarget::Both, "Filename       Size      Date    Description of File Contents")?;
         self.state.new_line()?;
         self.state.print(
             TerminalTarget::Both,
@@ -114,21 +97,15 @@ impl PcbBoardCommand {
             let date = header.file_date().unwrap();
             let name = header.name();
             self.state.set_color(IcbColor::Dos(14))?;
-            self.state
-                .print(TerminalTarget::Both, &format!("{:<12} ", name))?;
+            self.state.print(TerminalTarget::Both, &format!("{:<12} ", name))?;
             if name.len() > 12 {
                 self.state.new_line()?;
             }
             self.state.set_color(IcbColor::Dos(2))?;
-            self.state.print(
-                TerminalTarget::Both,
-                &format!("{:>8}  ", humanize_bytes_decimal!(size).to_string()),
-            )?;
+            self.state
+                .print(TerminalTarget::Both, &format!("{:>8}  ", humanize_bytes_decimal!(size).to_string()))?;
             self.state.set_color(IcbColor::Dos(4))?;
-            self.state.print(
-                TerminalTarget::Both,
-                &format!("{}", date.format("%m/%d/%C")),
-            )?;
+            self.state.print(TerminalTarget::Both, &format!("{}", date.format("%m/%d/%C")))?;
             self.state.set_color(IcbColor::Dos(3))?;
 
             self.state.print(TerminalTarget::Both, "  ")?;
@@ -140,8 +117,7 @@ impl PcbBoardCommand {
                     self.state.set_color(IcbColor::Dos(11))?;
                     for (i, line) in description.lines().enumerate() {
                         if i > 0 {
-                            self.state
-                                .print(TerminalTarget::Both, &format!("{:33}", " "))?;
+                            self.state.print(TerminalTarget::Both, &format!("{:33}", " "))?;
                         }
                         self.state.print(TerminalTarget::Both, line)?;
                         self.state.new_line()?;

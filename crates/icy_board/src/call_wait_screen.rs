@@ -77,69 +77,37 @@ impl CallWaitScreen {
             buttons = vec![
                 Button {
                     title: board.display_text.get_display_text(IceText::UserBusy)?.text,
-                    description: board
-                        .display_text
-                        .get_display_text(IceText::UserBusyDescription)?
-                        .text,
+                    description: board.display_text.get_display_text(IceText::UserBusyDescription)?.text,
                     message: CallWaitMessage::User(true),
                 },
                 Button {
-                    title: board
-                        .display_text
-                        .get_display_text(IceText::SysopBusy)?
-                        .text,
-                    description: board
-                        .display_text
-                        .get_display_text(IceText::SysopBusyDescription)?
-                        .text,
+                    title: board.display_text.get_display_text(IceText::SysopBusy)?.text,
+                    description: board.display_text.get_display_text(IceText::SysopBusyDescription)?.text,
                     message: CallWaitMessage::Sysop(true),
                 },
                 Button {
                     title: board.display_text.get_display_text(IceText::DOSBusy)?.text,
-                    description: board
-                        .display_text
-                        .get_display_text(IceText::DOSBusyDescription)?
-                        .text,
+                    description: board.display_text.get_display_text(IceText::DOSBusyDescription)?.text,
                     message: CallWaitMessage::Exit(true),
                 },
                 Button {
-                    title: board
-                        .display_text
-                        .get_display_text(IceText::UserNotBusy)?
-                        .text,
-                    description: board
-                        .display_text
-                        .get_display_text(IceText::UserNotBusyDescription)?
-                        .text,
+                    title: board.display_text.get_display_text(IceText::UserNotBusy)?.text,
+                    description: board.display_text.get_display_text(IceText::UserNotBusyDescription)?.text,
                     message: CallWaitMessage::User(false),
                 },
                 Button {
-                    title: board
-                        .display_text
-                        .get_display_text(IceText::SysopNotBusy)?
-                        .text,
-                    description: board
-                        .display_text
-                        .get_display_text(IceText::SysopNotBusyDescription)?
-                        .text,
+                    title: board.display_text.get_display_text(IceText::SysopNotBusy)?.text,
+                    description: board.display_text.get_display_text(IceText::SysopNotBusyDescription)?.text,
                     message: CallWaitMessage::Sysop(false),
                 },
                 Button {
-                    title: board
-                        .display_text
-                        .get_display_text(IceText::DOSNotBusy)?
-                        .text,
-                    description: board
-                        .display_text
-                        .get_display_text(IceText::DOSNotBusyDescription)?
-                        .text,
+                    title: board.display_text.get_display_text(IceText::DOSNotBusy)?.text,
+                    description: board.display_text.get_display_text(IceText::DOSNotBusyDescription)?.text,
                     message: CallWaitMessage::Exit(false),
                 },
             ];
         } else {
-            return Err(Box::new(IcyBoardError::Error(
-                "Board is locked".to_string(),
-            )));
+            return Err(Box::new(IcyBoardError::Error("Board is locked".to_string())));
         }
         /*
         let file = board
@@ -153,48 +121,12 @@ impl CallWaitScreen {
         let file_name = board.lock().as_ref().unwrap().resolve_file(&file);
         let call_stat = CallStat::load(&file_name)?;*/
 
-        let last_caller_txt = board
-            .lock()
-            .as_ref()
-            .unwrap()
-            .display_text
-            .get_display_text(IceText::LastCaller)?
-            .text;
-        let calls_txt = board
-            .lock()
-            .as_ref()
-            .unwrap()
-            .display_text
-            .get_display_text(IceText::NumberCalls)?
-            .text;
-        let msgs_txt = board
-            .lock()
-            .as_ref()
-            .unwrap()
-            .display_text
-            .get_display_text(IceText::NumberMessages)?
-            .text;
-        let dls_txt = board
-            .lock()
-            .as_ref()
-            .unwrap()
-            .display_text
-            .get_display_text(IceText::NumberDownload)?
-            .text;
-        let uls_txt = board
-            .lock()
-            .as_ref()
-            .unwrap()
-            .display_text
-            .get_display_text(IceText::NumberUpload)?
-            .text;
-        let sysavail_txt = board
-            .lock()
-            .as_ref()
-            .unwrap()
-            .display_text
-            .get_display_text(IceText::SystemAvailable)?
-            .text;
+        let last_caller_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::LastCaller)?.text;
+        let calls_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::NumberCalls)?.text;
+        let msgs_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::NumberMessages)?.text;
+        let dls_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::NumberDownload)?.text;
+        let uls_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::NumberUpload)?.text;
+        let sysavail_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::SystemAvailable)?.text;
 
         Ok(Self {
             x: 0,
@@ -286,9 +218,7 @@ impl CallWaitScreen {
                 let y_padding = -2.0;
                 let button_space = width / 3.0;
                 let button_width = (button_space * 19.0 / 26.0).floor();
-                let left_pos = ((width + button_space - button_width - 3.0 * button_space.floor())
-                    / 2.0)
-                    .ceil();
+                let left_pos = ((width + button_space - button_width - 3.0 * button_space.floor()) / 2.0).ceil();
 
                 for (i, b) in self.buttons.iter().enumerate() {
                     render_button(
@@ -316,11 +246,7 @@ impl CallWaitScreen {
                 // draw separator
                 let separator_y = 7.0;
                 for i in 0..=(width as usize) {
-                    ctx.print(
-                        i as f64,
-                        separator_y,
-                        Line::from("═").style(Style::new().fg(DOS_WHITE)),
-                    );
+                    ctx.print(i as f64, separator_y, Line::from("═").style(Style::new().fg(DOS_WHITE)));
                 }
 
                 //self.icy_board.lock().borrow().as_ref().unwrap().data.stat
@@ -342,8 +268,7 @@ impl CallWaitScreen {
 
                 let label_space = width / 4.0;
                 let label_size = (label_space * 14.0 / 19.0).floor();
-                let left_pos =
-                    ((width + label_space - label_size - 4.0 * label_space.floor()) / 2.0).ceil();
+                let left_pos = ((width + label_space - label_size - 4.0 * label_space.floor()) / 2.0).ceil();
 
                 render_label(
                     ctx,
@@ -382,30 +307,18 @@ impl CallWaitScreen {
             .y_bounds([0.0, height])
             .block(
                 Block::default()
-                    .title(
-                        Title::from(
-                            Line::from(format!(" {} ", now.date_naive()))
-                                .style(Style::new().white()),
-                        )
-                        .alignment(Alignment::Left),
-                    )
+                    .title(Title::from(Line::from(format!(" {} ", now.date_naive())).style(Style::new().white())).alignment(Alignment::Left))
                     .title_style(Style::new().fg(DOS_YELLOW))
                     .title_alignment(Alignment::Center)
                     .title(format!("  IcyBoard v{}  ", ver))
                     .title(
-                        Title::from(
-                            Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap()))
-                                .style(Style::new().white()),
-                        )
-                        .alignment(Alignment::Right),
+                        Title::from(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white()))
+                            .alignment(Alignment::Right),
                     )
                     .title(
-                        Title::from(
-                            Line::from("  (C) Copyright Mike Krüger, 2024 ")
-                                .style(Style::new().white()),
-                        )
-                        .alignment(Alignment::Center)
-                        .position(block::Position::Bottom),
+                        Title::from(Line::from("  (C) Copyright Mike Krüger, 2024 ").style(Style::new().white()))
+                            .alignment(Alignment::Center)
+                            .position(block::Position::Bottom),
                     )
                     .style(Style::new().bg(DOS_BLUE))
                     .border_type(BorderType::Double)
@@ -454,14 +367,7 @@ impl SelectState {
     }
 }
 
-fn render_button(
-    ctx: &mut canvas::Context<'_>,
-    x: f64,
-    y: f64,
-    width: f64,
-    title: &str,
-    selected: SelectState,
-) {
+fn render_button(ctx: &mut canvas::Context<'_>, x: f64, y: f64, width: f64, title: &str, selected: SelectState) {
     let bg = selected.get_bg();
 
     if selected != SelectState::Pressed {
@@ -474,18 +380,10 @@ fn render_button(
         });
 
         for i in 0..=(width as usize) {
-            ctx.print(
-                x + 1.0 + i as f64,
-                y - 1.0,
-                Line::from("▀").style(Style::new().fg(DOS_BLACK)),
-            );
+            ctx.print(x + 1.0 + i as f64, y - 1.0, Line::from("▀").style(Style::new().fg(DOS_BLACK)));
         }
 
-        ctx.print(
-            x + width + 1.0,
-            y,
-            Line::from("▄").style(Style::new().fg(DOS_BLACK)),
-        );
+        ctx.print(x + width + 1.0, y, Line::from("▄").style(Style::new().fg(DOS_BLACK)));
         ctx.print(
             x + (width - title.len() as f64) / 2.0,
             y,
@@ -493,23 +391,11 @@ fn render_button(
         );
     } else {
         for i in 0..=(width as usize) {
-            ctx.print(
-                x + 1.0 + i as f64,
-                y,
-                Line::from("▄").style(Style::new().fg(DOS_LIGHTGRAY)),
-            );
-            ctx.print(
-                x + 1.0 + i as f64,
-                y - 1.0,
-                Line::from("▀").style(Style::new().fg(DOS_LIGHTGRAY)),
-            );
+            ctx.print(x + 1.0 + i as f64, y, Line::from("▄").style(Style::new().fg(DOS_LIGHTGRAY)));
+            ctx.print(x + 1.0 + i as f64, y - 1.0, Line::from("▀").style(Style::new().fg(DOS_LIGHTGRAY)));
         }
 
-        ctx.print(
-            x + width + 1.0,
-            y,
-            Line::from("▄").style(Style::new().fg(DOS_LIGHTGRAY)),
-        );
+        ctx.print(x + width + 1.0, y, Line::from("▄").style(Style::new().fg(DOS_LIGHTGRAY)));
     }
 }
 
@@ -525,18 +411,10 @@ fn render_label(ctx: &mut canvas::Context<'_>, x: f64, y: f64, width: f64, title
     });
 
     for i in 0..=(width as usize) {
-        ctx.print(
-            x + 1.0 + i as f64,
-            y - 1.0,
-            Line::from("▀").style(Style::new().fg(DOS_BLACK)),
-        );
+        ctx.print(x + 1.0 + i as f64, y - 1.0, Line::from("▀").style(Style::new().fg(DOS_BLACK)));
     }
 
-    ctx.print(
-        x + width + 1.0,
-        y,
-        Line::from("▄").style(Style::new().fg(DOS_BLACK)),
-    );
+    ctx.print(x + width + 1.0, y, Line::from("▄").style(Style::new().fg(DOS_BLACK)));
     ctx.print(
         x + (width - title.len() as f64) / 2.0,
         y,

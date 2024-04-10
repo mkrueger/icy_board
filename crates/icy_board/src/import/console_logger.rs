@@ -13,13 +13,7 @@ pub struct ConsoleLogger {}
 
 impl OutputLogger for ConsoleLogger {
     fn start_action(&self, message: String) {
-        execute!(
-            stdout(),
-            SetAttribute(Attribute::Bold),
-            Print(message),
-            SetAttribute(Attribute::Reset)
-        )
-        .unwrap();
+        execute!(stdout(), SetAttribute(Attribute::Bold), Print(message), SetAttribute(Attribute::Reset)).unwrap();
         println!();
     }
 

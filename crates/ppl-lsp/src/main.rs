@@ -35,9 +35,7 @@ impl LanguageServer for Backend {
             offset_encoding: None,
             capabilities: ServerCapabilities {
                 inlay_hint_provider: Some(OneOf::Left(true)),
-                text_document_sync: Some(TextDocumentSyncCapability::Kind(
-                    TextDocumentSyncKind::FULL,
-                )),
+                text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
 
                 completion_provider: Some(CompletionOptions {
@@ -60,31 +58,29 @@ impl LanguageServer for Backend {
                     }),
                     file_operations: None,
                 }),
-                semantic_tokens_provider: Some(
-                    SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(
-                        SemanticTokensRegistrationOptions {
-                            text_document_registration_options: {
-                                TextDocumentRegistrationOptions {
-                                    document_selector: Some(vec![DocumentFilter {
-                                        language: Some("ppl".to_string()),
-                                        scheme: Some("file".to_string()),
-                                        pattern: None,
-                                    }]),
-                                }
-                            },
-                            semantic_tokens_options: SemanticTokensOptions {
-                                work_done_progress_options: WorkDoneProgressOptions::default(),
-                                legend: SemanticTokensLegend {
-                                    token_types: LEGEND_TYPE.into(),
-                                    token_modifiers: vec![],
-                                },
-                                range: Some(true),
-                                full: Some(SemanticTokensFullOptions::Bool(true)),
-                            },
-                            static_registration_options: StaticRegistrationOptions::default(),
+                semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(
+                    SemanticTokensRegistrationOptions {
+                        text_document_registration_options: {
+                            TextDocumentRegistrationOptions {
+                                document_selector: Some(vec![DocumentFilter {
+                                    language: Some("ppl".to_string()),
+                                    scheme: Some("file".to_string()),
+                                    pattern: None,
+                                }]),
+                            }
                         },
-                    ),
-                ),
+                        semantic_tokens_options: SemanticTokensOptions {
+                            work_done_progress_options: WorkDoneProgressOptions::default(),
+                            legend: SemanticTokensLegend {
+                                token_types: LEGEND_TYPE.into(),
+                                token_modifiers: vec![],
+                            },
+                            range: Some(true),
+                            full: Some(SemanticTokensFullOptions::Bool(true)),
+                        },
+                        static_registration_options: StaticRegistrationOptions::default(),
+                    },
+                )),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
                 rename_provider: Some(OneOf::Left(true)),
@@ -93,9 +89,7 @@ impl LanguageServer for Backend {
         })
     }
     async fn initialized(&self, _: InitializedParams) {
-        self.client
-            .log_message(MessageType::INFO, "initialized!")
-            .await;
+        self.client.log_message(MessageType::INFO, "initialized!").await;
     }
 
     async fn shutdown(&self) -> Result<()> {
@@ -103,9 +97,7 @@ impl LanguageServer for Backend {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        self.client
-            .log_message(MessageType::INFO, "file opened!")
-            .await;
+        self.client.log_message(MessageType::INFO, "file opened!").await;
         self.on_change(TextDocumentItem {
             uri: params.text_document.uri,
             text: params.text_document.text,
@@ -124,14 +116,10 @@ impl LanguageServer for Backend {
     }
 
     async fn did_save(&self, _: DidSaveTextDocumentParams) {
-        self.client
-            .log_message(MessageType::INFO, "file saved!")
-            .await;
+        self.client.log_message(MessageType::INFO, "file saved!").await;
     }
     async fn did_close(&self, _: DidCloseTextDocumentParams) {
-        self.client
-            .log_message(MessageType::INFO, "file closed!")
-            .await;
+        self.client.log_message(MessageType::INFO, "file closed!").await;
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
@@ -151,10 +139,7 @@ impl LanguageServer for Backend {
         Ok(result)
     }
 
-    async fn goto_definition(
-        &self,
-        params: GotoDefinitionParams,
-    ) -> Result<Option<GotoDefinitionResponse>> {
+    async fn goto_definition(&self, params: GotoDefinitionParams) -> Result<Option<GotoDefinitionResponse>> {
         let definition = async {
             let uri = params.text_document_position_params.text_document.uri;
             let ast = self.ast_map.get(uri.as_str())?;
@@ -164,9 +149,7 @@ impl LanguageServer for Backend {
             let char = rope.try_line_to_char(position.line as usize).ok()?;
             let offset = char + position.character as usize;
             let span = get_definition(&ast, offset);
-            self.client
-                .log_message(MessageType::INFO, &format!("{:?}, ", span))
-                .await;
+            self.client.log_message(MessageType::INFO, &format!("{:?}, ", span)).await;
             span.and_then(|r| {
                 let start_position = offset_to_position(r.span.start, &rope)?;
                 let end_position = offset_to_position(r.span.end, &rope)?;
@@ -206,14 +189,9 @@ impl LanguageServer for Backend {
         Ok(reference_list)
     }
 
-    async fn semantic_tokens_full(
-        &self,
-        params: SemanticTokensParams,
-    ) -> Result<Option<SemanticTokensResult>> {
+    async fn semantic_tokens_full(&self, params: SemanticTokensParams) -> Result<Option<SemanticTokensResult>> {
         let uri = params.text_document.uri.to_string();
-        self.client
-            .log_message(MessageType::LOG, "semantic_token_full")
-            .await;
+        self.client.log_message(MessageType::LOG, "semantic_token_full").await;
         let semantic_tokens = || -> Option<Vec<SemanticToken>> {
             let mut im_complete_tokens = self.semantic_token_map.get_mut(&uri)?;
             let rope = self.document_map.get(&uri)?;
@@ -230,11 +208,7 @@ impl LanguageServer for Backend {
                     let first = rope.try_line_to_char(line as usize).ok()? as u32;
                     let start = token.start as u32 - first;
                     let delta_line = line - pre_line;
-                    let delta_start = if delta_line == 0 {
-                        start - pre_start
-                    } else {
-                        start
-                    };
+                    let delta_start = if delta_line == 0 { start - pre_start } else { start };
                     let ret = Some(SemanticToken {
                         delta_line,
                         delta_start,
@@ -258,10 +232,7 @@ impl LanguageServer for Backend {
         Ok(None)
     }
 
-    async fn semantic_tokens_range(
-        &self,
-        params: SemanticTokensRangeParams,
-    ) -> Result<Option<SemanticTokensRangeResult>> {
+    async fn semantic_tokens_range(&self, params: SemanticTokensRangeParams) -> Result<Option<SemanticTokensRangeResult>> {
         let uri = params.text_document.uri.to_string();
         let semantic_tokens = || -> Option<Vec<SemanticToken>> {
             let im_complete_tokens = self.semantic_token_map.get(&uri)?;
@@ -276,11 +247,7 @@ impl LanguageServer for Backend {
                     let start = token.start as u32 - first;
                     let ret = Some(SemanticToken {
                         delta_line: line.saturating_sub(pre_line),
-                        delta_start: if start >= pre_start {
-                            start - pre_start
-                        } else {
-                            start
-                        },
+                        delta_start: if start >= pre_start { start - pre_start } else { start },
                         length: token.length as u32,
                         token_type: token.token_type as u32,
                         token_modifiers_bitset: 0,
@@ -301,13 +268,8 @@ impl LanguageServer for Backend {
         Ok(None)
     }
 
-    async fn inlay_hint(
-        &self,
-        params: tower_lsp::lsp_types::InlayHintParams,
-    ) -> Result<Option<Vec<InlayHint>>> {
-        self.client
-            .log_message(MessageType::INFO, "inlay hint")
-            .await;
+    async fn inlay_hint(&self, params: tower_lsp::lsp_types::InlayHintParams) -> Result<Option<Vec<InlayHint>>> {
+        self.client.log_message(MessageType::INFO, "inlay hint").await;
         let uri = &params.text_document.uri;
         if let Some(_program) = self.ast_map.get(uri.as_str()) {}
         let inlay_hint_list = Vec::new();
@@ -346,10 +308,7 @@ impl LanguageServer for Backend {
                     .filter_map(|r| {
                         let start_position = offset_to_position(r.span.start, &rope)?;
                         let end_position = offset_to_position(r.span.end, &rope)?;
-                        Some(TextEdit::new(
-                            Range::new(start_position, end_position),
-                            new_name.clone(),
-                        ))
+                        Some(TextEdit::new(Range::new(start_position, end_position), new_name.clone()))
                     })
                     .collect::<Vec<_>>();
                 let mut map = HashMap::new();
@@ -364,27 +323,19 @@ impl LanguageServer for Backend {
     }
 
     async fn did_change_configuration(&self, _: DidChangeConfigurationParams) {
-        self.client
-            .log_message(MessageType::INFO, "configuration changed!")
-            .await;
+        self.client.log_message(MessageType::INFO, "configuration changed!").await;
     }
 
     async fn did_change_workspace_folders(&self, _: DidChangeWorkspaceFoldersParams) {
-        self.client
-            .log_message(MessageType::INFO, "workspace folders changed!")
-            .await;
+        self.client.log_message(MessageType::INFO, "workspace folders changed!").await;
     }
 
     async fn did_change_watched_files(&self, _: DidChangeWatchedFilesParams) {
-        self.client
-            .log_message(MessageType::INFO, "watched files have changed!")
-            .await;
+        self.client.log_message(MessageType::INFO, "watched files have changed!").await;
     }
 
     async fn execute_command(&self, _: ExecuteCommandParams) -> Result<Option<Value>> {
-        self.client
-            .log_message(MessageType::INFO, "command executed!")
-            .await;
+        self.client.log_message(MessageType::INFO, "command executed!").await;
 
         match self.client.apply_edit(WorkspaceEdit::default()).await {
             Ok(res) if res.applied => self.client.log_message(MessageType::INFO, "applied").await,
@@ -423,40 +374,27 @@ impl Backend {
         let mut diagnostics = Vec::new();
 
         for err in &semantic_visitor.errors.lock().unwrap().errors {
-            let start_position =
-                offset_to_position(err.span.start, &rope).unwrap_or(Position::new(0, 0));
-            let end_position =
-                offset_to_position(err.span.end, &rope).unwrap_or(Position::new(0, 0));
-            let mut diag = Diagnostic::new_simple(
-                Range::new(start_position, end_position),
-                format!("{}", err.error),
-            );
+            let start_position = offset_to_position(err.span.start, &rope).unwrap_or(Position::new(0, 0));
+            let end_position = offset_to_position(err.span.end, &rope).unwrap_or(Position::new(0, 0));
+            let mut diag = Diagnostic::new_simple(Range::new(start_position, end_position), format!("{}", err.error));
             diag.severity = Some(DiagnosticSeverity::ERROR);
             diagnostics.push(diag);
         }
         for err in &semantic_visitor.errors.lock().unwrap().warnings {
-            let start_position =
-                offset_to_position(err.span.start, &rope).unwrap_or(Position::new(0, 0));
-            let end_position =
-                offset_to_position(err.span.end, &rope).unwrap_or(Position::new(0, 0));
-            let mut diag = Diagnostic::new_simple(
-                Range::new(start_position, end_position),
-                format!("{}", err.error),
-            );
+            let start_position = offset_to_position(err.span.start, &rope).unwrap_or(Position::new(0, 0));
+            let end_position = offset_to_position(err.span.end, &rope).unwrap_or(Position::new(0, 0));
+            let mut diag = Diagnostic::new_simple(Range::new(start_position, end_position), format!("{}", err.error));
             diag.severity = Some(DiagnosticSeverity::WARNING);
             diagnostics.push(diag);
         }
 
-        self.client
-            .publish_diagnostics(params.uri.clone(), diagnostics, Some(params.version))
-            .await;
+        self.client.publish_diagnostics(params.uri.clone(), diagnostics, Some(params.version)).await;
 
         self.ast_map.insert(params.uri.to_string(), ast);
         // self.client
         //     .log_message(MessageType::INFO, &format!("{:?}", semantic_tokens))
         //     .await;
-        self.semantic_token_map
-            .insert(params.uri.to_string(), semantic_tokens);
+        self.semantic_token_map.insert(params.uri.to_string(), semantic_tokens);
     }
 }
 
@@ -485,10 +423,7 @@ struct TooltipVisitor {
 }
 
 impl AstVisitor<()> for TooltipVisitor {
-    fn visit_variable_declaration_statement(
-        &mut self,
-        var_decl: &icy_ppe::ast::VariableDeclarationStatement,
-    ) {
+    fn visit_variable_declaration_statement(&mut self, var_decl: &icy_ppe::ast::VariableDeclarationStatement) {
         if var_decl.get_type_token().span.contains(&self.offset) {
             self.tooltip = get_type_hover(var_decl.get_variable_type());
         }
@@ -501,11 +436,7 @@ impl AstVisitor<()> for TooltipVisitor {
     }
 
     fn visit_function_declaration(&mut self, func_decl: &icy_ppe::ast::FunctionDeclarationAstNode) {
-        if func_decl
-            .get_return_type_token()
-            .span
-            .contains(&self.offset)
-        {
+        if func_decl.get_return_type_token().span.contains(&self.offset) {
             self.tooltip = get_type_hover(func_decl.get_return_type());
         }
         walk_function_declaration(self, func_decl);
@@ -556,10 +487,7 @@ fn offset_to_position(offset: usize, rope: &Rope) -> Option<Position> {
 }
 
 fn get_tooltip(ast: &Ast, offset: usize) -> Option<Hover> {
-    let mut visitor = TooltipVisitor {
-        tooltip: None,
-        offset,
-    };
+    let mut visitor = TooltipVisitor { tooltip: None, offset };
     ast.visit(&mut visitor);
     visitor.tooltip
 }

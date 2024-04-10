@@ -133,16 +133,11 @@ fn run_message(msg: CallWaitMessage, board: Arc<Mutex<IcyBoard>>) {
         CallWaitMessage::User(busy) | CallWaitMessage::Sysop(busy) => {
             println!("Login {}...", busy);
 
-            stdout()
-                .execute(Clear(crossterm::terminal::ClearType::All))
-                .unwrap();
+            stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
 
             let screen = Arc::new(Mutex::new(Screen::new()));
             let input_buffer = Arc::new(Mutex::new(VecDeque::new()));
-            let io = Arc::new(Mutex::new(IcyEngineOutput::new(
-                screen.clone(),
-                input_buffer.clone(),
-            )));
+            let io = Arc::new(Mutex::new(IcyEngineOutput::new(screen.clone(), input_buffer.clone())));
 
             let mut state = IcyBoardState::new(board, io);
             state.session.is_sysop = true;

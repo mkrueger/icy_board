@@ -1,9 +1,6 @@
 use crate::ast::RenameVisitor;
 
-use super::{
-    constant_scan_visitor::ConstantScanVisitor, rename_visitor::RenameScanVistitor, Ast,
-    Expression, Statement,
-};
+use super::{constant_scan_visitor::ConstantScanVisitor, rename_visitor::RenameScanVistitor, Ast, Expression, Statement};
 
 pub fn reconstruct_block(_statements: &[Statement]) {
     // optimize_block(statements);

@@ -1,8 +1,8 @@
 use super::{lexer::Token, Parser};
 use crate::{
     ast::{
-        BinOp, BinaryExpression, ConstantExpression, Expression, FunctionCallExpression,
-        IdentifierExpression, ParensExpression, PredefinedFunctionCallExpression, UnaryExpression,
+        BinOp, BinaryExpression, ConstantExpression, Expression, FunctionCallExpression, IdentifierExpression, ParensExpression,
+        PredefinedFunctionCallExpression, UnaryExpression,
     },
     executable::{FunctionDefinition, FUNCTION_DEFINITIONS},
     parser::ParserErrorType,
@@ -17,10 +17,7 @@ impl Parser {
         if self.get_cur_token() == Some(Token::Not) {
             self.next_token();
             let expr = self.parse_bool()?;
-            return Some(UnaryExpression::create_empty_expression(
-                crate::ast::UnaryOp::Not,
-                expr,
-            ));
+            return Some(UnaryExpression::create_empty_expression(crate::ast::UnaryOp::Not, expr));
         }
 
         let mut expr = self.parse_comparison()?;
@@ -112,10 +109,7 @@ impl Parser {
 
     fn parse_factor(&mut self) -> Option<Expression> {
         let mut expr = self.parse_pow()?;
-        while self.get_cur_token() == Some(Token::Mul)
-            || self.get_cur_token() == Some(Token::Div)
-            || self.get_cur_token() == Some(Token::Mod)
-        {
+        while self.get_cur_token() == Some(Token::Mul) || self.get_cur_token() == Some(Token::Div) || self.get_cur_token() == Some(Token::Mod) {
             let op = match self.get_cur_token() {
                 Some(Token::Mul) => BinOp::Mul,
                 Some(Token::Div) => BinOp::Div,
@@ -159,30 +153,21 @@ impl Parser {
             self.next_token();
             let expr = self.parse_unary();
             if let Some(e) = expr {
-                return Some(UnaryExpression::create_empty_expression(
-                    crate::ast::UnaryOp::Plus,
-                    e,
-                ));
+                return Some(UnaryExpression::create_empty_expression(crate::ast::UnaryOp::Plus, e));
             }
         }
         if self.get_cur_token() == Some(Token::Sub) {
             self.next_token();
             let expr = self.parse_unary();
             if let Some(e) = expr {
-                return Some(UnaryExpression::create_empty_expression(
-                    crate::ast::UnaryOp::Minus,
-                    e,
-                ));
+                return Some(UnaryExpression::create_empty_expression(crate::ast::UnaryOp::Minus, e));
             }
         }
         if self.get_cur_token() == Some(Token::Not) {
             self.next_token();
             let expr = self.parse_unary();
             if let Some(e) = expr {
-                return Some(UnaryExpression::create_empty_expression(
-                    crate::ast::UnaryOp::Not,
-                    e,
-                ));
+                return Some(UnaryExpression::create_empty_expression(crate::ast::UnaryOp::Not, e));
             }
         }
 
@@ -195,10 +180,7 @@ impl Parser {
         match &t.token {
             Token::Const(c) => {
                 self.next_token();
-                Some(Expression::Const(ConstantExpression::new(
-                    t.clone(),
-                    c.clone(),
-                )))
+                Some(Expression::Const(ConstantExpression::new(t.clone(), c.clone())))
             }
             Token::Identifier(id) => {
                 let identifier_token = self.save_spanned_token();
@@ -211,10 +193,10 @@ impl Parser {
 
                     while self.get_cur_token() != Some(Token::RPar) {
                         let Some(value) = self.parse_expression() else {
-                            self.errors.lock().unwrap().report_error(
-                                self.save_token_span(),
-                                ParserErrorType::InvalidToken(self.save_token()),
-                            );
+                            self.errors
+                                .lock()
+                                .unwrap()
+                                .report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
                             self.next_token();
                             return None;
                         };
@@ -224,18 +206,16 @@ impl Parser {
                             continue;
                         }
 
-                        if self.get_cur_token() != Some(Token::RPar)
-                            && self.get_cur_token() != Some(Token::Comma)
-                        {
+                        if self.get_cur_token() != Some(Token::RPar) && self.get_cur_token() != Some(Token::Comma) {
                             break;
                         }
                     }
 
                     if self.get_cur_token() != Some(Token::RPar) {
-                        self.errors.lock().unwrap().report_error(
-                            self.save_token_span(),
-                            ParserErrorType::MissingCloseParens(self.save_token()),
-                        );
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(self.save_token_span(), ParserErrorType::MissingCloseParens(self.save_token()));
                         return None;
                     }
                     let rightpar_token = self.save_spanned_token();
@@ -248,44 +228,30 @@ impl Parser {
                         if (def.args as usize) < arguments.len() {
                             self.errors.lock().unwrap().report_error(
                                 identifier_token.span.clone(),
-                                ParserErrorType::TooFewArguments(
-                                    identifier_token.token.to_string(),
-                                    arguments.len(),
-                                    def.args,
-                                ),
+                                ParserErrorType::TooFewArguments(identifier_token.token.to_string(), arguments.len(), def.args),
                             );
                         }
                         if (def.args as usize) > arguments.len() {
                             self.errors.lock().unwrap().report_error(
                                 identifier_token.span.clone(),
-                                ParserErrorType::TooManyArguments(
-                                    identifier_token.token.to_string(),
-                                    arguments.len(),
-                                    def.args,
-                                ),
+                                ParserErrorType::TooManyArguments(identifier_token.token.to_string(), arguments.len(), def.args),
                             );
                         }
 
                         if self.version < def.version {
                             self.report_error(
                                 identifier_token.span,
-                                ParserErrorType::FunctionVersionNotSupported(
-                                    def.opcode,
-                                    def.version,
-                                    self.version,
-                                ),
+                                ParserErrorType::FunctionVersionNotSupported(def.opcode, def.version, self.version),
                             );
                             return None;
                         }
-                        return Some(Expression::PredefinedFunctionCall(
-                            PredefinedFunctionCallExpression::new(
-                                identifier_token,
-                                def,
-                                leftpar_token,
-                                arguments,
-                                rightpar_token,
-                            ),
-                        ));
+                        return Some(Expression::PredefinedFunctionCall(PredefinedFunctionCallExpression::new(
+                            identifier_token,
+                            def,
+                            leftpar_token,
+                            arguments,
+                            rightpar_token,
+                        )));
                     }
                     return Some(Expression::FunctionCall(FunctionCallExpression::new(
                         identifier_token,
@@ -295,25 +261,23 @@ impl Parser {
                     )));
                 }
 
-                Some(Expression::Identifier(IdentifierExpression::new(
-                    identifier_token,
-                )))
+                Some(Expression::Identifier(IdentifierExpression::new(identifier_token)))
             }
             Token::LPar => {
                 self.next_token();
                 let Some(expr) = self.parse_expression() else {
-                    self.errors.lock().unwrap().report_error(
-                        self.save_token_span(),
-                        ParserErrorType::ExpressionExpected(self.save_token()),
-                    );
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(self.save_token_span(), ParserErrorType::ExpressionExpected(self.save_token()));
                     return None;
                 };
                 let ret = ParensExpression::create_empty_expression(expr);
                 if self.get_cur_token() != Some(Token::RPar) {
-                    self.errors.lock().unwrap().report_error(
-                        self.save_token_span(),
-                        ParserErrorType::MissingCloseParens(self.save_token()),
-                    );
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(self.save_token_span(), ParserErrorType::MissingCloseParens(self.save_token()));
                     return None;
                 }
                 self.next_token();

@@ -5,6 +5,7 @@ use std::{
 };
 
 use bstr::BString;
+use codepages::{normalize_file, tables::get_utf8};
 use icy_sauce::SauceInformation;
 use unrar::Archive;
 use walkdir::WalkDir;
@@ -22,13 +23,7 @@ pub fn scan_file_directory(scan_dir: &PathBuf, out_file_base: &PathBuf) -> crate
         if path.path().is_dir() {
             continue;
         }
-        let mut info = FileInfo::new(
-            path.path()
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .to_string(),
-        );
+        let mut info = FileInfo::new(path.path().file_name().unwrap().to_string_lossy().to_string());
 
         if let Ok(file) = fs::read(&path.path()) {
             info = info.with_size(file.len() as u64);
@@ -53,11 +48,7 @@ pub fn scan_file_directory(scan_dir: &PathBuf, out_file_base: &PathBuf) -> crate
     Ok(())
 }
 
-fn scan_file(
-    info: FileInfo,
-    path: &Path,
-    extension: std::ffi::OsString,
-) -> crate::Result<FileInfo> {
+fn scan_file(info: FileInfo, path: &Path, extension: std::ffi::OsString) -> crate::Result<FileInfo> {
     match extension.to_str() {
         Some("ZIP") => scan_zip(info, &path),
         Some("LHA") | Some("LZH") => scan_lha(info, path),
@@ -95,8 +86,7 @@ fn scan_zip(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
         let extract = if let Some(_outpath) = file.enclosed_name() {
-            file.name().eq_ignore_ascii_case("FILE_ID.DIZ")
-                || file.name().eq_ignore_ascii_case("DESC.SDI")
+            file.name().eq_ignore_ascii_case("FILE_ID.DIZ") || file.name().eq_ignore_ascii_case("DESC.SDI")
         } else {
             println!("Entry {} has a suspicious path", file.name());
             continue;
@@ -110,31 +100,12 @@ fn scan_zip(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {
     Ok(info)
 }
 
-fn get_file_id(mut content: Vec<u8>) -> BString {
-    let mut file_id = Vec::new();
-    while content.ends_with(b"\r")
-        || content.ends_with(b"\n")
-        || content.ends_with(b" ")
-        || content.ends_with(b"\t")
-        || content.ends_with(&[0x1A])
-    {
+fn get_file_id(mut content: Vec<u8>) -> String {
+    while content.ends_with(b"\r") || content.ends_with(b"\n") || content.ends_with(b" ") || content.ends_with(b"\t") || content.ends_with(&[0x1A]) {
         content.pop();
     }
-    for c in content {
-        if c == b'\r' {
-            continue;
-        }
-        if c == b'\n' {
-            file_id.push(b'\n');
-            continue;
-        }
-        if c == 0x1A {
-            break;
-        }
-        file_id.push(c);
-    }
-
-    BString::new(file_id)
+    let file_id = normalize_file(&content);
+    get_utf8(&file_id)
 }
 
 fn scan_lha(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {

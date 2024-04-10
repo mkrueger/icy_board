@@ -22,15 +22,12 @@ pub struct PcbBoardCommand {
     pub state: IcyBoardState,
     pub display_menu: bool,
 }
-const MASK_COMMAND: &str  = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;':,.<>?/\\\" ";
+const MASK_COMMAND: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;':,.<>?/\\\" ";
 const MASK_NUMBER: &str = "0123456789";
 
 impl PcbBoardCommand {
     pub fn new(state: IcyBoardState) -> Self {
-        Self {
-            state,
-            display_menu: true,
-        }
+        Self { state, display_menu: true }
     }
 
     pub fn do_command(&mut self) -> Res<()> {
@@ -39,13 +36,7 @@ impl PcbBoardCommand {
             self.display_menu = false;
         }
 
-        let command = self.state.input_field(
-            IceText::CommandPrompt,
-            40,
-            MASK_COMMAND,
-            "",
-            display_flags::UPCASE,
-        )?;
+        let command = self.state.input_field(IceText::CommandPrompt, 40, MASK_COMMAND, "", display_flags::UPCASE)?;
 
         let mut cmds = command.split(' ');
 
@@ -58,25 +49,15 @@ impl PcbBoardCommand {
             return self.dispatch_action(command, &action);
         }
 
-        self.state.display_text(
-            IceText::InvalidEntry,
-            display_flags::NEWLINE | display_flags::LFAFTER | display_flags::LFBEFORE,
-        )?;
+        self.state
+            .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFAFTER | display_flags::LFBEFORE)?;
         Ok(())
     }
 
     fn display_menu(&mut self) -> Res<()> {
         let current_conference = self.state.session.current_conference_number;
 
-        let menu_file = if let Some(conference) = self
-            .state
-            .board
-            .lock()
-            .as_ref()
-            .unwrap()
-            .conferences
-            .get(current_conference as usize)
-        {
+        let menu_file = if let Some(conference) = self.state.board.lock().as_ref().unwrap().conferences.get(current_conference as usize) {
             if self.state.session.is_sysop {
                 &conference.sysop_menu
             } else {
@@ -111,8 +92,7 @@ impl PcbBoardCommand {
 
             CommandType::Goodbye => {
                 // G
-                self.state
-                    .hangup(icy_board_engine::vm::HangupType::Goodbye)?;
+                self.state.hangup(icy_board_engine::vm::HangupType::Goodbye)?;
             }
             CommandType::Help => {
                 // H
@@ -176,10 +156,7 @@ impl PcbBoardCommand {
             }
 
             _ => {
-                return Err(Box::new(IcyBoardError::UnknownAction(format!(
-                    "{:?}",
-                    action.command_type
-                ))));
+                return Err(Box::new(IcyBoardError::UnknownAction(format!("{:?}", action.command_type))));
             }
         }
         Ok(())
@@ -187,24 +164,19 @@ impl PcbBoardCommand {
 
     fn abandon_conference(&mut self) -> Res<()> {
         if self.state.board.lock().unwrap().conferences.is_empty() {
-            self.state.display_text(
-                IceText::NoConferenceAvailable,
-                display_flags::NEWLINE | display_flags::LFBEFORE,
-            )?;
+            self.state
+                .display_text(IceText::NoConferenceAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
             self.state.press_enter()?;
             return Ok(());
         }
         if self.state.session.current_conference_number > 0 {
             self.state.session.op_text = format!(
                 "{} ({})",
-                self.state.session.current_conference.name,
-                self.state.session.current_conference_number
+                self.state.session.current_conference.name, self.state.session.current_conference_number
             );
             self.state.join_conference(0);
-            self.state.display_text(
-                IceText::ConferenceAbandoned,
-                display_flags::NEWLINE | display_flags::NOTBLANK,
-            )?;
+            self.state
+                .display_text(IceText::ConferenceAbandoned, display_flags::NEWLINE | display_flags::NOTBLANK)?;
             self.state.new_line()?;
             self.state.press_enter()?;
         }
@@ -214,25 +186,15 @@ impl PcbBoardCommand {
 
     fn join_conference(&mut self, action: &Command) -> Res<()> {
         if self.state.board.lock().unwrap().conferences.is_empty() {
-            self.state.display_text(
-                IceText::NoConferenceAvailable,
-                display_flags::NEWLINE | display_flags::LFBEFORE,
-            )?;
+            self.state
+                .display_text(IceText::NoConferenceAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
             self.state.press_enter()?;
             return Ok(());
         }
         let conf_number = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
-            let mnu = self
-                .state
-                .board
-                .lock()
-                .unwrap()
-                .config
-                .paths
-                .conf_join_menu
-                .clone();
+            let mnu = self.state.board.lock().unwrap().config.paths.conf_join_menu.clone();
             let mnu = self.state.resolve_path(&mnu);
 
             self.state.display_menu(&mnu)?;
@@ -248,19 +210,14 @@ impl PcbBoardCommand {
         };
         let mut joined = false;
         if let Ok(number) = conf_number.parse::<i32>() {
-            if 0 <= number
-                && (number as usize) <= self.state.board.lock().unwrap().conferences.len()
-            {
+            if 0 <= number && (number as usize) <= self.state.board.lock().unwrap().conferences.len() {
                 self.state.join_conference(number);
                 self.state.session.op_text = format!(
                     "{} ({})",
-                    self.state.session.current_conference.name,
-                    self.state.session.current_conference_number
+                    self.state.session.current_conference.name, self.state.session.current_conference_number
                 );
-                self.state.display_text(
-                    IceText::ConferenceJoined,
-                    display_flags::NEWLINE | display_flags::NOTBLANK,
-                )?;
+                self.state
+                    .display_text(IceText::ConferenceJoined, display_flags::NEWLINE | display_flags::NOTBLANK)?;
 
                 joined = true;
             }
@@ -268,10 +225,8 @@ impl PcbBoardCommand {
 
         if !joined {
             self.state.session.op_text = conf_number;
-            self.state.display_text(
-                IceText::InvalidConferenceNumber,
-                display_flags::NEWLINE | display_flags::NOTBLANK,
-            )?;
+            self.state
+                .display_text(IceText::InvalidConferenceNumber, display_flags::NEWLINE | display_flags::NOTBLANK)?;
         }
 
         self.state.new_line()?;
@@ -294,20 +249,13 @@ impl PcbBoardCommand {
             )?
         };
 
-        self.state.display_text(
-            IceText::UsersHeader,
-            display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::NOTBLANK,
-        )?;
         self.state
-            .display_text(IceText::UserScanLine, display_flags::NOTBLANK)?;
+            .display_text(IceText::UsersHeader, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::NOTBLANK)?;
+        self.state.display_text(IceText::UserScanLine, display_flags::NOTBLANK)?;
         self.state.reset_color()?;
         let mut output = String::new();
         for u in self.state.board.lock().unwrap().users.iter() {
-            if text.is_empty()
-                || u.get_name()
-                    .to_ascii_uppercase()
-                    .contains(&text.to_ascii_uppercase())
-            {
+            if text.is_empty() || u.get_name().to_ascii_uppercase().contains(&text.to_ascii_uppercase()) {
                 output.push_str(&format!(
                     "{:<24} {:<30} {} {}\r\n",
                     u.get_name(),
@@ -359,25 +307,21 @@ impl PcbBoardCommand {
         if false
         /*self.state.board.lock().unwrap().data..non_graphics*/
         {
-            self.state.display_text(
-                IceText::GraphicsUnavailable,
-                display_flags::NEWLINE | display_flags::LFBEFORE,
-            )?;
+            self.state
+                .display_text(IceText::GraphicsUnavailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
         } else {
             if !self.state.session.disp_options.disable_color {
                 self.state.reset_color()?;
             }
 
-            self.state.session.disp_options.disable_color =
-                !self.state.session.disp_options.disable_color;
+            self.state.session.disp_options.disable_color = !self.state.session.disp_options.disable_color;
 
             let msg = if self.state.session.disp_options.disable_color {
                 IceText::GraphicsOff
             } else {
                 IceText::GraphicsOn
             };
-            self.state
-                .display_text(msg, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+            self.state.display_text(msg, display_flags::NEWLINE | display_flags::LFBEFORE)?;
         }
         self.state.press_enter()?;
         self.display_menu = true;
@@ -388,21 +332,14 @@ impl PcbBoardCommand {
         let page_len = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
-            self.state
-                .display_text(IceText::CurrentPageLength, display_flags::LFBEFORE)?;
-            self.state.print(
-                TerminalTarget::Both,
-                &format!(" {}\r\n", self.state.session.page_len),
-            )?;
+            self.state.display_text(IceText::CurrentPageLength, display_flags::LFBEFORE)?;
+            self.state.print(TerminalTarget::Both, &format!(" {}\r\n", self.state.session.page_len))?;
             self.state.input_field(
                 IceText::EnterPageLength,
                 2,
                 MASK_NUMBER,
                 &action.help,
-                display_flags::FIELDLEN
-                    | display_flags::NEWLINE
-                    | display_flags::LFAFTER
-                    | display_flags::HIGHASCII,
+                display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )?
         };
 
@@ -432,15 +369,7 @@ impl PcbBoardCommand {
             )?
         };
         if !help_cmd.is_empty() {
-            let mut help_loc = self
-                .state
-                .board
-                .lock()
-                .unwrap()
-                .config
-                .paths
-                .help_path
-                .clone();
+            let mut help_loc = self.state.board.lock().unwrap().config.paths.help_path.clone();
             let mut found = false;
             for action in &self.state.session.current_conference.commands {
                 if action.input.contains(&help_cmd) && !action.help.is_empty() {
@@ -482,12 +411,9 @@ impl PcbBoardCommand {
                 IceText::SecurityViolation,
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LOGIT,
             )?;
-            self.state.display_text(
-                IceText::AutoDisconnectNow,
-                display_flags::NEWLINE | display_flags::LFBEFORE,
-            )?;
             self.state
-                .hangup(icy_board_engine::vm::HangupType::Hangup)?;
+                .display_text(IceText::AutoDisconnectNow, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+            self.state.hangup(icy_board_engine::vm::HangupType::Hangup)?;
         }
 
         Ok(false)
@@ -498,15 +424,7 @@ impl PcbBoardCommand {
         self.state.print(TerminalTarget::Both, &board_name)?;
         self.state.new_line()?;
 
-        let welcome_screen = self
-            .state
-            .board
-            .lock()
-            .unwrap()
-            .config
-            .paths
-            .welcome
-            .clone();
+        let welcome_screen = self.state.board.lock().unwrap().config.paths.welcome.clone();
 
         let welcome_screen = self.state.resolve_path(&welcome_screen);
         self.state.display_file(&welcome_screen)?;

@@ -47,14 +47,8 @@ impl PCBoardRecordImporter<Survey> for SurveyList {
     }
 
     fn load_pcboard_record(data: &[u8]) -> Res<Survey> {
-        let question_file = PathBuf::from(icy_ppe::tables::import_cp437_string(
-            &data[..Self::RECORD_SIZE / 2],
-            true,
-        ));
-        let answer_file = PathBuf::from(icy_ppe::tables::import_cp437_string(
-            &data[Self::RECORD_SIZE / 2..],
-            true,
-        ));
+        let question_file = PathBuf::from(icy_ppe::tables::import_cp437_string(&data[..Self::RECORD_SIZE / 2], true));
+        let answer_file = PathBuf::from(icy_ppe::tables::import_cp437_string(&data[Self::RECORD_SIZE / 2..], true));
         Ok(Survey {
             question_file,
             answer_file,

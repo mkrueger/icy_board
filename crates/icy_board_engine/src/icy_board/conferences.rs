@@ -137,10 +137,7 @@ impl ConferenceBase {
         self.entries.is_empty()
     }
 
-    pub fn import_pcboard(
-        conferences: &[PcbConferenceHeader],
-        add_conferences: &[PcbAdditionalConferenceHeader],
-    ) -> ConferenceBase {
+    pub fn import_pcboard(conferences: &[PcbConferenceHeader], add_conferences: &[PcbAdditionalConferenceHeader]) -> ConferenceBase {
         let mut confs = Vec::new();
         for (i, c) in conferences.iter().enumerate() {
             let d = &add_conferences[i];

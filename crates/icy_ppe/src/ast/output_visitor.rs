@@ -74,8 +74,7 @@ impl AstVisitor<()> for OutputVisitor {
                 }
             }
             _ => {
-                self.output
-                    .push_str(&format!("{}", constant.get_constant_value().get_value()));
+                self.output.push_str(&format!("{}", constant.get_constant_value().get_value()));
             }
         }
     }
@@ -91,10 +90,7 @@ impl AstVisitor<()> for OutputVisitor {
         unary.get_expression().visit(self);
     }
 
-    fn visit_predefined_function_call_expression(
-        &mut self,
-        call: &super::PredefinedFunctionCallExpression,
-    ) {
+    fn visit_predefined_function_call_expression(&mut self, call: &super::PredefinedFunctionCallExpression) {
         self.output_keyword(call.get_identifier());
         self.output.push('(');
         for (i, arg) in call.get_arguments().iter().enumerate() {
@@ -128,8 +124,7 @@ impl AstVisitor<()> for OutputVisitor {
         if self.skip_comments {
             return;
         }
-        self.output
-            .push_str(&comment.get_comment_type().to_string());
+        self.output.push_str(&comment.get_comment_type().to_string());
         self.output.push_str(comment.get_comment());
     }
 
@@ -387,10 +382,7 @@ impl AstVisitor<()> for OutputVisitor {
         }
     }
 
-    fn visit_variable_declaration_statement(
-        &mut self,
-        var_decl: &super::VariableDeclarationStatement,
-    ) {
+    fn visit_variable_declaration_statement(&mut self, var_decl: &super::VariableDeclarationStatement) {
         self.output_keyword(var_decl.get_variable_type().to_string().as_str());
         self.output.push(' ');
         for (i, var) in var_decl.get_variables().iter().enumerate() {
@@ -398,8 +390,7 @@ impl AstVisitor<()> for OutputVisitor {
             if !var.get_dimensions().is_empty() {
                 self.output.push('(');
                 for (j, dim) in var.get_dimensions().iter().enumerate() {
-                    self.output
-                        .push_str(dim.get_dimension().to_string().as_str());
+                    self.output.push_str(dim.get_dimension().to_string().as_str());
                     if j < var.get_dimensions().len() - 1 {
                         self.output.push_str(", ");
                     }
@@ -428,8 +419,7 @@ impl AstVisitor<()> for OutputVisitor {
             if !arg.get_variable().get_dimensions().is_empty() {
                 self.output.push('(');
                 for (j, dim) in arg.get_variable().get_dimensions().iter().enumerate() {
-                    self.output
-                        .push_str(dim.get_dimension().to_string().as_str());
+                    self.output.push_str(dim.get_dimension().to_string().as_str());
                     if j < arg.get_variable().get_dimensions().len() - 1 {
                         self.output.push_str(", ");
                     }
@@ -460,8 +450,7 @@ impl AstVisitor<()> for OutputVisitor {
             if !arg.get_variable().get_dimensions().is_empty() {
                 self.output.push('(');
                 for (j, dim) in arg.get_variable().get_dimensions().iter().enumerate() {
-                    self.output
-                        .push_str(dim.get_dimension().to_string().as_str());
+                    self.output.push_str(dim.get_dimension().to_string().as_str());
                     if j < arg.get_variable().get_dimensions().len() - 1 {
                         self.output.push_str(", ");
                     }
@@ -493,8 +482,7 @@ impl AstVisitor<()> for OutputVisitor {
             if !arg.get_variable().get_dimensions().is_empty() {
                 self.output.push('(');
                 for (j, dim) in arg.get_variable().get_dimensions().iter().enumerate() {
-                    self.output
-                        .push_str(dim.get_dimension().to_string().as_str());
+                    self.output.push_str(dim.get_dimension().to_string().as_str());
                     if j < arg.get_variable().get_dimensions().len() - 1 {
                         self.output.push_str(", ");
                     }
@@ -535,8 +523,7 @@ impl AstVisitor<()> for OutputVisitor {
             if !arg.get_variable().get_dimensions().is_empty() {
                 self.output.push('(');
                 for (j, dim) in arg.get_variable().get_dimensions().iter().enumerate() {
-                    self.output
-                        .push_str(dim.get_dimension().to_string().as_str());
+                    self.output.push_str(dim.get_dimension().to_string().as_str());
                     if j < arg.get_variable().get_dimensions().len() - 1 {
                         self.output.push_str(", ");
                     }

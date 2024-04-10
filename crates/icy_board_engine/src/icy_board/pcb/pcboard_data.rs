@@ -687,9 +687,7 @@ pub fn read_line(reader: &mut BufReader<File>, encoding: Encoding) -> Res<String
         buf.pop();
     }
     let res = if encoding == Encoding::CP437 {
-        buf.into_iter()
-            .map(|b| CP437_TO_UNICODE[b as usize])
-            .collect::<String>()
+        buf.into_iter().map(|b| CP437_TO_UNICODE[b as usize]).collect::<String>()
     } else {
         String::from_utf8_lossy(&buf).to_string()
     };
@@ -1151,11 +1149,7 @@ impl PcbBoardData {
 
     pub fn serialize(&self, encoding: Encoding) -> Vec<u8> {
         let mut res = Vec::new();
-        append_line(
-            &mut res,
-            encoding,
-            "*** PCBoard Version 14.5 & 15.0 data file ***",
-        );
+        append_line(&mut res, encoding, "*** PCBoard Version 14.5 & 15.0 data file ***");
         append_line(&mut res, encoding, &self.sysop_info.sysop);
         append_line(&mut res, encoding, &self.sysop_info.password);
         append_bool(&mut res, encoding, self.sysop_info.use_real_name);
@@ -1166,51 +1160,19 @@ impl PcbBoardData {
         append_int(&mut res, encoding, self.sysop_security.sysop);
         append_int(&mut res, encoding, self.sysop_security.copy_move_messages);
 
-        append_int(
-            &mut res,
-            encoding,
-            self.sysop_security.sec_1_view_caller_log,
-        );
+        append_int(&mut res, encoding, self.sysop_security.sec_1_view_caller_log);
         append_int(&mut res, encoding, self.sysop_security.sec_2_view_usr_list);
-        append_int(
-            &mut res,
-            encoding,
-            self.sysop_security.sec_3_pack_renumber_msg,
-        );
-        append_int(
-            &mut res,
-            encoding,
-            self.sysop_security.sec_4_recover_deleted_msg,
-        );
-        append_int(
-            &mut res,
-            encoding,
-            self.sysop_security.sec_5_list_message_hdr,
-        );
+        append_int(&mut res, encoding, self.sysop_security.sec_3_pack_renumber_msg);
+        append_int(&mut res, encoding, self.sysop_security.sec_4_recover_deleted_msg);
+        append_int(&mut res, encoding, self.sysop_security.sec_5_list_message_hdr);
         append_int(&mut res, encoding, self.sysop_security.sec_6_view_any_file);
         append_int(&mut res, encoding, self.sysop_security.sec_7_user_maint);
         append_int(&mut res, encoding, self.sysop_security.sec_8_pack_usr_file);
         append_int(&mut res, encoding, self.sysop_security.sec_9_exit_to_dos);
-        append_int(
-            &mut res,
-            encoding,
-            self.sysop_security.sec_10_shelled_dos_func,
-        );
-        append_int(
-            &mut res,
-            encoding,
-            self.sysop_security.sec_11_view_other_nodes,
-        );
-        append_int(
-            &mut res,
-            encoding,
-            self.sysop_security.sec_12_logoff_alt_node,
-        );
-        append_int(
-            &mut res,
-            encoding,
-            self.sysop_security.sec_13_drop_alt_node_to_dos,
-        );
+        append_int(&mut res, encoding, self.sysop_security.sec_10_shelled_dos_func);
+        append_int(&mut res, encoding, self.sysop_security.sec_11_view_other_nodes);
+        append_int(&mut res, encoding, self.sysop_security.sec_12_logoff_alt_node);
+        append_int(&mut res, encoding, self.sysop_security.sec_13_drop_alt_node_to_dos);
         append_int(&mut res, encoding, self.sysop_security.sec_14_drop_to_dos);
 
         append_line(&mut res, encoding, &self.path.help_loc);
@@ -1360,11 +1322,7 @@ impl PcbBoardData {
         append_bool(&mut res, encoding, self.allow_shell);
 
         append_bool(&mut res, encoding, self.slaves);
-        append_int(
-            &mut res,
-            encoding,
-            self.subscription_info.subscription_length,
-        );
+        append_int(&mut res, encoding, self.subscription_info.subscription_length);
         append_int(&mut res, encoding, self.max_total_msgs);
         append_int(&mut res, encoding, self.max_conf_msgs);
         append_int(&mut res, encoding, self.min_prior_to_event);
@@ -1380,11 +1338,7 @@ impl PcbBoardData {
         append_bool(&mut res, encoding, self.quick_scan);
         append_int(&mut res, encoding, self.subscription_info.warning_days);
         append_bool(&mut res, encoding, self.allow_one_name);
-        append_int(
-            &mut res,
-            encoding,
-            self.subscription_info.default_expired_level as i32,
-        );
+        append_int(&mut res, encoding, self.subscription_info.default_expired_level as i32);
         append_int(&mut res, encoding, self.user_levels.cmd_test_file);
         append_line(&mut res, encoding, &self.cap_file);
         append_bool(&mut res, encoding, self.test_uploads);
@@ -1441,23 +1395,11 @@ impl PcbBoardData {
         append_bool(&mut res, encoding, self.sysop_info.require_pwrd_to_exit);
 
         append_int(&mut res, encoding, self.sysop_security.sec_15);
-        append_int(
-            &mut res,
-            encoding,
-            self.sysop_security.use_broadcast_command,
-        );
+        append_int(&mut res, encoding, self.sysop_security.use_broadcast_command);
         append_int(&mut res, encoding, self.sysop_security.view_private_uploads);
-        append_int(
-            &mut res,
-            encoding,
-            self.sysop_security.enter_generic_message,
-        );
+        append_int(&mut res, encoding, self.sysop_security.enter_generic_message);
         append_int(&mut res, encoding, self.sysop_security.edit_message_headers);
-        append_int(
-            &mut res,
-            encoding,
-            self.sysop_security.protect_unprotect_messages,
-        );
+        append_int(&mut res, encoding, self.sysop_security.protect_unprotect_messages);
         append_int(&mut res, encoding, self.sysop_security.overwrite_uploads);
         append_int(&mut res, encoding, self.sysop_security.unused0);
 

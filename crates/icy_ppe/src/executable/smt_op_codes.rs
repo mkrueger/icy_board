@@ -282,12 +282,8 @@ pub struct StatementDefinition {
     pub sig: StatementSignature,
 }
 impl StatementDefinition {
-    pub(crate) fn get_statement_definition(
-        identifier: &unicase::Ascii<String>,
-    ) -> Option<&'static StatementDefinition> {
-        STATEMENT_DEFINITIONS
-            .iter()
-            .find(|def| unicase::Ascii::new(def.name) == identifier)
+    pub(crate) fn get_statement_definition(identifier: &unicase::Ascii<String>) -> Option<&'static StatementDefinition> {
+        STATEMENT_DEFINITIONS.iter().find(|def| unicase::Ascii::new(def.name) == identifier)
     }
 }
 

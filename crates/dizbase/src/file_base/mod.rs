@@ -60,28 +60,15 @@ impl FileBase {
     pub fn create<P: AsRef<Path>>(file_name: P) -> crate::Result<Self> {
         let index_file_name = file_name.as_ref().with_extension(extensions::FILE_INDEX);
         FileBaseHeaderInfo::create(&index_file_name, 0, 0)?;
-        fs::write(
-            file_name.as_ref().with_extension(extensions::FILE_METADATA),
-            "",
-        )?;
+        fs::write(file_name.as_ref().with_extension(extensions::FILE_METADATA), "")?;
         Self::open(file_name)
     }
 
     /// Creates a new password protected file base
-    pub fn create_with_password<P: AsRef<Path>>(
-        file_name: P,
-        password: &str,
-    ) -> crate::Result<Self> {
+    pub fn create_with_password<P: AsRef<Path>>(file_name: P, password: &str) -> crate::Result<Self> {
         let index_file_name = file_name.as_ref().with_extension(extensions::FILE_INDEX);
-        FileBaseHeaderInfo::create(
-            &index_file_name,
-            Self::get_pw_hash(password),
-            base_header_attributes::PASSWORD,
-        )?;
-        fs::write(
-            file_name.as_ref().with_extension(extensions::FILE_METADATA),
-            "",
-        )?;
+        FileBaseHeaderInfo::create(&index_file_name, Self::get_pw_hash(password), base_header_attributes::PASSWORD)?;
+        fs::write(file_name.as_ref().with_extension(extensions::FILE_METADATA), "")?;
         Self::open(file_name)
     }
 
@@ -115,14 +102,12 @@ impl FileBase {
 
     /// Unlocks the file base
     pub fn unlock(&self) {
-        self.locked
-            .store(false, std::sync::atomic::Ordering::Release);
+        self.locked.store(false, std::sync::atomic::Ordering::Release);
     }
 
     pub fn read_header(&self, header_number: u64) -> crate::Result<FileHeader> {
         let index_file_name = self.file_name.with_extension(extensions::FILE_INDEX);
-        let offset =
-            FileBaseHeaderInfo::HEADER_SIZE + header_number * FileHeader::HEADER_SIZE as u64;
+        let offset = FileBaseHeaderInfo::HEADER_SIZE + header_number * FileHeader::HEADER_SIZE as u64;
         let mut file = File::open(index_file_name)?;
         file.seek(std::io::SeekFrom::Start(offset))?;
 
@@ -140,8 +125,7 @@ impl FileBase {
         let index_file_name = self.file_name.with_extension(extensions::FILE_INDEX);
         let mut f = File::open(index_file_name).unwrap();
         let len = f.metadata().unwrap().len();
-        f.seek(std::io::SeekFrom::Start(FileBaseHeaderInfo::HEADER_SIZE))
-            .unwrap();
+        f.seek(std::io::SeekFrom::Start(FileBaseHeaderInfo::HEADER_SIZE)).unwrap();
         FileBaseMessageIter {
             reader: BufReader::new(f),
             len,
@@ -180,19 +164,11 @@ impl FileBase {
             return Err(FileBaseError::InvalidSearchToken.into());
         };
 
-        Ok(self
-            .file_headers
-            .par_iter()
-            .filter(|header| pattern.matches(&header.name))
-            .collect())
+        Ok(self.file_headers.par_iter().filter(|header| pattern.matches(&header.name)).collect())
     }
 
     pub fn find_newer_files(&self, timestamp: u64) -> crate::Result<Vec<&FileHeader>> {
-        Ok(self
-            .file_headers
-            .par_iter()
-            .filter(|header| header.file_date > timestamp)
-            .collect())
+        Ok(self.file_headers.par_iter().filter(|header| header.file_date > timestamp).collect())
     }
 
     pub fn get_headers(&self) -> &Vec<FileHeader> {
@@ -220,10 +196,7 @@ impl FileBase {
             let end = meta_len as usize + 5;
             let metadata = data[5..end].to_vec();
             data = &data[end..];
-            result.push(MetadataHeader::new(
-                MetadaType::from_data(meta_type),
-                metadata,
-            ));
+            result.push(MetadataHeader::new(MetadaType::from_data(meta_type), metadata));
         }
         Ok(result)
     }

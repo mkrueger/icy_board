@@ -271,14 +271,7 @@ impl IcyBoardState {
     }
 
     pub fn reset_color(&mut self) -> Res<()> {
-        let color = self
-            .board
-            .lock()
-            .unwrap()
-            .config
-            .color_configuration
-            .default
-            .clone();
+        let color = self.board.lock().unwrap().config.color_configuration.default.clone();
         self.set_color(color)
     }
 
@@ -349,20 +342,14 @@ impl IcyBoardState {
         }
         self.session.last_new_line_y = cur_y;
 
-        if self.session.page_len > 0
-            && self.session.num_lines_printed >= self.session.page_len as usize
-        {
+        if self.session.page_len > 0 && self.session.num_lines_printed >= self.session.page_len as usize {
             self.more_promt()
         } else {
             Ok(true)
         }
     }
 
-    pub fn run_ppe<P: AsRef<Path>>(
-        &mut self,
-        file_name: &P,
-        answer_file: Option<&Path>,
-    ) -> Res<()> {
+    pub fn run_ppe<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>) -> Res<()> {
         match Executable::read_file(&file_name, false) {
             Ok(executable) => {
                 let path = PathBuf::from(file_name.as_ref());
@@ -370,29 +357,15 @@ impl IcyBoardState {
 
                 let mut io = DiskIO::new(&parent, answer_file);
                 if let Err(err) = run(file_name, &executable, &mut io, self) {
-                    log::error!(
-                        "Error executing PPE {}: {}",
-                        file_name.as_ref().display(),
-                        err
-                    );
+                    log::error!("Error executing PPE {}: {}", file_name.as_ref().display(), err);
                     self.session.op_text = format!("{}", err);
-                    self.display_text(
-                        IceText::ErrorExecPPE,
-                        display_flags::LFBEFORE | display_flags::LFAFTER,
-                    )?;
+                    self.display_text(IceText::ErrorExecPPE, display_flags::LFBEFORE | display_flags::LFAFTER)?;
                 }
             }
             Err(err) => {
-                log::error!(
-                    "Error loading PPE {}: {}",
-                    file_name.as_ref().display(),
-                    err
-                );
+                log::error!("Error loading PPE {}: {}", file_name.as_ref().display(), err);
                 self.session.op_text = format!("{}", err);
-                self.display_text(
-                    IceText::ErrorLoadingPPE,
-                    display_flags::LFBEFORE | display_flags::LFAFTER,
-                )?;
+                self.display_text(IceText::ErrorLoadingPPE, display_flags::LFBEFORE | display_flags::LFAFTER)?;
             }
         }
 
@@ -404,11 +377,7 @@ impl IcyBoardState {
         let in_chars: Vec<char> = value.chars().collect();
 
         for (i, c) in in_chars.iter().enumerate() {
-            if *c == '^'
-                && i + 1 < in_chars.len()
-                && in_chars[i + 1] >= 'A'
-                && in_chars[i + 1] <= '['
-            {
+            if *c == '^' && i + 1 < in_chars.len() && in_chars[i + 1] >= 'A' && in_chars[i + 1] <= '[' {
                 let c = in_chars[i + 1] as u8 - b'@';
                 chars.push(c as char);
             } else {
@@ -496,13 +465,7 @@ impl IcyBoardState {
     /// # Errors
     pub fn gotoxy(&mut self, target: TerminalTarget, x: i32, y: i32) -> Res<()> {
         if self.use_ansi() {
-            self.write_raw(
-                target,
-                format!("\x1B[{};{}H", y, x)
-                    .chars()
-                    .collect::<Vec<char>>()
-                    .as_slice(),
-            )
+            self.write_raw(target, format!("\x1B[{};{}H", y, x).chars().collect::<Vec<char>>().as_slice())
         } else {
             Ok(())
         }
@@ -510,13 +473,7 @@ impl IcyBoardState {
 
     pub fn backward(&mut self, chars: i32) -> Res<()> {
         if self.use_ansi() {
-            self.write_raw(
-                TerminalTarget::Both,
-                format!("\x1B[{}D", chars)
-                    .chars()
-                    .collect::<Vec<char>>()
-                    .as_slice(),
-            )
+            self.write_raw(TerminalTarget::Both, format!("\x1B[{}D", chars).chars().collect::<Vec<char>>().as_slice())
         } else {
             Ok(())
         }
@@ -524,13 +481,7 @@ impl IcyBoardState {
 
     pub fn forward(&mut self, chars: i32) -> Res<()> {
         if self.use_ansi() {
-            self.write_raw(
-                TerminalTarget::Both,
-                format!("\x1B[{}C", chars)
-                    .chars()
-                    .collect::<Vec<char>>()
-                    .as_slice(),
-            )
+            self.write_raw(TerminalTarget::Both, format!("\x1B[{}C", chars).chars().collect::<Vec<char>>().as_slice())
         } else {
             Ok(())
         }
@@ -549,8 +500,7 @@ impl IcyBoardState {
     }
 
     fn write_char(&mut self, c: char) -> Res<()> {
-        self.parser
-            .print_char(&mut self.buffer, 0, &mut self.caret, c)?;
+        self.parser.print_char(&mut self.buffer, 0, &mut self.caret, c)?;
         self.ctx.lock().unwrap().write_raw(&[c])?;
         if c == '\n' {
             self.next_line()?;
@@ -560,8 +510,7 @@ impl IcyBoardState {
 
     fn write_string(&mut self, data: &[char]) -> Res<()> {
         for c in data {
-            self.parser
-                .print_char(&mut self.buffer, 0, &mut self.caret, *c)?;
+            self.parser.print_char(&mut self.buffer, 0, &mut self.caret, *c)?;
             if *c == '\n' {
                 self.next_line()?;
             }
@@ -622,8 +571,7 @@ impl IcyBoardState {
                             self.write_char(ch1)?;
                             self.write_char(*c)?;
                         } else {
-                            let color =
-                                (c.to_digit(16).unwrap() | (ch1.to_digit(16).unwrap() << 4)) as u8;
+                            let color = (c.to_digit(16).unwrap() | (ch1.to_digit(16).unwrap() << 4)) as u8;
                             self.set_color(color.into())?;
                         }
                     }
@@ -694,14 +642,7 @@ impl IcyBoardState {
                 }
             }
             "EXPDAYS" => {
-                if self
-                    .board
-                    .lock()
-                    .unwrap()
-                    .config
-                    .subscription_info
-                    .is_enabled
-                {
+                if self.board.lock().unwrap().config.subscription_info.is_enabled {
                     if let Some(user) = &self.current_user {
                         if user.exp_date.get_year() != 0 {
                             result  =
@@ -715,13 +656,7 @@ impl IcyBoardState {
                     }
                 }
                 if result.is_empty() {
-                    let entry = self
-                        .board
-                        .lock()
-                        .unwrap()
-                        .display_text
-                        .get_display_text(IceText::Unlimited)
-                        .unwrap();
+                    let entry = self.board.lock().unwrap().display_text.get_display_text(IceText::Unlimited).unwrap();
                     if entry.style != IcbTextStyle::Plain {
                         let _ = self.set_color(entry.style.to_color());
                     }
@@ -749,9 +684,8 @@ impl IcyBoardState {
             "HIGHMSGNUM" => {}
             "INAME" => {}
             "INCONF" => result = self.session.current_conference.name.to_string(),
-            "KBLEFT" | "KBLIMIT" | "LASTCALLERNODE" | "LASTCALLERSYSTEM" | "LASTDATEON"
-            | "LASTTIMEON" | "LMR" | "LOGDATE" | "LOGTIME" | "LOWMSGNUM" | "MAXBYTES"
-            | "MAXFILES" => {}
+            "KBLEFT" | "KBLIMIT" | "LASTCALLERNODE" | "LASTCALLERSYSTEM" | "LASTDATEON" | "LASTTIMEON" | "LMR" | "LOGDATE" | "LOGTIME" | "LOWMSGNUM"
+            | "MAXBYTES" | "MAXFILES" => {}
             "MINLEFT" => result = "1000".to_string(),
             "MORE" => {
                 let _ = self.more_promt();
@@ -806,8 +740,7 @@ impl IcyBoardState {
                 }
             }
 
-            "POFF" | "PON" | "PROLTR" | "PRODESC" | "PWXDATE" | "PWXDAYS" | "QOFF" | "QON"
-            | "RATIOBYTES" | "RATIOFILES" => {}
+            "POFF" | "PON" | "PROLTR" | "PRODESC" | "PWXDATE" | "PWXDAYS" | "QOFF" | "QON" | "RATIOBYTES" | "RATIOFILES" => {}
             "RCPS" => result = self.transfer_statistics.get_cps_upload().to_string(),
             "RBYTES" => result = self.transfer_statistics.uploaded_bytes.to_string(),
             "RFILES" => result = self.transfer_statistics.uploaded_files.to_string(),
@@ -823,33 +756,10 @@ impl IcyBoardState {
             "SYSDATE" => {
                 let now = Local::now();
                 let d = now.date_naive();
-                result = format!(
-                    "{:02}/{:02}/{:02}",
-                    d.month0() + 1,
-                    d.day(),
-                    d.year_ce().1 % 100
-                );
+                result = format!("{:02}/{:02}/{:02}", d.month0() + 1, d.day(), d.year_ce().1 % 100);
             }
-            "SYSOPIN" => {
-                result = self
-                    .board
-                    .lock()
-                    .unwrap()
-                    .config
-                    .sysop
-                    .sysop_start
-                    .to_string()
-            }
-            "SYSOPOUT" => {
-                result = self
-                    .board
-                    .lock()
-                    .unwrap()
-                    .config
-                    .sysop
-                    .sysop_stop
-                    .to_string()
-            }
+            "SYSOPIN" => result = self.board.lock().unwrap().config.sysop.sysop_start.to_string(),
+            "SYSOPOUT" => result = self.board.lock().unwrap().config.sysop.sysop_stop.to_string(),
             "SYSTIME" => {
                 let now = Local::now();
                 let t = now.time();
@@ -977,19 +887,11 @@ impl IcyBoardState {
         }
 
         if fg != new_color.get_foreground() {
-            color_change += format!(
-                "{};",
-                COLOR_OFFSETS[new_color.get_foreground() as usize % 8] + 30
-            )
-            .as_str();
+            color_change += format!("{};", COLOR_OFFSETS[new_color.get_foreground() as usize % 8] + 30).as_str();
         }
 
         if bg != new_color.get_background() {
-            color_change += format!(
-                "{};",
-                COLOR_OFFSETS[new_color.get_background() as usize % 8] + 40
-            )
-            .as_str();
+            color_change += format!("{};", COLOR_OFFSETS[new_color.get_background() as usize % 8] + 40).as_str();
         }
 
         color_change.pop();
@@ -1018,10 +920,7 @@ impl IcyBoardState {
                 self.display_file(&logoff_script)?;
             }
             */
-            self.display_text(
-                IceText::ThanksForCalling,
-                display_flags::LFBEFORE | display_flags::NEWLINE,
-            )?;
+            self.display_text(IceText::ThanksForCalling, display_flags::LFBEFORE | display_flags::NEWLINE)?;
         }
         self.reset_color()?;
         self.session.request_logoff = true;
@@ -1043,10 +942,7 @@ impl IcyBoardState {
             12,
             "YyNn",
             "HLPMORE",
-            display_flags::YESNO
-                | display_flags::UPCASE
-                | display_flags::STACKED
-                | display_flags::ERASELINE,
+            display_flags::YESNO | display_flags::UPCASE | display_flags::STACKED | display_flags::ERASELINE,
         )?;
         Ok(result != "N")
     }

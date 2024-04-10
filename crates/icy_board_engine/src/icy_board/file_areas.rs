@@ -7,10 +7,7 @@ use std::{
 use icy_ppe::{tables::export_cp437_string, Res};
 use serde::{Deserialize, Serialize};
 
-use super::{
-    is_false, security::RequiredSecurity, user_base::Password, IcyBoardError, IcyBoardSerializer,
-    PCBoardRecordImporter,
-};
+use super::{is_false, security::RequiredSecurity, user_base::Password, IcyBoardError, IcyBoardSerializer, PCBoardRecordImporter};
 
 #[derive(Serialize, Deserialize, Default, Clone, Copy)]
 pub enum SortOrder {
@@ -84,16 +81,8 @@ impl FileAreaList {
         let mut buf = Vec::with_capacity(Self::RECORD_SIZE * self.areas.len());
 
         for area in &self.areas {
-            buf.extend(export_cp437_string(
-                &area.file_base.to_string_lossy(),
-                Self::PATH_SIZE,
-                b' ',
-            ));
-            buf.extend(export_cp437_string(
-                &area.path.to_string_lossy(),
-                Self::PATH_SIZE,
-                b' ',
-            ));
+            buf.extend(export_cp437_string(&area.file_base.to_string_lossy(), Self::PATH_SIZE, b' '));
+            buf.extend(export_cp437_string(&area.path.to_string_lossy(), Self::PATH_SIZE, b' '));
             buf.extend(export_cp437_string(&area.name, Self::NAME_SIZE, b' '));
             let sort_order = match area.sort_order {
                 SortOrder::NoSort => 0,
@@ -134,15 +123,9 @@ impl PCBoardRecordImporter<FileArea> for FileAreaList {
     }
 
     fn load_pcboard_record(data: &[u8]) -> Res<FileArea> {
-        let file_base = PathBuf::from(icy_ppe::tables::import_cp437_string(
-            &data[..Self::PATH_SIZE],
-            true,
-        ));
+        let file_base = PathBuf::from(icy_ppe::tables::import_cp437_string(&data[..Self::PATH_SIZE], true));
         let data = &data[Self::PATH_SIZE..];
-        let path = PathBuf::from(icy_ppe::tables::import_cp437_string(
-            &data[..Self::PATH_SIZE],
-            true,
-        ));
+        let path = PathBuf::from(icy_ppe::tables::import_cp437_string(&data[..Self::PATH_SIZE], true));
         let data = &data[Self::PATH_SIZE..];
         let name = icy_ppe::tables::import_cp437_string(&data[..Self::NAME_SIZE], true);
         let data = &data[Self::NAME_SIZE..];

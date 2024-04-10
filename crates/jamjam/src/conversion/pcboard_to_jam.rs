@@ -16,9 +16,7 @@ use crate::{
 fn get_jam_attributes(msg: &PCBoardMessage) -> u32 {
     let mut result = 0;
     match msg.get_status() {
-        crate::pcboard::MessageStatus::Private | crate::pcboard::MessageStatus::CommentToSysop => {
-            result |= jam::attributes::MSG_PRIVATE
-        }
+        crate::pcboard::MessageStatus::Private | crate::pcboard::MessageStatus::CommentToSysop => result |= jam::attributes::MSG_PRIVATE,
         _ => {}
     }
 
@@ -41,11 +39,7 @@ fn get_jam_attributes(msg: &PCBoardMessage) -> u32 {
     result
 }
 
-pub fn convert_pcboard_to_jam(
-    pcboard_path: &Path,
-    jam_dest_path: &Path,
-    aka: &EchomailAddress,
-) -> crate::Result<()> {
+pub fn convert_pcboard_to_jam(pcboard_path: &Path, jam_dest_path: &Path, aka: &EchomailAddress) -> crate::Result<()> {
     let pcb_base = PCBoardMessageBase::open(pcboard_path)?;
 
     let mut jam_messages = BTreeMap::new();
@@ -153,12 +147,7 @@ mod tests {
     fn test_read_message() {
         let tmpdir = TempDir::with_prefix_in("jamtest", ".").unwrap();
         let converted = tmpdir.path().join("jambase");
-        convert_pcboard_to_jam(
-            &PathBuf::from("data/pcboard/test"),
-            &converted,
-            &EchomailAddress::default(),
-        )
-        .unwrap();
+        convert_pcboard_to_jam(&PathBuf::from("data/pcboard/test"), &converted, &EchomailAddress::default()).unwrap();
 
         let pcb = PCBoardMessageBase::open("data/pcboard/test").unwrap();
         let jam = JamMessageBase::open(&converted).unwrap();

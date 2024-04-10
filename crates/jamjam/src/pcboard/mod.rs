@@ -85,11 +85,7 @@ impl PCBoardMessage {
                 continue;
             }
             let text = convert_msg(&buf[i..]);
-            return Ok(PCBoardMessage {
-                header,
-                extended_header,
-                text,
-            });
+            return Ok(PCBoardMessage { header, extended_header, text });
         }
 
         Ok(PCBoardMessage {
@@ -201,18 +197,11 @@ impl PCBoardMessageBase {
 
     pub fn read_message(&self, num: u32) -> crate::Result<PCBoardMessage> {
         if num < self.lowest_message_number() || num > self.highest_message_number() {
-            return Err(PCBoardError::MessageNumberOutOfRange(
-                num,
-                self.lowest_message_number(),
-                self.highest_message_number(),
-            )
-            .into());
+            return Err(PCBoardError::MessageNumberOutOfRange(num, self.lowest_message_number(), self.highest_message_number()).into());
         }
         let idx_file_name = self.file_name.with_extension(extensions::INDEX);
         let mut reader = BufReader::new(File::open(idx_file_name)?);
-        reader.seek(std::io::SeekFrom::Start(
-            (num as u64 - 1) * PCBoardMessageIndex::HEADER_SIZE as u64,
-        ))?;
+        reader.seek(std::io::SeekFrom::Start((num as u64 - 1) * PCBoardMessageIndex::HEADER_SIZE as u64))?;
         let header = PCBoardMessageIndex::read(&mut reader)?;
         let mut file = BufReader::new(File::open(&self.file_name)?);
         file.seek(std::io::SeekFrom::Start(header.offset as u64))?;

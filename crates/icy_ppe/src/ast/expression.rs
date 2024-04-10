@@ -58,14 +58,7 @@ impl BinOp {
 
             BinOp::Add | BinOp::Sub => 1,
 
-            BinOp::Eq
-            | BinOp::NotEq
-            | BinOp::Lower
-            | BinOp::LowerEq
-            | BinOp::Greater
-            | BinOp::GreaterEq
-            | BinOp::And
-            | BinOp::Or => 0,
+            BinOp::Eq | BinOp::NotEq | BinOp::Lower | BinOp::LowerEq | BinOp::Greater | BinOp::GreaterEq | BinOp::And | BinOp::Or => 0,
         }
     }
 }
@@ -141,19 +134,11 @@ impl Expression {
         match self {
             Expression::Identifier(i) => i.get_identifier_token().span.clone(),
             Expression::Const(c) => c.get_constant_token().span.clone(),
-            Expression::Parens(p) => {
-                p.get_lpar_token_token().span.start..p.get_rpar_token_token().span.end
-            }
-            Expression::PredefinedFunctionCall(pc) => {
-                pc.get_identifier_token().span.start..pc.get_rpar_token_token().span.end
-            }
-            Expression::FunctionCall(fc) => {
-                fc.get_identifier_token().span.start..fc.get_rpar_token_token().span.end
-            }
+            Expression::Parens(p) => p.get_lpar_token_token().span.start..p.get_rpar_token_token().span.end,
+            Expression::PredefinedFunctionCall(pc) => pc.get_identifier_token().span.start..pc.get_rpar_token_token().span.end,
+            Expression::FunctionCall(fc) => fc.get_identifier_token().span.start..fc.get_rpar_token_token().span.end,
             Expression::Unary(u) => u.get_op_token().span.start..u.get_expression().get_span().end,
-            Expression::Binary(b) => {
-                b.get_left_expression().get_span().start..b.get_right_expression().get_span().end
-            }
+            Expression::Binary(b) => b.get_left_expression().get_span().start..b.get_right_expression().get_span().end,
         }
     }
 
@@ -162,9 +147,7 @@ impl Expression {
             Expression::Identifier(expr) => visitor.visit_identifier_expression(expr),
             Expression::Const(expr) => visitor.visit_constant_expression(expr),
             Expression::Parens(expr) => visitor.visit_parens_expression(expr),
-            Expression::PredefinedFunctionCall(expr) => {
-                visitor.visit_predefined_function_call_expression(expr)
-            }
+            Expression::PredefinedFunctionCall(expr) => visitor.visit_predefined_function_call_expression(expr),
             Expression::FunctionCall(expr) => visitor.visit_function_call_expression(expr),
             Expression::Unary(expr) => visitor.visit_unary_expression(expr),
             Expression::Binary(expr) => visitor.visit_binary_expression(expr),
@@ -177,9 +160,7 @@ impl Expression {
             Expression::Identifier(expr) => visitor.visit_identifier_expression(expr),
             Expression::Const(expr) => visitor.visit_constant_expression(expr),
             Expression::Parens(expr) => visitor.visit_parens_expression(expr),
-            Expression::PredefinedFunctionCall(expr) => {
-                visitor.visit_predefined_function_call_expression(expr)
-            }
+            Expression::PredefinedFunctionCall(expr) => visitor.visit_predefined_function_call_expression(expr),
             Expression::FunctionCall(expr) => visitor.visit_function_call_expression(expr),
             Expression::Unary(expr) => visitor.visit_unary_expression(expr),
             Expression::Binary(expr) => visitor.visit_binary_expression(expr),
@@ -188,43 +169,22 @@ impl Expression {
 
     pub fn is_similar(&self, check: &Expression) -> bool {
         match (self, check) {
-            (Expression::Identifier(i1), Expression::Identifier(i2)) => {
-                i1.get_identifier() == i2.get_identifier()
-            }
-            (Expression::Const(c1), Expression::Const(c2)) => {
-                c1.constant_value == c2.constant_value
-            }
-            (Expression::Parens(e1), Expression::Parens(e2)) => {
-                e1.get_expression().is_similar(e2.get_expression())
-            }
+            (Expression::Identifier(i1), Expression::Identifier(i2)) => i1.get_identifier() == i2.get_identifier(),
+            (Expression::Const(c1), Expression::Const(c2)) => c1.constant_value == c2.constant_value,
+            (Expression::Parens(e1), Expression::Parens(e2)) => e1.get_expression().is_similar(e2.get_expression()),
             (Expression::PredefinedFunctionCall(f1), Expression::PredefinedFunctionCall(f2)) => {
-                f1.get_identifier() == f2.get_identifier()
-                    && f1
-                        .get_arguments()
-                        .iter()
-                        .zip(f2.get_arguments().iter())
-                        .all(|(a, b)| a.is_similar(b))
+                f1.get_identifier() == f2.get_identifier() && f1.get_arguments().iter().zip(f2.get_arguments().iter()).all(|(a, b)| a.is_similar(b))
             }
             (Expression::FunctionCall(f1), Expression::FunctionCall(f2)) => {
-                f1.get_identifier() == f2.get_identifier()
-                    && f1
-                        .get_arguments()
-                        .iter()
-                        .zip(f2.get_arguments().iter())
-                        .all(|(a, b)| a.is_similar(b))
+                f1.get_identifier() == f2.get_identifier() && f1.get_arguments().iter().zip(f2.get_arguments().iter()).all(|(a, b)| a.is_similar(b))
             }
             (Expression::Unary(expr1), Expression::Unary(expr2)) => {
-                expr1.get_op() == expr2.get_op()
-                    && expr1.get_expression().is_similar(expr2.get_expression())
+                expr1.get_op() == expr2.get_op() && expr1.get_expression().is_similar(expr2.get_expression())
             }
             (Expression::Binary(expr1), Expression::Binary(expr2)) => {
                 expr1.get_op() == expr2.get_op()
-                    && expr1
-                        .get_left_expression()
-                        .is_similar(expr2.get_left_expression())
-                    && expr1
-                        .get_right_expression()
-                        .is_similar(expr2.get_right_expression())
+                    && expr1.get_left_expression().is_similar(expr2.get_left_expression())
+                    && expr1.get_right_expression().is_similar(expr2.get_right_expression())
             }
             _ => false,
         }
@@ -239,9 +199,7 @@ impl Expression {
     }
 
     pub(crate) fn negate_expression(&self) -> Expression {
-        let variant1 = self
-            .visit_mut(&mut NegateExpressionVisitor::default())
-            .strip_parens();
+        let variant1 = self.visit_mut(&mut NegateExpressionVisitor::default()).strip_parens();
         let variant2 = UnaryExpression::create_empty_expression(
             UnaryOp::Not,
             if matches!(self, Expression::Binary(_)) {
@@ -333,9 +291,7 @@ impl ConstantExpression {
 
     pub fn empty(constant_value: Constant) -> Self {
         Self {
-            constant_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(
-                String::new(),
-            ))),
+            constant_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(String::new()))),
             constant_value,
         }
     }
@@ -367,11 +323,7 @@ pub struct ParensExpression {
 }
 
 impl ParensExpression {
-    pub fn new(
-        leftpar_token: Spanned<Token>,
-        expression: Expression,
-        rightpar_token: Spanned<Token>,
-    ) -> Self {
+    pub fn new(leftpar_token: Spanned<Token>, expression: Expression, rightpar_token: Spanned<Token>) -> Self {
         Self {
             lpar_token: leftpar_token,
             expression: Box::new(expression),
@@ -423,12 +375,7 @@ pub struct FunctionCallExpression {
 }
 
 impl FunctionCallExpression {
-    pub fn new(
-        identifier_token: Spanned<Token>,
-        leftpar_token: Spanned<Token>,
-        arguments: Vec<Expression>,
-        rightpar_token: Spanned<Token>,
-    ) -> Self {
+    pub fn new(identifier_token: Spanned<Token>, leftpar_token: Spanned<Token>, arguments: Vec<Expression>, rightpar_token: Spanned<Token>) -> Self {
         Self {
             identifier_token,
             lpar_token: leftpar_token,
@@ -481,10 +428,7 @@ impl FunctionCallExpression {
         panic!("Expected identifier token")
     }
 
-    pub(crate) fn create_empty_expression(
-        identifier: unicase::Ascii<String>,
-        arguments: Vec<Expression>,
-    ) -> Expression {
+    pub(crate) fn create_empty_expression(identifier: unicase::Ascii<String>, arguments: Vec<Expression>) -> Expression {
         Expression::FunctionCall(FunctionCallExpression::empty(identifier, arguments))
     }
 
@@ -535,9 +479,7 @@ impl PredefinedFunctionCallExpression {
 
     pub fn empty(func: &'static FunctionDefinition, arguments: Vec<Expression>) -> Self {
         Self {
-            identifier_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(
-                func.name.to_string(),
-            ))),
+            identifier_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(func.name.to_string()))),
             func,
             lpar_token: Spanned::create_empty(Token::LPar),
             arguments,
@@ -576,10 +518,7 @@ impl PredefinedFunctionCallExpression {
         panic!("Expected identifier token")
     }
 
-    pub(crate) fn create_empty_expression(
-        func: &'static FunctionDefinition,
-        arguments: Vec<Expression>,
-    ) -> Expression {
+    pub(crate) fn create_empty_expression(func: &'static FunctionDefinition, arguments: Vec<Expression>) -> Expression {
         Expression::PredefinedFunctionCall(PredefinedFunctionCallExpression::empty(func, arguments))
     }
 
@@ -671,11 +610,7 @@ pub struct BinaryExpression {
 }
 
 impl BinaryExpression {
-    pub fn new(
-        left_expression: Expression,
-        op_token: Spanned<Token>,
-        right_expression: Expression,
-    ) -> Self {
+    pub fn new(left_expression: Expression, op_token: Spanned<Token>, right_expression: Expression) -> Self {
         Self {
             left_expression: Box::new(left_expression),
             op_token,
@@ -751,27 +686,13 @@ impl BinaryExpression {
         &mut self.right_expression
     }
 
-    pub(crate) fn create_empty_expression(
-        op: BinOp,
-        left_expression: Expression,
-        right_expression: Expression,
-    ) -> Expression {
-        Expression::Binary(BinaryExpression::empty(
-            left_expression,
-            op,
-            right_expression,
-        ))
+    pub(crate) fn create_empty_expression(op: BinOp, left_expression: Expression, right_expression: Expression) -> Expression {
+        Expression::Binary(BinaryExpression::empty(left_expression, op, right_expression))
     }
 }
 
 impl fmt::Display for BinaryExpression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} {} {}",
-            self.get_left_expression(),
-            self.get_op(),
-            self.get_right_expression()
-        )
+        write!(f, "{} {} {}", self.get_left_expression(), self.get_op(), self.get_right_expression())
     }
 }

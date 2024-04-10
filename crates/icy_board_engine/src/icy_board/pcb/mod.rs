@@ -115,20 +115,12 @@ impl PcbBoard {
         let mut path = file_path.parent().unwrap().to_path_buf();
         path.push(help_loc.file_name().unwrap());
         if !path.exists() {
-            return Err(Box::new(IcyBoardError::Error(
-                "Can't resolve C: file".to_string(),
-            )));
+            return Err(Box::new(IcyBoardError::Error("Can't resolve C: file".to_string())));
         }
 
         //let len = to_str().unwrap().len();
         let k = help_loc.parent().unwrap().to_str().unwrap().to_string();
-        let v = file_path
-            .parent()
-            .unwrap()
-            .to_path_buf()
-            .to_str()
-            .unwrap()
-            .to_string();
+        let v = file_path.parent().unwrap().to_path_buf().to_str().unwrap().to_string();
         paths.insert(k, v);
         let mut res = PcbBoard {
             file_name: file.to_string(),

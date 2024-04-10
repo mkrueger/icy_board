@@ -86,20 +86,14 @@ impl PcbUserInf {
     const REC_SIZE: usize = 33;
     fn read(data: &[u8]) -> Res<Self> {
         if Self::REC_SIZE != data.len() {
-            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(
-                "USER.INF",
-                Self::REC_SIZE,
-                data.len(),
-            )));
+            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize("USER.INF", Self::REC_SIZE, data.len())));
         }
         let mut i = 0;
         let name = convert_str(&data[i..i + 25]);
         i += 25;
-        let messages_read =
-            u32::from_le_bytes([data[i], data[i + 1], data[i + 2], data[i + 3]]) as usize;
+        let messages_read = u32::from_le_bytes([data[i], data[i + 1], data[i + 2], data[i + 3]]) as usize;
         i += 4;
-        let messages_left =
-            u32::from_le_bytes([data[i], data[i + 1], data[i + 2], data[i + 3]]) as usize;
+        let messages_left = u32::from_le_bytes([data[i], data[i + 1], data[i + 2], data[i + 3]]) as usize;
 
         Ok(Self {
             name,
@@ -134,8 +128,7 @@ impl PcbUserInf {
             let mut user = PcbUserInf::read(&record[0..size_of_rec])?;
 
             for app in &apps {
-                let data =
-                    &record[app.offset as usize..app.offset as usize + app.size_of_rec as usize];
+                let data = &record[app.offset as usize..app.offset as usize + app.size_of_rec as usize];
                 match app.name.as_str() {
                     AliasUserInf::NAME => {
                         user.alias = Some(AliasUserInf::read(data)?);
@@ -208,11 +201,7 @@ impl VerifyUserInf {
 
     pub fn read(data: &[u8]) -> Res<Self> {
         if Self::REC_SIZE != data.len() {
-            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(
-                Self::NAME,
-                Self::REC_SIZE,
-                data.len(),
-            )));
+            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(Self::NAME, Self::REC_SIZE, data.len())));
         }
         let alias = convert_str(data);
         Ok(Self { verify: alias })
@@ -235,11 +224,7 @@ impl AddressUserInf {
 
     pub fn read(data: &[u8]) -> Res<Self> {
         if Self::REC_SIZE != data.len() {
-            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(
-                Self::NAME,
-                Self::REC_SIZE,
-                data.len(),
-            )));
+            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(Self::NAME, Self::REC_SIZE, data.len())));
         }
         let mut i = 0;
         let street1 = convert_str(&data[i..i + 50]);
@@ -280,11 +265,7 @@ impl PasswordUserInf {
 
     pub fn read(data: &[u8]) -> Res<Self> {
         if Self::REC_SIZE != data.len() {
-            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(
-                Self::NAME,
-                Self::REC_SIZE,
-                data.len(),
-            )));
+            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(Self::NAME, Self::REC_SIZE, data.len())));
         }
 
         let mut i = 0;
@@ -351,11 +332,7 @@ impl CallStatsUserInf {
 
     pub fn read(data: &[u8]) -> Res<Self> {
         if Self::REC_SIZE != data.len() {
-            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(
-                Self::NAME,
-                Self::REC_SIZE,
-                data.len(),
-            )));
+            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(Self::NAME, Self::REC_SIZE, data.len())));
         }
 
         let mut cursor = Cursor::new(data);
@@ -409,11 +386,7 @@ impl NotesUserInf {
 
     pub fn read(data: &[u8]) -> Res<Self> {
         if Self::REC_SIZE != data.len() {
-            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(
-                Self::NAME,
-                Self::REC_SIZE,
-                data.len(),
-            )));
+            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(Self::NAME, Self::REC_SIZE, data.len())));
         }
 
         let mut i = 0;
@@ -443,11 +416,7 @@ impl QwkConfigUserInf {
 
     pub fn read(data: &[u8]) -> Res<Self> {
         if Self::REC_SIZE != data.len() {
-            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(
-                Self::NAME,
-                Self::REC_SIZE,
-                data.len(),
-            )));
+            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(Self::NAME, Self::REC_SIZE, data.len())));
         }
 
         let mut cursor = Cursor::new(data);
@@ -498,11 +467,7 @@ impl AccountUserInf {
 
     pub fn read(data: &[u8]) -> Res<Self> {
         if Self::REC_SIZE != data.len() {
-            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(
-                Self::NAME,
-                Self::REC_SIZE,
-                data.len(),
-            )));
+            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(Self::NAME, Self::REC_SIZE, data.len())));
         }
 
         let mut cursor = Cursor::new(data);
@@ -563,11 +528,7 @@ impl PersonalUserInf {
 
     pub fn read(data: &[u8]) -> Res<Self> {
         if Self::REC_SIZE != data.len() {
-            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(
-                Self::NAME,
-                Self::REC_SIZE,
-                data.len(),
-            )));
+            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(Self::NAME, Self::REC_SIZE, data.len())));
         }
 
         let mut i = 0;
@@ -633,20 +594,13 @@ impl BankUserInf {
 
     pub fn read(data: &[u8]) -> Res<Self> {
         if Self::REC_SIZE != data.len() {
-            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(
-                Self::NAME,
-                Self::REC_SIZE,
-                data.len(),
-            )));
+            return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(Self::NAME, Self::REC_SIZE, data.len())));
         }
 
         let mut cursor = Cursor::new(data);
         let time_info = BankInfo::read(&mut cursor)?;
         let byte_info = BankInfo::read(&mut cursor)?;
 
-        Ok(Self {
-            time_info,
-            byte_info,
-        })
+        Ok(Self { time_info, byte_info })
     }
 }

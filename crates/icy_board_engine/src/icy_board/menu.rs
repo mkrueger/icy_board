@@ -55,11 +55,7 @@ impl Menu {
         let lines = txt.lines().collect::<Vec<&str>>();
 
         if lines.len() < 5 {
-            return Err(IcyError::InvalidMNU(
-                path.as_ref().to_string_lossy().to_string(),
-                "Lines < 5".to_string(),
-            )
-            .into());
+            return Err(IcyError::InvalidMNU(path.as_ref().to_string_lossy().to_string(), "Lines < 5".to_string()).into());
         }
         res.title = lines[0].to_string();
 
@@ -80,14 +76,9 @@ impl Menu {
                 let splitted_line = command_line.split(',').collect::<Vec<&str>>();
 
                 if splitted_line.len() != 2 {
-                    return Err(IcyError::InvalidMNU(
-                        path.as_ref().to_string_lossy().to_string(),
-                        "Invalid prompt line.".to_string(),
-                    )
-                    .into());
+                    return Err(IcyError::InvalidMNU(path.as_ref().to_string_lossy().to_string(), "Invalid prompt line.".to_string()).into());
                 }
-                res.prompts
-                    .push((splitted_line[0].to_string(), splitted_line[1].to_string()));
+                res.prompts.push((splitted_line[0].to_string(), splitted_line[1].to_string()));
             }
         }
         let mut cur_line = 4 + prompts as usize;
@@ -99,11 +90,7 @@ impl Menu {
             let splitted_line = cmd.split(',').collect::<Vec<&str>>();
 
             if splitted_line.len() != 4 {
-                return Err(IcyError::InvalidMNU(
-                    path.as_ref().to_string_lossy().to_string(),
-                    "Invalid command line.".to_string(),
-                )
-                .into());
+                return Err(IcyError::InvalidMNU(path.as_ref().to_string_lossy().to_string(), "Invalid command line.".to_string()).into());
             }
             let keyword = splitted_line[0].to_string();
             let security = splitted_line[1].parse::<u8>().unwrap_or(0);

@@ -127,13 +127,7 @@ impl Pattern {
         self.matches_from(true, str.chars(), 0, options) == MatchResult::Match
     }
 
-    fn matches_from(
-        &self,
-        mut follows_separator: bool,
-        mut file: std::str::Chars,
-        i: usize,
-        options: MatchOptions,
-    ) -> MatchResult {
+    fn matches_from(&self, mut follows_separator: bool, mut file: std::str::Chars, i: usize, options: MatchOptions) -> MatchResult {
         for (ti, token) in self.tokens[i..].iter().enumerate() {
             match *token {
                 PatternToken::AnySequence => {
@@ -149,19 +143,10 @@ impl Pattern {
                         }
                         follows_separator = false;
                         match *token {
-                            PatternToken::AnySequence
-                                if options.require_literal_separator && follows_separator =>
-                            {
-                                return MatchResult::SubPatternDoesntMatch
-                            }
+                            PatternToken::AnySequence if options.require_literal_separator && follows_separator => return MatchResult::SubPatternDoesntMatch,
                             _ => (),
                         }
-                        match self.matches_from(
-                            follows_separator,
-                            file.clone(),
-                            i + ti + 1,
-                            options,
-                        ) {
+                        match self.matches_from(follows_separator, file.clone(), i + ti + 1, options) {
                             MatchResult::SubPatternDoesntMatch => (), // keep trying
                             m => return m,
                         }
@@ -176,23 +161,14 @@ impl Pattern {
                     let is_sep = false;
 
                     if !match *token {
-                        PatternToken::AnyChar
-                        | PatternToken::AnyWithin(..)
-                        | PatternToken::AnyExcept(..)
-                            if (options.require_literal_separator && is_sep)
-                                || (follows_separator
-                                    && options.require_literal_leading_dot
-                                    && c == '.') =>
+                        PatternToken::AnyChar | PatternToken::AnyWithin(..) | PatternToken::AnyExcept(..)
+                            if (options.require_literal_separator && is_sep) || (follows_separator && options.require_literal_leading_dot && c == '.') =>
                         {
                             false
                         }
                         PatternToken::AnyChar => true,
-                        PatternToken::AnyWithin(ref specifiers) => {
-                            in_char_specifiers(specifiers, c, options)
-                        }
-                        PatternToken::AnyExcept(ref specifiers) => {
-                            !in_char_specifiers(specifiers, c, options)
-                        }
+                        PatternToken::AnyWithin(ref specifiers) => in_char_specifiers(specifiers, c, options),
+                        PatternToken::AnyExcept(ref specifiers) => !in_char_specifiers(specifiers, c, options),
                         PatternToken::Char(c2) => chars_eq(c, c2, options.case_sensitive),
                         PatternToken::AnySequence => unreachable!(),
                     } {

@@ -5,10 +5,7 @@ use crossterm::{
     style::{Attribute, Color, Print, SetAttribute, SetForegroundColor},
 };
 
-use super::{
-    CommandOrError, Executable, FunctionDefinition, OpCode, PPEExpr, PPEScript, PPEVisitor,
-    StatementDefinition,
-};
+use super::{CommandOrError, Executable, FunctionDefinition, OpCode, PPEExpr, PPEScript, PPEVisitor, StatementDefinition};
 
 pub struct DisassembleVisitor<'a> {
     /// If true, the visitor will print the deserialized data from the statement itself, if false the data will be taken from the PPE File directly.
@@ -168,10 +165,7 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
         execute!(
             stdout(),
             SetForegroundColor(Color::Magenta),
-            Print(format!(
-                " {}",
-                self.ppe_file.variable_table.get_var_entry(id).name
-            )),
+            Print(format!(" {}", self.ppe_file.variable_table.get_var_entry(id).name)),
             SetAttribute(Attribute::Reset),
             Print("["),
             SetForegroundColor(Color::Green),
@@ -189,10 +183,7 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
         execute!(
             stdout(),
             SetForegroundColor(Color::Magenta),
-            Print(format!(
-                " {}",
-                self.ppe_file.variable_table.get_var_entry(id).name
-            )),
+            Print(format!(" {}", self.ppe_file.variable_table.get_var_entry(id).name)),
             SetAttribute(Attribute::Reset),
             Print("["),
             SetForegroundColor(Color::Green),
@@ -280,13 +271,7 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
         cond.visit(self);
         print!(")");
 
-        execute!(
-            stdout(),
-            SetForegroundColor(Color::Yellow),
-            Print(" GOTO "),
-            SetAttribute(Attribute::Reset),
-        )
-        .unwrap();
+        execute!(stdout(), SetForegroundColor(Color::Yellow), Print(" GOTO "), SetAttribute(Attribute::Reset),).unwrap();
 
         execute!(
             stdout(),
@@ -351,13 +336,7 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
         Self::output_op_code(OpCode::LET);
         print!(" ");
         target.visit(self);
-        execute!(
-            stdout(),
-            SetForegroundColor(Color::Yellow),
-            Print(" <- "),
-            SetAttribute(Attribute::Reset),
-        )
-        .unwrap();
+        execute!(stdout(), SetForegroundColor(Color::Yellow), Print(" <- "), SetAttribute(Attribute::Reset),).unwrap();
         value.visit(self);
     }
 
@@ -373,7 +352,5 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
 fn print_disassemble_header() {
     println!();
     println!("Offset  # OpCode      Parameters");
-    println!(
-        "---------------------------------------------------------------------------------------"
-    );
+    println!("---------------------------------------------------------------------------------------");
 }

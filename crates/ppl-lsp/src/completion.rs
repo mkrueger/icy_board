@@ -32,9 +32,8 @@ const KEYWORDS: [&str; 18] = [
     "ENDFUNC",
 ];
 const TYPES: [&str; 26] = [
-    "BOOLEAN", "DATE", "DDATE", "INTEGER", "SDWORD", "LONG", "MONEY", "STRING", "TIME", "BIGSTR",
-    "EDATE", "REAL", "FLOAT", "DREAL", "DOUBLE", "UNSIGNED", "DWORD", "UDWORD", "BYTE", "UBYTE",
-    "WORD", "UWORD", "SBYTE", "SHORT", "SWORD", "INT",
+    "BOOLEAN", "DATE", "DDATE", "INTEGER", "SDWORD", "LONG", "MONEY", "STRING", "TIME", "BIGSTR", "EDATE", "REAL", "FLOAT", "DREAL", "DOUBLE", "UNSIGNED",
+    "DWORD", "UDWORD", "BYTE", "UBYTE", "WORD", "UWORD", "SBYTE", "SHORT", "SWORD", "INT",
 ];
 
 /// return (need_to_continue_search, founded reference)
@@ -85,9 +84,7 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
                         label: decl.token.to_string(),
                         insert_text: Some(decl.token.to_string()),
                         kind: Some(tower_lsp::lsp_types::CompletionItemKind::FUNCTION),
-                        insert_text_format: Some(
-                            tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT,
-                        ),
+                        insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
                         ..Default::default()
                     });
                 }
@@ -98,9 +95,7 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
                         label: decl.token.to_string(),
                         insert_text: Some(decl.token.to_string()),
                         kind: Some(tower_lsp::lsp_types::CompletionItemKind::VARIABLE),
-                        insert_text_format: Some(
-                            tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT,
-                        ),
+                        insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
                         ..Default::default()
                     });
                 }
@@ -114,9 +109,7 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
                         label: decl.token.to_string(),
                         insert_text: Some(decl.token.to_string()),
                         kind: Some(tower_lsp::lsp_types::CompletionItemKind::FUNCTION),
-                        insert_text_format: Some(
-                            tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT,
-                        ),
+                        insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
                         ..Default::default()
                     });
                 }
@@ -128,9 +121,7 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
                         label: decl.token.to_string(),
                         insert_text: Some(decl.token.to_string()),
                         kind: Some(tower_lsp::lsp_types::CompletionItemKind::VARIABLE),
-                        insert_text_format: Some(
-                            tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT,
-                        ),
+                        insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
                         ..Default::default()
                     });
                 }
@@ -149,10 +140,7 @@ struct CompletionVisitor {
 
 impl CompletionVisitor {
     pub fn new(offset: usize) -> Self {
-        Self {
-            offset,
-            items: Vec::new(),
-        }
+        Self { offset, items: Vec::new() }
     }
 
     fn add_functions(&mut self) {

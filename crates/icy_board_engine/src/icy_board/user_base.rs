@@ -321,10 +321,7 @@ pub struct User {
 
 impl User {
     pub fn new(id: u64) -> Self {
-        User {
-            id,
-            ..Default::default()
-        }
+        User { id, ..Default::default() }
     }
 
     pub fn get_id(&self) -> u64 {
@@ -352,11 +349,7 @@ impl User {
     }
 
     fn import_pcb(id: u64, u: &PcbUser) -> Self {
-        let alias = if let Some(alias) = &u.inf.alias {
-            alias.alias.clone()
-        } else {
-            String::new()
-        };
+        let alias = if let Some(alias) = &u.inf.alias { alias.alias.clone() } else { String::new() };
         let verify = if let Some(verify) = &u.inf.verify {
             verify.verify.clone()
         } else {
@@ -371,16 +364,10 @@ impl User {
                 personal.web.clone(),
             )
         } else {
-            (
-                String::new(),
-                IcbDate::new(0, 0, 0),
-                String::new(),
-                String::new(),
-            )
+            (String::new(), IcbDate::new(0, 0, 0), String::new(), String::new())
         };
 
-        let (street1, street2, _city2, state, zip, country) = if let Some(address) = &u.inf.address
-        {
+        let (street1, street2, _city2, state, zip, country) = if let Some(address) = &u.inf.address {
             (
                 address.street1.clone(),
                 address.street2.clone(),
@@ -390,32 +377,24 @@ impl User {
                 address.country.clone(),
             )
         } else {
-            (
-                String::new(),
-                String::new(),
-                String::new(),
-                String::new(),
-                String::new(),
-                String::new(),
-            )
+            (String::new(), String::new(), String::new(), String::new(), String::new(), String::new())
         };
 
-        let (prev_pwd, last_change, times_changed, expire_date) =
-            if let Some(password) = &u.inf.password {
-                (
-                    password
-                        .prev_pwd
-                        .iter()
-                        .filter(|s| !s.is_empty())
-                        .map(|pwd| Password::from_str(pwd).unwrap())
-                        .collect(),
-                    password.last_change.clone(),
-                    password.times_changed,
-                    password.expire_date.clone(),
-                )
-            } else {
-                (Vec::new(), IcbDate::new(0, 0, 0), 0, IcbDate::new(0, 0, 0))
-            };
+        let (prev_pwd, last_change, times_changed, expire_date) = if let Some(password) = &u.inf.password {
+            (
+                password
+                    .prev_pwd
+                    .iter()
+                    .filter(|s| !s.is_empty())
+                    .map(|pwd| Password::from_str(pwd).unwrap())
+                    .collect(),
+                password.last_change.clone(),
+                password.times_changed,
+                password.expire_date.clone(),
+            )
+        } else {
+            (Vec::new(), IcbDate::new(0, 0, 0), 0, IcbDate::new(0, 0, 0))
+        };
 
         let (
             first_date_on,

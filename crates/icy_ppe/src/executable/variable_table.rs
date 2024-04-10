@@ -10,10 +10,7 @@ use crate::{
     Res,
 };
 
-use super::{
-    ExecutableError, GenericVariableData, PPEExpr, PPEScript, VariableData, VariableNameGenerator,
-    VariableType, VariableValue, LAST_PPLC,
-};
+use super::{ExecutableError, GenericVariableData, PPEExpr, PPEScript, VariableData, VariableNameGenerator, VariableType, VariableValue, LAST_PPLC};
 
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct VarHeader {
@@ -106,11 +103,7 @@ impl fmt::Debug for FunctionValue {
         write!(
             f,
             "parameters:{} locals:{} offset:{:04X}h first:{:04X}h return:{:04X}h",
-            self.parameters,
-            self.local_variables,
-            self.start_offset,
-            self.first_var_id,
-            self.return_var
+            self.parameters, self.local_variables, self.start_offset, self.first_var_id, self.return_var
         )
     }
 }
@@ -137,11 +130,7 @@ impl fmt::Debug for ProcedureValue {
         write!(
             f,
             "parameters:{} locals:{} offset:{:04X}h first:{:04X}h pass:{:b}b",
-            self.parameters,
-            self.local_variables,
-            self.start_offset,
-            self.first_var_id,
-            self.pass_flags
+            self.parameters, self.local_variables, self.start_offset, self.first_var_id, self.pass_flags
         )
     }
 }
@@ -208,12 +197,7 @@ pub struct TableEntry {
 }
 
 impl TableEntry {
-    pub fn new(
-        name: impl Into<String>,
-        header: VarHeader,
-        variable: VariableValue,
-        entry_type: EntryType,
-    ) -> Self {
+    pub fn new(name: impl Into<String>, header: VarHeader, variable: VariableValue, entry_type: EntryType) -> Self {
         Self {
             header,
             name: name.into(),
@@ -255,9 +239,7 @@ impl TableEntry {
         encrypt(&mut buffer, version);
 
         let b = buffer.len();
-        if self.header.variable_type == VariableType::Procedure
-            || self.header.variable_type == VariableType::Function
-        {
+        if self.header.variable_type == VariableType::Procedure || self.header.variable_type == VariableType::Function {
             if version < 340 {
                 buffer.push(0);
                 buffer.push(0);
@@ -337,13 +319,7 @@ impl VariableTable {
 
         let mut result = vec![TableEntry::default(); max_var];
         if max_var == 0 {
-            return Ok((
-                i,
-                VariableTable {
-                    version,
-                    entries: result,
-                },
-            ));
+            return Ok((i, VariableTable { version, entries: result }));
         }
         let mut var_count = max_var as i32 - 1;
 
@@ -352,18 +328,10 @@ impl VariableTable {
             let cur_block = &buf[i..(i + 11)];
             let header = VarHeader::from_bytes(cur_block)?;
             if header.id > max_var {
-                log::warn!(
-                    "Variable count exceeds maximum: {} ({})",
-                    var_count,
-                    max_var
-                );
+                log::warn!("Variable count exceeds maximum: {} ({})", var_count, max_var);
             }
             if header.id != var_count as usize + 1 {
-                log::warn!(
-                    "Variable id mismatch: {} != {}",
-                    header.id,
-                    var_count as usize + 1
-                );
+                log::warn!("Variable id mismatch: {} != {}", header.id, var_count as usize + 1);
             }
             i += 11;
 
@@ -403,10 +371,7 @@ impl VariableTable {
                     let cur_buf = &buf[i..(i + 10)];
                     let vtype = VariableType::from_byte(cur_buf[0]);
                     if vtype != header.variable_type {
-                        return Err(Box::new(ExecutableError::FunctionHeaderTypeMismatch(
-                            vtype,
-                            header.variable_type,
-                        )));
+                        return Err(Box::new(ExecutableError::FunctionHeaderTypeMismatch(vtype, header.variable_type)));
                     }
                     let function_value = FunctionValue::from_bytes(&cur_buf[2..])?;
                     i += 2; // type
@@ -430,7 +395,11 @@ impl VariableTable {
                         i += 2; // SKIP VTABLE - seems to get stored by accident.
                         let vtype = VariableType::from_byte(buf[i]);
                         if vtype != header.variable_type {
-                            log::error!("Encountered anomaly in variable table: {} variable type and variable value {} are not matching.", header.variable_type, vtype);
+                            log::error!(
+                                "Encountered anomaly in variable table: {} variable type and variable value {} are not matching.",
+                                header.variable_type,
+                                vtype
+                            );
                             log::error!("File is potentially damaged.");
                         }
                         i += 2; // what's stored here ?
@@ -452,7 +421,11 @@ impl VariableTable {
 
                         let vtype = VariableType::from_byte(buf[i]);
                         if vtype != header.variable_type {
-                            log::error!("Encountered anomaly in variable table: {} variable type and variable value {} are not matching.", header.variable_type, vtype);
+                            log::error!(
+                                "Encountered anomaly in variable table: {} variable type and variable value {} are not matching.",
+                                header.variable_type,
+                                vtype
+                            );
                             log::error!("File is potentially damaged.");
                         }
                         i += 2; // what's stored here ?
@@ -481,9 +454,7 @@ impl VariableTable {
                 VariableType::Function => unsafe {
                     let ret = (cur.value.data.function_value.return_var as usize).saturating_sub(1);
                     let last = cur.value.data.function_value.local_variables as usize + ret;
-                    for (j, i) in
-                        (cur.value.data.function_value.first_var_id as usize..last).enumerate()
-                    {
+                    for (j, i) in (cur.value.data.function_value.first_var_id as usize..last).enumerate() {
                         let fvar = &mut result[i];
                         if i == ret {
                             fvar.set_type(EntryType::FunctionResult);
@@ -510,10 +481,7 @@ impl VariableTable {
             }
         }
 
-        let mut table = VariableTable {
-            version,
-            entries: result,
-        };
+        let mut table = VariableTable { version, entries: result };
         table.generate_names();
         Ok((i, table))
     }
@@ -538,8 +506,7 @@ impl VariableTable {
                 self.entries[id - 1].set_name(name);
             }
             if var_type == VariableType::Function || var_type == VariableType::Procedure {
-                let first_var =
-                    unsafe { self.entries[i].value.data.procedure_value.first_var_id as usize };
+                let first_var = unsafe { self.entries[i].value.data.procedure_value.first_var_id as usize };
                 let last = unsafe {
                     self.entries[i].value.data.procedure_value.local_variables as usize
                         + self.entries[i].value.data.procedure_value.parameters as usize
@@ -579,8 +546,7 @@ impl VariableTable {
             },
             super::PPECommand::PredefinedCall(id, args) => match id.sig {
                 super::StatementSignature::Invalid => {}
-                super::StatementSignature::ArgumentsWithVariable(var_arg, _)
-                | super::StatementSignature::VariableArguments(var_arg) => {
+                super::StatementSignature::ArgumentsWithVariable(var_arg, _) | super::StatementSignature::VariableArguments(var_arg) => {
                     if var_arg > 0 {
                         self.report_usage(&args[var_arg - 1]);
                     }
@@ -588,8 +554,7 @@ impl VariableTable {
                 super::StatementSignature::SpecialCaseDcreate => {
                     self.report_usage(&args[3]);
                 }
-                super::StatementSignature::SpecialCaseDlockg
-                | super::StatementSignature::SpecialCaseSort => {
+                super::StatementSignature::SpecialCaseDlockg | super::StatementSignature::SpecialCaseSort => {
                     self.report_usage(&args[1]);
                 }
                 super::StatementSignature::SpecialCaseVarSeg => {
@@ -663,10 +628,7 @@ impl VariableTable {
                 || self.entries[i].header.vector_size != u_var.value.get_vector_size()
             {
                 // workaround for a bug in 3.40 beta where U_BIRTHDATE was a string instead of a date.
-                if i < self.entries.len()
-                    && u_var.name == "U_BIRTHDATE"
-                    && self.entries[i].header.variable_type == VariableType::String
-                {
+                if i < self.entries.len() && u_var.name == "U_BIRTHDATE" && self.entries[i].header.variable_type == VariableType::String {
                     continue;
                 }
                 let res = if u_var.version > 340 {
@@ -763,10 +725,7 @@ impl VariableTable {
                 let d = match var.header.dim {
                     1 => format!("{}", var.header.vector_size),
                     2 => format!("{}, {}", var.header.vector_size, var.header.matrix_size),
-                    _ => format!(
-                        "{}, {}, {}",
-                        var.header.vector_size, var.header.matrix_size, var.header.cube_size
-                    ),
+                    _ => format!("{}, {}, {}", var.header.vector_size, var.header.matrix_size, var.header.cube_size),
                 };
                 execute!(
                     stdout(),
@@ -777,9 +736,7 @@ impl VariableTable {
                     Print("]".to_string()),
                 )
                 .unwrap();
-            } else if var.header.variable_type == VariableType::String
-                || var.header.variable_type == VariableType::BigStr
-            {
+            } else if var.header.variable_type == VariableType::String || var.header.variable_type == VariableType::BigStr {
                 execute!(
                     stdout(),
                     SetAttribute(Attribute::Bold),

@@ -1655,16 +1655,8 @@ impl IcbTextFile {
                 if e.kind() == std::io::ErrorKind::NotFound {
                     Err(IcyError::FileNotFound(path.as_ref().to_string_lossy().to_string()).into())
                 } else {
-                    log::error!(
-                        "Error loading icb text file '{}': {}",
-                        path.as_ref().display(),
-                        e
-                    );
-                    Err(IcyError::ErrorLoadingFile(
-                        path.as_ref().to_string_lossy().to_string(),
-                        e.to_string(),
-                    )
-                    .into())
+                    log::error!("Error loading icb text file '{}': {}", path.as_ref().display(), e);
+                    Err(IcyError::ErrorLoadingFile(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
                 }
             }
         }
@@ -1710,11 +1702,7 @@ impl IcbTextFile {
 
     pub fn export_pcboard_format<P: AsRef<Path>>(&self, file_name: &P) -> Res<()> {
         let mut fs = BufWriter::new(File::create(file_name)?);
-        let header = TextEntry::new(
-            IcbTextStyle::Red,
-            PCBTEXT_HEADER,
-            IcbTextJustification::Left,
-        );
+        let header = TextEntry::new(IcbTextStyle::Red, PCBTEXT_HEADER, IcbTextJustification::Left);
         header.serialize_pcb_format(&mut fs)?;
         for entry in self.entries.iter().skip(1) {
             entry.serialize_pcb_format(&mut fs)?;
@@ -1738,11 +1726,7 @@ impl DerefMut for IcbTextFile {
 }
 
 impl TextEntry {
-    fn new(
-        color: IcbTextStyle,
-        text: impl Into<String>,
-        justification: IcbTextJustification,
-    ) -> Self {
+    fn new(color: IcbTextStyle, text: impl Into<String>, justification: IcbTextJustification) -> Self {
         Self {
             style: color,
             text: text.into(),
@@ -1790,11 +1774,7 @@ fn load_ice_format(data: &[u8], file: String) -> Res<Vec<TextEntry>> {
                         return Err(Box::new(TextError::IceTextEntryWithoutText(k.clone())));
                     };
 
-                    let mut entry = TextEntry::new(
-                        IcbTextStyle::default(),
-                        text,
-                        IcbTextJustification::default(),
-                    );
+                    let mut entry = TextEntry::new(IcbTextStyle::default(), text, IcbTextJustification::default());
 
                     if let Some(Value::String(text)) = values.get("style") {
                         entry.style = text.parse::<IcbTextStyle>()?;
@@ -1826,8 +1806,7 @@ const BIN_ENTRY_SIZE: usize = 0x50;
 
 /// PCBoard hard coded justifications
 const RIGHT_JUSTIFY_RECORDS: [usize; 30] = [
-    20, 23, 44, 47, 48, 81, 91, 108, 115, 122, 124, 147, 151, 172, 174, 183, 184, 201, 202, 205,
-    206, 207, 362, 364, 391, 392, 410, 432, 456, 462,
+    20, 23, 44, 47, 48, 81, 91, 108, 115, 122, 124, 147, 151, 172, 174, 183, 184, 201, 202, 205, 206, 207, 362, 364, 391, 392, 410, 432, 456, 462,
 ];
 
 const PCBTEXT_HEADER: &str = "PCBoard version 14.5 & 15.0 & 15.2 & 15.3 & 15.4 PCBTEXT file";

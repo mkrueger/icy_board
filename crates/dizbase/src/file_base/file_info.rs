@@ -25,10 +25,7 @@ impl FileInfo {
             long_description_offset: 0,
             attribute: 0,
         };
-        Self {
-            header,
-            metadata: Vec::new(),
-        }
+        Self { header, metadata: Vec::new() }
     }
 
     pub fn with_size(mut self, size: u64) -> Self {
@@ -63,36 +60,27 @@ impl FileInfo {
     // Metadata
 
     pub fn with_uploader(mut self, uploader: String) -> Self {
-        self.metadata.push(MetadataHeader::new(
-            MetadaType::UploaderName,
-            uploader.into_bytes(),
-        ));
+        self.metadata.push(MetadataHeader::new(MetadaType::UploaderName, uploader.into_bytes()));
         self
     }
 
     pub fn with_password(mut self, password: String) -> Self {
-        self.metadata.push(MetadataHeader::new(
-            MetadaType::Password,
-            password.into_bytes(),
-        ));
+        self.metadata.push(MetadataHeader::new(MetadaType::Password, password.into_bytes()));
         self
     }
 
     pub fn with_tags(mut self, tags: String) -> Self {
-        self.metadata
-            .push(MetadataHeader::new(MetadaType::Tags, tags.into_bytes()));
+        self.metadata.push(MetadataHeader::new(MetadaType::Tags, tags.into_bytes()));
         self
     }
 
     pub fn with_sauce(mut self, data: Vec<u8>) -> Self {
-        self.metadata
-            .push(MetadataHeader::new(MetadaType::Sauce, data));
+        self.metadata.push(MetadataHeader::new(MetadaType::Sauce, data));
         self
     }
 
-    pub fn with_file_id(mut self, file_id: BString) -> Self {
-        self.metadata
-            .push(MetadataHeader::new(MetadaType::FileID, file_id.to_vec()));
+    pub fn with_file_id(mut self, file_id: String) -> Self {
+        self.metadata.push(MetadataHeader::new(MetadaType::FileID, file_id.as_bytes().to_vec()));
         self
     }
 

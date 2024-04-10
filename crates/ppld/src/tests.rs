@@ -63,10 +63,7 @@ fn test_decompiler() {
         }
 
         let file_name = cur_entry.as_os_str();
-        println!(
-            "File: {}...",
-            cur_entry.file_name().unwrap().to_str().unwrap()
-        );
+        println!("File: {}...", cur_entry.file_name().unwrap().to_str().unwrap());
         if [
             "for_next.ppe",
             "select_case.ppe",

@@ -22,10 +22,7 @@ impl PcbBoardCommand {
         if surveys.is_empty() {
             self.state.display_text(
                 IceText::NoSurveysAvailable,
-                display_flags::NEWLINE
-                    | display_flags::LFBEFORE
-                    | display_flags::LFAFTER
-                    | display_flags::BELL,
+                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER | display_flags::BELL,
             )?;
             return Ok(());
         }
@@ -58,9 +55,7 @@ impl PcbBoardCommand {
                     } else {
                         self.state.display_text(
                             IceText::InvalidSelection,
-                            display_flags::NEWLINE
-                                | display_flags::LFBEFORE
-                                | display_flags::LFAFTER,
+                            display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
                         )?;
                     }
                 }
@@ -110,8 +105,7 @@ impl PcbBoardCommand {
                 let lines: Vec<&str> = question.lines().collect();
                 self.state.reset_color()?;
                 for line in &lines[0..5] {
-                    self.state
-                        .print(icy_board_engine::vm::TerminalTarget::Both, line)?;
+                    self.state.print(icy_board_engine::vm::TerminalTarget::Both, line)?;
                     self.state.new_line()?;
                 }
 
@@ -120,17 +114,12 @@ impl PcbBoardCommand {
                     11,
                     "yYnN",
                     "",
-                    display_flags::YESNO
-                        | display_flags::NEWLINE
-                        | display_flags::LFBEFORE
-                        | display_flags::FIELDLEN
-                        | display_flags::UPCASE,
+                    display_flags::YESNO | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::UPCASE,
                 )?;
                 if txt.starts_with(self.state.yes_char) {
                     for question in &lines[5..] {
                         self.state.set_color(IcbColor::Dos(14))?;
-                        self.state
-                            .print(icy_board_engine::vm::TerminalTarget::Both, question)?;
+                        self.state.print(icy_board_engine::vm::TerminalTarget::Both, question)?;
                         self.state.new_line()?;
                         self.state.reset_color()?;
                         let answer = self.state.input_string(
@@ -139,10 +128,7 @@ impl PcbBoardCommand {
                             60,
                             &MASK_ALNUM,
                             "",
-                            display_flags::FIELDLEN
-                                | display_flags::NEWLINE
-                                | display_flags::GUIDE
-                                | display_flags::LFAFTER,
+                            display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::GUIDE | display_flags::LFAFTER,
                         )?;
                         output.push(format!("Q: {}", question));
                         output.push(format!("A: {}", answer));
@@ -154,11 +140,7 @@ impl PcbBoardCommand {
                 }
             }
             Err(e) => {
-                log::error!(
-                    "Error reading survey question: {} ({})",
-                    e,
-                    question.display()
-                );
+                log::error!("Error reading survey question: {} ({})", e, question.display());
                 self.state.display_text(
                     IceText::ErrorReadingSurvey,
                     display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,

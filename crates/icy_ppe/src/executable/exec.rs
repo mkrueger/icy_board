@@ -69,9 +69,7 @@ impl Executable {
         if !buffer.starts_with(PREAMBLE) {
             return Err(Box::new(ExecutableError::InvalidPPEFile));
         }
-        let version = ((buffer[40] & 15) as u16 * 10 + (buffer[41] as u16 & 15)) * 100
-            + (buffer[43] as u16 & 15) * 10
-            + (buffer[44] as u16 & 15);
+        let version = ((buffer[40] & 15) as u16 * 10 + (buffer[41] as u16 & 15)) * 100 + (buffer[43] as u16 & 15) * 10 + (buffer[44] as u16 & 15);
 
         if version > LAST_PPLC {
             return Err(Box::new(ExecutableError::UnsupporrtedVersion(version)));
@@ -140,11 +138,7 @@ impl Executable {
             code_data
         };
         if data.len() != code_size {
-            log::warn!(
-                "WARNING: decoded size({}) differs from expected size ({}).",
-                data.len(),
-                code_size
-            );
+            log::warn!("WARNING: decoded size({}) differs from expected size ({}).", data.len(), code_size);
         }
         let mut script_buffer = Vec::new();
         let mut i = 0;
@@ -200,9 +194,7 @@ impl Executable {
         let mut offset = 0;
         while offset < code_data.len() {
             let chunk_size = 2027;
-            let add_byte = use_rle
-                && offset + chunk_size < code_data.len()
-                && code_data[offset + chunk_size] == 0;
+            let add_byte = use_rle && offset + chunk_size < code_data.len() && code_data[offset + chunk_size] == 0;
 
             let end = (offset + chunk_size).min(code_data.len());
             let chunk = &mut code_data[offset..end];

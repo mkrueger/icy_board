@@ -1,9 +1,8 @@
 use crate::{
     ast::{
         constant::{ConstantType, BUILTIN_CONSTS},
-        AstVisitorMut, BinOp, BinaryExpression, Constant, ConstantExpression, Expression,
-        PredefinedCallStatement, PredefinedFunctionCallExpression, Statement, UnaryExpression,
-        UnaryOp,
+        AstVisitorMut, BinOp, BinaryExpression, Constant, ConstantExpression, Expression, PredefinedCallStatement, PredefinedFunctionCallExpression, Statement,
+        UnaryExpression, UnaryOp,
     },
     executable::{FuncOpCode, OpCode},
 };
@@ -21,10 +20,7 @@ impl AstVisitorMut for ConstantReplaceVisitor {
             let mut expression = None;
             //check non 0 value built-in constants combinations
             for c in &BUILTIN_CONSTS {
-                if c.value != 0
-                    && (c.value & *i) == c.value
-                    && c.used_by.contains(&self.replace_category)
-                {
+                if c.value != 0 && (c.value & *i) == c.value && c.used_by.contains(&self.replace_category) {
                     if expression.is_some() {
                         expression = Some(BinaryExpression::create_empty_expression(
                             BinOp::Add,
@@ -32,9 +28,7 @@ impl AstVisitorMut for ConstantReplaceVisitor {
                             ConstantExpression::create_empty_expression(Constant::Builtin(c)),
                         ));
                     } else {
-                        expression = Some(ConstantExpression::create_empty_expression(
-                            Constant::Builtin(c),
-                        ));
+                        expression = Some(ConstantExpression::create_empty_expression(Constant::Builtin(c)));
                     }
                 }
             }
@@ -43,9 +37,7 @@ impl AstVisitorMut for ConstantReplaceVisitor {
             if expression.is_none() {
                 for c in &BUILTIN_CONSTS {
                     if c.value == 0 && c.used_by.contains(&self.replace_category) {
-                        expression = Some(ConstantExpression::create_empty_expression(
-                            Constant::Builtin(c),
-                        ));
+                        expression = Some(ConstantExpression::create_empty_expression(Constant::Builtin(c)));
                         break;
                     }
                 }
@@ -132,10 +124,7 @@ impl AstVisitorMut for ConstantScanVisitor {
         UnaryExpression::create_empty_expression(unary.get_op(), expr)
     }
 
-    fn visit_predefined_function_call_expression(
-        &mut self,
-        call: &crate::ast::PredefinedFunctionCallExpression,
-    ) -> Expression {
+    fn visit_predefined_function_call_expression(&mut self, call: &crate::ast::PredefinedFunctionCallExpression) -> Expression {
         let mut args: Vec<Expression> = Vec::new();
 
         let op = call.get_func().opcode;
@@ -153,9 +142,6 @@ impl AstVisitorMut for ConstantScanVisitor {
             args.push(new_arg);
         }
 
-        Expression::PredefinedFunctionCall(PredefinedFunctionCallExpression::empty(
-            call.get_func(),
-            args,
-        ))
+        Expression::PredefinedFunctionCall(PredefinedFunctionCallExpression::empty(call.get_func(), args))
     }
 }

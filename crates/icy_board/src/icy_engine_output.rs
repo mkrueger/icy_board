@@ -20,9 +20,7 @@ impl Screen {
     }
 
     pub fn print(&mut self, parser: &mut ansi::Parser, c: char) {
-        parser
-            .print_char(&mut self.buffer, 0, &mut self.caret, c)
-            .unwrap();
+        parser.print_char(&mut self.buffer, 0, &mut self.caret, c).unwrap();
     }
 }
 
@@ -33,17 +31,10 @@ pub struct IcyEngineOutput {
 }
 
 impl IcyEngineOutput {
-    pub fn new(
-        screen: Arc<Mutex<Screen>>,
-        input_buffer: Arc<Mutex<VecDeque<(bool, char)>>>,
-    ) -> Self {
+    pub fn new(screen: Arc<Mutex<Screen>>, input_buffer: Arc<Mutex<VecDeque<(bool, char)>>>) -> Self {
         let mut parser = ansi::Parser::default();
         parser.bs_is_ctrl_char = true;
-        Self {
-            input_buffer,
-            parser,
-            screen,
-        }
+        Self { input_buffer, parser, screen }
     }
 }
 
@@ -88,10 +79,7 @@ impl BoardIO for IcyEngineOutput {
     }
 
     fn put_keyboard_buffer(&mut self, value: &[char]) -> Res<()> {
-        self.input_buffer
-            .lock()
-            .unwrap()
-            .extend(value.iter().map(|c| (false, *c)));
+        self.input_buffer.lock().unwrap().extend(value.iter().map(|c| (false, *c)));
         self.input_buffer.lock().unwrap().push_back((false, '\n'));
         Ok(())
     }

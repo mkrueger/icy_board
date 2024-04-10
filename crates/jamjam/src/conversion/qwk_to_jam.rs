@@ -4,10 +4,7 @@ use crate::{
     util::echmoail::EchomailAddress,
 };
 
-pub fn convert_qwk_to_jam(
-    qwk_mail: &[QWKMessage],
-    jam_base: &mut JamMessageBase,
-) -> crate::Result<()> {
+pub fn convert_qwk_to_jam(qwk_mail: &[QWKMessage], jam_base: &mut JamMessageBase) -> crate::Result<()> {
     for mail in qwk_mail {
         let mut jam_msg = JamMessage::new(mail.msg_number, &EchomailAddress::default());
 

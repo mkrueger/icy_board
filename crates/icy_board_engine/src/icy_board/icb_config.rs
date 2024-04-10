@@ -4,9 +4,7 @@ use icy_engine::Color;
 use icy_ppe::datetime::IcbTime;
 use serde::{Deserialize, Serialize};
 
-use super::{
-    is_false, is_null_16, is_null_8, is_null_i32, user_base::Password, IcyBoardSerializer,
-};
+use super::{is_false, is_null_16, is_null_8, is_null_i32, user_base::Password, IcyBoardSerializer};
 
 #[derive(Serialize, Deserialize)]
 pub struct SysopSecurityLevels {

@@ -112,9 +112,7 @@ impl FileHeader {
         file.read_exact(data)?;
 
         let name_len = data[0] as usize;
-        let name = std::str::from_utf8(&data[1..name_len + 1])
-            .unwrap()
-            .to_string();
+        let name = std::str::from_utf8(&data[1..name_len + 1]).unwrap().to_string();
         let mut data = &data[256..];
         convert_u64!(file_date, data);
         convert_u64!(size, data);
@@ -138,10 +136,7 @@ impl FileHeader {
     pub fn write(&self, file: &mut BufWriter<File>) -> crate::Result<()> {
         let mut data = Vec::with_capacity(Self::HEADER_SIZE);
         if self.name.len() > 255 {
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "Name too long",
-            )));
+            return Err(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Name too long")));
         }
         data.push(self.name.len() as u8);
         data.extend(self.name.as_bytes());

@@ -1,10 +1,7 @@
 use std::path::PathBuf;
 
 use crate::{
-    ast::{
-        AstNode, FunctionDeclarationAstNode, ParameterSpecifier, ProcedureDeclarationAstNode,
-        VariableSpecifier,
-    },
+    ast::{AstNode, FunctionDeclarationAstNode, ParameterSpecifier, ProcedureDeclarationAstNode, VariableSpecifier},
     executable::{VariableType, LAST_PPLC},
 };
 
@@ -33,10 +30,7 @@ fn check_ast_node(input: &str, check: &AstNode) {
 fn test_proc_declarations() {
     check_ast_node(
         "DECLARE PROCEDURE PROC001()",
-        &ProcedureDeclarationAstNode::empty_node(
-            unicase::Ascii::new("PROC001".to_string()),
-            vec![],
-        ),
+        &ProcedureDeclarationAstNode::empty_node(unicase::Ascii::new("PROC001".to_string()), vec![]),
     );
     check_ast_node(
         "DECLARE PROCEDURE PROC001(BYTE B)",
@@ -66,11 +60,7 @@ fn test_proc_declarations() {
 fn test_func_declarations() {
     check_ast_node(
         "DECLARE FUNCTION FUNC001() INTEGER",
-        &FunctionDeclarationAstNode::empty_node(
-            unicase::Ascii::new("FUNC001".to_string()),
-            vec![],
-            VariableType::Integer,
-        ),
+        &FunctionDeclarationAstNode::empty_node(unicase::Ascii::new("FUNC001".to_string()), vec![], VariableType::Integer),
     );
     check_ast_node(
         "DECLARE FUNCTION FUNC001(BYTE B) INTEGER",

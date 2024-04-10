@@ -8,8 +8,7 @@ use icy_ppe::{
 };
 pub use predefined_functions::*;
 
-type PredefFunc =
-    fn(vm: &mut crate::vm::VirtualMachine, arguments: &[PPEExpr]) -> Res<VariableValue>;
+type PredefFunc = fn(vm: &mut crate::vm::VirtualMachine, arguments: &[PPEExpr]) -> Res<VariableValue>;
 
 pub static FUNCTION_TABLE: [PredefFunc; 294] = [
     predefined_functions::invalid,

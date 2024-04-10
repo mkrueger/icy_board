@@ -127,36 +127,23 @@ impl JamMessageBase {
 
     /// Checks if a password is valid.
     pub fn is_password_valid(&self, password: &BString) -> bool {
-        self.header_info.password_crc == CRC_SEED
-            || self.header_info.password_crc == Self::get_crc(password)
+        self.header_info.password_crc == CRC_SEED || self.header_info.password_crc == Self::get_crc(password)
     }
 
     pub fn create<P: AsRef<Path>>(file_name: P) -> crate::Result<Self> {
         Self::create_with_passwordcrc(file_name, CRC_SEED)
     }
 
-    pub fn create_with_password<P: AsRef<Path>>(
-        file_name: P,
-        password: &BString,
-    ) -> crate::Result<Self> {
+    pub fn create_with_password<P: AsRef<Path>>(file_name: P, password: &BString) -> crate::Result<Self> {
         Self::create_with_passwordcrc(file_name, Self::get_crc(password))
     }
 
-    pub fn create_with_passwordcrc<P: AsRef<Path>>(
-        file_name: P,
-        passwordcrc: u32,
-    ) -> crate::Result<Self> {
+    pub fn create_with_passwordcrc<P: AsRef<Path>>(file_name: P, passwordcrc: u32) -> crate::Result<Self> {
         let header_file_name = file_name.as_ref().with_extension(extensions::HEADER_DATA);
         JHRHeaderInfo::create(&header_file_name, passwordcrc)?;
         fs::write(file_name.as_ref().with_extension(extensions::TEXT_DATA), "")?;
-        fs::write(
-            file_name.as_ref().with_extension(extensions::MESSAGE_INDEX),
-            "",
-        )?;
-        fs::write(
-            file_name.as_ref().with_extension(extensions::LASTREAD_INFO),
-            "",
-        )?;
+        fs::write(file_name.as_ref().with_extension(extensions::MESSAGE_INDEX), "")?;
+        fs::write(file_name.as_ref().with_extension(extensions::LASTREAD_INFO), "")?;
         Self::open(file_name)
     }
 
@@ -180,8 +167,7 @@ impl JamMessageBase {
 
     /// Unlocks the message base
     pub fn unlock(&self) {
-        self.locked
-            .store(false, std::sync::atomic::Ordering::Release);
+        self.locked.store(false, std::sync::atomic::Ordering::Release);
     }
 
     /// Get the jam base crc of a string
@@ -215,11 +201,7 @@ impl JamMessageBase {
 
         let index_file_name = self.file_name.with_extension(extensions::MESSAGE_INDEX);
         let mut index_file = OpenOptions::new().append(true).open(index_file_name)?;
-        let crc = if let Some(to) = header.get_to() {
-            Self::get_crc(to)
-        } else {
-            CRC_SEED
-        };
+        let crc = if let Some(to) = header.get_to() { Self::get_crc(to) } else { CRC_SEED };
         index_file.write_all(&crc.to_le_bytes())?;
         index_file.write_all(&message_header_offset.to_le_bytes())?;
         Ok(())
@@ -268,12 +250,7 @@ impl JamMessageBase {
 
     pub fn read_header(&self, msg_number: u32) -> crate::Result<JamMessageHeader> {
         if msg_number < self.header_info.base_msg_num || msg_number > self.header_info.active_msgs {
-            return Err(JamError::MessageNumberOutOfRange(
-                msg_number,
-                self.header_info.base_msg_num,
-                self.header_info.active_msgs,
-            )
-            .into());
+            return Err(JamError::MessageNumberOutOfRange(msg_number, self.header_info.base_msg_num, self.header_info.active_msgs).into());
         }
         let record = (msg_number - self.header_info.base_msg_num) as u64;
 
@@ -307,12 +284,7 @@ impl JamMessageBase {
     /// The message will be deleted when the message base gets packed.
     pub fn delete_message(&self, msg_number: u32) -> crate::Result<()> {
         if msg_number < self.header_info.base_msg_num || msg_number > self.header_info.active_msgs {
-            return Err(JamError::MessageNumberOutOfRange(
-                msg_number,
-                self.header_info.base_msg_num,
-                self.header_info.active_msgs,
-            )
-            .into());
+            return Err(JamError::MessageNumberOutOfRange(msg_number, self.header_info.base_msg_num, self.header_info.active_msgs).into());
         }
         let record = (msg_number - self.header_info.base_msg_num) as u64;
         let index_file_name = self.file_name.with_extension(extensions::MESSAGE_INDEX);
@@ -344,12 +316,7 @@ impl JamMessageBase {
     /// The opposite of `delete_message`
     pub fn restore_message(&self, msg_number: u32) -> crate::Result<()> {
         if msg_number < self.header_info.base_msg_num || msg_number > self.header_info.active_msgs {
-            return Err(JamError::MessageNumberOutOfRange(
-                msg_number,
-                self.header_info.base_msg_num,
-                self.header_info.active_msgs,
-            )
-            .into());
+            return Err(JamError::MessageNumberOutOfRange(msg_number, self.header_info.base_msg_num, self.header_info.active_msgs).into());
         }
         let record = (msg_number - self.header_info.base_msg_num) as u64;
         let index_file_name = self.file_name.with_extension(extensions::MESSAGE_INDEX);
@@ -386,11 +353,7 @@ impl JamMessageBase {
         Ok(res)
     }
 
-    pub fn find_last_read(
-        &mut self,
-        user_name_crc: u32,
-        id: u32,
-    ) -> crate::Result<Option<JamLastReadStorage>> {
+    pub fn find_last_read(&mut self, user_name_crc: u32, id: u32) -> crate::Result<Option<JamLastReadStorage>> {
         let last_read_file_name = self.file_name.with_extension(extensions::LASTREAD_INFO);
         let file = File::open(last_read_file_name)?;
         let mut reader = BufReader::new(file);
@@ -478,8 +441,7 @@ impl JamMessageBase {
         let header_file_name = self.file_name.with_extension(extensions::HEADER_DATA);
         let mut f = File::open(header_file_name).unwrap();
         let size = f.metadata().unwrap().len();
-        f.seek(std::io::SeekFrom::Start(JHRHeaderInfo::JHR_HEADER_SIZE))
-            .unwrap();
+        f.seek(std::io::SeekFrom::Start(JHRHeaderInfo::JHR_HEADER_SIZE)).unwrap();
         JamBaseMessageIter {
             reader: BufReader::new(f),
             size,
@@ -574,23 +536,17 @@ impl JamMessage {
     }
 
     pub fn with_from(mut self, name: BString) -> Self {
-        self.header
-            .sub_fields
-            .push(MessageSubfield::new(SubfieldType::SenderName, name));
+        self.header.sub_fields.push(MessageSubfield::new(SubfieldType::SenderName, name));
         self
     }
 
     pub fn with_to(mut self, name: BString) -> Self {
-        self.header
-            .sub_fields
-            .push(MessageSubfield::new(SubfieldType::RecvName, name));
+        self.header.sub_fields.push(MessageSubfield::new(SubfieldType::RecvName, name));
         self
     }
 
     pub fn with_subject(mut self, subject: BString) -> Self {
-        self.header
-            .sub_fields
-            .push(MessageSubfield::new(SubfieldType::Subject, subject));
+        self.header.sub_fields.push(MessageSubfield::new(SubfieldType::Subject, subject));
         self
     }
 

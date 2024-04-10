@@ -1,8 +1,5 @@
 use crate::{
-    ast::{
-        AstVisitor, AstVisitorMut, BinOp, BinaryExpression, Constant, ConstantExpression,
-        Expression, UnaryExpression, UnaryOp,
-    },
+    ast::{AstVisitor, AstVisitorMut, BinOp, BinaryExpression, Constant, ConstantExpression, Expression, UnaryExpression, UnaryOp},
     executable::{VariableType, VariableValue},
 };
 
@@ -10,10 +7,7 @@ use crate::{
 pub struct EvaluationVisitor {}
 
 impl AstVisitor<Option<VariableValue>> for EvaluationVisitor {
-    fn visit_constant_expression(
-        &mut self,
-        constant: &crate::ast::ConstantExpression,
-    ) -> Option<VariableValue> {
+    fn visit_constant_expression(&mut self, constant: &crate::ast::ConstantExpression) -> Option<VariableValue> {
         match constant.get_constant_value() {
             Constant::Boolean(b) => Some(VariableValue::new_bool(*b)),
             Constant::Integer(i) => Some(VariableValue::new_int(*i)),
@@ -25,10 +19,7 @@ impl AstVisitor<Option<VariableValue>> for EvaluationVisitor {
         }
     }
 
-    fn visit_unary_expression(
-        &mut self,
-        unary: &crate::ast::UnaryExpression,
-    ) -> Option<VariableValue> {
+    fn visit_unary_expression(&mut self, unary: &crate::ast::UnaryExpression) -> Option<VariableValue> {
         if let Some(expr) = unary.get_expression().visit(self) {
             match unary.get_op() {
                 UnaryOp::Not => Some(expr.not()),
@@ -40,10 +31,7 @@ impl AstVisitor<Option<VariableValue>> for EvaluationVisitor {
         }
     }
 
-    fn visit_binary_expression(
-        &mut self,
-        binary: &crate::ast::BinaryExpression,
-    ) -> Option<VariableValue> {
+    fn visit_binary_expression(&mut self, binary: &crate::ast::BinaryExpression) -> Option<VariableValue> {
         let left = binary.get_left_expression().visit(self);
         let right = binary.get_right_expression().visit(self);
 
@@ -68,12 +56,8 @@ impl AstVisitor<Option<VariableValue>> for EvaluationVisitor {
                 BinOp::PoW => Some(left_value.pow(right_value)),
                 BinOp::Eq => Some(VariableValue::new_bool(left_value == right_value)),
                 BinOp::NotEq => Some(VariableValue::new_bool(left_value != right_value)),
-                BinOp::Or => Some(VariableValue::new_bool(
-                    left_value.as_bool() || right_value.as_bool(),
-                )),
-                BinOp::And => Some(VariableValue::new_bool(
-                    left_value.as_bool() && right_value.as_bool(),
-                )),
+                BinOp::Or => Some(VariableValue::new_bool(left_value.as_bool() || right_value.as_bool())),
+                BinOp::And => Some(VariableValue::new_bool(left_value.as_bool() && right_value.as_bool())),
                 BinOp::Lower => Some(VariableValue::new_bool(left_value < right_value)),
                 BinOp::LowerEq => Some(VariableValue::new_bool(left_value <= right_value)),
                 BinOp::Greater => Some(VariableValue::new_bool(left_value > right_value)),
@@ -111,31 +95,18 @@ fn partial_evaluate(get_op: BinOp, val: &VariableValue) -> Option<VariableValue>
 pub struct OptimizationVisitor {}
 
 impl AstVisitorMut for OptimizationVisitor {
-    fn visit_unary_expression(
-        &mut self,
-        unary: &crate::ast::UnaryExpression,
-    ) -> crate::ast::Expression {
+    fn visit_unary_expression(&mut self, unary: &crate::ast::UnaryExpression) -> crate::ast::Expression {
         if let Some(value) = EvaluationVisitor::default().visit_unary_expression(unary) {
             if let Some(value) = value_to_expression(&value) {
                 return value;
             }
         }
-        Expression::Unary(UnaryExpression::empty(
-            unary.get_op(),
-            unary.get_expression().visit_mut(self),
-        ))
+        Expression::Unary(UnaryExpression::empty(unary.get_op(), unary.get_expression().visit_mut(self)))
     }
 
-    fn visit_binary_expression(
-        &mut self,
-        binary: &crate::ast::BinaryExpression,
-    ) -> crate::ast::Expression {
-        let left_value = binary
-            .get_left_expression()
-            .visit(&mut EvaluationVisitor::default());
-        let right_value = binary
-            .get_right_expression()
-            .visit(&mut EvaluationVisitor::default());
+    fn visit_binary_expression(&mut self, binary: &crate::ast::BinaryExpression) -> crate::ast::Expression {
+        let left_value = binary.get_left_expression().visit(&mut EvaluationVisitor::default());
+        let right_value = binary.get_right_expression().visit(&mut EvaluationVisitor::default());
         if left_value.is_none() || right_value.is_none() {
             let val = if let Some(val) = &left_value {
                 val
@@ -157,9 +128,7 @@ impl AstVisitorMut for OptimizationVisitor {
                 }
                 BinOp::Or => {
                     if val.as_bool() {
-                        return ConstantExpression::create_empty_expression(Constant::Boolean(
-                            true,
-                        ));
+                        return ConstantExpression::create_empty_expression(Constant::Boolean(true));
                     }
                     if left_value.is_none() {
                         return binary.get_left_expression().visit_mut(self);
@@ -168,9 +137,7 @@ impl AstVisitorMut for OptimizationVisitor {
                 }
                 BinOp::And => {
                     if !val.as_bool() {
-                        return ConstantExpression::create_empty_expression(Constant::Boolean(
-                            false,
-                        ));
+                        return ConstantExpression::create_empty_expression(Constant::Boolean(false));
                     }
                     if left_value.is_none() {
                         return binary.get_left_expression().visit_mut(self);
@@ -179,11 +146,7 @@ impl AstVisitorMut for OptimizationVisitor {
                 }
                 _ => {}
             }
-        } else if let Some(value) = value_to_expression(
-            &EvaluationVisitor::default()
-                .visit_binary_expression(binary)
-                .unwrap(),
-        ) {
+        } else if let Some(value) = value_to_expression(&EvaluationVisitor::default().visit_binary_expression(binary).unwrap()) {
             return value;
         }
         let left = binary.get_left_expression().visit_mut(self);
@@ -194,30 +157,18 @@ impl AstVisitorMut for OptimizationVisitor {
 
 fn value_to_expression(value: &VariableValue) -> Option<Expression> {
     match value.get_type() {
-        VariableType::Boolean => {
-            return Some(ConstantExpression::create_empty_expression(
-                Constant::Boolean(value.as_bool()),
-            ))
-        }
-        VariableType::Integer => {
-            return Some(ConstantExpression::create_empty_expression(
-                Constant::Integer(value.as_int()),
-            ))
-        }
-        VariableType::String => {
-            return Some(ConstantExpression::create_empty_expression(
-                Constant::String(value.as_string()),
-            ))
-        }
+        VariableType::Boolean => return Some(ConstantExpression::create_empty_expression(Constant::Boolean(value.as_bool()))),
+        VariableType::Integer => return Some(ConstantExpression::create_empty_expression(Constant::Integer(value.as_int()))),
+        VariableType::String => return Some(ConstantExpression::create_empty_expression(Constant::String(value.as_string()))),
         VariableType::Double => {
-            return Some(ConstantExpression::create_empty_expression(
-                Constant::Double(unsafe { value.data.double_value }),
-            ))
+            return Some(ConstantExpression::create_empty_expression(Constant::Double(unsafe {
+                value.data.double_value
+            })))
         }
         VariableType::Unsigned => {
-            return Some(ConstantExpression::create_empty_expression(
-                Constant::Unsigned(unsafe { value.data.unsigned_value }),
-            ))
+            return Some(ConstantExpression::create_empty_expression(Constant::Unsigned(unsafe {
+                value.data.unsigned_value
+            })))
         }
         _ => {}
     }

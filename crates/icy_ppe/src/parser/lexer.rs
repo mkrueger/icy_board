@@ -298,12 +298,7 @@ lazy_static::lazy_static! {
 }
 
 impl Lexer {
-    pub fn new(
-        file: PathBuf,
-        text: &str,
-        encoding: Encoding,
-        errors: Arc<Mutex<ErrorRepoter>>,
-    ) -> Self {
+    pub fn new(file: PathBuf, text: &str, encoding: Encoding, errors: Arc<Mutex<ErrorRepoter>>) -> Self {
         Self {
             file,
             encoding,
@@ -796,11 +791,7 @@ impl Lexer {
             }
         }
 
-        let identifier = unicase::Ascii::new(
-            self.text[self.token_start..self.token_end]
-                .iter()
-                .collect::<String>(),
-        );
+        let identifier = unicase::Ascii::new(self.text[self.token_start..self.token_end].iter().collect::<String>());
         if !open_bracket {
             if let Some(token) = TOKEN_LOOKUP_TABLE.get(&identifier) {
                 return Some(token.clone());
@@ -824,24 +815,10 @@ impl Lexer {
             }
         }
         self.lexer_state = LexerState::AfterEol;
-        let comment = self.text[self.token_start + 1..self.token_end]
-            .iter()
-            .collect::<String>();
+        let comment = self.text[self.token_start + 1..self.token_end].iter().collect::<String>();
 
-        if comment.len() > "$INCLUDE:".len()
-            && comment
-                .chars()
-                .take("$INCLUDE:".len())
-                .collect::<String>()
-                .to_ascii_uppercase()
-                == "$INCLUDE:"
-        {
-            let include_file = comment
-                .chars()
-                .skip("$INCLUDE:".len())
-                .collect::<String>()
-                .trim()
-                .to_string();
+        if comment.len() > "$INCLUDE:".len() && comment.chars().take("$INCLUDE:".len()).collect::<String>().to_ascii_uppercase() == "$INCLUDE:" {
+            let include_file = comment.chars().skip("$INCLUDE:".len()).collect::<String>().trim().to_string();
             let Some(parent) = self.file.parent() else {
                 self.errors.lock().unwrap().report_error(
                     self.token_start..self.token_end,
@@ -853,34 +830,19 @@ impl Lexer {
 
             match load_with_encoding(&path, self.encoding) {
                 Ok(k) => {
-                    self.include_lexer = Some(Box::new(Lexer::new(
-                        path,
-                        &k,
-                        Encoding::Utf8,
-                        self.errors.clone(),
-                    )));
+                    self.include_lexer = Some(Box::new(Lexer::new(path, &k, Encoding::Utf8, self.errors.clone())));
                 }
                 Err(err) => {
                     self.errors.lock().unwrap().report_error(
                         self.token_start..self.token_end,
-                        LexingErrorType::ErrorLoadingIncludeFile(
-                            include_file.to_string(),
-                            err.to_string(),
-                        ),
+                        LexingErrorType::ErrorLoadingIncludeFile(include_file.to_string(), err.to_string()),
                     );
                     return None;
                 }
             }
         }
 
-        if comment.len() > "$USEFUNCS".len()
-            && comment
-                .chars()
-                .take("$USEFUNCS".len())
-                .collect::<String>()
-                .to_ascii_uppercase()
-                == "$USEFUNCS"
-        {
+        if comment.len() > "$USEFUNCS".len() && comment.chars().take("$USEFUNCS".len()).collect::<String>().to_ascii_uppercase() == "$USEFUNCS" {
             return Some(Token::UseFuncs(cmt_type, comment));
         }
         Some(Token::Comment(cmt_type, comment))

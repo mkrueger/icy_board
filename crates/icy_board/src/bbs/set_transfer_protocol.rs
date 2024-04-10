@@ -1,7 +1,5 @@
 use icy_board_engine::{
-    icy_board::{
-        commands::Command, icb_config::IcbColor, icb_text::IceText, state::functions::display_flags,
-    },
+    icy_board::{commands::Command, icb_config::IcbColor, icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
 };
 use icy_ppe::Res;
@@ -12,11 +10,7 @@ impl PcbBoardCommand {
     pub fn set_transfer_protocol(&mut self, _action: &Command) -> Res<()> {
         let mut protocols = Vec::new();
         let mut valid_protocols = String::new();
-        let cur_protocol = if let Some(user) = &mut self.state.current_user {
-            user.protocol
-        } else {
-            ' '
-        };
+        let cur_protocol = if let Some(user) = &mut self.state.current_user { user.protocol } else { ' ' };
         self.state.new_line()?;
 
         if let Ok(board) = self.state.board.lock() {
@@ -26,15 +20,9 @@ impl PcbBoardCommand {
                 }
                 valid_protocols.push(protocol.char_code.to_ascii_uppercase());
                 if protocol.char_code == cur_protocol {
-                    protocols.push(format!(
-                        "=> ({}) {}",
-                        protocol.char_code, protocol.description
-                    ));
+                    protocols.push(format!("=> ({}) {}", protocol.char_code, protocol.description));
                 } else {
-                    protocols.push(format!(
-                        "   ({}) {}",
-                        protocol.char_code, protocol.description
-                    ));
+                    protocols.push(format!("   ({}) {}", protocol.char_code, protocol.description));
                 }
             }
         }
@@ -49,11 +37,7 @@ impl PcbBoardCommand {
             1,
             &valid_protocols,
             "",
-            display_flags::NEWLINE
-                | display_flags::LFBEFORE
-                | display_flags::LFAFTER
-                | display_flags::UPCASE
-                | display_flags::FIELDLEN,
+            display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER | display_flags::UPCASE | display_flags::FIELDLEN,
         )?;
 
         if !protocol.is_empty() {
@@ -61,8 +45,7 @@ impl PcbBoardCommand {
             if let Some(user) = &mut self.state.current_user {
                 user.protocol = selected_protocol;
             }
-            self.state
-                .display_text(IceText::DefaultProtocol, display_flags::DEFAULT)?;
+            self.state.display_text(IceText::DefaultProtocol, display_flags::DEFAULT)?;
             let txt = if let Ok(board) = self.state.board.lock() {
                 let mut res = String::new();
                 for protocol in board.protocols.iter() {

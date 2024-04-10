@@ -160,9 +160,7 @@ impl JamMessageHeader {
 
     /// Checks if a password is valid.
     pub fn is_password_valid(&self, password: &str) -> bool {
-        self.password_crc == CRC_SEED
-            || self.password_crc
-                == JamMessageBase::get_crc(&BString::new(password.as_bytes().to_vec()))
+        self.password_crc == CRC_SEED || self.password_crc == JamMessageBase::get_crc(&BString::new(password.as_bytes().to_vec()))
     }
 
     pub fn read(file: &mut BufReader<File>) -> crate::Result<Self> {
@@ -174,9 +172,7 @@ impl JamMessageHeader {
         let data = &data[4..];
         convert_single_u16!(revision, data);
         if revision != 1 {
-            return Err(Box::new(JamError::UnsupportedMessageHeaderRevision(
-                revision,
-            )));
+            return Err(Box::new(JamError::UnsupportedMessageHeaderRevision(revision)));
         }
         let mut data = &data[4..];
         // convert_u32!(reserved_word, data);
@@ -235,11 +231,7 @@ impl JamMessageHeader {
         file.write_all(&u16::to_le_bytes(1))?;
         // reserved_word
         file.write_all(&u16::to_le_bytes(0))?;
-        let subfield_data_len = self
-            .sub_fields
-            .iter()
-            .map(|sf| 8 + sf.content.len())
-            .sum::<usize>();
+        let subfield_data_len = self.sub_fields.iter().map(|sf| 8 + sf.content.len()).sum::<usize>();
         file.write_all(&u32::to_le_bytes(subfield_data_len as u32))?;
         file.write_all(&self.times_read.to_le_bytes())?;
         file.write_all(&self.msgid_crc.to_le_bytes())?;
@@ -470,10 +462,7 @@ pub struct MessageSubfield {
 
 impl MessageSubfield {
     pub fn new(field_type: SubfieldType, content: BString) -> Self {
-        Self {
-            field_type,
-            content,
-        }
+        Self { field_type, content }
     }
 
     pub fn get_string(&self) -> &BString {

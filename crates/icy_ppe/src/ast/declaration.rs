@@ -27,9 +27,7 @@ impl DimensionSpecifier {
 
     pub fn empty(dimension: usize) -> Self {
         Self {
-            dimension_token: Spanned::create_empty(Token::Const(Constant::Integer(
-                dimension as i32,
-            ))),
+            dimension_token: Spanned::create_empty(Token::Const(Constant::Integer(dimension as i32))),
         }
     }
 
@@ -78,10 +76,7 @@ impl VariableSpecifier {
         Self {
             identifier_token: Spanned::create_empty(Token::Identifier(identifier)),
             leftpar_token: None,
-            dimensions: dimensions
-                .into_iter()
-                .map(DimensionSpecifier::empty)
-                .collect(),
+            dimensions: dimensions.into_iter().map(DimensionSpecifier::empty).collect(),
             rightpar_token: None,
         }
     }
@@ -128,26 +123,14 @@ impl VariableSpecifier {
         let var_value = variable_type.create_empty_value();
         match self.dimensions.len() {
             0 => var_value,
-            1 => VariableValue::new_vector(
-                variable_type,
-                vec![var_value; self.dimensions[0].get_dimension()],
-            ),
+            1 => VariableValue::new_vector(variable_type, vec![var_value; self.dimensions[0].get_dimension()]),
             2 => VariableValue::new_matrix(
                 variable_type,
-                vec![
-                    vec![var_value; self.dimensions[0].get_dimension()];
-                    self.dimensions[1].get_dimension()
-                ],
+                vec![vec![var_value; self.dimensions[0].get_dimension()]; self.dimensions[1].get_dimension()],
             ),
             _ => VariableValue::new_cube(
                 variable_type,
-                vec![
-                    vec![
-                        vec![var_value; self.dimensions[0].get_dimension()];
-                        self.dimensions[1].get_dimension()
-                    ];
-                    self.dimensions[2].get_dimension()
-                ],
+                vec![vec![vec![var_value; self.dimensions[0].get_dimension()]; self.dimensions[1].get_dimension()]; self.dimensions[2].get_dimension()],
             ),
         }
     }
@@ -207,11 +190,7 @@ pub struct VariableDeclarationStatement {
 }
 
 impl VariableDeclarationStatement {
-    pub fn new(
-        type_token: Spanned<Token>,
-        variable_type: VariableType,
-        variables: Vec<VariableSpecifier>,
-    ) -> Self {
+    pub fn new(type_token: Spanned<Token>, variable_type: VariableType, variables: Vec<VariableSpecifier>) -> Self {
         Self {
             type_token,
             variable_type,
@@ -221,9 +200,7 @@ impl VariableDeclarationStatement {
 
     pub fn empty(variable_type: VariableType, variables: Vec<VariableSpecifier>) -> Self {
         Self {
-            type_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(
-                variable_type.to_string(),
-            ))),
+            type_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(variable_type.to_string()))),
             variable_type,
             variables,
         }
@@ -245,14 +222,8 @@ impl VariableDeclarationStatement {
         &mut self.variables
     }
 
-    pub fn create_empty_statement(
-        variable_type: VariableType,
-        variables: Vec<VariableSpecifier>,
-    ) -> Statement {
-        Statement::VariableDeclaration(VariableDeclarationStatement::empty(
-            variable_type,
-            variables,
-        ))
+    pub fn create_empty_statement(variable_type: VariableType, variables: Vec<VariableSpecifier>) -> Statement {
+        Statement::VariableDeclaration(VariableDeclarationStatement::empty(variable_type, variables))
     }
 }
 
@@ -265,12 +236,7 @@ pub struct ParameterSpecifier {
 }
 
 impl ParameterSpecifier {
-    pub fn new(
-        var_token: Option<Spanned<Token>>,
-        type_token: Spanned<Token>,
-        variable_type: VariableType,
-        variable: VariableSpecifier,
-    ) -> Self {
+    pub fn new(var_token: Option<Spanned<Token>>, type_token: Spanned<Token>, variable_type: VariableType, variable: VariableSpecifier) -> Self {
         Self {
             var_token,
             type_token,
@@ -282,15 +248,11 @@ impl ParameterSpecifier {
     pub fn empty(is_var: bool, variable_type: VariableType, variable: VariableSpecifier) -> Self {
         Self {
             var_token: if is_var {
-                Some(Spanned::create_empty(Token::Identifier(
-                    unicase::Ascii::new("VAR".to_string()),
-                )))
+                Some(Spanned::create_empty(Token::Identifier(unicase::Ascii::new("VAR".to_string()))))
             } else {
                 None
             },
-            type_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(
-                variable_type.to_string(),
-            ))),
+            type_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(variable_type.to_string()))),
             variable_type,
             variable,
         }
@@ -320,14 +282,8 @@ impl ParameterSpecifier {
         &mut self.variable
     }
 
-    pub fn create_empty_statement(
-        variable_type: VariableType,
-        variables: Vec<VariableSpecifier>,
-    ) -> Statement {
-        Statement::VariableDeclaration(VariableDeclarationStatement::empty(
-            variable_type,
-            variables,
-        ))
+    pub fn create_empty_statement(variable_type: VariableType, variables: Vec<VariableSpecifier>) -> Statement {
+        Statement::VariableDeclaration(VariableDeclarationStatement::empty(variable_type, variables))
     }
 
     #[must_use]
@@ -342,12 +298,7 @@ impl ParameterSpecifier {
 
 impl fmt::Display for VariableDeclarationStatement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} {}",
-            self.get_variable_type(),
-            Statement::variable_list_to_string(self.get_variables())
-        )
+        write!(f, "{} {}", self.get_variable_type(), Statement::variable_list_to_string(self.get_variables()))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -445,13 +396,8 @@ impl ProcedureDeclarationAstNode {
         flags
     }
 
-    pub fn empty_node(
-        identifier: unicase::Ascii<String>,
-        parameters: Vec<ParameterSpecifier>,
-    ) -> super::AstNode {
-        super::AstNode::ProcedureDeclaration(ProcedureDeclarationAstNode::empty(
-            identifier, parameters,
-        ))
+    pub fn empty_node(identifier: unicase::Ascii<String>, parameters: Vec<ParameterSpecifier>) -> super::AstNode {
+        super::AstNode::ProcedureDeclaration(ProcedureDeclarationAstNode::empty(identifier, parameters))
     }
 }
 
@@ -491,11 +437,7 @@ impl FunctionDeclarationAstNode {
         }
     }
 
-    pub fn empty(
-        identifier: unicase::Ascii<String>,
-        parameters: Vec<ParameterSpecifier>,
-        return_type: VariableType,
-    ) -> Self {
+    pub fn empty(identifier: unicase::Ascii<String>, parameters: Vec<ParameterSpecifier>, return_type: VariableType) -> Self {
         Self {
             declare_token: Spanned::create_empty(Token::Declare),
             function_token: Spanned::create_empty(Token::Function),
@@ -503,9 +445,7 @@ impl FunctionDeclarationAstNode {
             leftpar_token: Spanned::create_empty(Token::LPar),
             parameters,
             rightpar_token: Spanned::create_empty(Token::RPar),
-            return_type_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(
-                return_type.to_string(),
-            ))),
+            return_type_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(return_type.to_string()))),
             return_type,
         }
     }
@@ -563,15 +503,7 @@ impl FunctionDeclarationAstNode {
         self.return_type
     }
 
-    pub fn empty_node(
-        identifier: unicase::Ascii<String>,
-        parameters: Vec<ParameterSpecifier>,
-        return_type: VariableType,
-    ) -> super::AstNode {
-        super::AstNode::FunctionDeclaration(FunctionDeclarationAstNode::empty(
-            identifier,
-            parameters,
-            return_type,
-        ))
+    pub fn empty_node(identifier: unicase::Ascii<String>, parameters: Vec<ParameterSpecifier>, return_type: VariableType) -> super::AstNode {
+        super::AstNode::FunctionDeclaration(FunctionDeclarationAstNode::empty(identifier, parameters, return_type))
     }
 }

@@ -102,24 +102,24 @@ impl VariableType {
 impl fmt::Display for VariableType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            VariableType::Boolean => write!(f, "Boolean"), // BOOL 0 = false, 1 = true
+            VariableType::Boolean => write!(f, "Boolean"),   // BOOL 0 = false, 1 = true
             VariableType::Unsigned => write!(f, "Unsigned"), // u32
-            VariableType::Date => write!(f, "Date"),       // 2*u8 - julian date
-            VariableType::EDate => write!(f, "EDate"),     // 2*u8 - julian date
-            VariableType::Integer => write!(f, "Integer"), // i32
-            VariableType::Money => write!(f, "Money"),     // i32 - x/100 Dollar x%100 Cents
-            VariableType::Float => write!(f, "Real"),      // f32
-            VariableType::String => write!(f, "String"), // String without \0 and maximum length of 255 (Pascal like)
-            VariableType::Time => write!(f, "Time"),     // u32 - Seconds elapsed since midnight
-            VariableType::Byte => write!(f, "Byte"),     // u8
-            VariableType::Word => write!(f, "Word"),     // u16
-            VariableType::SByte => write!(f, "SByte"),   // i8
-            VariableType::SWord => write!(f, "SWord"),   // i16
-            VariableType::BigStr => write!(f, "BigStr"), // String (max 2kb)
-            VariableType::Double => write!(f, "Double"), // f65
-            VariableType::Function => write!(f, "FUNC"), // 2*u8
-            VariableType::Procedure => write!(f, "PROC"), // 2*u8
-            VariableType::DDate => write!(f, "DDate"),   // i32
+            VariableType::Date => write!(f, "Date"),         // 2*u8 - julian date
+            VariableType::EDate => write!(f, "EDate"),       // 2*u8 - julian date
+            VariableType::Integer => write!(f, "Integer"),   // i32
+            VariableType::Money => write!(f, "Money"),       // i32 - x/100 Dollar x%100 Cents
+            VariableType::Float => write!(f, "Real"),        // f32
+            VariableType::String => write!(f, "String"),     // String without \0 and maximum length of 255 (Pascal like)
+            VariableType::Time => write!(f, "Time"),         // u32 - Seconds elapsed since midnight
+            VariableType::Byte => write!(f, "Byte"),         // u8
+            VariableType::Word => write!(f, "Word"),         // u16
+            VariableType::SByte => write!(f, "SByte"),       // i8
+            VariableType::SWord => write!(f, "SWord"),       // i16
+            VariableType::BigStr => write!(f, "BigStr"),     // String (max 2kb)
+            VariableType::Double => write!(f, "Double"),     // f65
+            VariableType::Function => write!(f, "FUNC"),     // 2*u8
+            VariableType::Procedure => write!(f, "PROC"),    // 2*u8
+            VariableType::DDate => write!(f, "DDate"),       // i32
             VariableType::Unknown => write!(f, "Unknown"),
         }
     }
@@ -191,29 +191,21 @@ pub enum GenericVariableData {
     Dim3(Vec<Vec<Vec<VariableValue>>>),
 }
 impl GenericVariableData {
-    pub(crate) fn create_array(
-        base_value: VariableValue,
-        dim: u8,
-        vector_size: usize,
-        matrix_size: usize,
-        cube_size: usize,
-    ) -> GenericVariableData {
+    pub(crate) fn create_array(base_value: VariableValue, dim: u8, vector_size: usize, matrix_size: usize, cube_size: usize) -> GenericVariableData {
         match dim {
             1 => GenericVariableData::Dim1(vec![base_value; vector_size + 1]),
-            2 => {
-                GenericVariableData::Dim2(vec![vec![base_value; matrix_size + 1]; vector_size + 1])
-            }
+            2 => GenericVariableData::Dim2(vec![vec![base_value; matrix_size + 1]; vector_size + 1]),
             3 => {
                 if vector_size * matrix_size * cube_size > 1_000_000_000 {
-                    log::error!("Creating a large array of size: {}x{}x{}={} elements - probably file is corrupt.", vector_size, matrix_size, cube_size, vector_size * matrix_size * cube_size);
+                    log::error!(
+                        "Creating a large array of size: {}x{}x{}={} elements - probably file is corrupt.",
+                        vector_size,
+                        matrix_size,
+                        cube_size,
+                        vector_size * matrix_size * cube_size
+                    );
                 }
-                GenericVariableData::Dim3(vec![
-                    vec![
-                        vec![base_value; cube_size + 1];
-                        matrix_size + 1
-                    ];
-                    vector_size + 1
-                ])
+                GenericVariableData::Dim3(vec![vec![vec![base_value; cube_size + 1]; matrix_size + 1]; vector_size + 1])
             }
             _ => panic!("Invalid dimension: {dim}"),
         }
@@ -274,9 +266,7 @@ impl PartialEq for VariableValue {
 
                 VariableType::Integer => self.as_int() == other.as_int(),
                 VariableType::Money => self.data.money_value == other.data.money_value,
-                VariableType::String | VariableType::BigStr => {
-                    self.as_string() == other.as_string()
-                }
+                VariableType::String | VariableType::BigStr => self.as_string() == other.as_string(),
 
                 VariableType::Time => self.data.time_value == other.data.time_value,
                 VariableType::Float => self.data.float_value == other.data.float_value,
@@ -296,14 +286,10 @@ fn promote_to(l: VariableType, r: VariableType) -> VariableType {
     if l == r {
         return l;
     }
-    if (l == VariableType::String || l == VariableType::BigStr)
-        && (r == VariableType::String || r == VariableType::BigStr)
-    {
+    if (l == VariableType::String || l == VariableType::BigStr) && (r == VariableType::String || r == VariableType::BigStr) {
         return VariableType::BigStr;
     }
-    if (l == VariableType::Float || l == VariableType::Double)
-        && (r == VariableType::Float || r == VariableType::Double)
-    {
+    if (l == VariableType::Float || l == VariableType::Double) && (r == VariableType::Float || r == VariableType::Double) {
         return VariableType::Double;
     }
     VariableType::Integer
@@ -315,12 +301,7 @@ impl Add<VariableValue> for VariableValue {
     fn add(self, other: VariableValue) -> Self {
         let mut dest_type: VariableType = promote_to(self.vtype, other.vtype);
         match dest_type {
-            VariableType::Boolean
-            | VariableType::Date
-            | VariableType::EDate
-            | VariableType::Money
-            | VariableType::Time
-            | VariableType::DDate => {
+            VariableType::Boolean | VariableType::Date | VariableType::EDate | VariableType::Money | VariableType::Time | VariableType::DDate => {
                 dest_type = VariableType::Integer;
             }
             _ => {}
@@ -330,10 +311,7 @@ impl Add<VariableValue> for VariableValue {
         unsafe {
             match dest_type {
                 VariableType::Unsigned => {
-                    data.unsigned_value = self
-                        .data
-                        .unsigned_value
-                        .wrapping_add(other.data.unsigned_value);
+                    data.unsigned_value = self.data.unsigned_value.wrapping_add(other.data.unsigned_value);
                 }
                 VariableType::Integer => {
                     data.int_value = self.data.int_value.wrapping_add(other.data.int_value);
@@ -381,12 +359,7 @@ impl Sub<VariableValue> for VariableValue {
     fn sub(self, other: VariableValue) -> VariableValue {
         let mut dest_type: VariableType = promote_to(self.vtype, other.vtype);
         match dest_type {
-            VariableType::Boolean
-            | VariableType::Date
-            | VariableType::EDate
-            | VariableType::Money
-            | VariableType::Time
-            | VariableType::DDate => {
+            VariableType::Boolean | VariableType::Date | VariableType::EDate | VariableType::Money | VariableType::Time | VariableType::DDate => {
                 dest_type = VariableType::Integer;
             }
             VariableType::String | VariableType::BigStr => {
@@ -405,10 +378,7 @@ impl Sub<VariableValue> for VariableValue {
         unsafe {
             match dest_type {
                 VariableType::Unsigned => {
-                    data.unsigned_value = self
-                        .data
-                        .unsigned_value
-                        .wrapping_sub(other.data.unsigned_value);
+                    data.unsigned_value = self.data.unsigned_value.wrapping_sub(other.data.unsigned_value);
                 }
                 VariableType::Integer => {
                     data.int_value = self.data.int_value.wrapping_sub(other.data.int_value);
@@ -450,12 +420,7 @@ impl Mul<VariableValue> for VariableValue {
     fn mul(self, other: VariableValue) -> VariableValue {
         let mut dest_type: VariableType = promote_to(self.vtype, other.vtype);
         match dest_type {
-            VariableType::Boolean
-            | VariableType::Date
-            | VariableType::EDate
-            | VariableType::Money
-            | VariableType::Time
-            | VariableType::DDate => {
+            VariableType::Boolean | VariableType::Date | VariableType::EDate | VariableType::Money | VariableType::Time | VariableType::DDate => {
                 dest_type = VariableType::Integer;
             }
             VariableType::String | VariableType::BigStr => {
@@ -474,10 +439,7 @@ impl Mul<VariableValue> for VariableValue {
         unsafe {
             match dest_type {
                 VariableType::Unsigned => {
-                    data.unsigned_value = self
-                        .data
-                        .unsigned_value
-                        .wrapping_mul(other.data.unsigned_value);
+                    data.unsigned_value = self.data.unsigned_value.wrapping_mul(other.data.unsigned_value);
                 }
                 VariableType::Integer => {
                     data.int_value = self.data.int_value.wrapping_mul(other.data.int_value);
@@ -519,12 +481,7 @@ impl Div<VariableValue> for VariableValue {
     fn div(self, other: VariableValue) -> VariableValue {
         let mut dest_type: VariableType = promote_to(self.vtype, other.vtype);
         match dest_type {
-            VariableType::Boolean
-            | VariableType::Date
-            | VariableType::EDate
-            | VariableType::Money
-            | VariableType::Time
-            | VariableType::DDate => {
+            VariableType::Boolean | VariableType::Date | VariableType::EDate | VariableType::Money | VariableType::Time | VariableType::DDate => {
                 dest_type = VariableType::Integer;
             }
             VariableType::String | VariableType::BigStr => {
@@ -543,10 +500,7 @@ impl Div<VariableValue> for VariableValue {
         unsafe {
             match dest_type {
                 VariableType::Unsigned => {
-                    data.unsigned_value = self
-                        .data
-                        .unsigned_value
-                        .wrapping_div(other.data.unsigned_value);
+                    data.unsigned_value = self.data.unsigned_value.wrapping_div(other.data.unsigned_value);
                 }
                 VariableType::Integer => {
                     data.int_value = self.data.int_value.wrapping_div(other.data.int_value);
@@ -615,10 +569,7 @@ impl Rem<VariableValue> for VariableValue {
         unsafe {
             match dest_type {
                 VariableType::Unsigned => {
-                    data.unsigned_value = self
-                        .data
-                        .unsigned_value
-                        .wrapping_rem(other.data.unsigned_value);
+                    data.unsigned_value = self.data.unsigned_value.wrapping_rem(other.data.unsigned_value);
                 }
                 VariableType::Integer => {
                     data.int_value = self.data.int_value.wrapping_rem(other.data.int_value);
@@ -654,24 +605,18 @@ impl PartialOrd for VariableValue {
         unsafe {
             match dest_type {
                 VariableType::Boolean => Some(self.data.bool_value.cmp(&other.data.bool_value)),
-                VariableType::Unsigned => {
-                    Some(self.data.unsigned_value.cmp(&other.data.unsigned_value))
-                }
+                VariableType::Unsigned => Some(self.data.unsigned_value.cmp(&other.data.unsigned_value)),
                 VariableType::Date => Some(self.data.date_value.cmp(&other.data.date_value)),
                 VariableType::DDate => Some(self.data.ddate_value.cmp(&other.data.ddate_value)),
                 VariableType::EDate => Some(self.data.edate_value.cmp(&other.data.edate_value)),
 
                 VariableType::Integer => Some(self.as_int().cmp(&other.as_int())),
                 VariableType::Money => Some(self.data.money_value.cmp(&other.data.money_value)),
-                VariableType::String | VariableType::BigStr => {
-                    Some(self.as_string().cmp(&other.as_string()))
-                }
+                VariableType::String | VariableType::BigStr => Some(self.as_string().cmp(&other.as_string())),
 
                 VariableType::Time => Some(self.data.time_value.cmp(&other.data.time_value)),
                 VariableType::Float => self.data.float_value.partial_cmp(&other.data.float_value),
-                VariableType::Double => {
-                    self.data.double_value.partial_cmp(&other.data.double_value)
-                }
+                VariableType::Double => self.data.double_value.partial_cmp(&other.data.double_value),
                 VariableType::Byte => Some(self.data.byte_value.cmp(&other.data.byte_value)),
                 VariableType::SByte => Some(self.data.sbyte_value.cmp(&other.data.sbyte_value)),
                 VariableType::Word => Some(self.data.word_value.cmp(&other.data.word_value)),
@@ -904,10 +849,7 @@ impl VariableValue {
         unsafe {
             match dest_type {
                 VariableType::Integer => {
-                    data.int_value = self
-                        .data
-                        .int_value
-                        .wrapping_pow(other.data.int_value as u32);
+                    data.int_value = self.data.int_value.wrapping_pow(other.data.int_value as u32);
                 }
                 VariableType::Float => {
                     data.float_value = self.data.float_value.powf(other.data.float_value);
@@ -916,16 +858,10 @@ impl VariableValue {
                     data.double_value = self.data.double_value.powf(other.data.double_value);
                 }
                 VariableType::SByte => {
-                    data.sbyte_value = self
-                        .data
-                        .sbyte_value
-                        .wrapping_pow(other.data.sbyte_value as u32);
+                    data.sbyte_value = self.data.sbyte_value.wrapping_pow(other.data.sbyte_value as u32);
                 }
                 VariableType::SWord => {
-                    data.sword_value = self
-                        .data
-                        .sword_value
-                        .wrapping_pow(other.data.sword_value as u32);
+                    data.sword_value = self.data.sword_value.wrapping_pow(other.data.sword_value as u32);
                 }
                 _ => {
                     panic!("unsupported lvalue for add {self:?}");
@@ -1137,8 +1073,7 @@ impl VariableValue {
     }
 
     pub fn redim(&mut self, dim: u8, vs: usize, ms: usize, cs: usize) {
-        self.generic_data =
-            GenericVariableData::create_array(self.vtype.create_empty_value(), dim, vs, ms, cs);
+        self.generic_data = GenericVariableData::create_array(self.vtype.create_empty_value(), dim, vs, ms, cs);
     }
 
     pub fn set_array_value(&mut self, dim1: usize, dim2: usize, dim3: usize, val: VariableValue) {

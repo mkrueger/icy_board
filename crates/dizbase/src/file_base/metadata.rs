@@ -43,10 +43,7 @@ pub struct MetadataHeader {
 }
 impl MetadataHeader {
     pub fn new(metadata_type: MetadaType, data: Vec<u8>) -> Self {
-        Self {
-            metadata_type,
-            data,
-        }
+        Self { metadata_type, data }
     }
 
     pub fn get_type(&self) -> MetadaType {

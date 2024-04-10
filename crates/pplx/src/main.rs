@@ -73,10 +73,7 @@ fn main() {
             let mut io = DiskIO::new(".", None);
 
             enable_raw_mode().unwrap();
-            let supports_keyboard_enhancement = matches!(
-                crossterm::terminal::supports_keyboard_enhancement(),
-                Ok(true)
-            );
+            let supports_keyboard_enhancement = matches!(crossterm::terminal::supports_keyboard_enhancement(), Ok(true));
 
             if supports_keyboard_enhancement {
                 queue!(
@@ -92,9 +89,7 @@ fn main() {
             }
 
             stdout()
-                .execute(crossterm::terminal::Clear(
-                    crossterm::terminal::ClearType::All,
-                ))
+                .execute(crossterm::terminal::Clear(crossterm::terminal::ClearType::All))
                 .unwrap()
                 .execute(MoveTo(0, 0))
                 .unwrap();

@@ -56,11 +56,7 @@ lazy_static::lazy_static! {
 
 fn main() {
     let arguments = Cli::parse();
-    let version = if let Some(v) = arguments.ppl_version {
-        v
-    } else {
-        330
-    };
+    let version = if let Some(v) = arguments.ppl_version { v } else { 330 };
     let valid_versions: Vec<u16> = vec![100, 200, 300, 310, 330, 340];
     if !valid_versions.contains(&version) {
         println!("Invalid version number valid values {valid_versions:?}");
@@ -77,11 +73,7 @@ fn main() {
         file_name.push_str(".pps");
     }
 
-    let encoding = if arguments.dos {
-        Encoding::CP437
-    } else {
-        Encoding::Utf8
-    };
+    let encoding = if arguments.dos { Encoding::CP437 } else { Encoding::Utf8 };
 
     match load_with_encoding(&PathBuf::from(&file_name), encoding) {
         Ok(src) => {
@@ -101,9 +93,7 @@ fn main() {
 
             let errors = sv.errors.clone();
 
-            if errors.lock().unwrap().has_errors()
-                || (errors.lock().unwrap().has_warnings() && !arguments.nowarnings)
-            {
+            if errors.lock().unwrap().has_errors() || (errors.lock().unwrap().has_warnings() && !arguments.nowarnings) {
                 let mut error_count = 0;
                 let mut warning_count = 0;
 
@@ -112,10 +102,7 @@ fn main() {
                     Report::build(ReportKind::Error, &file_name, err.span.start)
                         .with_code(error_count)
                         .with_message(format!("{}", err.error))
-                        .with_label(
-                            Label::new((&file_name, err.span.clone()))
-                                .with_color(ariadne::Color::Red),
-                        )
+                        .with_label(Label::new((&file_name, err.span.clone())).with_color(ariadne::Color::Red))
                         .finish()
                         .print((&file_name, Source::from(&src)))
                         .unwrap();
@@ -127,10 +114,7 @@ fn main() {
                         Report::build(ReportKind::Warning, &file_name, err.span.start)
                             .with_code(warning_count)
                             .with_message(format!("{}", err.error))
-                            .with_label(
-                                Label::new((&file_name, err.span.clone()))
-                                    .with_color(ariadne::Color::Yellow),
-                            )
+                            .with_label(Label::new((&file_name, err.span.clone())).with_color(ariadne::Color::Yellow))
                             .finish()
                             .print((&file_name, Source::from(&src)))
                             .unwrap();
@@ -153,8 +137,7 @@ fn main() {
                         println!();
                         executable.print_variable_table();
                         println!();
-                        let mut visitor =
-                            icy_ppe::executable::disassembler::DisassembleVisitor::new(&executable);
+                        let mut visitor = icy_ppe::executable::disassembler::DisassembleVisitor::new(&executable);
                         visitor.generate_statement_data = true;
                         compiler.get_script().visit(&mut visitor);
                         println!();
@@ -169,13 +152,7 @@ fn main() {
                     let len = bin.len();
                     fs::write(&out_file_name, bin).expect("Unable to write file");
                     let lines = src.lines().count();
-                    println!(
-                        "{} lines, {} chars compiled. {} bytes written to {:?}",
-                        lines,
-                        src.len(),
-                        len,
-                        &out_file_name
-                    );
+                    println!("{} lines, {} chars compiled. {} bytes written to {:?}", lines, src.len(), len, &out_file_name);
                 }
                 Err(err) => {
                     execute!(

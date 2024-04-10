@@ -1,7 +1,4 @@
-use super::{
-    AstVisitor, BinaryExpression, ConstantExpression, FunctionCallExpression, ParensExpression,
-    PredefinedFunctionCallExpression, UnaryExpression,
-};
+use super::{AstVisitor, BinaryExpression, ConstantExpression, FunctionCallExpression, ParensExpression, PredefinedFunctionCallExpression, UnaryExpression};
 
 #[derive(Default)]
 pub struct ExpressionDepthVisitor {}
@@ -16,20 +13,14 @@ impl AstVisitor<usize> for ExpressionDepthVisitor {
     }
 
     fn visit_binary_expression(&mut self, binary: &BinaryExpression) -> usize {
-        1 + binary
-            .get_left_expression()
-            .visit(self)
-            .max(binary.get_right_expression().visit(self))
+        1 + binary.get_left_expression().visit(self).max(binary.get_right_expression().visit(self))
     }
 
     fn visit_unary_expression(&mut self, unary: &UnaryExpression) -> usize {
         1 + unary.get_expression().visit(self)
     }
 
-    fn visit_predefined_function_call_expression(
-        &mut self,
-        _: &PredefinedFunctionCallExpression,
-    ) -> usize {
+    fn visit_predefined_function_call_expression(&mut self, _: &PredefinedFunctionCallExpression) -> usize {
         1
     }
 

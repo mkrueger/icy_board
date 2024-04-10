@@ -238,9 +238,7 @@ pub fn inputstr(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let len = vm.eval_expr(&args[3])?.as_int();
     let valid = vm.eval_expr(&args[4])?.as_string();
     let flags = vm.eval_expr(&args[5])?.as_int();
-    let output = vm
-        .icy_board_state
-        .input_string(color.into(), prompt, len, &valid, "", flags)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, &valid, "", flags)?;
     vm.set_variable(&args[1], VariableValue::new_string(output))?;
     Ok(())
 }
@@ -254,14 +252,9 @@ pub fn inputyn(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let color = vm.eval_expr(&args[2])?.as_int() as u8;
     let len = 1;
     let valid = "YyNn";
-    let output = vm
-        .icy_board_state
-        .input_string(color.into(), prompt, len, valid, "", 0)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", 0)?;
 
-    vm.set_variable(
-        &args[1],
-        VariableValue::new_string(output.to_ascii_uppercase()),
-    )?;
+    vm.set_variable(&args[1], VariableValue::new_string(output.to_ascii_uppercase()))?;
     Ok(())
 }
 
@@ -274,9 +267,7 @@ pub fn inputmoney(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let color = vm.eval_expr(&args[2])?.as_int() as u8;
     let len = 13;
     let valid = "01234567890+-$.";
-    let output = vm
-        .icy_board_state
-        .input_string(color.into(), prompt, len, valid, "", 0)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", 0)?;
     // TODO: Money conversion.
     vm.set_variable(&args[1], VariableValue::new_string(output))?;
     Ok(())
@@ -291,9 +282,7 @@ pub fn inputint(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let color = vm.eval_expr(&args[2])?.as_int() as u8;
     let len = 11;
     let valid = "01234567890+-";
-    let output = vm
-        .icy_board_state
-        .input_string(color.into(), prompt, len, valid, "", 0)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", 0)?;
     vm.set_variable(&args[1], VariableValue::new_int(output.parse::<i32>()?))?;
     Ok(())
 }
@@ -306,9 +295,7 @@ pub fn inputcc(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let color = vm.eval_expr(&args[2])?.as_int() as u8;
     let len = 16;
     let valid = "01234567890";
-    let output = vm
-        .icy_board_state
-        .input_string(color.into(), prompt, len, valid, "", 0)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", 0)?;
     vm.set_variable(&args[1], VariableValue::new_string(output))?;
     Ok(())
 }
@@ -321,9 +308,7 @@ pub fn inputdate(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let color = vm.eval_expr(&args[2])?.as_int() as u8;
     let len = 8;
     let valid = "01234567890-/";
-    let output = vm
-        .icy_board_state
-        .input_string(color.into(), prompt, len, valid, "", 0)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", 0)?;
     // TODO: Date conversion
     vm.set_variable(&args[1], VariableValue::new_string(output))?;
     Ok(())
@@ -338,9 +323,7 @@ pub fn inputtime(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let color = vm.eval_expr(&args[2])?.as_int() as u8;
     let len = 8;
     let valid = "01234567890:";
-    let output = vm
-        .icy_board_state
-        .input_string(color.into(), prompt, len, valid, "", 0)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", 0)?;
     // TODO: Time conversion
     vm.set_variable(&args[1], VariableValue::new_string(output))?;
     Ok(())
@@ -410,9 +393,7 @@ pub fn newlines(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 /// Errors if the variable is not found.
 pub fn tokenize(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let str = vm.eval_expr(&args[0])?.to_string();
-    let split = str
-        .split(&[' ', ';'][..])
-        .map(std::string::ToString::to_string);
+    let split = str.split(&[' ', ';'][..]).map(std::string::ToString::to_string);
     vm.icy_board_state.session.tokens.extend(split);
     Ok(())
 }
@@ -431,8 +412,7 @@ pub fn disptext(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let rec = vm.eval_expr(&args[0])?.as_int();
     let flags = vm.eval_expr(&args[1])?.as_int();
 
-    vm.icy_board_state
-        .display_text(IceText::from(rec as usize), flags)
+    vm.icy_board_state.display_text(IceText::from(rec as usize), flags)
 }
 
 pub fn stop(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
@@ -626,22 +606,18 @@ pub fn ansipos(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 pub fn backup(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let numcols = vm.eval_expr(&args[0])?.as_int();
     if vm.icy_board_state.use_ansi() {
-        vm.icy_board_state
-            .print(TerminalTarget::Both, &format!("\x1B[{numcols}D"))
+        vm.icy_board_state.print(TerminalTarget::Both, &format!("\x1B[{numcols}D"))
     } else {
-        vm.icy_board_state
-            .print(TerminalTarget::Both, &"\x08".repeat(numcols as usize))
+        vm.icy_board_state.print(TerminalTarget::Both, &"\x08".repeat(numcols as usize))
     }
 }
 
 pub fn forward(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let numcols = vm.eval_expr(&args[0])?.as_int();
     if vm.icy_board_state.use_ansi() {
-        vm.icy_board_state
-            .print(TerminalTarget::Both, &format!("\x1B[{numcols}C"))?;
+        vm.icy_board_state.print(TerminalTarget::Both, &format!("\x1B[{numcols}C"))?;
     } else {
-        vm.icy_board_state
-            .print(TerminalTarget::Both, &" ".repeat(numcols as usize))?;
+        vm.icy_board_state.print(TerminalTarget::Both, &" ".repeat(numcols as usize))?;
     }
     Ok(())
 }
@@ -829,11 +805,7 @@ pub fn fread(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
             vm.set_variable(&args[1], VariableValue::new_int(i))?;
         }
         _ => {
-            return Err(Box::new(VMError::FReadError(
-                val.get_type(),
-                result.len(),
-                size,
-            )));
+            return Err(Box::new(VMError::FReadError(val.get_type(), result.len(), size)));
         }
     }
 
@@ -981,9 +953,7 @@ pub fn sort(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     {
         let indices = vm.variable_table.get_value(indices_idx);
         if indices.vtype != VariableType::Integer {
-            return Err(Box::new(IcyError::SortDestinationArrayIntRequired(
-                indices.vtype,
-            )));
+            return Err(Box::new(IcyError::SortDestinationArrayIntRequired(indices.vtype)));
         }
     }
 

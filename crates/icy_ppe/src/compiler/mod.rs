@@ -9,10 +9,7 @@ use thiserror::Error;
 
 use crate::{
     ast::{Ast, AstNode, Expression, Statement},
-    executable::{
-        Executable, ExpressionNegator, OpCode, PPECommand, PPEExpr, PPEScript, VariableType,
-        LAST_PPLC,
-    },
+    executable::{Executable, ExpressionNegator, OpCode, PPECommand, PPEExpr, PPEScript, VariableType, LAST_PPLC},
     parser::{
         lexer::{Spanned, Token},
         ErrorRepoter,
@@ -118,11 +115,8 @@ impl PPECompiler {
             }
         }
 
-        if self.commands.statements.is_empty()
-            || self.commands.statements.last().unwrap().command != PPECommand::End
-        {
-            self.commands
-                .add_statement(&mut self.cur_offset, PPECommand::End);
+        if self.commands.statements.is_empty() || self.commands.statements.last().unwrap().command != PPECommand::End {
+            self.commands.add_statement(&mut self.cur_offset, PPECommand::End);
         }
 
         self.compile_functions(&prg);
@@ -133,59 +127,35 @@ impl PPECompiler {
         for imp in &prg.nodes {
             match imp {
                 AstNode::Procedure(proc) => {
-                    let Some(idx) = self
-                        .lookup_table
-                        .lookup_variable_index(proc.get_identifier())
-                    else {
+                    let Some(idx) = self.lookup_table.lookup_variable_index(proc.get_identifier()) else {
                         // unused procedure
                         continue;
                     };
-                    self.lookup_table
-                        .variable_table
-                        .get_var_entry_mut(idx)
-                        .value
-                        .data
-                        .procedure_value
-                        .start_offset = self.cur_offset as u16 * 2;
+                    self.lookup_table.variable_table.get_var_entry_mut(idx).value.data.procedure_value.start_offset = self.cur_offset as u16 * 2;
 
-                    self.lookup_table
-                        .start_compile_function_body(proc.get_identifier());
+                    self.lookup_table.start_compile_function_body(proc.get_identifier());
                     proc.get_statements().iter().for_each(|s| {
                         self.compile_add_statement(s);
                     });
                     self.lookup_table.end_compile_function_body();
 
-                    self.commands
-                        .add_statement(&mut self.cur_offset, PPECommand::EndProc);
-                    self.commands
-                        .add_statement(&mut self.cur_offset, PPECommand::End);
+                    self.commands.add_statement(&mut self.cur_offset, PPECommand::EndProc);
+                    self.commands.add_statement(&mut self.cur_offset, PPECommand::End);
                 }
                 AstNode::Function(func) => {
-                    let Some(idx) = self
-                        .lookup_table
-                        .lookup_variable_index(func.get_identifier())
-                    else {
+                    let Some(idx) = self.lookup_table.lookup_variable_index(func.get_identifier()) else {
                         // unused function
                         continue;
                     };
-                    self.lookup_table
-                        .variable_table
-                        .get_var_entry_mut(idx)
-                        .value
-                        .data
-                        .function_value
-                        .start_offset = self.cur_offset as u16 * 2;
-                    self.lookup_table
-                        .start_compile_function_body(func.get_identifier());
+                    self.lookup_table.variable_table.get_var_entry_mut(idx).value.data.function_value.start_offset = self.cur_offset as u16 * 2;
+                    self.lookup_table.start_compile_function_body(func.get_identifier());
                     func.get_statements().iter().for_each(|s| {
                         self.compile_add_statement(s);
                     });
                     self.lookup_table.end_compile_function_body();
 
-                    self.commands
-                        .add_statement(&mut self.cur_offset, PPECommand::EndFunc);
-                    self.commands
-                        .add_statement(&mut self.cur_offset, PPECommand::End);
+                    self.commands.add_statement(&mut self.cur_offset, PPECommand::EndFunc);
+                    self.commands.add_statement(&mut self.cur_offset, PPECommand::End);
                 }
                 _ => {}
             }
@@ -208,12 +178,8 @@ impl PPECompiler {
         match s {
             Statement::Comment(_) | Statement::VariableDeclaration(_) => None,
             Statement::Return(_) => Some(PPECommand::Return),
-            Statement::Gosub(gosub_stmt) => Some(PPECommand::Gosub(
-                self.get_label_index(gosub_stmt.get_label()),
-            )),
-            Statement::Goto(goto_stmt) => Some(PPECommand::Goto(
-                self.get_label_index(goto_stmt.get_label()),
-            )),
+            Statement::Gosub(gosub_stmt) => Some(PPECommand::Gosub(self.get_label_index(gosub_stmt.get_label()))),
+            Statement::Goto(goto_stmt) => Some(PPECommand::Goto(self.get_label_index(goto_stmt.get_label()))),
             Statement::Label(label) => {
                 self.set_label_offset(label.get_label_token());
                 None
@@ -223,13 +189,8 @@ impl PPECompiler {
                     panic!("Invalid if statement without goto.");
                 };
 
-                let cond_buffer = self
-                    .comp_expr(if_stmt.get_condition())
-                    .visit_mut(&mut ExpressionNegator::default());
-                Some(PPECommand::IfNot(
-                    Box::new(cond_buffer),
-                    self.get_label_index(goto_stmt.get_label()),
-                ))
+                let cond_buffer = self.comp_expr(if_stmt.get_condition()).visit_mut(&mut ExpressionNegator::default());
+                Some(PPECommand::IfNot(Box::new(cond_buffer), self.get_label_index(goto_stmt.get_label())))
             }
 
             Statement::Let(let_smt) => {
@@ -284,10 +245,7 @@ impl PPECompiler {
             }
             Statement::Call(call_stmt) => {
                 let Some(decl_idx) = self.lookup_variable_index(call_stmt.get_identifier()) else {
-                    log::error!(
-                        "Procedure not found: {}",
-                        call_stmt.get_identifier().to_string()
-                    );
+                    log::error!("Procedure not found: {}", call_stmt.get_identifier().to_string());
                     return None;
                 };
                 let mut arguments = Vec::new();
@@ -296,28 +254,16 @@ impl PPECompiler {
                     arguments.push(expr_buffer);
                 }
 
-                let decl = self
-                    .lookup_table
-                    .variable_table
-                    .get_var_entry(decl_idx)
-                    .clone();
+                let decl = self.lookup_table.variable_table.get_var_entry(decl_idx).clone();
                 if decl.header.variable_type == VariableType::Procedure {
                     let len = unsafe { decl.value.data.procedure_value.parameters as usize };
-                    if !Self::check_arg_count(
-                        len,
-                        arguments.len(),
-                        call_stmt.get_identifier_token(),
-                    ) {
+                    if !Self::check_arg_count(len, arguments.len(), call_stmt.get_identifier_token()) {
                         return None;
                     }
                     Some(PPECommand::ProcedureCall(decl.header.id, arguments))
                 } else if decl.header.variable_type == VariableType::Function {
                     let len = unsafe { decl.value.data.function_value.parameters as usize };
-                    if !Self::check_arg_count(
-                        len,
-                        arguments.len(),
-                        call_stmt.get_identifier_token(),
-                    ) {
+                    if !Self::check_arg_count(len, arguments.len(), call_stmt.get_identifier_token()) {
                         return None;
                     }
 
@@ -341,11 +287,7 @@ impl PPECompiler {
         }
     }
 
-    fn check_arg_count(
-        arg_count_expected: usize,
-        arg_count: usize,
-        identifier_token: &Spanned<Token>,
-    ) -> bool {
+    fn check_arg_count(arg_count_expected: usize, arg_count: usize, identifier_token: &Spanned<Token>) -> bool {
         if arg_count_expected != arg_count {
             log::error!(
                 "Invalid number of parameters for {}: expected {}, got {}",

@@ -7,10 +7,7 @@ use crate::{
     executable::{OpCode, FUNCTION_DEFINITIONS, STATEMENT_DEFINITIONS},
 };
 
-use super::{
-    Executable, FuncOpCode, PPECommand, PPEExpr, StatementSignature, VariableType, VariableValue,
-    LAST_STMT,
-};
+use super::{Executable, FuncOpCode, PPECommand, PPEExpr, StatementSignature, VariableType, VariableValue, LAST_STMT};
 
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum DeserializationErrorType {
@@ -84,10 +81,7 @@ impl PPEDeserializer {
     /// This function will return an error if .
     /// # Panics
     ///
-    pub fn deserialize_statement(
-        &mut self,
-        executable: &Executable,
-    ) -> Result<Option<PPECommand>, DeserializationErrorType> {
+    pub fn deserialize_statement(&mut self, executable: &Executable) -> Result<Option<PPECommand>, DeserializationErrorType> {
         self.stmt_offset = self.offset;
         if self.offset >= executable.script_buffer.len() {
             return Ok(None);
@@ -149,10 +143,7 @@ impl PPEDeserializer {
                 };
 
                 if var.value.vtype != VariableType::Procedure {
-                    return Err(DeserializationErrorType::CalledNonProcedureInPCall(
-                        proc_id,
-                        var.value.clone(),
-                    ));
+                    return Err(DeserializationErrorType::CalledNonProcedureInPCall(proc_id, var.value.clone()));
                 }
 
                 let argument_count = unsafe { var.value.data.procedure_value.parameters };
@@ -176,10 +167,7 @@ impl PPEDeserializer {
                 }
 
                 let (var_idx, argument_count) = match def.sig {
-                    crate::executable::StatementSignature::ArgumentsWithVariable(
-                        var_idx,
-                        argument_count,
-                    ) => (var_idx, argument_count),
+                    crate::executable::StatementSignature::ArgumentsWithVariable(var_idx, argument_count) => (var_idx, argument_count),
                     crate::executable::StatementSignature::VariableArguments(var_idx) => {
                         let argument_count = executable.script_buffer[self.offset];
                         assert!(argument_count >= 0, "negative argument count");
@@ -188,8 +176,7 @@ impl PPEDeserializer {
                         let mut arguments = Vec::new();
                         for i in 0..argument_count {
                             let expr = if i + 1 == var_idx as i16 {
-                                let expr =
-                                    PPEExpr::Value(executable.script_buffer[self.offset] as usize);
+                                let expr = PPEExpr::Value(executable.script_buffer[self.offset] as usize);
                                 self.offset += 1;
                                 expr
                             } else {
@@ -269,10 +256,7 @@ impl PPEDeserializer {
     /// # Errors
     ///
     /// This function will return an error if .
-    pub fn deserialize_expression(
-        &mut self,
-        executable: &Executable,
-    ) -> Result<Option<PPEExpr>, DeserializationErrorType> {
+    pub fn deserialize_expression(&mut self, executable: &Executable) -> Result<Option<PPEExpr>, DeserializationErrorType> {
         self.expr_offset = self.offset;
 
         loop {
@@ -294,12 +278,7 @@ impl PPEDeserializer {
                 match val.vtype {
                     VariableType::Function => unsafe {
                         self.offset += 2;
-                        let parameters = executable
-                            .variable_table
-                            .get_value(id)
-                            .data
-                            .function_value
-                            .parameters;
+                        let parameters = executable.variable_table.get_value(id).data.function_value.parameters;
                         let mut arguments = Vec::new();
                         for _ in 0..parameters {
                             if let Some(expr) = self.deserialize_expression(executable)? {
@@ -311,9 +290,7 @@ impl PPEDeserializer {
                     },
                     VariableType::Procedure => {
                         self.offset += 1;
-                        return Err(DeserializationErrorType::GotProcedureCallInExpression(
-                            id as i16,
-                        ));
+                        return Err(DeserializationErrorType::GotProcedureCallInExpression(id as i16));
                     }
                     _ => {}
                 }
@@ -340,9 +317,7 @@ impl PPEDeserializer {
                         } else {
                             // Some obfuscators try to trick the decompiler by using invalid unary expressions with 0 arguments
                             // PCBoard will just skip these
-                            self.report_bug(
-                                DeserializationErrorType::TooFewArgumentsForUnaryExpression(op),
-                            );
+                            self.report_bug(DeserializationErrorType::TooFewArgumentsForUnaryExpression(op));
                             return self.deserialize_expression(executable);
                         }
                     }
@@ -350,25 +325,17 @@ impl PPEDeserializer {
                         self.offset += 1;
                         let binop = BinOp::from_opcode(func_def.opcode);
                         if self.expr_stack.is_empty() {
-                            self.report_bug(DeserializationErrorType::BinaryExpressionStackEmpty(
-                                binop,
-                            ));
+                            self.report_bug(DeserializationErrorType::BinaryExpressionStackEmpty(binop));
                             return Ok(None);
                         }
                         let r_value = self.pop_expr().unwrap();
                         if self.expr_stack.is_empty() {
-                            self.report_bug(DeserializationErrorType::OnlyOneArgumentForBinop(
-                                binop,
-                            ));
+                            self.report_bug(DeserializationErrorType::OnlyOneArgumentForBinop(binop));
                             self.push_expr(r_value);
                         } else {
                             let l_value = self.pop_expr().unwrap();
 
-                            self.push_expr(PPEExpr::BinaryExpression(
-                                binop,
-                                Box::new(l_value),
-                                Box::new(r_value),
-                            ));
+                            self.push_expr(PPEExpr::BinaryExpression(binop, Box::new(l_value), Box::new(r_value)));
                         }
                     }
                     _ => {
@@ -383,10 +350,7 @@ impl PPEDeserializer {
                                     self.expr_stack.len(),
                                 ));
                             }
-                            let arguments = self
-                                .expr_stack
-                                .drain(self.expr_stack.len() - func_def.args as usize..)
-                                .collect();
+                            let arguments = self.expr_stack.drain(self.expr_stack.len() - func_def.args as usize..).collect();
                             self.push_expr(PPEExpr::PredefinedFunctionCall(func_def, arguments));
                         }
                     }
@@ -425,9 +389,7 @@ impl PPEDeserializer {
         }
         let dim = executable.script_buffer[self.offset];
         if !(0..=3).contains(&dim) {
-            self.report_bug(DeserializationErrorType::InvalidDimensonizedExpression(
-                id, dim,
-            ));
+            self.report_bug(DeserializationErrorType::InvalidDimensonizedExpression(id, dim));
             return None;
         }
         self.offset += 1;
@@ -443,10 +405,7 @@ impl PPEDeserializer {
             self.report_bug(DeserializationErrorType::InvalidExpressionStackState);
             return None;
         }
-        let dims = self
-            .expr_stack
-            .drain(self.expr_stack.len() - dim as usize..)
-            .collect();
+        let dims = self.expr_stack.drain(self.expr_stack.len() - dim as usize..).collect();
         Some(PPEExpr::Dim(id as usize, dims))
     }
 }

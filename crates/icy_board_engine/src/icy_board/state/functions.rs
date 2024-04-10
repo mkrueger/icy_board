@@ -126,12 +126,7 @@ impl PPECall {
 
 impl IcyBoardState {
     pub fn display_text(&mut self, message_number: IceText, display_flags: i32) -> Res<()> {
-        let txt_entry = self
-            .board
-            .lock()
-            .unwrap()
-            .display_text
-            .get_display_text(message_number)?;
+        let txt_entry = self.board.lock().unwrap().display_text.get_display_text(message_number)?;
         let color = if txt_entry.style == IcbTextStyle::Plain {
             self.caret.get_attribute().as_u8(IceMode::Blink).into()
         } else {
@@ -204,11 +199,7 @@ impl IcyBoardState {
     }
 
     pub fn display_menu<P: AsRef<Path>>(&mut self, file_name: &P) -> Res<bool> {
-        let resolved_name_ppe = self
-            .board
-            .lock()
-            .unwrap()
-            .resolve_file(&(file_name.as_ref().with_extension("PPE")));
+        let resolved_name_ppe = self.board.lock().unwrap().resolve_file(&(file_name.as_ref().with_extension("PPE")));
         let path = PathBuf::from(resolved_name_ppe);
         if path.exists() {
             self.run_ppe(&path, None)?;
@@ -223,10 +214,7 @@ impl IcyBoardState {
         let Ok(content) = fs::read(resolved_name) else {
             self.bell()?;
             self.set_color(pcb_colors::RED)?;
-            self.print(
-                TerminalTarget::Both,
-                &format!("\r\n({}) is missing!\r\n\r\n", file_name.as_ref().display()),
-            )?;
+            self.print(TerminalTarget::Both, &format!("\r\n({}) is missing!\r\n\r\n", file_name.as_ref().display()))?;
             return Ok(true);
         };
         let converted_content = if content.starts_with(&UTF8_BOM) {
@@ -255,40 +243,13 @@ impl IcyBoardState {
         Ok(true)
     }
 
-    pub fn input_field(
-        &mut self,
-        message_number: IceText,
-        len: i32,
-        valid_mask: &str,
-        help: &str,
-        display_flags: i32,
-    ) -> Res<String> {
-        let txt_entry = self
-            .board
-            .lock()
-            .unwrap()
-            .display_text
-            .get_display_text(message_number)?;
+    pub fn input_field(&mut self, message_number: IceText, len: i32, valid_mask: &str, help: &str, display_flags: i32) -> Res<String> {
+        let txt_entry = self.board.lock().unwrap().display_text.get_display_text(message_number)?;
 
-        self.input_string(
-            txt_entry.style.to_color(),
-            txt_entry.text,
-            len,
-            valid_mask,
-            help,
-            display_flags,
-        )
+        self.input_string(txt_entry.style.to_color(), txt_entry.text, len, valid_mask, help, display_flags)
     }
 
-    pub fn input_string(
-        &mut self,
-        color: IcbColor,
-        prompt: String,
-        len: i32,
-        valid_mask: &str,
-        help: &str,
-        display_flags: i32,
-    ) -> Res<String> {
+    pub fn input_string(&mut self, color: IcbColor, prompt: String, len: i32, valid_mask: &str, help: &str, display_flags: i32) -> Res<String> {
         self.session.num_lines_printed = 0;
 
         let mut prompt = prompt;
@@ -339,21 +300,13 @@ impl IcyBoardState {
                 if !help.is_empty() {
                     if let Some(cmd) = self.try_find_command(&output) {
                         if cmd.command_type == CommandType::Help {
-                            let help_loc =
-                                self.board.lock().unwrap().config.paths.help_path.clone();
+                            let help_loc = self.board.lock().unwrap().config.paths.help_path.clone();
                             let help_loc = help_loc.join(help);
                             let am = self.session.disable_auto_more;
                             self.session.disable_auto_more = false;
                             self.display_file(&help_loc)?;
                             self.session.disable_auto_more = am;
-                            return self.input_string(
-                                color,
-                                prompt,
-                                len,
-                                valid_mask,
-                                help,
-                                display_flags,
-                            );
+                            return self.input_string(color, prompt, len, valid_mask, help, display_flags);
                         }
                     }
                 }
@@ -392,11 +345,7 @@ impl IcyBoardState {
         Ok(output)
     }
 
-    pub fn check_password<F: Fn(&str) -> bool>(
-        &mut self,
-        ice_text: IceText,
-        call_back: F,
-    ) -> Res<bool> {
+    pub fn check_password<F: Fn(&str) -> bool>(&mut self, ice_text: IceText, call_back: F) -> Res<bool> {
         if call_back(&self.session.last_password) {
             return Ok(true);
         }
@@ -422,10 +371,7 @@ impl IcyBoardState {
         if let Some(user) = &mut self.current_user {
             user.stats.num_password_failures += 1;
         }
-        self.display_text(
-            IceText::PasswordFailure,
-            display_flags::NEWLINE | display_flags::LFAFTER,
-        )?;
+        self.display_text(IceText::PasswordFailure, display_flags::NEWLINE | display_flags::LFAFTER)?;
         Ok(false)
     }
 }

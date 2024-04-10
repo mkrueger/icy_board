@@ -33,10 +33,7 @@ fn test_compiler() {
         }
 
         let file_name = cur_entry.as_os_str();
-        println!(
-            "File: {}...",
-            cur_entry.file_name().unwrap().to_str().unwrap()
-        );
+        println!("File: {}...", cur_entry.file_name().unwrap().to_str().unwrap());
 
         let mut data = String::new();
         let mut expected = String::new();

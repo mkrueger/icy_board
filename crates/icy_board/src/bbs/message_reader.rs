@@ -124,94 +124,36 @@ impl MessageViewer {
         result
     }
 
-    pub fn display_header(
-        &self,
-        state: &mut IcyBoardState,
-        msg_base: &JamMessageBase,
-        header: &JamMessageHeader,
-    ) -> Res<()> {
+    pub fn display_header(&self, state: &mut IcyBoardState, msg_base: &JamMessageBase, header: &JamMessageHeader) -> Res<()> {
         state.clear_screen()?;
 
-        let c1 = state
-            .board
-            .lock()
-            .unwrap()
-            .config
-            .color_configuration
-            .msg_hdr_date
-            .clone();
+        let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_date.clone();
         state.set_color(c1)?;
-        let time = if let Some(dt) = chrono::DateTime::from_timestamp(header.date_written as i64, 0)
-        {
+        let time = if let Some(dt) = chrono::DateTime::from_timestamp(header.date_written as i64, 0) {
             dt.to_string()
         } else {
             String::new()
         };
-        let msg_counter = format!(
-            "{} {} {}",
-            header.message_number,
-            self.separator.text,
-            msg_base.active_messages()
-        );
+        let msg_counter = format!("{} {} {}", header.message_number, self.separator.text, msg_base.active_messages());
         let txt = self.format_hdr_text(&self.date_num.text, &time, &msg_counter);
         state.print(TerminalTarget::Both, &txt)?;
 
-        let c1 = state
-            .board
-            .lock()
-            .unwrap()
-            .config
-            .color_configuration
-            .msg_hdr_to
-            .clone();
+        let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_to.clone();
         state.set_color(c1)?;
-        let txt = self.format_hdr_text(
-            &self.to_line.text,
-            &header.get_to().unwrap().to_string(),
-            "",
-        );
+        let txt = self.format_hdr_text(&self.to_line.text, &header.get_to().unwrap().to_string(), "");
         state.print(TerminalTarget::Both, &txt)?;
 
-        let c1 = state
-            .board
-            .lock()
-            .unwrap()
-            .config
-            .color_configuration
-            .msg_hdr_from
-            .clone();
+        let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_from.clone();
         state.set_color(c1)?;
-        let txt = self.format_hdr_text(
-            &self.from_line.text,
-            &header.get_from().unwrap().to_string(),
-            "",
-        );
+        let txt = self.format_hdr_text(&self.from_line.text, &header.get_from().unwrap().to_string(), "");
         state.print(TerminalTarget::Both, &txt)?;
 
-        let c1 = state
-            .board
-            .lock()
-            .unwrap()
-            .config
-            .color_configuration
-            .msg_hdr_subj
-            .clone();
+        let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_subj.clone();
         state.set_color(c1)?;
-        let txt = self.format_hdr_text(
-            &self.subj_line.text,
-            &header.get_subject().unwrap().to_string(),
-            "",
-        );
+        let txt = self.format_hdr_text(&self.subj_line.text, &header.get_subject().unwrap().to_string(), "");
         state.print(TerminalTarget::Both, &txt)?;
 
-        let c1 = state
-            .board
-            .lock()
-            .unwrap()
-            .config
-            .color_configuration
-            .msg_hdr_read
-            .clone();
+        let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_read.clone();
         state.set_color(c1)?;
         /*        let txt = self.format_hdr_text(&self.read.text, "", "");
                 state.print(TerminalTarget::Both, &txt)?;
@@ -238,12 +180,7 @@ impl PcbBoardCommand {
         let viewer = MessageViewer::load(&self.state.board.lock().unwrap().display_text)?;
 
         let message_base_file = &self.state.session.current_conference.message_areas[0].filename;
-        let msgbase_file_resolved = self
-            .state
-            .board
-            .lock()
-            .unwrap()
-            .resolve_file(message_base_file);
+        let msgbase_file_resolved = self.state.board.lock().unwrap().resolve_file(message_base_file);
 
         match JamMessageBase::open(&msgbase_file_resolved) {
             Ok(message_base) => {
@@ -253,11 +190,7 @@ impl PcbBoardCommand {
                     } else {
                         IceText::MessageReadCommand
                     };
-                    self.state.session.op_text = format!(
-                        "{}-{}",
-                        message_base.base_messagenumber(),
-                        message_base.active_messages()
-                    );
+                    self.state.session.op_text = format!("{}-{}", message_base.base_messagenumber(), message_base.active_messages());
 
                     let text = self.state.input_field(
                         prompt,
@@ -281,20 +214,16 @@ impl PcbBoardCommand {
             Err(err) => {
                 log::error!("Message index load error {}", err);
                 log::error!("Creating new message index at {}", &msgbase_file_resolved);
-                self.state.display_text(
-                    IceText::CreatingNewMessageIndex,
-                    display_flags::NEWLINE | display_flags::LFAFTER,
-                )?;
+                self.state
+                    .display_text(IceText::CreatingNewMessageIndex, display_flags::NEWLINE | display_flags::LFAFTER)?;
                 if JamMessageBase::create(msgbase_file_resolved).is_ok() {
                     log::error!("successfully created new message index.");
                     return self.read_messages(action);
                 }
                 log::error!("failed to create message index.");
 
-                self.state.display_text(
-                    IceText::PathErrorInSystemConfiguration,
-                    display_flags::NEWLINE | display_flags::LFAFTER,
-                )?;
+                self.state
+                    .display_text(IceText::PathErrorInSystemConfiguration, display_flags::NEWLINE | display_flags::LFAFTER)?;
 
                 self.state.press_enter()?;
                 self.display_menu = true;
@@ -303,12 +232,7 @@ impl PcbBoardCommand {
         }
     }
 
-    fn read_message_number(
-        &mut self,
-        message_base: &JamMessageBase,
-        viewer: &MessageViewer,
-        number: u32,
-    ) -> Res<()> {
+    fn read_message_number(&mut self, message_base: &JamMessageBase, viewer: &MessageViewer, number: u32) -> Res<()> {
         if number == 0 {
             return Ok(());
         }
@@ -319,12 +243,7 @@ impl PcbBoardCommand {
                     viewer.display_header(&mut self.state, message_base, &header)?;
 
                     if header.needs_password() {
-                        if self
-                            .state
-                            .check_password(IceText::PasswordToReadMessage, |pwd| {
-                                header.is_password_valid(pwd)
-                            })?
-                        {
+                        if self.state.check_password(IceText::PasswordToReadMessage, |pwd| header.is_password_valid(pwd))? {
                             viewer.display_body(&mut self.state, &text)?;
                         }
                     } else {
@@ -334,10 +253,7 @@ impl PcbBoardCommand {
                 }
                 Err(err) => {
                     log::error!("Error reading message header: {}", err);
-                    self.state.display_text(
-                        IceText::NoMailFound,
-                        display_flags::NEWLINE | display_flags::LFAFTER,
-                    )?;
+                    self.state.display_text(IceText::NoMailFound, display_flags::NEWLINE | display_flags::LFAFTER)?;
                 }
             }
             let prompt = if self.state.session.expert_mode {

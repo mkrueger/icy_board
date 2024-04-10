@@ -24,9 +24,7 @@ impl Output {
             if let Event::Key(key_evt) = r {
                 match key_evt.code {
                     KeyCode::Char(c) => {
-                        if (c == 'x' || c == 'c')
-                            && key_evt.modifiers.contains(KeyModifiers::CONTROL)
-                        {
+                        if (c == 'x' || c == 'c') && key_evt.modifiers.contains(KeyModifiers::CONTROL) {
                             let _ = disable_raw_mode();
                             panic!("Ctrl-X or Ctrl-C pressed");
                         }

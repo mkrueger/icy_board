@@ -5,10 +5,7 @@ use crate::{
     parser::lexer::{CommentType, Spanned, Token},
 };
 
-use super::{
-    AstVisitor, AstVisitorMut, Constant, ConstantExpression, Expression, UnaryExpression, UnaryOp,
-    VariableDeclarationStatement, VariableSpecifier,
-};
+use super::{AstVisitor, AstVisitorMut, Constant, ConstantExpression, Expression, UnaryExpression, UnaryOp, VariableDeclarationStatement, VariableSpecifier};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
@@ -91,11 +88,13 @@ impl Statement {
     pub fn is_similar(&self, check: &Statement) -> bool {
         match (self, check) {
             (Statement::Comment(c1), Statement::Comment(c2)) => c1.get_comment() == c2.get_comment(),
-            (Statement::Return(_), Statement::Return(_)) |
-            (Statement::Break(_), Statement::Break(_)) |
-            (Statement::Continue(_), Statement::Continue(_)) => true,
+            (Statement::Return(_), Statement::Return(_)) | (Statement::Break(_), Statement::Break(_)) | (Statement::Continue(_), Statement::Continue(_)) => {
+                true
+            }
 
-            (Statement::Block(_), Statement::Block(_)) => panic!("Not implemented PPL has no blocks, it's just used as a container for statements during compiling."),
+            (Statement::Block(_), Statement::Block(_)) => {
+                panic!("Not implemented PPL has no blocks, it's just used as a container for statements during compiling.")
+            }
 
             (Statement::If(i1), Statement::If(i2)) => i1.get_condition().is_similar(i2.get_condition()) && i1.get_statement().is_similar(i2.get_statement()),
             (Statement::IfThen(i1), Statement::IfThen(i2)) => {
@@ -175,9 +174,9 @@ impl Statement {
                 }
                 true
             }
-            (Statement::Let(l1), Statement::Let(l2)) =>
-                l1.get_identifier() == l2.get_identifier() &&
-                l1.get_value_expression().is_similar(l2.get_value_expression()),
+            (Statement::Let(l1), Statement::Let(l2)) => {
+                l1.get_identifier() == l2.get_identifier() && l1.get_value_expression().is_similar(l2.get_value_expression())
+            }
             (Statement::Goto(g1), Statement::Goto(g2)) => g1.get_label() == g2.get_label(),
             (Statement::Gosub(g1), Statement::Gosub(g2)) => g1.get_label() == g2.get_label(),
             (Statement::Label(g1), Statement::Label(g2)) => g1.get_label() == g2.get_label(),
@@ -208,7 +207,7 @@ impl Statement {
                     }
                 }
                 true
-            },
+            }
             (Statement::VariableDeclaration(v1), Statement::VariableDeclaration(v2)) => {
                 if v1.get_variable_type() != v2.get_variable_type() {
                     return false;
@@ -254,10 +253,7 @@ impl CommentAstNode {
 
     pub fn empty(comment: impl Into<String>) -> Self {
         Self {
-            comment_token: Spanned::create_empty(Token::Comment(
-                CommentType::SingleLineSemicolon,
-                comment.into(),
-            )),
+            comment_token: Spanned::create_empty(Token::Comment(CommentType::SingleLineSemicolon, comment.into())),
         }
     }
 
@@ -405,11 +401,7 @@ pub struct BlockStatement {
 }
 
 impl BlockStatement {
-    pub fn new(
-        begin_token: Spanned<Token>,
-        statements: Vec<Statement>,
-        end_token: Spanned<Token>,
-    ) -> Self {
+    pub fn new(begin_token: Spanned<Token>, statements: Vec<Statement>, end_token: Spanned<Token>) -> Self {
         Self {
             begin_token,
             statements,
@@ -419,13 +411,9 @@ impl BlockStatement {
 
     pub fn empty(statements: Vec<Statement>) -> Self {
         Self {
-            begin_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(
-                "BEGIN".to_string(),
-            ))),
+            begin_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new("BEGIN".to_string()))),
             statements,
-            end_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(
-                "END".to_string(),
-            ))),
+            end_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new("END".to_string()))),
         }
     }
 
@@ -460,13 +448,7 @@ pub struct IfStatement {
 }
 
 impl IfStatement {
-    pub fn new(
-        if_token: Spanned<Token>,
-        leftpar_token: Spanned<Token>,
-        condition: Expression,
-        rightpar_token: Spanned<Token>,
-        statement: Statement,
-    ) -> Self {
+    pub fn new(if_token: Spanned<Token>, leftpar_token: Spanned<Token>, condition: Expression, rightpar_token: Spanned<Token>, statement: Statement) -> Self {
         Self {
             if_token,
             leftpar_token,
@@ -608,10 +590,7 @@ pub struct ElseBlock {
 
 impl ElseBlock {
     pub fn new(else_token: Spanned<Token>, statements: Vec<Statement>) -> Self {
-        Self {
-            else_token,
-            statements,
-        }
+        Self { else_token, statements }
     }
 
     pub fn empty(statements: Vec<Statement>) -> Self {
@@ -730,20 +709,13 @@ impl IfThenStatement {
         &self.endif_token
     }
 
-    pub fn empty(
-        condition: Expression,
-        statements: Vec<Statement>,
-        else_if_blocks: Vec<ElseIfBlock>,
-        else_block: Option<ElseBlock>,
-    ) -> Self {
+    pub fn empty(condition: Expression, statements: Vec<Statement>, else_if_blocks: Vec<ElseIfBlock>, else_block: Option<ElseBlock>) -> Self {
         Self {
             if_token: Spanned::create_empty(Token::If),
             leftpar_token: Spanned::create_empty(Token::LPar),
             condition: Box::new(condition),
             rightpar_token: Spanned::create_empty(Token::RPar),
-            then_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(
-                "THEN".to_string(),
-            ))),
+            then_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new("THEN".to_string()))),
             statements,
             else_if_blocks,
             else_block,
@@ -757,12 +729,7 @@ impl IfThenStatement {
         else_if_blocks: Vec<ElseIfBlock>,
         else_block: Option<ElseBlock>,
     ) -> Statement {
-        Statement::IfThen(IfThenStatement::empty(
-            condition,
-            statements,
-            else_if_blocks,
-            else_block,
-        ))
+        Statement::IfThen(IfThenStatement::empty(condition, statements, else_if_blocks, else_block))
     }
 }
 
@@ -872,9 +839,7 @@ impl WhileDoStatement {
             leftpar_token: Spanned::create_empty(Token::LPar),
             condition: Box::new(condition),
             rightpar_token: Spanned::create_empty(Token::RPar),
-            do_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(
-                "Do".to_string(),
-            ))),
+            do_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new("Do".to_string()))),
             statements,
             endwhile_token: Spanned::create_empty(Token::EndWhile),
         }
@@ -978,13 +943,11 @@ impl ForStatement {
             identifier_token: Spanned::create_empty(Token::Identifier(variable_name)),
             eq_token: Spanned::create_empty(Token::Eq),
             start_expr: Box::new(start_expr),
-            to_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(
-                "TO".to_string(),
-            ))),
+            to_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new("TO".to_string()))),
             end_expr: Box::new(end_expr),
-            step_token: step_expr.as_ref().map(|_| {
-                Spanned::create_empty(Token::Identifier(unicase::Ascii::new("Step".to_string())))
-            }),
+            step_token: step_expr
+                .as_ref()
+                .map(|_| Spanned::create_empty(Token::Identifier(unicase::Ascii::new("Step".to_string())))),
             step_expr,
             statements,
             next_token: Spanned::create_empty(Token::Next),
@@ -1093,13 +1056,7 @@ impl ForStatement {
         step_expr: Option<Box<Expression>>,
         statements: Vec<Statement>,
     ) -> Statement {
-        Statement::For(ForStatement::empty(
-            variable_name,
-            start_expr,
-            end_expr,
-            step_expr,
-            statements,
-        ))
+        Statement::For(ForStatement::empty(variable_name, start_expr, end_expr, step_expr, statements))
     }
 }
 
@@ -1112,9 +1069,7 @@ impl CaseSpecifier {
     fn is_similar(&self, i: &CaseSpecifier) -> bool {
         match (self, i) {
             (CaseSpecifier::Expression(e1), CaseSpecifier::Expression(e2)) => e1.is_similar(e2),
-            (CaseSpecifier::FromTo(f1, t1), CaseSpecifier::FromTo(f2, t2)) => {
-                f1.is_similar(f2) && t1.is_similar(t2)
-            }
+            (CaseSpecifier::FromTo(f1, t1), CaseSpecifier::FromTo(f2, t2)) => f1.is_similar(f2) && t1.is_similar(t2),
             _ => false,
         }
     }
@@ -1137,11 +1092,7 @@ pub struct CaseBlock {
 }
 
 impl CaseBlock {
-    pub fn new(
-        case_token: Spanned<Token>,
-        case_specifiers: Vec<CaseSpecifier>,
-        statements: Vec<Statement>,
-    ) -> Self {
+    pub fn new(case_token: Spanned<Token>, case_specifiers: Vec<CaseSpecifier>, statements: Vec<Statement>) -> Self {
         Self {
             case_token,
             case_specifiers,
@@ -1235,11 +1186,7 @@ impl SelectStatement {
         }
     }
 
-    pub fn empty(
-        expr: Expression,
-        case_blocks: Vec<CaseBlock>,
-        default_statements: Vec<Statement>,
-    ) -> Self {
+    pub fn empty(expr: Expression, case_blocks: Vec<CaseBlock>, default_statements: Vec<Statement>) -> Self {
         Self {
             select_token: Spanned::create_empty(Token::Select),
             case_token: Spanned::create_empty(Token::Case),
@@ -1248,9 +1195,7 @@ impl SelectStatement {
             default_token: if default_statements.is_empty() {
                 None
             } else {
-                Some(Spanned::create_empty(Token::Identifier(
-                    unicase::Ascii::new("DEFAULT".to_string()),
-                )))
+                Some(Spanned::create_empty(Token::Identifier(unicase::Ascii::new("DEFAULT".to_string()))))
             },
             default_statements,
             endselect_token: Spanned::create_empty(Token::EndSelect),
@@ -1300,16 +1245,8 @@ impl SelectStatement {
         &self.endselect_token
     }
 
-    pub fn create_empty_statement(
-        expr: Expression,
-        case_blocks: Vec<CaseBlock>,
-        default_statements: Vec<Statement>,
-    ) -> Statement {
-        Statement::Select(SelectStatement::empty(
-            expr,
-            case_blocks,
-            default_statements,
-        ))
+    pub fn create_empty_statement(expr: Expression, case_blocks: Vec<CaseBlock>, default_statements: Vec<Statement>) -> Statement {
+        Statement::Select(SelectStatement::empty(expr, case_blocks, default_statements))
     }
 }
 
@@ -1327,10 +1264,7 @@ impl GosubStatement {
                 span: label_token.span,
             };
         }
-        Self {
-            gosub_token,
-            label_token,
-        }
+        Self { gosub_token, label_token }
     }
 
     pub fn empty(label: unicase::Ascii<String>) -> Self {
@@ -1385,10 +1319,7 @@ impl GotoStatement {
                 span: label_token.span,
             };
         }
-        Self {
-            goto_token,
-            label_token,
-        }
+        Self { goto_token, label_token }
     }
 
     pub fn empty(label: unicase::Ascii<String>) -> Self {
@@ -1491,12 +1422,7 @@ pub struct ProcedureCallStatement {
 }
 
 impl ProcedureCallStatement {
-    pub fn new(
-        identifier_token: Spanned<Token>,
-        leftpar_token: Spanned<Token>,
-        arguments: Vec<Expression>,
-        rightpar_token: Spanned<Token>,
-    ) -> Self {
+    pub fn new(identifier_token: Spanned<Token>, leftpar_token: Spanned<Token>, arguments: Vec<Expression>, rightpar_token: Spanned<Token>) -> Self {
         Self {
             identifier_token,
             leftpar_token,
@@ -1551,10 +1477,7 @@ impl ProcedureCallStatement {
         }
     }
 
-    pub fn create_empty_statement(
-        identifier: unicase::Ascii<String>,
-        arguments: Vec<Expression>,
-    ) -> Statement {
+    pub fn create_empty_statement(identifier: unicase::Ascii<String>, arguments: Vec<Expression>) -> Statement {
         Statement::Call(ProcedureCallStatement::empty(identifier, arguments))
     }
 }
@@ -1567,11 +1490,7 @@ pub struct PredefinedCallStatement {
 }
 
 impl PredefinedCallStatement {
-    pub fn new(
-        identifier_token: Spanned<Token>,
-        func: &'static StatementDefinition,
-        arguments: Vec<Expression>,
-    ) -> Self {
+    pub fn new(identifier_token: Spanned<Token>, func: &'static StatementDefinition, arguments: Vec<Expression>) -> Self {
         Self {
             identifier_token,
             func,
@@ -1581,9 +1500,7 @@ impl PredefinedCallStatement {
 
     pub fn empty(func: &'static StatementDefinition, arguments: Vec<Expression>) -> Self {
         Self {
-            identifier_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(
-                func.name.to_string(),
-            ))),
+            identifier_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(func.name.to_string()))),
             func,
             arguments,
         }
@@ -1617,10 +1534,7 @@ impl PredefinedCallStatement {
         &mut self.arguments
     }
 
-    pub fn create_empty_statement(
-        func: &'static StatementDefinition,
-        arguments: Vec<Expression>,
-    ) -> Statement {
+    pub fn create_empty_statement(func: &'static StatementDefinition, arguments: Vec<Expression>) -> Statement {
         Statement::PredifinedCall(PredefinedCallStatement::empty(func, arguments))
     }
 }
@@ -1657,11 +1571,7 @@ impl LetStatement {
         }
     }
 
-    pub fn empty(
-        identifier: unicase::Ascii<String>,
-        arguments: Vec<Expression>,
-        value_expression: Expression,
-    ) -> Self {
+    pub fn empty(identifier: unicase::Ascii<String>, arguments: Vec<Expression>, value_expression: Expression) -> Self {
         Self {
             let_token: None,
             identifier_token: Spanned::create_empty(Token::Identifier(identifier)),
@@ -1726,11 +1636,7 @@ impl LetStatement {
     pub fn get_value_expression_mut(&mut self) -> &mut Expression {
         &mut self.value_expression
     }
-    pub fn create_empty_statement(
-        identifier: unicase::Ascii<String>,
-        arguments: Vec<Expression>,
-        value_expression: Expression,
-    ) -> Statement {
+    pub fn create_empty_statement(identifier: unicase::Ascii<String>, arguments: Vec<Expression>, value_expression: Expression) -> Statement {
         Statement::Let(LetStatement::empty(identifier, arguments, value_expression))
     }
 }
@@ -1778,9 +1684,7 @@ impl Statement {
 
     pub fn try_boolean_conversion(expr: &Expression) -> Expression {
         match expr {
-            Expression::Const(c) => ConstantExpression::create_empty_expression(Constant::Boolean(
-                c.get_constant_value().get_value().as_bool(),
-            )),
+            Expression::Const(c) => ConstantExpression::create_empty_expression(Constant::Boolean(c.get_constant_value().get_value().as_bool())),
             Expression::Parens(expr) => Statement::try_boolean_conversion(expr.get_expression()),
             Expression::Unary(un_expr) => {
                 if !matches!(un_expr.get_op(), UnaryOp::Not) {
@@ -1788,17 +1692,12 @@ impl Statement {
                 }
 
                 match un_expr.get_expression() {
-                    Expression::Const(c) => Expression::Const(ConstantExpression::empty(
-                        Constant::Boolean(!c.get_constant_value().get_value().as_bool()),
-                    )),
+                    Expression::Const(c) => Expression::Const(ConstantExpression::empty(Constant::Boolean(!c.get_constant_value().get_value().as_bool()))),
                     Expression::Unary(notexpr) => {
                         if matches!(notexpr.get_op(), UnaryOp::Not) {
                             return Statement::try_boolean_conversion(notexpr.get_expression());
                         }
-                        UnaryExpression::create_empty_expression(
-                            un_expr.get_op(),
-                            Statement::try_boolean_conversion(un_expr.get_expression()),
-                        )
+                        UnaryExpression::create_empty_expression(un_expr.get_op(), Statement::try_boolean_conversion(un_expr.get_expression()))
                     }
                     _ => expr.clone(),
                 }

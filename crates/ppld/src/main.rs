@@ -98,10 +98,7 @@ fn main() {
                             stdout()
                                 .execute(SetForegroundColor(Color::Red))
                                 .unwrap()
-                                .execute(Print(format!(
-                                    "Can't create {:?} on disk, reason: {}",
-                                    &out_file_name, err
-                                )))
+                                .execute(Print(format!("Can't create {:?} on disk, reason: {}", &out_file_name, err)))
                                 .unwrap()
                                 .execute(ResetColor)
                                 .unwrap()

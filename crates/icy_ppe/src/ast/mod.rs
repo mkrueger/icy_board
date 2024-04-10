@@ -74,9 +74,7 @@ impl AstNode {
     /// Panics if .
     pub fn is_similar(&self, check: &AstNode) -> bool {
         match (self, check) {
-            (AstNode::VariableDeclaration(s1), AstNode::VariableDeclaration(s2)) => {
-                s1.is_similar(s2)
-            }
+            (AstNode::VariableDeclaration(s1), AstNode::VariableDeclaration(s2)) => s1.is_similar(s2),
 
             (AstNode::FunctionDeclaration(f1), AstNode::FunctionDeclaration(f2)) => {
                 if f1.get_identifier() != f2.get_identifier() {
@@ -237,9 +235,7 @@ impl FunctionImplementation {
             leftpar_token: Spanned::create_empty(Token::LPar),
             parameters,
             rightpar_token: Spanned::create_empty(Token::RPar),
-            return_type_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(
-                return_type.to_string(),
-            ))),
+            return_type_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(return_type.to_string()))),
             return_type,
             statements,
             endfunc_token: Spanned::create_empty(Token::EndFunc),
@@ -386,12 +382,7 @@ impl ProcedureImplementation {
         }
     }
 
-    pub fn empty(
-        id: usize,
-        identifier: unicase::Ascii<String>,
-        parameters: Vec<ParameterSpecifier>,
-        statements: Vec<Statement>,
-    ) -> Self {
+    pub fn empty(id: usize, identifier: unicase::Ascii<String>, parameters: Vec<ParameterSpecifier>, statements: Vec<Statement>) -> Self {
         Self {
             id,
             procedure_token: Spanned::create_empty(Token::Procedure),

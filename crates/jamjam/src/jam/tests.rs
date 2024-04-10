@@ -32,10 +32,7 @@ fn test_get_text() {
     let base = JamMessageBase::open("data/jam/general").unwrap();
     let header = base.read_header(4).unwrap();
     let txt = base.read_msg_text(&header).unwrap();
-    assert_eq!(
-        txt,
-        "private message\r\r... Multitasking: Reading in the bathroom\r"
-    );
+    assert_eq!(txt, "private message\r\r... Multitasking: Reading in the bathroom\r");
 }
 
 #[test]
