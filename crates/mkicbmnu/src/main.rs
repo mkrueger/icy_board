@@ -3,12 +3,19 @@ use clap::Parser;
 use color_eyre::Result;
 use icy_board_engine::icy_board::{menu::Menu, IcyBoardSerializer};
 use icy_board_tui::{get_text_args, print_error, term};
+use semver::Version;
 use std::{collections::HashMap, path::PathBuf, process::exit};
 
 mod app;
 
 mod tabs;
 pub use tabs::*;
+
+pub mod edit_command_dialog;
+
+lazy_static::lazy_static! {
+    static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
+}
 
 /// Make IcyBord Menus
 #[derive(clap::Parser)]

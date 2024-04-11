@@ -20,6 +20,8 @@ pub struct Theme {
     pub edit_value: Style,
 
     pub content_box: Style,
+
+    pub table_header: Style,
 }
 
 pub const THEME: Theme = Theme {
@@ -36,7 +38,7 @@ pub const THEME: Theme = Theme {
 
     content_box: Style::new().bg(DOS_BLACK).fg(DOS_DARKGRAY),
 
-    key_binding: Style::new().bg(DOS_DARKGRAY).fg(DOS_LIGHTGRAY),
+    key_binding: Style::new().bg(DOS_DARKGRAY).fg(DOS_LIGHT_GRAY),
     key_binding_description: Style::new().bg(DOS_BLACK).fg(DOS_DARKGRAY),
 
     status_line: Style::new().bg(DOS_BLACK).fg(DOS_CYAN),
@@ -46,18 +48,10 @@ pub const THEME: Theme = Theme {
 
     value: Style::new().bg(DOS_BLACK).fg(LIGHT_GRAY),
     edit_value: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
-    
+    table_header: Style::new().bg(DOS_BLUE).fg(DOS_WHITE),
 };
 
 const DARK_BLUE: Color = Color::Rgb(16, 24, 48);
-const LIGHT_BLUE: Color = Color::Rgb(64, 96, 192);
-const LIGHT_YELLOW: Color = Color::Rgb(192, 192, 96);
-const LIGHT_GREEN: Color = Color::Rgb(64, 192, 96);
-const LIGHT_RED: Color = Color::Rgb(192, 96, 96);
-const RED: Color = Color::Rgb(215, 0, 0);
-const BLACK: Color = Color::Rgb(8, 8, 8); // not really black, often #080808
-const DARK_GRAY: Color = Color::Rgb(68, 68, 68);
-const MID_GRAY: Color = Color::Rgb(128, 128, 128);
 const LIGHT_GRAY: Color = Color::Rgb(188, 188, 188);
 const WHITE: Color = Color::Rgb(238, 238, 238); // not really white, often #eeeeee
 
@@ -68,7 +62,7 @@ pub const DOS_CYAN: Color = Color::Rgb(0, 0xAA, 0xAA);
 pub const DOS_RED: Color = Color::Rgb(0xAA, 0, 0);
 pub const DOS_MAGENTA: Color = Color::Rgb(0xAA, 0, 0xAA);
 pub const DOS_BROWN: Color = Color::Rgb(0xAA, 0x55, 0);
-pub const DOS_LIGHTGRAY: Color = Color::Rgb(0xAA, 0xAA, 0xAA);
+pub const DOS_LIGHT_GRAY: Color = Color::Rgb(0xAA, 0xAA, 0xAA);
 
 pub const DOS_DARKGRAY: Color = Color::Rgb(0x55, 0x55, 0x55);
 pub const DOS_LIGHT_BLUE: Color = Color::Rgb(0x55, 0x55, 0xFF);

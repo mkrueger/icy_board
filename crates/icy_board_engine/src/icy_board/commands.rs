@@ -3,9 +3,10 @@ use serde::{Deserialize, Serialize};
 
 use super::{security::RequiredSecurity, IcyBoardSerializer, PCBoardRecordImporter};
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, Default)]
 pub enum CommandType {
     /// Do nothing
+    #[default]
     Disabled,
 
     /// If you have assigned a menu command to have this type,
@@ -118,9 +119,6 @@ pub enum CommandType {
     /// J command
     JoinConference,
 
-    /// New "I" command
-    MessageAreas,
-
     /// K command
     DeleteMessage,
 
@@ -210,9 +208,12 @@ pub enum CommandType {
     RestoreMessage,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Default)]
 pub struct Command {
-    pub input: Vec<String>,
+    pub display: String,
+    pub lighbar_display: String,
+
+    pub keyword: String,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -257,7 +258,9 @@ impl PCBoardRecordImporter<Command> for CommandList {
 
         let parameter = icy_ppe::tables::import_cp437_string(&data[16..56], true);
         Ok(Command {
-            input: vec![name],
+            keyword: name,
+            display: "".to_string(),
+            lighbar_display: "".to_string(),
             help: "".to_string(),
             command_type,
             parameter,

@@ -1,4 +1,6 @@
 pub mod about;
+use std::io;
+
 pub use about::*;
 
 pub mod general;
@@ -6,10 +8,14 @@ use crossterm::event::KeyEvent;
 pub use general::*;
 
 pub mod commands;
-use icy_board_engine::icy_board::menu::Menu;
 pub use commands::*;
 
-use ratatui::{buffer::Buffer, layout::Rect};
+use icy_board_tui::TerminalType;
+use ratatui::{
+    backend::{Backend, CrosstermBackend},
+    layout::Rect,
+    Frame, Terminal,
+};
 
 pub trait TabPage {
     fn prev_row(&mut self) {}
@@ -20,13 +26,17 @@ pub trait TabPage {
 
     fn next(&mut self) {}
 
-    fn render(&self, area: Rect, buf: &mut Buffer);
+    fn render(&mut self, frame: &mut Frame, area: Rect);
 
     fn handle_key_press(&mut self, _key: KeyEvent) -> Option<(u16, u16)> {
         None
     }
 
-    fn request_edit_mode(&mut self) -> Option<(u16, u16)> {
+    fn request_edit_mode(&mut self, terminal: &mut TerminalType) -> Option<(u16, u16)> {
         None
     }
+
+    fn insert(&mut self) {}
+
+    fn delete(&mut self) {}
 }

@@ -128,7 +128,9 @@ impl Menu {
             };
 
             res.commands.push(Command {
-                input: vec![keyword],
+                keyword,
+                display: "".to_string(),
+                lighbar_display: "".to_string(),
                 security: RequiredSecurity::new(security),
                 help: "".to_string(),
                 command_type: cmd_type,

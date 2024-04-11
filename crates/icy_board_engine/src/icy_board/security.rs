@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::state::Session;
 
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RequiredSecurity {
     level: u8,
     min_age: u8,

@@ -12,7 +12,7 @@ impl Widget for RgbSwatch {
             let value_fg = value / f32::from(area.height);
             let value_bg = (value - 0.5) / f32::from(area.height);
 
-            for (xi, x) in (area.left()..area.right()).enumerate() {
+            for (_xi, x) in (area.left()..area.right()).enumerate() {
                 let mut upper = Color::Rgb((64.0 * value_fg) as u8, (128.0 * value_fg) as u8, (255.0 * value_fg) as u8);
                 let lower = Color::Rgb((64.0 * value_fg) as u8, (128.0 * value_bg) as u8, (255.0 * value_bg) as u8);
 

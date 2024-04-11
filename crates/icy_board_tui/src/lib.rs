@@ -14,11 +14,14 @@ use i18n_embed::{
     DesktopLanguageRequester,
 };
 use i18n_embed_fl::fl;
+use ratatui::{backend::CrosstermBackend, Terminal};
 use rust_embed::RustEmbed;
 
 #[derive(RustEmbed)]
 #[folder = "i18n"] // path to the compiled localization resources
 struct Localizations;
+
+pub type TerminalType = Terminal<CrosstermBackend<std::io::Stdout>>;
 
 use once_cell::sync::Lazy;
 pub static LANGUAGE_LOADER: Lazy<FluentLanguageLoader> = Lazy::new(|| {

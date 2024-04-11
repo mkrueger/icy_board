@@ -445,7 +445,7 @@ impl PcbBoardCommand {
             let mut help_loc = self.state.board.lock().unwrap().config.paths.help_path.clone();
             let mut found = false;
             for action in &self.state.session.current_conference.commands {
-                if action.input.contains(&help_cmd) && !action.help.is_empty() {
+                if action.keyword.contains(&help_cmd) && !action.help.is_empty() {
                     help_loc = help_loc.join(&action.help);
                     found = true;
                     break;

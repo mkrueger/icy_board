@@ -13,6 +13,8 @@ use crossterm::{
 };
 use ratatui::prelude::*;
 
+use crate::TerminalType;
+
 pub fn init_hooks() -> Result<()> {
     let (panic, error) = HookBuilder::default().into_hooks();
     let panic = panic.into_panic_hook();
@@ -28,7 +30,7 @@ pub fn init_hooks() -> Result<()> {
     Ok(())
 }
 
-pub fn init() -> Result<Terminal<impl Backend>> {
+pub fn init() -> Result<TerminalType> {
     init_hooks()?;
 
     // this size is to match the size of the terminal when running the demo

@@ -1,10 +1,10 @@
-use std::{sync::Arc, time::Duration};
+use std::{io, sync::Arc, time::Duration};
 
 use chrono::{Local, Timelike};
 use color_eyre::{eyre::Context, Result};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use icy_board_engine::icy_board::menu::Menu;
-use icy_board_tui::{term::next_event, theme::THEME};
+use icy_board_tui::{term::next_event, theme::THEME, TerminalType};
 use itertools::Itertools;
 use ratatui::{prelude::*, widgets::*};
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
@@ -15,13 +15,12 @@ pub struct App {
     mode: Mode,
     tab: TabPageType,
 
-    mnu: Arc<Menu>,
     cursor: Option<(u16, u16)>,
 
     full_screen: bool,
 
     general_tab: GeneralTab,
-    keywords_tab: KeywordsTab,
+    command_tab: CommandsTab,
     about_tab: AboutTab,
 }
 
@@ -43,25 +42,25 @@ enum TabPageType {
 
 impl App {
     pub fn new(mnu: Menu, full_screen: bool) -> Self {
-        let mnu = Arc::new( mnu);
+        let mnu = Arc::new(mnu);
         let general_tab = GeneralTab::new(mnu.clone());
+        let command_tab = CommandsTab::new(mnu.clone());
         Self {
-            mnu,
             full_screen,
             general_tab,
             cursor: None,
             mode: Mode::default(),
             tab: TabPageType::General,
-            keywords_tab: KeywordsTab::default(),
-            about_tab: AboutTab::default()
+            command_tab,
+            about_tab: AboutTab::default(),
         }
     }
 
     /// Run the app until the user quits.
-    pub fn run(&mut self, terminal: &mut Terminal<impl Backend>) -> Result<()> {
+    pub fn run(&mut self, terminal: &mut TerminalType) -> Result<()> {
         while self.is_running() {
             self.draw(terminal)?;
-            self.handle_events()?;
+            self.handle_events(terminal)?;
         }
         Ok(())
     }
@@ -71,7 +70,7 @@ impl App {
     }
 
     /// Draw a single frame of the app.
-    fn draw(&self, terminal: &mut Terminal<impl Backend>) -> Result<()> {
+    fn draw(&mut self, terminal: &mut TerminalType) -> Result<()> {
         terminal
             .draw(|frame| {
                 let screen = if self.full_screen {
@@ -84,12 +83,11 @@ impl App {
                     let y = frame.size().y + (frame.size().height - height) / 2;
                     Rect::new(frame.size().x + x, frame.size().y + y, width, height)
                 };
-                frame.render_widget(self, screen);
-                
+                self.ui(frame, screen);
+
                 if let Some((x, y)) = self.cursor {
                     frame.set_cursor(x, y);
                 }
-
             })
             .wrap_err("terminal.draw")?;
         Ok(())
@@ -99,10 +97,10 @@ impl App {
     ///
     /// This function is called once per frame, The events are polled from the stdin with timeout of
     /// 1/50th of a second. This was chosen to try to match the default frame rate of a GIF in VHS.
-    fn handle_events(&mut self) -> Result<()> {
+    fn handle_events(&mut self, terminal: &mut TerminalType) -> Result<()> {
         let timeout = Duration::from_secs_f64(1.0 / 50.0);
         match next_event(timeout)? {
-            Some(Event::Key(key)) if key.kind == KeyEventKind::Press => self.handle_key_press(key),
+            Some(Event::Key(key)) if key.kind == KeyEventKind::Press => self.handle_key_press(terminal, key),
             _ => {}
         }
         Ok(())
@@ -111,21 +109,20 @@ impl App {
     fn get_tab(&self) -> &dyn TabPage {
         match self.tab {
             TabPageType::General => &self.general_tab,
-            TabPageType::Commands => &self.keywords_tab,
+            TabPageType::Commands => &self.command_tab,
             TabPageType::About => &self.about_tab,
         }
     }
-    
+
     fn get_tab_mut(&mut self) -> &mut dyn TabPage {
         match self.tab {
             TabPageType::General => &mut self.general_tab,
-            TabPageType::Commands => &mut self.keywords_tab,
+            TabPageType::Commands => &mut self.command_tab,
             TabPageType::About => &mut self.about_tab,
         }
     }
 
-    fn handle_key_press(&mut self, key: KeyEvent) {
-
+    fn handle_key_press(&mut self, terminal: &mut TerminalType, key: KeyEvent) {
         if self.mode == Mode::Edit {
             self.cursor = self.get_tab_mut().handle_key_press(key);
             if self.cursor.is_none() {
@@ -141,13 +138,15 @@ impl App {
             Char('l') | Right => self.next_tab(),
             Char('k') | Up => self.get_tab_mut().prev(),
             Char('j') | Down => self.get_tab_mut().next(),
+            Insert => self.get_tab_mut().insert(),
+            Delete => self.get_tab_mut().delete(),
             Char('d') | Enter => {
-                self.cursor = self.get_tab_mut().request_edit_mode();
+                self.cursor = self.get_tab_mut().request_edit_mode(terminal);
                 if self.cursor.is_some() {
                     self.mode = Mode::Edit;
                 }
-            },
-            
+            }
+
             _ => {}
         };
     }
@@ -160,28 +159,21 @@ impl App {
         self.tab = self.tab.next();
     }
 
-}
-
-/// Implement Widget for &App rather than for App as we would otherwise have to clone or copy the
-/// entire app state on every frame. For this example, the app state is small enough that it doesn't
-/// matter, but for larger apps this can be a significant performance improvement.
-impl Widget for &App {
-    fn render(self, area: Rect, buf: &mut Buffer) {
+    fn ui(&mut self, frame: &mut Frame, area: Rect) {
         let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1), Constraint::Length(1), Constraint::Length(1)]);
         let [title_bar, tab, key_bar, status_line] = vertical.areas(area);
 
-        Block::new().style(THEME.title_bar).render(area, buf);
-        self.render_title_bar(title_bar, buf);
-        self.render_selected_tab(tab, buf);
-        App::render_key_help_view(key_bar, buf);
-        App::render_status_line(status_line, buf);
+        Block::new().style(THEME.title_bar).render(area, frame.buffer_mut());
+        self.render_title_bar(title_bar, frame.buffer_mut());
+        self.render_selected_tab(frame, tab);
+        App::render_key_help_view(key_bar, frame.buffer_mut());
+        App::render_status_line(status_line, frame.buffer_mut());
     }
 }
 
 impl App {
     fn render_title_bar(&self, area: Rect, buf: &mut Buffer) {
-        
-        let len:u16 = TabPageType::iter().map(|p| TabPageType::title(p).len() as u16).sum();
+        let len: u16 = TabPageType::iter().map(|p| TabPageType::title(p).len() as u16).sum();
         let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(len)]);
         let [title, tabs] = layout.areas(area);
 
@@ -196,10 +188,9 @@ impl App {
             .render(tabs, buf);
     }
 
-    fn render_selected_tab(&self, area: Rect, buf: &mut Buffer) {
-        icy_board_tui::colors::RgbSwatch.render(area, buf);
-
-        self.get_tab().render(area, buf);
+    fn render_selected_tab(&mut self, frame: &mut Frame, area: Rect) {
+        icy_board_tui::colors::RgbSwatch.render(area, frame.buffer_mut());
+        self.get_tab_mut().render(frame, area);
     }
 
     fn render_key_help_view(area: Rect, buf: &mut Buffer) {
