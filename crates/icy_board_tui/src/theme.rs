@@ -16,6 +16,9 @@ pub struct Theme {
     pub item: Style,
     pub selected_item: Style,
 
+    pub value: Style,
+    pub edit_value: Style,
+
     pub content_box: Style,
 }
 
@@ -40,6 +43,10 @@ pub const THEME: Theme = Theme {
 
     item: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
     selected_item: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
+
+    value: Style::new().bg(DOS_BLACK).fg(LIGHT_GRAY),
+    edit_value: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
+    
 };
 
 const DARK_BLUE: Color = Color::Rgb(16, 24, 48);

@@ -1,6 +1,6 @@
 use ratatui::prelude::*;
 
-use crate::theme::{DOS_LIGHT_CYAN, THEME};
+use crate::theme::THEME;
 
 pub struct RgbSwatch;
 

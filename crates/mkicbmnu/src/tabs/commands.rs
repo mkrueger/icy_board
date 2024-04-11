@@ -7,5 +7,7 @@ use super::TabPage;
 pub struct KeywordsTab {}
 
 impl TabPage for KeywordsTab {
-    fn render(&self, mnu: &Menu, area: Rect, buf: &mut Buffer) {}
+    fn render(&self, area: Rect, buf: &mut Buffer) {
+
+    }
 }

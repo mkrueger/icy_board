@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use chrono::{Local, Timelike};
 use color_eyre::{eyre::Context, Result};
@@ -11,44 +11,49 @@ use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 
 use crate::tabs::*;
 
-#[derive(Default, Clone)]
 pub struct App {
     mode: Mode,
-    tab: Tab,
+    tab: TabPageType,
 
-    mnu: Menu,
+    mnu: Arc<Menu>,
+    cursor: Option<(u16, u16)>,
 
     full_screen: bool,
 
     general_tab: GeneralTab,
     keywords_tab: KeywordsTab,
-    prompts_tab: PromptsTab,
     about_tab: AboutTab,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 enum Mode {
     #[default]
-    Running,
-    Destroy,
+    Command,
+    Edit,
     Quit,
 }
 
 #[derive(Debug, Clone, Copy, Default, Display, EnumIter, FromRepr, PartialEq, Eq)]
-enum Tab {
+enum TabPageType {
     #[default]
     General,
-    Keywords,
-    Prompts,
+    Commands,
     About,
 }
 
 impl App {
     pub fn new(mnu: Menu, full_screen: bool) -> Self {
+        let mnu = Arc::new( mnu);
+        let general_tab = GeneralTab::new(mnu.clone());
         Self {
             mnu,
             full_screen,
-            ..Default::default()
+            general_tab,
+            cursor: None,
+            mode: Mode::default(),
+            tab: TabPageType::General,
+            keywords_tab: KeywordsTab::default(),
+            about_tab: AboutTab::default()
         }
     }
 
@@ -80,6 +85,11 @@ impl App {
                     Rect::new(frame.size().x + x, frame.size().y + y, width, height)
                 };
                 frame.render_widget(self, screen);
+                
+                if let Some((x, y)) = self.cursor {
+                    frame.set_cursor(x, y);
+                }
+
             })
             .wrap_err("terminal.draw")?;
         Ok(())
@@ -98,35 +108,48 @@ impl App {
         Ok(())
     }
 
+    fn get_tab(&self) -> &dyn TabPage {
+        match self.tab {
+            TabPageType::General => &self.general_tab,
+            TabPageType::Commands => &self.keywords_tab,
+            TabPageType::About => &self.about_tab,
+        }
+    }
+    
+    fn get_tab_mut(&mut self) -> &mut dyn TabPage {
+        match self.tab {
+            TabPageType::General => &mut self.general_tab,
+            TabPageType::Commands => &mut self.keywords_tab,
+            TabPageType::About => &mut self.about_tab,
+        }
+    }
+
     fn handle_key_press(&mut self, key: KeyEvent) {
+
+        if self.mode == Mode::Edit {
+            self.cursor = self.get_tab_mut().handle_key_press(key);
+            if self.cursor.is_none() {
+                self.mode = Mode::Command;
+            }
+            return;
+        }
+
         use KeyCode::*;
         match key.code {
             Char('q') | Esc => self.mode = Mode::Quit,
             Char('h') | Left => self.prev_tab(),
             Char('l') | Right => self.next_tab(),
-            Char('k') | Up => self.prev(),
-            Char('j') | Down => self.next(),
-            Char('d') | Delete => self.destroy(),
+            Char('k') | Up => self.get_tab_mut().prev(),
+            Char('j') | Down => self.get_tab_mut().next(),
+            Char('d') | Enter => {
+                self.cursor = self.get_tab_mut().request_edit_mode();
+                if self.cursor.is_some() {
+                    self.mode = Mode::Edit;
+                }
+            },
+            
             _ => {}
         };
-    }
-
-    fn prev(&mut self) {
-        match self.tab {
-            Tab::General => self.general_tab.prev(),
-            Tab::Keywords => self.keywords_tab.prev(),
-            Tab::Prompts => self.prompts_tab.prev(),
-            Tab::About => self.about_tab.prev(),
-        }
-    }
-
-    fn next(&mut self) {
-        match self.tab {
-            Tab::General => self.general_tab.next(),
-            Tab::Keywords => self.keywords_tab.next(),
-            Tab::Prompts => self.prompts_tab.next(),
-            Tab::About => self.about_tab.next(),
-        }
     }
 
     fn prev_tab(&mut self) {
@@ -137,9 +160,6 @@ impl App {
         self.tab = self.tab.next();
     }
 
-    fn destroy(&mut self) {
-        self.mode = Mode::Destroy;
-    }
 }
 
 /// Implement Widget for &App rather than for App as we would otherwise have to clone or copy the
@@ -160,11 +180,13 @@ impl Widget for &App {
 
 impl App {
     fn render_title_bar(&self, area: Rect, buf: &mut Buffer) {
-        let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(35)]);
+        
+        let len:u16 = TabPageType::iter().map(|p| TabPageType::title(p).len() as u16).sum();
+        let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(len)]);
         let [title, tabs] = layout.areas(area);
 
         Span::styled(" MNU File Editor", THEME.app_title).render(title, buf);
-        let titles = Tab::iter().map(Tab::title);
+        let titles = TabPageType::iter().map(TabPageType::title);
         Tabs::new(titles)
             .style(THEME.tabs)
             .highlight_style(THEME.tabs_selected)
@@ -177,12 +199,7 @@ impl App {
     fn render_selected_tab(&self, area: Rect, buf: &mut Buffer) {
         icy_board_tui::colors::RgbSwatch.render(area, buf);
 
-        match self.tab {
-            Tab::General => self.general_tab.render(&self.mnu, area, buf),
-            Tab::Keywords => self.keywords_tab.render(&self.mnu, area, buf),
-            Tab::Prompts => self.prompts_tab.render(&self.mnu, area, buf),
-            Tab::About => self.about_tab.render(&self.mnu, area, buf),
-        };
+        self.get_tab().render(area, buf);
     }
 
     fn render_key_help_view(area: Rect, buf: &mut Buffer) {
@@ -207,7 +224,7 @@ impl App {
     }
 }
 
-impl Tab {
+impl TabPageType {
     fn next(self) -> Self {
         let current_index = self as usize;
         let next_index = current_index.saturating_add(1);

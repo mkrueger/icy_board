@@ -1,8 +1,6 @@
 use app::App;
 use clap::Parser;
 use color_eyre::Result;
-use crossterm::execute;
-use i18n_embed_fl::fl;
 use icy_board_engine::icy_board::{menu::Menu, IcyBoardSerializer};
 use icy_board_tui::{get_text_args, print_error, term};
 use std::{collections::HashMap, path::PathBuf, process::exit};
@@ -44,7 +42,11 @@ fn main() -> Result<()> {
     }
 
     match Menu::load(&file) {
-        Ok(mnu) => {
+        Ok(mut mnu) => {
+            mnu.title = "Title Menu".to_string();
+            mnu.display_file = PathBuf::from("file.txt");
+            mnu.help_file = PathBuf::from("help.txt");
+            mnu.prompt = "Enter selection: ".to_string();
             let terminal = &mut term::init()?;
             App::new(mnu, arguments.full_screen).run(terminal)?;
             term::restore()?;

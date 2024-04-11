@@ -1,3 +1,3 @@
 max_width = 160
-use_small_heuristics = ""
+use_small_heuristics = "Default"
 use_field_init_shorthand = true
