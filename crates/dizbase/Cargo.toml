@@ -12,8 +12,9 @@ zip = "0.6"
 delharc = "0.6.0"
 unrar = "0.5.3"
 bstr = "1.9.1"
-icy_sauce = { git ="https://github.com/mkrueger/icy_sauce" }
-tempfile = "3.10.1"
+icy_sauce = { git ="https://github.com/mkrueger/icy_tools" }
+
+tempfile = "3.4.0"
 rayon = "1.10.0"
 walkdir = "2.3.1"
 

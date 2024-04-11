@@ -8,7 +8,7 @@ edition.workspace = true
 
 [dependencies]
 icy_ppe = { workspace = true }
-icy_engine = { git ="https://github.com/mkrueger/icy_engine" }
+icy_engine = { git ="https://github.com/mkrueger/icy_tools" }
 lazy_static = "1.4.0"
 thiserror = "1.0.57"
 log = "0.4.21"

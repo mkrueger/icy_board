@@ -10,7 +10,7 @@ icy_ppe = { workspace = true}
 icy_board_engine = { workspace = true}
 jamjam = { workspace = true}
 dizbase = { workspace = true}
-icy_engine = { git ="https://github.com/mkrueger/icy_engine" }
+icy_engine = { git ="https://github.com/mkrueger/icy_tools" }
 
 lazy_static = "1.4.0"
 clap = { version="4.5.2", features = ["derive"] }
