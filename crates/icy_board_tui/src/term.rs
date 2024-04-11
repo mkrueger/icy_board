@@ -28,17 +28,13 @@ pub fn init_hooks() -> Result<()> {
     Ok(())
 }
 
-pub fn init(full_screen: bool) -> Result<Terminal<impl Backend>> {
+pub fn init() -> Result<Terminal<impl Backend>> {
     init_hooks()?;
 
     // this size is to match the size of the terminal when running the demo
     // using vhs in a 1280x640 sized window (github social preview size)
     let options = TerminalOptions {
-        viewport: if full_screen {
-            Viewport::Fullscreen
-        } else {
-            Viewport::Fixed(Rect::new(0, 0, 80, 25))
-        },
+        viewport: Viewport::Fullscreen
     };
     let terminal = Terminal::with_options(CrosstermBackend::new(io::stdout()), options)?;
     enable_raw_mode().context("enable raw mode")?;

@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{arch::x86_64, time::Duration};
 
 use color_eyre::{eyre::Context, Result};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
@@ -13,6 +13,8 @@ use crate::{tabs::*, TabPage};
 pub struct App {
     mode: Mode,
     tab: Tab,
+
+    full_screen: bool,
 
     about_tab: AboutTab,
     general_tab: GeneralTab,
@@ -37,13 +39,12 @@ enum Tab {
     Prompts,
 }
 
-pub fn run(terminal: &mut Terminal<impl Backend>) -> Result<()> {
-    App::new().run(terminal)
-}
-
 impl App {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(full_screen: bool) -> Self {
+        Self {
+            full_screen,
+            ..Default::default()
+        }
     }
 
     /// Run the app until the user quits.
@@ -63,7 +64,14 @@ impl App {
     fn draw(&self, terminal: &mut Terminal<impl Backend>) -> Result<()> {
         terminal
             .draw(|frame| {
-                frame.render_widget(self, frame.size());
+
+                let width = frame.size().width.min(80);
+                let height = frame.size().height.min(25);
+
+                let x = frame.size().x + (frame.size().width - width) / 2;
+                let y = frame.size().y + (frame.size().height - height) / 2;
+
+                frame.render_widget(self, Rect::new(frame.size().x + x, frame.size().y + y, width, height));
             })
             .wrap_err("terminal.draw")?;
         Ok(())

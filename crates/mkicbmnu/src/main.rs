@@ -22,7 +22,7 @@ struct Cli {
 
     /// Default is 80x25
     #[arg(long, short)]
-    full_srceen: bool,
+    full_screen: bool,
 
     /// file[.mnu] to edit/create (extension will always be .mnu)
     file: PathBuf,
@@ -43,8 +43,8 @@ fn main() -> Result<()> {
         Menu::default().save(&file).unwrap();
     }
 
-    let terminal = &mut term::init(arguments.full_srceen)?;
-    App::new().run(terminal)?;
+    let terminal = &mut term::init()?;
+    App::new(arguments.full_screen).run(terminal)?;
     term::restore()?;
     Ok(())
 }
