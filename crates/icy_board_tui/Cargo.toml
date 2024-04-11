@@ -15,7 +15,6 @@ clap = { version = "4.5.4", features = ["derive"] }
 crossterm = "0.27.0"
 ratatui = "0.26.1"
 color-eyre = "0.6.3"
-palette = "0.7.5"
 
 i18n-embed = { version = "0.14.0", features = ["fluent-system", "desktop-requester"]} 
 i18n-embed-fl = "0.8.0"

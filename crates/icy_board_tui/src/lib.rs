@@ -41,7 +41,7 @@ pub fn print_error<A: Display>(error: A) {
         stdout(),
         SetAttribute(Attribute::Bold),
         SetForegroundColor(Color::Red),
-        Print(fl!(crate::LANGUAGE_LOADER, "cmd_line_error")),
+        Print(fl!(crate::LANGUAGE_LOADER, "error_cmd_line_label")),
         Print(" "),
         SetAttribute(Attribute::Reset),
         SetAttribute(Attribute::Bold),

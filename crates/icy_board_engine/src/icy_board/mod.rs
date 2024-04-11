@@ -456,7 +456,7 @@ pub trait IcyBoardSerializer: serde::de::DeserializeOwned + serde::ser::Serializ
                 Ok(result) => Ok(result),
                 Err(e) => {
                     log::error!("Loading {} toml file '{}': {}", Self::FILE_TYPE, path.as_ref().display(), e);
-                    Err(IcyError::ErrorParsingConfig(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
+                    Err(IcyError::ErrorLoadingFile(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
                 }
             },
             Err(e) => {

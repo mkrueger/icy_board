@@ -1,25 +1,29 @@
-use std::{arch::x86_64, time::Duration};
+use std::time::Duration;
 
+use chrono::{Local, Timelike};
 use color_eyre::{eyre::Context, Result};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
+use icy_board_engine::icy_board::menu::Menu;
 use icy_board_tui::{term::next_event, theme::THEME};
 use itertools::Itertools;
 use ratatui::{prelude::*, widgets::*};
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 
-use crate::{tabs::*, TabPage};
+use crate::tabs::*;
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Clone)]
 pub struct App {
     mode: Mode,
     tab: Tab,
 
+    mnu: Menu,
+
     full_screen: bool,
 
-    about_tab: AboutTab,
     general_tab: GeneralTab,
     keywords_tab: KeywordsTab,
     prompts_tab: PromptsTab,
+    about_tab: AboutTab,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -33,15 +37,16 @@ enum Mode {
 #[derive(Debug, Clone, Copy, Default, Display, EnumIter, FromRepr, PartialEq, Eq)]
 enum Tab {
     #[default]
-    About,
     General,
     Keywords,
     Prompts,
+    About,
 }
 
 impl App {
-    pub fn new(full_screen: bool) -> Self {
+    pub fn new(mnu: Menu, full_screen: bool) -> Self {
         Self {
+            mnu,
             full_screen,
             ..Default::default()
         }
@@ -64,14 +69,17 @@ impl App {
     fn draw(&self, terminal: &mut Terminal<impl Backend>) -> Result<()> {
         terminal
             .draw(|frame| {
+                let screen = if self.full_screen {
+                    frame.size()
+                } else {
+                    let width = frame.size().width.min(80);
+                    let height = frame.size().height.min(25);
 
-                let width = frame.size().width.min(80);
-                let height = frame.size().height.min(25);
-
-                let x = frame.size().x + (frame.size().width - width) / 2;
-                let y = frame.size().y + (frame.size().height - height) / 2;
-
-                frame.render_widget(self, Rect::new(frame.size().x + x, frame.size().y + y, width, height));
+                    let x = frame.size().x + (frame.size().width - width) / 2;
+                    let y = frame.size().y + (frame.size().height - height) / 2;
+                    Rect::new(frame.size().x + x, frame.size().y + y, width, height)
+                };
+                frame.render_widget(self, screen);
             })
             .wrap_err("terminal.draw")?;
         Ok(())
@@ -104,11 +112,21 @@ impl App {
     }
 
     fn prev(&mut self) {
-        self.tab.prev();
+        match self.tab {
+            Tab::General => self.general_tab.prev(),
+            Tab::Keywords => self.keywords_tab.prev(),
+            Tab::Prompts => self.prompts_tab.prev(),
+            Tab::About => self.about_tab.prev(),
+        }
     }
 
     fn next(&mut self) {
-        self.tab.next();
+        match self.tab {
+            Tab::General => self.general_tab.next(),
+            Tab::Keywords => self.keywords_tab.next(),
+            Tab::Prompts => self.prompts_tab.next(),
+            Tab::About => self.about_tab.next(),
+        }
     }
 
     fn prev_tab(&mut self) {
@@ -129,13 +147,14 @@ impl App {
 /// matter, but for larger apps this can be a significant performance improvement.
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1), Constraint::Length(1)]);
-        let [title_bar, tab, bottom_bar] = vertical.areas(area);
+        let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1), Constraint::Length(1), Constraint::Length(1)]);
+        let [title_bar, tab, key_bar, status_line] = vertical.areas(area);
 
-        Block::new().style(THEME.root).render(area, buf);
+        Block::new().style(THEME.title_bar).render(area, buf);
         self.render_title_bar(title_bar, buf);
         self.render_selected_tab(tab, buf);
-        App::render_bottom_bar(bottom_bar, buf);
+        App::render_key_help_view(key_bar, buf);
+        App::render_status_line(status_line, buf);
     }
 }
 
@@ -144,7 +163,7 @@ impl App {
         let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(35)]);
         let [title, tabs] = layout.areas(area);
 
-        Span::styled("MNU File Editor", THEME.app_title).render(title, buf);
+        Span::styled(" MNU File Editor", THEME.app_title).render(title, buf);
         let titles = Tab::iter().map(Tab::title);
         Tabs::new(titles)
             .style(THEME.tabs)
@@ -159,24 +178,32 @@ impl App {
         icy_board_tui::colors::RgbSwatch.render(area, buf);
 
         match self.tab {
-            Tab::About => self.about_tab.render(area, buf),
-            Tab::General => self.general_tab.render(area, buf),
-            Tab::Keywords => self.keywords_tab.render(area, buf),
-            Tab::Prompts => self.prompts_tab.render(area, buf),
+            Tab::General => self.general_tab.render(&self.mnu, area, buf),
+            Tab::Keywords => self.keywords_tab.render(&self.mnu, area, buf),
+            Tab::Prompts => self.prompts_tab.render(&self.mnu, area, buf),
+            Tab::About => self.about_tab.render(&self.mnu, area, buf),
         };
     }
 
-    fn render_bottom_bar(area: Rect, buf: &mut Buffer) {
+    fn render_key_help_view(area: Rect, buf: &mut Buffer) {
         let keys = [("H/←", "Left"), ("L/→", "Right"), ("K/↑", "Up"), ("J/↓", "Down"), ("Q/Esc", "Quit")];
         let spans = keys
             .iter()
             .flat_map(|(key, desc)| {
-                let key = Span::styled(format!(" {key} "), THEME.key_binding.key);
-                let desc = Span::styled(format!(" {desc} "), THEME.key_binding.description);
+                let key = Span::styled(format!(" {key} "), THEME.key_binding);
+                let desc = Span::styled(format!(" {desc} "), THEME.key_binding_description);
                 [key, desc]
             })
             .collect_vec();
         Line::from(spans).centered().style((Color::Indexed(236), Color::Indexed(232))).render(area, buf);
+    }
+
+    fn render_status_line(area: Rect, buf: &mut Buffer) {
+        let now = Local::now();
+        Line::from(format!(" {} {}", now.time().with_nanosecond(0).unwrap(), now.date_naive().format("%m-%d-%y")))
+            .left_aligned()
+            .style(THEME.status_line)
+            .render(area, buf);
     }
 }
 

@@ -11,7 +11,7 @@ use super::{
     IcyBoardSerializer,
 };
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct Menu {
     pub title: String,
     #[serde(default)]

@@ -34,7 +34,7 @@ pub fn init() -> Result<Terminal<impl Backend>> {
     // this size is to match the size of the terminal when running the demo
     // using vhs in a 1280x640 sized window (github social preview size)
     let options = TerminalOptions {
-        viewport: Viewport::Fullscreen
+        viewport: Viewport::Fullscreen,
     };
     let terminal = Terminal::with_options(CrosstermBackend::new(io::stdout()), options)?;
     enable_raw_mode().context("enable raw mode")?;

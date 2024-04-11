@@ -43,8 +43,16 @@ fn main() -> Result<()> {
         Menu::default().save(&file).unwrap();
     }
 
-    let terminal = &mut term::init()?;
-    App::new(arguments.full_screen).run(terminal)?;
-    term::restore()?;
-    Ok(())
+    match Menu::load(&file) {
+        Ok(mnu) => {
+            let terminal = &mut term::init()?;
+            App::new(mnu, arguments.full_screen).run(terminal)?;
+            term::restore()?;
+            Ok(())
+        }
+        Err(err) => {
+            print_error(format!("{}", err));
+            exit(1);
+        }
+    }
 }
