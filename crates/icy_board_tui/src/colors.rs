@@ -7,6 +7,10 @@ pub struct RgbSwatch;
 impl Widget for RgbSwatch {
     #[allow(clippy::cast_precision_loss, clippy::similar_names)]
     fn render(self, area: Rect, buf: &mut Buffer) {
+        if !THEME.swatch {
+            buf.set_style(area, THEME.content_box);
+            return;
+        }
         for (yi, y) in (area.top()..area.bottom()).enumerate() {
             let value = f32::from(area.height) - yi as f32;
             let value_fg = value / f32::from(area.height);

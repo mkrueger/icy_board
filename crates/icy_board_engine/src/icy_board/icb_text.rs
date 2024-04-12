@@ -1560,8 +1560,12 @@ pub enum TextError {
 
     #[error("invalid ICETEXT entry ({0})")]
     IceTextEntryInvalid(String),
+
+    #[error("missing ICETEXT entry ({0})")]
+    MissingEntry(usize),
 }
 
+#[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Default, Display, EnumString)]
 pub enum IcbTextJustification {
     #[default]
@@ -1570,6 +1574,7 @@ pub enum IcbTextJustification {
     Center,
 }
 
+#[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Default, Display, Debug, EnumString)]
 pub enum IcbTextStyle {
     #[default]
@@ -1617,7 +1622,6 @@ pub struct TextEntry {
     pub text: String,
     pub justification: IcbTextJustification,
 }
-
 const HEADER: &str = "# IcyBoard text file v1.0\n";
 
 lazy_static::lazy_static! {
@@ -1642,7 +1646,7 @@ impl IcbTextFile {
         if let Some(entry) = self.entries.get(message_number as usize) {
             Ok(entry.clone())
         } else {
-            DEFAULT_DISPLAY_TEXT.get_display_text(message_number)
+            Err(TextError::MissingEntry(message_number as usize))
         }
     }
 

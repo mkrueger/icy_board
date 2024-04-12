@@ -52,3 +52,61 @@ impl Write for SerialConnection {
         self.port.flush()
     }
 }
+
+impl AsyncRead for ModemConnection {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+        loop {
+            let data = self.get_mut().port.read(buf.initialize_unfilled());
+            match data {
+                Ok(bytes_read) => {
+                    buf.advance(bytes_read);
+                    return Poll::Ready(Ok(()));
+                }
+                Err(err) => {
+                    if err.kind() == std::io::ErrorKind::WouldBlock {
+                        cx.waker().wake_by_ref();
+                        return Poll::Pending;
+                    }
+                    return Poll::Ready(Err(err));
+                }
+            }
+        }
+    }
+}
+
+impl AsyncWrite for ModemConnection {
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+        loop {
+            match self.get_mut().port.write(buf) {
+                Ok(result) => return Poll::Ready(Ok(result)),
+                Err(err) => {
+                    if err.kind() == std::io::ErrorKind::WouldBlock {
+                        cx.waker().wake_by_ref();
+                        return Poll::Pending;
+                    }
+                    return Poll::Ready(Err(err));
+                }
+            }
+        }
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        loop {
+            match self.get_mut().port.flush() {
+                Ok(()) => return Poll::Ready(Ok(())),
+                Err(err) => {
+                    if err.kind() == std::io::ErrorKind::WouldBlock {
+                        cx.waker().wake_by_ref();
+                        return Poll::Pending;
+                    }
+                    return Poll::Ready(Err(err));
+                }
+            }
+        }
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        let _ = self.poll_flush(cx)?;
+        Ok(()).into()
+    }
+}

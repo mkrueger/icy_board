@@ -22,6 +22,10 @@ pub struct PcbBoardCommand {
     pub state: IcyBoardState,
     pub display_menu: bool,
 }
+
+unsafe impl Send for PcbBoardCommand {}
+unsafe impl Sync for PcbBoardCommand {}
+
 const MASK_COMMAND: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;':,.<>?/\\\" ";
 const MASK_NUMBER: &str = "0123456789";
 
@@ -30,13 +34,16 @@ impl PcbBoardCommand {
         Self { state, display_menu: true }
     }
 
-    pub fn do_command(&mut self) -> Res<()> {
+    pub async fn do_command(&mut self) -> Res<()> {
         if self.display_menu && !self.state.session.expert_mode {
-            self.display_menu()?;
+            self.display_menu().await?;
             self.display_menu = false;
         }
 
-        let command = self.state.input_field(IceText::CommandPrompt, 40, MASK_COMMAND, "", display_flags::UPCASE)?;
+        let command = self
+            .state
+            .input_field(IceText::CommandPrompt, 40, MASK_COMMAND, "", display_flags::UPCASE)
+            .await?;
 
         let mut cmds = command.split(' ');
 
@@ -45,147 +52,148 @@ impl PcbBoardCommand {
             self.state.session.tokens.push_back(cmd.to_string());
         }
 
-        if let Some(action) = self.state.try_find_command(command) {
-            return self.dispatch_action(command, &action);
+        if let Some(action) = self.state.try_find_command(command).await {
+            return self.dispatch_action(command, &action).await;
         }
 
         self.state
-            .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFAFTER | display_flags::LFBEFORE)?;
+            .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFAFTER | display_flags::LFBEFORE)
+            .await?;
         Ok(())
     }
 
-    fn display_menu(&mut self) -> Res<()> {
-        self.displaycmdfile("menu")?;
+    async fn display_menu(&mut self) -> Res<()> {
+        self.displaycmdfile("menu").await?;
         let menu_file = if self.state.session.is_sysop {
             self.state.session.current_conference.sysop_menu.clone()
         } else {
             self.state.session.current_conference.users_menu.clone()
         };
-        self.state.display_file(&menu_file)?;
+        self.state.display_file(&menu_file).await?;
         Ok(())
     }
 
-    fn display_news(&mut self) -> Res<()> {
-        self.displaycmdfile("news")?;
+    async fn display_news(&mut self) -> Res<()> {
+        self.displaycmdfile("news").await?;
         let news_file = self.state.session.current_conference.news_file.clone();
-        let resolved_path = self.state.resolve_path(&news_file);
+        let resolved_path = self.state.resolve_path(&news_file).await;
 
         if !resolved_path.exists() {
-            self.state.display_text(IceText::NoNews, display_flags::NEWLINE)?;
+            self.state.display_text(IceText::NoNews, display_flags::NEWLINE).await?;
         } else {
-            self.state.display_file(&news_file)?;
+            self.state.display_file(&news_file).await?;
         }
-        self.state.new_line()?;
-        self.state.press_enter()?;
+        self.state.new_line().await?;
+        self.state.press_enter().await;
         self.display_menu = true;
         Ok(())
     }
 
-    fn dispatch_action(&mut self, command: &str, action: &Command) -> Res<()> {
-        if !self.check_sec(command, &action.security)? {
+    async fn dispatch_action(&mut self, command: &str, action: &Command) -> Res<()> {
+        if !self.check_sec(command, &action.security).await? {
             return Ok(());
         }
 
         match action.command_type {
             CommandType::AbandonConference => {
                 // A
-                self.abandon_conference()?;
+                self.abandon_conference().await?;
             }
             CommandType::BulletinList => {
                 // B
-                self.show_bulletins(action)?;
+                self.show_bulletins(action).await?;
             }
             CommandType::FileDirectory => {
                 // F
-                self.show_file_directories(action)?;
+                self.show_file_directories(action).await?;
             }
 
             CommandType::Goodbye => {
                 // G
-                self.displaycmdfile("g")?;
+                self.displaycmdfile("g").await?;
 
                 // force logoff - no flagged files scan
                 if let Some(token) = self.state.session.tokens.pop_front() {
                     if token.to_ascii_uppercase() == self.state.yes_char.to_string().to_ascii_uppercase() {
-                        self.state.hangup()?;
+                        self.state.hangup().await?;
                     }
                 }
 
                 // todo : check flagged files & parse input
-                self.state.hangup()?;
+                self.state.hangup().await?;
             }
             CommandType::Help => {
                 // H
-                self.show_help()?;
+                self.show_help().await?;
             }
             CommandType::InitialWelcome => {
                 // I
-                self.initial_welcome()?;
+                self.initial_welcome().await?;
             }
             CommandType::JoinConference => {
                 // J
-                self.join_conference(action)?;
+                self.join_conference(action).await?;
             }
             CommandType::DeleteMessage => {
                 // K
-                self.delete_message(action)?;
+                self.delete_message(action).await?;
             }
             CommandType::LocateFile => {
                 // L
-                self.find_files(action)?;
+                self.find_files(action).await?;
             }
             CommandType::ToggleGraphics => {
                 // M
-                self.toggle_graphics()?;
+                self.toggle_graphics().await?;
             }
             CommandType::NewFileScan => {
                 // N
-                self.find_new_files(action, 60000)?;
+                self.find_new_files(action, 60000).await?;
             }
             CommandType::SetPageLength => {
                 // P
-                self.set_page_len(action)?;
+                self.set_page_len(action).await?;
             }
             CommandType::ReadMessages => {
                 // R
-                self.read_messages(action)?;
+                self.read_messages(action).await?;
             }
 
             CommandType::Survey => {
                 // S
-                self.take_survey(action)?;
+                self.take_survey(action).await?;
             }
             CommandType::SetTransferProtocol => {
                 // T
-                self.set_transfer_protocol(action)?;
+                self.set_transfer_protocol(action).await?;
             }
             CommandType::ExpertMode => {
                 // X
-                self.set_expert_mode()?;
+                self.set_expert_mode().await?;
             }
             CommandType::ZippyDirectoryScan => {
                 // Z
-                self.zippy_directory_scan(action)?;
+                self.zippy_directory_scan(action).await?;
             }
 
             CommandType::ShowMenu => {
                 // MENU
-                self.display_menu()?;
+                self.display_menu().await?;
                 self.display_menu = false;
             }
 
             CommandType::DisplayNews => {
                 // MENU
-                self.display_news()?;
+                self.display_news().await?;
             }
             CommandType::UserList => {
                 // USER
-                self.show_user_list(action)?;
+                self.show_user_list(action).await?;
             }
 
             CommandType::RestoreMessage => {
                 // 4
-                self.restore_message(action)?;
+                self.restore_message(action).await?;
             }
 
             _ => {
@@ -195,11 +203,12 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    fn abandon_conference(&mut self) -> Res<()> {
+    async fn abandon_conference(&mut self) -> Res<()> {
         if self.state.board.lock().unwrap().conferences.is_empty() {
             self.state
-                .display_text(IceText::NoConferenceAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
-            self.state.press_enter()?;
+                .display_text(IceText::NoConferenceAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            self.state.press_enter().await;
             return Ok(());
         }
         if self.state.session.current_conference_number > 0 {
@@ -209,48 +218,53 @@ impl PcbBoardCommand {
             );
             self.state.join_conference(0);
             self.state
-                .display_text(IceText::ConferenceAbandoned, display_flags::NEWLINE | display_flags::NOTBLANK)?;
-            self.state.new_line()?;
-            self.state.press_enter()?;
+                .display_text(IceText::ConferenceAbandoned, display_flags::NEWLINE | display_flags::NOTBLANK)
+                .await?;
+            self.state.new_line().await?;
+            self.state.press_enter().await;
         }
         self.display_menu = true;
         Ok(())
     }
 
-    fn join_conference(&mut self, action: &Command) -> Res<()> {
+    async fn join_conference(&mut self, action: &Command) -> Res<()> {
         if self.state.board.lock().unwrap().conferences.is_empty() {
             self.state
-                .display_text(IceText::NoConferenceAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
-            self.state.press_enter()?;
+                .display_text(IceText::NoConferenceAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            self.state.press_enter().await;
             return Ok(());
         }
         let conf_number = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
             let mnu = self.state.board.lock().unwrap().config.paths.conf_join_menu.clone();
-            let mnu = self.state.resolve_path(&mnu);
+            let mnu = self.state.resolve_path(&mnu).await;
 
-            self.state.display_menu(&mnu)?;
-            self.state.new_line()?;
+            self.state.display_menu(&mnu).await?;
+            self.state.new_line().await?;
 
-            self.state.input_field(
-                IceText::JoinConferenceNumber,
-                40,
-                MASK_COMMAND,
-                &action.help,
-                display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
-            )?
+            self.state
+                .input_field(
+                    IceText::JoinConferenceNumber,
+                    40,
+                    MASK_COMMAND,
+                    &action.help,
+                    display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
+                )
+                .await?
         };
         let mut joined = false;
         if let Ok(number) = conf_number.parse::<i32>() {
             if 0 <= number && (number as usize) <= self.state.board.lock().unwrap().conferences.len() {
-                self.state.join_conference(number);
+                self.state.join_conference(number).await;
                 self.state.session.op_text = format!(
                     "{} ({})",
                     self.state.session.current_conference.name, self.state.session.current_conference_number
                 );
                 self.state
-                    .display_text(IceText::ConferenceJoined, display_flags::NEWLINE | display_flags::NOTBLANK)?;
+                    .display_text(IceText::ConferenceJoined, display_flags::NEWLINE | display_flags::NOTBLANK)
+                    .await?;
 
                 joined = true;
             }
@@ -259,33 +273,37 @@ impl PcbBoardCommand {
         if !joined {
             self.state.session.op_text = conf_number;
             self.state
-                .display_text(IceText::InvalidConferenceNumber, display_flags::NEWLINE | display_flags::NOTBLANK)?;
+                .display_text(IceText::InvalidConferenceNumber, display_flags::NEWLINE | display_flags::NOTBLANK)
+                .await?;
         }
 
-        self.state.new_line()?;
-        self.state.press_enter()?;
+        self.state.new_line().await?;
+        self.state.press_enter().await;
         self.display_menu = true;
         Ok(())
     }
 
-    fn show_user_list(&mut self, action: &Command) -> Res<()> {
-        self.state.new_line()?;
+    async fn show_user_list(&mut self, action: &Command) -> Res<()> {
+        self.state.new_line().await?;
         let text = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
-            self.state.input_field(
-                IceText::UserScan,
-                40,
-                MASK_COMMAND,
-                &action.help,
-                display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
-            )?
+            self.state
+                .input_field(
+                    IceText::UserScan,
+                    40,
+                    MASK_COMMAND,
+                    &action.help,
+                    display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
+                )
+                .await?
         };
 
         self.state
-            .display_text(IceText::UsersHeader, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::NOTBLANK)?;
-        self.state.display_text(IceText::UserScanLine, display_flags::NOTBLANK)?;
-        self.state.reset_color()?;
+            .display_text(IceText::UsersHeader, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::NOTBLANK)
+            .await?;
+        self.state.display_text(IceText::UserScanLine, display_flags::NOTBLANK).await?;
+        self.state.reset_color().await?;
         let mut output = String::new();
         for u in self.state.board.lock().unwrap().users.iter() {
             if text.is_empty() || u.get_name().to_ascii_uppercase().contains(&text.to_ascii_uppercase()) {
@@ -298,16 +316,16 @@ impl PcbBoardCommand {
                 ));
             }
         }
-        self.state.print(TerminalTarget::Both, &output)?;
+        self.state.print(TerminalTarget::Both, &output).await?;
 
-        self.state.new_line()?;
-        self.state.press_enter()?;
+        self.state.new_line().await?;
+        self.state.press_enter().await;
         self.display_menu = true;
         Ok(())
     }
 
-    fn set_expert_mode(&mut self) -> Res<()> {
-        self.displaycmdfile("x")?;
+    async fn set_expert_mode(&mut self) -> Res<()> {
+        self.displaycmdfile("x").await?;
 
         let mut expert_mode = !self.state.session.expert_mode;
         if let Some(token) = self.state.session.tokens.pop_front() {
@@ -323,23 +341,27 @@ impl PcbBoardCommand {
             user.flags.expert_mode = expert_mode;
         }
         if expert_mode {
-            self.state.display_text(
-                IceText::ExpertmodeModeOn,
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
-            )?;
+            self.state
+                .display_text(
+                    IceText::ExpertmodeModeOn,
+                    display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
+                )
+                .await?;
         } else {
-            self.state.display_text(
-                IceText::ExpertmodeModeOff,
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
-            )?;
-            self.state.press_enter()?;
+            self.state
+                .display_text(
+                    IceText::ExpertmodeModeOff,
+                    display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
+                )
+                .await?;
+            self.state.press_enter().await;
         }
         self.display_menu = true;
         Ok(())
     }
 
-    fn toggle_graphics(&mut self) -> Res<()> {
-        self.displaycmdfile("m")?;
+    async fn toggle_graphics(&mut self) -> Res<()> {
+        self.displaycmdfile("m").await?;
 
         /* no_graphics disabled atm
         if self.state.board.lock().unwrap().config.no_graphis {
@@ -356,27 +378,37 @@ impl PcbBoardCommand {
                 "CT" => {
                     self.state.session.disp_options.disable_color = true;
                     self.state.session.disp_options.grapics_mode = GraphicsMode::Off;
-                    self.state.display_text(IceText::CTTYOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                    self.state
+                        .display_text(IceText::CTTYOn, display_flags::NEWLINE | display_flags::LFBEFORE)
+                        .await?;
                 }
                 "AN" => {
                     self.state.session.disp_options.disable_color = false;
                     self.state.session.disp_options.grapics_mode = GraphicsMode::Ansi;
-                    self.state.display_text(IceText::AnsiOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                    self.state
+                        .display_text(IceText::AnsiOn, display_flags::NEWLINE | display_flags::LFBEFORE)
+                        .await?;
                 }
                 "AV" => {
                     self.state.session.disp_options.disable_color = false;
                     self.state.session.disp_options.grapics_mode = GraphicsMode::Avatar;
-                    self.state.display_text(IceText::AnsiOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                    self.state
+                        .display_text(IceText::AnsiOn, display_flags::NEWLINE | display_flags::LFBEFORE)
+                        .await?;
                 }
                 "GR" => {
                     self.state.session.disp_options.disable_color = false;
                     self.state.session.disp_options.grapics_mode = GraphicsMode::Ansi;
-                    self.state.display_text(IceText::GraphicsOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                    self.state
+                        .display_text(IceText::GraphicsOn, display_flags::NEWLINE | display_flags::LFBEFORE)
+                        .await?;
                 }
                 "RI" => {
                     self.state.session.disp_options.disable_color = false;
                     self.state.session.disp_options.grapics_mode = GraphicsMode::Rip;
-                    self.state.display_text(IceText::RIPModeOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                    self.state
+                        .display_text(IceText::RIPModeOn, display_flags::NEWLINE | display_flags::LFBEFORE)
+                        .await?;
                 }
                 _ => {}
             }
@@ -384,7 +416,7 @@ impl PcbBoardCommand {
 
         {
             if !self.state.session.disp_options.disable_color {
-                self.state.reset_color()?;
+                self.state.reset_color().await?;
             }
 
             self.state.session.disp_options.disable_color = !self.state.session.disp_options.disable_color;
@@ -394,26 +426,28 @@ impl PcbBoardCommand {
             } else {
                 IceText::GraphicsOn
             };
-            self.state.display_text(msg, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+            self.state.display_text(msg, display_flags::NEWLINE | display_flags::LFBEFORE).await?;
         }
-        self.state.press_enter()?;
+        self.state.press_enter().await;
         self.display_menu = true;
         Ok(())
     }
 
-    fn set_page_len(&mut self, action: &Command) -> Res<()> {
+    async fn set_page_len(&mut self, action: &Command) -> Res<()> {
         let page_len = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
-            self.state.display_text(IceText::CurrentPageLength, display_flags::LFBEFORE)?;
-            self.state.print(TerminalTarget::Both, &format!(" {}\r\n", self.state.session.page_len))?;
-            self.state.input_field(
-                IceText::EnterPageLength,
-                2,
-                MASK_NUMBER,
-                &action.help,
-                display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
-            )?
+            self.state.display_text(IceText::CurrentPageLength, display_flags::LFBEFORE).await?;
+            self.state.print(TerminalTarget::Both, &format!(" {}\r\n", self.state.session.page_len)).await?;
+            self.state
+                .input_field(
+                    IceText::EnterPageLength,
+                    2,
+                    MASK_NUMBER,
+                    &action.help,
+                    display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
+                )
+                .await?
         };
 
         if !page_len.is_empty() {
@@ -423,23 +457,25 @@ impl PcbBoardCommand {
                 user.page_len = page_len;
             }
         }
-        self.state.press_enter()?;
+        self.state.press_enter().await;
         self.display_menu = true;
         Ok(())
     }
 
-    fn show_help(&mut self) -> Res<()> {
+    async fn show_help(&mut self) -> Res<()> {
         self.display_menu = true;
         let help_cmd = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
-            self.state.input_field(
-                IceText::HelpPrompt,
-                8,
-                MASK_COMMAND,
-                "",
-                display_flags::UPCASE | display_flags::NEWLINE | display_flags::HIGHASCII,
-            )?
+            self.state
+                .input_field(
+                    IceText::HelpPrompt,
+                    8,
+                    MASK_COMMAND,
+                    "",
+                    display_flags::UPCASE | display_flags::NEWLINE | display_flags::HIGHASCII,
+                )
+                .await?
         };
         if !help_cmd.is_empty() {
             let mut help_loc = self.state.board.lock().unwrap().config.paths.help_path.clone();
@@ -454,57 +490,62 @@ impl PcbBoardCommand {
             if !found {
                 help_loc = help_loc.join(format!("hlp{}", help_cmd).as_str());
             }
-            let res = self.state.display_file(&help_loc)?;
+            let res = self.state.display_file(&help_loc).await?;
 
             if res {
-                self.state.press_enter()?;
+                self.state.press_enter().await;
             }
         }
         Ok(())
     }
 
-    fn check_sec(&mut self, command: &str, required_sec: &RequiredSecurity) -> Res<bool> {
+    async fn check_sec(&mut self, command: &str, required_sec: &RequiredSecurity) -> Res<bool> {
         if required_sec.user_can_access(&self.state.session) {
             return Ok(true);
         }
 
-        self.state.bell()?;
+        self.state.bell().await?;
         self.state.session.op_text = command.to_string();
-        self.state.display_text(
-            IceText::MenuSelectionUnavailable,
-            display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
-        )?;
+        self.state
+            .display_text(
+                IceText::MenuSelectionUnavailable,
+                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
+            )
+            .await?;
 
         self.state.session.security_violations += 1;
         if let Some(user) = &mut self.state.current_user {
             user.stats.num_sec_viol += 1;
         }
         if self.state.session.security_violations > 10 {
-            self.state.display_text(
-                IceText::SecurityViolation,
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LOGIT,
-            )?;
             self.state
-                .display_text(IceText::AutoDisconnectNow, display_flags::NEWLINE | display_flags::LFBEFORE)?;
-            self.state.hangup()?;
+                .display_text(
+                    IceText::SecurityViolation,
+                    display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LOGIT,
+                )
+                .await?;
+            self.state
+                .display_text(IceText::AutoDisconnectNow, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            self.state.hangup().await?;
         }
 
         Ok(false)
     }
 
-    fn initial_welcome(&mut self) -> Res<()> {
+    async fn initial_welcome(&mut self) -> Res<()> {
         let board_name = self.state.board.lock().unwrap().config.board.name.clone();
-        self.state.print(TerminalTarget::Both, &board_name)?;
-        self.state.new_line()?;
+        self.state.print(TerminalTarget::Both, &board_name).await?;
+        self.state.new_line().await?;
 
         let welcome_screen = self.state.board.lock().unwrap().config.paths.welcome.clone();
 
-        let welcome_screen = self.state.resolve_path(&welcome_screen);
-        self.state.display_file(&welcome_screen)?;
+        let welcome_screen = self.state.resolve_path(&welcome_screen).await;
+        self.state.display_file(&welcome_screen).await?;
         Ok(())
     }
 
-    fn displaycmdfile(&mut self, command_file: &str) -> Res<bool> {
+    async fn displaycmdfile(&mut self, command_file: &str) -> Res<bool> {
         let path = self.state.board.lock().unwrap().config.paths.command_display_path.clone();
         if !path.is_dir() {
             return Ok(false);
@@ -512,7 +553,7 @@ impl PcbBoardCommand {
         let file = path.join(command_file);
 
         if file.with_extension("ppe").is_file() {
-            self.state.run_ppe(&path, None)?;
+            self.state.run_ppe(&path, None).await?;
             return Ok(true);
         }
 
@@ -523,7 +564,7 @@ impl PcbBoardCommand {
         }
         */
         if file.exists() {
-            self.state.display_file(&file)?;
+            self.state.display_file(&file).await?;
             return Ok(true);
         }
 

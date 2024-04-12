@@ -1,6 +1,5 @@
 use std::{
     io::{self, stdout},
-    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
@@ -10,7 +9,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use icy_board_engine::icy_board::{icb_text::IceText, IcyBoard, IcyBoardError};
+use icy_board_engine::icy_board::{icb_text::IceText, statistics::Statistics};
 use icy_ppe::Res;
 use ratatui::{
     prelude::*,
@@ -21,7 +20,7 @@ use ratatui::{
     },
 };
 
-use crate::VERSION;
+use crate::{bbs::BBS, VERSION};
 
 pub const DOS_BLACK: Color = Color::Rgb(0, 0, 0);
 pub const DOS_BLUE: Color = Color::Rgb(0, 0, 0xAA);
@@ -58,7 +57,6 @@ pub struct CallWaitScreen {
     x: i32,
     y: i32,
     selected: Option<Instant>,
-    board: Arc<Mutex<IcyBoard>>,
     buttons: Vec<Button>,
 
     last_caller_txt: String,
@@ -70,11 +68,22 @@ pub struct CallWaitScreen {
 }
 
 impl CallWaitScreen {
-    pub fn new(board: Arc<Mutex<IcyBoard>>) -> Res<Self> {
-        let buttons;
-
-        if let Ok(board) = board.lock().as_ref() {
-            buttons = vec![
+    pub async fn new(bbs: &BBS) -> Res<Self> {
+        let mut res = Self {
+            x: 0,
+            y: 0,
+            selected: None,
+            buttons: Vec::new(),
+            last_caller_txt: String::new(),
+            calls_txt: String::new(),
+            msgs_txt: String::new(),
+            dls_txt: String::new(),
+            uls_txt: String::new(),
+            sysavail_txt: String::new(),
+        };
+        {
+            let board = bbs.get_board().await;
+            res.buttons = vec![
                 Button {
                     title: board.display_text.get_display_text(IceText::UserBusy)?.text,
                     description: board.display_text.get_display_text(IceText::UserBusyDescription)?.text,
@@ -106,51 +115,29 @@ impl CallWaitScreen {
                     message: CallWaitMessage::Exit(false),
                 },
             ];
-        } else {
-            return Err(Box::new(IcyBoardError::Error("Board is locked".to_string())));
+
+            res.last_caller_txt = board.display_text.get_display_text(IceText::LastCaller)?.text;
+            res.calls_txt = board.display_text.get_display_text(IceText::NumberCalls)?.text;
+            res.msgs_txt = board.display_text.get_display_text(IceText::NumberMessages)?.text;
+            res.dls_txt = board.display_text.get_display_text(IceText::NumberDownload)?.text;
+            res.uls_txt = board.display_text.get_display_text(IceText::NumberUpload)?.text;
+            res.sysavail_txt = board.display_text.get_display_text(IceText::SystemAvailable)?.text;
         }
-        /*
-        let file = board
-            .lock()
-            .as_ref()
-            .unwrap()
-            .data
-            .path
-            .stats_file
-            .to_string();
-        let file_name = board.lock().as_ref().unwrap().resolve_file(&file);
-        let call_stat = CallStat::load(&file_name)?;*/
-
-        let last_caller_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::LastCaller)?.text;
-        let calls_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::NumberCalls)?.text;
-        let msgs_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::NumberMessages)?.text;
-        let dls_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::NumberDownload)?.text;
-        let uls_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::NumberUpload)?.text;
-        let sysavail_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::SystemAvailable)?.text;
-
-        Ok(Self {
-            x: 0,
-            y: 0,
-            selected: None,
-            buttons,
-            last_caller_txt,
-            calls_txt,
-            msgs_txt,
-            dls_txt,
-            uls_txt,
-            sysavail_txt,
-            board,
-        })
+        Ok(res)
     }
 
-    pub fn run(&mut self) -> Res<CallWaitMessage> {
+    pub async fn run(&mut self, bbs: &mut BBS) -> Res<CallWaitMessage> {
         let mut terminal = init_terminal()?;
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
 
         loop {
-            terminal.draw(|frame| self.ui(frame))?;
+            let board_name = bbs.get_board().await.config.board.name.clone();
+            let call_stat = bbs.get_board().await.statistics.clone();
 
+            terminal.draw(|frame| {
+                self.ui(board_name, call_stat, frame);
+            })?;
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
 
             if event::poll(timeout)? && self.selected.is_none() {
@@ -186,11 +173,11 @@ impl CallWaitScreen {
         }
     }
 
-    fn ui(&self, frame: &mut Frame) {
-        frame.render_widget(self.main_canvas(frame.size()), frame.size());
+    fn ui(&self, board_name: String, call_stat: Statistics, frame: &mut Frame<'_>) {
+        frame.render_widget(self.main_canvas(board_name, call_stat, frame.size()), frame.size());
     }
 
-    fn main_canvas(&self, rect: Rect) -> impl Widget + '_ {
+    fn main_canvas(&self, board_name: String, call_stat: Statistics, rect: Rect) -> impl Widget + '_ {
         let now = Local::now();
         let width = rect.width as f64 - 2.0; // -2 for border
         let height = rect.height as f64;
@@ -207,14 +194,7 @@ impl CallWaitScreen {
                     Line::from(node_txt).style(Style::new().fg(DOS_WHITE)),
                 );
 
-                render_button(
-                    ctx,
-                    4.0,
-                    height - 2.0,
-                    width - 7.0,
-                    &self.board.lock().unwrap().config.board.name,
-                    SelectState::Selected,
-                );
+                render_button(ctx, 4.0, height - 2.0, width - 7.0, &board_name, SelectState::Selected);
 
                 let y_padding = -2.0;
                 let button_space = width / 3.0;
@@ -253,7 +233,6 @@ impl CallWaitScreen {
                 //self.icy_board.lock().borrow().as_ref().unwrap().data.stat
 
                 render_label(ctx, 4.0, separator_y - 2.0, width - 7.0, &self.sysavail_txt);
-                let call_stat = &self.board.lock().unwrap().statistics;
                 let last_caller = if let Some(lc) = call_stat.last_callers.last() {
                     lc.clone()
                 } else {

@@ -24,8 +24,13 @@ use ratatui::{
     prelude::*,
     widgets::{canvas::Canvas, Paragraph},
 };
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    runtime::Builder,
+};
 
 use crate::{
+    bbs::BBS,
     call_wait_screen::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GREEN, DOS_WHITE},
     icy_engine_output::Screen,
     menu_runner::PcbBoardCommand,
@@ -37,14 +42,15 @@ pub struct Tui {
     session: Arc<Mutex<Session>>,
     connection: Arc<Mutex<ChannelConnection>>,
     status_bar: usize,
-    handle: Option<thread::JoinHandle<Result<(), String>>>,
+    is_running: bool,
 }
 
 impl Tui {
-    pub fn new(board: Arc<Mutex<IcyBoard>>) -> Self {
+    pub async fn new(board: &mut BBS) -> Self {
         let ui_session = Arc::new(Mutex::new(Session::new()));
         let session = ui_session.clone();
         let (mut ui_connection, connection) = ChannelConnection::create_pair();
+        let board = board.board.clone();
         let ui_board = board.clone();
         let join = thread::spawn(move || {
             let mut state = IcyBoardState::new(board, Box::new(connection));
@@ -54,33 +60,39 @@ impl Tui {
 
             let orig_hook = std::panic::take_hook();
             std::panic::set_hook(Box::new(move |panic_info| {
+                restore_terminal().unwrap();
                 log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
                 log::error!("full info: {:?}", panic_info);
 
                 orig_hook(panic_info);
             }));
+            let rt = Builder::new_current_thread().enable_all().build().unwrap();
+            let local = tokio::task::LocalSet::new();
+            local.spawn_local(async move {
+                loop {
+                    session.lock().unwrap().cur_user = cmd.state.session.cur_user;
+                    session.lock().unwrap().current_conference = cmd.state.session.current_conference.clone();
+                    session.lock().unwrap().disp_options = cmd.state.session.disp_options.clone();
 
-            loop {
-                session.lock().unwrap().cur_user = cmd.state.session.cur_user;
-                session.lock().unwrap().current_conference = cmd.state.session.current_conference.clone();
-                session.lock().unwrap().disp_options = cmd.state.session.disp_options.clone();
-
-                if let Err(err) = cmd.do_command() {
+                    if let Err(err) = cmd.do_command().await {
+                        cmd.state.session.disp_options.reset_printout();
+                        log::error!("Error: {}", err);
+                        cmd.state.set_color(4.into()).await.unwrap();
+                        cmd.state
+                            .print(icy_board_engine::vm::TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err))
+                            .await
+                            .unwrap();
+                        cmd.state.reset_color().await.unwrap();
+                    }
                     cmd.state.session.disp_options.reset_printout();
-                    log::error!("Error: {}", err);
-                    cmd.state.set_color(4.into()).unwrap();
-                    cmd.state
-                        .print(icy_board_engine::vm::TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err))
-                        .unwrap();
-                    cmd.state.reset_color().unwrap();
+                    if cmd.state.session.request_logoff {
+                        cmd.state.connection.shutdown();
+                        return;
+                    }
+                    thread::sleep(Duration::from_millis(20));
                 }
-                cmd.state.session.disp_options.reset_printout();
-                if cmd.state.session.request_logoff {
-                    cmd.state.connection.shutdown();
-                    return Ok(());
-                }
-                thread::sleep(Duration::from_millis(20));
-            }
+            });
+            rt.block_on(local);
         });
         let ui_screen = Arc::new(Mutex::new(Screen::new()));
         let ui_connection = Arc::new(Mutex::new(ui_connection));
@@ -94,11 +106,11 @@ impl Tui {
             session: ui_session,
             connection: ui_connection,
             status_bar: 0,
-            handle: Some(join),
+            is_running: true,
         }
     }
 
-    pub fn run(&mut self) -> Res<()> {
+    pub async fn run(&mut self) -> Res<()> {
         let mut terminal = init_terminal()?;
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(20);
@@ -110,7 +122,7 @@ impl Tui {
             parser.bs_is_ctrl_char = true;
             let mut redraw = false;
             loop {
-                let size = self.connection.lock().unwrap().read(&mut screen_buf)?;
+                let size = self.connection.lock().unwrap().read(&mut screen_buf).await?;
                 if size == 0 {
                     break;
                 }
@@ -121,15 +133,14 @@ impl Tui {
                     }
                 }
             }
-
+            /*
             if self.handle.as_ref().unwrap().is_finished() {
                 restore_terminal()?;
                 let handle = self.handle.take().unwrap();
                 if let Err(_err) = handle.join() {
                     return Err(Box::new(IcyBoardError::ThreadCrashed));
                 }
-                return Ok(());
-            }
+            }*/
             if redraw {
                 let _ = terminal.draw(|frame| {
                     if let Ok(board) = &self.board.lock() {
@@ -137,57 +148,70 @@ impl Tui {
                     }
                 });
             }
+
+            self.draw_terminal(&mut terminal);
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
-            if event::poll(timeout)? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press {
-                        if key.modifiers.contains(KeyModifiers::ALT) {
-                            match key.code {
-                                KeyCode::Char('h') => {
-                                    self.status_bar = (self.status_bar + 1) % 2;
-                                }
-                                KeyCode::Char('x') => {
-                                    let _ = restore_terminal();
-
-                                    return Ok(());
-                                }
-                                _ => {}
-                            }
-                        } else {
-                            match key.code {
-                                KeyCode::Char(c) => {
-                                    if (c == 'x' || c == 'c') && key.modifiers.contains(KeyModifiers::CONTROL) {
-                                        let _ = disable_raw_mode();
-                                        return Ok(());
-                                    }
-                                    self.add_input(c.to_string().chars())?
-                                }
-                                KeyCode::Enter => self.add_input("\r".chars())?,
-                                KeyCode::Backspace => self.add_input("\x08".chars())?,
-                                KeyCode::Esc => self.add_input("\x1B".chars())?,
-                                KeyCode::Tab => self.add_input("\x09".chars())?,
-                                KeyCode::Delete => self.add_input("\x7F".chars())?,
-
-                                KeyCode::Insert => self.add_input("\x1B[2~".chars())?,
-                                KeyCode::Home => self.add_input("\x1B[H".chars())?,
-                                KeyCode::End => self.add_input("\x1B[F".chars())?,
-                                KeyCode::Up => self.add_input("\x1B[A".chars())?,
-                                KeyCode::Down => self.add_input("\x1B[B".chars())?,
-                                KeyCode::Right => self.add_input("\x1B[C".chars())?,
-                                KeyCode::Left => self.add_input("\x1B[D".chars())?,
-                                KeyCode::PageUp => self.add_input("\x1B[5~".chars())?,
-                                KeyCode::PageDown => self.add_input("\x1B[6~".chars())?,
-                                _ => {}
-                            }
-                        }
-                    }
-                }
-            }
+            self.poll_input(timeout).await?;
 
             if last_tick.elapsed() >= tick_rate {
                 last_tick = Instant::now();
             }
         }
+    }
+
+    fn draw_terminal(&mut self, terminal: &mut Terminal<CrosstermBackend<Stdout>>) {
+        let board = &self.board.lock().unwrap();
+        let _ = terminal.draw(|frame| {
+            self.ui(frame, board);
+        });
+    }
+
+    async fn poll_input(&mut self, timeout: Duration) -> Res<()> {
+        if event::poll(timeout)? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press {
+                    if key.modifiers.contains(KeyModifiers::ALT) {
+                        match key.code {
+                            KeyCode::Char('h') => {
+                                self.status_bar = (self.status_bar + 1) % 2;
+                            }
+                            KeyCode::Char('x') => {
+                                self.is_running = false;
+                                return Ok(());
+                            }
+                            _ => {}
+                        }
+                    } else {
+                        match key.code {
+                            KeyCode::Char(c) => {
+                                if (c == 'x' || c == 'c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                                    self.is_running = false;
+                                    return Ok(());
+                                }
+                                self.add_input(c.to_string().chars()).await?;
+                            }
+                            KeyCode::Enter => self.add_input("\r".chars()).await?,
+                            KeyCode::Backspace => self.add_input("\x08".chars()).await?,
+                            KeyCode::Esc => self.add_input("\x1B".chars()).await?,
+                            KeyCode::Tab => self.add_input("\x09".chars()).await?,
+                            KeyCode::Delete => self.add_input("\x7F".chars()).await?,
+
+                            KeyCode::Insert => self.add_input("\x1B[2~".chars()).await?,
+                            KeyCode::Home => self.add_input("\x1B[H".chars()).await?,
+                            KeyCode::End => self.add_input("\x1B[F".chars()).await?,
+                            KeyCode::Up => self.add_input("\x1B[A".chars()).await?,
+                            KeyCode::Down => self.add_input("\x1B[B".chars()).await?,
+                            KeyCode::Right => self.add_input("\x1B[C".chars()).await?,
+                            KeyCode::Left => self.add_input("\x1B[D".chars()).await?,
+                            KeyCode::PageUp => self.add_input("\x1B[5~".chars()).await?,
+                            KeyCode::PageDown => self.add_input("\x1B[6~".chars()).await?,
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     fn ui(&self, frame: &mut Frame, board: &IcyBoard) {
@@ -202,7 +226,7 @@ impl Tui {
         }
     }
 
-    fn status_bar(&self, board: &IcyBoard) -> impl Widget + '_ {
+    fn status_bar(&self, _board: &IcyBoard) -> impl Widget + '_ {
         let user_name;
         let current_conf;
         let cur_security;
@@ -211,7 +235,7 @@ impl Tui {
         let upbytes;
         let dn;
         let dnbytes;
-        if let Ok(user) = self.session.lock() {
+        /*   if let Ok(user) = self.session.lock() {
             current_conf = user.current_conference_number;
             cur_security = user.cur_security;
             if user.cur_user >= 0 {
@@ -229,7 +253,8 @@ impl Tui {
                 upbytes = 0;
                 dnbytes = 0;
             }
-        } else {
+        } else*/
+        {
             user_name = String::new();
             current_conf = 0;
             cur_security = 0;
@@ -309,12 +334,12 @@ impl Tui {
             .y_bounds([0.0, area.height as f64])
     }
 
-    fn add_input(&self, c_seq: std::str::Chars<'_>) -> Res<()> {
+    async fn add_input(&mut self, c_seq: std::str::Chars<'_>) -> Res<()> {
         let mut s = String::new();
         for c in c_seq {
             s.push(c);
         }
-        self.connection.lock().unwrap().write_all(s.as_bytes())?;
+        self.connection.lock().unwrap().write_all(s.as_bytes()).await?;
         Ok(())
     }
 }

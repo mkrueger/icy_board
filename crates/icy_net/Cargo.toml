@@ -10,6 +10,7 @@ authors.workspace = true
 log = { workspace = true }
 thiserror = { workspace = true }
 tempfile = { workspace = true }
+tokio = { workspace = true }
 
 # MODEM
 serial = "0.4.0"

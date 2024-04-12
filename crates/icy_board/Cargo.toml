@@ -13,6 +13,7 @@ codepages = { workspace = true}
 dizbase = { workspace = true}
 icy_engine = { workspace = true }
 icy_net = { workspace = true }
+tokio = { workspace = true }
 
 lazy_static = { workspace = true }
 semver = { workspace = true }
@@ -36,7 +37,7 @@ toml = { workspace = true }
 relative-path = "1.9.2"
 regex = "1.10.4"
 temp-file = "0.1.8"
-
+async-recursion = "1.1.0"
 # for file view kb/mb
 humanize-bytes = "1.0.5"
 

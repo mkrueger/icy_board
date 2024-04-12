@@ -1,11 +1,12 @@
-use std::io::{Read, Write};
+use tokio::io::{AsyncRead, AsyncWrite};
+
 pub mod channel;
-pub mod modem;
+// pub mod modem;
 pub mod raw;
-pub mod serial;
-pub mod ssh;
-pub mod telnet;
-pub mod websocket;
+// pub mod serial;
+// pub mod ssh;
+// pub mod telnet;
+// pub mod websocket;
 
 pub struct ConnectionData {
     pub address: String,
@@ -34,16 +35,16 @@ impl ConnectionType {
     }
 }
 
-pub trait Connection: Read + Write {
+pub trait Connection: AsyncRead + AsyncWrite + Unpin {
     fn get_connection_type(&self) -> ConnectionType;
 
     fn shutdown(&mut self) -> crate::Result<()> {
         Ok(())
     }
-
+    /*
     fn read_u8(&mut self) -> crate::Result<u8> {
         let mut buf = [0; 1];
         self.read_exact(&mut buf)?;
         Ok(buf[0])
-    }
+    }*/
 }

@@ -1,13 +1,20 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, sync::Arc};
 
 use icy_board_engine::icy_board::{state::Session, IcyBoard};
-use icy_net::Connection;
+use icy_net::connection::{raw::RawConnection, Connection};
+use icy_ppe::Res;
+use tokio::{
+    net::TcpListener,
+    sync::{mpsc, Mutex},
+};
+
+pub type Tx = tokio::sync::mpsc::UnboundedSender<Vec<u8>>;
+pub type Rx = tokio::sync::mpsc::UnboundedReceiver<Vec<u8>>;
 
 pub struct ActiveConnection {
     pub connection: Box<dyn Connection>,
+    pub tx: Tx,
+
     pub session: Session,
 }
 

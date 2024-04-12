@@ -2,25 +2,29 @@ use std::{
     io::stdout,
     path::{Path, PathBuf},
     process,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
+use bbs::BBS;
 use call_wait_screen::{CallWaitMessage, CallWaitScreen};
 use chrono::Local;
 use clap::{Parser, Subcommand};
 use crossterm::{terminal::Clear, ExecutableCommand};
 use icy_board_engine::icy_board::IcyBoard;
 use icy_engine_output::Screen;
+use icy_ppe::Res;
 use import::{
     console_logger::{print_error, ConsoleLogger},
     PCBoardImporter,
 };
+use menu_runner::PcbBoardCommand;
 use semver::Version;
+use tokio::sync::Mutex;
 use tui::{print_exit_screen, Tui};
 
 use crate::call_wait_screen::restore_terminal;
 
-mod bbs;
+pub mod bbs;
 mod call_wait_screen;
 mod icy_engine_output;
 mod import;
@@ -53,9 +57,9 @@ enum Commands {
 lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
-/// evlevlelvelvelv`
 
-fn main() {
+#[tokio::main]
+async fn main() -> Res<()> {
     let arguments = Cli::parse();
 
     match &arguments.command {
@@ -76,12 +80,14 @@ fn main() {
             }
         }
         Commands::Run { file } => {
-            start_icy_board(file);
+            start_icy_board(file).await?;
         }
     }
+
+    Ok(())
 }
 
-pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) {
+pub async fn start_icy_board<P: AsRef<Path>>(config_file: &P) -> Res<()> {
     fern::Dispatch::new()
         // Perform allocation-free log formatting
         .format(|out, message, record| {
@@ -105,12 +111,12 @@ pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) {
 
     match IcyBoard::load(config_file) {
         Ok(icy_board) => {
-            let board = Arc::new(Mutex::new(icy_board));
+            let mut bbs = BBS::new(icy_board);
             loop {
-                let mut app = CallWaitScreen::new(board.clone()).unwrap();
-                match app.run() {
+                let mut app = CallWaitScreen::new(&bbs).await?;
+                match app.run(&mut bbs).await {
                     Ok(msg) => {
-                        run_message(msg, board.clone());
+                        run_message(msg, &mut bbs).await;
                     }
                     Err(err) => {
                         restore_terminal().unwrap();
@@ -122,20 +128,20 @@ pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) {
         }
         Err(err) => {
             log::error!("while loading icy board configuration: {}", err.to_string());
-            print_error(err.to_string());
+            Err(err)
         }
     }
 }
 
-fn run_message(msg: CallWaitMessage, board: Arc<Mutex<IcyBoard>>) {
+async fn run_message(msg: CallWaitMessage, bbs: &mut BBS) {
     match msg {
         CallWaitMessage::User(busy) | CallWaitMessage::Sysop(busy) => {
             println!("Login {}...", busy);
 
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
 
-            let mut tui = Tui::new(board);
-            if let Err(err) = tui.run() {
+            let mut tui = Tui::new(bbs).await;
+            if let Err(err) = tui.run().await {
                 restore_terminal().unwrap();
                 log::error!("while running board in local mode: {}", err.to_string());
                 println!("Error: {}", err);

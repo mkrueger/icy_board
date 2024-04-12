@@ -7,6 +7,7 @@ use std::{
     time::Duration,
 };
 
+use async_recursion::async_recursion;
 use chrono::{DateTime, Datelike, Local, Timelike};
 use codepages::tables::UNICODE_TO_CP437;
 use icy_engine::ansi::constants::COLOR_OFFSETS;
@@ -14,6 +15,7 @@ use icy_engine::TextAttribute;
 use icy_engine::{ansi, Buffer, BufferParser, Caret};
 use icy_net::Connection;
 use icy_ppe::{datetime::IcbDate, executable::Executable, Res};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::vm::{run, DiskIO, TerminalTarget};
 pub mod functions;
@@ -275,67 +277,66 @@ impl IcyBoardState {
         // TODO: Check time left.
     }
 
-    pub fn reset_color(&mut self) -> Res<()> {
+    pub async fn reset_color(&mut self) -> Res<()> {
         let color = self.board.lock().unwrap().config.color_configuration.default.clone();
-        self.set_color(color)
+        self.set_color(color).await
     }
 
-    pub fn clear_screen(&mut self) -> Res<()> {
+    pub async fn clear_screen(&mut self) -> Res<()> {
         self.session.num_lines_printed = 0;
         if self.use_ansi() {
-            self.print(TerminalTarget::Both, "\x1B[2J\x1B[H")
+            self.print(TerminalTarget::Both, "\x1B[2J\x1B[H").await
         } else {
             // form feed character
-            self.print(TerminalTarget::Both, "\x0C")
+            self.print(TerminalTarget::Both, "\x0C").await
         }
     }
 
-    pub fn clear_line(&mut self) -> Res<()> {
+    pub async fn clear_line(&mut self) -> Res<()> {
         if self.use_ansi() {
-            self.print(TerminalTarget::Both, "\r\x1B[K")
+            self.print(TerminalTarget::Both, "\r\x1B[K").await
         } else {
             // TODO
             Ok(())
         }
     }
 
-    pub fn clear_eol(&mut self) -> Res<()> {
+    pub async fn clear_eol(&mut self) -> Res<()> {
         if self.use_ansi() {
-            self.print(TerminalTarget::Both, "\x1B[K")
+            self.print(TerminalTarget::Both, "\x1B[K").await
         } else {
             Ok(())
         }
     }
 
-    pub fn set_current_user(&mut self, user: i32) {
+    pub async fn set_current_user(&mut self, user: i32) {
         self.session.cur_user = user;
         if user >= 0 {
-            let last_conference = if let Ok(board) = self.board.lock() {
+            let last_conference = {
+                let board = self.board.lock().unwrap();
                 self.current_user = Some(board.users[user as usize].clone());
                 self.session.cur_security = board.users[user as usize].security_level;
                 self.session.page_len = board.users[user as usize].page_len;
                 board.users[user as usize].last_conference as i32
-            } else {
-                return;
             };
-            self.join_conference(last_conference);
+            self.join_conference(last_conference).await;
         }
     }
 
-    pub fn join_conference(&mut self, conference: i32) {
-        if conference >= 0 && conference < self.board.lock().unwrap().conferences.len() as i32 {
+    pub async fn join_conference(&mut self, conference: i32) {
+        let board = self.board.lock().unwrap();
+        if conference >= 0 && conference < board.conferences.len() as i32 {
             self.session.current_conference_number = conference;
-            if let Ok(board) = self.board.lock() {
-                self.session.current_conference = board.conferences[conference as usize].clone();
-            }
+            self.session.current_conference = board.conferences[conference as usize].clone();
 
-            let file_area_file = self.resolve_path(&self.session.current_conference.file_area_file);
+            let file_area_file = self.resolve_path(&self.session.current_conference.file_area_file).await;
             self.session.current_file_areas = FileAreaList::load(&file_area_file).unwrap();
             // todo unwrap
         }
     }
 
-    fn next_line(&mut self) -> Res<bool> {
+    #[async_recursion(?Send)]
+    async fn next_line(&mut self) -> Res<bool> {
         if self.session.disp_options.non_stop {
             return Ok(true);
         }
@@ -348,36 +349,39 @@ impl IcyBoardState {
         self.session.last_new_line_y = cur_y;
 
         if self.session.page_len > 0 && self.session.num_lines_printed >= self.session.page_len as usize {
-            self.more_promt()
+            self.more_promt().await?;
+            Ok(true)
         } else {
             Ok(true)
         }
     }
 
-    pub fn run_ppe<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>) -> Res<()> {
+    pub async fn run_ppe<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>) -> Res<()> {
         match Executable::read_file(&file_name, false) {
             Ok(executable) => {
                 let path = PathBuf::from(file_name.as_ref());
                 let parent = path.parent().unwrap().to_str().unwrap().to_string();
 
                 let mut io = DiskIO::new(&parent, answer_file);
-                if let Err(err) = run(file_name, &executable, &mut io, self) {
+                if let Err(err) = run(file_name, &executable, &mut io, self).await {
                     log::error!("Error executing PPE {}: {}", file_name.as_ref().display(), err);
                     self.session.op_text = format!("{}", err);
-                    self.display_text(IceText::ErrorExecPPE, display_flags::LFBEFORE | display_flags::LFAFTER)?;
+                    self.display_text(IceText::ErrorExecPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
+                        .await?;
                 }
             }
             Err(err) => {
                 log::error!("Error loading PPE {}: {}", file_name.as_ref().display(), err);
                 self.session.op_text = format!("{}", err);
-                self.display_text(IceText::ErrorLoadingPPE, display_flags::LFBEFORE | display_flags::LFAFTER)?;
+                self.display_text(IceText::ErrorLoadingPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
+                    .await?;
             }
         }
 
         Ok(())
     }
 
-    pub fn put_keyboard_buffer(&mut self, value: &str) -> Res<()> {
+    pub async fn put_keyboard_buffer(&mut self, value: &str) -> Res<()> {
         let in_chars: Vec<char> = value.chars().collect();
 
         for (i, c) in in_chars.iter().enumerate() {
@@ -392,45 +396,36 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub fn load_bullettins(&self) -> Res<BullettinList> {
-        if let Ok(board) = self.board.lock() {
-            let path = board.resolve_file(&self.session.current_conference.blt_file);
-            BullettinList::load(&path)
-        } else {
-            Err("Board is locked".into())
-        }
+    pub async fn load_bullettins(&self) -> Res<BullettinList> {
+        let board = self.board.lock().unwrap();
+        let path = board.resolve_file(&self.session.current_conference.blt_file);
+        BullettinList::load(&path)
     }
 
-    pub fn load_surveys(&self) -> Res<SurveyList> {
-        if let Ok(board) = self.board.lock() {
-            let path = board.resolve_file(&self.session.current_conference.survey_file);
-            SurveyList::load(&path)
-        } else {
-            Err("Board is locked".into())
-        }
+    pub async fn load_surveys(&self) -> Res<SurveyList> {
+        let board = self.board.lock().unwrap();
+        let path = board.resolve_file(&self.session.current_conference.survey_file);
+        SurveyList::load(&path)
     }
 
-    pub fn get_pcbdat(&self) -> Res<String> {
-        if let Ok(board) = self.board.lock() {
-            let path = board.resolve_file(&board.config.paths.tmp_path);
+    pub async fn get_pcbdat(&self) -> Res<String> {
+        let board = self.board.lock().unwrap();
+        let path = board.resolve_file(&board.config.paths.tmp_path);
 
-            let path = PathBuf::from(path);
-            if !path.is_dir() {
-                fs::create_dir_all(&path)?;
-            }
-            let output = path.join("pcboard.dat");
-
-            if let Err(err) = board.export_pcboard(&output) {
-                log::error!("Error writing pcbdat.dat file: {}", err);
-                return Err(err);
-            }
-            Ok(output.to_str().unwrap().to_string())
-        } else {
-            Err("Board is locked".into())
+        let path = PathBuf::from(path);
+        if !path.is_dir() {
+            fs::create_dir_all(&path)?;
         }
+        let output = path.join("pcboard.dat");
+
+        if let Err(err) = board.export_pcboard(&output) {
+            log::error!("Error writing pcbdat.dat file: {}", err);
+            return Err(err);
+        }
+        Ok(output.to_str().unwrap().to_string())
     }
 
-    pub fn try_find_command(&self, command: &str) -> Option<super::commands::Command> {
+    pub async fn try_find_command(&self, command: &str) -> Option<super::commands::Command> {
         let command = command.to_ascii_uppercase();
         for cmd in &self.session.current_conference.commands {
             if cmd.keyword == command {
@@ -458,7 +453,7 @@ impl IcyBoardState {
 
         None
     }
-    pub fn resolve_path<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
+    pub async fn resolve_path<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
         PathBuf::from(self.board.lock().unwrap().resolve_file(&file))
     }
 }
@@ -485,33 +480,37 @@ impl IcyBoardState {
     }
 
     /// # Errors
-    pub fn gotoxy(&mut self, target: TerminalTarget, x: i32, y: i32) -> Res<()> {
+    pub async fn gotoxy(&mut self, target: TerminalTarget, x: i32, y: i32) -> Res<()> {
         if self.use_ansi() {
             self.write_raw(target, format!("\x1B[{};{}H", y, x).chars().collect::<Vec<char>>().as_slice())
+                .await
         } else {
             Ok(())
         }
     }
 
-    pub fn backward(&mut self, chars: i32) -> Res<()> {
+    pub async fn backward(&mut self, chars: i32) -> Res<()> {
         if self.use_ansi() {
             self.write_raw(TerminalTarget::Both, format!("\x1B[{}D", chars).chars().collect::<Vec<char>>().as_slice())
+                .await
         } else {
             Ok(())
         }
     }
 
-    pub fn forward(&mut self, chars: i32) -> Res<()> {
+    pub async fn forward(&mut self, chars: i32) -> Res<()> {
         if self.use_ansi() {
             self.write_raw(TerminalTarget::Both, format!("\x1B[{}C", chars).chars().collect::<Vec<char>>().as_slice())
+                .await
         } else {
             Ok(())
         }
     }
 
     /// # Errors
-    pub fn print(&mut self, target: TerminalTarget, str: &str) -> Res<()> {
-        self.write_raw(target, str.chars().collect::<Vec<char>>().as_slice())
+    pub async fn print(&mut self, target: TerminalTarget, str: &str) -> Res<()> {
+        let vec = str.chars().collect::<Vec<char>>();
+        self.write_raw(target, &vec).await
     }
 
     fn no_terminal(&self, terminal_target: TerminalTarget) -> bool {
@@ -520,36 +519,43 @@ impl IcyBoardState {
             _ => false,
         }
     }
+    fn to_bytes(&self, data: &[char]) -> Vec<u8> {
+        let mut vec = Vec::with_capacity(data.len());
+        for c in data {
+            vec.push(*c as u8);
+        }
+        vec
+    }
 
-    fn write_char(&mut self, c: char) -> Res<()> {
+    #[async_recursion(?Send)]
+    async fn write_char(&mut self, c: char) -> Res<()> {
         self.parser.print_char(&mut self.buffer, 0, &mut self.caret, c)?;
-
         if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
-            self.connection.write_all(&[cp437])?;
+            self.connection.write_all(&[cp437]).await?;
         } else {
-            self.connection.write_all(&[b'.'])?;
+            self.connection.write_all(&[b'.']).await?;
         }
         if c == '\n' {
-            self.next_line()?;
+            self.next_line().await?;
         }
         Ok(())
     }
 
-    fn write_string(&mut self, data: &[char]) -> Res<()> {
+    async fn write_string(&mut self, data: &[char]) -> Res<()> {
         let mut b = Vec::new();
         for c in data {
             self.parser.print_char(&mut self.buffer, 0, &mut self.caret, *c)?;
             if *c == '\n' {
-                self.next_line()?;
+                self.next_line().await?;
             }
             b.push(*c as u8);
         }
-        self.connection.write_all(&b)?;
+        self.connection.write_all(&b).await?;
         Ok(())
     }
 
     /// # Errors
-    pub fn write_raw(&mut self, target: TerminalTarget, data: &[char]) -> Res<()> {
+    pub async fn write_raw(&mut self, target: TerminalTarget, data: &[char]) -> Res<()> {
         if self.no_terminal(target) {
             return Ok(());
         }
@@ -565,7 +571,7 @@ impl IcyBoardState {
                         if *c == '@' {
                             state = PcbState::GotAt;
                         } else {
-                            self.write_char(*c)?;
+                            self.write_char(*c).await?;
                         }
                     }
                     PcbState::GotAt => {
@@ -578,8 +584,8 @@ impl IcyBoardState {
                     PcbState::ReadAtSequence(s) => {
                         if *c == '@' {
                             state = PcbState::Default;
-                            if let Some(s) = self.translate_variable(&s) {
-                                self.write_string(s.chars().collect::<Vec<char>>().as_slice())?;
+                            if let Some(s) = self.translate_variable(&s).await {
+                                self.write_string(s.chars().collect::<Vec<char>>().as_slice()).await?;
                             }
                         } else {
                             state = PcbState::ReadAtSequence(s + &c.to_string());
@@ -589,20 +595,20 @@ impl IcyBoardState {
                         if c.is_ascii_hexdigit() {
                             state = PcbState::ReadColor2(*c);
                         } else {
-                            self.write_char('@')?;
-                            self.write_char(*c)?;
+                            self.write_char('@').await?;
+                            self.write_char(*c).await?;
                             state = PcbState::Default;
                         }
                     }
                     PcbState::ReadColor2(ch1) => {
                         state = PcbState::Default;
                         if !c.is_ascii_hexdigit() {
-                            self.write_char('@')?;
-                            self.write_char(ch1)?;
-                            self.write_char(*c)?;
+                            self.write_char('@').await?;
+                            self.write_char(ch1).await?;
+                            self.write_char(*c).await?;
                         } else {
                             let color = (c.to_digit(16).unwrap() | (ch1.to_digit(16).unwrap() << 4)) as u8;
-                            self.set_color(color.into())?;
+                            self.set_color(color.into()).await?;
                         }
                     }
                 }
@@ -611,7 +617,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    fn translate_variable(&mut self, input: &str) -> Option<String> {
+    async fn translate_variable(&mut self, input: &str) -> Option<String> {
         let mut split = input.split(':');
         let id = split.next().unwrap();
         let param = split.next();
@@ -734,7 +740,7 @@ impl IcyBoardState {
             "NOCHAR" => result = self.no_char.to_string(),
             "NODE" => result = self.session.node_num.to_string(),
             "NUMBLT" => {
-                if let Ok(bullettins) = self.load_bullettins() {
+                if let Ok(bullettins) = self.load_bullettins().await {
                     result = bullettins.len().to_string();
                 }
             }
@@ -865,12 +871,12 @@ impl IcyBoardState {
     }
 
     /// # Errors
-    pub fn get_char(&mut self) -> Res<Option<(bool, char)>> {
+    pub async fn get_char(&mut self) -> Res<Option<(bool, char)>> {
         if let Some(ch) = self.char_buffer.pop_front() {
             return Ok(Some((true, ch)));
         }
         let mut a = [0; 1];
-        let size = self.connection.read(&mut a)?;
+        let size = self.connection.read(&mut a).await?;
         if size == 1 {
             Ok(Some((true, a[0] as char)))
         } else {
@@ -883,7 +889,7 @@ impl IcyBoardState {
         self.char_buffer.len() as i32
     }
 
-    pub fn set_color(&mut self, color: IcbColor) -> Res<()> {
+    pub async fn set_color(&mut self, color: IcbColor) -> Res<()> {
         if !self.use_graphics() {
             return Ok(());
         }
@@ -931,7 +937,7 @@ impl IcyBoardState {
 
         color_change.pop();
         color_change += "m";
-        self.write_string(color_change.chars().collect::<Vec<char>>().as_slice())
+        self.write_string(color_change.chars().collect::<Vec<char>>().as_slice()).await
     }
 
     pub fn get_caret_position(&mut self) -> (i32, i32) {
@@ -939,58 +945,64 @@ impl IcyBoardState {
     }
 
     /// # Errors
-    pub fn hangup(&mut self) -> Res<()> {
+    pub async fn hangup(&mut self) -> Res<()> {
         /*   if HangupType::Hangup != hangup_type {
 
-            if HangupType::Goodbye == hangup_type {
-                let logoff_script = self
-                    .board
-                    .lock()
-                    .as_ref()
-                    .unwrap()
-                    .data
-                    .paths
-                    .logoff_script
-                    .clone();
-                self.display_file(&logoff_script)?;
-            }
+        if HangupType::Goodbye == hangup_type {
+            let logoff_script = self
+                .board
+                .lock()
+                .as_ref()
+                .unwrap()
+                .data
+                .paths
+                .logoff_script
+                .clone();
+            self.display_file(&logoff_script)?;
+        }
 
-
-        } */
-        self.display_text(IceText::ThanksForCalling, display_flags::LFBEFORE | display_flags::NEWLINE)?;
-        self.reset_color()?;
+        */
+        self.display_text(IceText::ThanksForCalling, display_flags::LFBEFORE | display_flags::NEWLINE)
+            .await?;
+        self.reset_color().await?;
         self.session.request_logoff = true;
-        self.connection.shutdown()?;
+        self.connection.shutdown().await?;
         Ok(())
     }
 
-    pub fn bell(&mut self) -> Res<()> {
-        self.write_raw(TerminalTarget::Both, &['\x07'])
+    pub async fn bell(&mut self) -> Res<()> {
+        self.write_char('\x07').await
     }
 
-    pub fn more_promt(&mut self) -> Res<bool> {
+    pub async fn more_promt(&mut self) -> Res<()> {
         if self.session.disable_auto_more {
             self.session.more_requested = true;
-            return Ok(true);
+            return Ok(());
         }
-        let result = self.input_field(
-            IceText::MorePrompt,
-            12,
-            "YyNn",
-            "HLPMORE",
-            display_flags::YESNO | display_flags::UPCASE | display_flags::STACKED | display_flags::ERASELINE,
-        )?;
-        Ok(result != "N")
-    }
-
-    pub fn press_enter(&mut self) -> Res<()> {
-        self.session.disable_auto_more = true;
-        self.session.more_requested = false;
-        self.input_field(IceText::PressEnter, 0, "", "", display_flags::ERASELINE)?;
+        let result = self
+            .input_field(
+                IceText::MorePrompt,
+                12,
+                "YyNn",
+                "HLPMORE",
+                display_flags::YESNO | display_flags::UPCASE | display_flags::STACKED | display_flags::ERASELINE,
+            )
+            .await?;
+        if result == "N" {
+            self.session.cancel_batch = true;
+        }
         Ok(())
     }
 
-    pub fn new_line(&mut self) -> Res<()> {
-        self.write_raw(TerminalTarget::Both, &['\r', '\n'])
+    #[async_recursion(?Send)]
+    pub async fn press_enter(&mut self) -> Res<()> {
+        self.session.disable_auto_more = true;
+        self.session.more_requested = false;
+        self.input_field(IceText::PressEnter, 0, "", "", display_flags::ERASELINE).await?;
+        Ok(())
+    }
+
+    pub async fn new_line(&mut self) -> Res<()> {
+        self.write_raw(TerminalTarget::Both, &['\r', '\n']).await
     }
 }

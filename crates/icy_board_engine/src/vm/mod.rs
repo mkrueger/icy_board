@@ -1,3 +1,4 @@
+use async_recursion::async_recursion;
 use icy_ppe::ast::BinOp;
 use icy_ppe::ast::Statement;
 use icy_ppe::ast::UnaryOp;
@@ -22,8 +23,9 @@ pub mod statements;
 use crate::icy_board::pcboard_data::Node;
 use crate::icy_board::state::IcyBoardState;
 use crate::icy_board::user_base::User;
+use crate::icy_board::IcyBoard;
 
-use self::expressions::FUNCTION_TABLE;
+use self::expressions::run_function;
 pub use self::statements::*;
 
 pub mod io;
@@ -118,7 +120,7 @@ impl ReturnAddress {
 }
 
 pub struct VirtualMachine<'a> {
-    io: &'a mut dyn PCBoardIO,
+    io: &'a mut DiskIO,
     pub file_name: PathBuf,
     pub variable_table: VariableTable,
 
@@ -136,10 +138,14 @@ pub struct VirtualMachine<'a> {
     write_back_stack: Vec<PPEExpr>,
 
     pub label_table: HashMap<usize, usize>,
-    pub push_pop_stack: Vec<VariableValue>,
+    pub push_pop_stack: Vec<Box<VariableValue>>,
 }
 
 impl<'a> VirtualMachine<'a> {
+    async fn icy_board(&self) -> std::sync::MutexGuard<IcyBoard> {
+        self.icy_board_state.board.lock().unwrap()
+    }
+
     fn set_user_variables(&mut self, cur_user: &User) {
         self.variable_table.set_value(U_EXPERT, VariableValue::new_bool(cur_user.flags.expert_mode));
         self.variable_table.set_value(U_FSE, VariableValue::new_bool(cur_user.flags.use_fsedefault));
@@ -295,98 +301,117 @@ impl<'a> VirtualMachine<'a> {
         }
     }
 
-    fn eval_expr(&mut self, expr: &PPEExpr) -> Res<VariableValue> {
-        match expr {
-            PPEExpr::Invalid => Err(VMError::InternalVMError.into()),
-            PPEExpr::Value(id) => Ok(self.variable_table.get_value(*id).clone()),
-            PPEExpr::UnaryExpression(op, expr) => {
-                let val = self.eval_expr(expr)?;
-                match op {
-                    UnaryOp::Not => Ok(val.not()),
-                    UnaryOp::Minus => Ok(-val),
-                    UnaryOp::Plus => Ok(val),
+    async fn eval_expr(&mut self, expr: &PPEExpr) -> Res<Box<VariableValue>> {
+        Box::pin(async move {
+            match expr {
+                PPEExpr::Invalid => Err(VMError::InternalVMError.into()),
+                PPEExpr::Value(id) => Ok(Box::new(self.variable_table.get_value(*id).clone())),
+                PPEExpr::UnaryExpression(op, expr) => {
+                    let val = self.eval_expr(expr).await?;
+                    match op {
+                        UnaryOp::Not => Ok(Box::new(val.not())),
+                        UnaryOp::Minus => Ok(Box::new(-*val)),
+                        UnaryOp::Plus => Ok(val),
+                    }
+                }
+                PPEExpr::BinaryExpression(op, left, right) => {
+                    let left_value = self.eval_expr(left).await?;
+                    let right_value = self.eval_expr(right).await?;
+
+                    match op {
+                        BinOp::Add => Ok(Box::new(*left_value + *right_value)),
+                        BinOp::Sub => Ok(Box::new(*left_value - *right_value)),
+                        BinOp::Mul => Ok(Box::new(*left_value * *right_value)),
+                        BinOp::Div => Ok(Box::new(*left_value / *right_value)),
+                        BinOp::Mod => Ok(Box::new(*left_value % *right_value)),
+                        BinOp::PoW => Ok(Box::new(left_value.pow(*right_value))),
+                        BinOp::Eq => Ok(Box::new(VariableValue::new_bool(left_value == right_value))),
+                        BinOp::NotEq => Ok(Box::new(VariableValue::new_bool(left_value != right_value))),
+                        BinOp::Or => Ok(Box::new(VariableValue::new_bool(left_value.as_bool() || right_value.as_bool()))),
+                        BinOp::And => Ok(Box::new(VariableValue::new_bool(left_value.as_bool() && right_value.as_bool()))),
+                        BinOp::Lower => Ok(Box::new(VariableValue::new_bool(left_value < right_value))),
+                        BinOp::LowerEq => Ok(Box::new(VariableValue::new_bool(left_value <= right_value))),
+                        BinOp::Greater => Ok(Box::new(VariableValue::new_bool(left_value > right_value))),
+                        BinOp::GreaterEq => Ok(Box::new(VariableValue::new_bool(left_value >= right_value))),
+                    }
+                }
+                PPEExpr::Dim(id, dims) => {
+                    let dim_1 = self.eval_expr(&dims[0]).await?.as_int() as usize;
+                    let dim_2 = if dims.len() >= 2 {
+                        self.eval_expr(&dims[1]).await?.as_int() as usize
+                    } else {
+                        0
+                    };
+                    let dim_3 = if dims.len() >= 3 {
+                        self.eval_expr(&dims[2]).await?.as_int() as usize
+                    } else {
+                        0
+                    };
+
+                    Ok(Box::new(self.variable_table.get_value(*id).get_array_value(dim_1, dim_2, dim_3)))
+                }
+                PPEExpr::PredefinedFunctionCall(func, arguments) => match run_function(func.opcode, self, arguments).await {
+                    Ok(val) => Ok(val),
+                    Err(e) => Err(VMError::ErrorInFunctionCall(func.name.to_string(), e.to_string()).into()),
+                },
+
+                PPEExpr::FunctionCall(func_id, arguments) => {
+                    let proc_offset;
+                    let locals;
+                    let parameters;
+                    let first;
+                    let return_var_id;
+                    unsafe {
+                        let proc = &self.variable_table.get_var_entry(*func_id);
+                        proc_offset = proc.value.data.function_value.start_offset as usize;
+                        first = (proc.value.data.function_value.first_var_id + 1) as usize;
+                        locals = proc.value.data.function_value.local_variables as usize;
+                        parameters = proc.value.data.function_value.parameters as usize;
+                        return_var_id = proc.value.data.function_value.return_var as usize;
+                    }
+
+                    self.prepare_call(locals, parameters, first, arguments, 0).await?;
+
+                    self.return_addresses.push(ReturnAddress::func_call(self.cur_ptr, *func_id));
+                    self.goto(proc_offset)?;
+                    self.run().await?;
+                    self.fpclear = false;
+                    Ok(Box::new(self.variable_table.get_value(return_var_id).clone()))
                 }
             }
-            PPEExpr::BinaryExpression(op, left, right) => {
-                let left_value = self.eval_expr(left)?;
-                let right_value = self.eval_expr(right)?;
-
-                match op {
-                    BinOp::Add => Ok(left_value + right_value),
-                    BinOp::Sub => Ok(left_value - right_value),
-                    BinOp::Mul => Ok(left_value * right_value),
-                    BinOp::Div => Ok(left_value / right_value),
-                    BinOp::Mod => Ok(left_value % right_value),
-                    BinOp::PoW => Ok(left_value.pow(right_value)),
-                    BinOp::Eq => Ok(VariableValue::new_bool(left_value == right_value)),
-                    BinOp::NotEq => Ok(VariableValue::new_bool(left_value != right_value)),
-                    BinOp::Or => Ok(VariableValue::new_bool(left_value.as_bool() || right_value.as_bool())),
-                    BinOp::And => Ok(VariableValue::new_bool(left_value.as_bool() && right_value.as_bool())),
-                    BinOp::Lower => Ok(VariableValue::new_bool(left_value < right_value)),
-                    BinOp::LowerEq => Ok(VariableValue::new_bool(left_value <= right_value)),
-                    BinOp::Greater => Ok(VariableValue::new_bool(left_value > right_value)),
-                    BinOp::GreaterEq => Ok(VariableValue::new_bool(left_value >= right_value)),
-                }
-            }
-            PPEExpr::Dim(id, dims) => {
-                let dim_1 = self.eval_expr(&dims[0])?.as_int() as usize;
-                let dim_2 = if dims.len() >= 2 { self.eval_expr(&dims[1])?.as_int() as usize } else { 0 };
-                let dim_3 = if dims.len() >= 3 { self.eval_expr(&dims[2])?.as_int() as usize } else { 0 };
-
-                Ok(self.variable_table.get_value(*id).get_array_value(dim_1, dim_2, dim_3))
-            }
-
-            PPEExpr::PredefinedFunctionCall(func, arguments) => match (FUNCTION_TABLE[(func.opcode as i16).unsigned_abs() as usize])(self, arguments) {
-                Ok(val) => Ok(val),
-                Err(e) => Err(VMError::ErrorInFunctionCall(func.name.to_string(), e.to_string()).into()),
-            },
-
-            PPEExpr::FunctionCall(func_id, arguments) => {
-                let proc_offset;
-                let locals;
-                let parameters;
-                let first;
-                let return_var_id;
-                unsafe {
-                    let proc = &self.variable_table.get_var_entry(*func_id);
-                    proc_offset = proc.value.data.function_value.start_offset as usize;
-                    first = (proc.value.data.function_value.first_var_id + 1) as usize;
-                    locals = proc.value.data.function_value.local_variables as usize;
-                    parameters = proc.value.data.function_value.parameters as usize;
-                    return_var_id = proc.value.data.function_value.return_var as usize;
-                }
-
-                self.prepare_call(locals, parameters, first, arguments, 0)?;
-
-                self.return_addresses.push(ReturnAddress::func_call(self.cur_ptr, *func_id));
-                self.goto(proc_offset)?;
-                self.run()?;
-                self.fpclear = false;
-                Ok(self.variable_table.get_value(return_var_id).clone())
-            }
-        }
+        })
+        .await
     }
 
-    fn run(&mut self) -> Res<()> {
+    #[async_recursion(?Send)]
+    async fn run(&mut self) -> Res<()> {
         let max_ptr = self.script.statements.len();
         while !self.fpclear && self.is_running && self.cur_ptr < max_ptr {
             let p = self.cur_ptr;
             self.cur_ptr += 1;
             let c = self.script.statements[p].command.clone();
-            self.execute_statement(&c)?;
+            self.execute_statement(&c).await?;
         }
         Ok(())
     }
 
-    fn set_variable(&mut self, variable: &PPEExpr, value: VariableValue) -> Res<()> {
+    async fn set_variable(&mut self, variable: &PPEExpr, value: VariableValue) -> Res<()> {
         match variable {
             PPEExpr::Value(id) => {
                 self.variable_table.set_value(*id, value);
             }
             PPEExpr::Dim(id, dims) => {
-                let dim_1 = self.eval_expr(&dims[0])?.as_int() as usize;
-                let dim_2 = if dims.len() >= 2 { self.eval_expr(&dims[1])?.as_int() as usize } else { 0 };
-                let dim_3 = if dims.len() >= 3 { self.eval_expr(&dims[2])?.as_int() as usize } else { 0 };
+                let dim_1 = self.eval_expr(&dims[0]).await?.as_int() as usize;
+                let dim_2 = if dims.len() >= 2 {
+                    self.eval_expr(&dims[1]).await?.as_int() as usize
+                } else {
+                    0
+                };
+                let dim_3 = if dims.len() >= 3 {
+                    self.eval_expr(&dims[2]).await?.as_int() as usize
+                } else {
+                    0
+                };
 
                 self.variable_table.get_var_entry_mut(*id).value.set_array_value(dim_1, dim_2, dim_3, value);
             }
@@ -397,7 +422,7 @@ impl<'a> VirtualMachine<'a> {
         Ok(())
     }
 
-    fn execute_statement(&mut self, stmt: &PPECommand) -> Res<()> {
+    async fn execute_statement(&mut self, stmt: &PPECommand) -> Res<()> {
         match stmt {
             PPECommand::End | PPECommand::Stop => {
                 self.is_running = false;
@@ -464,7 +489,7 @@ impl<'a> VirtualMachine<'a> {
                                     };
                                     if let Some(argument_expr) = self.write_back_stack.pop() {
                                         //println!("pop pass value {}", val);
-                                        self.set_variable(&argument_expr, val)?;
+                                        self.set_variable(&argument_expr, val).await?;
                                     } else {
                                         return Err(VMError::WriteBackStackEmpty.into());
                                     }
@@ -482,7 +507,7 @@ impl<'a> VirtualMachine<'a> {
             }
 
             PPECommand::IfNot(expr, label) => {
-                let value = self.eval_expr(expr)?.as_bool();
+                let value = self.eval_expr(expr).await?.as_bool();
                 if !value {
                     self.goto(*label)?;
                 }
@@ -503,14 +528,14 @@ impl<'a> VirtualMachine<'a> {
                     parameters = proc.value.data.procedure_value.parameters as usize;
                     pass_flags = proc.value.data.procedure_value.pass_flags;
                 }
-                self.prepare_call(locals, parameters, first, arguments, pass_flags)?;
+                self.prepare_call(locals, parameters, first, arguments, pass_flags).await?;
 
                 self.return_addresses.push(ReturnAddress::func_call(self.cur_ptr, *proc_id));
                 self.goto(proc_offset)?;
             }
 
             PPECommand::PredefinedCall(proc, arguments) => {
-                (STATEMENT_TABLE[proc.opcode as usize])(self, arguments)?;
+                run_predefined_statement(proc.opcode, self, arguments).await?;
             }
 
             PPECommand::Goto(label) => {
@@ -521,8 +546,8 @@ impl<'a> VirtualMachine<'a> {
                 self.goto(*label)?;
             }
             PPECommand::Let(variable, expr) => {
-                let val = self.eval_expr(expr)?;
-                self.set_variable(variable, val)?;
+                let val = self.eval_expr(expr).await?;
+                self.set_variable(variable, *val).await?;
             }
         }
 
@@ -530,7 +555,7 @@ impl<'a> VirtualMachine<'a> {
     }
 
     #[allow(clippy::needless_range_loop)]
-    fn prepare_call(&mut self, locals: usize, parameters: usize, first: usize, arguments: &[PPEExpr], pass_flags: u16) -> Res<()> {
+    async fn prepare_call(&mut self, locals: usize, parameters: usize, first: usize, arguments: &[PPEExpr], pass_flags: u16) -> Res<()> {
         // store locals + parameters
         for i in 0..(locals + parameters) {
             let id = first + i;
@@ -542,9 +567,9 @@ impl<'a> VirtualMachine<'a> {
         }
         for i in 0..parameters {
             let id = first + i;
-            let value = self.eval_expr(&arguments[i])?;
+            let value = self.eval_expr(&arguments[i]).await?;
             //  println!("set parameter {:02X} to {}", id, value);
-            self.variable_table.set_value(id, value);
+            self.variable_table.set_value(id, *value);
 
             if (1 << i) & pass_flags != 0 {
                 self.write_back_stack.push(arguments[i].clone());
@@ -574,14 +599,14 @@ impl<'a> VirtualMachine<'a> {
         }
     }
 
-    pub fn resolve_file<P: AsRef<Path>>(&self, file: &P) -> String {
-        self.icy_board_state.board.lock().unwrap().resolve_file(file)
+    pub async fn resolve_file<P: AsRef<Path>>(&self, file: &P) -> String {
+        self.icy_board().await.resolve_file(file)
     }
 }
 
 /// .
 /// # Errors
-pub fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn PCBoardIO, icy_board_state: &mut IcyBoardState) -> Res<bool> {
+pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut DiskIO, icy_board_state: &mut IcyBoardState) -> Res<bool> {
     let Ok(script) = PPEScript::from_ppe_file(prg) else {
         return Ok(false);
     };
@@ -606,7 +631,7 @@ pub fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn PCBoard
         write_back_stack: Vec::new(),
         push_pop_stack: Vec::new(),
     };
-    vm.run()?;
+    vm.run().await?;
     Ok(true)
 }
 

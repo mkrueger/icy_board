@@ -12,8 +12,6 @@ use crossterm::style::SetForegroundColor;
 use crossterm::terminal::disable_raw_mode;
 use crossterm::terminal::enable_raw_mode;
 use crossterm::ExecutableCommand;
-use icy_board_engine::icy_board::state::IcyBoardState;
-use icy_board_engine::vm::run;
 use icy_board_engine::vm::DiskIO;
 use icy_ppe::executable::Executable;*/
 use semver::Version; /*
@@ -21,6 +19,7 @@ use semver::Version; /*
                      use std::io::stdout;
                      use std::path::Path;
                      */
+
 #[derive(clap::Parser)]
 #[command(version="", about="PCBoard Programming Language Execution Environment", long_about = None)]
 struct Cli {

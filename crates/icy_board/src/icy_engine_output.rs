@@ -1,10 +1,21 @@
+use std::{collections::VecDeque, sync::Arc};
+
 use icy_engine::{ansi, Buffer, BufferParser, Caret};
+use tokio::sync::Mutex;
 
 pub struct Screen {
     pub caret: Caret,
     pub buffer: Buffer,
 }
 
+impl Clone for Screen {
+    fn clone(&self) -> Self {
+        Self {
+            caret: self.caret.clone(),
+            buffer: self.buffer.flat_clone(false),
+        }
+    }
+}
 impl Screen {
     pub fn new() -> Screen {
         let mut buffer = Buffer::new((80, 24));

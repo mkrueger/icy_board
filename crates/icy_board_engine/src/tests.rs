@@ -2,7 +2,7 @@ use std::{
     env,
     fs::read_to_string,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 use icy_ppe::{
@@ -12,6 +12,7 @@ use icy_ppe::{
     semantic::SemanticVisitor,
     Res,
 };
+use tokio::sync::Mutex;
 
 use crate::{
     icy_board::IcyBoard,

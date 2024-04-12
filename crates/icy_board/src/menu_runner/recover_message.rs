@@ -8,7 +8,7 @@ use jamjam::jam::JamMessageBase;
 use super::{PcbBoardCommand, MASK_COMMAND};
 
 impl PcbBoardCommand {
-    pub fn restore_message(&mut self, action: &Command) -> Res<()> {
+    pub async fn restore_message(&mut self, action: &Command) -> Res<()> {
         let message_base_file = &self.state.session.current_conference.message_areas[0].filename;
         let msgbase_file_resolved = self.state.board.lock().unwrap().resolve_file(message_base_file);
 
@@ -19,20 +19,22 @@ impl PcbBoardCommand {
                 } else {
                     self.state.session.op_text = format!("{}-{}", message_base.base_messagenumber(), message_base.active_messages());
 
-                    self.state.input_field(
-                        IceText::MessageNumberToActivate,
-                        40,
-                        MASK_COMMAND,
-                        &action.help,
-                        display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
-                    )?
+                    self.state
+                        .input_field(
+                            IceText::MessageNumberToActivate,
+                            40,
+                            MASK_COMMAND,
+                            &action.help,
+                            display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
+                        )
+                        .await?
                 };
 
                 if let Ok(number) = msg.parse::<u32>() {
-                    self.try_to_restore_message(&message_base, number)?;
+                    self.try_to_restore_message(&message_base, number).await?;
                 }
 
-                self.state.press_enter()?;
+                self.state.press_enter().await;
                 self.display_menu = true;
                 Ok(())
             }
@@ -40,38 +42,40 @@ impl PcbBoardCommand {
                 log::error!("Message index load error {}", err);
                 log::error!("Creating new message index at {}", &msgbase_file_resolved);
                 self.state
-                    .display_text(IceText::CreatingNewMessageIndex, display_flags::NEWLINE | display_flags::LFAFTER)?;
+                    .display_text(IceText::CreatingNewMessageIndex, display_flags::NEWLINE | display_flags::LFAFTER)
+                    .await?;
                 if JamMessageBase::create(msgbase_file_resolved).is_ok() {
                     log::error!("successfully created new message index.");
-                    return self.read_messages(action);
+                    return self.read_messages(action).await;
                 }
                 log::error!("failed to create message index.");
 
                 self.state
-                    .display_text(IceText::PathErrorInSystemConfiguration, display_flags::NEWLINE | display_flags::LFAFTER)?;
+                    .display_text(IceText::PathErrorInSystemConfiguration, display_flags::NEWLINE | display_flags::LFAFTER)
+                    .await?;
 
-                self.state.press_enter()?;
+                self.state.press_enter().await;
                 self.display_menu = true;
                 Ok(())
             }
         }
     }
 
-    fn try_to_restore_message(&mut self, message_base: &JamMessageBase, number: u32) -> Res<()> {
+    async fn try_to_restore_message(&mut self, message_base: &JamMessageBase, number: u32) -> Res<()> {
         match message_base.restore_message(number) {
             Ok(_) => {
                 log::error!("Restore message {} ({})", number, message_base.get_filename().display());
-                self.state.display_text(IceText::MessageRestored, display_flags::DEFAULT)?;
-                self.state.print(TerminalTarget::Both, &format!("{}", number))?;
-                self.state.new_line()?;
-                self.state.new_line()?;
+                self.state.display_text(IceText::MessageRestored, display_flags::DEFAULT).await?;
+                self.state.print(TerminalTarget::Both, &format!("{}", number)).await?;
+                self.state.new_line().await?;
+                self.state.new_line().await?;
             }
             Err(err) => {
                 log::error!("Error restoring message:{} ({})/ {}", number, message_base.get_filename().display(), err);
-                self.state.display_text(IceText::NoSuchMessageNumber, display_flags::DEFAULT)?;
-                self.state.print(TerminalTarget::Both, &format!("{}", number))?;
-                self.state.new_line()?;
-                self.state.new_line()?;
+                self.state.display_text(IceText::NoSuchMessageNumber, display_flags::DEFAULT).await?;
+                self.state.print(TerminalTarget::Both, &format!("{}", number)).await?;
+                self.state.new_line().await?;
+                self.state.new_line().await?;
             }
         }
         Ok(())

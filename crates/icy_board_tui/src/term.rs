@@ -39,7 +39,7 @@ pub fn init() -> Result<TerminalType> {
         viewport: Viewport::Fullscreen,
     };
     let terminal = Terminal::with_options(CrosstermBackend::new(io::stdout()), options)?;
-    enable_raw_mode().context("enable raw mode")?;
+    // enable_raw_mode().context("enable raw mode")?;
     stdout().execute(EnterAlternateScreen).wrap_err("enter alternate screen")?;
     Ok(terminal)
 }

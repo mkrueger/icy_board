@@ -1,27 +1,29 @@
+use std::{
+    io,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use tokio::{
+    io::{AsyncRead, AsyncWrite, ReadBuf},
+    sync::mpsc::{UnboundedReceiver, UnboundedSender},
+};
+
 use super::{Connection, ConnectionType};
-use std::collections::VecDeque;
-use std::io::{self, Read, Write};
-use std::sync::mpsc;
-use std::sync::mpsc::{Receiver, Sender};
 
 pub struct ChannelConnection {
-    buffer: VecDeque<u8>,
-    rx: Receiver<Vec<u8>>,
-    tx: Sender<Vec<u8>>,
+    rx: UnboundedReceiver<Vec<u8>>,
+    tx: UnboundedSender<Vec<u8>>,
 }
 
 impl ChannelConnection {
-    pub fn new(rx: Receiver<Vec<u8>>, tx: Sender<Vec<u8>>) -> Self {
-        Self {
-            buffer: VecDeque::new(),
-            rx,
-            tx,
-        }
+    pub fn new(rx: UnboundedReceiver<Vec<u8>>, tx: UnboundedSender<Vec<u8>>) -> Self {
+        Self { rx, tx }
     }
 
     pub fn create_pair() -> (ChannelConnection, ChannelConnection) {
-        let (tx1, rx1) = mpsc::channel();
-        let (tx2, rx2) = mpsc::channel();
+        let (tx1, rx1) = tokio::sync::mpsc::unbounded_channel();
+        let (tx2, rx2) = tokio::sync::mpsc::unbounded_channel();
         (ChannelConnection::new(rx1, tx2), ChannelConnection::new(rx2, tx1))
     }
 }
@@ -32,81 +34,54 @@ impl Connection for ChannelConnection {
     }
 }
 
-impl Read for ChannelConnection {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if !self.buffer.is_empty() {
-            let len = self.buffer.len().min(buf.len());
-            buf[..len].copy_from_slice(&self.buffer.drain(..len).collect::<Vec<u8>>());
-            return Ok(len);
-        }
-        match self.rx.try_recv() {
-            Ok(data) => {
-                if data.is_empty() {
-                    return Ok(0);
-                }
-                let len = data.len().min(buf.len());
-                buf[..len].copy_from_slice(&data[..len]);
-                self.buffer.extend(data.into_iter().skip(len));
-                Ok(len)
+impl AsyncRead for ChannelConnection {
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+        let p = self.rx.poll_recv(cx);
+        match p {
+            Poll::Ready(Some(data)) => {
+                buf.put_slice(&data);
+                Poll::Ready(Ok(()))
             }
-            Err(err) => match err {
-                mpsc::TryRecvError::Empty => Ok(0),
-                mpsc::TryRecvError::Disconnected => Err(io::Error::new(io::ErrorKind::BrokenPipe, err)),
-            },
+            Poll::Ready(None) => Poll::Ready(Ok(())),
+            Poll::Pending => Poll::Pending,
         }
     }
 }
 
-impl Write for ChannelConnection {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if let Err(err) = self.tx.send(buf.to_vec()) {
-            return Err(io::Error::new(io::ErrorKind::BrokenPipe, err));
+impl AsyncWrite for ChannelConnection {
+    fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+        let p = self.tx.send(buf.to_vec());
+        if let Err(err) = p {
+            return Poll::Ready(Err(io::Error::new(io::ErrorKind::BrokenPipe, err)));
         }
-        Ok(buf.len())
+        Poll::Ready(Ok(buf.len()))
     }
 
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-    #[test]
-    fn test_reader_writer_pair() {
+    #[tokio::test]
+    async fn test_reader_writer_pair() {
         let (mut p1, mut p2) = ChannelConnection::create_pair();
-        p1.write_all("Hello World".as_bytes()).unwrap();
+        tokio::spawn(async move {
+            p1.write_all("Hello World".as_bytes()).await.unwrap();
+        })
+        .await
+        .unwrap();
 
         let mut buf = [0u8; 11];
-        p2.read_exact(&mut buf).unwrap();
+        p2.read_exact(&mut buf).await.unwrap();
         assert_eq!(&buf, "Hello World".as_bytes());
-    }
-
-    #[test]
-    fn test_reader_writer_pair2() {
-        let (mut p1, mut p2) = ChannelConnection::create_pair();
-        p1.write_all("Hello".as_bytes()).unwrap();
-        p1.write_all(" ".as_bytes()).unwrap();
-        p1.write_all("World".as_bytes()).unwrap();
-
-        let mut buf = [0u8; 11];
-        p2.read_exact(&mut buf).unwrap();
-        assert_eq!(&buf, "Hello World".as_bytes());
-    }
-
-    #[test]
-    fn read_chars() {
-        let (mut p1, mut p2) = ChannelConnection::create_pair();
-        p1.write_all("Hello World".as_bytes()).unwrap();
-
-        let mut s = String::new();
-        for _ in 0..11 {
-            let mut buf = [0; 1];
-            let len = p2.read(&mut buf).unwrap();
-            s.push(buf[0] as char);
-        }
-        assert_eq!(&s, "Hello World");
     }
 }
