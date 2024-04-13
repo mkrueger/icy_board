@@ -36,6 +36,7 @@ The goal is to be as compatible as possible but enhancing PCBoard for the modere
 * Message base format changed to JAM
   * Planned is to support multiple message base formats
   * Means all PPEs/tools break that may read the old format
+* No security level centralization. Security levels are now on command basis. 
 
 ### CP437 is dead
 
@@ -51,13 +52,12 @@ So it's possible to use a modern (non CP437) text editor to alter the BBS files.
   
 ### Command changes
 
-* Conferences can now have more than one message area - message area switch is implemented with "I" command
-* "I" command switched to "IW"
+* No more hard coded commands. They're now all configurable
 
 ### PPE/Menus
 
 * `.MNU` files are converted to a new .toml format (in the assumption that no `.PPE` will handle `.MNU` files)
-* PCBoard is now case sensitive on unix but that does NOT apply to `.PPE` files. Note: May change for new `.PPE` files but will always be remain for old ones.
+* PCBoard is now case sensitive on unix but that does NOT apply to `.PPE` files. Note: May change for new `.PPE` files but will always remain for old ones for compatiblity reasons.
 
 ### Trashcan
 
@@ -65,6 +65,21 @@ A simple text file read line by line. If a line starts with '#' it's treated as 
 Leading & traling whitespaces are ignored
 
 
+### Enhancements
+
+* Access System is more complex. The old one had user levels. An access now consists of a combination of:
+  * security level
+  * group (like unix groups)
+  * age 
+* Added more trashcans: bad_email, bad_passwords
+* New 'vip' users vip_users.txt (same as trashcan). But a list of users which the sysop gets a notification for logon (from RemoteAccess)
+* 
+
+### Planned Enhancements/Discussion 
+
+* Access system time limit - so it's only open at certain days & times - however only command where that makes sense to me is the sysop page.
+But I like the RA "DayTimes" system.
+* 
 
 # PPLEngine
 

@@ -6,7 +6,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use bbs::PcbBoardCommand;
 use call_wait_screen::{CallWaitMessage, CallWaitScreen};
 use chrono::Local;
 use clap::{Parser, Subcommand};
@@ -17,15 +16,16 @@ use import::{
     console_logger::{print_error, ConsoleLogger},
     PCBoardImporter,
 };
+use menu_runner::PcbBoardCommand;
 use semver::Version;
 use tui::{print_exit_screen, Tui};
 
 use crate::call_wait_screen::restore_terminal;
 
-pub mod bbs;
 mod call_wait_screen;
 mod icy_engine_output;
 mod import;
+pub mod menu_runner;
 mod tui;
 
 #[derive(clap::Parser)]

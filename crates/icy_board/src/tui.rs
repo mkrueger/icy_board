@@ -23,9 +23,9 @@ use ratatui::{
 };
 
 use crate::{
-    bbs::PcbBoardCommand,
     call_wait_screen::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GREEN, DOS_WHITE},
     icy_engine_output::Screen,
+    menu_runner::PcbBoardCommand,
 };
 
 pub struct Tui {

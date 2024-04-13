@@ -1,8 +1,6 @@
 use ratatui::prelude::*;
 
 pub struct Theme {
-    pub content: Style,
-
     pub title_bar: Style,
     pub app_title: Style,
     pub tabs: Style,
@@ -12,6 +10,7 @@ pub struct Theme {
     pub key_binding_description: Style,
 
     pub status_line: Style,
+    pub status_line_text: Style,
 
     pub item: Style,
     pub selected_item: Style,
@@ -20,38 +19,68 @@ pub struct Theme {
     pub edit_value: Style,
 
     pub content_box: Style,
+    pub content_box_title: Style,
 
     pub table_header: Style,
+
+    pub swatch: bool,
 }
 
-pub const THEME: Theme = Theme {
-    content: Style::new().bg(DARK_BLUE).fg(LIGHT_GRAY),
+pub const THEME: Theme = /* Theme {
 
-    title_bar: Style::new().bg(DOS_BLUE),
-    app_title: Style::new().fg(WHITE).bg(DOS_BLUE).add_modifier(Modifier::BOLD),
-    tabs: Style::new().fg(DOS_WHITE).bg(DOS_BLUE),
-    tabs_selected: Style::new()
-        .fg(DOS_CYAN)
-        .bg(DOS_LIGHT_CYAN)
-        .add_modifier(Modifier::BOLD)
-        .add_modifier(Modifier::REVERSED),
+        title_bar: Style::new().bg(DOS_RED),
+        app_title: Style::new().fg(DOS_YELLOW).bg(DOS_RED).add_modifier(Modifier::BOLD),
+        tabs: Style::new().fg(DOS_YELLOW).bg(DOS_RED),
+        tabs_selected: Style::new()
+            .bg(DOS_RED)
+            .fg(DOS_YELLOW)
+            .add_modifier(Modifier::BOLD)
+            .add_modifier(Modifier::REVERSED),
 
-    content_box: Style::new().bg(DOS_BLACK).fg(DOS_DARKGRAY),
+        content_box: Style::new().bg(DOS_BLACK).fg(DOS_BLUE),
 
-    key_binding: Style::new().bg(DOS_DARKGRAY).fg(DOS_LIGHT_GRAY),
-    key_binding_description: Style::new().bg(DOS_BLACK).fg(DOS_DARKGRAY),
+        key_binding: Style::new().bg(DOS_BROWN).fg(DOS_BLACK),
+        key_binding_description: Style::new().bg(DOS_BROWN).fg(DOS_BLACK),
 
-    status_line: Style::new().bg(DOS_BLACK).fg(DOS_CYAN),
+        status_line: Style::new().bg(DOS_BLACK).fg(DOS_CYAN),
 
-    item: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
-    selected_item: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
+        item: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GREEN),
+        selected_item: Style::new().bg(DOS_CYAN).fg(DOS_YELLOW),
 
-    value: Style::new().bg(DOS_BLACK).fg(LIGHT_GRAY),
-    edit_value: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
-    table_header: Style::new().bg(DOS_BLUE).fg(DOS_WHITE),
-};
+        value: Style::new().bg(DOS_BLACK).fg(DOS_CYAN),
+        edit_value: Style::new().bg(DOS_RED).fg(DOS_WHITE),
+        table_header: Style::new().bg(DOS_BLACK).fg(DOS_RED),
 
-const DARK_BLUE: Color = Color::Rgb(16, 24, 48);
+        swatch: false
+    };*/
+    Theme {
+        title_bar: Style::new().bg(DOS_BLUE),
+        app_title: Style::new().fg(WHITE).bg(DOS_BLUE).add_modifier(Modifier::BOLD),
+        tabs: Style::new().fg(DOS_WHITE).bg(DOS_BLUE),
+        tabs_selected: Style::new()
+            .fg(DOS_CYAN)
+            .bg(DOS_LIGHT_CYAN)
+            .add_modifier(Modifier::BOLD)
+            .add_modifier(Modifier::REVERSED),
+
+        content_box: Style::new().bg(DOS_BLACK).fg(DOS_DARKGRAY),
+        content_box_title: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
+
+        key_binding: Style::new().bg(DOS_DARKGRAY).fg(DOS_LIGHT_GRAY),
+        key_binding_description: Style::new().bg(DOS_BLACK).fg(DOS_DARKGRAY),
+
+        status_line: Style::new().bg(DOS_BLACK).fg(DOS_CYAN),
+        status_line_text: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_CYAN),
+        item: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
+        selected_item: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
+
+        value: Style::new().bg(DOS_BLACK).fg(LIGHT_GRAY),
+        edit_value: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
+        table_header: Style::new().bg(DOS_BLUE).fg(DOS_WHITE),
+        swatch: true,
+    };
+
+// const DARK_BLUE: Color = Color::Rgb(16, 24, 48);
 const LIGHT_GRAY: Color = Color::Rgb(188, 188, 188);
 const WHITE: Color = Color::Rgb(238, 238, 238); // not really white, often #eeeeee
 
