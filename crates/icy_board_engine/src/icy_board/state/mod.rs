@@ -438,13 +438,25 @@ impl IcyBoardState {
     pub fn try_find_command(&self, command: &str) -> Option<super::commands::Command> {
         let command = command.to_ascii_uppercase();
         for cmd in &self.session.current_conference.commands {
-            if cmd.keyword.contains(&command) {
+            if cmd.keyword == command {
                 return Some(cmd.clone());
             }
         }
 
         for cmd in &self.board.lock().unwrap().commands.commands {
-            if cmd.keyword.contains(&command) {
+            if cmd.keyword == command {
+                return Some(cmd.clone());
+            }
+        }
+
+        for cmd in &self.session.current_conference.commands {
+            if cmd.keyword.starts_with(&command) {
+                return Some(cmd.clone());
+            }
+        }
+
+        for cmd in &self.board.lock().unwrap().commands.commands {
+            if cmd.keyword.starts_with(&command) {
                 return Some(cmd.clone());
             }
         }
