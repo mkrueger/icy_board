@@ -14,7 +14,8 @@ members = [
 	"crates/scandb",
 	"crates/codepages", 
 	"crates/icy_board_tui",
-	"crates/mkicbmnu", 
+	"crates/mkicbmnu",
+	"crates/icy_net", 
 ]
 
 [workspace.package]
@@ -28,7 +29,7 @@ dizbase = { path = "crates/dizbase" }
 jamjam = { path = "crates/jamjam" }
 icy_board_tui = { path = "crates/icy_board_tui" }
 
-#icy_net = { path = "crates/icy_net" }
+icy_net = { path = "crates/icy_net" }
 icy_ppe = { path = "crates/icy_ppe" }
 icy_board_engine = { path = "crates/icy_board_engine" }
 icy_engine = { git ="https://github.com/mkrueger/icy_tools" }

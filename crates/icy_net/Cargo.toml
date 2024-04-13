@@ -1,0 +1,35 @@
+[package]
+name = "icy_net"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = { workspace = true }
+thiserror = { workspace = true }
+tempfile = { workspace = true }
+
+# MODEM
+serial = "0.4.0"
+
+# SSH
+libssh-rs =  { version = "0.2.2", features = ["vendored", "vendored-openssl"] }
+
+# WEBSOCKETS
+tungstenite = { version = "0.21.0", features = [
+    "rustls-tls-webpki-roots", # webpki root CAs
+    "__rustls-tls",            # use Rustls
+]}
+
+http = "1.1.0"
+url = "2.5.0"
+rustls = { version = "0.22.0", features = [
+    "tls12",
+ #   "dangerous_configuration"  # Allow invalid certs/etc.
+]}
+webpki-roots = "0.26.1"
+
+[dev-dependencies]
+pretty_assertions = "1"
