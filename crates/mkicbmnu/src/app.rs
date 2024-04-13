@@ -99,7 +99,7 @@ impl App {
     /// This function is called once per frame, The events are polled from the stdin with timeout of
     /// 1/50th of a second. This was chosen to try to match the default frame rate of a GIF in VHS.
     fn handle_events(&mut self, terminal: &mut TerminalType) -> Result<()> {
-        let timeout = Duration::from_secs_f64(1.0 / 50.0);
+        let timeout = Duration::from_secs_f64(1.0);
         match next_event(timeout)? {
             Some(Event::Key(key)) if key.kind == KeyEventKind::Press => self.handle_key_press(terminal, key),
             _ => {}

@@ -146,10 +146,11 @@ impl CallWaitScreen {
     pub fn run(&mut self) -> Res<CallWaitMessage> {
         let mut terminal = init_terminal()?;
         let mut last_tick = Instant::now();
-        let tick_rate = Duration::from_millis(16);
+        let tick_rate = Duration::from_millis(1000);
 
         loop {
             terminal.draw(|frame| self.ui(frame))?;
+
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
 
             if event::poll(timeout)? && self.selected.is_none() {
