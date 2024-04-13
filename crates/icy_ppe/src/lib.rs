@@ -10,6 +10,8 @@
     clippy::struct_excessive_bools,
     clippy::module_name_repetitions
 )]
+
+use std::error::Error;
 extern crate core;
 extern crate lazy_static;
 
@@ -23,4 +25,4 @@ pub mod parser;
 pub mod semantic;
 pub mod tables;
 
-pub type Res<T> = Result<T, Box<dyn std::error::Error>>;
+pub type Res<T> = Result<T, Box<dyn Error + Send + Sync>>;

@@ -21,14 +21,8 @@ impl ImportLog {
             }
         }
     }
-    pub fn log_boxed_error(&mut self, res: Option<Box<dyn std::error::Error>>) -> Res<()> {
-        match res {
-            None => Ok(()),
-            Some(e) => {
-                self.output.push_str(&format!("Error {}\n", e));
-                Err(e)
-            }
-        }
+    pub fn log_boxed_error(&mut self, e: &dyn std::error::Error) {
+        self.output.push_str(&format!("Error {}\n", e));
     }
 
     pub(crate) fn converted_file(&mut self, src: &Path, destination: &Path, converted_to_utf8: bool) {

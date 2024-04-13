@@ -7,4 +7,4 @@ pub mod pcboard;
 pub mod qwk;
 pub mod util;
 
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;

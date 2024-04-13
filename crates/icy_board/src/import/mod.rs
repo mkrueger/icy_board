@@ -258,7 +258,9 @@ impl PCBoardImporter {
 
         let destination = self.output_directory.join("icyboard.toml");
         self.output.start_action(format!("Create main configuration {}…", destination.display()));
-        self.logger.log_boxed_error(icb_cfg.save(&destination).err())?;
+        if let Err(err) = icb_cfg.save(&destination) {
+            self.logger.log_boxed_error(&*err);
+        }
         self.output.start_action("done.".into());
         self.logger.log("done.");
 
@@ -368,7 +370,9 @@ impl PCBoardImporter {
         for (i, entry) in text_file.iter_mut().enumerate() {
             entry.text = self.scan_line_for_commands(&entry.text, &format!("PCBTEXT, entry {}", i))?;
         }
-        self.logger.log_boxed_error(text_file.save(&destination).err())?;
+        if let Err(err) = text_file.save(&destination) {
+            self.logger.log_boxed_error(&*err);
+        }
         self.logger.converted_file(&resolved_file, &destination, true);
         self.logger.log("");
 
@@ -687,7 +691,9 @@ impl PCBoardImporter {
             T::default()
         };
         let destination = self.output_directory.join(new_rel_name);
-        self.logger.log_boxed_error(res.save(&destination).err())?;
+        if let Err(err) = res.save(&destination) {
+            self.logger.log_boxed_error(&*err);
+        }
         self.logger.log("");
 
         Ok(PathBuf::from(new_rel_name))
