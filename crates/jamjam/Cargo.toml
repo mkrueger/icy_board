@@ -10,13 +10,15 @@ license-file = "LICENSE"
 keywords = ["jam", "pcboard", "qwk", "qwke", "messagebase"]
 
 [dependencies]
-thiserror = "1.0.58"
-rayon = "1.10.0"
-log = "0.4.14"
-chrono = "0.4.37"
-rand = "0.8.4"
-bstr = "1.9.1"
+lazy_static = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+chrono = { workspace = true }
+bstr = { workspace = true }
+
+rayon = { workspace = true }
+rand = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = "1"
-tempfile = "3"
+tempfile = { workspace = true }

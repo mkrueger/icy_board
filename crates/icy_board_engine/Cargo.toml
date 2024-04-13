@@ -8,24 +8,31 @@ edition.workspace = true
 
 [dependencies]
 icy_ppe = { workspace = true }
-icy_engine = { git ="https://github.com/mkrueger/icy_tools" }
-lazy_static = "1.4.0"
-thiserror = "1.0.57"
-log = "0.4.21"
-unicase = "2.7.0"
-crossterm = "0.27.0"
-rand = "0.8"
+icy_engine = { workspace = true }
+#icy_net = { workspace = true }
+
+lazy_static = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+crossterm = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+
+unicase = { workspace = true }
+rand = { workspace = true }
+
+async-recursion = "1.1.0"
 radix_fmt = "1"
 qfile = "3.0.1"
-substring = "1.4.5"
+substring = { workspace = true }
 byteorder = "1.5.0"
-chrono = "0.4.37"
-strum = "0.26.2"
+strum = { workspace = true }
 strum_macros = "0.26.2"
-toml = "0.8.12"
-serde = "1.0.197"
+toml = { workspace = true }
 relative-path = "1.9.2"
-
+async-trait = "0.1.80"
 # interpreter deps
 [dev-dependencies]
 stopwatch = "0.0.7"
+

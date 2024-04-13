@@ -4,23 +4,26 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-thiserror = "1.0.58"
-log = "0.4.14"
+lazy_static = { workspace = true }
+semver = { workspace = true }
+thiserror = { workspace = true }
+clap = { workspace = true }
+crossterm = { workspace = true }
+ratatui = { workspace = true }
+chrono = { workspace = true }
+log = { workspace = true }
+
 murmurhash64 = "0.3.1"
-chrono = "0.4.37"
 zip = "0.6"
 delharc = "0.6.0"
 unrar = "0.5.3"
-bstr = "1.9.1"
 icy_sauce = { git ="https://github.com/mkrueger/icy_tools" }
 
-tempfile = "3.4.0"
-rayon = "1.10.0"
-walkdir = "2.3.1"
-
+tempfile = { workspace = true }
+rayon = { workspace = true }
+walkdir = { workspace = true }
 codepages = { workspace = true}
 
-
 [dev-dependencies]
-tempfile = "3"
+tempfile = { workspace = true }
 pretty_assertions = "1"

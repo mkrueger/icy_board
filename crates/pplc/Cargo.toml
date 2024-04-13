@@ -6,10 +6,12 @@ edition.workspace = true
 
 [dependencies]
 icy_ppe = { workspace = true }
-lazy_static = "1.4.0"
-semver = "1.0.20"
-thiserror = "1.0.57"
+
+lazy_static = { workspace = true }
+semver = { workspace = true }
+thiserror = { workspace = true }
+clap = { workspace = true }
+crossterm = { workspace = true }
+
 ariadne = "0.4.0"
-unicase = "2.7.0"
-clap = { version = "4.5.4", features = ["derive"] }
-crossterm = "0.27.0"
+unicase = { workspace = true }

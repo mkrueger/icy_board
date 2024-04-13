@@ -7,8 +7,9 @@ edition.workspace = true
 [dependencies]
 icy_ppe = { workspace = true }
 icy_board_engine = { workspace = true }
-clap = { version = "4.5.4", features = ["derive"] }
-semver = "1.0.20"
-thiserror = "1.0.57"
-lazy_static = "1.4.0"
-crossterm = "0.27.0"
+lazy_static = { workspace = true }
+semver = { workspace = true }
+thiserror = { workspace = true }
+crossterm = { workspace = true }
+clap = { workspace = true }
+tokio = { workspace = true }

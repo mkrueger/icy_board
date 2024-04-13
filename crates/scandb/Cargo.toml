@@ -6,13 +6,14 @@ edition.workspace = true
 
 [dependencies]
 dizbase = { workspace = true }
-lazy_static = "1.4.0"
-semver = "1.0.20"
-thiserror = "1.0.57"
-clap = { version = "4.5.4", features = ["derive"] }
-crossterm = "0.27.0"
-icy_engine = { git ="https://github.com/mkrueger/icy_tools" }
-murmurhash64 = "0.3.1"
-ratatui = "0.26.1"
 
-rayon = "1.10.0"
+lazy_static = { workspace = true }
+semver = { workspace = true }
+thiserror = { workspace = true }
+clap = { workspace = true }
+crossterm = { workspace = true }
+ratatui = { workspace = true }
+rayon = { workspace = true }
+icy_engine = { workspace = true }
+murmurhash64 = "0.3.1"
+ 
