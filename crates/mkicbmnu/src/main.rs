@@ -55,7 +55,7 @@ fn main() -> Result<()> {
             mnu.help_file = PathBuf::from("help.txt");
             mnu.prompt = "Enter selection: ".to_string();
             let terminal = &mut term::init()?;
-            App::new(mnu, arguments.full_screen).run(terminal)?;
+            App::new(mnu, file, arguments.full_screen).run(terminal)?;
             term::restore()?;
             Ok(())
         }

@@ -1,4 +1,4 @@
-use std::{io, sync::Arc, time::Duration};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use chrono::{Local, Timelike};
 use color_eyre::{eyre::Context, Result};
@@ -15,8 +15,10 @@ pub struct App {
     mode: Mode,
     tab: TabPageType,
 
-    cursor: Option<(u16, u16)>,
+    file: PathBuf,
 
+    cursor: Option<(u16, u16)>,
+    status_line: String,
     full_screen: bool,
 
     general_tab: GeneralTab,
@@ -40,19 +42,27 @@ enum TabPageType {
     About,
 }
 
+#[derive(Default)]
+pub struct ResultState {
+    pub cursor: Option<(u16, u16)>,
+    pub status_line: String,
+}
+
 impl App {
-    pub fn new(mnu: Menu, full_screen: bool) -> Self {
+    pub fn new(mnu: Menu, file: PathBuf, full_screen: bool) -> Self {
         let mnu = Arc::new(mnu);
         let general_tab = GeneralTab::new(mnu.clone());
         let command_tab = CommandsTab::new(mnu.clone());
         Self {
             full_screen,
+            file,
             general_tab,
             cursor: None,
             mode: Mode::default(),
             tab: TabPageType::General,
             command_tab,
             about_tab: AboutTab::default(),
+            status_line: String::new(),
         }
     }
 
@@ -73,16 +83,7 @@ impl App {
     fn draw(&mut self, terminal: &mut TerminalType) -> Result<()> {
         terminal
             .draw(|frame| {
-                let screen = if self.full_screen {
-                    frame.size()
-                } else {
-                    let width = frame.size().width.min(80);
-                    let height = frame.size().height.min(25);
-
-                    let x = frame.size().x + (frame.size().width - width) / 2;
-                    let y = frame.size().y + (frame.size().height - height) / 2;
-                    Rect::new(frame.size().x + x, frame.size().y + y, width, height)
-                };
+                let screen = get_screen_size(&frame, self.full_screen);
                 self.ui(frame, screen);
 
                 if let Some((x, y)) = self.cursor {
@@ -124,7 +125,9 @@ impl App {
 
     fn handle_key_press(&mut self, terminal: &mut TerminalType, key: KeyEvent) {
         if self.mode == Mode::Edit {
-            self.cursor = self.get_tab_mut().handle_key_press(key);
+            let state = self.get_tab_mut().handle_key_press(key);
+            self.cursor = state.cursor;
+            self.status_line = state.status_line;
             if self.cursor.is_none() {
                 self.mode = Mode::Command;
             }
@@ -136,27 +139,31 @@ impl App {
             Char('q') | Esc => self.mode = Mode::Quit,
             Char('h') | Left => self.prev_tab(),
             Char('l') | Right => self.next_tab(),
-            Char('k') | Up => self.get_tab_mut().prev(),
-            Char('j') | Down => self.get_tab_mut().next(),
-            Insert => self.get_tab_mut().insert(),
-            Delete => self.get_tab_mut().delete(),
             Char('d') | Enter => {
-                self.cursor = self.get_tab_mut().request_edit_mode(terminal);
+                let full_screen = self.full_screen;
+                let state = self.get_tab_mut().request_edit_mode(terminal, full_screen);
+                self.status_line = state.status_line;
+                self.cursor = state.cursor;
                 if self.cursor.is_some() {
                     self.mode = Mode::Edit;
                 }
             }
 
-            _ => {}
+            _ => {
+                let state = self.get_tab_mut().handle_key_press(key);
+                self.status_line = state.status_line;
+            }
         };
     }
 
     fn prev_tab(&mut self) {
         self.tab = self.tab.prev();
+        self.update_state();
     }
 
     fn next_tab(&mut self) {
         self.tab = self.tab.next();
+        self.update_state();
     }
 
     fn ui(&mut self, frame: &mut Frame, area: Rect) {
@@ -167,7 +174,12 @@ impl App {
         self.render_title_bar(title_bar, frame.buffer_mut());
         self.render_selected_tab(frame, tab);
         App::render_key_help_view(key_bar, frame.buffer_mut());
-        App::render_status_line(status_line, frame.buffer_mut());
+        self.render_status_line(status_line, frame.buffer_mut());
+    }
+
+    fn update_state(&mut self) {
+        let state = self.get_tab().request_status();
+        self.status_line = state.status_line;
     }
 }
 
@@ -177,7 +189,11 @@ impl App {
         let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(len)]);
         let [title, tabs] = layout.areas(area);
 
-        Span::styled(" MNU File Editor", THEME.app_title).render(title, buf);
+        Span::styled(
+            format!(" MNU File Editor ({})", self.file.file_name().unwrap().to_string_lossy()),
+            THEME.app_title,
+        )
+        .render(title, buf);
         let titles = TabPageType::iter().map(TabPageType::title);
         Tabs::new(titles)
             .style(THEME.tabs)
@@ -206,11 +222,17 @@ impl App {
         Line::from(spans).centered().style((Color::Indexed(236), Color::Indexed(232))).render(area, buf);
     }
 
-    fn render_status_line(area: Rect, buf: &mut Buffer) {
+    fn render_status_line(&self, area: Rect, buf: &mut Buffer) {
         let now = Local::now();
-        Line::from(format!(" {} {}", now.time().with_nanosecond(0).unwrap(), now.date_naive().format("%m-%d-%y")))
+        let time_status = format!(" {} {} |", now.time().with_nanosecond(0).unwrap(), now.date_naive().format("%m-%d-%y"));
+        let time_len = time_status.len() as u16;
+        Line::from(time_status).left_aligned().style(THEME.status_line).render(area, buf);
+        let mut area = area;
+        area.x += time_len + 1;
+        area.width -= time_len + 1;
+        Line::from(self.status_line.clone())
             .left_aligned()
-            .style(THEME.status_line)
+            .style(THEME.status_line_text)
             .render(area, buf);
     }
 }
@@ -230,5 +252,18 @@ impl TabPageType {
 
     fn title(self) -> String {
         format!(" {self} ")
+    }
+}
+
+pub fn get_screen_size(frame: &Frame, is_full_screen: bool) -> Rect {
+    if is_full_screen {
+        frame.size()
+    } else {
+        let width = frame.size().width.min(80);
+        let height = frame.size().height.min(25);
+
+        let x = frame.size().x + (frame.size().width - width) / 2;
+        let y = frame.size().y + (frame.size().height - height) / 2;
+        Rect::new(frame.size().x + x, frame.size().y + y, width, height)
     }
 }

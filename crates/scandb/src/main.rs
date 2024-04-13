@@ -47,7 +47,7 @@ pub fn main() {
     let arguments = Cli::parse();
     match &arguments.command {
         Some(Commands::ScanFileDirectory { input, file }) => {
-            scan_file_directory(input, file);
+            scan_file_directory(input, file).unwrap();
         }
         Some(Commands::List { file }) => {
             list_file_base(file);
@@ -113,19 +113,6 @@ fn search_file_base(file: &PathBuf, pattern: &str) {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum FileType {
-    ASCII,
-    CP437,
-    Unicode,
-}
-
-enum State {
-    Default,
-    TwoByteContinuation,
-    ThreeByteLow,
-}
-
 fn list_file_base(file: &PathBuf) {
     let mut base = FileBase::open(file).unwrap();
     let time = SystemTime::now();
@@ -148,10 +135,6 @@ fn list_file_base(file: &PathBuf) {
     }
     println!();*/
 
-    let mut ascii = 0;
-    let mut utf8 = 0;
-    let mut cp437 = 0;
-    let now = SystemTime::now();
     for header in base.get_headers() {
         match base.read_metadata(header) {
             Ok(metadata) => {
@@ -175,6 +158,7 @@ fn list_file_base(file: &PathBuf) {
                         }
                         MetadaType::FileID => {
                             let t = convert_to_utf8(&m.data);
+                            println!("  {:10?} {}", m.get_type(), t);
                         }
                         MetadaType::Sauce => {
                             println!("  {:10?} {}", m.get_type(), String::from_utf8_lossy(&m.data));
@@ -186,9 +170,6 @@ fn list_file_base(file: &PathBuf) {
             Err(err) => eprintln!("{}", err),
         }
     }
-
-    println!("ASCII: {} CP437: {} UTF8: {} files:{}", ascii, cp437, utf8, base.get_headers().len());
-    println!("took: {}", now.elapsed().unwrap().as_millis());
 }
 
 fn convert_to_utf8(data: &[u8]) -> String {

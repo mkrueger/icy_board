@@ -11,7 +11,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::TabPage;
+use crate::{app::ResultState, TabPage};
 
 pub struct GeneralTab {
     state: ConfigMenuState,
@@ -26,8 +26,10 @@ pub enum ListValue {
 }
 
 pub struct ListItem {
-    id: String,
+    _id: String,
     title: String,
+    status: String,
+    edit_status: String,
     cursor_pos: u16,
     edit_pos: Arc<Mutex<(u16, u16)>>,
     value: ListValue,
@@ -40,7 +42,9 @@ impl ListItem {
             _ => 0,
         };
         Self {
-            id: id.to_string(),
+            _id: id.to_string(),
+            status: format!("{}", title),
+            edit_status: format!("Edit {}", title),
             title,
             cursor_pos,
             edit_pos: Arc::new(Mutex::new((0, 0))),
@@ -83,29 +87,28 @@ impl ListItem {
         }
     }
 
-    fn handle_key_press(&mut self, key: KeyEvent) -> Option<(u16, u16)> {
+    fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
         match &mut self.value {
-            ListValue::File(_edit_len, text) | ListValue::Text(_edit_len, text) => {
-                match key.code {
-                    KeyCode::Enter => {
-                        return None;
-                    }
-                    KeyCode::Esc => {
-                        return None;
-                    }
-                    KeyCode::Char(c) => {
-                        text.push(c);
-                        self.cursor_pos += 1;
-                    }
-                    _ => {}
+            ListValue::File(_edit_len, text) | ListValue::Text(_edit_len, text) => match key.code {
+                KeyCode::Enter => {}
+                KeyCode::Esc => {}
+                KeyCode::Char(c) => {
+                    text.push(c);
+                    self.cursor_pos += 1;
+                    let mut e = (*self.edit_pos).lock().unwrap().clone();
+                    e.0 += self.cursor_pos;
+                    return ResultState {
+                        cursor: Some(e),
+                        status_line: self.edit_status.clone(),
+                    };
                 }
-
-                let mut e = (*self.edit_pos).lock().unwrap().clone();
-                e.0 += self.cursor_pos;
-                return Some(e);
-            }
-            ListValue::Bool(_value) => None,
-            ListValue::ValueList(_cur_value, _) => None,
+                _ => {}
+            },
+            ListValue::Bool(_) | ListValue::ValueList(_, _) => {}
+        }
+        ResultState {
+            cursor: None,
+            status_line: self.status.clone(),
         }
     }
 }
@@ -151,16 +154,19 @@ impl ConfigMenu {
         }
     }
 
-    fn handle_key_press(&mut self, key: KeyEvent, state: &ConfigMenuState) -> Option<(u16, u16)> {
+    fn handle_key_press(&mut self, key: KeyEvent, state: &ConfigMenuState) -> ResultState {
         if !state.in_edit {
-            return None;
+            return ResultState::default();
         }
         self.items[state.selected].handle_key_press(key)
     }
 
-    fn request_edit_mode(&self, state: &ConfigMenuState) -> Option<(u16, u16)> {
+    fn request_edit_mode(&self, state: &ConfigMenuState) -> ResultState {
         let e = self.items[state.selected].edit_pos.lock().unwrap().clone();
-        Some((e.0 + self.items[state.selected].cursor_pos, e.1))
+        ResultState {
+            cursor: Some((e.0 + self.items[state.selected].cursor_pos, e.1)),
+            status_line: self.items[state.selected].edit_status.clone(),
+        }
     }
 }
 
@@ -186,9 +192,6 @@ impl GeneralTab {
             config: ConfigMenu { items },
         }
     }
-}
-
-impl TabPage for GeneralTab {
     fn prev(&mut self) {
         let selected = self.state.selected;
         self.state.selected = (selected + 3) % 4;
@@ -198,7 +201,9 @@ impl TabPage for GeneralTab {
         let selected = self.state.selected;
         self.state.selected = (selected + 1) % 4;
     }
+}
 
+impl TabPage for GeneralTab {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         let width = (2 + 50 + 2).min(area.width) as u16;
 
@@ -218,16 +223,35 @@ impl TabPage for GeneralTab {
         self.config.render(area, frame.buffer_mut(), &self.state);
     }
 
-    fn request_edit_mode(&mut self, _t: &mut TerminalType) -> Option<(u16, u16)> {
+    fn request_edit_mode(&mut self, _t: &mut TerminalType, _fs: bool) -> ResultState {
         self.state.in_edit = true;
         self.config.request_edit_mode(&self.state)
     }
 
-    fn handle_key_press(&mut self, key: KeyEvent) -> Option<(u16, u16)> {
+    fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
+        if !self.state.in_edit {
+            match key.code {
+                KeyCode::Char('k') | KeyCode::Up => self.prev(),
+                KeyCode::Char('j') | KeyCode::Down => self.next(),
+                _ => {}
+            }
+            return ResultState {
+                cursor: None,
+                status_line: self.config.items[self.state.selected].status.clone(),
+            };
+        }
+
         let res = self.config.handle_key_press(key, &self.state);
-        if res.is_none() {
+        if res.cursor.is_none() {
             self.state.in_edit = false;
         }
         res
+    }
+
+    fn request_status(&self) -> ResultState {
+        return ResultState {
+            cursor: None,
+            status_line: self.config.items[self.state.selected].status.clone(),
+        };
     }
 }
