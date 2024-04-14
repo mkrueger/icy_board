@@ -22,13 +22,13 @@ struct MessageViewer {
     _grp_pwd: TextEntry,
     _snd_pwd: TextEntry,
     _public: TextEntry,
-    _refer_num: TextEntry,
+    refer_num: TextEntry,
     _read: TextEntry,
     subj_line: TextEntry,
     _status: TextEntry,
     _file: TextEntry,
     _list: TextEntry,
-    _none: TextEntry,
+    none: TextEntry,
     confarea: TextEntry,
     separator: TextEntry,
     _all_name: TextEntry,
@@ -88,13 +88,13 @@ impl MessageViewer {
             _grp_pwd: grp_pwd,
             _snd_pwd: snd_pwd,
             _public: public,
-            _refer_num: refer_num,
+            refer_num,
             _read: read,
             subj_line,
             _status: status,
             _file: file,
             _list: list,
-            _none: none,
+            none,
             confarea,
             separator,
             _all_name: all_name,
@@ -115,8 +115,8 @@ impl MessageViewer {
             result.push(' ');
         }
 
-        let xleft = self.left + 3;
-        let xright = self.right + 3;
+        let xleft = self.left + 2;
+        let xright = self.right + 2;
 
         result.replace_range(xleft..xleft + left.len(), left);
         result.replace_range(xright..xright + right.len(), right);
@@ -134,7 +134,18 @@ impl MessageViewer {
         } else {
             String::new()
         };
-        let msg_counter = format!("{} {} {}", header.message_number, self.separator.text, msg_base.active_messages());
+        let msg_counter = format!(
+            "{} {} {} ({} {})",
+            header.message_number,
+            self.separator.text,
+            msg_base.active_messages(),
+            self.refer_num.text,
+            if header.reply_to == 0 {
+                self.none.text.clone()
+            } else {
+                header.reply_to.to_string()
+            }
+        );
         let txt = self.format_hdr_text(&self.date_num.text, &time, &msg_counter);
         state.print(TerminalTarget::Both, &txt)?;
 
