@@ -3,6 +3,8 @@ use std::{
     fs,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
+    thread,
+    time::Duration,
 };
 
 use chrono::{DateTime, Datelike, Local, Timelike};
@@ -872,6 +874,7 @@ impl IcyBoardState {
         if size == 1 {
             Ok(Some((true, a[0] as char)))
         } else {
+            thread::sleep(Duration::from_millis(50));
             Ok(None)
         }
     }

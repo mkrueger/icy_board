@@ -108,12 +108,13 @@ impl Tui {
 
             let mut parser = ansi::Parser::default();
             parser.bs_is_ctrl_char = true;
-
+            let mut redraw = false;
             loop {
                 let size = self.connection.lock().unwrap().read(&mut screen_buf)?;
                 if size == 0 {
                     break;
                 }
+                redraw = true;
                 if let Ok(mut screen) = self.screen.lock() {
                     for &b in screen_buf[0..size].iter() {
                         screen.print(&mut parser, codepages::tables::CP437_TO_UNICODE[b as usize]);
@@ -129,12 +130,13 @@ impl Tui {
                 }
                 return Ok(());
             }
-
-            let _ = terminal.draw(|frame| {
-                if let Ok(board) = &self.board.lock() {
-                    self.ui(frame, board);
-                }
-            });
+            if redraw {
+                let _ = terminal.draw(|frame| {
+                    if let Ok(board) = &self.board.lock() {
+                        self.ui(frame, board);
+                    }
+                });
+            }
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
             if event::poll(timeout)? {
                 if let Event::Key(key) = event::read()? {
