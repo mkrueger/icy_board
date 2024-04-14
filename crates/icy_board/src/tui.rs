@@ -14,40 +14,41 @@ use crossterm::{
 };
 
 use icy_board_engine::icy_board::{
-    state::{IcyBoardState, Session},
+    state::{IcyBoardState, NodeState, Session},
     IcyBoard, IcyBoardError,
 };
+use icy_board_tui::{
+    get_text,
+    theme::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GRAY, DOS_LIGHT_GREEN, DOS_WHITE},
+};
 use icy_engine::{ansi, TextPane};
-use icy_net::channel::ChannelConnection;
+use icy_net::{channel::ChannelConnection, ConnectionType};
 use icy_ppe::Res;
 use ratatui::{
     prelude::*,
     widgets::{canvas::Canvas, Paragraph},
 };
 
-use crate::{
-    call_wait_screen::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GREEN, DOS_WHITE},
-    icy_engine_output::Screen,
-    menu_runner::PcbBoardCommand,
-};
+use crate::{bbs::BBS, icy_engine_output::Screen, menu_runner::PcbBoardCommand};
 
 pub struct Tui {
     screen: Arc<Mutex<Screen>>,
-    board: Arc<Mutex<IcyBoard>>,
     session: Arc<Mutex<Session>>,
     connection: Arc<Mutex<ChannelConnection>>,
     status_bar: usize,
-    handle: Option<thread::JoinHandle<Result<(), String>>>,
+    handle: Arc<Mutex<NodeState>>,
 }
 
 impl Tui {
-    pub fn new(board: Arc<Mutex<IcyBoard>>) -> Self {
+    pub fn new(board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>) -> Self {
         let ui_session = Arc::new(Mutex::new(Session::new()));
         let session = ui_session.clone();
-        let (mut ui_connection, connection) = ChannelConnection::create_pair();
-        let ui_board = board.clone();
-        let join = thread::spawn(move || {
-            let mut state = IcyBoardState::new(board, Box::new(connection));
+        let (ui_connection, connection) = ChannelConnection::create_pair();
+        let board = board.clone();
+        let ui_node = bbs.lock().unwrap().create_new_node(ConnectionType::Channel);
+        let node = ui_node.clone();
+        let handle = thread::spawn(move || {
+            let mut state = IcyBoardState::new(board, node, Box::new(connection));
             state.session.is_sysop = true;
             state.set_current_user(0);
             let mut cmd = PcbBoardCommand::new(state);
@@ -68,15 +69,16 @@ impl Tui {
                 if let Err(err) = cmd.do_command() {
                     cmd.state.session.disp_options.reset_printout();
                     log::error!("Error: {}", err);
-                    cmd.state.set_color(4.into()).unwrap();
-                    cmd.state
-                        .print(icy_board_engine::vm::TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err))
-                        .unwrap();
-                    cmd.state.reset_color().unwrap();
+                    if cmd.state.set_color(4.into()).is_ok() {
+                        let _ = cmd
+                            .state
+                            .print(icy_board_engine::vm::TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err));
+                        let _ = cmd.state.reset_color();
+                    }
                 }
                 cmd.state.session.disp_options.reset_printout();
                 if cmd.state.session.request_logoff {
-                    cmd.state.connection.shutdown();
+                    let _ = cmd.state.connection.shutdown();
                     return Ok(());
                 }
                 thread::sleep(Duration::from_millis(20));
@@ -84,55 +86,57 @@ impl Tui {
         });
         let ui_screen = Arc::new(Mutex::new(Screen::new()));
         let ui_connection = Arc::new(Mutex::new(ui_connection));
-        let screen = ui_screen.clone();
-        let connection = ui_connection.clone();
-        thread::spawn(move || {});
-
+        ui_node.lock().unwrap().handle = Some(handle);
         Self {
             screen: ui_screen,
-            board: ui_board,
             session: ui_session,
             connection: ui_connection,
             status_bar: 0,
-            handle: Some(join),
+            handle: ui_node,
         }
     }
 
-    pub fn run(&mut self) -> Res<()> {
+    pub fn run(&mut self, board: &Arc<Mutex<IcyBoard>>) -> Res<()> {
         let mut terminal = init_terminal()?;
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(20);
 
         loop {
             let mut screen_buf = [0; 1024 * 16];
-
             let mut parser = ansi::Parser::default();
             parser.bs_is_ctrl_char = true;
             let mut redraw = false;
             loop {
-                let size = self.connection.lock().unwrap().read(&mut screen_buf)?;
-                if size == 0 {
-                    break;
-                }
-                redraw = true;
-                if let Ok(mut screen) = self.screen.lock() {
-                    for &b in screen_buf[0..size].iter() {
-                        screen.print(&mut parser, codepages::tables::CP437_TO_UNICODE[b as usize]);
+                match self.connection.lock().unwrap().read(&mut screen_buf) {
+                    Ok(size) => {
+                        if size == 0 {
+                            break;
+                        }
+                        redraw = true;
+                        if let Ok(mut screen) = self.screen.lock() {
+                            for &b in screen_buf[0..size].iter() {
+                                screen.print(&mut parser, codepages::tables::CP437_TO_UNICODE[b as usize]);
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        // channel closed
+                        return Ok(());
                     }
                 }
             }
-
-            if self.handle.as_ref().unwrap().is_finished() {
+            if self.handle.lock().unwrap().handle.as_ref().unwrap().is_finished() {
                 restore_terminal()?;
-                let handle = self.handle.take().unwrap();
+                let handle = self.handle.lock().unwrap().handle.take().unwrap();
                 if let Err(_err) = handle.join() {
                     return Err(Box::new(IcyBoardError::ThreadCrashed));
                 }
                 return Ok(());
             }
             if redraw {
+                let board = board.clone();
                 let _ = terminal.draw(|frame| {
-                    if let Ok(board) = &self.board.lock() {
+                    if let Ok(board) = &board.lock() {
                         self.ui(frame, board);
                     }
                 });
@@ -278,7 +282,7 @@ impl Tui {
                 }
                 _ => {}
             })
-            .background_color(crate::call_wait_screen::DOS_LIGHTGRAY)
+            .background_color(DOS_LIGHT_GRAY)
             .x_bounds([0.0, 80.0])
     }
 
@@ -340,12 +344,10 @@ pub fn print_exit_screen() {
             r.height = 1;
             let white = Style::default().fg(DOS_WHITE);
             let green = Style::default().fg(DOS_LIGHT_GREEN);
-
-            let text = vec![
-                Span::styled("Thank you for using ", green),
-                Span::styled("IcyBoard", white),
-                Span::styled(" Professional BBS Software!", green),
-            ];
+            let txt = get_text("exit_icy_board_msg");
+            let p1 = txt[0..txt.as_bytes().iter().position(|c| *c == b'{').unwrap()].to_string();
+            let p2 = txt[txt.as_bytes().iter().position(|c| *c == b'}').unwrap() + 1..].to_string();
+            let text = vec![Span::styled(p1, green), Span::styled("IcyBoard", white), Span::styled(p2, green)];
             frame.render_widget(Paragraph::new(Line::from(text)).alignment(Alignment::Center).bg(DOS_BLUE), r)
         })
         .unwrap();

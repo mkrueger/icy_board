@@ -10,7 +10,10 @@ use icy_board_engine::icy_board::{
     icb_config::IcbColor,
     icb_text::IceText,
     read_with_encoding_detection,
-    state::functions::{display_flags, MASK_ALNUM},
+    state::{
+        functions::{display_flags, MASK_ALNUM},
+        UserActivity,
+    },
 };
 use icy_ppe::Res;
 
@@ -18,6 +21,8 @@ use super::PcbBoardCommand;
 
 impl PcbBoardCommand {
     pub fn take_survey(&mut self, action: &Command) -> Res<()> {
+        self.state.node_state.lock().unwrap().user_activity = UserActivity::TakeSurvey;
+
         let surveys = self.state.load_surveys()?;
         if surveys.is_empty() {
             self.state.display_text(

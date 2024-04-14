@@ -12,7 +12,7 @@ use codepages::tables::UNICODE_TO_CP437;
 use icy_engine::ansi::constants::COLOR_OFFSETS;
 use icy_engine::TextAttribute;
 use icy_engine::{ansi, Buffer, BufferParser, Caret};
-use icy_net::Connection;
+use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
 use icy_ppe::{datetime::IcbDate, executable::Executable, Res};
 
 use crate::vm::{run, DiskIO, TerminalTarget};
@@ -199,9 +199,43 @@ impl Default for Session {
     }
 }
 
+pub enum UserActivity {
+    LoggingIn,
+    BrowseMenu,
+    EnterMessage,
+    BrowseFiles,
+    ReadMessages,
+    ReadBulletins,
+    TakeSurvey,
+}
+
+pub struct NodeState {
+    pub connections: Arc<Mutex<Vec<Box<ChannelConnection>>>>,
+    pub cur_user: i32,
+    pub user_activity: UserActivity,
+    pub node_number: usize,
+    pub connection_type: ConnectionType,
+    pub handle: Option<thread::JoinHandle<Result<(), String>>>,
+}
+
+impl NodeState {
+    pub fn new(node_number: usize, connection_type: ConnectionType) -> Self {
+        Self {
+            connections: Arc::new(Mutex::new(Vec::new())),
+            user_activity: UserActivity::LoggingIn,
+            cur_user: -1,
+            node_number,
+            connection_type,
+            handle: None,
+        }
+    }
+}
+
 pub struct IcyBoardState {
     pub connection: Box<dyn Connection>,
     pub board: Arc<Mutex<IcyBoard>>,
+
+    pub node_state: Arc<Mutex<NodeState>>,
 
     pub nodes: Vec<Node>,
 
@@ -226,7 +260,7 @@ pub struct IcyBoardState {
 }
 
 impl IcyBoardState {
-    pub fn new(board: Arc<Mutex<IcyBoard>>, connection: Box<dyn Connection>) -> Self {
+    pub fn new(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<NodeState>>, connection: Box<dyn Connection>) -> Self {
         let buffer = Buffer::new((80, 25));
         let caret = Caret::default();
         let mut parser = ansi::Parser::default();
@@ -235,6 +269,7 @@ impl IcyBoardState {
         Self {
             board,
             connection,
+            node_state,
             nodes: Vec::new(),
             current_user: None,
             yes_char: 'Y',
@@ -309,6 +344,7 @@ impl IcyBoardState {
 
     pub fn set_current_user(&mut self, user: i32) {
         self.session.cur_user = user;
+        self.node_state.lock().unwrap().cur_user = user;
         if user >= 0 {
             let last_conference = if let Ok(board) = self.board.lock() {
                 self.current_user = Some(board.users[user as usize].clone());
@@ -461,6 +497,18 @@ impl IcyBoardState {
     pub fn resolve_path<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
         PathBuf::from(self.board.lock().unwrap().resolve_file(&file))
     }
+
+    fn shutdown_connections(&mut self) {
+        let _ = self.connection.shutdown();
+
+        if let Ok(node_state) = self.node_state.lock() {
+            if let Ok(connections) = &mut node_state.connections.lock() {
+                for conn in connections.iter_mut() {
+                    let _ = conn.shutdown();
+                }
+            }
+        }
+    }
 }
 
 enum PcbState {
@@ -521,28 +569,18 @@ impl IcyBoardState {
         }
     }
 
-    fn write_char(&mut self, c: char) -> Res<()> {
-        self.parser.print_char(&mut self.buffer, 0, &mut self.caret, c)?;
-
-        if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
-            self.connection.write_all(&[cp437])?;
-        } else {
-            self.connection.write_all(&[b'.'])?;
-        }
-        if c == '\n' {
-            self.next_line()?;
-        }
-        Ok(())
-    }
-
-    fn write_string(&mut self, data: &[char]) -> Res<()> {
+    fn write_chars(&mut self, data: &[char]) -> Res<()> {
         let mut b = Vec::new();
         for c in data {
             self.parser.print_char(&mut self.buffer, 0, &mut self.caret, *c)?;
             if *c == '\n' {
                 self.next_line()?;
             }
-            b.push(*c as u8);
+            if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
+                b.push(cp437);
+            } else {
+                b.push(b'.');
+            }
         }
         self.connection.write_all(&b)?;
         Ok(())
@@ -565,7 +603,7 @@ impl IcyBoardState {
                         if *c == '@' {
                             state = PcbState::GotAt;
                         } else {
-                            self.write_char(*c)?;
+                            self.write_chars(&[*c])?;
                         }
                     }
                     PcbState::GotAt => {
@@ -579,7 +617,7 @@ impl IcyBoardState {
                         if *c == '@' {
                             state = PcbState::Default;
                             if let Some(s) = self.translate_variable(&s) {
-                                self.write_string(s.chars().collect::<Vec<char>>().as_slice())?;
+                                self.write_chars(s.chars().collect::<Vec<char>>().as_slice())?;
                             }
                         } else {
                             state = PcbState::ReadAtSequence(s + &c.to_string());
@@ -589,17 +627,14 @@ impl IcyBoardState {
                         if c.is_ascii_hexdigit() {
                             state = PcbState::ReadColor2(*c);
                         } else {
-                            self.write_char('@')?;
-                            self.write_char(*c)?;
+                            self.write_chars(&['@', *c])?;
                             state = PcbState::Default;
                         }
                     }
                     PcbState::ReadColor2(ch1) => {
                         state = PcbState::Default;
                         if !c.is_ascii_hexdigit() {
-                            self.write_char('@')?;
-                            self.write_char(ch1)?;
-                            self.write_char(*c)?;
+                            self.write_chars(&['@', ch1, *c])?;
                         } else {
                             let color = (c.to_digit(16).unwrap() | (ch1.to_digit(16).unwrap() << 4)) as u8;
                             self.set_color(color.into())?;
@@ -931,7 +966,7 @@ impl IcyBoardState {
 
         color_change.pop();
         color_change += "m";
-        self.write_string(color_change.chars().collect::<Vec<char>>().as_slice())
+        self.write_chars(color_change.chars().collect::<Vec<char>>().as_slice())
     }
 
     pub fn get_caret_position(&mut self) -> (i32, i32) {
@@ -960,7 +995,7 @@ impl IcyBoardState {
         self.display_text(IceText::ThanksForCalling, display_flags::LFBEFORE | display_flags::NEWLINE)?;
         self.reset_color()?;
         self.session.request_logoff = true;
-        self.connection.shutdown()?;
+        self.shutdown_connections();
         Ok(())
     }
 

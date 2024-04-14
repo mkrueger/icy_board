@@ -5,26 +5,33 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use bbs::{await_telnet_connections, BBS};
 use call_wait_screen::{CallWaitMessage, CallWaitScreen};
 use chrono::Local;
 use clap::{Parser, Subcommand};
-use crossterm::{terminal::Clear, ExecutableCommand};
+use crossterm::{
+    terminal::{disable_raw_mode, enable_raw_mode, Clear, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
+};
 use icy_board_engine::icy_board::IcyBoard;
-use icy_engine_output::Screen;
+use icy_ppe::Res;
 use import::{
     console_logger::{print_error, ConsoleLogger},
     PCBoardImporter,
 };
+use ratatui::{
+    backend::{Backend, CrosstermBackend},
+    Terminal,
+};
 use semver::Version;
 use tui::{print_exit_screen, Tui};
-
-use crate::call_wait_screen::restore_terminal;
 
 mod bbs;
 mod call_wait_screen;
 mod icy_engine_output;
 mod import;
 pub mod menu_runner;
+mod node_monitoring_screen;
 mod tui;
 
 #[derive(clap::Parser)]
@@ -55,7 +62,7 @@ lazy_static::lazy_static! {
 }
 /// evlevlelvelvelv`
 
-fn main() {
+fn main() -> Res<()> {
     let arguments = Cli::parse();
 
     match &arguments.command {
@@ -76,12 +83,13 @@ fn main() {
             }
         }
         Commands::Run { file } => {
-            start_icy_board(file);
+            start_icy_board(file)?;
         }
     }
+    Ok(())
 }
 
-pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) {
+pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) -> Res<()> {
     fern::Dispatch::new()
         // Perform allocation-free log formatting
         .format(|out, message, record| {
@@ -105,15 +113,26 @@ pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) {
 
     match IcyBoard::load(config_file) {
         Ok(icy_board) => {
+            let mut bbs = Arc::new(Mutex::new(BBS::new(icy_board.config.num_nodes as usize)));
             let board = Arc::new(Mutex::new(icy_board));
+
+            {
+                let bbs = bbs.clone();
+                let board = board.clone();
+                std::thread::spawn(move || {
+                    let _ = await_telnet_connections(board, bbs);
+                });
+            }
+            let mut terminal = init_terminal()?;
+
             loop {
-                let mut app = CallWaitScreen::new(board.clone()).unwrap();
-                match app.run() {
+                let mut app = CallWaitScreen::new(&board)?;
+                match app.run(&mut terminal, &board) {
                     Ok(msg) => {
-                        run_message(msg, board.clone());
+                        run_message(msg, &mut terminal, &board, &mut bbs);
                     }
                     Err(err) => {
-                        restore_terminal().unwrap();
+                        restore_terminal()?;
                         log::error!("while running call wait screen: {}", err.to_string());
                         print_error(err.to_string());
                     }
@@ -123,30 +142,40 @@ pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) {
         Err(err) => {
             log::error!("while loading icy board configuration: {}", err.to_string());
             print_error(err.to_string());
+            return Err(err);
         }
     }
 }
 
-fn run_message(msg: CallWaitMessage, board: Arc<Mutex<IcyBoard>>) {
+fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, board: &Arc<Mutex<IcyBoard>>, bbs: &mut Arc<Mutex<BBS>>) {
     match msg {
-        CallWaitMessage::User(busy) | CallWaitMessage::Sysop(busy) => {
-            println!("Login {}...", busy);
-
+        CallWaitMessage::User(_busy) | CallWaitMessage::Sysop(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
-
-            let mut tui = Tui::new(board);
-            if let Err(err) = tui.run() {
+            let mut tui = Tui::new(board, bbs);
+            if let Err(err) = tui.run(&board) {
                 restore_terminal().unwrap();
                 log::error!("while running board in local mode: {}", err.to_string());
                 println!("Error: {}", err);
                 process::exit(1);
             }
         }
-        CallWaitMessage::Exit(busy) => {
-            println!("Exiting {}...", busy);
+        CallWaitMessage::Exit(_busy) => {
             restore_terminal().unwrap();
             print_exit_screen();
             process::exit(0);
+        }
+        CallWaitMessage::Monitor => {
+            let mut app = node_monitoring_screen::NodeMonitoringScreen::new(&board);
+            match app.run(terminal, &board, bbs) {
+                Ok(_msg) => {
+                    // TODO
+                }
+                Err(err) => {
+                    restore_terminal().unwrap();
+                    log::error!("while running node monitoring screen: {}", err.to_string());
+                    print_error(err.to_string());
+                }
+            }
         }
     }
 }
@@ -166,3 +195,17 @@ fn init_error_hooks() -> Res<()> {
     Ok(())
 }
 */
+
+fn init_terminal() -> Res<Terminal<impl Backend>> {
+    enable_raw_mode()?;
+    stdout().execute(EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout());
+    let terminal = Terminal::new(backend)?;
+    Ok(terminal)
+}
+
+pub fn restore_terminal() -> Res<()> {
+    disable_raw_mode()?;
+    stdout().execute(LeaveAlternateScreen)?;
+    Ok(())
+}

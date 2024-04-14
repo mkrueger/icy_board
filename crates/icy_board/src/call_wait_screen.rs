@@ -1,16 +1,15 @@
 use std::{
-    io::{self, stdout},
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
 use chrono::{Local, Timelike};
-use crossterm::{
-    event::{self, Event, KeyCode, KeyEventKind},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use icy_board_engine::icy_board::{statistics::Statistics, IcyBoard};
+use icy_board_tui::{
+    get_text,
+    theme::{DOS_BLACK, DOS_BLUE, DOS_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_WHITE, DOS_YELLOW},
 };
-use icy_board_engine::icy_board::{icb_text::IceText, IcyBoard, IcyBoardError};
 use icy_ppe::Res;
 use ratatui::{
     prelude::*,
@@ -23,29 +22,12 @@ use ratatui::{
 
 use crate::VERSION;
 
-pub const DOS_BLACK: Color = Color::Rgb(0, 0, 0);
-pub const DOS_BLUE: Color = Color::Rgb(0, 0, 0xAA);
-// pub const DOS_GREEN: Color = Color::Rgb(0, 0xAA, 0);
-pub const DOS_CYAN: Color = Color::Rgb(0, 0xAA, 0xAA);
-pub const DOS_RED: Color = Color::Rgb(0xAA, 0, 0);
-// pub const DOS_MAGENTA: Color = Color::Rgb(0xAA, 0, 0xAA);
-// pub const DOS_BROWN: Color = Color::Rgb(0xAA, 0x55, 0);
-pub const DOS_LIGHTGRAY: Color = Color::Rgb(0xAA, 0xAA, 0xAA);
-
-// pub const DOS_DARKGRAY: Color = Color::Rgb(0x55, 0x55, 0x55);
-// pub const DOS_LIGHT_BLUE: Color = Color::Rgb(0x55, 0x55, 0xFF);
-pub const DOS_LIGHT_GREEN: Color = Color::Rgb(0x55, 0xFF, 0x55);
-// pub const DOS_LIGHT_CYAN: Color = Color::Rgb(0x55, 0xFF, 0xFF);
-// pub const DOS_LIGHT_RED: Color = Color::Rgb(0xFF, 0x55, 0x55);
-// pub const DOS_LIGHT_MAGENTA: Color = Color::Rgb(0xFF, 0x55, 0xFF);
-pub const DOS_YELLOW: Color = Color::Rgb(0xFF, 0xFF, 0x55);
-pub const DOS_WHITE: Color = Color::Rgb(0xFF, 0xFF, 0xFF);
-
 #[derive(Clone, Copy)]
 pub enum CallWaitMessage {
     User(bool),
     Sysop(bool),
     Exit(bool),
+    Monitor,
 }
 
 struct Button {
@@ -58,112 +40,86 @@ pub struct CallWaitScreen {
     x: i32,
     y: i32,
     selected: Option<Instant>,
-    board: Arc<Mutex<IcyBoard>>,
     buttons: Vec<Button>,
-
-    last_caller_txt: String,
-    calls_txt: String,
-    msgs_txt: String,
-    dls_txt: String,
-    uls_txt: String,
-    sysavail_txt: String,
+    board_name: String,
+    statistics: Statistics,
 }
 
 impl CallWaitScreen {
-    pub fn new(board: Arc<Mutex<IcyBoard>>) -> Res<Self> {
-        let buttons;
-
-        if let Ok(board) = board.lock().as_ref() {
-            buttons = vec![
-                Button {
-                    title: board.display_text.get_display_text(IceText::UserBusy)?.text,
-                    description: board.display_text.get_display_text(IceText::UserBusyDescription)?.text,
-                    message: CallWaitMessage::User(true),
-                },
-                Button {
-                    title: board.display_text.get_display_text(IceText::SysopBusy)?.text,
-                    description: board.display_text.get_display_text(IceText::SysopBusyDescription)?.text,
-                    message: CallWaitMessage::Sysop(true),
-                },
-                Button {
-                    title: board.display_text.get_display_text(IceText::DOSBusy)?.text,
-                    description: board.display_text.get_display_text(IceText::DOSBusyDescription)?.text,
-                    message: CallWaitMessage::Exit(true),
-                },
-                Button {
-                    title: board.display_text.get_display_text(IceText::UserNotBusy)?.text,
-                    description: board.display_text.get_display_text(IceText::UserNotBusyDescription)?.text,
-                    message: CallWaitMessage::User(false),
-                },
-                Button {
-                    title: board.display_text.get_display_text(IceText::SysopNotBusy)?.text,
-                    description: board.display_text.get_display_text(IceText::SysopNotBusyDescription)?.text,
-                    message: CallWaitMessage::Sysop(false),
-                },
-                Button {
-                    title: board.display_text.get_display_text(IceText::DOSNotBusy)?.text,
-                    description: board.display_text.get_display_text(IceText::DOSNotBusyDescription)?.text,
-                    message: CallWaitMessage::Exit(false),
-                },
-            ];
-        } else {
-            return Err(Box::new(IcyBoardError::Error("Board is locked".to_string())));
-        }
-        /*
-        let file = board
-            .lock()
-            .as_ref()
-            .unwrap()
-            .data
-            .path
-            .stats_file
-            .to_string();
-        let file_name = board.lock().as_ref().unwrap().resolve_file(&file);
-        let call_stat = CallStat::load(&file_name)?;*/
-
-        let last_caller_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::LastCaller)?.text;
-        let calls_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::NumberCalls)?.text;
-        let msgs_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::NumberMessages)?.text;
-        let dls_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::NumberDownload)?.text;
-        let uls_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::NumberUpload)?.text;
-        let sysavail_txt = board.lock().as_ref().unwrap().display_text.get_display_text(IceText::SystemAvailable)?.text;
+    pub fn new(board: &Arc<Mutex<IcyBoard>>) -> Res<Self> {
+        let buttons = vec![
+            Button {
+                title: get_text("call_wait_screen_user_button_busy"),
+                description: get_text("call_wait_screen_user_button_busy_descr"),
+                message: CallWaitMessage::User(true),
+            },
+            Button {
+                title: get_text("call_wait_screen_sysop_button_busy"),
+                description: get_text("call_wait_screen_sysop_button_busy_descr"),
+                message: CallWaitMessage::Sysop(true),
+            },
+            Button {
+                title: get_text("call_wait_screen_dos_button_busy"),
+                description: get_text("call_wait_screen_dos_button_busy_descr"),
+                message: CallWaitMessage::Exit(true),
+            },
+            Button {
+                title: get_text("call_wait_screen_user_button_not_busy"),
+                description: get_text("call_wait_screen_user_button_not_busy_descr"),
+                message: CallWaitMessage::User(false),
+            },
+            Button {
+                title: get_text("call_wait_screen_sysop_button_not_busy"),
+                description: get_text("call_wait_screen_sysop_button_not_busy_descr"),
+                message: CallWaitMessage::Sysop(false),
+            },
+            Button {
+                title: get_text("call_wait_screen_dos_button_not_busy"),
+                description: get_text("call_wait_screen_dos_button_not_busy_descr"),
+                message: CallWaitMessage::Exit(false),
+            },
+            Button {
+                title: get_text("call_wait_screen_monitor_button_not_busy"),
+                description: get_text("call_wait_screen_monitor_button_not_busy_descr"),
+                message: CallWaitMessage::Monitor,
+            },
+        ];
+        let board_name = board.lock().unwrap().config.board.name.clone();
 
         Ok(Self {
             x: 0,
             y: 0,
             selected: None,
             buttons,
-            last_caller_txt,
-            calls_txt,
-            msgs_txt,
-            dls_txt,
-            uls_txt,
-            sysavail_txt,
-            board,
+            board_name,
+            statistics: Statistics::default(),
         })
     }
 
-    pub fn run(&mut self) -> Res<CallWaitMessage> {
-        let mut terminal = init_terminal()?;
+    pub fn run(&mut self, terminal: &mut Terminal<impl Backend>, board: &Arc<Mutex<IcyBoard>>) -> Res<CallWaitMessage> {
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
 
         loop {
+            if let Ok(board) = &board.lock() {
+                self.statistics = board.statistics.clone();
+            }
+
             terminal.draw(|frame| self.ui(frame))?;
 
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
 
-            if event::poll(timeout)? && self.selected.is_none() {
+            if self.selected.is_none() && event::poll(timeout)? {
                 if let Event::Key(key) = event::read()? {
                     if key.kind == KeyEventKind::Press {
                         match key.code {
                             KeyCode::Esc => {
                                 return Ok(CallWaitMessage::Exit(false));
                             }
-                            KeyCode::Down | KeyCode::Char('s') => self.y = (self.y + 1).min(1),
-                            KeyCode::Up | KeyCode::Char('w') => self.y = (self.y - 1).max(0),
-                            KeyCode::Right | KeyCode::Char('d') => self.x = (self.x + 1).min(2),
-                            KeyCode::Left | KeyCode::Char('a') => self.x = (self.x - 1).max(0),
+                            KeyCode::Down | KeyCode::Char('s') => self.set_if_valid(self.x, self.y + 1),
+                            KeyCode::Up | KeyCode::Char('w') => self.set_if_valid(self.x, self.y - 1),
+                            KeyCode::Right | KeyCode::Char('d') => self.set_if_valid(self.x + 1, self.y),
+                            KeyCode::Left | KeyCode::Char('a') => self.set_if_valid(self.x - 1, self.y),
                             KeyCode::Enter => {
                                 self.selected = Some(Instant::now());
                             }
@@ -174,7 +130,7 @@ impl CallWaitScreen {
             }
 
             if let Some(selected) = self.selected {
-                if selected.elapsed() >= Duration::from_millis(500) {
+                if selected.elapsed() >= Duration::from_millis(300) {
                     return Ok(self.buttons[(self.y * 3 + self.x) as usize].message);
                 }
             }
@@ -195,7 +151,6 @@ impl CallWaitScreen {
         let width = rect.width as f64 - 2.0; // -2 for border
         let height = rect.height as f64;
         let ver = VERSION.to_string();
-
         Canvas::default()
             .marker(Marker::Block)
             .paint(move |ctx| {
@@ -207,14 +162,7 @@ impl CallWaitScreen {
                     Line::from(node_txt).style(Style::new().fg(DOS_WHITE)),
                 );
 
-                render_button(
-                    ctx,
-                    4.0,
-                    height - 2.0,
-                    width - 7.0,
-                    &self.board.lock().unwrap().config.board.name,
-                    SelectState::Selected,
-                );
+                render_button(ctx, 4.0, height - 2.0, width - 7.0, &self.board_name, SelectState::Selected);
 
                 let y_padding = -2.0;
                 let button_space = width / 3.0;
@@ -250,21 +198,14 @@ impl CallWaitScreen {
                     ctx.print(i as f64, separator_y, Line::from("═").style(Style::new().fg(DOS_WHITE)));
                 }
 
-                //self.icy_board.lock().borrow().as_ref().unwrap().data.stat
+                render_label(ctx, 4.0, separator_y - 2.0, width - 7.0, &get_text("call_wait_screen_sys_ready"));
 
-                render_label(ctx, 4.0, separator_y - 2.0, width - 7.0, &self.sysavail_txt);
-                let call_stat = &self.board.lock().unwrap().statistics;
-                let last_caller = if let Some(lc) = call_stat.last_callers.last() {
-                    lc.clone()
-                } else {
-                    "".to_string()
-                };
                 render_label(
                     ctx,
                     4.0,
                     separator_y - 4.0,
                     width - 7.0,
-                    format!("{} {}", self.last_caller_txt, last_caller).as_str(),
+                    format!("{} {}", get_text("call_wait_screen_last_caller"), self.statistics.last_caller).as_str(),
                 );
 
                 let label_space = width / 4.0;
@@ -276,7 +217,7 @@ impl CallWaitScreen {
                     left_pos,
                     separator_y - 6.0,
                     label_size,
-                    format!("{} {}", self.calls_txt, call_stat.total.calls).as_str(),
+                    format!("{} {}", get_text("call_wait_screen_num_calls"), self.statistics.total.calls).as_str(),
                 );
 
                 render_label(
@@ -284,7 +225,7 @@ impl CallWaitScreen {
                     left_pos + label_space * 1.0,
                     separator_y - 6.0,
                     label_size,
-                    format!("{} {}", self.msgs_txt, call_stat.total.messages).as_str(),
+                    format!("{} {}", get_text("call_wait_screen_num_msgs"), self.statistics.total.messages).as_str(),
                 );
 
                 render_label(
@@ -292,7 +233,7 @@ impl CallWaitScreen {
                     left_pos + label_space * 2.0,
                     separator_y - 6.0,
                     label_size,
-                    format!("{} {}", self.dls_txt, call_stat.total.downloads).as_str(),
+                    format!("{} {}", get_text("call_wait_screen_num_dls"), self.statistics.total.downloads).as_str(),
                 );
 
                 render_label(
@@ -300,7 +241,7 @@ impl CallWaitScreen {
                     left_pos + label_space * 3.0,
                     separator_y - 6.0,
                     label_size,
-                    format!("{} {}", self.uls_txt, call_stat.total.uploads).as_str(),
+                    format!("{} {}", get_text("call_wait_screen_num_uls"), self.statistics.total.uploads).as_str(),
                 );
             })
             .background_color(DOS_BLUE)
@@ -341,6 +282,14 @@ impl CallWaitScreen {
         }
         SelectState::None
     }
+
+    fn set_if_valid(&mut self, x: i32, y: i32) {
+        let selected_button = y * 3 + x;
+        if selected_button >= 0 && selected_button < self.buttons.len() as i32 {
+            self.x = x;
+            self.y = y;
+        }
+    }
 }
 
 #[derive(PartialEq)]
@@ -362,8 +311,8 @@ impl SelectState {
     pub fn get_bg(&self) -> Color {
         match self {
             SelectState::None => DOS_RED,
-            SelectState::Selected => DOS_LIGHTGRAY,
-            SelectState::Pressed => DOS_LIGHTGRAY,
+            SelectState::Selected => DOS_LIGHT_GRAY,
+            SelectState::Pressed => DOS_LIGHT_GRAY,
         }
     }
 }
@@ -392,11 +341,11 @@ fn render_button(ctx: &mut canvas::Context<'_>, x: f64, y: f64, width: f64, titl
         );
     } else {
         for i in 0..=(width as usize) {
-            ctx.print(x + 1.0 + i as f64, y, Line::from("▄").style(Style::new().fg(DOS_LIGHTGRAY)));
-            ctx.print(x + 1.0 + i as f64, y - 1.0, Line::from("▀").style(Style::new().fg(DOS_LIGHTGRAY)));
+            ctx.print(x + 1.0 + i as f64, y, Line::from("▄").style(Style::new().fg(DOS_LIGHT_GRAY)));
+            ctx.print(x + 1.0 + i as f64, y - 1.0, Line::from("▀").style(Style::new().fg(DOS_LIGHT_GRAY)));
         }
 
-        ctx.print(x + width + 1.0, y, Line::from("▄").style(Style::new().fg(DOS_LIGHTGRAY)));
+        ctx.print(x + width + 1.0, y, Line::from("▄").style(Style::new().fg(DOS_LIGHT_GRAY)));
     }
 }
 
@@ -421,18 +370,4 @@ fn render_label(ctx: &mut canvas::Context<'_>, x: f64, y: f64, width: f64, title
         y,
         Line::from(title.to_string()).style(Style::new().bg(bg).fg(DOS_BLACK)),
     );
-}
-
-fn init_terminal() -> Res<Terminal<impl Backend>> {
-    enable_raw_mode()?;
-    stdout().execute(EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout());
-    let terminal = Terminal::new(backend)?;
-    Ok(terminal)
-}
-
-pub fn restore_terminal() -> io::Result<()> {
-    disable_raw_mode()?;
-    stdout().execute(LeaveAlternateScreen)?;
-    Ok(())
 }

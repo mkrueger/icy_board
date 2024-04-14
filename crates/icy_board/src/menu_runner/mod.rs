@@ -3,7 +3,7 @@ use icy_board_engine::{
         commands::{Command, CommandType},
         icb_text::IceText,
         security::RequiredSecurity,
-        state::{functions::display_flags, GraphicsMode, IcyBoardState},
+        state::{functions::display_flags, GraphicsMode, IcyBoardState, UserActivity},
         IcyBoardError,
     },
     vm::TerminalTarget,
@@ -31,6 +31,7 @@ impl PcbBoardCommand {
     }
 
     pub fn do_command(&mut self) -> Res<()> {
+        self.state.node_state.lock().unwrap().user_activity = UserActivity::BrowseMenu;
         if self.display_menu && !self.state.session.expert_mode {
             self.display_menu()?;
             self.display_menu = false;

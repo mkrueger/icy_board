@@ -1,10 +1,17 @@
-use icy_board_engine::icy_board::{bulletins::MASK_BULLETINS, commands::Command, icb_text::IceText, state::functions::display_flags};
+use icy_board_engine::icy_board::{
+    bulletins::MASK_BULLETINS,
+    commands::Command,
+    icb_text::IceText,
+    state::{functions::display_flags, UserActivity},
+};
 use icy_ppe::Res;
 
 use super::PcbBoardCommand;
 
 impl PcbBoardCommand {
     pub fn show_bulletins(&mut self, action: &Command) -> Res<()> {
+        self.state.node_state.lock().unwrap().user_activity = UserActivity::ReadBulletins;
+
         let bulletins = self.state.load_bullettins()?;
         if bulletins.is_empty() {
             self.state.display_text(

@@ -269,6 +269,8 @@ pub struct IcbConfig {
     ///  function key definitions
     pub func_keys: [String; 10],
 
+    pub num_nodes: u16,
+
     #[serde(rename = "subs")]
     pub subscription_info: SubscriptionMode,
 
@@ -315,6 +317,7 @@ impl IcbConfig {
                 msg_hdr_conf: IcbColor::Dos(0x3E),
             },
             func_keys: Default::default(),
+            num_nodes: 32,
             subscription_info: SubscriptionMode {
                 is_enabled: false,
                 subscription_length: 0,

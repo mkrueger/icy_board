@@ -212,6 +212,7 @@ impl PCBoardImporter {
                 notice: String::new(),
                 capabilities: String::new(),
             },
+            num_nodes: 32,
             func_keys: self.data.func_keys.clone(),
             subscription_info: SubscriptionMode {
                 is_enabled: self.data.subscription_info.is_enabled,

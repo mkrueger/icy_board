@@ -1,7 +1,14 @@
 use dizbase::file_base::{metadata::MetadaType, FileBase};
 use humanize_bytes::humanize_bytes_decimal;
 use icy_board_engine::{
-    icy_board::{commands::Command, file_areas::FileAreaList, icb_config::IcbColor, icb_text::IceText, state::functions::display_flags, IcyBoardSerializer},
+    icy_board::{
+        commands::Command,
+        file_areas::FileAreaList,
+        icb_config::IcbColor,
+        icb_text::IceText,
+        state::{functions::display_flags, UserActivity},
+        IcyBoardSerializer,
+    },
     vm::TerminalTarget,
 };
 use icy_ppe::Res;
@@ -10,6 +17,8 @@ use super::{PcbBoardCommand, MASK_COMMAND};
 
 impl PcbBoardCommand {
     pub fn show_file_directories(&mut self, action: &Command) -> Res<()> {
+        self.state.node_state.lock().unwrap().user_activity = UserActivity::BrowseFiles;
+
         let file_area_file = self.state.resolve_path(&self.state.session.current_conference.file_area_file);
 
         let file_areas = FileAreaList::load(&file_area_file)?;

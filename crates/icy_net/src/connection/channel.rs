@@ -104,7 +104,7 @@ mod tests {
         let mut s = String::new();
         for _ in 0..11 {
             let mut buf = [0; 1];
-            let len = p2.read(&mut buf).unwrap();
+            let _len = p2.read(&mut buf).unwrap();
             s.push(buf[0] as char);
         }
         assert_eq!(&s, "Hello World");

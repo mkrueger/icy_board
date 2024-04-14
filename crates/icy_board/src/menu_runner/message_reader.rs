@@ -2,7 +2,7 @@ use icy_board_engine::{
     icy_board::{
         commands::Command,
         icb_text::{IceText, TextEntry},
-        state::{functions::display_flags, IcyBoardState},
+        state::{functions::display_flags, IcyBoardState, UserActivity},
     },
     vm::TerminalTarget,
 };
@@ -177,6 +177,8 @@ impl MessageViewer {
 
 impl PcbBoardCommand {
     pub fn read_messages(&mut self, action: &Command) -> Res<()> {
+        self.state.node_state.lock().unwrap().user_activity = UserActivity::ReadMessages;
+
         let viewer = MessageViewer::load(&self.state.board.lock().unwrap().display_text)?;
 
         let message_base_file = &self.state.session.current_conference.message_areas[0].filename;

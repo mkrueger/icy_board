@@ -5,7 +5,10 @@ use icy_board_engine::{
         commands::Command,
         icb_config::IcbColor,
         icb_text::IceText,
-        state::functions::{display_flags, MASK_ASCII},
+        state::{
+            functions::{display_flags, MASK_ASCII},
+            UserActivity,
+        },
     },
     vm::TerminalTarget,
 };
@@ -15,6 +18,8 @@ use super::{PcbBoardCommand, MASK_COMMAND};
 
 impl PcbBoardCommand {
     pub fn find_files(&mut self, action: &Command) -> Res<()> {
+        self.state.node_state.lock().unwrap().user_activity = UserActivity::BrowseFiles;
+
         if self.state.session.current_file_areas.is_empty() {
             self.state
                 .display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;

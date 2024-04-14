@@ -31,12 +31,18 @@ pub static LANGUAGE_LOADER: Lazy<FluentLanguageLoader> = Lazy::new(|| {
     loader
 });
 
-pub fn get_text(txt: &str) -> String {
-    crate::LANGUAGE_LOADER.get(txt)
+pub fn get_text(message_id: &str) -> String {
+    if !crate::LANGUAGE_LOADER.has(message_id) {
+        log::error!("Missing translation for: {}", message_id);
+    }
+    crate::LANGUAGE_LOADER.get(message_id)
 }
 
-pub fn get_text_args(txt: &str, args: HashMap<String, String>) -> String {
-    crate::LANGUAGE_LOADER.get_args(txt, args)
+pub fn get_text_args(message_id: &str, args: HashMap<String, String>) -> String {
+    if !crate::LANGUAGE_LOADER.has(message_id) {
+        log::error!("Missing translation for: {}", message_id);
+    }
+    crate::LANGUAGE_LOADER.get_args(message_id, args)
 }
 
 pub fn print_error<A: Display>(error: A) {

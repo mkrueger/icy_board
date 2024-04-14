@@ -511,16 +511,16 @@ style = "Red"
 text = "Sorry, the Sysop is not currently available for CHAT!"
 style = "Red"
 
-[SysopBusy]
+[_SysopBusy]
 text = "Sysop - Busy"
 
-[UserBusy]
+[_UserBusy]
 text = "User - Busy"
 
-[DOSBusy]
+[_DOSBusy]
 text = "DOS - Busy"
 
-[DOSNotBusy]
+[_DOSNotBusy]
 text = "DOS - Not Busy"
 
 [TurnPrinterOn]
@@ -1530,7 +1530,7 @@ justify = "Right"
 [ResetModem]
 text = "Resetting Modem ..."
 
-[SystemAvailable]
+[_SystemAvailable]
 text = "System is Ready For Callers"
 
 [MinutesLeft]
@@ -1962,10 +1962,10 @@ style = "White"
 text = "Insufficient Memory for Operation @OPTEXT@"
 style = "Cyan"
 
-[SysopNotBusy]
+[_SysopNotBusy]
 text = "Sysop - Not Busy"
 
-[UserNotBusy]
+[_UserNotBusy]
 text = "User - Not Busy"
 
 [PCBSysMgr]
@@ -1980,7 +1980,7 @@ text = "PCBSetup"
 [SetStatsLocal]
 text = "SYSTEM Statistics"
 
-[PCBMonitor]
+[_PCBMonitor]
 text = "PCBMoni"
 
 [ResetStats]
@@ -1998,10 +1998,10 @@ text = "Alarm is On"
 [TurnPageOff]
 text = "Page Bell is On"
 
-[UserBusyDescription]
+[_UserBusyDescription]
 text = "Log in as a regular user.  Callers will get a busy signal."
 
-[UserNotBusyDescription]
+[_UserNotBusyDescription]
 text = "Log in as a regular user.  RING Alert will be activated."
 
 [TogglePrinterDescription]
@@ -2013,10 +2013,10 @@ text = "Run PCBoard System Manager for User File maintenance."
 [SetStatsDescription]
 text = "Choose between System-Wide and Node-Specific Statistics Display"
 
-[SysopBusyDescription]
+[_SysopBusyDescription]
 text = "Log in as the Sysop.  Callers will get a busy signal."
 
-[SysopNotBusyDescription]
+[_SysopNotBusyDescription]
 text = "Log in as the Sysop.  RING Alert will be activated."
 
 [TogglePageDescription]
@@ -2025,13 +2025,13 @@ text = "Toggle `Page Bell' on or off.  System will BEEP when caller pages you."
 [PCBFilerDescription]
 text = "Run PCBFiler for File Directory maintenance."
 
-[PCBMoniDescription]
+[_PCBMoniDescription]
 text = "Run PCBMoni to monitor NODE activity"
 
-[DOSBusyDescription]
+[_DOSBusyDescription]
 text = "Drop to DOS.  Callers will get a busy signal."
 
-[DOSNotBusyDescription]
+[_DOSNotBusyDescription]
 text = "Drop to DOS.  Callers will NOT get a busy signal.  Phone will ring!"
 
 [ToggleAlarmDescription]
@@ -2046,19 +2046,19 @@ text = "Reset Node/System Statistics to Zero"
 [NoModemSelected]
 text = "No Modem Selected"
 
-[LastCaller]
+[_LastCaller]
 text = "Last Caller:"
 
-[NumberCalls]
+[_NumberCalls]
 text = "Calls:"
 
-[NumberMessages]
+[_NumberMessages]
 text = "Msgs:"
 
-[NumberDownload]
+[_NumberDownload]
 text = "D/Ls:"
 
-[NumberUpload]
+[_NumberUpload]
 text = "U/Ls:"
 
 [EscToExit]

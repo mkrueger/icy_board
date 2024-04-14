@@ -16,7 +16,7 @@ pub struct UsageStatistics {
     pub downloads_kb: u64,
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Statistics {
     pub last_callers: Vec<String>,
     pub last_caller: String,

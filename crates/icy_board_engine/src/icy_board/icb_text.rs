@@ -278,13 +278,13 @@ pub enum IceText {
     /// `Sorry, the Sysop is not currently available for CHAT!`
     SysopUnAvailable = 128,
     /// `Sysop - Busy`
-    SysopBusy = 129,
+    _SysopBusy = 129,
     /// `User - Busy`
-    UserBusy = 130,
+    _UserBusy = 130,
     /// `DOS - Busy`
-    DOSBusy = 131,
+    _DOSBusy = 131,
     /// `DOS - Not Busy`
-    DOSNotBusy = 132,
+    _DOSNotBusy = 132,
     /// `Printer is Off`
     TurnPrinterOn = 133,
     /// `Alarm is Off`
@@ -808,7 +808,7 @@ pub enum IceText {
     /// `Resetting Modem ...`
     ResetModem = 393,
     /// `System is Ready For Callers`
-    SystemAvailable = 394,
+    _SystemAvailable = 394,
     /// `min. left)`
     MinutesLeft = 395,
     /// `(@X0C@TIMELEFT@@X0E min. left) @INCONF@Command`
@@ -1038,9 +1038,9 @@ pub enum IceText {
     /// `Insufficient Memory for Operation @OPTEXT@`
     InsufficientMemory = 508,
     /// `Sysop - Not Busy`
-    SysopNotBusy = 509,
+    _SysopNotBusy = 509,
     /// `User - Not Busy`
-    UserNotBusy = 510,
+    _UserNotBusy = 510,
     /// `PCBSysMgr`
     PCBSysMgr = 511,
     /// `PCBFiler`
@@ -1050,7 +1050,7 @@ pub enum IceText {
     /// `SYSTEM Statistics`
     SetStatsLocal = 514,
     /// `PCBMoni`
-    PCBMonitor = 515,
+    _PCBMonitor = 515,
     /// `Reset Stats`
     ResetStats = 516,
     /// `No Printer`
@@ -1062,9 +1062,9 @@ pub enum IceText {
     /// `Page Bell is On`
     TurnPageOff = 520,
     /// `Log in as a regular user.  Callers will get a busy signal.`
-    UserBusyDescription = 521,
+    _UserBusyDescription = 521,
     /// `Log in as a regular user.  RING Alert will be activated.`
-    UserNotBusyDescription = 522,
+    _UserNotBusyDescription = 522,
     /// `Toggle printer off or on.  When on, caller log is echoed to printer.`
     TogglePrinterDescription = 523,
     /// `Run PCBoard System Manager for User File maintenance.`
@@ -1072,19 +1072,19 @@ pub enum IceText {
     /// `Choose between System-Wide and Node-Specific Statistics Display`
     SetStatsDescription = 525,
     /// `Log in as the Sysop.  Callers will get a busy signal.`
-    SysopBusyDescription = 526,
+    _SysopBusyDescription = 526,
     /// `Log in as the Sysop.  RING Alert will be activated.`
-    SysopNotBusyDescription = 527,
+    _SysopNotBusyDescription = 527,
     /// `Toggle `Page Bell' on or off.  System will BEEP when caller pages you.`
     TogglePageDescription = 528,
     /// `Run PCBFiler for File Directory maintenance.`
     PCBFilerDescription = 529,
     /// `Run PCBMoni to monitor NODE activity`
-    PCBMoniDescription = 530,
+    _PCBMoniDescription = 530,
     /// `Drop to DOS.  Callers will get a busy signal.`
-    DOSBusyDescription = 531,
+    _DOSBusyDescription = 531,
     /// `Drop to DOS.  Callers will NOT get a busy signal.  Phone will ring!`
-    DOSNotBusyDescription = 532,
+    _DOSNotBusyDescription = 532,
     /// `Toggle `Caller Alarm' on or off.  System BEEPs as caller logs on, etc.`
     ToggleAlarmDescription = 533,
     /// `Run PCBSetup to change PCBoard configuration.`
@@ -1094,15 +1094,15 @@ pub enum IceText {
     /// `No Modem Selected`
     NoModemSelected = 536,
     /// `Last Caller:`
-    LastCaller = 537,
+    _LastCaller = 537,
     /// `Calls:`
-    NumberCalls = 538,
+    _NumberCalls = 538,
     /// `Msgs:`
-    NumberMessages = 539,
+    _NumberMessages = 539,
     /// `D/Ls:`
-    NumberDownload = 540,
+    _NumberDownload = 540,
     /// `U/Ls:`
-    NumberUpload = 541,
+    _NumberUpload = 541,
     /// `Press (Esc) to Exit  (Ctrl-Z) for Help`
     EscToExit = 542,
     /// `(Ins/Ctrl-V) Mode: Overwrite`
