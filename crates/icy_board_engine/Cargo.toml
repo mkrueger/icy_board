@@ -10,6 +10,7 @@ edition.workspace = true
 icy_ppe = { workspace = true }
 icy_engine = { workspace = true }
 icy_net = { workspace = true }
+codepages = { workspace = true }
 
 lazy_static = { workspace = true }
 thiserror = { workspace = true }

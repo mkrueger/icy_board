@@ -7,10 +7,8 @@ use std::{
 };
 
 use byteorder::WriteBytesExt;
-use icy_ppe::{
-    tables::{import_cp437_string, UNICODE_TO_CP437},
-    Res,
-};
+use codepages::tables::UNICODE_TO_CP437;
+use icy_ppe::{tables::import_cp437_string, Res};
 use strum_macros::{Display, EnumString};
 use thiserror::Error;
 use toml::Value;

@@ -3,6 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use codepages::tables::CP437_TO_UNICODE;
 use icy_engine::IceMode;
 use icy_ppe::Res;
 
@@ -222,7 +223,7 @@ impl IcyBoardState {
         } else {
             let mut s = String::new();
             for byte in content {
-                s.push(icy_ppe::tables::CP437_TO_UNICODE[byte as usize]);
+                s.push(CP437_TO_UNICODE[byte as usize]);
             }
             s
         };

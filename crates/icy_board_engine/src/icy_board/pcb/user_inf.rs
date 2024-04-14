@@ -1,5 +1,6 @@
 use byteorder::{LittleEndian, ReadBytesExt};
-use icy_ppe::{datetime::IcbDate, tables::CP437_TO_UNICODE, Res};
+use codepages::tables::CP437_TO_UNICODE;
+use icy_ppe::{datetime::IcbDate, Res};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,

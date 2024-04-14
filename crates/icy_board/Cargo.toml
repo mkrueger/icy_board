@@ -9,6 +9,7 @@ edition = "2021"
 icy_ppe = { workspace = true}
 icy_board_engine = { workspace = true}
 jamjam = { workspace = true}
+codepages = { workspace = true}
 dizbase = { workspace = true}
 icy_engine = { workspace = true }
 icy_net = { workspace = true }

@@ -1,5 +1,6 @@
 use std::{fmt, io::stdout};
 
+use codepages::tables::{CP437_TO_UNICODE, UNICODE_TO_CP437};
 use crossterm::{
     execute,
     style::{Attribute, Color, Print, SetAttribute, SetForegroundColor},
@@ -260,7 +261,7 @@ impl TableEntry {
                 }
                 let mut string_buffer: Vec<u8> = Vec::new();
                 for c in s.chars() {
-                    if let Some(b) = crate::tables::UNICODE_TO_CP437.get(&c) {
+                    if let Some(b) = UNICODE_TO_CP437.get(&c) {
                         string_buffer.push(*b);
                     } else {
                         string_buffer.push(c as u8);
@@ -347,7 +348,7 @@ impl VariableTable {
                     } else {
                         let mut str = String::new();
                         for c in &buf[i..(i + string_length - 1)] {
-                            str.push(crate::tables::CP437_TO_UNICODE[*c as usize]);
+                            str.push(CP437_TO_UNICODE[*c as usize]);
                         }
                         GenericVariableData::String(str)
                     };

@@ -116,7 +116,7 @@ impl Tui {
                 }
                 if let Ok(mut screen) = self.screen.lock() {
                     for &b in screen_buf[0..size].iter() {
-                        screen.print(&mut parser, b as char);
+                        screen.print(&mut parser, codepages::tables::CP437_TO_UNICODE[b as usize]);
                     }
                 }
             }

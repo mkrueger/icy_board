@@ -1,5 +1,4 @@
 use super::{Connection, ConnectionType};
-use std::borrow::Borrow;
 use std::collections::VecDeque;
 use std::io::{self, Read, Write};
 use std::sync::mpsc;

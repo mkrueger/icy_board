@@ -1,8 +1,8 @@
 use std::{fs, thread, time::Duration};
 
+use codepages::tables::CP437_TO_UNICODE;
 use icy_ppe::{
     executable::{PPEExpr, VariableType, VariableValue},
-    tables::CP437_TO_UNICODE,
     Res,
 };
 

@@ -6,6 +6,7 @@ use std::{
 };
 
 use chrono::{DateTime, Datelike, Local, Timelike};
+use codepages::tables::UNICODE_TO_CP437;
 use icy_engine::ansi::constants::COLOR_OFFSETS;
 use icy_engine::TextAttribute;
 use icy_engine::{ansi, Buffer, BufferParser, Caret};
@@ -520,7 +521,12 @@ impl IcyBoardState {
 
     fn write_char(&mut self, c: char) -> Res<()> {
         self.parser.print_char(&mut self.buffer, 0, &mut self.caret, c)?;
-        self.connection.write_all(&[c as u8])?;
+
+        if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
+            self.connection.write_all(&[cp437])?;
+        } else {
+            self.connection.write_all(&[b'.'])?;
+        }
         if c == '\n' {
             self.next_line()?;
         }

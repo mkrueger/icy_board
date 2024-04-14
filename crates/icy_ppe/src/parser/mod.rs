@@ -11,10 +11,10 @@ use crate::{
         ProcedureDeclarationAstNode, ProcedureImplementation, Statement, VariableSpecifier,
     },
     executable::{FuncOpCode, FunctionDefinition, OpCode, StatementDefinition, VariableType},
-    tables::CP437_TO_UNICODE,
 };
 
 use self::lexer::{Lexer, Spanned, Token};
+use codepages::tables::CP437_TO_UNICODE;
 use thiserror::Error;
 use unicase::Ascii;
 

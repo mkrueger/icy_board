@@ -13,6 +13,7 @@ log = { workspace = true }
 crossterm = { workspace = true }
 serde = { workspace = true }
 chrono = { workspace = true }
+codepages = { workspace = true }
 
 unicase = { workspace = true }
 toml = { workspace = true }

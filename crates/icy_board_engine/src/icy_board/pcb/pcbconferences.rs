@@ -1,10 +1,7 @@
 use std::{fs::File, io::BufReader, path::Path};
 
-use icy_ppe::{
-    parser::Encoding,
-    tables::{import_cp437_string, UNICODE_TO_CP437},
-    Res,
-};
+use codepages::tables::UNICODE_TO_CP437;
+use icy_ppe::{parser::Encoding, tables::import_cp437_string, Res};
 
 use crate::icy_board::pcboard_data::{append_bool, append_int, append_line, read_bool, read_int, read_line};
 
