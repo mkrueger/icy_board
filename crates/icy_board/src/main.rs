@@ -130,7 +130,11 @@ pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) -> Res<()> {
                 let mut terminal = init_terminal()?;
                 match app.run(&mut terminal, &board) {
                     Ok(msg) => {
-                        run_message(msg, &mut terminal, &board, &mut bbs);
+                        if let Err(err) = run_message(msg, &mut terminal, &board, &mut bbs) {
+                            restore_terminal()?;
+                            log::error!("while processing call wait screen message: {}", err.to_string());
+                            print_error(err.to_string());
+                        }
                     }
                     Err(err) => {
                         restore_terminal()?;
@@ -148,13 +152,13 @@ pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) -> Res<()> {
     }
 }
 
-fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, board: &Arc<Mutex<IcyBoard>>, bbs: &mut Arc<Mutex<BBS>>) {
+fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, board: &Arc<Mutex<IcyBoard>>, bbs: &mut Arc<Mutex<BBS>>) -> Res<()> {
     match msg {
         CallWaitMessage::User(_busy) | CallWaitMessage::Sysop(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
             let mut tui = Tui::local_mode(board, bbs);
             if let Err(err) = tui.run(&board) {
-                restore_terminal().unwrap();
+                restore_terminal()?;
                 log::error!("while running board in local mode: {}", err.to_string());
                 println!("Error: {}", err);
                 process::exit(1);
@@ -170,9 +174,9 @@ fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, boar
             match app.run(terminal, &board, bbs) {
                 Ok(msg) => {
                     if let NodeMonitoringScreenMessage::EnterNode(node) = msg {
-                        let mut tui = Tui::sysop_mode(bbs, node).unwrap();
+                        let mut tui = Tui::sysop_mode(bbs, node)?;
                         if let Err(err) = tui.run(&board) {
-                            restore_terminal().unwrap();
+                            restore_terminal()?;
                             log::error!("while running board in local mode: {}", err.to_string());
                             println!("Error: {}", err);
                             process::exit(1);
@@ -180,15 +184,16 @@ fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, boar
                     }
                 }
                 Err(err) => {
-                    restore_terminal().unwrap();
+                    restore_terminal()?;
                     log::error!("while running node monitoring screen: {}", err.to_string());
                     print_error(err.to_string());
                 }
             }
         }
     }
+    Ok(())
 }
-/*
+
 fn init_error_hooks() -> Res<()> {
     //let (panic, error) = HookBuilder::default().into_hooks();
     //let panic = panic.into_panic_hook();
@@ -203,9 +208,9 @@ fn init_error_hooks() -> Res<()> {
     }));
     Ok(())
 }
-*/
 
 fn init_terminal() -> Res<Terminal<impl Backend>> {
+    init_error_hooks()?;
     enable_raw_mode()?;
     stdout().execute(EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout());

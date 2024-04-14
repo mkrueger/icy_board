@@ -92,9 +92,10 @@ impl NodeMonitoringScreen {
                             }
                             KeyCode::Enter => {
                                 if let Some(i) = self.table_state.selected() {
-                                    return Ok(NodeMonitoringScreenMessage::EnterNode(i));
+                                    if bbs.lock().unwrap().get_node(i).is_some() {
+                                        return Ok(NodeMonitoringScreenMessage::EnterNode(i));
+                                    }
                                 }
-                                return Ok(NodeMonitoringScreenMessage::Exit);
                             }
                             _ => {}
                         }
@@ -111,13 +112,19 @@ impl NodeMonitoringScreen {
 
     fn ui(&mut self, frame: &mut Frame, board: &Arc<Mutex<IcyBoard>>, bbs: &mut Arc<Mutex<BBS>>) {
         let now = Local::now();
+        let mut footer = get_text("icbmoni_footer");
+        if let Some(i) = self.table_state.selected() {
+            if bbs.lock().unwrap().get_node(i).is_some() {
+                footer = get_text("icbmoni_on_note_footer")
+            }
+        }
 
         let b = Block::default()
             .title(Title::from(Line::from(format!(" {} ", now.date_naive())).style(Style::new().white())).alignment(Alignment::Left))
             .title(Title::from(Span::from(get_text("icbmoni_title")).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED).bold())).alignment(Alignment::Center))
             .title(Title::from(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white())).alignment(Alignment::Right))
             .title(
-                Title::from(Span::from(get_text("icbmoni_footer")).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)))
+                Title::from(Span::from(footer).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)))
                     .alignment(Alignment::Center)
                     .position(block::Position::Bottom),
             )

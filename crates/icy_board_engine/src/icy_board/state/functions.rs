@@ -17,7 +17,7 @@ use crate::{
     vm::TerminalTarget,
 };
 
-use super::IcyBoardState;
+use super::{IcyBoardState, KeySource};
 
 pub mod display_flags {
     pub const DEFAULT: i32 = 0x00000;
@@ -290,14 +290,14 @@ impl IcyBoardState {
 
         let mut output = String::new();
         loop {
-            let Some((echo, mut ch)) = self.get_char()? else {
+            let Some(mut key_char) = self.get_char()? else {
                 continue;
             };
             if display_flags & display_flags::UPCASE != 0 {
-                ch = ch.to_ascii_uppercase();
+                key_char.ch = key_char.ch.to_ascii_uppercase();
             }
 
-            if ch == '\n' || ch == '\r' {
+            if key_char.ch == '\n' || key_char.ch == '\r' {
                 if !help.is_empty() {
                     if let Some(cmd) = self.try_find_command(&output) {
                         if cmd.command_type == CommandType::Help {
@@ -317,21 +317,21 @@ impl IcyBoardState {
                 }
                 break;
             }
-            if ch == '\x08' && !output.is_empty() {
+            if key_char.ch == '\x08' && !output.is_empty() {
                 output.pop();
-                if echo {
+                if key_char.source != KeySource::StuffedHidden {
                     self.print(TerminalTarget::Both, "\x08 \x08")?;
                 }
                 continue;
             }
 
-            if (output.len() as i32) < len && valid_mask.contains(ch) {
-                output.push(ch);
-                if echo {
+            if (output.len() as i32) < len && valid_mask.contains(key_char.ch) {
+                output.push(key_char.ch);
+                if key_char.source != KeySource::StuffedHidden {
                     if display_flags & display_flags::ECHODOTS != 0 {
                         self.print(TerminalTarget::Both, ".")?;
                     } else {
-                        self.print(TerminalTarget::Both, &ch.to_string())?;
+                        self.print(TerminalTarget::Both, &key_char.ch.to_string())?;
                     }
                 }
             }

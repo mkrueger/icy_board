@@ -1,5 +1,5 @@
 use std::{
-    io::{self, Read, Write},
+    io::{self, ErrorKind, Read, Write},
     net::{TcpStream, ToSocketAddrs},
     time::Duration,
 };
@@ -58,10 +58,10 @@ impl TelnetConnection {
                 addr.set_port(23);
             }
             let tcp_stream = TcpStream::connect_timeout(&addr, timeout)?;
+            tcp_stream.set_nonblocking(true)?;
 
             tcp_stream.set_write_timeout(Some(timeout))?;
             tcp_stream.set_read_timeout(Some(timeout))?;
-            tcp_stream.set_nonblocking(false)?;
 
             return Ok(Self {
                 tcp_stream,
@@ -73,6 +73,8 @@ impl TelnetConnection {
     }
 
     pub fn accept(tcp_stream: TcpStream) -> crate::Result<Self> {
+        tcp_stream.set_nonblocking(true)?;
+
         Ok(Self {
             tcp_stream,
             caps: TermCaps {
@@ -252,11 +254,21 @@ impl Connection for TelnetConnection {
 
 impl Read for TelnetConnection {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let size = self.tcp_stream.read(buf)?;
-
-        let size = self.parse(&mut buf[..size])?;
-
-        Ok(size)
+        match self.tcp_stream.read(buf) {
+            Ok(size) => {
+                if size == 0 {
+                    return Ok(0);
+                }
+                let size = self.parse(&mut buf[..size])?;
+                Ok(size)
+            }
+            Err(ref e) => {
+                if e.kind() == ErrorKind::WouldBlock {
+                    return Ok(0);
+                }
+                Err(io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")))
+            }
+        }
     }
 }
 

@@ -32,9 +32,9 @@ use ratatui::{
 use crate::{bbs::BBS, icy_engine_output::Screen, menu_runner::PcbBoardCommand};
 
 pub struct Tui {
-    screen: Arc<Mutex<Screen>>,
+    screen: Screen,
     session: Arc<Mutex<Session>>,
-    connection: Arc<Mutex<ChannelConnection>>,
+    connection: ChannelConnection,
     status_bar: usize,
     handle: Arc<Mutex<NodeState>>,
 }
@@ -84,11 +84,9 @@ impl Tui {
                 thread::sleep(Duration::from_millis(20));
             }
         });
-        let ui_screen = Arc::new(Mutex::new(Screen::new()));
-        let ui_connection = Arc::new(Mutex::new(ui_connection));
         ui_node.lock().unwrap().handle = Some(handle);
         Self {
-            screen: ui_screen,
+            screen: Screen::new(),
             session: ui_session,
             connection: ui_connection,
             status_bar: 0,
@@ -104,10 +102,8 @@ impl Tui {
                 return Err(Box::new(IcyBoardError::Error("Node not found".to_string())));
             };
             node.lock().unwrap().connections.lock().unwrap().push(Box::new(connection));
-            let ui_screen = Arc::new(Mutex::new(Screen::new()));
-            let ui_connection = Arc::new(Mutex::new(ui_connection));
             Ok(Self {
-                screen: ui_screen,
+                screen: Screen::new(),
                 session: ui_session,
                 connection: ui_connection,
                 status_bar: 0,
@@ -128,16 +124,14 @@ impl Tui {
             let mut parser = ansi::Parser::default();
             parser.bs_is_ctrl_char = true;
             loop {
-                match self.connection.lock().unwrap().read(&mut screen_buf) {
+                match self.connection.read(&mut screen_buf) {
                     Ok(size) => {
                         if size == 0 {
                             break;
                         }
                         redraw = true;
-                        if let Ok(mut screen) = self.screen.lock() {
-                            for &b in screen_buf[0..size].iter() {
-                                screen.print(&mut parser, codepages::tables::CP437_TO_UNICODE[b as usize]);
-                            }
+                        for &b in screen_buf[0..size].iter() {
+                            self.screen.print(&mut parser, codepages::tables::CP437_TO_UNICODE[b as usize]);
                         }
                     }
                     Err(_) => {
@@ -223,10 +217,8 @@ impl Tui {
 
         let area = Rect::new(0, (frame.size().height - 1).min(24), frame.size().width.min(80), 1);
         frame.render_widget(self.status_bar(board), area);
-        if let Ok(screen) = self.screen.lock() {
-            let p = screen.caret.get_position();
-            frame.set_cursor(p.x.clamp(0, 80) as u16, (p.y - screen.buffer.get_first_visible_line()).clamp(0, 25) as u16);
-        }
+        let p = self.screen.caret.get_position();
+        frame.set_cursor(p.x.clamp(0, 80) as u16, (p.y - self.screen.buffer.get_first_visible_line()).clamp(0, 25) as u16);
     }
 
     fn status_bar(&self, board: &IcyBoard) -> impl Widget + '_ {
@@ -312,22 +304,20 @@ impl Tui {
     fn main_canvas(&self, area: Rect) -> impl Widget + '_ {
         Canvas::default()
             .paint(move |ctx| {
-                if let Ok(screen) = self.screen.lock() {
-                    let buffer = &screen.buffer;
-                    for y in 0..area.height as i32 {
-                        for x in 0..area.width as i32 {
-                            let c = buffer.get_char((x, y + buffer.get_first_visible_line()));
-                            let mut fg = c.attribute.get_foreground();
-                            if c.attribute.is_bold() {
-                                fg += 8;
-                            }
-                            let fg = buffer.palette.get_color(fg).get_rgb();
-                            let bg = buffer.palette.get_color(c.attribute.get_background()).get_rgb();
-
-                            let out_char = Line::from(c.ch.to_string()).style(Style::new().bg(Color::Rgb(bg.0, bg.1, bg.2)).fg(Color::Rgb(fg.0, fg.1, fg.2)));
-
-                            ctx.print(x as f64 + 1.0, (area.height as i32 - 1 - y) as f64, out_char);
+                let buffer = &self.screen.buffer;
+                for y in 0..area.height as i32 {
+                    for x in 0..area.width as i32 {
+                        let c = buffer.get_char((x, y + buffer.get_first_visible_line()));
+                        let mut fg = c.attribute.get_foreground();
+                        if c.attribute.is_bold() {
+                            fg += 8;
                         }
+                        let fg = buffer.palette.get_color(fg).get_rgb();
+                        let bg = buffer.palette.get_color(c.attribute.get_background()).get_rgb();
+
+                        let out_char = Line::from(c.ch.to_string()).style(Style::new().bg(Color::Rgb(bg.0, bg.1, bg.2)).fg(Color::Rgb(fg.0, fg.1, fg.2)));
+
+                        ctx.print(x as f64 + 1.0, (area.height as i32 - 1 - y) as f64, out_char);
                     }
                 }
             })
@@ -336,12 +326,12 @@ impl Tui {
             .y_bounds([0.0, area.height as f64])
     }
 
-    fn add_input(&self, c_seq: std::str::Chars<'_>) -> Res<()> {
+    fn add_input(&mut self, c_seq: std::str::Chars<'_>) -> Res<()> {
         let mut s = String::new();
         for c in c_seq {
             s.push(c);
         }
-        self.connection.lock().unwrap().write_all(s.as_bytes())?;
+        self.connection.write_all(s.as_bytes())?;
         Ok(())
     }
 }

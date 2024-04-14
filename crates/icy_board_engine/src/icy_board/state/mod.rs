@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, VecDeque},
     fs,
+    io::{Read, Write},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     thread,
@@ -231,6 +232,24 @@ impl NodeState {
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum KeySource {
+    User,
+    StuffedHidden,
+    Sysop,
+}
+
+pub struct KeyChar {
+    pub ch: char,
+    pub source: KeySource,
+}
+
+impl KeyChar {
+    pub fn new(src: KeySource, c: char) -> Self {
+        Self { ch: c, source: src }
+    }
+}
+
 pub struct IcyBoardState {
     pub connection: Box<dyn Connection>,
     pub board: Arc<Mutex<IcyBoard>>,
@@ -256,7 +275,7 @@ pub struct IcyBoardState {
     caret: Caret,
     buffer: Buffer,
 
-    char_buffer: VecDeque<char>,
+    char_buffer: VecDeque<KeyChar>,
 }
 
 impl IcyBoardState {
@@ -419,12 +438,12 @@ impl IcyBoardState {
         for (i, c) in in_chars.iter().enumerate() {
             if *c == '^' && i + 1 < in_chars.len() && in_chars[i + 1] >= 'A' && in_chars[i + 1] <= '[' {
                 let c = in_chars[i + 1] as u8 - b'@';
-                self.char_buffer.push_back(c as char);
+                self.char_buffer.push_back(KeyChar::new(KeySource::StuffedHidden, c as char));
             } else {
-                self.char_buffer.push_back(*c);
+                self.char_buffer.push_back(KeyChar::new(KeySource::StuffedHidden, *c));
             }
         }
-        self.char_buffer.push_back('\n');
+        self.char_buffer.push_back(KeyChar::new(KeySource::StuffedHidden, '\n'));
         Ok(())
     }
 
@@ -583,6 +602,14 @@ impl IcyBoardState {
             }
         }
         self.connection.write_all(&b)?;
+        if let Ok(node_state) = self.node_state.lock() {
+            if let Ok(connections) = &mut node_state.connections.lock() {
+                for conn in connections.iter_mut() {
+                    let _ = conn.write_all(&b);
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -900,18 +927,28 @@ impl IcyBoardState {
     }
 
     /// # Errors
-    pub fn get_char(&mut self) -> Res<Option<(bool, char)>> {
+    pub fn get_char(&mut self) -> Res<Option<KeyChar>> {
         if let Some(ch) = self.char_buffer.pop_front() {
-            return Ok(Some((true, ch)));
+            return Ok(Some(ch));
         }
-        let mut a = [0; 1];
-        let size = self.connection.read(&mut a)?;
+        let mut key_data = [0; 1];
+        let size = self.connection.read(&mut key_data)?;
         if size == 1 {
-            Ok(Some((true, a[0] as char)))
-        } else {
-            thread::sleep(Duration::from_millis(50));
-            Ok(None)
+            return Ok(Some(KeyChar::new(KeySource::User, key_data[0] as char)));
         }
+        if let Ok(node_state) = self.node_state.lock() {
+            if let Ok(connections) = &mut node_state.connections.lock() {
+                for conn in connections.iter_mut() {
+                    let size = conn.read(&mut key_data)?;
+                    if size == 1 {
+                        return Ok(Some(KeyChar::new(KeySource::Sysop, key_data[0] as char)));
+                    }
+                }
+            }
+        }
+
+        thread::sleep(Duration::from_millis(100));
+        Ok(None)
     }
 
     pub fn inbytes(&mut self) -> i32 {

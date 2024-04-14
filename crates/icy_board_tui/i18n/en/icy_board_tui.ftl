@@ -33,6 +33,7 @@ call_wait_screen_num_uls = U/Ls:
 
 icbmoni_title = [ IcyBoard Node Monitoring Utility ]
 icbmoni_footer = [ (↑), (↓), (Esc) to End ]
+icbmoni_on_note_footer = [ (↑), (↓), (Return) to Monitor, (Esc) to End ]
 icbmoni_no_caller = No Caller this Node
 icbmoni_user_log_in = Logging Into System
 icbmoni_user_browse_menu = Browsing Menus

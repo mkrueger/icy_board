@@ -478,15 +478,15 @@ pub fn yeschar(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> 
 }
 
 pub fn inkey(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some((echo, ch)) = vm.icy_board_state.get_char()? {
-        if ch as u8 == 127 {
+    if let Some(key_char) = vm.icy_board_state.get_char()? {
+        if key_char.ch as u8 == 127 {
             return Ok(VariableValue::new_string("DEL".to_string()));
         }
-        if ch == '\x1B' {
-            if let Some((echo, ch)) = vm.icy_board_state.get_char()? {
-                if ch == '[' {
-                    if let Some((echo, ch)) = vm.icy_board_state.get_char()? {
-                        match ch {
+        if key_char.ch == '\x1B' {
+            if let Some(key_char) = vm.icy_board_state.get_char()? {
+                if key_char.ch == '[' {
+                    if let Some(key_char) = vm.icy_board_state.get_char()? {
+                        match key_char.ch {
                             'A' => return Ok(VariableValue::new_string("UP".to_string())),
                             'B' => return Ok(VariableValue::new_string("DOWN".to_string())),
                             'C' => return Ok(VariableValue::new_string("RIGHT".to_string())),
@@ -500,14 +500,14 @@ pub fn inkey(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
 
                             '@' => return Ok(VariableValue::new_string("INS".to_string())),
 
-                            _ => return Ok(VariableValue::new_string(ch.to_string())),
+                            _ => return Ok(VariableValue::new_string(key_char.ch.to_string())),
                         }
                     }
                 }
             }
             return Ok(VariableValue::new_string("\x1B".to_string()));
         }
-        Ok(VariableValue::new_string(ch.to_string()))
+        Ok(VariableValue::new_string(key_char.ch.to_string()))
     } else {
         Ok(VariableValue::new_string(String::new()))
     }

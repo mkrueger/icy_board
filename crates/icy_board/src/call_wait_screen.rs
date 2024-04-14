@@ -13,11 +13,7 @@ use icy_board_tui::{
 use icy_ppe::Res;
 use ratatui::{
     prelude::*,
-    widgets::{
-        block::Title,
-        canvas::{Canvas, Rectangle},
-        *,
-    },
+    widgets::{block::Title, *},
 };
 
 use crate::VERSION;
@@ -143,144 +139,163 @@ impl CallWaitScreen {
     }
 
     fn ui(&self, frame: &mut Frame) {
-        frame.render_widget(self.main_canvas(frame.size()), frame.size());
-    }
-
-    fn main_canvas(&self, rect: Rect) -> impl Widget + '_ {
         let now = Local::now();
-        let width = rect.width as f64 - 2.0; // -2 for border
-        let height = rect.height as f64;
         let ver = VERSION.to_string();
-        Canvas::default()
-            .marker(Marker::Block)
-            .paint(move |ctx| {
-                // draw node
-                let node_txt = "https://github.com/mkrueger/icy_board".to_string();
-                ctx.print(
-                    4.0 + (width - node_txt.len() as f64) / 2.0,
-                    height - 1.0,
-                    Line::from(node_txt).style(Style::new().fg(DOS_WHITE)),
-                );
-
-                render_button(ctx, 4.0, height - 2.0, width - 7.0, &self.board_name, SelectState::Selected);
-
-                let y_padding = -2.0;
-                let button_space = width / 3.0;
-                let button_width = (button_space * 19.0 / 26.0).floor();
-                let left_pos = ((width + button_space - button_width - 3.0 * button_space.floor()) / 2.0).ceil();
-
-                for (i, b) in self.buttons.iter().enumerate() {
-                    render_button(
-                        ctx,
-                        left_pos + button_space * (i % 3) as f64,
-                        height - 4.0 + y_padding * (i / 3) as f64,
-                        button_width,
-                        &b.title,
-                        self.get_select_state(i as i32),
-                    );
-                }
-
-                let selected_button = (self.y * 3 + self.x) as usize;
-                // draw description
-                ctx.print(
-                    4.0 + (width - self.buttons[selected_button].description.len() as f64) / 2.0,
-                    8.0,
-                    Line::from(self.buttons[selected_button].description.to_string()).style(
-                        Style::new()
-                            //.bg(bg)
-                            .fg(DOS_WHITE),
-                    ),
-                );
-
-                // draw separator
-                let separator_y = 7.0;
-                for i in 0..=(width as usize) {
-                    ctx.print(i as f64, separator_y, Line::from("═").style(Style::new().fg(DOS_WHITE)));
-                }
-
-                render_label(ctx, 4.0, separator_y - 2.0, width - 7.0, &get_text("call_wait_screen_sys_ready"));
-
-                render_label(
-                    ctx,
-                    4.0,
-                    separator_y - 4.0,
-                    width - 7.0,
-                    format!("{} {}", get_text("call_wait_screen_last_caller"), self.statistics.last_caller).as_str(),
-                );
-
-                let label_space = width / 4.0;
-                let label_size = (label_space * 14.0 / 19.0).floor();
-                let left_pos = ((width + label_space - label_size - 4.0 * label_space.floor()) / 2.0).ceil();
-
-                render_label(
-                    ctx,
-                    left_pos,
-                    separator_y - 6.0,
-                    label_size,
-                    format!("{} {}", get_text("call_wait_screen_num_calls"), self.statistics.total.calls).as_str(),
-                );
-
-                render_label(
-                    ctx,
-                    left_pos + label_space * 1.0,
-                    separator_y - 6.0,
-                    label_size,
-                    format!("{} {}", get_text("call_wait_screen_num_msgs"), self.statistics.total.messages).as_str(),
-                );
-
-                render_label(
-                    ctx,
-                    left_pos + label_space * 2.0,
-                    separator_y - 6.0,
-                    label_size,
-                    format!("{} {}", get_text("call_wait_screen_num_dls"), self.statistics.total.downloads).as_str(),
-                );
-
-                render_label(
-                    ctx,
-                    left_pos + label_space * 3.0,
-                    separator_y - 6.0,
-                    label_size,
-                    format!("{} {}", get_text("call_wait_screen_num_uls"), self.statistics.total.uploads).as_str(),
-                );
-            })
-            .background_color(DOS_BLUE)
-            .x_bounds([0.0, width])
-            .y_bounds([0.0, height])
-            .block(
-                Block::default()
-                    .title(Title::from(Line::from(format!(" {} ", now.date_naive())).style(Style::new().white())).alignment(Alignment::Left))
-                    .title_style(Style::new().fg(DOS_YELLOW))
-                    .title_alignment(Alignment::Center)
-                    .title(format!("  IcyBoard v{}  ", ver))
-                    .title(
-                        Title::from(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white()))
-                            .alignment(Alignment::Right),
-                    )
-                    .title(
-                        Title::from(Line::from("  (C) Copyright Mike Krüger, 2024 ").style(Style::new().white()))
-                            .alignment(Alignment::Center)
-                            .position(block::Position::Bottom),
-                    )
-                    .style(Style::new().bg(DOS_BLUE))
-                    .border_type(BorderType::Double)
-                    .border_style(Style::new().white())
-                    .borders(Borders::ALL),
+        let area = frame.size();
+        let b = Block::default()
+            .title(Title::from(Line::from(format!(" {} ", now.date_naive())).style(Style::new().white())).alignment(Alignment::Left))
+            .title_style(Style::new().fg(DOS_YELLOW))
+            .title_alignment(Alignment::Center)
+            .title(format!("  IcyBoard v{}  ", ver))
+            .title(Title::from(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white())).alignment(Alignment::Right))
+            .title(
+                Title::from(Line::from("  (C) Copyright Mike Krüger, 2024 ").style(Style::new().white()))
+                    .alignment(Alignment::Center)
+                    .position(block::Position::Bottom),
             )
+            .style(Style::new().bg(DOS_BLUE))
+            .border_type(BorderType::Double)
+            .border_style(Style::new().white())
+            .borders(Borders::ALL);
+        b.render(area, frame.buffer_mut());
+
+        let vertical = Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Fill(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(7),
+        ]);
+
+        let [header, mut title, mut button_bar, footer, separator, mut stats] = vertical.areas(area.inner(&Margin { vertical: 1, horizontal: 1 }));
+
+        // draw node
+        Line::from("https://github.com/mkrueger/icy_board")
+            .style(Style::new().fg(DOS_WHITE))
+            .centered()
+            .render(header, frame.buffer_mut());
+        let selected_button = (self.y * 3 + self.x) as usize;
+
+        title.width -= 1;
+        PcbButton::new(self.board_name.clone())
+            .theme(Theme {
+                text: DOS_BLACK,
+                background: DOS_LIGHT_GRAY,
+            })
+            .render(title.inner(&Margin { horizontal: 2, vertical: 0 }), frame.buffer_mut());
+
+        let horizontal = Layout::horizontal([Constraint::Percentage(33), Constraint::Percentage(33), Constraint::Percentage(33)]);
+
+        button_bar.y -= 1;
+        //button_bar.width -= 2;
+        let [mut row1, mut row2, mut row3] = horizontal.areas(button_bar);
+
+        row1.height = 1;
+        row1 = row1.inner(&Margin { vertical: 0, horizontal: 2 });
+
+        row2.height = 1;
+        row2 = row2.inner(&Margin { vertical: 0, horizontal: 2 });
+
+        row3.height = 1;
+        row3 = row3.inner(&Margin { vertical: 0, horizontal: 2 });
+
+        for (i, b) in self.buttons.iter().enumerate() {
+            if i % 3 == 0 {
+                row1.y += 2;
+                row2.y += 2;
+                row3.y += 2;
+            }
+
+            PcbButton::new(b.title.clone()).state(self.get_select_state(i as i32)).render(
+                match i % 3 {
+                    2 => row3,
+                    1 => row2,
+                    _ => row1,
+                },
+                frame.buffer_mut(),
+            );
+        }
+
+        Line::from(self.buttons[selected_button].description.to_string())
+            .style(Style::new().fg(DOS_WHITE))
+            .centered()
+            .render(footer.inner(&Margin { horizontal: 1, vertical: 0 }), frame.buffer_mut());
+
+        // draw description
+        Line::from("═".repeat(stats.width as usize))
+            .style(Style::new().fg(DOS_WHITE))
+            .centered()
+            .render(separator, frame.buffer_mut());
+
+        stats.y += 1;
+        stats.height -= 1;
+
+        let mut area = stats.inner(&Margin { horizontal: 3, vertical: 0 });
+        area.height = 1;
+
+        let stat_teme = Theme {
+            text: DOS_BLACK,
+            background: DOS_CYAN,
+        };
+        PcbButton::new(get_text("call_wait_screen_sys_ready"))
+            .theme(stat_teme)
+            .render(area, frame.buffer_mut());
+        stats.y += 2;
+        stats.height -= 2;
+
+        let mut area = stats.inner(&Margin { horizontal: 3, vertical: 0 });
+        area.height = 1;
+
+        PcbButton::new(format!("{} {}", get_text("call_wait_screen_last_caller"), self.statistics.last_caller))
+            .theme(stat_teme)
+            .render(area, frame.buffer_mut());
+
+        stats.y += 1;
+        stats.height -= 1;
+        let horizontal = Layout::horizontal([
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+        ]);
+
+        let [mut calls, mut msgs, mut dls, mut uls] = horizontal.areas(stats.inner(&Margin { vertical: 1, horizontal: 1 }));
+        calls.height = 1;
+        msgs.height = 1;
+        dls.height = 1;
+        uls.height = 1;
+
+        let horizontal = 2;
+        PcbButton::new(format!("{} {}", get_text("call_wait_screen_num_calls"), self.statistics.total.calls))
+            .theme(stat_teme)
+            .render(calls.inner(&Margin { horizontal, vertical: 0 }), frame.buffer_mut());
+
+        PcbButton::new(format!("{} {}", get_text("call_wait_screen_num_msgs"), self.statistics.total.messages))
+            .theme(stat_teme)
+            .render(msgs.inner(&Margin { horizontal, vertical: 0 }), frame.buffer_mut());
+
+        PcbButton::new(format!("{} {}", get_text("call_wait_screen_num_dls"), self.statistics.total.downloads))
+            .theme(stat_teme)
+            .render(dls.inner(&Margin { horizontal, vertical: 0 }), frame.buffer_mut());
+
+        PcbButton::new(format!("{} {}", get_text("call_wait_screen_num_uls"), self.statistics.total.uploads))
+            .theme(stat_teme)
+            .render(uls.inner(&Margin { horizontal, vertical: 0 }), frame.buffer_mut());
     }
 
-    fn get_select_state(&self, button: i32) -> SelectState {
+    fn get_select_state(&self, button: i32) -> State {
         let selected_button = self.y * 3 + self.x;
         if self.selected.is_none() {
             if button == selected_button {
-                return SelectState::Selected;
+                return State::Selected;
             }
-            return SelectState::None;
+            return State::Normal;
         }
         if button == selected_button {
-            return SelectState::Pressed;
+            return State::Active;
         }
-        SelectState::None
+        State::Normal
     }
 
     fn set_if_valid(&mut self, x: i32, y: i32) {
@@ -292,82 +307,97 @@ impl CallWaitScreen {
     }
 }
 
-#[derive(PartialEq)]
-enum SelectState {
-    None,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum State {
+    Normal,
     Selected,
-    Pressed,
+    Active,
 }
 
-impl SelectState {
+impl State {
     pub fn get_fg(&self) -> Color {
         match self {
-            SelectState::None => DOS_WHITE,
-            SelectState::Selected => DOS_BLACK,
-            SelectState::Pressed => DOS_BLACK,
+            State::Normal => DOS_WHITE,
+            State::Selected => DOS_BLACK,
+            State::Active => DOS_BLACK,
         }
     }
 
     pub fn get_bg(&self) -> Color {
         match self {
-            SelectState::None => DOS_RED,
-            SelectState::Selected => DOS_LIGHT_GRAY,
-            SelectState::Pressed => DOS_LIGHT_GRAY,
+            State::Normal => DOS_RED,
+            State::Selected => DOS_LIGHT_GRAY,
+            State::Active => DOS_LIGHT_GRAY,
         }
     }
 }
 
-fn render_button(ctx: &mut canvas::Context<'_>, x: f64, y: f64, width: f64, title: &str, selected: SelectState) {
-    let bg = selected.get_bg();
+#[derive(Debug, Clone, Copy)]
+struct Theme {
+    text: Color,
+    background: Color,
+}
 
-    if selected != SelectState::Pressed {
-        ctx.draw(&Rectangle {
-            x,
-            y,
-            width,
-            height: 0.0,
-            color: bg,
-        });
+struct PcbButton<'a> {
+    label: Line<'a>,
+    theme: Option<Theme>,
+    state: State,
+}
 
-        for i in 0..=(width as usize) {
-            ctx.print(x + 1.0 + i as f64, y - 1.0, Line::from("▀").style(Style::new().fg(DOS_BLACK)));
+impl<'a> PcbButton<'a> {
+    pub fn new<T: Into<Line<'a>>>(label: T) -> Self {
+        PcbButton {
+            label: label.into(),
+            theme: None,
+            state: State::Normal,
+        }
+    }
+
+    pub const fn theme(mut self, theme: Theme) -> Self {
+        self.theme = Some(theme);
+        self
+    }
+
+    pub const fn state(mut self, state: State) -> Self {
+        self.state = state;
+        self
+    }
+}
+
+impl<'a> Widget for PcbButton<'a> {
+    #[allow(clippy::cast_possible_truncation)]
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        if self.state == State::Active {
+            buf.set_string(
+                area.x + 1,
+                area.y,
+                "▀".repeat(area.width as usize),
+                Style::new().fg(DOS_BLUE).bg(DOS_LIGHT_GRAY),
+            );
+            buf.set_string(
+                area.x + 1,
+                area.y + 1,
+                "▀".repeat(area.width as usize),
+                Style::new().fg(DOS_LIGHT_GRAY).bg(DOS_BLUE),
+            );
+            return;
         }
 
-        ctx.print(x + width + 1.0, y, Line::from("▄").style(Style::new().fg(DOS_BLACK)));
-        ctx.print(
-            x + (width - title.len() as f64) / 2.0,
-            y,
-            Line::from(title.to_string()).style(Style::new().bg(bg).fg(selected.get_fg())),
+        let (fg, bg) = if let Some(theme) = self.theme {
+            (theme.text, theme.background)
+        } else {
+            (self.state.get_fg(), self.state.get_bg())
+        };
+        buf.set_style(area, Style::new().bg(bg).fg(fg));
+        buf.set_string(area.x + 1, area.y + 1, "▀".repeat(area.width as usize), Style::new().fg(DOS_BLACK).bg(DOS_BLUE));
+        buf.set_string(area.x + area.width, area.y, "▀", Style::new().fg(DOS_BLUE).bg(DOS_BLACK));
+
+        // render label centered
+        buf.set_line(
+            area.x + (area.width.saturating_sub(self.label.width() as u16)) / 2,
+            area.y + (area.height.saturating_sub(1)) / 2,
+            &self.label,
+            area.width,
         );
-    } else {
-        for i in 0..=(width as usize) {
-            ctx.print(x + 1.0 + i as f64, y, Line::from("▄").style(Style::new().fg(DOS_LIGHT_GRAY)));
-            ctx.print(x + 1.0 + i as f64, y - 1.0, Line::from("▀").style(Style::new().fg(DOS_LIGHT_GRAY)));
-        }
-
-        ctx.print(x + width + 1.0, y, Line::from("▄").style(Style::new().fg(DOS_LIGHT_GRAY)));
     }
-}
-
-fn render_label(ctx: &mut canvas::Context<'_>, x: f64, y: f64, width: f64, title: &str) {
-    let bg = DOS_CYAN;
-
-    ctx.draw(&Rectangle {
-        x,
-        y,
-        width,
-        height: 0.0,
-        color: bg,
-    });
-
-    for i in 0..=(width as usize) {
-        ctx.print(x + 1.0 + i as f64, y - 1.0, Line::from("▀").style(Style::new().fg(DOS_BLACK)));
-    }
-
-    ctx.print(x + width + 1.0, y, Line::from("▄").style(Style::new().fg(DOS_BLACK)));
-    ctx.print(
-        x + (width - title.len() as f64) / 2.0,
-        y,
-        Line::from(title.to_string()).style(Style::new().bg(bg).fg(DOS_BLACK)),
-    );
 }
