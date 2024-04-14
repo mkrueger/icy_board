@@ -15,7 +15,8 @@ members = [
 	"crates/codepages", 
 	"crates/icy_board_tui",
 	"crates/mkicbmnu",
-	"crates/icy_net", 
+	"crates/icy_net",
+	"crates/mkpcbtxt", 
 ]
 
 [workspace.package]
