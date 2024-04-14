@@ -40,7 +40,7 @@ pub struct Tui {
 }
 
 impl Tui {
-    pub fn new(board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>) -> Self {
+    pub fn local_mode(board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>) -> Self {
         let ui_session = Arc::new(Mutex::new(Session::new()));
         let session = ui_session.clone();
         let (ui_connection, connection) = ChannelConnection::create_pair();
@@ -96,16 +96,37 @@ impl Tui {
         }
     }
 
+    pub fn sysop_mode(bbs: &Arc<Mutex<BBS>>, node: usize) -> Res<Self> {
+        let ui_session = Arc::new(Mutex::new(Session::new()));
+        let (ui_connection, connection) = ChannelConnection::create_pair();
+        if let Ok(bbs) = bbs.lock() {
+            let Some(node) = bbs.get_node(node) else {
+                return Err(Box::new(IcyBoardError::Error("Node not found".to_string())));
+            };
+            node.lock().unwrap().connections.lock().unwrap().push(Box::new(connection));
+            let ui_screen = Arc::new(Mutex::new(Screen::new()));
+            let ui_connection = Arc::new(Mutex::new(ui_connection));
+            Ok(Self {
+                screen: ui_screen,
+                session: ui_session,
+                connection: ui_connection,
+                status_bar: 0,
+                handle: node.clone(),
+            })
+        } else {
+            return Err(Box::new(IcyBoardError::Error("Node not found".to_string())));
+        }
+    }
+
     pub fn run(&mut self, board: &Arc<Mutex<IcyBoard>>) -> Res<()> {
         let mut terminal = init_terminal()?;
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(20);
-
+        let mut redraw = true;
         loop {
             let mut screen_buf = [0; 1024 * 16];
             let mut parser = ansi::Parser::default();
             parser.bs_is_ctrl_char = true;
-            let mut redraw = false;
             loop {
                 match self.connection.lock().unwrap().read(&mut screen_buf) {
                     Ok(size) => {
@@ -133,7 +154,9 @@ impl Tui {
                 }
                 return Ok(());
             }
+
             if redraw {
+                redraw = false;
                 let board = board.clone();
                 let _ = terminal.draw(|frame| {
                     if let Ok(board) = &board.lock() {

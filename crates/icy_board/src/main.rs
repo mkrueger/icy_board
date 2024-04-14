@@ -19,6 +19,7 @@ use import::{
     console_logger::{print_error, ConsoleLogger},
     PCBoardImporter,
 };
+use node_monitoring_screen::NodeMonitoringScreenMessage;
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     Terminal,
@@ -123,10 +124,10 @@ pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) -> Res<()> {
                     let _ = await_telnet_connections(board, bbs);
                 });
             }
-            let mut terminal = init_terminal()?;
 
             loop {
                 let mut app = CallWaitScreen::new(&board)?;
+                let mut terminal = init_terminal()?;
                 match app.run(&mut terminal, &board) {
                     Ok(msg) => {
                         run_message(msg, &mut terminal, &board, &mut bbs);
@@ -151,7 +152,7 @@ fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, boar
     match msg {
         CallWaitMessage::User(_busy) | CallWaitMessage::Sysop(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
-            let mut tui = Tui::new(board, bbs);
+            let mut tui = Tui::local_mode(board, bbs);
             if let Err(err) = tui.run(&board) {
                 restore_terminal().unwrap();
                 log::error!("while running board in local mode: {}", err.to_string());
@@ -167,8 +168,16 @@ fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, boar
         CallWaitMessage::Monitor => {
             let mut app = node_monitoring_screen::NodeMonitoringScreen::new(&board);
             match app.run(terminal, &board, bbs) {
-                Ok(_msg) => {
-                    // TODO
+                Ok(msg) => {
+                    if let NodeMonitoringScreenMessage::EnterNode(node) = msg {
+                        let mut tui = Tui::sysop_mode(bbs, node).unwrap();
+                        if let Err(err) = tui.run(&board) {
+                            restore_terminal().unwrap();
+                            log::error!("while running board in local mode: {}", err.to_string());
+                            println!("Error: {}", err);
+                            process::exit(1);
+                        }
+                    }
                 }
                 Err(err) => {
                     restore_terminal().unwrap();

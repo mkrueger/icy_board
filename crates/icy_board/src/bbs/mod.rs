@@ -40,6 +40,10 @@ impl BBS {
         &self.open_connections
     }
 
+    pub fn get_node(&self, node: usize) -> &Option<Arc<Mutex<NodeState>>> {
+        &self.open_connections[node]
+    }
+
     pub fn create_new_node(&mut self, connection_type: ConnectionType) -> Arc<Mutex<NodeState>> {
         self.clear_closed_connections();
         for i in 0..self.open_connections.len() {
@@ -115,7 +119,6 @@ fn handle_client(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<NodeState>>,
                     .print(icy_board_engine::vm::TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err))?;
                 cmd.state.reset_color()?;
             }
-            return Err(err);
         }
         cmd.state.session.disp_options.reset_printout();
         if cmd.state.session.request_logoff {
