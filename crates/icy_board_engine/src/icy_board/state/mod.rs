@@ -9,9 +9,10 @@ use chrono::{DateTime, Datelike, Local, Timelike};
 use icy_engine::ansi::constants::COLOR_OFFSETS;
 use icy_engine::TextAttribute;
 use icy_engine::{ansi, Buffer, BufferParser, Caret};
+use icy_net::Connection;
 use icy_ppe::{datetime::IcbDate, executable::Executable, Res};
 
-use crate::vm::{run, BoardIO, DiskIO, HangupType, TerminalTarget};
+use crate::vm::{run, DiskIO, TerminalTarget};
 pub mod functions;
 
 use self::functions::display_flags;
@@ -22,7 +23,6 @@ use super::{
     file_areas::FileAreaList,
     icb_config::IcbColor,
     icb_text::{IcbTextStyle, IceText},
-    output::Output,
     pcboard_data::Node,
     surveys::SurveyList,
     user_base::User,
@@ -197,7 +197,7 @@ impl Default for Session {
 }
 
 pub struct IcyBoardState {
-    pub ctx: Arc<Mutex<dyn BoardIO>>,
+    pub connection: Box<dyn Connection>,
     pub board: Arc<Mutex<IcyBoard>>,
 
     pub nodes: Vec<Node>,
@@ -218,19 +218,20 @@ pub struct IcyBoardState {
     parser: ansi::Parser,
     caret: Caret,
     buffer: Buffer,
+
+    char_buffer: VecDeque<char>,
 }
 
-impl Default for IcyBoardState {
-    fn default() -> Self {
+impl IcyBoardState {
+    pub fn new(board: Arc<Mutex<IcyBoard>>, connection: Box<dyn Connection>) -> Self {
         let buffer = Buffer::new((80, 25));
         let caret = Caret::default();
         let mut parser = ansi::Parser::default();
         parser.bs_is_ctrl_char = true;
 
-        let ctx = Arc::new(Mutex::new(Output::default()));
         Self {
-            board: Arc::new(Mutex::new(IcyBoard::new())),
-            ctx,
+            board,
+            connection,
             nodes: Vec::new(),
             current_user: None,
             yes_char: 'Y',
@@ -242,16 +243,7 @@ impl Default for IcyBoardState {
             parser,
             buffer,
             caret,
-        }
-    }
-}
-
-impl IcyBoardState {
-    pub fn new(board: Arc<Mutex<IcyBoard>>, ctx: Arc<Mutex<dyn BoardIO>>) -> Self {
-        Self {
-            board,
-            ctx,
-            ..Default::default()
+            char_buffer: VecDeque::new(),
         }
     }
 
@@ -383,18 +375,18 @@ impl IcyBoardState {
     }
 
     pub fn put_keyboard_buffer(&mut self, value: &str) -> Res<()> {
-        let mut chars = Vec::new();
         let in_chars: Vec<char> = value.chars().collect();
 
         for (i, c) in in_chars.iter().enumerate() {
             if *c == '^' && i + 1 < in_chars.len() && in_chars[i + 1] >= 'A' && in_chars[i + 1] <= '[' {
                 let c = in_chars[i + 1] as u8 - b'@';
-                chars.push(c as char);
+                self.char_buffer.push_back(c as char);
             } else {
-                chars.push(*c);
+                self.char_buffer.push_back(*c);
             }
         }
-        self.ctx.lock().unwrap().put_keyboard_buffer(&chars)
+        self.char_buffer.push_back('\n');
+        Ok(())
     }
 
     pub fn load_bullettins(&self) -> Res<BullettinList> {
@@ -528,7 +520,7 @@ impl IcyBoardState {
 
     fn write_char(&mut self, c: char) -> Res<()> {
         self.parser.print_char(&mut self.buffer, 0, &mut self.caret, c)?;
-        self.ctx.lock().unwrap().write_raw(&[c])?;
+        self.connection.write_all(&[c as u8])?;
         if c == '\n' {
             self.next_line()?;
         }
@@ -536,13 +528,16 @@ impl IcyBoardState {
     }
 
     fn write_string(&mut self, data: &[char]) -> Res<()> {
+        let mut b = Vec::new();
         for c in data {
             self.parser.print_char(&mut self.buffer, 0, &mut self.caret, *c)?;
             if *c == '\n' {
                 self.next_line()?;
             }
+            b.push(*c as u8);
         }
-        self.ctx.lock().unwrap().write_raw(data)
+        self.connection.write_all(&b)?;
+        Ok(())
     }
 
     /// # Errors
@@ -862,17 +857,21 @@ impl IcyBoardState {
     }
 
     /// # Errors
-    pub fn read(&mut self) -> Res<String> {
-        self.ctx.lock().unwrap().read()
-    }
-
-    /// # Errors
     pub fn get_char(&mut self) -> Res<Option<(bool, char)>> {
-        self.ctx.lock().unwrap().get_char()
+        if let Some(ch) = self.char_buffer.pop_front() {
+            return Ok(Some((true, ch)));
+        }
+        let mut a = [0; 1];
+        let size = self.connection.read(&mut a)?;
+        if size == 1 {
+            Ok(Some((true, a[0] as char)))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn inbytes(&mut self) -> i32 {
-        self.ctx.lock().unwrap().inbytes()
+        self.char_buffer.len() as i32
     }
 
     pub fn set_color(&mut self, color: IcbColor) -> Res<()> {
@@ -931,9 +930,9 @@ impl IcyBoardState {
     }
 
     /// # Errors
-    pub fn hangup(&mut self, hangup_type: HangupType) -> Res<()> {
-        if HangupType::Hangup != hangup_type {
-            /*
+    pub fn hangup(&mut self) -> Res<()> {
+        /*   if HangupType::Hangup != hangup_type {
+
             if HangupType::Goodbye == hangup_type {
                 let logoff_script = self
                     .board
@@ -946,12 +945,13 @@ impl IcyBoardState {
                     .clone();
                 self.display_file(&logoff_script)?;
             }
-            */
-            self.display_text(IceText::ThanksForCalling, display_flags::LFBEFORE | display_flags::NEWLINE)?;
-        }
+
+
+        } */
+        self.display_text(IceText::ThanksForCalling, display_flags::LFBEFORE | display_flags::NEWLINE)?;
         self.reset_color()?;
         self.session.request_logoff = true;
-        self.ctx.lock().unwrap().hangup()?;
+        self.connection.shutdown()?;
         Ok(())
     }
 

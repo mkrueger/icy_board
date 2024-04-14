@@ -107,12 +107,12 @@ impl PcbBoardCommand {
                 // force logoff - no flagged files scan
                 if let Some(token) = self.state.session.tokens.pop_front() {
                     if token.to_ascii_uppercase() == self.state.yes_char.to_string().to_ascii_uppercase() {
-                        self.state.hangup(icy_board_engine::vm::HangupType::Goodbye)?;
+                        self.state.hangup()?;
                     }
                 }
 
                 // todo : check flagged files & parse input
-                self.state.hangup(icy_board_engine::vm::HangupType::Goodbye)?;
+                self.state.hangup()?;
             }
             CommandType::Help => {
                 // H
@@ -486,7 +486,7 @@ impl PcbBoardCommand {
             )?;
             self.state
                 .display_text(IceText::AutoDisconnectNow, display_flags::NEWLINE | display_flags::LFBEFORE)?;
-            self.state.hangup(icy_board_engine::vm::HangupType::Hangup)?;
+            self.state.hangup()?;
         }
 
         Ok(false)

@@ -37,7 +37,7 @@ impl PcbBoardCommand {
             };
             match text.as_str() {
                 "G" => {
-                    self.state.hangup(icy_board_engine::vm::HangupType::Goodbye)?;
+                    self.state.hangup()?;
                     return Ok(());
                 }
                 "R" | "L" => {

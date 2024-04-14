@@ -75,48 +75,6 @@ pub enum TerminalTarget {
     Sysop,
 }
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum HangupType {
-    Hangup,
-    Bye,
-    Goodbye,
-}
-
-pub trait BoardIO: Send {
-    fn get_bps(&self) -> i32 {
-        115_200
-    }
-
-    /// .
-    ///
-    /// # Errors
-    /// Errors if the variable is not found.
-    fn write_raw(&mut self, data: &[char]) -> Res<()>;
-
-    /// .
-    ///
-    /// # Errors
-    /// Errors if the variable is not found.
-    fn read(&mut self) -> Res<String>;
-
-    /// .
-    ///
-    /// # Errors
-    /// Errors if the variable is not found.
-    fn get_char(&mut self) -> Res<Option<(bool, char)>>;
-
-    /// Number of chars in the keyboard buffer
-    fn inbytes(&mut self) -> i32;
-
-    /// Put a string into the keyboard buffer
-    fn put_keyboard_buffer(&mut self, value: &[char]) -> Res<()>;
-
-    /// .
-    /// # Errors
-    /// Errors if the variable is not found.
-    fn hangup(&mut self) -> Res<()>;
-}
-
 pub struct StackFrame {
     pub values: HashMap<unicase::Ascii<String>, VariableValue>,
     pub cur_ptr: usize,

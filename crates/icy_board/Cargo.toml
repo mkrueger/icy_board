@@ -11,7 +11,7 @@ icy_board_engine = { workspace = true}
 jamjam = { workspace = true}
 dizbase = { workspace = true}
 icy_engine = { workspace = true }
-#icy_net = { workspace = true }
+icy_net = { workspace = true }
 
 lazy_static = { workspace = true }
 semver = { workspace = true }
@@ -25,15 +25,12 @@ serde = { workspace = true }
 bstr = { workspace = true }
 walkdir = { workspace = true }
 substring = { workspace = true }
-tokio = { workspace = true }
-async-trait = "0.1.80"
 ariadne = "0.4.0"
 unicase = { workspace = true }
 fern = "0.6.2"
 qfile = "3.0.1"
 easy_reader = "0.5.2"
 toml = { workspace = true }
-async-recursion = "1.1.0"
 
 relative-path = "1.9.2"
 regex = "1.10.4"

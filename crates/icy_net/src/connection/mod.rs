@@ -1,4 +1,5 @@
 use std::io::{Read, Write};
+pub mod channel;
 pub mod modem;
 pub mod raw;
 pub mod serial;

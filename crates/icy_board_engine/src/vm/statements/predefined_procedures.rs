@@ -171,7 +171,7 @@ pub fn fputpad(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 /// # Errors
 /// Errors if the variable is not found.
 pub fn hangup(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.hangup(crate::vm::HangupType::Hangup)?;
+    vm.icy_board_state.hangup()?;
     vm.is_running = false;
     Ok(())
 }
@@ -338,7 +338,7 @@ pub fn dtron(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub fn dtroff(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.hangup(crate::vm::HangupType::Hangup)?;
+    vm.icy_board_state.hangup()?;
     Ok(())
 }
 
@@ -490,13 +490,13 @@ pub fn kbdfile(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub fn bye(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.hangup(crate::vm::HangupType::Bye)?;
+    vm.icy_board_state.hangup()?;
     vm.is_running = false;
     Ok(())
 }
 
 pub fn goodbye(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.hangup(crate::vm::HangupType::Goodbye)?;
+    vm.icy_board_state.hangup()?;
     vm.is_running = false;
     Ok(())
 }

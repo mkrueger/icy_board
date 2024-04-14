@@ -72,6 +72,17 @@ impl TelnetConnection {
         Err(NetError::CouldNotConnect.into())
     }
 
+    pub fn accept(tcp_stream: TcpStream) -> crate::Result<Self> {
+        Ok(Self {
+            tcp_stream,
+            caps: TermCaps {
+                window_size: (0, 0),
+                terminal: Terminal::Ansi,
+            },
+            state: ParserState::Data,
+        })
+    }
+
     fn parse(&mut self, data: &mut [u8]) -> io::Result<usize> {
         let mut write_ptr = 0;
         for i in 0..data.len() {

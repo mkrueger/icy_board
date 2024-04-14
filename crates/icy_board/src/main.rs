@@ -1,5 +1,4 @@
 use std::{
-    collections::VecDeque,
     io::stdout,
     path::{Path, PathBuf},
     process,
@@ -10,18 +9,18 @@ use call_wait_screen::{CallWaitMessage, CallWaitScreen};
 use chrono::Local;
 use clap::{Parser, Subcommand};
 use crossterm::{terminal::Clear, ExecutableCommand};
-use icy_board_engine::icy_board::{state::IcyBoardState, IcyBoard};
-use icy_engine_output::{IcyEngineOutput, Screen};
+use icy_board_engine::icy_board::IcyBoard;
+use icy_engine_output::Screen;
 use import::{
     console_logger::{print_error, ConsoleLogger},
     PCBoardImporter,
 };
-use menu_runner::PcbBoardCommand;
 use semver::Version;
 use tui::{print_exit_screen, Tui};
 
 use crate::call_wait_screen::restore_terminal;
 
+mod bbs;
 mod call_wait_screen;
 mod icy_engine_output;
 mod import;
@@ -135,16 +134,7 @@ fn run_message(msg: CallWaitMessage, board: Arc<Mutex<IcyBoard>>) {
 
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
 
-            let screen = Arc::new(Mutex::new(Screen::new()));
-            let input_buffer = Arc::new(Mutex::new(VecDeque::new()));
-            let io = Arc::new(Mutex::new(IcyEngineOutput::new(screen.clone(), input_buffer.clone())));
-
-            let mut state = IcyBoardState::new(board, io);
-            state.session.is_sysop = true;
-            state.set_current_user(0);
-            let cmd = PcbBoardCommand::new(state);
-
-            let mut tui = Tui::new(cmd, screen, input_buffer);
+            let mut tui = Tui::new(board);
             if let Err(err) = tui.run() {
                 restore_terminal().unwrap();
                 log::error!("while running board in local mode: {}", err.to_string());
