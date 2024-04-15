@@ -15,8 +15,8 @@ pub struct FileBaseHeaderInfo {
 
     /// Creation date, unix utc timestamp
     pub date_created: u64,
-    /// Password for the filebase (Murmur64a hash)
-    pub password: u64,
+    /// Password for the filebase (crc32 hash)
+    pub password: u32,
     /// attributes
     pub attributes: u32,
 }
@@ -26,13 +26,13 @@ pub mod base_header_attributes {
 }
 
 impl FileBaseHeaderInfo {
-    const USED_HEADER_SIZE: usize = 24;
+    const USED_HEADER_SIZE: usize = 20;
     pub const HEADER_SIZE: u64 = 1024;
 
     pub fn date_created(&self) -> Option<DateTime<Utc>> {
         chrono::DateTime::from_timestamp(self.date_created as i64, 0)
     }
-    pub fn password(&self) -> u64 {
+    pub fn password(&self) -> u32 {
         self.password
     }
 
@@ -44,7 +44,7 @@ impl FileBaseHeaderInfo {
         }
         let mut data = &data[4..];
         convert_u64!(date_created, data);
-        convert_u64!(password, data);
+        convert_u32!(password, data);
         convert_u32!(attributes, data);
         Ok(Self {
             date_created,
@@ -53,7 +53,7 @@ impl FileBaseHeaderInfo {
         })
     }
 
-    pub(crate) fn create<P: AsRef<Path>>(file_name: &P, password: u64, attributes: u32) -> crate::Result<()> {
+    pub(crate) fn create<P: AsRef<Path>>(file_name: &P, password: u32, attributes: u32) -> crate::Result<()> {
         let now = Utc::now();
         let datecreated = now.timestamp();
 

@@ -12,8 +12,8 @@ crossterm = { workspace = true }
 ratatui = { workspace = true }
 chrono = { workspace = true }
 log = { workspace = true }
+icy_net = { workspace = true }
 
-murmurhash64 = "0.3.1"
 zip = "0.6"
 delharc = "0.6.0"
 unrar = "0.5.3"

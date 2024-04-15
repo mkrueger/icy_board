@@ -32,7 +32,7 @@ impl FileInfo {
         self
     }
 
-    pub fn with_hash(mut self, hash: u64) -> Self {
+    pub fn with_hash(mut self, hash: u32) -> Self {
         self.header.hash = hash;
         self
     }

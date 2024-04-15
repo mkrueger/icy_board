@@ -5,6 +5,7 @@ use std::{
 };
 
 use codepages::{normalize_file, tables::get_utf8};
+use icy_net::crc::get_crc32;
 use icy_sauce::SauceInformation;
 use unrar::Archive;
 use walkdir::WalkDir;
@@ -26,7 +27,7 @@ pub fn scan_file_directory(scan_dir: &PathBuf, out_file_base: &PathBuf) -> crate
 
         if let Ok(file) = fs::read(&path.path()) {
             info = info.with_size(file.len() as u64);
-            let hash = murmurhash64::murmur_hash64a(&file, 0);
+            let hash = get_crc32(&file);
             info = info.with_hash(hash);
         }
 

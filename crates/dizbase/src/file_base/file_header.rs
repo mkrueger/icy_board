@@ -5,7 +5,7 @@ use std::{
 
 use chrono::{DateTime, Utc};
 
-use crate::{convert_u64, convert_u8};
+use crate::{convert_u32, convert_u64, convert_u8};
 
 #[derive(Clone)]
 pub struct FileHeader {
@@ -16,8 +16,8 @@ pub struct FileHeader {
     pub file_date: u64,
     /// size of the file in bytes
     pub size: u64,
-    /// Murmur64a hash of the file
-    pub hash: u64,
+    /// crc32 hash of the file
+    pub hash: u32,
     /// # times of download.self.attribute & attributes::PASSWORD != 0
     pub dl_counter: u64,
     /// Offset of the metadata
@@ -42,7 +42,7 @@ pub mod attributes {
 }
 
 impl FileHeader {
-    pub const HEADER_SIZE: usize = 256 + 8 + 8 + 8 + 8 + 8 + 8 + 1;
+    pub const HEADER_SIZE: usize = 256 + 8 + 8 + 8 + 4 + 8 + 8 + 1;
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -52,7 +52,7 @@ impl FileHeader {
     pub fn size(&self) -> u64 {
         self.size
     }
-    pub fn hash(&self) -> u64 {
+    pub fn hash(&self) -> u32 {
         self.hash
     }
     pub fn dl_counter(&self) -> u64 {
@@ -116,7 +116,7 @@ impl FileHeader {
         let mut data = &data[256..];
         convert_u64!(file_date, data);
         convert_u64!(size, data);
-        convert_u64!(hash, data);
+        convert_u32!(hash, data);
         convert_u64!(dl_counter, data);
         convert_u64!(metadata_offset, data);
         convert_u64!(long_description_offset, data);

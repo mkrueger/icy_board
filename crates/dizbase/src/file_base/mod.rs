@@ -6,6 +6,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use icy_net::crc::get_crc32;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use thiserror::Error;
 
@@ -116,9 +117,9 @@ impl FileBase {
         FileHeader::read(&mut reader)
     }
 
-    /// Returns lowercased murmur64a hash of the password
-    fn get_pw_hash(password: &str) -> u64 {
-        murmurhash64::murmur_hash64a(password.to_lowercase().as_bytes(), 0)
+    /// Returns lowercased crc hash of the password
+    fn get_pw_hash(password: &str) -> u32 {
+        get_crc32(password.to_lowercase().as_bytes())
     }
 
     pub fn iter(&self) -> impl Iterator<Item = crate::Result<FileHeader>> {
