@@ -46,6 +46,7 @@ bstr = "1.9.1"
 serde = "1.0.197"
 tokio = { version = "1.37.0", features = ["full"] }
 rayon = "1.10.0"
+regex = "1.10.4"
 
 walkdir = "2.5.0"
 i18n-embed = { version = "0.14.0", features = ["fluent-system", "desktop-requester"]} 

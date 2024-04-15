@@ -9,6 +9,9 @@ use icy_net::crc::get_crc32;
 use icy_sauce::SauceInformation;
 use unrar::Archive;
 use walkdir::WalkDir;
+pub mod repack;
+
+pub mod bbstro_fingerprint;
 
 use crate::file_base::{file_info::FileInfo, FileBase};
 
@@ -37,7 +40,7 @@ pub fn scan_file_directory(scan_dir: &PathBuf, out_file_base: &PathBuf) -> crate
                     info = i;
                 }
                 Err(err) => {
-                    eprintln!("{}", err);
+                    eprintln!("{}:{}", path.path().display(), err);
                     continue;
                 }
             }
@@ -56,12 +59,24 @@ fn scan_file(info: FileInfo, path: &Path, extension: std::ffi::OsString) -> crat
         Some("ANS") | Some("NFO") | Some("TXT") => scan_sauce(info, path),
 
         Some("RAR") => scan_rar(info, path),
+        Some("EXE") | Some("COM") | Some("BAT") | Some("BMP") | Some("GIF") | Some("JPG") => Ok(info),
 
         ext => {
             println!("Unknown extension {:?}", ext);
             Ok(info)
         }
     }
+}
+
+const FILE_DESCR: [&str; 4] = ["desc.sdi", "file_id.diz", "file_id.ans", "file_id.pcb"];
+
+fn is_short_desc(name: &std::ffi::OsStr) -> Option<i32> {
+    for (i, descr) in FILE_DESCR.iter().enumerate() {
+        if name.eq_ignore_ascii_case(descr) {
+            return Some(i as i32);
+        }
+    }
+    None
 }
 
 fn scan_sauce(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {
@@ -80,24 +95,31 @@ fn scan_sauce(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {
 fn scan_zip(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {
     let file = fs::File::open(path)?;
     let reader = BufReader::new(file);
-
     let mut archive = zip::ZipArchive::new(reader)?;
+    let mut short_descr = Vec::new();
+    let mut last_prio = 0;
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
-        let extract = if let Some(_outpath) = file.enclosed_name() {
-            file.name().eq_ignore_ascii_case("FILE_ID.DIZ") || file.name().eq_ignore_ascii_case("DESC.SDI")
+        if let Some(outpath) = file.enclosed_name() {
+            if let Some(prio) = is_short_desc(&outpath.file_name().unwrap()) {
+                if prio >= last_prio {
+                    continue;
+                }
+                last_prio = prio;
+                short_descr.clear();
+                file.read_to_end(&mut short_descr)?;
+            }
         } else {
             println!("Entry {} has a suspicious path", file.name());
             continue;
         };
-        if extract {
-            let mut content = Vec::new();
-            file.read_to_end(&mut content)?;
-            return Ok(info.with_file_id(get_file_id(content)));
-        }
     }
-    Ok(info)
+    if short_descr.is_empty() {
+        Ok(info)
+    } else {
+        Ok(info.with_file_id(get_file_id(short_descr)))
+    }
 }
 
 fn get_file_id(mut content: Vec<u8>) -> String {
@@ -110,31 +132,39 @@ fn get_file_id(mut content: Vec<u8>) -> String {
 
 fn scan_lha(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {
     let mut lha_reader = delharc::parse_file(path)?;
+    let mut last_prio = 0;
+    let mut short_descr = Vec::new();
     loop {
         let header = lha_reader.header();
         let filename = header.parse_pathname();
 
         if let Some(name) = filename.file_name() {
-            if name.eq_ignore_ascii_case("FILE_ID.DIZ") || name.eq_ignore_ascii_case("DESC.SDI") {
+            if let Some(prio) = is_short_desc(name) {
+                if prio >= last_prio {
+                    continue;
+                }
+                last_prio = prio;
                 if lha_reader.is_decoder_supported() {
-                    let mut content = Vec::new();
-                    lha_reader.read_to_end(&mut content)?;
-
+                    short_descr.clear();
+                    lha_reader.read_to_end(&mut short_descr)?;
                     lha_reader.crc_check()?;
-                    return Ok(info.with_file_id(get_file_id(content)));
                 } else if header.is_directory() {
                     eprintln!("skipping: an empty directory");
                 } else {
                     eprintln!("skipping: has unsupported compression method");
+                    break;
                 }
             }
         }
-
         if !lha_reader.next_file()? {
             break;
         }
     }
-    Ok(info)
+    if short_descr.is_empty() {
+        Ok(info)
+    } else {
+        Ok(info.with_file_id(get_file_id(short_descr)))
+    }
 }
 
 fn scan_rar(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {

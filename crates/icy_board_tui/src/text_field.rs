@@ -9,6 +9,8 @@ pub struct TextfieldState {
     cursor_position: u16,
     has_focus: bool,
     area: Rect,
+    mask: String,
+    max_len: u16,
 }
 
 impl TextfieldState {
@@ -16,7 +18,12 @@ impl TextfieldState {
         frame.set_cursor(self.area.x + self.cursor_position, self.area.y);
     }
 
+    pub fn max_len(&self) -> u16 {
+        self.max_len
+    }
+
     pub fn handle_input(&mut self, key: KeyEvent, value: &mut String) {
+        self.cursor_position = self.cursor_position.min(value.len() as u16);
         match key {
             KeyEvent { code: KeyCode::Left, .. } => {
                 self.cursor_position = self.cursor_position.saturating_sub(1);
@@ -35,16 +42,14 @@ impl TextfieldState {
                 modifiers: KeyModifiers::NONE,
                 ..
             } => {
-                value.insert(self.cursor_position as usize, ch);
-                self.cursor_position += 1;
+                self.insert_key(value, ch);
             }
             KeyEvent {
                 code: KeyCode::Char(ch),
                 modifiers: KeyModifiers::SHIFT,
                 ..
             } => {
-                value.insert(self.cursor_position as usize, ch.to_ascii_uppercase());
-                self.cursor_position += 1;
+                self.insert_key(value, ch.to_ascii_uppercase());
             }
 
             KeyEvent { code: KeyCode::Delete, .. } => {
@@ -64,8 +69,27 @@ impl TextfieldState {
         }
     }
 
+    fn insert_key(&mut self, value: &mut String, ch: char) {
+        if self.mask.is_empty() || self.mask.contains(ch) {
+            if self.cursor_position + 1 < self.max_len || self.max_len == 0 {
+                value.insert(self.cursor_position as usize, ch);
+                self.cursor_position += 1;
+            }
+        }
+    }
+
     pub fn with_position(mut self, position: u16) -> Self {
         self.cursor_position = position;
+        self
+    }
+
+    pub fn with_mask(mut self, mask: String) -> Self {
+        self.mask = mask;
+        self
+    }
+
+    pub fn with_max_len(mut self, max_len: u16) -> Self {
+        self.max_len = max_len;
         self
     }
 }

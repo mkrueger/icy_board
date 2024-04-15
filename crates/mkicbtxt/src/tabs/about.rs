@@ -48,6 +48,8 @@ impl IceText {
 
 impl TabPage for AboutTab {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
+        icy_board_tui::colors::RgbSwatch.render(area, frame.buffer_mut());
+
         let text = vec![
             format!("ICBTEXT File Generator/Editor v{}", crate::VERSION.to_string()),
             "written 2024 by Mike Krüger as part of the icy_board project".to_string(),

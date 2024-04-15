@@ -7,7 +7,7 @@ use std::{collections::HashMap, path::PathBuf, process::exit};
 mod app;
 mod tabs;
 
-use icy_board_engine::icy_board::icb_text::{IcbTextFile, IcbTextFormat};
+use icy_board_engine::icy_board::icb_text::{IcbTextFile, IcbTextFormat, DEFAULT_DISPLAY_TEXT};
 
 lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
@@ -45,7 +45,7 @@ fn main() -> Result<()> {
     }
 
     if arguments.create {
-        IcbTextFile::default().save(&file).unwrap();
+        DEFAULT_DISPLAY_TEXT.save(&file).unwrap();
         println!("File created: {}", file.display());
         return Ok(());
     }

@@ -28,14 +28,44 @@ pub enum Checksum {
 pub enum XYModemVariant {
     /// 128 byte blocks, SOH header.
     XModem,
-    /// 1k blocks STX header, fallback to SOH for blocks <= 128 byte
+    /// 128 byte blocks, SOH header, CRC 16 Checksum
+    XModemCRC,
+    /// 1k blocks STX header, fallback to SOH for blocks <= 128 byte, CRC 16 Checksum
     XModem1k,
-    /// 1k blocks STX header without ACK, fallback to SOH for blocks <= 128 byte
+    /// 1k blocks STX header without ACK, fallback to SOH for blocks <= 128 byte, CRC 16 Checksum
     XModem1kG,
     /// Ymodem
     YModem,
     /// Ymodem without ACK
     YModemG,
+}
+impl XYModemVariant {
+    fn get_block_length(&self) -> usize {
+        match self {
+            XYModemVariant::XModem | XYModemVariant::XModemCRC => DEFAULT_BLOCK_LENGTH,
+            XYModemVariant::XModem1k | XYModemVariant::XModem1kG | XYModemVariant::YModem | XYModemVariant::YModemG => EXT_BLOCK_LENGTH,
+        }
+    }
+
+    fn get_checksum_mode(&self) -> Checksum {
+        match self {
+            XYModemVariant::XModem => Checksum::Default,
+            XYModemVariant::XModemCRC | XYModemVariant::XModem1k | XYModemVariant::XModem1kG | XYModemVariant::YModem | XYModemVariant::YModemG => {
+                Checksum::CRC16
+            }
+        }
+    }
+
+    fn get_name(&self) -> &str {
+        match self {
+            XYModemVariant::XModem => "Xmodem",
+            XYModemVariant::XModemCRC => "Xmodem/CRC",
+            XYModemVariant::XModem1k => "Xmodem 1k",
+            XYModemVariant::XModem1kG => "Xmodem 1k-G",
+            XYModemVariant::YModem => "Ymodem",
+            XYModemVariant::YModemG => "Ymodem-G",
+        }
+    }
 }
 
 /// specification: <http://pauillac.inria.fr/~doligez/zmodem/ymodem.txt>
@@ -109,10 +139,8 @@ pub struct XYModemConfiguration {
 
 impl XYModemConfiguration {
     fn new(variant: XYModemVariant) -> Self {
-        let (block_length, checksum_mode) = match variant {
-            XYModemVariant::XModem => (DEFAULT_BLOCK_LENGTH, Checksum::Default),
-            XYModemVariant::XModem1k | XYModemVariant::XModem1kG | XYModemVariant::YModem | XYModemVariant::YModemG => (EXT_BLOCK_LENGTH, Checksum::CRC16),
-        };
+        let block_length = variant.get_block_length();
+        let checksum_mode = variant.get_checksum_mode();
 
         Self {
             variant,
@@ -122,13 +150,7 @@ impl XYModemConfiguration {
     }
 
     fn get_protocol_name(&self) -> &str {
-        match self.variant {
-            XYModemVariant::XModem => "Xmodem",
-            XYModemVariant::XModem1k => "Xmodem 1k",
-            XYModemVariant::XModem1kG => "Xmodem 1k-G",
-            XYModemVariant::YModem => "Ymodem",
-            XYModemVariant::YModemG => "Ymodem-G",
-        }
+        self.variant.get_name()
     }
 
     fn get_check_and_size(&self) -> String {

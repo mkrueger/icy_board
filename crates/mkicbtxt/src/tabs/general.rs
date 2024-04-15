@@ -7,7 +7,8 @@ use itertools::Itertools;
 use ratatui::{
     layout::{Constraint, Rect},
     style::Style,
-    widgets::{Cell, HighlightSpacing, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState},
+    text::{Line, Span},
+    widgets::{Cell, HighlightSpacing, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState, Widget},
     Frame,
 };
 
@@ -42,7 +43,11 @@ impl<'a> GeneralTab<'a> {
 
     pub fn get_original_text(&mut self) -> Option<&TextEntry> {
         if let Some(idx) = self.table_state.selected() {
-            DEFAULT_DISPLAY_TEXT.get(self.filtered_entries[idx])
+            if idx < self.filtered_entries.len() {
+                DEFAULT_DISPLAY_TEXT.get(self.filtered_entries[idx])
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -50,7 +55,11 @@ impl<'a> GeneralTab<'a> {
 
     pub fn get_selected_text_mut(&mut self) -> Option<&mut TextEntry> {
         if let Some(idx) = self.table_state.selected() {
-            self.icb_txt.get_mut(self.filtered_entries[idx])
+            if idx < self.filtered_entries.len() {
+                self.icb_txt.get_mut(self.filtered_entries[idx])
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -110,6 +119,14 @@ impl<'a> GeneralTab<'a> {
                         .contains(&filter)
             })
             .collect_vec();
+        self.scroll_state.position(0);
+        self.table_state.select(Some(0));
+    }
+
+    pub fn jump(&mut self, number: usize) {
+        if number < self.entries() {
+            self.table_state.select(Some(number));
+        }
     }
 }
 
@@ -130,6 +147,10 @@ fn get_style(txt: &icy_board_engine::icy_board::icb_text::TextEntry) -> Style {
 
 impl<'a> TabPage for GeneralTab<'a> {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
+        if self.filtered_entries.is_empty() {
+            Line::from(Span::styled("No entries found".to_string(), Style::default().fg(DOS_LIGHT_RED))).render(area, frame.buffer_mut());
+        }
+
         self.render_table(frame, area);
         self.render_scrollbar(frame, area);
     }
@@ -183,8 +204,12 @@ impl<'a> TabPage for GeneralTab<'a> {
 
     fn request_status(&self) -> crate::app::ResultState {
         let status_line = if let Some(sel) = self.table_state.selected() {
-            let txt = DEFAULT_DISPLAY_TEXT.get_display_text(IceText::from(self.filtered_entries[sel])).unwrap().text;
-            format!("{}/{} {}", self.filtered_entries[sel], self.icb_txt.len() - 1, txt)
+            if sel < self.filtered_entries.len() {
+                let txt = DEFAULT_DISPLAY_TEXT.get_display_text(IceText::from(self.filtered_entries[sel])).unwrap().text;
+                format!("{}/{} {}", self.filtered_entries[sel], self.icb_txt.len() - 1, txt)
+            } else {
+                String::new()
+            }
         } else {
             String::new()
         };

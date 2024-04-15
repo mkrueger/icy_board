@@ -3,7 +3,7 @@ use std::{path::PathBuf, time::SystemTime};
 use clap::{Parser, Subcommand};
 use dizbase::{
     file_base::{metadata::MetadaType, FileBase},
-    file_base_scanner::scan_file_directory,
+    file_base_scanner::{bbstro_fingerprint::FingerprintData, repack::repack_files, scan_file_directory},
 };
 use thiserror::Error;
 
@@ -32,6 +32,18 @@ enum Commands {
         /// file database
         file: PathBuf,
     },
+    /// Gets bbstro data and saves them as 'bbstros.dat'
+    GetBBStros {
+        /// input directory to scan
+        input: PathBuf,
+    },
+    /// Repack files
+    Repack {
+        /// input directory to scan
+        input: PathBuf,
+        /// bbstro data
+        bbstros: PathBuf,
+    },
     List {
         /// file database
         file: PathBuf,
@@ -46,8 +58,19 @@ enum Commands {
 pub fn main() {
     let arguments = Cli::parse();
     match &arguments.command {
+        Some(Commands::GetBBStros { input }) => {
+            println!("Scanning {} for bbstro fingerprints...", input.display());
+            let fingerprints = FingerprintData::scan_fingerprint_dir(input).unwrap();
+            fingerprints.save(&"bbstros.dat").unwrap();
+            println!("Fingerprints saved to 'bbstros.dat'");
+        }
         Some(Commands::ScanFileDirectory { input, file }) => {
             scan_file_directory(input, file).unwrap();
+        }
+
+        Some(Commands::Repack { input, bbstros }) => {
+            let fingerprints = FingerprintData::load(bbstros).unwrap();
+            repack_files(input, fingerprints).unwrap();
         }
         Some(Commands::List { file }) => {
             list_file_base(file);

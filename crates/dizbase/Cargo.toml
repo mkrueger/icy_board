@@ -13,6 +13,10 @@ ratatui = { workspace = true }
 chrono = { workspace = true }
 log = { workspace = true }
 icy_net = { workspace = true }
+bstr = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+regex = { workspace = true }
 
 zip = "0.6"
 delharc = "0.6.0"

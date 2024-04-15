@@ -11,7 +11,10 @@ use icy_board_tui::{
     TerminalType,
 };
 use itertools::Itertools;
-use ratatui::{prelude::*, widgets::*};
+use ratatui::{
+    prelude::*,
+    widgets::{block::Title, *},
+};
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 
 use crate::tabs::*;
@@ -27,6 +30,7 @@ pub struct App<'a> {
 
     filter: String,
     filter_state: TextfieldState,
+
     edit_state: TextfieldState,
     edit_text: String,
 
@@ -42,6 +46,7 @@ enum Mode {
     Command,
     Edit,
     Filter,
+    Jump,
     RequestQuit,
     Quit,
 }
@@ -101,7 +106,7 @@ impl<'a> App<'a> {
                 let screen = get_screen_size(&frame, self.full_screen);
                 self.ui(frame, screen);
                 match self.mode {
-                    Mode::Edit => self.edit_state.set_cursor_position(frame),
+                    Mode::Jump | Mode::Edit => self.edit_state.set_cursor_position(frame),
                     Mode::Filter => self.filter_state.set_cursor_position(frame),
                     _ => {}
                 }
@@ -167,6 +172,28 @@ impl<'a> App<'a> {
                 };
                 return;
             }
+
+            Mode::Jump => {
+                match key.code {
+                    Esc => self.mode = Mode::Command,
+
+                    Enter => {
+                        if let Some(number) = self.edit_text.parse::<usize>().ok() {
+                            if number > 0 {
+                                self.general_tab.set_filter("");
+                                self.general_tab.jump(number - 1);
+                                self.update_state();
+                            }
+                        }
+                        self.mode = Mode::Command;
+                    }
+
+                    _ => {
+                        self.edit_state.handle_input(key, &mut self.edit_text);
+                    }
+                };
+                return;
+            }
             Mode::RequestQuit => {
                 match key.code {
                     Left | Right => self.save = !self.save,
@@ -193,6 +220,11 @@ impl<'a> App<'a> {
                     Char('h') | Left => self.prev_tab(),
                     Char('l') | Right => self.next_tab(),
                     F(2) => self.mode = Mode::Filter,
+                    F(3) => {
+                        self.edit_text = "".to_string();
+                        self.edit_state = TextfieldState::default().with_max_len(4).with_position(0).with_mask("0123456789".to_string());
+                        self.mode = Mode::Jump;
+                    }
                     F(4) => {
                         let txt = self.general_tab.get_original_text().unwrap().text.clone();
                         if let Some(edit) = self.general_tab.get_selected_text_mut() {
@@ -244,8 +276,8 @@ impl<'a> App<'a> {
 
                 Block::new()
                     .borders(Borders::ALL)
-                    .title(" Edit ")
-                    .style(style::Style::default().fg(Color::Indexed(236)).bg(Color::Indexed(232)))
+                    .title(Title::from(Span::from(" Edit ").style(THEME.content_box_title)))
+                    .style(THEME.content_box)
                     .border_type(BorderType::Double)
                     .render(edit_area, frame.buffer_mut());
 
@@ -268,15 +300,33 @@ impl<'a> App<'a> {
 
                 Block::new()
                     .borders(Borders::ALL)
-                    .title(" Filter ")
-                    .style(style::Style::default().fg(Color::Indexed(236)).bg(Color::Indexed(232)))
+                    .title(Title::from(Span::from(" Filter ").style(THEME.content_box_title)))
+                    .style(THEME.content_box)
                     .border_type(BorderType::Double)
                     .render(filter_area, frame.buffer_mut());
 
                 let field = TextField::new().with_value(self.filter.to_string());
 
-                let area = filter_area.inner(&Margin { horizontal: 1, vertical: 1 });
+                let area = filter_area.inner(&Margin { horizontal: 2, vertical: 1 });
                 frame.render_stateful_widget(field, area, &mut self.filter_state);
+            }
+            Mode::Jump => {
+                let jump_size = 21;
+                let jump_area = Rect::new(area.x + 3 + (area.width - jump_size) / 2, area.y + (area.height - 3) / 2, jump_size, 3);
+
+                Clear.render(jump_area, frame.buffer_mut());
+
+                Block::new()
+                    .borders(Borders::ALL)
+                    .title(Title::from(Span::from(" Jump to Record # ").style(THEME.content_box_title)))
+                    .style(THEME.content_box)
+                    .border_type(BorderType::Double)
+                    .render(jump_area, frame.buffer_mut());
+
+                let field = TextField::new().with_value(self.edit_text.to_string());
+
+                let area = jump_area.inner(&Margin { horizontal: 2, vertical: 1 });
+                frame.render_stateful_widget(field, area, &mut self.edit_state);
             }
             Mode::RequestQuit => {
                 let save_text = "Save changes? ";
@@ -291,7 +341,7 @@ impl<'a> App<'a> {
 
                 Block::new()
                     .borders(Borders::ALL)
-                    .style(style::Style::default().fg(Color::Indexed(236)).bg(Color::Indexed(232)))
+                    .style(THEME.content_box)
                     .border_type(BorderType::Double)
                     .render(save_area, frame.buffer_mut());
 
@@ -342,7 +392,13 @@ impl<'a> App<'a> {
     fn render_key_help_view(&self, area: Rect, buf: &mut Buffer) {
         let keys = match self.mode {
             Mode::RequestQuit => vec![("Enter", "Quit"), ("Q/Esc", "Back")],
-            _ => vec![("F2", "Filter"), ("F4", "Restore Default"), ("Enter", "Edit"), ("Q/Esc", "Quit")],
+            _ => vec![
+                ("F2", "Filter"),
+                ("F3", "Jump"),
+                ("F4", "Restore Default"),
+                ("Enter", "Edit"),
+                ("Q/Esc", "Quit"),
+            ],
         };
         let spans = keys
             .iter()

@@ -35,7 +35,8 @@ easy_reader = "0.5.2"
 toml = { workspace = true }
 
 relative-path = "1.9.2"
-regex = "1.10.4"
+regex = { workspace = true }
+
 temp-file = "0.1.8"
 
 # for file view kb/mb
