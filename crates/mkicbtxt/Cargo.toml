@@ -1,5 +1,5 @@
 [package]
-name = "mkpcbtxt"
+name = "mkicbtxt"
 edition.workspace = true
 authors.workspace = true
 version.workspace = true

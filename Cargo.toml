@@ -16,9 +16,8 @@ members = [
 	"crates/icy_board_tui",
 	"crates/mkicbmnu",
 	"crates/icy_net",
-	"crates/mkpcbtxt", 
+	"crates/mkicbtxt", 
 ]
-
 [workspace.package]
 version = "0.1.0"
 edition = "2021"

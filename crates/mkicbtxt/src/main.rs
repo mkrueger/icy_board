@@ -7,7 +7,7 @@ use std::{collections::HashMap, path::PathBuf, process::exit};
 mod app;
 mod tabs;
 
-use icy_board_engine::icy_board::icb_text::IcbTextFile;
+use icy_board_engine::icy_board::icb_text::{IcbTextFile, IcbTextFormat};
 
 lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
@@ -20,6 +20,10 @@ struct Cli {
     /// create menu file
     #[arg(long, short)]
     create: bool,
+
+    /// create menu file
+    #[arg(long, short)]
+    import: bool,
 
     /// Default is 80x25
     #[arg(long, short)]
@@ -42,13 +46,36 @@ fn main() -> Result<()> {
 
     if arguments.create {
         IcbTextFile::default().save(&file).unwrap();
+        println!("File created: {}", file.display());
+        return Ok(());
     }
 
     match IcbTextFile::load(&file) {
-        Ok(icb_txt) => {
+        Ok(mut icb_txt) => {
+            if arguments.import {
+                let out_file = file.with_extension("toml");
+                if let Err(err) = icb_txt.save(&out_file) {
+                    print_error(format!("Can't save: {}", err));
+                    exit(1);
+                }
+                println!("File imported to: {}", out_file.display());
+                return Ok(());
+            }
+
             let terminal = &mut term::init()?;
-            App::new(icb_txt, file, arguments.full_screen).run(terminal)?;
+            let mut app = App::new(&mut icb_txt, file.clone(), arguments.full_screen);
+            app.run(terminal)?;
             term::restore()?;
+            if app.save {
+                let res = match icb_txt.get_format() {
+                    IcbTextFormat::IcyBoard => icb_txt.save(&file),
+                    IcbTextFormat::PCBoard => icb_txt.export_pcboard_format(&file),
+                };
+                if let Err(err) = res {
+                    print_error(format!("Can't save: {}", err));
+                    exit(1);
+                }
+            }
             Ok(())
         }
         Err(err) => {

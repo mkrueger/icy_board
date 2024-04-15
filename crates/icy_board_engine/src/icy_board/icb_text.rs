@@ -1611,7 +1611,7 @@ impl IcbTextStyle {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, PartialEq)]
 pub struct TextEntry {
     pub style: IcbTextStyle,
     pub text: String,
@@ -1627,9 +1627,17 @@ lazy_static::lazy_static! {
     };
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, PartialEq)]
 pub struct IcbTextFile {
     entries: Vec<TextEntry>,
+    format: IcbTextFormat,
+}
+
+#[derive(Clone, Copy, Default, PartialEq)]
+pub enum IcbTextFormat {
+    #[default]
+    IcyBoard,
+    PCBoard,
 }
 
 impl IcbTextFile {
@@ -1644,6 +1652,10 @@ impl IcbTextFile {
         } else {
             DEFAULT_DISPLAY_TEXT.get_display_text(message_number)
         }
+    }
+
+    pub fn get_format(&self) -> IcbTextFormat {
+        self.format
     }
 
     pub fn load<P: AsRef<Path>>(path: &P) -> Res<Self> {
@@ -1690,12 +1702,12 @@ impl IcbTextFile {
     }
 
     fn deserialize(data: &[u8], file: String) -> Res<Self> {
-        let entries = if data.starts_with(&HEADER.as_bytes()[..9]) {
-            load_ice_format(data, file)?
+        let (entries, format) = if data.starts_with(&HEADER.as_bytes()[..9]) {
+            (load_ice_format(data, file)?, IcbTextFormat::IcyBoard)
         } else {
-            import_pcboard_format(data, file)?
+            (import_pcboard_format(data, file)?, IcbTextFormat::PCBoard)
         };
-        Ok(Self { entries })
+        Ok(Self { entries, format })
     }
 
     pub fn export_pcboard_format<P: AsRef<Path>>(&self, file_name: &P) -> Res<()> {

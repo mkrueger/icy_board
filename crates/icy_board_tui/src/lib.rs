@@ -7,6 +7,7 @@ use crossterm::{
 
 pub mod colors;
 pub mod term;
+pub mod text_field;
 pub mod theme;
 
 use i18n_embed::{

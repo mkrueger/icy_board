@@ -63,11 +63,11 @@ pub const THEME: Theme = /* Theme {
             .add_modifier(Modifier::BOLD)
             .add_modifier(Modifier::REVERSED),
 
-        content_box: Style::new().bg(DOS_BLACK).fg(DOS_DARKGRAY),
+        content_box: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),
         content_box_title: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
 
-        key_binding: Style::new().bg(DOS_DARKGRAY).fg(DOS_LIGHT_GRAY),
-        key_binding_description: Style::new().bg(DOS_BLACK).fg(DOS_DARKGRAY),
+        key_binding: Style::new().bg(DOS_DARK_GRAY).fg(DOS_LIGHT_GRAY),
+        key_binding_description: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),
 
         status_line: Style::new().bg(DOS_BLACK).fg(DOS_CYAN),
         status_line_text: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_CYAN),
@@ -93,7 +93,7 @@ pub const DOS_MAGENTA: Color = Color::Rgb(0xAA, 0, 0xAA);
 pub const DOS_BROWN: Color = Color::Rgb(0xAA, 0x55, 0);
 pub const DOS_LIGHT_GRAY: Color = Color::Rgb(0xAA, 0xAA, 0xAA);
 
-pub const DOS_DARKGRAY: Color = Color::Rgb(0x55, 0x55, 0x55);
+pub const DOS_DARK_GRAY: Color = Color::Rgb(0x55, 0x55, 0x55);
 pub const DOS_LIGHT_BLUE: Color = Color::Rgb(0x55, 0x55, 0xFF);
 pub const DOS_LIGHT_GREEN: Color = Color::Rgb(0x55, 0xFF, 0x55);
 pub const DOS_LIGHT_CYAN: Color = Color::Rgb(0x55, 0xFF, 0xFF);
