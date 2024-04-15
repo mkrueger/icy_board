@@ -4,6 +4,7 @@ use crate::{
         IdentifierExpression, IfStatement, LabelStatement, LetStatement, SelectStatement, Statement,
     },
     decompiler::evaluation_visitor::OptimizationVisitor,
+    parser::lexer::{Spanned, Token},
 };
 
 #[derive(Default)]
@@ -115,6 +116,42 @@ impl AstVisitorMut for AstTransformationVisitor {
         Statement::Block(BlockStatement::empty(statements))
     }
 
+    fn visit_repeat_until_statement(&mut self, repeat_until: &crate::ast::RepeatUntilStatement) -> Statement {
+        let mut statements = Vec::new();
+
+        let continue_label = self.next_label();
+        let break_label = self.next_label();
+
+        self.continue_break_labels.push((continue_label.clone(), break_label.clone()));
+
+        statements.push(LabelStatement::create_empty_statement(continue_label.clone()));
+        statements.extend(repeat_until.get_statements().iter().map(|s| s.visit_mut(self)));
+
+        statements.push(IfStatement::create_empty_statement(
+            repeat_until.get_condition().clone(),
+            GotoStatement::create_empty_statement(continue_label.clone()),
+        ));
+        statements.push(LabelStatement::create_empty_statement(break_label.clone()));
+        self.continue_break_labels.pop();
+        Statement::Block(BlockStatement::empty(statements))
+    }
+
+    fn visit_loop_statement(&mut self, loop_stmt: &crate::ast::LoopStatement) -> Statement {
+        let mut statements = Vec::new();
+
+        let continue_label = self.next_label();
+        let break_label = self.next_label();
+
+        self.continue_break_labels.push((continue_label.clone(), break_label.clone()));
+
+        statements.push(LabelStatement::create_empty_statement(continue_label.clone()));
+        statements.extend(loop_stmt.get_statements().iter().map(|s| s.visit_mut(self)));
+        statements.push(GotoStatement::create_empty_statement(continue_label.clone()));
+        statements.push(LabelStatement::create_empty_statement(break_label.clone()));
+        self.continue_break_labels.pop();
+        Statement::Block(BlockStatement::empty(statements))
+    }
+
     fn visit_select_statement(&mut self, select_stmt: &SelectStatement) -> Statement {
         let mut statements = Vec::new();
 
@@ -168,6 +205,7 @@ impl AstVisitorMut for AstTransformationVisitor {
         // init variable
         statements.push(LetStatement::create_empty_statement(
             for_stmt.get_identifier().clone(),
+            Token::Eq,
             Vec::new(),
             for_stmt.get_start_expr().visit_mut(self),
         ));
@@ -217,6 +255,7 @@ impl AstVisitorMut for AstTransformationVisitor {
 
         statements.push(LetStatement::create_empty_statement(
             for_stmt.get_identifier().clone(),
+            Token::Eq,
             Vec::new(),
             BinaryExpression::create_empty_expression(crate::ast::BinOp::Add, id_expr, increment),
         ));
@@ -226,5 +265,75 @@ impl AstVisitorMut for AstTransformationVisitor {
         statements.push(LabelStatement::create_empty_statement(break_label.clone()));
         self.continue_break_labels.pop();
         Statement::Block(BlockStatement::empty(statements))
+    }
+
+    fn visit_let_statement(&mut self, let_stmt: &LetStatement) -> Statement {
+        let mut val_expr = let_stmt.get_value_expression().visit_mut(self);
+
+        match let_stmt.get_let_variant() {
+            Token::MulAssign => {
+                val_expr = BinaryExpression::create_empty_expression(
+                    crate::ast::BinOp::Mul,
+                    IdentifierExpression::create_empty_expression(let_stmt.get_identifier().clone()),
+                    val_expr,
+                );
+            }
+            Token::DivAssign => {
+                val_expr = BinaryExpression::create_empty_expression(
+                    crate::ast::BinOp::Div,
+                    IdentifierExpression::create_empty_expression(let_stmt.get_identifier().clone()),
+                    val_expr,
+                );
+            }
+            Token::ModAssign => {
+                val_expr = BinaryExpression::create_empty_expression(
+                    crate::ast::BinOp::Mod,
+                    IdentifierExpression::create_empty_expression(let_stmt.get_identifier().clone()),
+                    val_expr,
+                );
+            }
+            Token::AddAssign => {
+                val_expr = BinaryExpression::create_empty_expression(
+                    crate::ast::BinOp::Add,
+                    IdentifierExpression::create_empty_expression(let_stmt.get_identifier().clone()),
+                    val_expr,
+                );
+            }
+            Token::SubAssign => {
+                val_expr = BinaryExpression::create_empty_expression(
+                    crate::ast::BinOp::Sub,
+                    IdentifierExpression::create_empty_expression(let_stmt.get_identifier().clone()),
+                    val_expr,
+                );
+            }
+            Token::AndAssign => {
+                val_expr = BinaryExpression::create_empty_expression(
+                    crate::ast::BinOp::And,
+                    IdentifierExpression::create_empty_expression(let_stmt.get_identifier().clone()),
+                    val_expr,
+                );
+            }
+            Token::OrAssign => {
+                val_expr = BinaryExpression::create_empty_expression(
+                    crate::ast::BinOp::Or,
+                    IdentifierExpression::create_empty_expression(let_stmt.get_identifier().clone()),
+                    val_expr,
+                );
+            }
+            _ => {}
+        }
+
+        Statement::Let(LetStatement::new(
+            let_stmt.get_let_token().clone(),
+            Spanned {
+                span: let_stmt.get_identifier_token().span.clone(),
+                token: Token::Identifier(self.visit_identifier(let_stmt.get_identifier())),
+            },
+            let_stmt.get_lpar_token().clone(),
+            let_stmt.get_arguments().iter().map(|arg| arg.visit_mut(self)).collect(),
+            let_stmt.get_rpar_token_token().clone(),
+            Spanned::create_empty(Token::Eq),
+            val_expr,
+        ))
     }
 }

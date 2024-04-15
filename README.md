@@ -182,6 +182,26 @@ I think it improves the language and it's open for discussion. Note that some al
 * Added ```€``` as valid identifier character. (for UTF8 files)
 * Return type differences in function declaration/implementation is an error, original compiler didn't care.
 
+
+#### PPL 4.0
+
+New Constructs (Language Version 400):
+
+New loops
+``` REPEAT ... UNTIL [CONDITION] ``` Statement
+``` LOOP ... ENDLOOP``` Statement
+
+Variable initalizers:
+
+``` TYPE VAR=[INITALIZER]``` Statement
+
+Operator Assignment for binary (non condition operators):
+
+``` A += 1``` Statement
+
+With "lang" version 'Quit' and 'Loop' are no longer synonyms for 'break' and 'continue'. Existing sources should be easily adapted.
+But never saw them in the wild.
+
 ### Runner
 
 * pplx is able to run several PPEs on command line still has many limits but it's usable

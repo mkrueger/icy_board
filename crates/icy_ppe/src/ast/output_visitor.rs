@@ -281,6 +281,32 @@ impl AstVisitor<()> for OutputVisitor {
         self.eol();
     }
 
+    fn visit_repeat_until_statement(&mut self, repeat_until_stmt: &super::RepeatUntilStatement) {
+        self.output_keyword("Repeat");
+        self.eol();
+        self.indent += 1;
+        self.output_statements(repeat_until_stmt.get_statements());
+        self.indent -= 1;
+        self.eol();
+        self.indent();
+        self.output_keyword("Until");
+        self.output.push_str(" ");
+        repeat_until_stmt.get_condition().visit(self);
+        self.eol();
+    }
+
+    fn visit_loop_statement(&mut self, loop_stmt: &super::LoopStatement) {
+        self.output_keyword("Loop");
+        self.eol();
+        self.indent += 1;
+        self.output_statements(loop_stmt.get_statements());
+        self.indent -= 1;
+        self.eol();
+        self.indent();
+        self.output_keyword("EndLoop");
+        self.eol();
+    }
+
     fn visit_for_statement(&mut self, for_stmt: &super::ForStatement) {
         self.output_keyword("For");
         self.output.push(' ');
@@ -396,6 +422,10 @@ impl AstVisitor<()> for OutputVisitor {
                     }
                 }
                 self.output.push(')');
+            }
+            if let Some(init) = var.get_initalizer() {
+                self.output.push_str(" = ");
+                init.visit(self);
             }
             if i < var_decl.get_variables().len() - 1 {
                 self.output.push_str(", ");

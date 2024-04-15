@@ -40,7 +40,7 @@ pub struct Tui {
 }
 
 impl Tui {
-    pub fn local_mode(board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>) -> Self {
+    pub fn local_mode(board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>, sysop_mode: bool) -> Self {
         let ui_session = Arc::new(Mutex::new(Session::new()));
         let session = ui_session.clone();
         let (ui_connection, connection) = ChannelConnection::create_pair();
@@ -49,8 +49,10 @@ impl Tui {
         let node = ui_node.clone();
         let handle = thread::spawn(move || {
             let mut state = IcyBoardState::new(board, node, Box::new(connection));
-            state.session.is_sysop = true;
-            state.set_current_user(0);
+            if sysop_mode {
+                state.session.is_sysop = true;
+                state.set_current_user(0);
+            }
             let mut cmd = PcbBoardCommand::new(state);
 
             let orig_hook = std::panic::take_hook();
@@ -60,6 +62,19 @@ impl Tui {
 
                 orig_hook(panic_info);
             }));
+
+            if !sysop_mode {
+                match cmd.login() {
+                    Ok(true) => {}
+                    Ok(false) => {
+                        return Ok(());
+                    }
+                    Err(err) => {
+                        log::error!("error during login process {}", err);
+                        return Ok(());
+                    }
+                }
+            }
 
             loop {
                 session.lock().unwrap().cur_user = cmd.state.session.cur_user;

@@ -141,6 +141,22 @@ pub enum Token {
     EndFunc,
 
     Const(Constant),
+
+    // New in 400
+    Repeat,
+    Until,
+
+    Loop,
+    EndLoop,
+
+    MulAssign,
+
+    DivAssign,
+    ModAssign,
+    AddAssign,
+    SubAssign,
+    AndAssign,
+    OrAssign,
 }
 
 impl Token {
@@ -171,6 +187,10 @@ impl Token {
                 | Token::Procedure
                 | Token::EndProc
                 | Token::EndFunc
+                | Token::Repeat
+                | Token::Until
+                | Token::Loop
+                | Token::EndLoop
         )
     }
 
@@ -236,6 +256,18 @@ impl fmt::Display for Token {
             Token::Procedure => write!(f, "PROCEDURE"),
             Token::EndProc => write!(f, "ENDPROC"),
             Token::EndFunc => write!(f, "ENDFUNC"),
+
+            Token::Repeat => write!(f, "REPEAT"),
+            Token::Until => write!(f, "UNTIL"),
+            Token::Loop => write!(f, "LOOP"),
+            Token::EndLoop => write!(f, "ENDLOOP"),
+            Token::MulAssign => write!(f, "*="),
+            Token::DivAssign => write!(f, "/="),
+            Token::ModAssign => write!(f, "%="),
+            Token::AddAssign => write!(f, "+="),
+            Token::SubAssign => write!(f, "-="),
+            Token::AndAssign => write!(f, "&="),
+            Token::OrAssign => write!(f, "|="),
         }
     }
 }
@@ -249,7 +281,9 @@ pub enum LexerState {
 }
 
 pub struct Lexer {
+    lookup_table: &'static HashMap<unicase::Ascii<String>, Token>,
     file: PathBuf,
+    lang_version: u16,
     encoding: Encoding,
     text: Vec<char>,
 
@@ -290,17 +324,61 @@ lazy_static::lazy_static! {
         m.insert(unicase::Ascii::new("procedure".to_string()), Token::Procedure);
         m.insert(unicase::Ascii::new("endproc".to_string()), Token::EndProc);
         m.insert(unicase::Ascii::new("endfunc".to_string()), Token::EndFunc);
+
         for c in &BUILTIN_CONSTS {
             m.insert(unicase::Ascii::new(c.name.to_string()), Token::Const(Constant::Builtin(c)));
         }
         m
     };
+    static ref TOKEN_LOOKUP_TABLE_400: HashMap<unicase::Ascii<String>, Token> = {
+        let mut m = HashMap::new();
+        m.insert(unicase::Ascii::new("if".to_string()), Token::If);
+        m.insert(unicase::Ascii::new("let".to_string()), Token::Let);
+        m.insert(unicase::Ascii::new("while".to_string()), Token::While);
+        m.insert(unicase::Ascii::new("endwhile".to_string()), Token::EndWhile);
+        m.insert(unicase::Ascii::new("else".to_string()), Token::Else);
+        m.insert(unicase::Ascii::new("elseif".to_string()), Token::ElseIf);
+        m.insert(unicase::Ascii::new("endif".to_string()), Token::EndIf);
+        m.insert(unicase::Ascii::new("for".to_string()), Token::For);
+        m.insert(unicase::Ascii::new("next".to_string()), Token::Next);
+        m.insert(unicase::Ascii::new("endfor".to_string()), Token::Next);
+
+        m.insert(unicase::Ascii::new("break".to_string()), Token::Break);
+        m.insert(unicase::Ascii::new("continue".to_string()), Token::Continue);
+        m.insert(unicase::Ascii::new("return".to_string()), Token::Return);
+
+        m.insert(unicase::Ascii::new("gosub".to_string()), Token::Gosub);
+        m.insert(unicase::Ascii::new("goto".to_string()), Token::Goto);
+        m.insert(unicase::Ascii::new("select".to_string()), Token::Select);
+        m.insert(unicase::Ascii::new("case".to_string()), Token::Case);
+        m.insert(unicase::Ascii::new("default".to_string()), Token::Default);
+        m.insert(unicase::Ascii::new("endselect".to_string()), Token::EndSelect);
+        m.insert(unicase::Ascii::new("declare".to_string()), Token::Declare);
+        m.insert(unicase::Ascii::new("function".to_string()), Token::Function);
+        m.insert(unicase::Ascii::new("procedure".to_string()), Token::Procedure);
+        m.insert(unicase::Ascii::new("endproc".to_string()), Token::EndProc);
+        m.insert(unicase::Ascii::new("endfunc".to_string()), Token::EndFunc);
+
+        // new ones
+        m.insert(unicase::Ascii::new("repeat".to_string()), Token::Repeat);
+        m.insert(unicase::Ascii::new("until".to_string()), Token::Until);
+        m.insert(unicase::Ascii::new("loop".to_string()), Token::Loop);
+        m.insert(unicase::Ascii::new("endloop".to_string()), Token::EndLoop);
+
+        for c in &BUILTIN_CONSTS {
+            m.insert(unicase::Ascii::new(c.name.to_string()), Token::Const(Constant::Builtin(c)));
+        }
+        m
+    };
+
 }
 
 impl Lexer {
-    pub fn new(file: PathBuf, text: &str, encoding: Encoding, errors: Arc<Mutex<ErrorRepoter>>) -> Self {
+    pub fn new(file: PathBuf, version: u16, text: &str, encoding: Encoding, errors: Arc<Mutex<ErrorRepoter>>) -> Self {
         Self {
+            lookup_table: if version < 400 { &*TOKEN_LOOKUP_TABLE } else { &*TOKEN_LOOKUP_TABLE_400 },
             file,
+            lang_version: version,
             encoding,
             text: text.chars().collect(),
             lexer_state: LexerState::AfterEol,
@@ -465,17 +543,56 @@ impl Lexer {
                     return self.read_comment(ch);
                 }
                 let next = self.next_ch();
-                 if let Some('*') = next {
+                if let Some('*') = next {
                     Some(Token::PoW)
                 } else {
+                    if self.lang_version >= 400 && next == Some('=') {
+                        return Some(Token::MulAssign);
+                    }
                     self.put_back();
                     Some(Token::Mul)
                 }
              },
-            '/' => Some(Token::Div),
-            '%' => Some(Token::Mod),
-            '+' => Some(Token::Add),
-            '-' => Some(Token::Sub),
+            '/' => {
+                if self.lang_version >= 400 {
+                    let next = self.next_ch();
+                    if next == Some('=') {
+                        return Some(Token::DivAssign);
+                    }
+                    self.put_back();
+                }
+                Some(Token::Div)
+            },
+            '%' => {
+                if self.lang_version >= 400 {
+                    let next = self.next_ch();
+                    if next == Some('=') {
+                        return Some(Token::ModAssign);
+                    }
+                    self.put_back();
+                }
+                Some(Token::Mod)
+            }
+            '+' => {
+                if self.lang_version >= 400 {
+                    let next = self.next_ch();
+                    if next == Some('=') {
+                        return Some(Token::AddAssign);
+                    }
+                    self.put_back();
+                }
+                Some(Token::Add)
+            }
+            '-' => {
+                if self.lang_version >= 400 {
+                    let next = self.next_ch();
+                    if next == Some('=') {
+                        return Some(Token::SubAssign);
+                    }
+                    self.put_back();
+                }
+                Some(Token::Sub)
+            }
             '=' => {
                 let next = self.next_ch();
                  match next {
@@ -493,15 +610,26 @@ impl Lexer {
                  if let Some('&') = next {
                     Some(Token::And)
                 } else {
-                                         self.put_back();
-                                         Some(Token::And)
-                                     }
+                    if self.lang_version >= 400 {
+                        if next == Some('=') {
+                            return Some(Token::AndAssign);
+                        }
+                    }
+
+                    self.put_back();
+                    Some(Token::And)
+                }
              },
             '|' => {
                 let next = self.next_ch();
                  if let Some('|') = next {
                     Some(Token::Or)
                 } else {
+                    if self.lang_version >= 400 {
+                        if next == Some('=') {
+                            return Some(Token::OrAssign);
+                        }
+                    }
                     self.put_back();
                     Some(Token::Or)
                 }
@@ -793,7 +921,7 @@ impl Lexer {
 
         let identifier = unicase::Ascii::new(self.text[self.token_start..self.token_end].iter().collect::<String>());
         if !open_bracket {
-            if let Some(token) = TOKEN_LOOKUP_TABLE.get(&identifier) {
+            if let Some(token) = self.lookup_table.get(&identifier) {
                 return Some(token.clone());
             }
         }
@@ -830,7 +958,7 @@ impl Lexer {
 
             match load_with_encoding(&path, self.encoding) {
                 Ok(k) => {
-                    self.include_lexer = Some(Box::new(Lexer::new(path, &k, Encoding::Utf8, self.errors.clone())));
+                    self.include_lexer = Some(Box::new(Lexer::new(path, self.lang_version, &k, Encoding::Utf8, self.errors.clone())));
                 }
                 Err(err) => {
                     self.errors.lock().unwrap().report_error(

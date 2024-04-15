@@ -25,7 +25,7 @@ pub mod expr_tests;
 #[cfg(test)]
 pub mod stmt_tests;
 
-pub const LAST_PPLC: u16 = 340;
+pub const LAST_PPLC: u16 = 400;
 
 #[derive(Clone, Debug, Default)]
 pub struct VariableNameGenerator {

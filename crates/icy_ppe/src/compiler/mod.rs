@@ -176,7 +176,7 @@ impl PPECompiler {
 
     fn compile_statement(&mut self, s: &Statement) -> Option<PPECommand> {
         match s {
-            Statement::Comment(_) | Statement::VariableDeclaration(_) => None,
+            Statement::Comment(_) => None,
             Statement::Return(_) => Some(PPECommand::Return),
             Statement::Gosub(gosub_stmt) => Some(PPECommand::Gosub(self.get_label_index(gosub_stmt.get_label()))),
             Statement::Goto(goto_stmt) => Some(PPECommand::Goto(self.get_label_index(goto_stmt.get_label()))),
@@ -193,9 +193,27 @@ impl PPECompiler {
                 Some(PPECommand::IfNot(Box::new(cond_buffer), self.get_label_index(goto_stmt.get_label())))
             }
 
+            Statement::VariableDeclaration(var_del) => {
+                for v in var_del.get_variables() {
+                    if let Some(initializer) = v.get_initalizer() {
+                        let Some(decl_idx) = self.lookup_variable_index(v.get_identifier()) else {
+                            log::error!("Variable not found: {}", v.get_identifier());
+                            return None;
+                        };
+                        let decl = self.lookup_table.variable_table.get_var_entry(decl_idx);
+                        let variable = PPEExpr::Value(decl.header.id);
+                        let value = self.comp_expr(initializer);
+                        return Some(PPECommand::Let(Box::new(variable), Box::new(value)));
+                    }
+                }
+                None
+            }
+
             Statement::Let(let_smt) => {
                 let var_name = let_smt.get_identifier();
-
+                if let_smt.get_let_variant() != &Token::Eq {
+                    panic!("Let variants allowed in output AST.");
+                }
                 let Some(decl_idx) = self.lookup_variable_index(var_name) else {
                     log::error!("Variable not found: {}", var_name);
                     return None;
@@ -282,6 +300,8 @@ impl PPECompiler {
             Statement::Break(_) => panic!("Break not allowed in output AST."),
             Statement::IfThen(_) => panic!("if then not allowed in output AST."),
             Statement::WhileDo(_) => panic!("do while not allowed in output AST."),
+            Statement::RepeatUntil(_) => panic!("repeat until not allowed in output AST."),
+            Statement::Loop(_) => panic!("loop not allowed in output AST."),
             Statement::For(_) => panic!("for not allowed in output AST."),
             Statement::Select(_) => panic!("select not allowed in output AST."),
         }

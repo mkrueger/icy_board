@@ -5,7 +5,7 @@ use crate::{
     parser::lexer::{Spanned, Token},
 };
 
-use super::{AstVisitorMut, Constant, Statement};
+use super::{AstVisitorMut, Constant, Expression, Statement};
 #[derive(Debug, PartialEq, Clone)]
 pub struct DimensionSpecifier {
     dimension_token: Spanned<Token>,
@@ -55,6 +55,9 @@ pub struct VariableSpecifier {
     leftpar_token: Option<Spanned<Token>>,
     dimensions: Vec<DimensionSpecifier>,
     rightpar_token: Option<Spanned<Token>>,
+
+    eq_token: Option<Spanned<Token>>,
+    initalizer: Option<Expression>,
 }
 
 impl VariableSpecifier {
@@ -63,12 +66,16 @@ impl VariableSpecifier {
         leftpar_token: Option<Spanned<Token>>,
         dimensions: Vec<DimensionSpecifier>,
         rightpar_token: Option<Spanned<Token>>,
+        eq_token: Option<Spanned<Token>>,
+        initalizer: Option<Expression>,
     ) -> Self {
         Self {
             identifier_token,
             leftpar_token,
             dimensions,
             rightpar_token,
+            eq_token,
+            initalizer,
         }
     }
 
@@ -78,6 +85,8 @@ impl VariableSpecifier {
             leftpar_token: None,
             dimensions: dimensions.into_iter().map(DimensionSpecifier::empty).collect(),
             rightpar_token: None,
+            eq_token: None,
+            initalizer: None,
         }
     }
 
@@ -117,6 +126,14 @@ impl VariableSpecifier {
 
     pub fn get_rightpar_token(&self) -> &Option<Spanned<Token>> {
         &self.rightpar_token
+    }
+
+    pub fn get_eq_token(&self) -> &Option<Spanned<Token>> {
+        &self.eq_token
+    }
+
+    pub fn get_initalizer(&self) -> &Option<Expression> {
+        &self.initalizer
     }
 
     pub fn create_empty_value(&self, variable_type: VariableType) -> VariableValue {
@@ -178,6 +195,18 @@ impl VariableSpecifier {
                 return false;
             }
         }
+
+        if self.get_initalizer().is_some() != check.get_initalizer().is_some() {
+            return false;
+        }
+        if let Some(init) = self.get_initalizer() {
+            if let Some(check_init) = check.get_initalizer() {
+                if !init.is_similar(check_init) {
+                    return false;
+                }
+            }
+        }
+
         true
     }
 }

@@ -158,7 +158,7 @@ pub enum ParserWarningType {
 
 pub struct Parser {
     pub errors: Arc<Mutex<ErrorRepoter>>,
-    version: u16,
+    lang_version: u16,
     pub require_user_variables: bool,
 
     cur_token: Option<Spanned<Token>>,
@@ -178,13 +178,13 @@ lazy_static::lazy_static! {
 }
 
 impl Parser {
-    pub fn new(file: PathBuf, text: &str, encoding: Encoding, version: u16) -> Self {
+    pub fn new(file: PathBuf, text: &str, encoding: Encoding, lang_version: u16) -> Self {
         let errors = Arc::new(Mutex::new(ErrorRepoter::default()));
 
-        let lex = Lexer::new(file, text, encoding, errors.clone());
+        let lex = Lexer::new(file, lang_version, text, encoding, errors.clone());
         Parser {
             errors,
-            version,
+            lang_version,
             cur_token: None,
             lookahead_token: None,
             lex,
@@ -248,6 +248,9 @@ impl Parser {
                         }
                         Token::Select => {
                             self.cur_token = Some(Spanned::new(Token::EndSelect, start..self.lex.span().end));
+                        }
+                        Token::Loop => {
+                            self.cur_token = Some(Spanned::new(Token::EndLoop, start..self.lex.span().end));
                         }
                         Token::For => {
                             self.cur_token = Some(Spanned::new(Token::Next, start..self.lex.span().end));
@@ -510,8 +513,15 @@ impl Parser {
             }
             rightpar_token = Some(self.save_spanned_token());
             self.next_token();
+        } else if self.lang_version >= 400 {
+            if let Some(Token::Eq) = self.get_cur_token() {
+                let eq_token = self.next_token();
+                let initializer = self.parse_expression();
+                return Some(VariableSpecifier::new(identifier_token, None, dimensions, None, eq_token, initializer));
+            }
         }
-        Some(VariableSpecifier::new(identifier_token, leftpar_token, dimensions, rightpar_token))
+
+        Some(VariableSpecifier::new(identifier_token, leftpar_token, dimensions, rightpar_token, None, None))
     }
 
     /// Returns the parse function declaration of this [`Tokenizer`].

@@ -3,9 +3,10 @@ use crate::parser::lexer::{Spanned, Token};
 use super::{
     Ast, AstNode, BinaryExpression, BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstantExpression, ContinueStatement, ElseBlock,
     ElseIfBlock, Expression, ForStatement, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement,
-    IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement, ParameterSpecifier, ParensExpression, PredefinedCallStatement,
-    PredefinedFunctionCallExpression, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, ReturnStatement, SelectStatement,
-    Statement, UnaryExpression, VariableDeclarationStatement, VariableSpecifier, WhileDoStatement, WhileStatement,
+    IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement, LoopStatement, ParameterSpecifier, ParensExpression,
+    PredefinedCallStatement, PredefinedFunctionCallExpression, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation,
+    RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, UnaryExpression, VariableDeclarationStatement, VariableSpecifier, WhileDoStatement,
+    WhileStatement,
 };
 
 #[allow(unused_variables)]
@@ -77,6 +78,15 @@ pub trait AstVisitor<T: Default>: Sized {
         walk_while_do_stmt(self, while_do);
         T::default()
     }
+    fn visit_repeat_until_statement(&mut self, repeat_until: &RepeatUntilStatement) -> T {
+        walk_repeat_until_stmt(self, repeat_until);
+        T::default()
+    }
+    fn visit_loop_statement(&mut self, loop_stmt: &LoopStatement) -> T {
+        walk_loop_stmt(self, loop_stmt);
+        T::default()
+    }
+
     fn visit_for_statement(&mut self, for_stmt: &ForStatement) -> T {
         walk_for_stmt(self, for_stmt);
         T::default()
@@ -195,6 +205,19 @@ pub fn walk_while_stmt<T: Default, V: AstVisitor<T>>(visitor: &mut V, while_do_s
 pub fn walk_while_do_stmt<T: Default, V: AstVisitor<T>>(visitor: &mut V, while_do_stmt: &WhileDoStatement) {
     while_do_stmt.get_condition().visit(visitor);
     for stmt in while_do_stmt.get_statements() {
+        stmt.visit(visitor);
+    }
+}
+
+pub fn walk_repeat_until_stmt<T: Default, V: AstVisitor<T>>(visitor: &mut V, repeat_until_stmt: &RepeatUntilStatement) {
+    for stmt in repeat_until_stmt.get_statements() {
+        stmt.visit(visitor);
+    }
+    repeat_until_stmt.get_condition().visit(visitor);
+}
+
+pub fn walk_loop_stmt<T: Default, V: AstVisitor<T>>(visitor: &mut V, loop_stmt: &LoopStatement) {
+    for stmt in loop_stmt.get_statements() {
         stmt.visit(visitor);
     }
 }
@@ -421,6 +444,19 @@ pub trait AstVisitorMut: Sized {
         ))
     }
 
+    fn visit_repeat_until_statement(&mut self, repeat_until: &RepeatUntilStatement) -> Statement {
+        Statement::RepeatUntil(RepeatUntilStatement::empty(
+            self.visit_condition(repeat_until.get_condition()),
+            repeat_until.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
+        ))
+    }
+
+    fn visit_loop_statement(&mut self, loop_stmt: &LoopStatement) -> Statement {
+        Statement::Loop(LoopStatement::empty(
+            loop_stmt.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
+        ))
+    }
+
     fn visit_for_statement(&mut self, for_stmt: &ForStatement) -> Statement {
         Statement::For(ForStatement::new(
             for_stmt.get_for_token().clone(),
@@ -513,6 +549,8 @@ pub trait AstVisitorMut: Sized {
             var.get_leftpar_token().clone(),
             var.get_dimensions().clone(),
             var.get_rightpar_token().clone(),
+            var.get_eq_token().clone(),
+            var.get_initalizer().as_ref().map(|expr| expr.visit_mut(self)),
         )
     }
 

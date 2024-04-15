@@ -18,6 +18,9 @@ pub enum Statement {
 
     While(WhileStatement),
     WhileDo(WhileDoStatement),
+    RepeatUntil(RepeatUntilStatement),
+    Loop(LoopStatement),
+
     For(ForStatement),
     Break(BreakStatement),
     Continue(ContinueStatement),
@@ -42,6 +45,9 @@ impl Statement {
             Statement::Select(s) => visitor.visit_select_statement(s),
             Statement::While(s) => visitor.visit_while_statement(s),
             Statement::WhileDo(s) => visitor.visit_while_do_statement(s),
+            Statement::RepeatUntil(s) => visitor.visit_repeat_until_statement(s),
+            Statement::Loop(s) => visitor.visit_loop_statement(s),
+
             Statement::For(s) => visitor.visit_for_statement(s),
             Statement::Break(s) => visitor.visit_break_statement(s),
             Statement::Continue(s) => visitor.visit_continue_statement(s),
@@ -66,6 +72,8 @@ impl Statement {
             Statement::Select(s) => visitor.visit_select_statement(s),
             Statement::While(s) => visitor.visit_while_statement(s),
             Statement::WhileDo(s) => visitor.visit_while_do_statement(s),
+            Statement::RepeatUntil(s) => visitor.visit_repeat_until_statement(s),
+            Statement::Loop(s) => visitor.visit_loop_statement(s),
             Statement::For(s) => visitor.visit_for_statement(s),
             Statement::Break(s) => visitor.visit_break_statement(s),
             Statement::Continue(s) => visitor.visit_continue_statement(s),
@@ -144,6 +152,25 @@ impl Statement {
                 }
                 true
             }
+            (Statement::RepeatUntil(i1), Statement::RepeatUntil(i2)) => {
+                if !(i1.get_condition().is_similar(i2.get_condition())) || i1.get_statements().len() != i2.get_statements().len() {
+                    return false;
+                }
+                for i in 0..i1.get_statements().len() {
+                    if !i1.get_statements()[i].is_similar(&i2.get_statements()[i]) {
+                        return false;
+                    }
+                }
+                true
+            }
+            (Statement::Loop(i1), Statement::Loop(i2)) => {
+                for i in 0..i1.get_statements().len() {
+                    if !i1.get_statements()[i].is_similar(&i2.get_statements()[i]) {
+                        return false;
+                    }
+                }
+                true
+            }
             (Statement::For(f1), Statement::For(f2)) => {
                 if f1.get_identifier() != f2.get_identifier() {
                     return false;
@@ -175,7 +202,9 @@ impl Statement {
                 true
             }
             (Statement::Let(l1), Statement::Let(l2)) => {
-                l1.get_identifier() == l2.get_identifier() && l1.get_value_expression().is_similar(l2.get_value_expression())
+                l1.get_identifier() == l2.get_identifier()
+                    && l1.get_value_expression().is_similar(l2.get_value_expression())
+                    && l1.get_let_variant() == l2.get_let_variant()
             }
             (Statement::Goto(g1), Statement::Goto(g2)) => g1.get_label() == g2.get_label(),
             (Statement::Gosub(g1), Statement::Gosub(g2)) => g1.get_label() == g2.get_label(),
@@ -1571,14 +1600,14 @@ impl LetStatement {
         }
     }
 
-    pub fn empty(identifier: unicase::Ascii<String>, arguments: Vec<Expression>, value_expression: Expression) -> Self {
+    pub fn empty(identifier: unicase::Ascii<String>, variant: Token, arguments: Vec<Expression>, value_expression: Expression) -> Self {
         Self {
             let_token: None,
             identifier_token: Spanned::create_empty(Token::Identifier(identifier)),
             leftpar_token: None,
             arguments,
             rightpar_token: None,
-            eq_token: Spanned::create_empty(Token::Eq),
+            eq_token: Spanned::create_empty(variant),
             value_expression: Box::new(value_expression),
         }
     }
@@ -1609,6 +1638,10 @@ impl LetStatement {
         }
     }
 
+    pub fn get_let_variant(&self) -> &Token {
+        &self.eq_token.token
+    }
+
     pub fn get_lpar_token(&self) -> &Option<Spanned<Token>> {
         &self.leftpar_token
     }
@@ -1636,8 +1669,8 @@ impl LetStatement {
     pub fn get_value_expression_mut(&mut self) -> &mut Expression {
         &mut self.value_expression
     }
-    pub fn create_empty_statement(identifier: unicase::Ascii<String>, arguments: Vec<Expression>, value_expression: Expression) -> Statement {
-        Statement::Let(LetStatement::empty(identifier, arguments, value_expression))
+    pub fn create_empty_statement(identifier: unicase::Ascii<String>, variant: Token, arguments: Vec<Expression>, value_expression: Expression) -> Statement {
+        Statement::Let(LetStatement::empty(identifier, variant, arguments, value_expression))
     }
 }
 
@@ -1712,5 +1745,106 @@ impl Statement {
             res.push_str("    ");
         }
         res
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct RepeatUntilStatement {
+    repeat_token: Spanned<Token>,
+    statements: Vec<Statement>,
+    until_token: Spanned<Token>,
+    condition: Box<Expression>,
+}
+
+impl RepeatUntilStatement {
+    pub fn new(repeat_token: Spanned<Token>, statements: Vec<Statement>, until_token: Spanned<Token>, condition: Expression) -> Self {
+        Self {
+            repeat_token,
+            until_token,
+            statements,
+            condition: Box::new(condition),
+        }
+    }
+
+    pub fn empty(condition: Expression, statements: Vec<Statement>) -> Self {
+        Self {
+            repeat_token: Spanned::create_empty(Token::Repeat),
+            condition: Box::new(condition),
+            until_token: Spanned::create_empty(Token::Until),
+            statements,
+        }
+    }
+
+    pub fn get_repeat_token(&self) -> &Spanned<Token> {
+        &self.repeat_token
+    }
+
+    pub fn get_condition(&self) -> &Expression {
+        &self.condition
+    }
+
+    pub fn get_condition_mut(&mut self) -> &mut Expression {
+        &mut self.condition
+    }
+
+    pub fn get_until_token(&self) -> &Spanned<Token> {
+        &self.until_token
+    }
+
+    pub fn get_statements(&self) -> &Vec<Statement> {
+        &self.statements
+    }
+
+    pub fn get_statements_mut(&mut self) -> &mut Vec<Statement> {
+        &mut self.statements
+    }
+
+    pub fn create_empty_statement(condition: Expression, statements: Vec<Statement>) -> Statement {
+        Statement::RepeatUntil(RepeatUntilStatement::empty(condition, statements))
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct LoopStatement {
+    loop_token: Spanned<Token>,
+    statements: Vec<Statement>,
+    endloop_token: Spanned<Token>,
+}
+
+impl LoopStatement {
+    pub fn new(loop_token: Spanned<Token>, statements: Vec<Statement>, endloop_token: Spanned<Token>) -> Self {
+        Self {
+            loop_token,
+            endloop_token,
+            statements,
+        }
+    }
+
+    pub fn empty(statements: Vec<Statement>) -> Self {
+        Self {
+            loop_token: Spanned::create_empty(Token::Repeat),
+            statements,
+            endloop_token: Spanned::create_empty(Token::Until),
+        }
+    }
+
+    pub fn get_repeat_token(&self) -> &Spanned<Token> {
+        &self.loop_token
+    }
+
+    pub fn get_until_token(&self) -> &Spanned<Token> {
+        &self.endloop_token
+    }
+
+    pub fn get_statements(&self) -> &Vec<Statement> {
+        &self.statements
+    }
+
+    pub fn get_statements_mut(&mut self) -> &mut Vec<Statement> {
+        &mut self.statements
+    }
+
+    pub fn create_empty_statement(statements: Vec<Statement>) -> Statement {
+        Statement::Loop(LoopStatement::empty(statements))
     }
 }

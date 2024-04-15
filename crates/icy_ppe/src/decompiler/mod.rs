@@ -8,6 +8,7 @@ use crate::{
         ProcedureImplementation, Statement, UnaryExpression, VariableDeclarationStatement, VariableSpecifier,
     },
     executable::{DeserializationError, DeserializationErrorType, EntryType, Executable, OpCode, PPECommand, PPEExpr, PPEScript, TableEntry, VariableType},
+    parser::lexer::Token,
     Res,
 };
 
@@ -297,7 +298,7 @@ impl Decompiler {
                     value_expr = Statement::try_boolean_conversion(&value_expr);
                 }
 
-                LetStatement::create_empty_statement(identifier, arguments, value_expr)
+                LetStatement::create_empty_statement(identifier, Token::Eq, arguments, value_expr)
             }
         }
     }

@@ -1,8 +1,9 @@
 use crate::{
     ast::{
         BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, Constant, ContinueStatement, ElseBlock, ElseIfBlock, ForStatement,
-        GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement, PredefinedCallStatement,
-        ProcedureCallStatement, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement, WhileDoStatement, WhileStatement,
+        GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement, LoopStatement,
+        PredefinedCallStatement, ProcedureCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement,
+        WhileDoStatement, WhileStatement,
     },
     executable::{OpCode, StatementDefinition},
     parser::ParserErrorType,
@@ -87,6 +88,67 @@ impl Parser {
                 None
             }
         }
+    }
+
+    fn parse_repeat_until(&mut self) -> Option<Statement> {
+        let repeat_token = self.save_spanned_token();
+        self.next_token();
+
+        let mut statements = Vec::new();
+        self.skip_eol();
+        let mut until_token = None;
+        while self.get_cur_token() != Some(Token::Until) {
+            if self.get_cur_token().is_none() {
+                self.report_error(self.lex.span(), ParserErrorType::EndExpected);
+                return None;
+            }
+            statements.push(self.parse_statement());
+            self.skip_eol();
+        }
+        if until_token.is_none() {
+            until_token = Some(self.save_spanned_token());
+        }
+        self.next_token(); // skip UNTIL
+
+        let condition = self.parse_expression();
+        if condition.is_none() {
+            self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
+            return None;
+        }
+
+        Some(Statement::RepeatUntil(RepeatUntilStatement::new(
+            repeat_token,
+            statements.into_iter().flatten().collect(),
+            until_token.unwrap(),
+            condition.unwrap(),
+        )))
+    }
+
+    fn parse_loop(&mut self) -> Option<Statement> {
+        let loop_token = self.save_spanned_token();
+        self.next_token();
+
+        let mut statements = Vec::new();
+        self.skip_eol();
+        let mut endloop_token = None;
+        while self.get_cur_token() != Some(Token::EndLoop) {
+            if self.get_cur_token().is_none() {
+                self.report_error(self.lex.span(), ParserErrorType::EndExpected);
+                return None;
+            }
+            statements.push(self.parse_statement());
+            self.skip_eol();
+        }
+        if endloop_token.is_none() {
+            endloop_token = Some(self.save_spanned_token());
+        }
+        self.next_token(); // skip ENDLOOP
+
+        Some(Statement::Loop(LoopStatement::new(
+            loop_token,
+            statements.into_iter().flatten().collect(),
+            endloop_token.unwrap(),
+        )))
     }
 
     fn _parse_block(&mut self, begin_token: Spanned<Token>) -> Option<Statement> {
@@ -498,6 +560,8 @@ impl Parser {
                 self.parse_block(begin_token)
             }*/
             Some(Token::While) => self.parse_while(),
+            Some(Token::Repeat) => self.parse_repeat_until(),
+            Some(Token::Loop) => self.parse_loop(),
             Some(Token::Select) => self.parse_select(),
             Some(Token::If) => self.parse_if(),
             Some(Token::For) => self.parse_for(),
@@ -550,7 +614,7 @@ impl Parser {
                     self.next_token();
                 }
 
-                if self.get_cur_token() == Some(Token::Eq) {
+                if is_assign_token(self.get_cur_token()) {
                     let eq_token = self.save_spanned_token();
                     self.next_token();
                     let Some(value_expression) = self.parse_expression() else {
@@ -676,7 +740,7 @@ impl Parser {
         let id_token = self.save_spanned_token();
         self.next_token();
 
-        if self.get_cur_token() == Some(Token::Eq) {
+        if is_assign_token(self.get_cur_token()) {
             let eq_token = self.save_spanned_token();
             self.next_token();
             let Some(value_expression) = self.parse_expression() else {
@@ -696,11 +760,13 @@ impl Parser {
         }
         if self.get_cur_token() != Some(Token::LPar) {
             // check 'pseudo keywords'
-            if *identifier == *QUIT_TOKEN {
-                return Some(Statement::Break(BreakStatement::new(id_token)));
-            }
-            if *identifier == *LOOP_TOKEN {
-                return Some(Statement::Continue(ContinueStatement::new(id_token)));
+            if self.lang_version < 400 {
+                if *identifier == *QUIT_TOKEN {
+                    return Some(Statement::Break(BreakStatement::new(id_token)));
+                }
+                if *identifier == *LOOP_TOKEN {
+                    return Some(Statement::Continue(ContinueStatement::new(id_token)));
+                }
             }
 
             if *identifier == *BEGIN_TOKEN {
@@ -738,10 +804,10 @@ impl Parser {
             {
                 self.require_user_variables = true;
             }
-            if self.version < def.version {
+            if self.lang_version < def.version {
                 self.report_error(
                     id_token.span,
-                    ParserErrorType::StatementVersionNotSupported(def.opcode, def.version, self.version),
+                    ParserErrorType::StatementVersionNotSupported(def.opcode, def.version, self.lang_version),
                 );
                 return None;
             }
@@ -773,12 +839,11 @@ impl Parser {
             let rightpar_token = self.save_spanned_token();
 
             self.next_token();
-            if self.get_cur_token() == Some(Token::Eq) {
+            if is_assign_token(self.get_cur_token()) {
                 let eq_token = self.save_spanned_token();
                 self.next_token();
                 let Some(value_expression) = self.parse_expression() else {
                     self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
-
                     return None;
                 };
                 if !params.is_empty() && params.len() <= 3 {
@@ -802,6 +867,17 @@ impl Parser {
         self.report_error(id_token.span, ParserErrorType::UnknownIdentifier(id_token.token.to_string()));
         None
     }
+}
+
+fn is_assign_token(token_opt: Option<Token>) -> bool {
+    token_opt == Some(Token::Eq)
+        || token_opt == Some(Token::AddAssign)
+        || token_opt == Some(Token::SubAssign)
+        || token_opt == Some(Token::MulAssign)
+        || token_opt == Some(Token::DivAssign)
+        || token_opt == Some(Token::ModAssign)
+        || token_opt == Some(Token::AndAssign)
+        || token_opt == Some(Token::OrAssign)
 }
 
 lazy_static::lazy_static! {

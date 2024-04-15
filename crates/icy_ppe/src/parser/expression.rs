@@ -238,10 +238,10 @@ impl Parser {
                             );
                         }
 
-                        if self.version < def.version {
+                        if self.lang_version < def.version {
                             self.report_error(
                                 identifier_token.span,
-                                ParserErrorType::FunctionVersionNotSupported(def.opcode, def.version, self.version),
+                                ParserErrorType::FunctionVersionNotSupported(def.opcode, def.version, self.lang_version),
                             );
                             return None;
                         }

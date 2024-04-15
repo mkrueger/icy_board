@@ -11,6 +11,7 @@ use icy_board_engine::{
 use icy_ppe::Res;
 mod delete_message;
 mod find_files;
+mod login;
 mod message_reader;
 mod recover_message;
 mod set_transfer_protocol;

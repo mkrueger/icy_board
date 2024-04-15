@@ -154,9 +154,19 @@ pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) -> Res<()> {
 
 fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, board: &Arc<Mutex<IcyBoard>>, bbs: &mut Arc<Mutex<BBS>>) -> Res<()> {
     match msg {
-        CallWaitMessage::User(_busy) | CallWaitMessage::Sysop(_busy) => {
+        CallWaitMessage::User(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
-            let mut tui = Tui::local_mode(board, bbs);
+            let mut tui = Tui::local_mode(board, bbs, false);
+            if let Err(err) = tui.run(&board) {
+                restore_terminal()?;
+                log::error!("while running board in local mode: {}", err.to_string());
+                println!("Error: {}", err);
+                process::exit(1);
+            }
+        }
+        CallWaitMessage::Sysop(_busy) => {
+            stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
+            let mut tui = Tui::local_mode(board, bbs, true);
             if let Err(err) = tui.run(&board) {
                 restore_terminal()?;
                 log::error!("while running board in local mode: {}", err.to_string());

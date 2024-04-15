@@ -1,8 +1,8 @@
 use icy_ppe::{
     ast::{
         walk_binary_expression, walk_block_stmt, walk_for_stmt, walk_function_call_expression, walk_function_implementation, walk_if_stmt, walk_if_then_stmt,
-        walk_let_stmt, walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation, walk_select_stmt, walk_while_do_stmt,
-        walk_while_stmt, Ast, AstVisitor, Constant, ParameterSpecifier,
+        walk_let_stmt, walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation, walk_repeat_until_stmt, walk_select_stmt,
+        walk_while_do_stmt, walk_while_stmt, Ast, AstVisitor, Constant, ParameterSpecifier,
     },
     parser::lexer::{Spanned, Token},
 };
@@ -204,6 +204,12 @@ impl AstVisitor<()> for SemanticTokenVisitor {
         self.highlight_token(while_do.get_do_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(while_do.get_endwhile_token(), SemanticTokenType::KEYWORD);
         walk_while_do_stmt(self, while_do);
+    }
+
+    fn visit_repeat_until_statement(&mut self, repeat_until_stmt: &icy_ppe::ast::RepeatUntilStatement) {
+        self.highlight_token(repeat_until_stmt.get_repeat_token(), SemanticTokenType::KEYWORD);
+        self.highlight_token(repeat_until_stmt.get_until_token(), SemanticTokenType::KEYWORD);
+        walk_repeat_until_stmt(self, repeat_until_stmt);
     }
 
     fn visit_for_statement(&mut self, for_stmt: &icy_ppe::ast::ForStatement) {
