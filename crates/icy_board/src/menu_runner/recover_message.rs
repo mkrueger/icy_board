@@ -24,6 +24,7 @@ impl PcbBoardCommand {
                         40,
                         MASK_COMMAND,
                         &action.help,
+                        None,
                         display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
                     )?
                 };

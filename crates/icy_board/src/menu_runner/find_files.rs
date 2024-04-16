@@ -34,6 +34,7 @@ impl PcbBoardCommand {
                 40,
                 &MASK_ASCII,
                 &action.help,
+                None,
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
             )?
         };
@@ -55,6 +56,7 @@ impl PcbBoardCommand {
                 40,
                 MASK_COMMAND,
                 &action.help,
+                None,
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
             )?
         };
@@ -160,6 +162,7 @@ impl PcbBoardCommand {
                 40,
                 &MASK_ASCII,
                 &action.help,
+                None,
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
             )?
         };
@@ -181,6 +184,7 @@ impl PcbBoardCommand {
                 40,
                 MASK_COMMAND,
                 &action.help,
+                None,
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
             )?
         };

@@ -9,6 +9,7 @@ use icy_board_engine::{
     vm::TerminalTarget,
 };
 use icy_ppe::Res;
+mod comment_to_sysop;
 mod delete_message;
 mod find_files;
 mod login;
@@ -38,7 +39,9 @@ impl PcbBoardCommand {
             self.display_menu = false;
         }
 
-        let command = self.state.input_field(IceText::CommandPrompt, 40, MASK_COMMAND, "", display_flags::UPCASE)?;
+        let command = self
+            .state
+            .input_field(IceText::CommandPrompt, 40, MASK_COMMAND, "", None, display_flags::UPCASE)?;
 
         let mut cmds = command.split(' ');
 
@@ -97,6 +100,10 @@ impl PcbBoardCommand {
                 // B
                 self.show_bulletins(action)?;
             }
+            CommandType::CommentToSysop => {
+                // C
+                self.comment_to_sysop(action)?;
+            }
             CommandType::FileDirectory => {
                 // F
                 self.show_file_directories(action)?;
@@ -108,7 +115,7 @@ impl PcbBoardCommand {
 
                 // force logoff - no flagged files scan
                 if let Some(token) = self.state.session.tokens.pop_front() {
-                    if token.to_ascii_uppercase() == self.state.yes_char.to_string().to_ascii_uppercase() {
+                    if token.to_ascii_uppercase() == self.state.session.yes_char.to_string().to_ascii_uppercase() {
                         self.state.goodbye()?;
                     }
                 }
@@ -240,6 +247,7 @@ impl PcbBoardCommand {
                 40,
                 MASK_COMMAND,
                 &action.help,
+                None,
                 display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )?
         };
@@ -280,6 +288,7 @@ impl PcbBoardCommand {
                 40,
                 MASK_COMMAND,
                 &action.help,
+                None,
                 display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )?
         };
@@ -414,6 +423,7 @@ impl PcbBoardCommand {
                 2,
                 MASK_NUMBER,
                 &action.help,
+                Some(self.state.session.page_len.to_string()),
                 display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )?
         };
@@ -440,6 +450,7 @@ impl PcbBoardCommand {
                 8,
                 MASK_COMMAND,
                 "",
+                None,
                 display_flags::UPCASE | display_flags::NEWLINE | display_flags::HIGHASCII,
             )?
         };

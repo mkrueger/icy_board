@@ -65,7 +65,7 @@ lazy_static::lazy_static! {
     + ('0'..='9').collect::<String>().as_str()
     + "!#$%&'()-.:[\\]^_`~";
     pub static ref MASK_ASCII: String = (' '..='~').collect::<String>();
-    pub static ref MASK_WEB: String = ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + ('0'..='9').collect::<String>().as_str() + "!#$%&'*+-/=?^_`{|}~";
+    pub static ref MASK_WEB: String = ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + ('0'..='9').collect::<String>().as_str() + "@!#$%&'*+-/=?^_`{|}~";
 
     pub static ref MASK_PHONE: String = ('0'..='9').collect::<String>() + "/()-+ ";
 
@@ -248,13 +248,30 @@ impl IcyBoardState {
         Ok(true)
     }
 
-    pub fn input_field(&mut self, message_number: IceText, len: i32, valid_mask: &str, help: &str, display_flags: i32) -> Res<String> {
+    pub fn input_field(
+        &mut self,
+        message_number: IceText,
+        len: i32,
+        valid_mask: &str,
+        help: &str,
+        default_string: Option<String>,
+        display_flags: i32,
+    ) -> Res<String> {
         let txt_entry = self.board.lock().unwrap().display_text.get_display_text(message_number)?;
 
-        self.input_string(txt_entry.style.to_color(), txt_entry.text, len, valid_mask, help, display_flags)
+        self.input_string(txt_entry.style.to_color(), txt_entry.text, len, valid_mask, help, default_string, display_flags)
     }
 
-    pub fn input_string(&mut self, color: IcbColor, prompt: String, len: i32, valid_mask: &str, help: &str, display_flags: i32) -> Res<String> {
+    pub fn input_string(
+        &mut self,
+        color: IcbColor,
+        prompt: String,
+        len: i32,
+        valid_mask: &str,
+        help: &str,
+        default_string: Option<String>,
+        display_flags: i32,
+    ) -> Res<String> {
         self.session.num_lines_printed = 0;
 
         let mut prompt = prompt;
@@ -282,7 +299,16 @@ impl IcyBoardState {
         }
         if display_flags & display_flags::FIELDLEN != 0 {
             self.print(TerminalTarget::Both, " (")?;
-            self.forward(len)?;
+            if let Some(default) = &default_string {
+                self.reset_color()?;
+                self.print(TerminalTarget::Both, default)?;
+
+                if self.use_graphics() {
+                    self.set_color(TerminalTarget::Both, color.clone())?;
+                }
+            } else {
+                self.forward(len)?;
+            }
             self.print(TerminalTarget::Both, ")")?;
             self.backward(len + 1)?;
         }
@@ -298,7 +324,6 @@ impl IcyBoardState {
             if display_flags & display_flags::UPCASE != 0 {
                 key_char.ch = key_char.ch.to_ascii_uppercase();
             }
-
             if key_char.ch == '\n' || key_char.ch == '\r' {
                 if !help.is_empty() {
                     if let Some(cmd) = self.try_find_command(&output) {
@@ -309,7 +334,7 @@ impl IcyBoardState {
                             self.session.disable_auto_more = false;
                             self.display_file(&help_loc)?;
                             self.session.disable_auto_more = am;
-                            return self.input_string(color, prompt, len, valid_mask, help, display_flags);
+                            return self.input_string(color, prompt, len, valid_mask, help, default_string, display_flags);
                         }
                     }
                 }
@@ -327,7 +352,14 @@ impl IcyBoardState {
                 continue;
             }
 
-            if (output.len() as i32) < len && valid_mask.contains(key_char.ch) {
+            if (output.len() as i32) < len
+                && if (display_flags & display_flags::YESNO) != 0 {
+                    &self.session.yes_no_mask
+                } else {
+                    valid_mask
+                }
+                .contains(key_char.ch)
+            {
                 output.push(key_char.ch);
                 if key_char.source != KeySource::StuffedHidden {
                     if display_flags & display_flags::ECHODOTS != 0 {
@@ -360,6 +392,7 @@ impl IcyBoardState {
                 13,
                 MASK_PASSWORD,
                 "",
+                None,
                 if (flags & pwd_flags::SHOW_WRONG_PWD_MSG) != 0 {
                     display_flags::ECHODOTS
                 } else {

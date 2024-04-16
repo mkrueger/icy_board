@@ -49,6 +49,7 @@ impl PcbBoardCommand {
                     12,
                     MASK_BULLETINS,
                     &action.help,
+                    None,
                     display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
                 )?
             };
@@ -116,15 +117,15 @@ impl PcbBoardCommand {
                     self.state.print(icy_board_engine::vm::TerminalTarget::Both, line)?;
                     self.state.new_line()?;
                 }
-
                 let txt = self.state.input_field(
                     IceText::CompleteQuestion,
                     11,
-                    "yYnN",
                     "",
+                    "",
+                    None,
                     display_flags::YESNO | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::UPCASE,
                 )?;
-                if txt.starts_with(self.state.yes_char) {
+                if txt.starts_with(self.state.session.yes_char) {
                     for question in &lines[5..] {
                         self.state.set_color(TerminalTarget::Both, IcbColor::Dos(14))?;
                         self.state.print(TerminalTarget::Both, question)?;
@@ -136,6 +137,7 @@ impl PcbBoardCommand {
                             60,
                             &MASK_ALNUM,
                             "",
+                            None,
                             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::GUIDE | display_flags::LFAFTER,
                         )?;
                         output.push(format!("Q: {}", question));

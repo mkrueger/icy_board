@@ -210,6 +210,7 @@ impl PcbBoardCommand {
                         40,
                         MASK_COMMAND,
                         &action.help,
+                        None,
                         display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
                     )?;
                     if text.is_empty() {
@@ -282,6 +283,7 @@ impl PcbBoardCommand {
                 40,
                 MASK_COMMAND,
                 "hlpendr", // TODO: Hard coded help flag!
+                None,
                 display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
             )?;
             if text.is_empty() {

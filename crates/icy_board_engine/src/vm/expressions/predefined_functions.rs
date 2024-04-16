@@ -471,10 +471,10 @@ pub fn ver(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(1540))
 }
 pub fn nochar(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_string(vm.icy_board_state.no_char.to_string()))
+    Ok(VariableValue::new_string(vm.icy_board_state.session.no_char.to_string()))
 }
 pub fn yeschar(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_string(vm.icy_board_state.yes_char.to_string()))
+    Ok(VariableValue::new_string(vm.icy_board_state.session.yes_char.to_string()))
 }
 
 pub fn inkey(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {

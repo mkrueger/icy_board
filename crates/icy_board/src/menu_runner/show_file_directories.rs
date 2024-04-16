@@ -45,6 +45,7 @@ impl PcbBoardCommand {
                 40,
                 MASK_COMMAND,
                 &action.help,
+                None,
                 display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )?
         };
@@ -155,10 +156,11 @@ impl PcbBoardCommand {
             40,
             MASK_COMMAND,
             &action.help,
+            None,
             display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
         )?;
         self.state.session.more_requested = false;
         self.state.session.num_lines_printed = 0;
-        Ok(input.to_ascii_uppercase() != self.state.no_char.to_string())
+        Ok(input.to_ascii_uppercase() != self.state.session.no_char.to_string())
     }
 }

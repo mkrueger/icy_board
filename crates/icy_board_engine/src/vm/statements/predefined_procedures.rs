@@ -238,7 +238,7 @@ pub fn inputstr(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let len = vm.eval_expr(&args[3])?.as_int();
     let valid = vm.eval_expr(&args[4])?.as_string();
     let flags = vm.eval_expr(&args[5])?.as_int();
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, &valid, "", flags)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, &valid, "", None, flags)?;
     vm.set_variable(&args[1], VariableValue::new_string(output))?;
     Ok(())
 }
@@ -252,7 +252,7 @@ pub fn inputyn(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let color = vm.eval_expr(&args[2])?.as_int() as u8;
     let len = 1;
     let valid = "YyNn";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", 0)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0)?;
 
     vm.set_variable(&args[1], VariableValue::new_string(output.to_ascii_uppercase()))?;
     Ok(())
@@ -267,7 +267,7 @@ pub fn inputmoney(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let color = vm.eval_expr(&args[2])?.as_int() as u8;
     let len = 13;
     let valid = "01234567890+-$.";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", 0)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0)?;
     // TODO: Money conversion.
     vm.set_variable(&args[1], VariableValue::new_string(output))?;
     Ok(())
@@ -282,7 +282,7 @@ pub fn inputint(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let color = vm.eval_expr(&args[2])?.as_int() as u8;
     let len = 11;
     let valid = "01234567890+-";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", 0)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0)?;
     vm.set_variable(&args[1], VariableValue::new_int(output.parse::<i32>()?))?;
     Ok(())
 }
@@ -295,7 +295,7 @@ pub fn inputcc(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let color = vm.eval_expr(&args[2])?.as_int() as u8;
     let len = 16;
     let valid = "01234567890";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", 0)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0)?;
     vm.set_variable(&args[1], VariableValue::new_string(output))?;
     Ok(())
 }
@@ -308,7 +308,7 @@ pub fn inputdate(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let color = vm.eval_expr(&args[2])?.as_int() as u8;
     let len = 8;
     let valid = "01234567890-/";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", 0)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0)?;
     // TODO: Date conversion
     vm.set_variable(&args[1], VariableValue::new_string(output))?;
     Ok(())
@@ -323,7 +323,7 @@ pub fn inputtime(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let color = vm.eval_expr(&args[2])?.as_int() as u8;
     let len = 8;
     let valid = "01234567890:";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", 0)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0)?;
     // TODO: Time conversion
     vm.set_variable(&args[1], VariableValue::new_string(output))?;
     Ok(())

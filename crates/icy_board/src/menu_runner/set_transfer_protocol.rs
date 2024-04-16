@@ -70,6 +70,7 @@ impl PcbBoardCommand {
             1,
             &valid_protocols,
             "",
+            Some(cur_protocol.to_string()),
             display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER | display_flags::UPCASE | display_flags::FIELDLEN,
         )?;
         Ok(protocol)

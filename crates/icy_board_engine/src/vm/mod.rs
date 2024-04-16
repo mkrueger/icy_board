@@ -168,9 +168,6 @@ impl<'a> VirtualMachine<'a> {
             Password::PlainText(pwd) => {
                 self.variable_table.set_value(U_PWD, VariableValue::new_string(pwd.clone()));
             }
-            _ => {
-                self.variable_table.set_value(U_PWD, VariableValue::new_string("SECRET".to_string()));
-            }
         }
 
         self.variable_table.set_value(U_SCROLL, VariableValue::new_bool(cur_user.flags.scroll_msg_body));

@@ -9,7 +9,7 @@
     "tower-lsp"
   ],
   "repository": {
-    "url": "https://github.com/IWANABETHATGUY/tower-lsp-boilerplate"
+    "url": "https://github.com/mkrueger/icy_board"
   },
   "engines": {
     "vscode": "^1.66.0"

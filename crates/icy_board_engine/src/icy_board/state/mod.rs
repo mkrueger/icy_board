@@ -167,6 +167,10 @@ pub struct Session {
     pub date_format: String,
 
     pub cursor_pos: Position,
+
+    pub yes_char: char,
+    pub no_char: char,
+    pub yes_no_mask: String,
 }
 
 impl Session {
@@ -200,6 +204,10 @@ impl Session {
             user_name: String::new(),
             date_format: DEFAULT_PCBOARD_DATE_FROMAT.to_string(),
             cursor_pos: Position::default(),
+
+            yes_char: 'Y',
+            no_char: 'N',
+            yes_no_mask: "YyNn".to_string(),
         }
     }
 
@@ -286,9 +294,6 @@ pub struct IcyBoardState {
 
     pub transfer_statistics: TransferStatistics,
 
-    pub yes_char: char,
-    pub no_char: char,
-
     pub current_user: Option<User>,
 
     pub session: Session,
@@ -329,8 +334,6 @@ impl IcyBoardState {
             node_state,
             nodes: Vec::new(),
             current_user: None,
-            yes_char: 'Y',
-            no_char: 'N',
             debug_level: 0,
             env_vars: HashMap::new(),
             session,
@@ -870,7 +873,7 @@ impl IcyBoardState {
                     result = user.stats.messages_read.to_string();
                 }
             }
-            "NOCHAR" => result = self.no_char.to_string(),
+            "NOCHAR" => result = self.session.no_char.to_string(),
             "NODE" => result = self.node_state.lock().unwrap().node_number.to_string(),
             "NUMBLT" => {
                 if let Ok(bullettins) = self.load_bullettins() {
@@ -979,7 +982,7 @@ impl IcyBoardState {
                 self.session.disp_options.disable_color = false;
                 return None;
             }
-            "YESCHAR" => result = self.yes_char.to_string(),
+            "YESCHAR" => result = self.session.yes_char.to_string(),
             _ => {
                 if id.to_ascii_uppercase().starts_with("ENV=") {
                     let key = &id[4..];
@@ -1128,8 +1131,9 @@ impl IcyBoardState {
         let result = self.input_field(
             IceText::MorePrompt,
             12,
-            "YyNn",
+            "",
             "HLPMORE",
+            None,
             display_flags::YESNO | display_flags::UPCASE | display_flags::STACKED | display_flags::ERASELINE,
         )?;
         Ok(result != "N")
@@ -1138,7 +1142,7 @@ impl IcyBoardState {
     pub fn press_enter(&mut self) -> Res<()> {
         self.session.disable_auto_more = true;
         self.session.more_requested = false;
-        self.input_field(IceText::PressEnter, 0, "", "", display_flags::ERASELINE)?;
+        self.input_field(IceText::PressEnter, 0, "", "", None, display_flags::ERASELINE)?;
         Ok(())
     }
 

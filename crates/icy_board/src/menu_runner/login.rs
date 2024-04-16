@@ -50,6 +50,7 @@ impl PcbBoardCommand {
                 39,
                 &MASK_ALNUM,
                 "",
+                None,
                 display_flags::UPCASE | display_flags::NEWLINE | display_flags::STACKED,
             )?;
 
@@ -58,6 +59,7 @@ impl PcbBoardCommand {
                 39,
                 &MASK_ALNUM,
                 "",
+                None,
                 display_flags::UPCASE | display_flags::NEWLINE | display_flags::STACKED,
             )?;
             self.state.session.user_name = format!("{} {}", first_name, last_name).trim().to_string();
@@ -93,13 +95,19 @@ impl PcbBoardCommand {
                 1,
                 &"RC",
                 "",
+                Some("C".to_string()),
                 display_flags::UPCASE | display_flags::NEWLINE | display_flags::FIELDLEN,
             )?;
 
             if re_enter.is_empty() || re_enter == "C" {
-                let register = self
-                    .state
-                    .input_field(IceText::Register, 1, &"YN", "", display_flags::NEWLINE | display_flags::FIELDLEN)?;
+                let register = self.state.input_field(
+                    IceText::Register,
+                    1,
+                    "",
+                    "",
+                    None,
+                    display_flags::YESNO | display_flags::NEWLINE | display_flags::FIELDLEN,
+                )?;
 
                 if register == "Y" || register.is_empty() {
                     let new_file = self.state.board.lock().unwrap().config.paths.newuser.clone();
@@ -209,6 +217,7 @@ impl PcbBoardCommand {
             30,
             &MASK_ALNUM,
             "",
+            None,
             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
         )?;
 
@@ -217,6 +226,7 @@ impl PcbBoardCommand {
             1,
             "MmFf",
             "",
+            None,
             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
         )?;
 
@@ -225,6 +235,7 @@ impl PcbBoardCommand {
             8,
             &MASK_ALNUM,
             "",
+            None,
             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
         )?;
         new_user.birth_date = IcbDate::parse(&date).to_utc_date_time();
@@ -234,6 +245,7 @@ impl PcbBoardCommand {
             30,
             &MASK_WEB,
             "",
+            None,
             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
         )?;
 
@@ -242,6 +254,7 @@ impl PcbBoardCommand {
             30,
             &MASK_WEB,
             "",
+            None,
             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
         )?;
 
@@ -332,6 +345,7 @@ impl PcbBoardCommand {
                 len,
                 mask,
                 "",
+                None,
                 flags | display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
             )?;
 
@@ -395,6 +409,7 @@ impl PcbBoardCommand {
             1,
             &MASK_NUMBER,
             "",
+            None,
             display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER | display_flags::UPCASE | display_flags::FIELDLEN,
         )?;
         if let Ok(number) = date_format.parse::<usize>() {

@@ -39,6 +39,7 @@ impl PcbBoardCommand {
                     12,
                     MASK_BULLETINS,
                     &action.help,
+                    None,
                     display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
                 )?
             };
