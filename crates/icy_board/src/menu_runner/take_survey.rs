@@ -4,16 +4,19 @@ use std::{
 };
 
 use chrono::Local;
-use icy_board_engine::icy_board::{
-    bulletins::MASK_BULLETINS,
-    commands::Command,
-    icb_config::IcbColor,
-    icb_text::IceText,
-    read_with_encoding_detection,
-    state::{
-        functions::{display_flags, MASK_ALNUM},
-        UserActivity,
+use icy_board_engine::{
+    icy_board::{
+        bulletins::MASK_BULLETINS,
+        commands::Command,
+        icb_config::IcbColor,
+        icb_text::IceText,
+        read_with_encoding_detection,
+        state::{
+            functions::{display_flags, MASK_ALNUM},
+            UserActivity,
+        },
     },
+    vm::TerminalTarget,
 };
 use icy_ppe::Res;
 
@@ -123,8 +126,8 @@ impl PcbBoardCommand {
                 )?;
                 if txt.starts_with(self.state.yes_char) {
                     for question in &lines[5..] {
-                        self.state.set_color(IcbColor::Dos(14))?;
-                        self.state.print(icy_board_engine::vm::TerminalTarget::Both, question)?;
+                        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(14))?;
+                        self.state.print(TerminalTarget::Both, question)?;
                         self.state.new_line()?;
                         self.state.reset_color()?;
                         let answer = self.state.input_string(

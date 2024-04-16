@@ -14,9 +14,12 @@ use crossterm::{
     ExecutableCommand,
 };
 
-use icy_board_engine::icy_board::{
-    state::{IcyBoardState, NodeState, Session},
-    IcyBoard, IcyBoardError,
+use icy_board_engine::{
+    icy_board::{
+        state::{IcyBoardState, NodeState, Session},
+        IcyBoard, IcyBoardError,
+    },
+    vm::TerminalTarget,
 };
 use icy_board_tui::{
     get_text_args,
@@ -85,10 +88,8 @@ impl Tui {
                 if let Err(err) = cmd.do_command() {
                     cmd.state.session.disp_options.reset_printout();
                     log::error!("Error: {}", err);
-                    if cmd.state.set_color(4.into()).is_ok() {
-                        let _ = cmd
-                            .state
-                            .print(icy_board_engine::vm::TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err));
+                    if cmd.state.set_color(TerminalTarget::Both, 4.into()).is_ok() {
+                        let _ = cmd.state.print(TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err));
                         let _ = cmd.state.reset_color();
                     }
                 }

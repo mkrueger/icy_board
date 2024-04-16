@@ -382,7 +382,7 @@ impl PcbBoardCommand {
             return Ok(cur_format);
         };
 
-        self.state.set_color(IcbColor::Dos(11))?;
+        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11))?;
         for (i, (disp_fmt, fmt)) in date_formats.iter().enumerate() {
             if fmt == &cur_format {
                 self.state.println(TerminalTarget::Both, &format!("=> ({}) {}", i + 1, disp_fmt))?;

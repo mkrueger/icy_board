@@ -32,7 +32,7 @@ impl PcbBoardCommand {
             } else {
                 "Error".to_string()
             };
-            self.state.set_color(IcbColor::Dos(11))?;
+            self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11))?;
             self.state.print(TerminalTarget::Both, &txt)?;
             self.state.new_line()?;
             self.state.new_line()?;
@@ -60,7 +60,7 @@ impl PcbBoardCommand {
                 }
             }
         }
-        self.state.set_color(IcbColor::Dos(11))?;
+        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11))?;
         for line in protocols {
             self.state.print(TerminalTarget::Both, &line)?;
             self.state.new_line()?;

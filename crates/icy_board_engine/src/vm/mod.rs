@@ -21,6 +21,7 @@ pub mod expressions;
 pub mod statements;
 use crate::icy_board::pcboard_data::Node;
 use crate::icy_board::state::IcyBoardState;
+use crate::icy_board::user_base::Password;
 use crate::icy_board::user_base::User;
 
 use self::expressions::FUNCTION_TABLE;
@@ -68,7 +69,7 @@ pub enum VMError {
     WriteBackStackEmpty,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum TerminalTarget {
     Both,
     User,
@@ -163,8 +164,14 @@ impl<'a> VirtualMachine<'a> {
         self.variable_table.set_value(U_CMNT1, VariableValue::new_string(cur_user.user_comment.clone()));
         self.variable_table
             .set_value(U_CMNT2, VariableValue::new_string(cur_user.sysop_comment.clone()));
-        self.variable_table
-            .set_value(U_PWD, VariableValue::new_string(/*cur_user.password.clone()*/ "".to_string()));
+        match &cur_user.password.password {
+            Password::PlainText(pwd) => {
+                self.variable_table.set_value(U_PWD, VariableValue::new_string(pwd.clone()));
+            }
+            _ => {
+                self.variable_table.set_value(U_PWD, VariableValue::new_string("SECRET".to_string()));
+            }
+        }
 
         self.variable_table.set_value(U_SCROLL, VariableValue::new_bool(cur_user.flags.scroll_msg_body));
         self.variable_table.set_value(U_LONGHDR, VariableValue::new_bool(!cur_user.flags.short_header));
@@ -271,7 +278,8 @@ impl<'a> VirtualMachine<'a> {
         cur_user.protocol = self.variable_table.get_value(U_TRANS).as_string().chars().next().unwrap_or('Z');
         cur_user.user_comment = self.variable_table.get_value(U_CMNT1).as_string();
         cur_user.sysop_comment = self.variable_table.get_value(U_CMNT2).as_string();
-        //cur_user.user.password = self.variable_table.get_value(U_PWD).as_string();
+
+        cur_user.password.password = Password::PlainText(self.variable_table.get_value(U_PWD).as_string());
 
         cur_user.flags.scroll_msg_body = self.variable_table.get_value(U_SCROLL).as_bool();
         cur_user.flags.short_header = self.variable_table.get_value(U_LONGHDR).as_bool();

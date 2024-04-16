@@ -133,7 +133,7 @@ impl IcyBoardState {
     pub fn display_text(&mut self, message_number: IceText, display_flags: i32) -> Res<()> {
         let txt_entry = self.board.lock().unwrap().display_text.get_display_text(message_number)?;
         let color = if txt_entry.style == IcbTextStyle::Plain {
-            self.caret.get_attribute().as_u8(IceMode::Blink).into()
+            self.user_screen.caret.get_attribute().as_u8(IceMode::Blink).into()
         } else {
             txt_entry.style.to_color()
         };
@@ -149,7 +149,7 @@ impl IcyBoardState {
             log::info!("{}", txt);
         }
 
-        let old_color = self.caret.get_attribute().as_u8(icy_engine::IceMode::Blink);
+        let old_color = self.user_screen.caret.get_attribute().as_u8(icy_engine::IceMode::Blink);
         if display_flags & display_flags::LFBEFORE != 0 {
             self.new_line()?;
         }
@@ -157,7 +157,7 @@ impl IcyBoardState {
             self.bell()?;
         }
         if self.use_graphics() {
-            self.set_color(color)?;
+            self.set_color(TerminalTarget::Both, color)?;
         }
 
         self.display_line(txt)?;
@@ -170,7 +170,7 @@ impl IcyBoardState {
             self.new_line()?;
         }
         if self.use_graphics() {
-            self.set_color(old_color.into())?;
+            self.set_color(TerminalTarget::Both, old_color.into())?;
         }
         Ok(())
     }
@@ -218,7 +218,7 @@ impl IcyBoardState {
 
         let Ok(content) = fs::read(resolved_name) else {
             self.bell()?;
-            self.set_color(pcb_colors::RED)?;
+            self.set_color(TerminalTarget::Both, pcb_colors::RED)?;
             self.print(TerminalTarget::Both, &format!("\r\n({}) is missing!\r\n\r\n", file_name.as_ref().display()))?;
             return Ok(true);
         };
@@ -266,7 +266,7 @@ impl IcyBoardState {
         };
         self.check_time_left();
 
-        let old_color = self.caret.get_attribute().as_u8(icy_engine::IceMode::Blink);
+        let old_color = self.user_screen.caret.get_attribute().as_u8(icy_engine::IceMode::Blink);
         if display_flags & display_flags::LFBEFORE != 0 {
             self.new_line()?;
         }
@@ -274,7 +274,7 @@ impl IcyBoardState {
             self.bell()?;
         }
         if self.use_graphics() {
-            self.set_color(color.clone())?;
+            self.set_color(TerminalTarget::Both, color.clone())?;
         }
         self.display_line(&prompt)?;
         if display_question {
@@ -287,7 +287,7 @@ impl IcyBoardState {
             self.backward(len + 1)?;
         }
         if self.use_graphics() {
-            self.set_color(old_color.into())?;
+            self.set_color(TerminalTarget::Both, old_color.into())?;
         }
 
         let mut output = String::new();

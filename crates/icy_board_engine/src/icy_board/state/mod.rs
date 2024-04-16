@@ -10,9 +10,9 @@ use std::{
 
 use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use codepages::tables::UNICODE_TO_CP437;
-use icy_engine::ansi::constants::COLOR_OFFSETS;
 use icy_engine::TextAttribute;
 use icy_engine::{ansi, Buffer, BufferParser, Caret};
+use icy_engine::{ansi::constants::COLOR_OFFSETS, Position};
 use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
 use icy_ppe::{executable::Executable, Res};
 
@@ -165,6 +165,8 @@ pub struct Session {
     pub user_name: String,
 
     pub date_format: String,
+
+    pub cursor_pos: Position,
 }
 
 impl Session {
@@ -197,6 +199,7 @@ impl Session {
             cancel_batch: false,
             user_name: String::new(),
             date_format: DEFAULT_PCBOARD_DATE_FROMAT.to_string(),
+            cursor_pos: Position::default(),
         }
     }
 
@@ -294,19 +297,30 @@ pub struct IcyBoardState {
     pub debug_level: i32,
     pub env_vars: HashMap<String, String>,
 
-    parser: ansi::Parser,
-    caret: Caret,
-    buffer: Buffer,
+    user_screen: VirtualScreen,
+    sysop_screen: VirtualScreen,
 
     char_buffer: VecDeque<KeyChar>,
 }
 
-impl IcyBoardState {
-    pub fn new(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<NodeState>>, connection: Box<dyn Connection>) -> Self {
+pub struct VirtualScreen {
+    parser: ansi::Parser,
+    caret: Caret,
+    buffer: Buffer,
+}
+
+impl VirtualScreen {
+    pub fn new() -> Self {
         let buffer = Buffer::new((80, 25));
         let caret = Caret::default();
         let mut parser = ansi::Parser::default();
         parser.bs_is_ctrl_char = true;
+        Self { parser, caret, buffer }
+    }
+}
+
+impl IcyBoardState {
+    pub fn new(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<NodeState>>, connection: Box<dyn Connection>) -> Self {
         let mut session = Session::new();
         session.date_format = board.lock().unwrap().config.board.date_format.clone();
         Self {
@@ -321,9 +335,8 @@ impl IcyBoardState {
             env_vars: HashMap::new(),
             session,
             transfer_statistics: TransferStatistics::default(),
-            parser,
-            buffer,
-            caret,
+            user_screen: VirtualScreen::new(),
+            sysop_screen: VirtualScreen::new(),
             char_buffer: VecDeque::new(),
         }
     }
@@ -355,7 +368,7 @@ impl IcyBoardState {
 
     pub fn reset_color(&mut self) -> Res<()> {
         let color = self.board.lock().unwrap().config.color_configuration.default.clone();
-        self.set_color(color)
+        self.set_color(TerminalTarget::Both, color)
     }
 
     pub fn clear_screen(&mut self) -> Res<()> {
@@ -430,7 +443,7 @@ impl IcyBoardState {
         if self.session.disp_options.non_stop {
             return Ok(true);
         }
-        let cur_y = self.caret.get_position().y;
+        let cur_y = self.user_screen.caret.get_position().y;
         if cur_y > self.session.last_new_line_y {
             self.session.num_lines_printed += (cur_y - self.session.last_new_line_y) as usize;
         } else {
@@ -629,43 +642,63 @@ impl IcyBoardState {
         self.write_raw(target, line.as_slice())
     }
 
-    fn no_terminal(&self, terminal_target: TerminalTarget) -> bool {
-        match terminal_target {
-            TerminalTarget::Sysop => !self.is_sysop(),
-            _ => false,
-        }
-    }
+    fn write_chars(&mut self, target: TerminalTarget, data: &[char]) -> Res<()> {
+        let mut user_bytes = Vec::new();
+        let mut sysop_bytes = Vec::new();
 
-    fn write_chars(&mut self, data: &[char]) -> Res<()> {
-        let mut b = Vec::new();
         for c in data {
-            self.parser.print_char(&mut self.buffer, 0, &mut self.caret, *c)?;
-            if *c == '\n' {
-                self.next_line()?;
+            if target != TerminalTarget::Sysop || self.session.is_sysop {
+                self.user_screen
+                    .parser
+                    .print_char(&mut self.user_screen.buffer, 0, &mut self.user_screen.caret, *c)?;
+                if *c == '\n' {
+                    self.next_line()?;
+                }
+                if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
+                    user_bytes.push(cp437);
+                } else {
+                    user_bytes.push(b'.');
+                }
             }
-            if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
-                b.push(cp437);
-            } else {
-                b.push(b'.');
-            }
-        }
-        self.connection.write_all(&b)?;
-        if let Ok(node_state) = self.node_state.lock() {
-            if let Ok(connections) = &mut node_state.connections.lock() {
-                for conn in connections.iter_mut() {
-                    let _ = conn.write_all(&b);
+            if target != TerminalTarget::User {
+                self.sysop_screen
+                    .parser
+                    .print_char(&mut self.sysop_screen.buffer, 0, &mut self.sysop_screen.caret, *c)?;
+                if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
+                    sysop_bytes.push(cp437);
+                } else {
+                    sysop_bytes.push(b'.');
                 }
             }
         }
 
+        if target != TerminalTarget::Sysop || self.session.is_sysop {
+            self.connection.write_all(&user_bytes)?;
+        }
+
+        if target != TerminalTarget::User {
+            // Send user only not to other connections
+            if let Ok(node_state) = self.node_state.lock() {
+                if let Ok(connections) = &mut node_state.connections.lock() {
+                    for conn in connections.iter_mut() {
+                        let _ = conn.write_all(&sysop_bytes);
+                    }
+                }
+            }
+        }
+        match target {
+            TerminalTarget::Both | TerminalTarget::User => {
+                self.session.cursor_pos = self.user_screen.caret.get_position();
+            }
+            TerminalTarget::Sysop => {
+                self.session.cursor_pos = self.sysop_screen.caret.get_position();
+            }
+        }
         Ok(())
     }
 
     /// # Errors
     pub fn write_raw(&mut self, target: TerminalTarget, data: &[char]) -> Res<()> {
-        if self.no_terminal(target) {
-            return Ok(());
-        }
         if self.session.disp_options.display_text {
             let mut state = PcbState::Default;
 
@@ -678,7 +711,7 @@ impl IcyBoardState {
                         if *c == '@' {
                             state = PcbState::GotAt;
                         } else {
-                            self.write_chars(&[*c])?;
+                            self.write_chars(target, &[*c])?;
                         }
                     }
                     PcbState::GotAt => {
@@ -691,8 +724,8 @@ impl IcyBoardState {
                     PcbState::ReadAtSequence(s) => {
                         if *c == '@' {
                             state = PcbState::Default;
-                            if let Some(s) = self.translate_variable(&s) {
-                                self.write_chars(s.chars().collect::<Vec<char>>().as_slice())?;
+                            if let Some(s) = self.translate_variable(target, &s) {
+                                self.write_chars(target, s.chars().collect::<Vec<char>>().as_slice())?;
                             }
                         } else {
                             state = PcbState::ReadAtSequence(s + &c.to_string());
@@ -702,17 +735,17 @@ impl IcyBoardState {
                         if c.is_ascii_hexdigit() {
                             state = PcbState::ReadColor2(*c);
                         } else {
-                            self.write_chars(&['@', *c])?;
+                            self.write_chars(target, &['@', *c])?;
                             state = PcbState::Default;
                         }
                     }
                     PcbState::ReadColor2(ch1) => {
                         state = PcbState::Default;
                         if !c.is_ascii_hexdigit() {
-                            self.write_chars(&['@', ch1, *c])?;
+                            self.write_chars(target, &['@', ch1, *c])?;
                         } else {
                             let color = (c.to_digit(16).unwrap() | (ch1.to_digit(16).unwrap() << 4)) as u8;
-                            self.set_color(color.into())?;
+                            self.set_color(target, color.into())?;
                         }
                     }
                 }
@@ -721,7 +754,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    fn translate_variable(&mut self, input: &str) -> Option<String> {
+    fn translate_variable(&mut self, target: TerminalTarget, input: &str) -> Option<String> {
         let mut split = input.split(':');
         let id = split.next().unwrap();
         let param = split.next();
@@ -798,7 +831,7 @@ impl IcyBoardState {
                 if result.is_empty() {
                     let entry = self.board.lock().unwrap().display_text.get_display_text(IceText::Unlimited).unwrap();
                     if entry.style != IcbTextStyle::Plain {
-                        let _ = self.set_color(entry.style.to_color());
+                        let _ = self.set_color(target, entry.style.to_color());
                     }
                     result = entry.text;
                 }
@@ -865,7 +898,7 @@ impl IcyBoardState {
                 return None;
             }
             "POS" => {
-                let x = self.caret.get_position().x as usize;
+                let x = self.user_screen.caret.get_position().x as usize;
                 if let Some(value) = param {
                     if let Ok(i) = value.parse::<usize>() {
                         while result.len() + 1 < i - x {
@@ -997,7 +1030,7 @@ impl IcyBoardState {
         self.char_buffer.len() as i32
     }
 
-    pub fn set_color(&mut self, color: IcbColor) -> Res<()> {
+    pub fn set_color(&mut self, target: TerminalTarget, color: IcbColor) -> Res<()> {
         if !self.use_graphics() {
             return Ok(());
         }
@@ -1006,7 +1039,7 @@ impl IcyBoardState {
                 return Ok(());
             }
             IcbColor::Dos(color) => {
-                if self.caret.get_attribute().as_u8(icy_engine::IceMode::Blink) == color {
+                if self.user_screen.caret.get_attribute().as_u8(icy_engine::IceMode::Blink) == color {
                     return Ok(());
                 }
                 TextAttribute::from_u8(color, icy_engine::IceMode::Blink)
@@ -1017,10 +1050,10 @@ impl IcyBoardState {
         };
 
         let mut color_change = "\x1B[".to_string();
-        let was_bold = self.caret.get_attribute().is_bold();
+        let was_bold = self.user_screen.caret.get_attribute().is_bold();
         let new_bold = new_color.is_bold() || new_color.get_foreground() > 7;
-        let mut bg = self.caret.get_attribute().get_background();
-        let mut fg = self.caret.get_attribute().get_foreground();
+        let mut bg = self.user_screen.caret.get_attribute().get_background();
+        let mut fg = self.user_screen.caret.get_attribute().get_foreground();
         if was_bold != new_bold {
             if new_bold {
                 color_change += "1;";
@@ -1031,7 +1064,7 @@ impl IcyBoardState {
             }
         }
 
-        if !self.caret.get_attribute().is_blinking() && new_color.is_blinking() {
+        if !self.user_screen.caret.get_attribute().is_blinking() && new_color.is_blinking() {
             color_change += "5;";
         }
 
@@ -1045,11 +1078,11 @@ impl IcyBoardState {
 
         color_change.pop();
         color_change += "m";
-        self.write_chars(color_change.chars().collect::<Vec<char>>().as_slice())
+        self.write_chars(target, color_change.chars().collect::<Vec<char>>().as_slice())
     }
 
     pub fn get_caret_position(&mut self) -> (i32, i32) {
-        (self.caret.get_position().x, self.caret.get_position().y)
+        (self.session.cursor_pos.x, self.session.cursor_pos.y)
     }
 
     /// # Errors

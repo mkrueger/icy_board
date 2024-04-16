@@ -85,7 +85,7 @@ impl PcbBoardCommand {
 
         self.state.clear_screen()?;
 
-        self.state.set_color(IcbColor::Dos(6))?;
+        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(6))?;
         self.state
             .print(TerminalTarget::Both, "Filename       Size      Date    Description of File Contents")?;
         self.state.new_line()?;
@@ -105,17 +105,17 @@ impl PcbBoardCommand {
             let size = header.size();
             let date = header.file_date().unwrap();
             let name = header.name();
-            self.state.set_color(IcbColor::Dos(14))?;
+            self.state.set_color(TerminalTarget::Both, IcbColor::Dos(14))?;
             self.state.print(TerminalTarget::Both, &format!("{:<12} ", name))?;
             if name.len() > 12 {
                 self.state.new_line()?;
             }
-            self.state.set_color(IcbColor::Dos(2))?;
+            self.state.set_color(TerminalTarget::Both, IcbColor::Dos(2))?;
             self.state
                 .print(TerminalTarget::Both, &format!("{:>8}  ", humanize_bytes_decimal!(size).to_string()))?;
-            self.state.set_color(IcbColor::Dos(4))?;
+            self.state.set_color(TerminalTarget::Both, IcbColor::Dos(4))?;
             self.state.print(TerminalTarget::Both, &format!("{}", date.format("%m/%d/%C")))?;
-            self.state.set_color(IcbColor::Dos(3))?;
+            self.state.set_color(TerminalTarget::Both, IcbColor::Dos(3))?;
 
             self.state.print(TerminalTarget::Both, "  ")?;
 
@@ -123,7 +123,7 @@ impl PcbBoardCommand {
             for m in metadata {
                 if m.get_type() == MetadaType::FileID {
                     let description = std::str::from_utf8(&m.data)?;
-                    self.state.set_color(IcbColor::Dos(11))?;
+                    self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11))?;
                     for (i, line) in description.lines().enumerate() {
                         if i > 0 {
                             self.state.print(TerminalTarget::Both, &format!("{:33}", " "))?;
@@ -134,7 +134,7 @@ impl PcbBoardCommand {
                         if self.state.session.more_requested && !self.filebase_more(action)? {
                             return Ok(());
                         }
-                        self.state.set_color(IcbColor::Dos(3))?;
+                        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(3))?;
                     }
                 }
             }

@@ -128,7 +128,7 @@ impl MessageViewer {
         state.clear_screen()?;
 
         let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_date.clone();
-        state.set_color(c1)?;
+        state.set_color(TerminalTarget::Both, c1)?;
         let time = if let Some(dt) = chrono::DateTime::from_timestamp(header.date_written as i64, 0) {
             dt.to_string()
         } else {
@@ -150,22 +150,22 @@ impl MessageViewer {
         state.print(TerminalTarget::Both, &txt)?;
 
         let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_to.clone();
-        state.set_color(c1)?;
+        state.set_color(TerminalTarget::Both, c1)?;
         let txt = self.format_hdr_text(&self.to_line.text, &header.get_to().unwrap().to_string(), "");
         state.print(TerminalTarget::Both, &txt)?;
 
         let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_from.clone();
-        state.set_color(c1)?;
+        state.set_color(TerminalTarget::Both, c1)?;
         let txt = self.format_hdr_text(&self.from_line.text, &header.get_from().unwrap().to_string(), "");
         state.print(TerminalTarget::Both, &txt)?;
 
         let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_subj.clone();
-        state.set_color(c1)?;
+        state.set_color(TerminalTarget::Both, c1)?;
         let txt = self.format_hdr_text(&self.subj_line.text, &header.get_subject().unwrap().to_string(), "");
         state.print(TerminalTarget::Both, &txt)?;
 
         let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_read.clone();
-        state.set_color(c1)?;
+        state.set_color(TerminalTarget::Both, c1)?;
         /*        let txt = self.format_hdr_text(&self.read.text, "", "");
                 state.print(TerminalTarget::Both, &txt)?;
         */

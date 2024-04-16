@@ -6,9 +6,12 @@ use std::{
     vec,
 };
 
-use icy_board_engine::icy_board::{
-    state::{IcyBoardState, NodeState},
-    IcyBoard,
+use icy_board_engine::{
+    icy_board::{
+        state::{IcyBoardState, NodeState},
+        IcyBoard,
+    },
+    vm::TerminalTarget,
 };
 use icy_net::{telnet::TelnetConnection, Connection, ConnectionType};
 use icy_ppe::Res;
@@ -103,18 +106,26 @@ pub fn await_telnet_connections(board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>
 }
 
 fn handle_client(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<NodeState>>, connection: Box<dyn Connection>) -> Res<()> {
-    let mut state = IcyBoardState::new(board, node_state, connection);
-    state.session.is_sysop = true;
-    state.set_current_user(0)?;
-
+    let state = IcyBoardState::new(board, node_state, connection);
     let mut cmd = PcbBoardCommand::new(state);
+
+    match cmd.login() {
+        Ok(true) => {}
+        Ok(false) => {
+            return Ok(());
+        }
+        Err(err) => {
+            log::error!("error during login process {}", err);
+            return Ok(());
+        }
+    }
 
     loop {
         if let Err(err) = cmd.do_command() {
             cmd.state.session.disp_options.reset_printout();
 
             // print error message to user, if possible
-            if cmd.state.set_color(4.into()).is_ok() {
+            if cmd.state.set_color(TerminalTarget::Both, 4.into()).is_ok() {
                 cmd.state
                     .print(icy_board_engine::vm::TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err))?;
                 cmd.state.reset_color()?;

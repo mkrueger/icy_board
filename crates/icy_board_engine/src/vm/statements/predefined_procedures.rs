@@ -49,7 +49,7 @@ pub fn wait(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
 
 pub fn color(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let color = vm.eval_expr(&args[0])?.as_int() as u8;
-    vm.icy_board_state.set_color(color.into())?;
+    vm.icy_board_state.set_color(TerminalTarget::Both, color.into())?;
     Ok(())
 }
 
