@@ -13,38 +13,7 @@ impl PcbBoardCommand {
             return Ok(());
         }
 
-        let mut protocols = Vec::new();
-        let mut valid_protocols = String::new();
-        let cur_protocol = if let Some(user) = &mut self.state.current_user { user.protocol } else { ' ' };
-        self.state.new_line()?;
-
-        if let Ok(board) = self.state.board.lock() {
-            for protocol in board.protocols.iter() {
-                if !protocol.is_enabled {
-                    continue;
-                }
-                valid_protocols.push(protocol.char_code.to_ascii_uppercase());
-                if protocol.char_code == cur_protocol {
-                    protocols.push(format!("=> ({}) {}", protocol.char_code, protocol.description));
-                } else {
-                    protocols.push(format!("   ({}) {}", protocol.char_code, protocol.description));
-                }
-            }
-        }
-        self.state.set_color(IcbColor::Dos(11))?;
-        for line in protocols {
-            self.state.print(TerminalTarget::Both, &line)?;
-            self.state.new_line()?;
-        }
-
-        let protocol = self.state.input_field(
-            IceText::DesiredProtocol,
-            1,
-            &valid_protocols,
-            "",
-            display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER | display_flags::UPCASE | display_flags::FIELDLEN,
-        )?;
-
+        let protocol = self.ask_protocols()?;
         if !protocol.is_empty() {
             let selected_protocol = protocol.chars().next().unwrap_or(' ').to_ascii_uppercase();
             if let Some(user) = &mut self.state.current_user {
@@ -71,5 +40,38 @@ impl PcbBoardCommand {
         self.state.press_enter()?;
         self.display_menu = true;
         Ok(())
+    }
+
+    pub fn ask_protocols(&mut self) -> Res<String> {
+        let mut protocols = Vec::new();
+        let mut valid_protocols = String::new();
+        let cur_protocol = if let Some(user) = &mut self.state.current_user { user.protocol } else { ' ' };
+        self.state.new_line()?;
+        if let Ok(board) = self.state.board.lock() {
+            for protocol in board.protocols.iter() {
+                if !protocol.is_enabled {
+                    continue;
+                }
+                valid_protocols.push(protocol.char_code.to_ascii_uppercase());
+                if protocol.char_code == cur_protocol {
+                    protocols.push(format!("=> ({}) {}", protocol.char_code, protocol.description));
+                } else {
+                    protocols.push(format!("   ({}) {}", protocol.char_code, protocol.description));
+                }
+            }
+        }
+        self.state.set_color(IcbColor::Dos(11))?;
+        for line in protocols {
+            self.state.print(TerminalTarget::Both, &line)?;
+            self.state.new_line()?;
+        }
+        let protocol = self.state.input_field(
+            IceText::DesiredProtocol,
+            1,
+            &valid_protocols,
+            "",
+            display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER | display_flags::UPCASE | display_flags::FIELDLEN,
+        )?;
+        Ok(protocol)
     }
 }

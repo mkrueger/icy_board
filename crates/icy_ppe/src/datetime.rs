@@ -1,6 +1,6 @@
 use core::fmt;
 
-use chrono::{Datelike, Timelike};
+use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
 use serde::Deserialize;
 use toml::value::{Date, Datetime};
 #[derive(Debug, Clone, PartialEq)]
@@ -179,6 +179,24 @@ impl IcbDate {
 
     pub fn to_country_date(&self) -> String {
         self.to_string()
+    }
+
+    pub fn to_utc_date_time(&self) -> chrono::prelude::DateTime<chrono::prelude::Utc> {
+        chrono::prelude::DateTime::<Utc>::from_naive_utc_and_offset(
+            NaiveDateTime::new(
+                NaiveDate::from_ymd_opt(self.year as i32, self.month as u32, self.day as u32).unwrap(),
+                NaiveTime::MIN,
+            ),
+            Utc,
+        )
+    }
+
+    pub fn from_utc(date_time: chrono::prelude::DateTime<chrono::prelude::Utc>) -> Self {
+        Self {
+            month: date_time.month() as u8,
+            day: date_time.day() as u8,
+            year: date_time.year() as u16,
+        }
     }
 }
 

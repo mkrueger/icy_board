@@ -1,11 +1,10 @@
-use std::{
-    fs,
-    io::{Cursor, Read},
-    path::Path,
-};
+use std::{fs, path::Path};
 
-use byteorder::{LittleEndian, ReadBytesExt};
-use icy_ppe::{datetime::IcbDate, Res};
+use icy_ppe::{
+    datetime::{IcbDate, IcbTime},
+    tables::import_cp437_string,
+    Res,
+};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PcbUserRecord {
@@ -17,7 +16,7 @@ pub struct PcbUserRecord {
     pub home_voice_phone: String,
 
     pub last_date_on: IcbDate,
-    pub last_time_on: String,
+    pub last_time_on: IcbTime,
 
     pub expert_mode: bool,
 
@@ -61,7 +60,7 @@ pub struct PcbUserRecord {
     pub exp_date: IcbDate,
     // unsigned short LastConference;     ///  Number of the conference the caller was in
     pub delete_flag: bool,
-    pub rec_num: usize,
+    pub rec_num: u32,
 
     pub last_conference: u16,
     pub ul_tot_dnld_bytes: u64,
@@ -71,39 +70,36 @@ pub struct PcbUserRecord {
 impl PcbUserRecord {
     /// # Errors
     pub fn read_users(path: &Path) -> Res<Vec<PcbUserRecord>> {
-        const RECORD_SIZE: u64 = 0x190;
+        const _RECORD_SIZE: u64 = 0x190;
         let mut users = Vec::new();
 
         let data = fs::read(path)?;
-        let mut cursor = Cursor::new(data);
-        while cursor.position() + RECORD_SIZE <= cursor.get_ref().len() as u64 {
-            let mut name = [0u8; 25];
-            cursor.read_exact(&mut name)?;
 
-            let mut city = [0u8; 24];
-            cursor.read_exact(&mut city)?;
+        let mut data = &data[..];
+        while !data.is_empty() {
+            let name = import_cp437_string(&data[..25], true);
+            data = &data[25..];
+            let city = import_cp437_string(&data[..24], true);
+            data = &data[24..];
+            let password = import_cp437_string(&data[..12], true);
+            data = &data[12..];
+            let bus_data_phone = import_cp437_string(&data[..13], true);
+            data = &data[13..];
+            let home_voice_phone = import_cp437_string(&data[..13], true);
+            data = &data[13..];
 
-            let mut password = [0u8; 12];
-            cursor.read_exact(&mut password)?;
+            let last_date_on = import_cp437_string(&data[..6], true);
+            data = &data[6..];
+            let last_date_on = IcbDate::parse(&last_date_on);
 
-            let mut data_phone = [0u8; 13];
-            cursor.read_exact(&mut data_phone)?;
+            let last_time_on = import_cp437_string(&data[..5], true);
+            data = &data[5..];
+            let last_time_on = IcbTime::parse(&last_time_on);
 
-            let mut voice_phone = [0u8; 13];
-            cursor.read_exact(&mut voice_phone)?;
+            let expert_mode = data[0] == b'Y';
+            let protocol = data[1] as char;
 
-            let mut last_date_on = [0u8; 6];
-            cursor.read_exact(&mut last_date_on)?;
-
-            let last_date_on = IcbDate::parse(&String::from_utf8_lossy(&last_date_on));
-            let mut last_time_on = [0u8; 5];
-
-            cursor.read_exact(&mut last_time_on)?;
-
-            let expert_mode = cursor.read_u8()?;
-            let protocol = cursor.read_u8()?;
-
-            let packet_flags = cursor.read_u8()?;
+            let packet_flags = data[2];
 
             let is_dirty = (packet_flags & (1 << 0)) != 0;
             let msg_clear = (packet_flags & (1 << 1)) != 0;
@@ -113,56 +109,81 @@ impl PcbUserRecord {
             let scroll_msg_body = (packet_flags & (1 << 5)) != 0;
             let short_header = (packet_flags & (1 << 6)) != 0;
             let wide_editor = (packet_flags & (1 << 7)) != 0;
+            data = &data[3..];
 
-            let mut date_last_dir_read = [0u8; 6];
-            cursor.read_exact(&mut date_last_dir_read)?;
-            let date_last_dir_read = IcbDate::parse(&String::from_utf8_lossy(&date_last_dir_read));
+            let date_last_dir_read = import_cp437_string(&data[..6], true);
+            data = &data[6..];
+            let date_last_dir_read = IcbDate::parse(&date_last_dir_read);
 
-            let security_level = cursor.read_u8()?;
-            let num_times_on = cursor.read_u16::<LittleEndian>()?;
-            let page_len = cursor.read_u8()?;
-            let num_uploads = cursor.read_u16::<LittleEndian>()?;
-            let num_downloads = cursor.read_u16::<LittleEndian>()?;
+            let security_level = data[0];
+            data = &data[1..];
 
-            let daily_downloaded_bytes = cursor.read_u64::<LittleEndian>()?;
+            let num_times_on = u16::from_le_bytes([data[0], data[1]]);
+            data = &data[2..];
+            let page_len = data[0];
+            data = &data[1..];
 
-            let mut cmt1 = [0u8; 30];
-            cursor.read_exact(&mut cmt1)?;
-            let mut cmt2 = [0u8; 30];
-            cursor.read_exact(&mut cmt2)?;
+            let num_uploads = u16::from_le_bytes([data[0], data[1]]);
+            data = &data[2..];
 
-            let elapsed_time_on = cursor.read_u16::<LittleEndian>()?;
+            let num_downloads = u16::from_le_bytes([data[0], data[1]]);
+            data = &data[2..];
 
-            let mut reg_exp_date = [0u8; 6];
-            cursor.read_exact(&mut reg_exp_date)?;
-            let reg_exp_date = IcbDate::parse(&String::from_utf8_lossy(&reg_exp_date));
+            let daily_downloaded_bytes = import_cp437_string(&data[..8], true);
+            data = &data[8..];
+            let daily_downloaded_bytes = daily_downloaded_bytes.parse::<u32>().unwrap_or_default();
 
-            let exp_security_level = cursor.read_u8()?;
-            let last_conference = cursor.read_u8()? as u16;
+            let user_comment = import_cp437_string(&data[..30], true);
+            data = &data[30..];
+            let sysop_comment = import_cp437_string(&data[..30], true);
+            data = &data[30..];
 
-            cursor.set_position(cursor.position() + 15);
+            let elapsed_time_on = u16::from_le_bytes([data[0], data[1]]);
+            data = &data[2..];
 
-            let ul_tot_dnld_bytes = cursor.read_u64::<LittleEndian>()?;
-            let ul_tot_upld_bytes = cursor.read_u64::<LittleEndian>()?;
-            let delete_flag = cursor.read_u8()? != 0;
-            cursor.set_position(cursor.position() + 40 * 4);
+            let reg_exp_date = import_cp437_string(&data[..6], true);
+            data = &data[6..];
+            let reg_exp_date = IcbDate::parse(&reg_exp_date);
 
-            let rec_num = cursor.read_u32::<LittleEndian>()? as usize;
-            // flags byte ?
-            cursor.read_u8()?;
-            // reseved bytes 2
-            cursor.set_position(cursor.position() + 8);
-            let _last_conference2 = cursor.read_u16::<LittleEndian>()? as i32;
+            let exp_security_level = data[0];
+            data = &data[1..];
+            let _last_conference_old = data[0];
+            data = &data[1..];
+
+            data = &data[15..];
+
+            let ul_tot_dnld_bytes = import_cp437_string(&data[..8], true);
+            data = &data[8..];
+            let ul_tot_dnld_bytes = ul_tot_dnld_bytes.parse::<u32>().unwrap_or_default();
+
+            let ul_tot_upld_bytes = import_cp437_string(&data[..8], true);
+            data = &data[8..];
+            let ul_tot_upld_bytes = ul_tot_upld_bytes.parse::<u32>().unwrap_or_default();
+
+            let delete_flag = data[0] == b'Y';
+            data = &data[1..];
+            data = &data[40 * 4..];
+
+            let rec_num = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) - 1;
+            data = &data[4..];
+
+            // flags 2
+            data = &data[1..];
+
+            // resevered
+            data = &data[8..];
+            let last_conference = u16::from_le_bytes([data[0], data[1]]);
+            data = &data[2..];
 
             let user = PcbUserRecord {
-                name: String::from_utf8_lossy(&name).trim().to_string(),
-                city: String::from_utf8_lossy(&city).trim().to_string(),
-                password: String::from_utf8_lossy(&password).trim().to_string(),
-                bus_data_phone: String::from_utf8_lossy(&data_phone).trim().to_string(),
-                home_voice_phone: String::from_utf8_lossy(&voice_phone).trim().to_string(),
+                name,
+                city,
+                password,
+                bus_data_phone,
+                home_voice_phone,
                 last_date_on,
-                last_time_on: String::from_utf8_lossy(&last_time_on).trim().to_string(),
-                expert_mode: expert_mode == b'Y',
+                last_time_on,
+                expert_mode,
                 protocol: protocol as char,
 
                 is_dirty,
@@ -181,14 +202,14 @@ impl PcbUserRecord {
                 num_uploads: num_uploads as i32,
                 num_downloads: num_downloads as i32,
                 daily_downloaded_bytes: daily_downloaded_bytes as usize,
-                user_comment: String::from_utf8_lossy(&cmt1).trim().to_string(),
-                sysop_comment: String::from_utf8_lossy(&cmt2).trim().to_string(),
+                user_comment,
+                sysop_comment,
                 elapsed_time_on,
                 exp_date: reg_exp_date,
                 exp_security_level,
                 last_conference,
-                ul_tot_dnld_bytes,
-                ul_tot_upld_bytes,
+                ul_tot_dnld_bytes: ul_tot_dnld_bytes as u64,
+                ul_tot_upld_bytes: ul_tot_upld_bytes as u64,
                 delete_flag,
                 rec_num,
             };

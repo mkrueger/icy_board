@@ -147,7 +147,7 @@ impl<'a> VirtualMachine<'a> {
         self.variable_table.set_value(U_CLS, VariableValue::new_bool(cur_user.flags.msg_clear));
 
         self.variable_table
-            .set_value(U_EXPDATE, VariableValue::new_date(cur_user.exp_date.to_pcboard_date()));
+            .set_value(U_EXPDATE, VariableValue::new_date(IcbDate::from_utc(cur_user.exp_date).to_pcboard_date()));
 
         self.variable_table.set_value(U_SEC, VariableValue::new_int(cur_user.security_level as i32));
         self.variable_table.set_value(U_PAGELEN, VariableValue::new_int(cur_user.page_len as i32));
@@ -200,17 +200,33 @@ impl<'a> VirtualMachine<'a> {
             .get_var_entry_mut(U_ADDR)
             .value
             .set_array_value(5, 0, 0, VariableValue::new_string(cur_user.country.clone()));
+
+        self.variable_table
+            .get_var_entry_mut(U_NOTES)
+            .value
+            .set_array_value(0, 0, 0, VariableValue::new_string(cur_user.custom_comment1.to_string()));
+
+        self.variable_table
+            .get_var_entry_mut(U_NOTES)
+            .value
+            .set_array_value(1, 0, 0, VariableValue::new_string(cur_user.custom_comment2.to_string()));
+
+        self.variable_table
+            .get_var_entry_mut(U_NOTES)
+            .value
+            .set_array_value(2, 0, 0, VariableValue::new_string(cur_user.custom_comment3.to_string()));
+
+        self.variable_table
+            .get_var_entry_mut(U_NOTES)
+            .value
+            .set_array_value(3, 0, 0, VariableValue::new_string(cur_user.custom_comment4.to_string()));
+
+        self.variable_table
+            .get_var_entry_mut(U_NOTES)
+            .value
+            .set_array_value(4, 0, 0, VariableValue::new_string(cur_user.custom_comment5.to_string()));
+
         let mut i = 0;
-        for l in cur_user.notes.lines() {
-            self.variable_table
-                .get_var_entry_mut(U_NOTES)
-                .value
-                .set_array_value(i, 0, 0, VariableValue::new_string(l.to_string()));
-            i += 1;
-            if i > 4 {
-                break;
-            }
-        }
         while i < 5 {
             self.variable_table
                 .get_var_entry_mut(U_NOTES)
@@ -219,8 +235,10 @@ impl<'a> VirtualMachine<'a> {
             i += 1;
         }
 
-        self.variable_table
-            .set_value(U_PWDEXP, VariableValue::new_date(cur_user.password.expire_date.to_pcboard_date()));
+        self.variable_table.set_value(
+            U_PWDEXP,
+            VariableValue::new_date(IcbDate::from_utc(cur_user.password.expire_date).to_pcboard_date()),
+        );
         if self.variable_table.get_version() >= 300 {
             // PCBoard seems not to set this variable ever.
             // U_ACCOUNT
@@ -242,7 +260,7 @@ impl<'a> VirtualMachine<'a> {
         cur_user.flags.dont_ask_fse = self.variable_table.get_value(U_FSEP).as_bool();
         cur_user.flags.msg_clear = self.variable_table.get_value(U_CLS).as_bool();
 
-        cur_user.exp_date = IcbDate::from_pcboard(self.variable_table.get_value(U_EXPDATE).as_int() as u32);
+        cur_user.exp_date = IcbDate::from_pcboard(self.variable_table.get_value(U_EXPDATE).as_int() as u32).to_utc_date_time();
         cur_user.security_level = self.variable_table.get_value(U_SEC).as_int() as u8;
         cur_user.page_len = self.variable_table.get_value(U_PAGELEN).as_int() as u16;
         cur_user.exp_security_level = self.variable_table.get_value(U_EXPSEC).as_int() as u8;
@@ -272,13 +290,12 @@ impl<'a> VirtualMachine<'a> {
         cur_user.state = self.variable_table.get_value(U_ADDR).get_array_value(3, 0, 0).as_string();
         cur_user.zip = self.variable_table.get_value(U_ADDR).get_array_value(4, 0, 0).as_string();
         cur_user.country = self.variable_table.get_value(U_ADDR).get_array_value(6, 0, 0).as_string();
-        cur_user.notes.clear();
-        for i in 0..5 {
-            let v = self.variable_table.get_value(U_NOTES).get_array_value(i, 0, 0).as_string();
-            cur_user.notes.push_str(&v);
-            cur_user.notes.push('\n');
-        }
-        cur_user.password.expire_date = IcbDate::from_pcboard(self.variable_table.get_value(U_PWDEXP).as_int() as u32);
+        cur_user.custom_comment1 = self.variable_table.get_value(U_NOTES).get_array_value(0, 0, 0).as_string();
+        cur_user.custom_comment2 = self.variable_table.get_value(U_NOTES).get_array_value(1, 0, 0).as_string();
+        cur_user.custom_comment3 = self.variable_table.get_value(U_NOTES).get_array_value(2, 0, 0).as_string();
+        cur_user.custom_comment4 = self.variable_table.get_value(U_NOTES).get_array_value(3, 0, 0).as_string();
+        cur_user.custom_comment5 = self.variable_table.get_value(U_NOTES).get_array_value(4, 0, 0).as_string();
+        cur_user.password.expire_date = IcbDate::from_pcboard(self.variable_table.get_value(U_PWDEXP).as_int() as u32).to_utc_date_time();
 
         if self.variable_table.get_version() >= 300 {
             // PCBoard seems not to set this variable ever.
@@ -289,7 +306,7 @@ impl<'a> VirtualMachine<'a> {
             cur_user.flags.short_header = self.variable_table.get_value(U_SHORTDESC).as_bool();
 
             cur_user.gender = self.variable_table.get_value(U_GENDER).as_string();
-            cur_user.birth_date = IcbDate::parse(&self.variable_table.get_value(U_BIRTHDATE).as_string());
+            cur_user.birth_date = IcbDate::parse(&self.variable_table.get_value(U_BIRTHDATE).as_string()).to_utc_date_time();
             cur_user.email = self.variable_table.get_value(U_EMAIL).as_string();
             cur_user.web = self.variable_table.get_value(U_WEB).as_string();
         }

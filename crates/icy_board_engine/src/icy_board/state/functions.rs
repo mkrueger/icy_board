@@ -65,6 +65,10 @@ lazy_static::lazy_static! {
     + ('0'..='9').collect::<String>().as_str()
     + "!#$%&'()-.:[\\]^_`~";
     pub static ref MASK_ASCII: String = (' '..='~').collect::<String>();
+    pub static ref MASK_WEB: String = ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + ('0'..='9').collect::<String>().as_str() + "!#$%&'*+-/=?^_`{|}~";
+
+    pub static ref MASK_PHONE: String = ('0'..='9').collect::<String>() + "/()-+ ";
+
 }
 
 #[derive(Debug)]
@@ -272,9 +276,7 @@ impl IcyBoardState {
         if self.use_graphics() {
             self.set_color(color.clone())?;
         }
-
         self.display_line(&prompt)?;
-
         if display_question {
             self.print(TerminalTarget::Both, "? ")?;
         }
@@ -346,8 +348,8 @@ impl IcyBoardState {
         Ok(output)
     }
 
-    pub fn check_password<F: Fn(&str) -> bool>(&mut self, ice_text: IceText, call_back: F) -> Res<bool> {
-        if call_back(&self.session.last_password) {
+    pub fn check_password<F: Fn(&str) -> bool>(&mut self, ice_text: IceText, flags: u32, call_back: F) -> Res<bool> {
+        if !self.session.last_password.is_empty() && call_back(&self.session.last_password) {
             return Ok(true);
         }
         let mut tries = 0;
@@ -358,14 +360,19 @@ impl IcyBoardState {
                 13,
                 MASK_PASSWORD,
                 "",
-                display_flags::FIELDLEN | display_flags::ECHODOTS | display_flags::ERASELINE,
+                if (flags & pwd_flags::SHOW_WRONG_PWD_MSG) != 0 {
+                    display_flags::ECHODOTS
+                } else {
+                    display_flags::FIELDLEN | display_flags::ECHODOTS | display_flags::ERASELINE
+                },
             )?;
-            if pwd.is_empty() {
-                return Ok(false);
-            }
+
             if call_back(&pwd) {
                 self.session.last_password = pwd;
                 return Ok(true);
+            }
+            if (flags & pwd_flags::SHOW_WRONG_PWD_MSG) != 0 {
+                self.display_text(IceText::WrongPasswordEntered, display_flags::NEWLINE)?;
             }
             tries += 1;
         }
@@ -378,3 +385,7 @@ impl IcyBoardState {
 }
 
 const MASK_PASSWORD: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{};:'\",.<>/?\\|~`";
+
+pub mod pwd_flags {
+    pub const SHOW_WRONG_PWD_MSG: u32 = 0x00001;
+}

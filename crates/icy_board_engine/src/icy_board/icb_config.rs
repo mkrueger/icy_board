@@ -44,6 +44,7 @@ pub struct UserPasswordPolicy {
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_16")]
     pub password_expire_days: u16,
+
     /// Number of days prior to WARN of PWRD expiring
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_16")]
@@ -93,6 +94,9 @@ pub struct BoardInformation {
 
     /// Capabilities of the board (used in EmsiISI)
     pub capabilities: String,
+
+    /// Local date format
+    pub date_format: String,
 }
 
 #[derive(Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -116,8 +120,8 @@ pub struct SysopInformation {
 
     ///  start time to allow sysop page
     #[serde(default)]
-    #[serde(skip_serializing_if = "IcbTime::is_empty")]
     pub sysop_start: IcbTime,
+
     ///  stop  time to allow sysop page
     #[serde(default)]
     #[serde(skip_serializing_if = "IcbTime::is_empty")]
@@ -209,7 +213,7 @@ pub struct ConfigPaths {
     /// name and location of closed file
     pub closed: PathBuf,
     /// name and location of warning file
-    pub warning: PathBuf,
+    pub expire_warning: PathBuf,
     /// name and location of expired file
     pub expired: PathBuf,
 
@@ -252,10 +256,37 @@ pub struct ConfigPaths {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct NewUserSettings {
+    pub sec_level: u8,
+
+    pub new_user_groups: String,
+
+    pub ask_city: bool,
+    pub ask_state: bool,
+    pub ask_zip: bool,
+    pub ask_country: bool,
+
+    pub ask_bus_data_phone: bool,
+    pub ask_voice_phone: bool,
+    pub ask_comment: bool,
+    pub ask_clr_msg: bool,
+
+    pub ask_xfer_protocol: bool,
+    pub ask_date_format: bool,
+
+    pub ask_alias: bool,
+    pub ask_gender: bool,
+    pub ask_birthdate: bool,
+    pub ask_email: bool,
+    pub ask_web_address: bool,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct IcbConfig {
     pub board: BoardInformation,
-
     pub sysop: SysopInformation,
+
+    pub new_user_settings: NewUserSettings,
 
     #[serde(rename = "sysop_sec")]
     pub sysop_security_level: SysopSecurityLevels,
@@ -278,6 +309,8 @@ pub struct IcbConfig {
     pub user_password_policy: UserPasswordPolicy,
 }
 
+pub const DEFAULT_PCBOARD_DATE_FROMAT: &str = "%m/%d/%C";
+
 impl IcbConfig {
     pub fn new() -> Self {
         Self {
@@ -287,6 +320,7 @@ impl IcbConfig {
                 operator: String::new(),
                 notice: String::new(),
                 capabilities: String::new(),
+                date_format: DEFAULT_PCBOARD_DATE_FROMAT.to_string(),
             },
 
             sysop: SysopInformation {
@@ -342,7 +376,7 @@ impl IcbConfig {
                 welcome: PathBuf::new(),
                 newuser: PathBuf::new(),
                 closed: PathBuf::new(),
-                warning: PathBuf::new(),
+                expire_warning: PathBuf::new(),
                 expired: PathBuf::new(),
                 conf_join_menu: PathBuf::new(),
                 group_chat: PathBuf::new(),
@@ -360,6 +394,25 @@ impl IcbConfig {
                 command_file: PathBuf::new(),
                 statistics_file: PathBuf::new(),
                 group_file: PathBuf::new(),
+            },
+            new_user_settings: NewUserSettings {
+                sec_level: 10,
+                new_user_groups: "new_users".to_string(),
+                ask_city: true,
+                ask_state: true,
+                ask_zip: true,
+                ask_country: true,
+                ask_bus_data_phone: true,
+                ask_voice_phone: true,
+                ask_comment: true,
+                ask_clr_msg: true,
+                ask_date_format: true,
+                ask_xfer_protocol: true,
+                ask_alias: true,
+                ask_gender: true,
+                ask_birthdate: true,
+                ask_email: true,
+                ask_web_address: true,
             },
         }
     }

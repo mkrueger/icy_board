@@ -27,7 +27,6 @@ use self::{
     xfer_protocols::SupportedProtocols,
 };
 
-pub mod archivers;
 pub mod bulletins;
 pub mod commands;
 pub mod conferences;
@@ -76,6 +75,12 @@ pub enum IcyBoardError {
 
     #[error("Error loading PCBoard DIR.LIST file invalid sort order ({0})")]
     InvalidDirListSortOrder(u8),
+
+    #[error("User number invalid: {0}")]
+    UserNumberInvalid(usize),
+
+    #[error("Internal board lock error (report!).")]
+    ErrorLockingBoard,
 }
 
 pub struct IcyBoard {
@@ -208,6 +213,17 @@ impl IcyBoard {
         })
     }
 
+    pub fn save_userbase(&mut self) -> Res<()> {
+        let path = self.resolve_file(&self.config.paths.user_base);
+        log::info!("Saving user base to {}", path);
+        if let Err(e) = self.users.save(&path) {
+            log::error!("Error saving user base: {}", e);
+            Err(e)
+        } else {
+            Ok(())
+        }
+    }
+
     pub fn export_pcboard(&self, file: &Path) -> Res<()> {
         let mut pcb_dat = PcbBoardData::default();
 
@@ -233,7 +249,7 @@ impl IcyBoard {
         pcb_dat.path.welcome_file = self.resolve_file(&self.config.paths.welcome);
         pcb_dat.path.newuser_file = self.resolve_file(&self.config.paths.newuser);
         pcb_dat.path.closed_file = self.resolve_file(&self.config.paths.closed);
-        pcb_dat.path.warning_file = self.resolve_file(&self.config.paths.warning);
+        pcb_dat.path.warning_file = self.resolve_file(&self.config.paths.expire_warning);
         pcb_dat.path.expired_file = self.resolve_file(&self.config.paths.expired);
         pcb_dat.path.conf_menu = self.resolve_file(&self.config.paths.conf_join_menu);
         pcb_dat.path.group_chat = self.resolve_file(&self.config.paths.group_chat);

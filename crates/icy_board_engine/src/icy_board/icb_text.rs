@@ -6,7 +6,6 @@ use std::{
     path::Path,
 };
 
-use byteorder::WriteBytesExt;
 use codepages::tables::UNICODE_TO_CP437;
 use icy_ppe::{tables::import_cp437_string, Res};
 use strum_macros::{Display, EnumString};
@@ -26,13 +25,13 @@ pub enum IceText {
     /// `Brand of CPU you are using`
     CommentFieldPrompt = 2,
     /// `Access Denied - Upcoming Event Pending ...`
-    AccessDeniedForEvent = 3,
+    DeniedAccessForEvent = 3,
     /// `Time Limit Exceeded.`
     TimelimitExceeded = 4,
     /// `Access Denied - Unauthorized name match on @USER@!`
-    UnauthorizedName = 5,
+    DeniedUnauthorizedName = 5,
     /// `Access Denied - You are Locked Out of this System!`
-    LockedOut = 6,
+    DeniedLockedOut = 6,
     /// `Access Denied - Excessive Password Failures!`
     DeniedWrongPassword = 7,
     /// `Access Denied - Refused to Complete Registration!`
@@ -1528,9 +1527,12 @@ pub enum IceText {
 
     /// `Conf:                                 Area:`
     MessagesConfArea = 753,
+
+    /// `Date Format Desired (Enter)=no change`
+    DateFormatDesired = 754,
 }
 
-const LAST_ENTRY: usize = 753;
+const LAST_ENTRY: usize = 754;
 
 impl IceText {
     pub fn from(i: usize) -> Self {
@@ -1755,7 +1757,7 @@ impl TextEntry {
             IcbTextStyle::Cyan => b'6',
             IcbTextStyle::White => b'7',
         };
-        fs.write_u8(pcb_char)?;
+        fs.write_all(&[pcb_char])?;
         let mut output_buffer = [b' '; BIN_ENTRY_SIZE - 1];
         let b = b' ';
         for (i, ch) in self.text.chars().take(BIN_ENTRY_SIZE - 1).enumerate() {

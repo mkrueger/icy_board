@@ -139,7 +139,7 @@ impl PcbBoard {
         let r = res.resolve_file(&res.data.path.inf_file);
         let user_inf = PcbUserInf::read_users(&PathBuf::from(&r))?;
         for user in users {
-            let inf = user_inf[user.rec_num - 1].clone();
+            let inf = user_inf[user.rec_num as usize].clone();
             res.users.push(PcbUser { user, inf });
         }
 

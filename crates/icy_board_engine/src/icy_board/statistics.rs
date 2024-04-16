@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use chrono::Local;
+use chrono::Utc;
 use icy_ppe::{tables::import_cp437_string, Res};
 use serde::{Deserialize, Serialize};
 
@@ -17,14 +17,33 @@ pub struct UsageStatistics {
 }
 
 #[derive(Default, Clone, Serialize, Deserialize)]
+pub struct LastCaller {
+    pub user_name: String,
+
+    /// Utc time in rfc3339 format
+    pub time: String,
+}
+
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Statistics {
-    pub last_callers: Vec<String>,
-    pub last_caller: String,
+    pub last_callers: Vec<LastCaller>,
     pub today: UsageStatistics,
     pub total: UsageStatistics,
 }
 
-impl Statistics {}
+impl Statistics {
+    pub fn add_caller(&mut self, user_name: String) {
+        self.total.calls += 1;
+        self.today.calls += 1;
+        self.last_callers.push(LastCaller {
+            user_name,
+            time: Utc::now().to_rfc3339(),
+        });
+        if self.last_callers.len() > 10 {
+            self.last_callers.remove(0);
+        }
+    }
+}
 
 impl IcyBoardSerializer for Statistics {
     const FILE_TYPE: &'static str = "statistics";
@@ -47,8 +66,10 @@ impl PCBoardBinImporter for Statistics {
         let total_up = i32::from_le_bytes([data[i + 8], data[i + 9], data[i + 10], data[i + 11]]);
         let total_dn = i32::from_le_bytes([data[i + 12], data[i + 13], data[i + 14], data[i + 15]]);
         let mut res = Statistics::default();
-        res.last_callers.push(last_caller);
-        res.last_caller = Local::now().to_rfc3339();
+        res.last_callers.push(LastCaller {
+            user_name: last_caller,
+            time: Utc::now().to_rfc3339(),
+        });
         res.total.calls = new_calls as u64;
         res.total.messages = new_msgs as u64;
         res.total.uploads_kb = total_up as u64;

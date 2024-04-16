@@ -16,7 +16,7 @@ pub struct Language {
 
 #[derive(Serialize, Deserialize)]
 pub struct SupportedLanguages {
-    pub date_formats: Vec<String>,
+    pub date_formats: Vec<(String, String)>,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -27,13 +27,17 @@ pub struct SupportedLanguages {
 impl Default for SupportedLanguages {
     fn default() -> Self {
         Self {
+            // see https://docs.rs/chrono/latest/chrono/format/strftime
             date_formats: vec![
-                "MM-DD-YY".to_string(),
-                "DD-MM-YY".to_string(),
-                "YY-MM-DD".to_string(),
-                "MM-DD-YYYY".to_string(),
-                "DD-MM-YYYY".to_string(),
-                "YYYY-MM-DD".to_string(),
+                ("MM/DD/YY".to_string(), "%m/%d/%C".to_string()),
+                ("DD/MM/YY".to_string(), "%d/%m/%C".to_string()),
+                ("YY/MM/DD".to_string(), "%C/%m/%d".to_string()),
+                ("MM.DD.YY".to_string(), "%m.%d.%C".to_string()),
+                ("DD.MM.YY".to_string(), "%d.%m.%C".to_string()),
+                ("YY.MM.DD".to_string(), "%C.%m.%d".to_string()),
+                ("MM-DD-YY".to_string(), "%m-%d-%C".to_string()),
+                ("DD-MM-YY".to_string(), "%d-%m-%C".to_string()),
+                ("YY-MM-DD".to_string(), "%C-%m-%d".to_string()),
             ],
             languages: Default::default(),
         }

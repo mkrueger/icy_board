@@ -109,12 +109,12 @@ impl PcbBoardCommand {
                 // force logoff - no flagged files scan
                 if let Some(token) = self.state.session.tokens.pop_front() {
                     if token.to_ascii_uppercase() == self.state.yes_char.to_string().to_ascii_uppercase() {
-                        self.state.hangup()?;
+                        self.state.goodbye()?;
                     }
                 }
 
                 // todo : check flagged files & parse input
-                self.state.hangup()?;
+                self.state.goodbye()?;
             }
             CommandType::Help => {
                 // H
@@ -295,8 +295,8 @@ impl PcbBoardCommand {
                     "{:<24} {:<30} {} {}\r\n",
                     u.get_name(),
                     u.city,
-                    u.last_date_on.to_country_date(),
-                    u.last_time_on
+                    self.state.format_date(u.stats.last_on),
+                    self.state.format_time(u.stats.last_on)
                 ));
             }
         }
@@ -488,7 +488,7 @@ impl PcbBoardCommand {
             )?;
             self.state
                 .display_text(IceText::AutoDisconnectNow, display_flags::NEWLINE | display_flags::LFBEFORE)?;
-            self.state.hangup()?;
+            self.state.goodbye()?;
         }
 
         Ok(false)
@@ -498,9 +498,7 @@ impl PcbBoardCommand {
         let board_name = self.state.board.lock().unwrap().config.board.name.clone();
         self.state.print(TerminalTarget::Both, &board_name)?;
         self.state.new_line()?;
-
         let welcome_screen = self.state.board.lock().unwrap().config.paths.welcome.clone();
-
         let welcome_screen = self.state.resolve_path(&welcome_screen);
         self.state.display_file(&welcome_screen)?;
         Ok(())

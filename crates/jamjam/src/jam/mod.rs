@@ -271,7 +271,6 @@ impl JamMessageBase {
         header_file.seek(SeekFrom::Start(offset as u64))?;
         let mut reader = BufReader::new(header_file);
         let header = JamMessageHeader::read(&mut reader)?;
-        log::info!("Read {} deleted {}", msg_number, header.is_deleted());
 
         if header.is_deleted() {
             return Err(JamError::MessageDeleted.into());
@@ -306,7 +305,6 @@ impl JamMessageBase {
             header_file.seek(SeekFrom::Start(offset as u64))?;
             let mut writer = BufWriter::new(header_file);
             header.write(&mut writer)?;
-            log::info!("Message {} deleted {}", msg_number, header.is_deleted());
             writer.flush()?;
         }
         Ok(())

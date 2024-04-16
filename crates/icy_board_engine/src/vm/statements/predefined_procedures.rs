@@ -171,7 +171,7 @@ pub fn fputpad(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 /// # Errors
 /// Errors if the variable is not found.
 pub fn hangup(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.hangup()?;
+    vm.icy_board_state.goodbye()?;
     vm.is_running = false;
     Ok(())
 }
@@ -338,7 +338,7 @@ pub fn dtron(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub fn dtroff(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.hangup()?;
+    vm.icy_board_state.goodbye()?;
     Ok(())
 }
 
@@ -470,13 +470,21 @@ pub fn dir(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub fn kbdstuff(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let value = vm.eval_expr(&args[0])?.as_string();
+    let mut value = vm.eval_expr(&args[0])?.as_string();
+    if !value.ends_with('\r') {
+        value.push('\r');
+    }
     vm.icy_board_state.put_keyboard_buffer(&value)?;
     Ok(())
 }
 pub fn kbdstring(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let value = vm.eval_expr(&args[0])?.as_string();
+    let mut value = vm.eval_expr(&args[0])?.as_string();
     vm.icy_board_state.print(TerminalTarget::Both, &value)?;
+
+    // TODO: is that correct here?
+    if !value.ends_with('\r') {
+        value.push('\r');
+    }
     vm.icy_board_state.put_keyboard_buffer(&value)?;
     Ok(())
 }
@@ -490,13 +498,13 @@ pub fn kbdfile(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub fn bye(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.hangup()?;
+    vm.icy_board_state.goodbye()?;
     vm.is_running = false;
     Ok(())
 }
 
 pub fn goodbye(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.hangup()?;
+    vm.icy_board_state.goodbye()?;
     vm.is_running = false;
     Ok(())
 }

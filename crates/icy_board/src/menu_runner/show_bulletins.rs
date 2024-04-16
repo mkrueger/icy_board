@@ -44,7 +44,7 @@ impl PcbBoardCommand {
             };
             match text.as_str() {
                 "G" => {
-                    self.state.hangup()?;
+                    self.state.goodbye()?;
                     return Ok(());
                 }
                 "R" | "L" => {

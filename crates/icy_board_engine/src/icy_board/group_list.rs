@@ -17,6 +17,7 @@ pub struct GroupList {
     #[serde(rename = "group")]
     groups: Vec<Group>,
 }
+
 impl GroupList {
     pub fn add_group(&mut self, name: impl Into<String>, description: impl Into<String>, members: &[i64]) {
         self.groups.push(Group {

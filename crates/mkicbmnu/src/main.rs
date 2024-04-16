@@ -38,7 +38,7 @@ fn main() -> Result<()> {
 
     let file = arguments.file.with_extension("mnu");
     if !file.exists() && !arguments.create {
-        let mut map = HashMap::new();
+        let mut map: HashMap<String, String> = HashMap::new();
         map.insert("name".to_string(), file.display().to_string());
         print_error(get_text_args("file_not_found", map));
         exit(1);

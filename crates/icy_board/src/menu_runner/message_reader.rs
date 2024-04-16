@@ -256,7 +256,10 @@ impl PcbBoardCommand {
                     viewer.display_header(&mut self.state, message_base, &header)?;
 
                     if header.needs_password() {
-                        if self.state.check_password(IceText::PasswordToReadMessage, |pwd| header.is_password_valid(pwd))? {
+                        if self
+                            .state
+                            .check_password(IceText::PasswordToReadMessage, 0, |pwd| header.is_password_valid(pwd))?
+                        {
                             viewer.display_body(&mut self.state, &text)?;
                         }
                     } else {

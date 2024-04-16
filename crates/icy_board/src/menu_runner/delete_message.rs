@@ -58,7 +58,11 @@ impl PcbBoardCommand {
 
     fn try_to_kill_message(&mut self, message_base: &JamMessageBase, number: u32) -> Res<()> {
         if let Ok(header) = message_base.read_header(number) {
-            if header.needs_password() && !self.state.check_password(IceText::PasswordToReadMessage, |pwd| header.is_password_valid(pwd))? {
+            if header.needs_password()
+                && !self
+                    .state
+                    .check_password(IceText::PasswordToReadMessage, 0, |pwd| header.is_password_valid(pwd))?
+            {
                 return Ok(());
             }
         }

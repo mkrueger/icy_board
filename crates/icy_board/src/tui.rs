@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     io::{self, stdout, Read, Stdout, Write},
     sync::{Arc, Mutex},
     thread,
@@ -18,7 +19,7 @@ use icy_board_engine::icy_board::{
     IcyBoard, IcyBoardError,
 };
 use icy_board_tui::{
-    get_text,
+    get_text_args,
     theme::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GRAY, DOS_LIGHT_GREEN, DOS_WHITE},
 };
 use icy_engine::{ansi, TextPane};
@@ -51,7 +52,7 @@ impl Tui {
             let mut state = IcyBoardState::new(board, node, Box::new(connection));
             if sysop_mode {
                 state.session.is_sysop = true;
-                state.set_current_user(0);
+                state.set_current_user(0).unwrap();
             }
             let mut cmd = PcbBoardCommand::new(state);
 
@@ -372,9 +373,11 @@ pub fn print_exit_screen() {
             r.height = 1;
             let white = Style::default().fg(DOS_WHITE);
             let green = Style::default().fg(DOS_LIGHT_GREEN);
-            let txt = get_text("exit_icy_board_msg");
-            let p1 = txt[0..txt.as_bytes().iter().position(|c| *c == b'{').unwrap()].to_string();
-            let p2 = txt[txt.as_bytes().iter().position(|c| *c == b'}').unwrap() + 1..].to_string();
+            let mut map = HashMap::new();
+            map.insert("name".to_string(), "@".to_string());
+            let txt = get_text_args("exit_icy_board_msg", map);
+            let p1 = txt[0..txt.as_bytes().iter().position(|c| *c == b'@').unwrap()].to_string();
+            let p2 = txt[txt.as_bytes().iter().position(|c| *c == b'@').unwrap() + 1..].to_string();
             let text = vec![Span::styled(p1, green), Span::styled("IcyBoard", white), Span::styled(p2, green)];
             frame.render_widget(Paragraph::new(Line::from(text)).alignment(Alignment::Center).bg(DOS_BLUE), r)
         })

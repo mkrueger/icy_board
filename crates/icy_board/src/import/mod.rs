@@ -14,8 +14,8 @@ use icy_board_engine::icy_board::{
     file_areas::FileAreaList,
     group_list::GroupList,
     icb_config::{
-        BoardInformation, ColorConfiguration, ConfigPaths, IcbColor, IcbConfig, PasswordStorageMethod, SubscriptionMode, SysopInformation, SysopSecurityLevels,
-        UserPasswordPolicy,
+        BoardInformation, ColorConfiguration, ConfigPaths, IcbColor, IcbConfig, NewUserSettings, PasswordStorageMethod, SubscriptionMode, SysopInformation,
+        SysopSecurityLevels, UserPasswordPolicy, DEFAULT_PCBOARD_DATE_FROMAT,
     },
     icb_text::IcbTextFile,
     language::SupportedLanguages,
@@ -211,6 +211,7 @@ impl PCBoardImporter {
                 operator: String::new(),
                 notice: String::new(),
                 capabilities: String::new(),
+                date_format: DEFAULT_PCBOARD_DATE_FROMAT.to_string(),
             },
             num_nodes: 32,
             func_keys: self.data.func_keys.clone(),
@@ -237,7 +238,7 @@ impl PCBoardImporter {
                 welcome,
                 newuser,
                 closed,
-                warning,
+                expire_warning: warning,
                 expired,
                 conf_join_menu,
                 group_chat,
@@ -254,6 +255,25 @@ impl PCBoardImporter {
                 bad_email,
                 bad_passwords,
                 vip_users,
+            },
+            new_user_settings: NewUserSettings {
+                sec_level: self.data.user_levels.agree_to_register as u8,
+                new_user_groups: "new_users".to_string(),
+                ask_city: true,
+                ask_state: false,
+                ask_zip: false,
+                ask_country: false,
+                ask_bus_data_phone: true,
+                ask_voice_phone: true,
+                ask_comment: true,
+                ask_clr_msg: true,
+                ask_xfer_protocol: !self.data.skip_protocol,
+                ask_date_format: true,
+                ask_alias: !self.data.skip_alias,
+                ask_gender: true,
+                ask_birthdate: true,
+                ask_email: true,
+                ask_web_address: true,
             },
         };
 
@@ -588,7 +608,7 @@ impl PCBoardImporter {
                 .iter()
                 .map(|u| PcbUser {
                     user: u.clone(),
-                    inf: user_inf[u.rec_num - 1].clone(),
+                    inf: user_inf[u.rec_num as usize].clone(),
                 })
                 .collect::<Vec<PcbUser>>(),
         );

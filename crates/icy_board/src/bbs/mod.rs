@@ -48,7 +48,7 @@ impl BBS {
         self.clear_closed_connections();
         for i in 0..self.open_connections.len() {
             if self.open_connections[i].is_none() {
-                let node_state = Arc::new(Mutex::new(NodeState::new(i, connection_type)));
+                let node_state = Arc::new(Mutex::new(NodeState::new(i + 1, connection_type)));
                 self.open_connections[i] = Some(node_state.clone());
                 return node_state;
             }
@@ -105,7 +105,7 @@ pub fn await_telnet_connections(board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>
 fn handle_client(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<NodeState>>, connection: Box<dyn Connection>) -> Res<()> {
     let mut state = IcyBoardState::new(board, node_state, connection);
     state.session.is_sysop = true;
-    state.set_current_user(0);
+    state.set_current_user(0)?;
 
     let mut cmd = PcbBoardCommand::new(state);
 

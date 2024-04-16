@@ -247,9 +247,13 @@ impl CallWaitScreen {
         let mut area = stats.inner(&Margin { horizontal: 3, vertical: 0 });
         area.height = 1;
 
-        PcbButton::new(format!("{} {}", get_text("call_wait_screen_last_caller"), self.statistics.last_caller))
-            .theme(stat_teme)
-            .render(area, frame.buffer_mut());
+        PcbButton::new(format!(
+            "{} {}",
+            get_text("call_wait_screen_last_caller"),
+            self.statistics.last_callers.last().map_or("", |c| &c.user_name)
+        ))
+        .theme(stat_teme)
+        .render(area, frame.buffer_mut());
 
         stats.y += 1;
         stats.height -= 1;

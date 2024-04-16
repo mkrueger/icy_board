@@ -3,11 +3,12 @@ use std::{
     str::FromStr,
 };
 
-use icy_ppe::datetime::{IcbDate, IcbTime};
+use chrono::{DateTime, Utc};
+use icy_ppe::datetime::IcbDate;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    icb_config::PasswordStorageMethod,
+    icb_config::{PasswordStorageMethod, DEFAULT_PCBOARD_DATE_FROMAT},
     is_false, is_null_16, is_null_64,
     user_inf::{AccountUserInf, BankUserInf, QwkConfigUserInf},
     IcyBoardSerializer, PcbUser,
@@ -36,6 +37,12 @@ impl Password {
     pub fn is_empty(&self) -> bool {
         match self {
             Password::PlainText(s) => s.is_empty(),
+        }
+    }
+
+    pub fn is_valid(&self, pwd: &str) -> bool {
+        match self {
+            Password::PlainText(s) => !pwd.is_empty() && s.eq_ignore_ascii_case(pwd),
         }
     }
 }
@@ -76,16 +83,14 @@ pub struct PasswordInfo {
     pub prev_pwd: Vec<Password>,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "IcbDate::is_empty")]
-    pub last_change: IcbDate,
+    pub last_change: DateTime<Utc>,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_64")]
     pub times_changed: u64,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "IcbDate::is_empty")]
-    pub expire_date: IcbDate,
+    pub expire_date: DateTime<Utc>,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "PasswordStorageMethod::is_default")]
@@ -96,8 +101,11 @@ pub struct PasswordInfo {
 pub struct UserStats {
     /// First date on
     #[serde(default)]
-    #[serde(skip_serializing_if = "IcbDate::is_empty")]
-    pub first_date_on: IcbDate,
+    pub first_dt_on: DateTime<Utc>,
+
+    #[serde(default)]
+    pub last_on: DateTime<Utc>,
+
     /// Number of times the caller has connected
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_64")]
@@ -209,6 +217,10 @@ pub struct UserFlags {
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
+    pub disabled_flag: bool,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
     pub use_graphics: bool,
 }
 
@@ -254,7 +266,7 @@ pub struct User {
 
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
-    pub notes: String,
+    pub date_format: String,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -263,7 +275,7 @@ pub struct User {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub home_voice_phone: String,
 
-    pub birth_date: IcbDate,
+    pub birth_date: DateTime<Utc>,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -273,24 +285,36 @@ pub struct User {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub sysop_comment: String,
 
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub custom_comment1: String,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub custom_comment2: String,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub custom_comment3: String,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub custom_comment4: String,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub custom_comment5: String,
+
     pub password: PasswordInfo,
 
     pub security_level: u8,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "IcbDate::is_empty")]
-    pub exp_date: IcbDate,
+    pub exp_date: DateTime<Utc>,
     /// Expired security level
     pub exp_security_level: u8,
 
     pub flags: UserFlags,
-
-    #[serde(default)]
-    #[serde(skip_serializing_if = "IcbDate::is_empty")]
-    pub last_date_on: IcbDate,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "IcbTime::is_empty")]
-    pub last_time_on: IcbTime,
 
     /// Protocol (A->Z)
     pub protocol: char,
@@ -309,8 +333,7 @@ pub struct User {
 
     /// Date for last DIR Scan (most recent file)
     #[serde(default)]
-    #[serde(skip_serializing_if = "IcbDate::is_empty")]
-    pub date_last_dir_read: IcbDate,
+    pub date_last_dir_read: DateTime<Utc>,
 
     pub qwk_config: Option<QwkConfigUserInf>,
     pub account: Option<AccountUserInf>,
@@ -330,22 +353,6 @@ impl User {
 
     pub fn get_name(&self) -> &String {
         &self.name
-    }
-
-    pub fn get_first_name(&self) -> String {
-        if let Some(idx) = self.name.find(' ') {
-            self.name[..idx].to_string()
-        } else {
-            self.name.clone()
-        }
-    }
-
-    pub fn get_last_name(&self) -> String {
-        if let Some(idx) = self.name.find(' ') {
-            self.name[idx + 1..].to_string()
-        } else {
-            String::new()
-        }
     }
 
     fn import_pcb(id: u64, u: &PcbUser) -> Self {
@@ -423,19 +430,18 @@ impl User {
         } else {
             (IcbDate::new(0, 0, 0), 0, 0, 0, 0, 0, 0, 0, 0, 0)
         };
+        let mut custom_comment1 = String::new();
+        let mut custom_comment2 = String::new();
+        let mut custom_comment3 = String::new();
+        let mut custom_comment4 = String::new();
+        let mut custom_comment5 = String::new();
 
-        let notes = if let Some(notes) = &u.inf.notes {
-            let mut s = String::new();
-            for n in &notes.notes {
-                s.push_str(n);
-                s.push('\n');
-            }
-            while s.ends_with('\n') {
-                s.pop();
-            }
-            s
-        } else {
-            String::new()
+        if let Some(notes) = &u.inf.notes {
+            custom_comment1 = notes.notes.get(0).unwrap_or(&String::new()).clone();
+            custom_comment2 = notes.notes.get(1).unwrap_or(&String::new()).clone();
+            custom_comment3 = notes.notes.get(2).unwrap_or(&String::new()).clone();
+            custom_comment4 = notes.notes.get(3).unwrap_or(&String::new()).clone();
+            custom_comment5 = notes.notes.get(4).unwrap_or(&String::new()).clone();
         };
 
         let qwk_config = u.inf.qwk_config.clone();
@@ -449,8 +455,9 @@ impl User {
             verify,
             city: u.user.city.clone(),
 
+            date_format: DEFAULT_PCBOARD_DATE_FROMAT.to_string(),
             gender,
-            birth_date,
+            birth_date: birth_date.to_utc_date_time(),
             email,
             web,
 
@@ -460,14 +467,18 @@ impl User {
             zip,
             country,
 
-            notes,
+            custom_comment1,
+            custom_comment2,
+            custom_comment3,
+            custom_comment4,
+            custom_comment5,
 
             password: PasswordInfo {
                 password: Password::from_str(&u.user.password).unwrap(),
                 prev_pwd,
-                last_change,
+                last_change: last_change.to_utc_date_time(),
                 times_changed: times_changed as u64,
-                expire_date,
+                expire_date: expire_date.to_utc_date_time(),
                 password_storage_method: PasswordStorageMethod::PlainText,
             },
 
@@ -479,9 +490,9 @@ impl User {
             home_voice_phone: u.user.home_voice_phone.clone(),
             user_comment: u.user.user_comment.clone(),
             sysop_comment: u.user.sysop_comment.clone(),
-            security_level: u.user.security_level,
-            exp_date: u.user.exp_date.clone(),
-            exp_security_level: u.user.exp_security_level,
+            security_level: u.user.security_level as u8,
+            exp_date: u.user.exp_date.to_utc_date_time(),
+            exp_security_level: u.user.exp_security_level as u8,
             flags: UserFlags {
                 expert_mode: u.user.expert_mode,
                 is_dirty: u.user.is_dirty,
@@ -494,17 +505,17 @@ impl User {
                 wide_editor: u.user.wide_editor,
                 delete_flag: u.user.delete_flag,
                 use_graphics: true,
+                disabled_flag: false,
             },
-            last_date_on: u.user.last_date_on.clone(),
-            last_time_on: IcbTime::parse(&u.user.last_time_on.clone()),
             protocol: u.user.protocol,
             page_len: u.user.page_len as u16,
             last_conference: u.user.last_conference,
             elapsed_time_on: u.user.elapsed_time_on,
-            date_last_dir_read: u.user.date_last_dir_read.clone(),
+            date_last_dir_read: u.user.date_last_dir_read.to_utc_date_time(),
 
             stats: UserStats {
-                first_date_on,
+                first_dt_on: first_date_on.to_utc_date_time(),
+                last_on: u.user.last_date_on.to_utc_date_time(),
                 num_times_on: u.user.num_times_on as u64,
                 messages_read: u.user.num_times_on as u64,
                 messages_left: u.user.num_times_on as u64,
@@ -525,6 +536,15 @@ impl User {
             },
         }
     }
+
+    pub fn is_valid_loginname(&self, name: &str) -> bool {
+        let name = name.trim();
+        self.name.eq_ignore_ascii_case(name) || self.alias.eq_ignore_ascii_case(name)
+    }
+
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
+    }
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -542,6 +562,11 @@ impl UserBase {
         self.users.len()
     }
 
+    pub fn next_id(&mut self) -> u64 {
+        self.last_id += 1;
+        self.last_id
+    }
+
     pub fn is_empty(&self) -> bool {
         self.users.is_empty()
     }
@@ -555,6 +580,11 @@ impl UserBase {
             last_id: users.len() as u64,
             users,
         }
+    }
+
+    pub fn new_user(&mut self, new_user: User) -> usize {
+        self.users.push(new_user);
+        self.users.len() - 1
     }
 }
 

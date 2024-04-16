@@ -8,15 +8,18 @@ use std::{
     time::Duration,
 };
 
-use chrono::{DateTime, Datelike, Local, Timelike};
+use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use codepages::tables::UNICODE_TO_CP437;
 use icy_engine::ansi::constants::COLOR_OFFSETS;
 use icy_engine::TextAttribute;
 use icy_engine::{ansi, Buffer, BufferParser, Caret};
 use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
-use icy_ppe::{datetime::IcbDate, executable::Executable, Res};
+use icy_ppe::{executable::Executable, Res};
 
-use crate::vm::{run, DiskIO, TerminalTarget};
+use crate::{
+    icy_board::IcyBoardError,
+    vm::{run, DiskIO, TerminalTarget},
+};
 pub mod functions;
 
 use self::functions::display_flags;
@@ -25,7 +28,7 @@ use super::{
     bulletins::BullettinList,
     conferences::Conference,
     file_areas::FileAreaList,
-    icb_config::IcbColor,
+    icb_config::{IcbColor, DEFAULT_PCBOARD_DATE_FROMAT},
     icb_text::{IcbTextStyle, IceText},
     pcboard_data::Node,
     surveys::SurveyList,
@@ -144,8 +147,6 @@ pub struct Session {
     pub time_limit: i32,
     pub security_violations: i32,
 
-    pub node_num: i32,
-
     /// If true, the keyboard timer is checked.
     /// After it's elapsed logoff the user for inactivity.
     pub keyboard_timer_check: bool,
@@ -159,6 +160,11 @@ pub struct Session {
     pub disable_auto_more: bool,
     pub more_requested: bool,
     pub cancel_batch: bool,
+
+    // needed to copy that for new users.
+    pub user_name: String,
+
+    pub date_format: String,
 }
 
 impl Session {
@@ -176,7 +182,6 @@ impl Session {
             security_violations: 0,
             current_message_area: 0,
             last_new_line_y: 0,
-            node_num: 0,
             page_len: 24,
             is_sysop: false,
             op_text: String::new(),
@@ -190,6 +195,24 @@ impl Session {
             disable_auto_more: false,
             more_requested: false,
             cancel_batch: false,
+            user_name: String::new(),
+            date_format: DEFAULT_PCBOARD_DATE_FROMAT.to_string(),
+        }
+    }
+
+    pub fn get_first_name(&self) -> String {
+        if let Some(idx) = self.user_name.find(' ') {
+            self.user_name[..idx].to_string()
+        } else {
+            self.user_name.clone()
+        }
+    }
+
+    pub fn get_last_name(&self) -> String {
+        if let Some(idx) = self.user_name.find(' ') {
+            self.user_name[idx + 1..].to_string()
+        } else {
+            String::new()
         }
     }
 }
@@ -284,7 +307,8 @@ impl IcyBoardState {
         let caret = Caret::default();
         let mut parser = ansi::Parser::default();
         parser.bs_is_ctrl_char = true;
-
+        let mut session = Session::new();
+        session.date_format = board.lock().unwrap().config.board.date_format.clone();
         Self {
             board,
             connection,
@@ -295,7 +319,7 @@ impl IcyBoardState {
             no_char: 'N',
             debug_level: 0,
             env_vars: HashMap::new(),
-            session: Session::new(),
+            session,
             transfer_statistics: TransferStatistics::default(),
             parser,
             buffer,
@@ -361,20 +385,32 @@ impl IcyBoardState {
         }
     }
 
-    pub fn set_current_user(&mut self, user: i32) {
-        self.session.cur_user = user;
-        self.node_state.lock().unwrap().cur_user = user;
-        if user >= 0 {
-            let last_conference = if let Ok(board) = self.board.lock() {
-                self.current_user = Some(board.users[user as usize].clone());
-                self.session.cur_security = board.users[user as usize].security_level;
-                self.session.page_len = board.users[user as usize].page_len;
-                board.users[user as usize].last_conference as i32
-            } else {
-                return;
-            };
-            self.join_conference(last_conference);
-        }
+    pub fn set_current_user(&mut self, user_number: usize) -> Res<()> {
+        self.session.cur_user = user_number as i32;
+        self.node_state.lock().unwrap().cur_user = user_number as i32;
+        let last_conference = if let Ok(mut board) = self.board.lock() {
+            if user_number >= board.users.len() {
+                log::error!("User number {} is out of range", user_number);
+                return Err(IcyBoardError::UserNumberInvalid(user_number).into());
+            }
+            let mut user = board.users[user_number].clone();
+            user.stats.last_on = Utc::now();
+            user.stats.num_times_on += 1;
+            let conf = user.last_conference as i32;
+            board.statistics.add_caller(user.get_name().clone());
+            if !user.date_format.is_empty() {
+                self.session.date_format = user.date_format.clone();
+            }
+            self.session.cur_security = user.security_level;
+            self.session.page_len = user.page_len;
+            self.session.user_name = user.get_name().clone();
+            self.current_user = Some(user);
+            conf
+        } else {
+            return Err(IcyBoardError::Error("board locked".to_string()).into());
+        };
+        self.join_conference(last_conference);
+        return Ok(());
     }
 
     pub fn join_conference(&mut self, conference: i32) {
@@ -443,7 +479,7 @@ impl IcyBoardState {
                 self.char_buffer.push_back(KeyChar::new(KeySource::StuffedHidden, *c));
             }
         }
-        self.char_buffer.push_back(KeyChar::new(KeySource::StuffedHidden, '\n'));
+        // self.char_buffer.push_back(KeyChar::new(KeySource::StuffedHidden, '\n'));
         Ok(())
     }
 
@@ -528,6 +564,11 @@ impl IcyBoardState {
             }
         }
     }
+
+    pub fn get_term_caps(&self) -> Res<()> {
+        // TODO
+        Ok(())
+    }
 }
 
 enum PcbState {
@@ -579,6 +620,13 @@ impl IcyBoardState {
     /// # Errors
     pub fn print(&mut self, target: TerminalTarget, str: &str) -> Res<()> {
         self.write_raw(target, str.chars().collect::<Vec<char>>().as_slice())
+    }
+
+    pub fn println(&mut self, target: TerminalTarget, str: &str) -> Res<()> {
+        let mut line = str.chars().collect::<Vec<char>>();
+        line.push('\r');
+        line.push('\n');
+        self.write_raw(target, line.as_slice())
     }
 
     fn no_terminal(&self, terminal_target: TerminalTarget) -> bool {
@@ -728,15 +776,15 @@ impl IcyBoardState {
             "DAYBYTES" | "DELAY" | "DIRNAME" | "DIRNUM" | "DLBYTES" | "DLFILES" | "EVENT" => {}
             "EXPDATE" => {
                 if let Some(user) = &self.current_user {
-                    result = user.exp_date.to_string();
+                    result = self.format_date(user.exp_date);
                 } else {
-                    result = IcbDate::default().to_country_date();
+                    result = "NEVER".to_string();
                 }
             }
             "EXPDAYS" => {
                 if self.board.lock().unwrap().config.subscription_info.is_enabled {
                     if let Some(user) = &self.current_user {
-                        if user.exp_date.get_year() != 0 {
+                        if user.exp_date.year() != 0 {
                             result  =
                                 0.to_string() // TODO
                                                /*
@@ -757,14 +805,10 @@ impl IcyBoardState {
             }
             "FBYTES" | "FFILES" | "FILECREDIT" | "FILERATIO" => {}
             "FIRST" => {
-                if let Some(user) = &self.current_user {
-                    result = user.get_first_name();
-                }
+                result = self.session.get_first_name();
             }
             "FIRSTU" => {
-                if let Some(user) = &self.current_user {
-                    result = user.get_first_name().to_uppercase();
-                }
+                result = self.session.get_first_name().to_uppercase();
             }
             "FNUM" => {}
             "FREESPACE" => {}
@@ -794,7 +838,7 @@ impl IcyBoardState {
                 }
             }
             "NOCHAR" => result = self.no_char.to_string(),
-            "NODE" => result = self.session.node_num.to_string(),
+            "NODE" => result = self.node_state.lock().unwrap().node_number.to_string(),
             "NUMBLT" => {
                 if let Ok(bullettins) = self.load_bullettins() {
                     result = bullettins.len().to_string();
@@ -846,9 +890,7 @@ impl IcyBoardState {
             "SBYTES" => result = self.transfer_statistics.downloaded_bytes.to_string(),
             "SFILES" => result = self.transfer_statistics.downloaded_files.to_string(),
             "SYSDATE" => {
-                let now = Local::now();
-                let d = now.date_naive();
-                result = format!("{:02}/{:02}/{:02}", d.month0() + 1, d.day(), d.year_ce().1 % 100);
+                result = self.format_date(Utc::now());
             }
             "SYSOPIN" => result = self.board.lock().unwrap().config.sysop.sysop_start.to_string(),
             "SYSOPOUT" => result = self.board.lock().unwrap().config.sysop.sysop_stop.to_string(),
@@ -1011,7 +1053,7 @@ impl IcyBoardState {
     }
 
     /// # Errors
-    pub fn hangup(&mut self) -> Res<()> {
+    pub fn goodbye(&mut self) -> Res<()> {
         /*   if HangupType::Hangup != hangup_type {
 
             if HangupType::Goodbye == hangup_type {
@@ -1031,6 +1073,11 @@ impl IcyBoardState {
         } */
         self.display_text(IceText::ThanksForCalling, display_flags::LFBEFORE | display_flags::NEWLINE)?;
         self.reset_color()?;
+
+        self.hangup()
+    }
+
+    pub fn hangup(&mut self) -> Res<()> {
         self.session.request_logoff = true;
         self.shutdown_connections();
         Ok(())
@@ -1064,5 +1111,14 @@ impl IcyBoardState {
 
     pub fn new_line(&mut self) -> Res<()> {
         self.write_raw(TerminalTarget::Both, &['\r', '\n'])
+    }
+
+    pub fn format_date(&self, date_time: DateTime<Utc>) -> String {
+        let local_time = date_time.with_timezone(&Local);
+        local_time.format(&self.session.date_format).to_string()
+    }
+    pub fn format_time(&self, date_time: DateTime<Utc>) -> String {
+        let local_time = date_time.with_timezone(&Local);
+        local_time.format("%H:%M").to_string()
     }
 }

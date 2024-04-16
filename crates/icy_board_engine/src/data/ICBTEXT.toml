@@ -8,7 +8,7 @@ style = "White"
 text = " Brand of CPU you are using"
 style = "Yellow"
 
-[AccessDeniedForEvent]
+[DeniedAccessForEvent]
 text = "Access Denied - Upcoming Event Pending ..."
 style = "Red"
 
@@ -16,11 +16,11 @@ style = "Red"
 text = "Time Limit Exceeded."
 style = "Red"
 
-[UnauthorizedName]
+[DeniedUnauthorizedName]
 text = "Access Denied - Unauthorized name match on @USER@!"
 style = "Red"
 
-[LockedOut]
+[DeniedLockedOut]
 text = "Access Denied - You are Locked Out of this System!"
 style = "Red"
 
@@ -2884,3 +2884,8 @@ style = "Yellow"
 
 [MessagesConfArea]
 text = "Conf:                                 Area:"
+style = "Yellow"
+
+[DateFormatDesired]
+text = "Date Format Desired (Enter)=no change"
+style = "Green"
