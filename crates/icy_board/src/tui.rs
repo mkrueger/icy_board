@@ -340,8 +340,11 @@ impl Tui {
                         }
                         let fg = buffer.palette.get_color(fg).get_rgb();
                         let bg = buffer.palette.get_color(c.attribute.get_background()).get_rgb();
-
-                        let out_char = Line::from(c.ch.to_string()).style(Style::new().bg(Color::Rgb(bg.0, bg.1, bg.2)).fg(Color::Rgb(fg.0, fg.1, fg.2)));
+                        let mut s = Style::new().bg(Color::Rgb(bg.0, bg.1, bg.2)).fg(Color::Rgb(fg.0, fg.1, fg.2));
+                        if c.attribute.is_blinking() {
+                            s = s.slow_blink();
+                        }
+                        let out_char = Line::from(c.ch.to_string()).style(s);
 
                         ctx.print(x as f64 + 1.0, (area.height as i32 - 1 - y) as f64, out_char);
                     }

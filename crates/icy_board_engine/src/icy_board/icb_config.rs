@@ -128,7 +128,7 @@ pub struct SysopInformation {
     pub sysop_stop: IcbTime,
 }
 
-#[derive(PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct ColorConfiguration {
     ///  color code for default color
     pub default: IcbColor,
@@ -144,6 +144,42 @@ pub struct ColorConfiguration {
     pub msg_hdr_read: IcbColor,
     ///  color for CONF line of message header
     pub msg_hdr_conf: IcbColor,
+
+    pub file_name: IcbColor,
+    pub file_size: IcbColor,
+    pub file_date: IcbColor,
+    pub file_description: IcbColor,
+    pub file_head: IcbColor,
+    pub file_text: IcbColor,
+    pub file_description_low: IcbColor,
+    pub file_deleted: IcbColor,
+    pub file_offline: IcbColor,
+    pub file_new_file: IcbColor,
+}
+
+impl Default for ColorConfiguration {
+    fn default() -> Self {
+        Self {
+            default: IcbColor::Dos(0x07),
+            msg_hdr_date: IcbColor::Dos(0x1F),
+            msg_hdr_to: IcbColor::Dos(0x3F),
+            msg_hdr_from: IcbColor::Dos(0x3F),
+            msg_hdr_subj: IcbColor::Dos(0x3F),
+            msg_hdr_read: IcbColor::Dos(0x3E),
+            msg_hdr_conf: IcbColor::Dos(0x3E),
+
+            file_name: IcbColor::Dos(0x0E),
+            file_size: IcbColor::Dos(0x02),
+            file_date: IcbColor::Dos(0x04),
+            file_description: IcbColor::Dos(0x0B),
+            file_head: IcbColor::Dos(0x06),
+            file_text: IcbColor::Dos(0x06),
+            file_description_low: IcbColor::Dos(0x03),
+            file_deleted: IcbColor::Dos(0x0F),
+            file_offline: IcbColor::Dos(0x05),
+            file_new_file: IcbColor::Dos(0x8F),
+        }
+    }
 }
 
 #[derive(PartialEq, Clone)]
@@ -342,15 +378,7 @@ impl IcbConfig {
                 edit_message_headers: 110,
                 protect_unprotect_messages: 110,
             },
-            color_configuration: ColorConfiguration {
-                default: IcbColor::Dos(0x07),
-                msg_hdr_date: IcbColor::Dos(0x1F),
-                msg_hdr_to: IcbColor::Dos(0x3F),
-                msg_hdr_from: IcbColor::Dos(0x3F),
-                msg_hdr_subj: IcbColor::Dos(0x3F),
-                msg_hdr_read: IcbColor::Dos(0x3E),
-                msg_hdr_conf: IcbColor::Dos(0x3E),
-            },
+            color_configuration: ColorConfiguration::default(),
             func_keys: Default::default(),
             num_nodes: 32,
             subscription_info: SubscriptionMode {

@@ -1,10 +1,8 @@
-use dizbase::file_base::{metadata::MetadaType, FileBase};
-use humanize_bytes::humanize_bytes_decimal;
+use dizbase::file_base::{file_header::FileHeader, FileBase};
 use icy_board_engine::{
     icy_board::{
         commands::Command,
         file_areas::FileAreaList,
-        icb_config::IcbColor,
         icb_text::IceText,
         state::{functions::display_flags, UserActivity},
         IcyBoardSerializer,
@@ -18,6 +16,8 @@ use super::{PcbBoardCommand, MASK_COMMAND};
 impl PcbBoardCommand {
     pub fn show_file_directories(&mut self, action: &Command) -> Res<()> {
         self.state.node_state.lock().unwrap().user_activity = UserActivity::BrowseFiles;
+        self.state.session.disable_auto_more = false;
+        self.state.session.more_requested = false;
 
         let file_area_file = self.state.resolve_path(&self.state.session.current_conference.file_area_file);
 
@@ -77,6 +77,7 @@ impl PcbBoardCommand {
     }
 
     fn display_file_area(&mut self, action: &Command, area: &&icy_board_engine::icy_board::file_areas::FileArea) -> Res<()> {
+        let colors = self.state.board.lock().unwrap().config.color_configuration.clone();
         let file_base_path = self.state.resolve_path(&area.file_base);
         let Ok(base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());
@@ -88,7 +89,7 @@ impl PcbBoardCommand {
 
         self.state.clear_screen()?;
 
-        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(6))?;
+        self.state.set_color(TerminalTarget::Both, colors.file_head)?;
         self.state
             .print(TerminalTarget::Both, "Filename       Size      Date    Description of File Contents")?;
         self.state.new_line()?;
@@ -98,64 +99,12 @@ impl PcbBoardCommand {
         )?;
         self.state.new_line()?;
 
-        let mut files = base.iter();
-        self.state.session.disable_auto_more = true;
-        let short_header = if let Some(user) = &self.state.current_user {
-            user.flags.use_short_filedescr
-        } else {
-            false
-        };
-
-        while let Some(file) = files.next() {
-            let header = file?;
-
-            let metadata = base.read_metadata(&header)?;
-
-            let size = header.size();
-            let date = header.file_date().unwrap();
-            let name = header.name();
-            self.state.set_color(TerminalTarget::Both, IcbColor::Dos(14))?;
-            self.state.print(TerminalTarget::Both, &format!("{:<12} ", name))?;
-            if name.len() > 12 {
-                self.state.new_line()?;
-            }
-            self.state.set_color(TerminalTarget::Both, IcbColor::Dos(2))?;
-            self.state
-                .print(TerminalTarget::Both, &format!("{:>8}  ", humanize_bytes_decimal!(size).to_string()))?;
-            self.state.set_color(TerminalTarget::Both, IcbColor::Dos(4))?;
-            self.state.print(TerminalTarget::Both, &format!("{}", date.format("%m/%d/%C")))?;
-            self.state.set_color(TerminalTarget::Both, IcbColor::Dos(3))?;
-
-            self.state.print(TerminalTarget::Both, "  ")?;
-
-            let mut printed_lines = false;
-            for m in metadata {
-                if m.get_type() == MetadaType::FileID {
-                    let description = std::str::from_utf8(&m.data)?;
-                    self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11))?;
-                    for (i, line) in description.lines().enumerate() {
-                        if i > 0 {
-                            self.state.print(TerminalTarget::Both, &format!("{:33}", " "))?;
-                        }
-                        self.state.print(TerminalTarget::Both, line)?;
-                        self.state.new_line()?;
-                        printed_lines = true;
-                        if self.state.session.more_requested && !self.filebase_more(action)? {
-                            return Ok(());
-                        }
-                        if short_header {
-                            break;
-                        }
-                        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(3))?;
-                    }
-                }
-            }
-            if !printed_lines {
-                self.state.new_line()?;
-            }
+        let files: Vec<FileHeader> = base.iter().flatten().collect();
+        let c: Vec<&FileHeader> = files.iter().collect();
+        self.display_file_list(action, &base, &c)?;
+        if self.state.session.num_lines_printed > 0 {
+            self.filebase_more(action)?;
         }
-        self.filebase_more(action)?;
-
         self.state.session.disable_auto_more = false;
         self.state.session.more_requested = false;
         Ok(())

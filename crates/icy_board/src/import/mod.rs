@@ -177,6 +177,34 @@ impl PCBoardImporter {
 
         let conferences = self.convert_conferences(&self.data.path.conference_file.clone(), "config/conferences.toml")?;
 
+        let color_file = self.resolve_file(&self.data.path.color_file)?;
+
+        let mut color_configuration = ColorConfiguration {
+            default: IcbColor::Dos(self.data.colors.default as u8),
+            msg_hdr_date: IcbColor::Dos(self.data.colors.msg_hdr_date as u8),
+            msg_hdr_to: IcbColor::Dos(self.data.colors.msg_hdr_to as u8),
+            msg_hdr_from: IcbColor::Dos(self.data.colors.msg_hdr_from as u8),
+            msg_hdr_subj: IcbColor::Dos(self.data.colors.msg_hdr_subj as u8),
+            msg_hdr_read: IcbColor::Dos(self.data.colors.msg_hdr_read as u8),
+            msg_hdr_conf: IcbColor::Dos(self.data.colors.msg_hdr_conf as u8),
+            ..Default::default()
+        };
+
+        if color_file.exists() {
+            let color_file = fs::read(color_file)?;
+            let start = 123;
+            color_configuration.file_name = IcbColor::Dos(color_file[start]);
+            color_configuration.file_size = IcbColor::Dos(color_file[start + 2]);
+            color_configuration.file_date = IcbColor::Dos(color_file[start + 4]);
+            color_configuration.file_description = IcbColor::Dos(color_file[start + 6]);
+            color_configuration.file_head = IcbColor::Dos(color_file[start + 8]);
+            color_configuration.file_text = IcbColor::Dos(color_file[start + 10]);
+            color_configuration.file_description_low = IcbColor::Dos(color_file[start + 12]);
+            color_configuration.file_deleted = IcbColor::Dos(color_file[start + 14]);
+            color_configuration.file_offline = IcbColor::Dos(color_file[start + 16]);
+            color_configuration.file_new_file = IcbColor::Dos(color_file[start + 18]);
+        }
+
         let icb_cfg = IcbConfig {
             sysop: SysopInformation {
                 name: self.data.sysop_info.sysop.clone(),
@@ -196,15 +224,7 @@ impl PCBoardImporter {
                 edit_message_headers: self.data.sysop_security.edit_message_headers as u8,
                 protect_unprotect_messages: self.data.sysop_security.protect_unprotect_messages as u8,
             },
-            color_configuration: ColorConfiguration {
-                default: IcbColor::Dos(self.data.colors.default as u8),
-                msg_hdr_date: IcbColor::Dos(self.data.colors.msg_hdr_date as u8),
-                msg_hdr_to: IcbColor::Dos(self.data.colors.msg_hdr_to as u8),
-                msg_hdr_from: IcbColor::Dos(self.data.colors.msg_hdr_from as u8),
-                msg_hdr_subj: IcbColor::Dos(self.data.colors.msg_hdr_subj as u8),
-                msg_hdr_read: IcbColor::Dos(self.data.colors.msg_hdr_read as u8),
-                msg_hdr_conf: IcbColor::Dos(self.data.colors.msg_hdr_conf as u8),
-            },
+            color_configuration,
             board: BoardInformation {
                 name: self.data.board_name.clone(),
                 location: String::new(),

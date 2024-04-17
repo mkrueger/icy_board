@@ -628,6 +628,7 @@ impl IcyBoardSerializer for UserBase {
             let user: User = toml::from_str(&user_txt)?;
             res.users.push(user);
         }
+        res.users.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(res)
     }
 

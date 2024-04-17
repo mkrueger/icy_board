@@ -120,7 +120,7 @@ impl PcbBoardCommand {
         self.state.new_line()?;
         base.load_headers()?;
         let files = base.find_files(search_pattern.as_str())?;
-        self.display_files(action, &base, files)
+        self.display_file_list(action, &base, &files)
     }
 
     pub fn find_new_files(&mut self, action: &Command, time_stamp: u64) -> Res<()> {
@@ -144,7 +144,7 @@ impl PcbBoardCommand {
         };
         base.load_headers()?;
         let files = base.find_newer_files(time_stamp)?;
-        self.display_files(action, &base, files)
+        self.display_file_list(action, &base, &files)
     }
 
     pub fn zippy_directory_scan(&mut self, action: &Command) -> Res<()> {
@@ -248,42 +248,52 @@ impl PcbBoardCommand {
         self.state.new_line()?;
         base.load_headers()?;
         let files = base.find_files_with_pattern(search_pattern.as_str())?;
-        self.display_files(action, &base, files)
+        self.display_file_list(action, &base, &files)?;
+
+        self.state.session.disable_auto_more = false;
+        self.state.session.more_requested = false;
+        Ok(())
     }
 
-    fn display_files(&mut self, action: &Command, base: &FileBase, files: Vec<&FileHeader>) -> Res<()> {
+    pub fn display_file_list(&mut self, action: &Command, base: &FileBase, files: &[&FileHeader]) -> Res<()> {
         self.state.session.disable_auto_more = true;
         let short_header = if let Some(user) = &self.state.current_user {
             user.flags.use_short_filedescr
         } else {
             false
         };
+        let colors = self.state.board.lock().unwrap().config.color_configuration.clone();
 
-        for header in &files {
+        for header in files {
             let metadata = base.read_metadata(header)?;
 
             let size = header.size();
             let date = header.file_date().unwrap();
             let name = header.name();
-            self.state.set_color(TerminalTarget::Both, IcbColor::Dos(14))?;
+            self.state.set_color(TerminalTarget::Both, colors.file_name.clone())?;
             self.state.print(TerminalTarget::Both, &format!("{:<12} ", name))?;
             if name.len() > 12 {
                 self.state.new_line()?;
             }
-            self.state.set_color(TerminalTarget::Both, IcbColor::Dos(2))?;
+            self.state.set_color(TerminalTarget::Both, colors.file_size.clone())?;
             self.state
                 .print(TerminalTarget::Both, &format!("{:>8}  ", humanize_bytes_decimal!(size).to_string()))?;
-            self.state.set_color(TerminalTarget::Both, IcbColor::Dos(4))?;
+            self.state.set_color(TerminalTarget::Both, colors.file_date.clone())?;
             self.state.print(TerminalTarget::Both, &format!("{}", date.format("%m/%d/%C")))?;
-            self.state.set_color(TerminalTarget::Both, IcbColor::Dos(3))?;
-
-            self.state.print(TerminalTarget::Both, "  ")?;
+            if false {
+                self.state.set_color(TerminalTarget::Both, colors.file_new_file.clone())?;
+                self.state.print(TerminalTarget::Both, "*")?;
+                self.state.reset_color()?;
+                self.state.print(TerminalTarget::Both, " ")?;
+            } else {
+                self.state.print(TerminalTarget::Both, "  ")?;
+            }
 
             let mut printed_lines = false;
             for m in metadata {
                 if m.get_type() == MetadaType::FileID {
                     let description = std::str::from_utf8(&m.data)?;
-                    self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11))?;
+                    self.state.set_color(TerminalTarget::Both, colors.file_description.clone())?;
                     for (i, line) in description.lines().enumerate() {
                         if i > 0 {
                             self.state.print(TerminalTarget::Both, &format!("{:33}", " "))?;
@@ -298,7 +308,7 @@ impl PcbBoardCommand {
                         if short_header {
                             break;
                         }
-                        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(3))?;
+                        self.state.set_color(TerminalTarget::Both, colors.file_description_low.clone())?;
                     }
                 }
             }
@@ -306,9 +316,6 @@ impl PcbBoardCommand {
                 self.state.new_line()?;
             }
         }
-
-        self.state.session.disable_auto_more = false;
-        self.state.session.more_requested = false;
         Ok(())
     }
 }
