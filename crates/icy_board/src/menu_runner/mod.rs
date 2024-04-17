@@ -18,6 +18,7 @@ mod find_files;
 mod login;
 mod message_reader;
 mod recover_message;
+mod set_language;
 mod set_transfer_protocol;
 mod show_bulletins;
 mod show_file_directories;
@@ -206,6 +207,10 @@ impl PcbBoardCommand {
             CommandType::UserList => {
                 // USER
                 self.show_user_list(action)?;
+            }
+            CommandType::SetLanguage => {
+                // LANG
+                self.set_language(action)?;
             }
 
             CommandType::RestoreMessage => {

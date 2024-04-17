@@ -131,7 +131,7 @@ impl PPECall {
 
 impl IcyBoardState {
     pub fn display_text(&mut self, message_number: IceText, display_flags: i32) -> Res<()> {
-        let txt_entry = self.board.lock().unwrap().display_text.get_display_text(message_number)?;
+        let txt_entry = self.display_text.get_display_text(message_number)?;
         let color = if txt_entry.style == IcbTextStyle::Plain {
             self.user_screen.caret.get_attribute().as_u8(IceMode::Blink).into()
         } else {
@@ -216,6 +216,9 @@ impl IcyBoardState {
     pub fn display_file<P: AsRef<Path>>(&mut self, file_name: &P) -> Res<bool> {
         let resolved_name = self.board.lock().unwrap().resolve_file(file_name);
 
+        // lookup language/security/graphics mode
+        let resolved_name = self.find_more_specific_file(resolved_name);
+
         let Ok(content) = fs::read(resolved_name) else {
             self.bell()?;
             self.set_color(TerminalTarget::Both, pcb_colors::RED)?;
@@ -257,7 +260,7 @@ impl IcyBoardState {
         default_string: Option<String>,
         display_flags: i32,
     ) -> Res<String> {
-        let txt_entry = self.board.lock().unwrap().display_text.get_display_text(message_number)?;
+        let txt_entry = self.display_text.get_display_text(message_number)?;
 
         self.input_string(txt_entry.style.to_color(), txt_entry.text, len, valid_mask, help, default_string, display_flags)
     }

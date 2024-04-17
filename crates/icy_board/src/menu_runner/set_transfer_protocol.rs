@@ -69,9 +69,9 @@ impl PcbBoardCommand {
             }
 
             if "N" == cur_protocol {
-                protocols.push(format!("=> (N) {}", board.display_text.get_display_text(IceText::None).unwrap().text));
+                protocols.push(format!("=> (N) {}", board.default_display_text.get_display_text(IceText::None).unwrap().text));
             } else {
-                protocols.push(format!("   (N) {}", board.display_text.get_display_text(IceText::None).unwrap().text));
+                protocols.push(format!("   (N) {}", board.default_display_text.get_display_text(IceText::None).unwrap().text));
             }
         }
 

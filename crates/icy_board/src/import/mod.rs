@@ -148,7 +148,7 @@ impl PCBoardImporter {
             file_name.chars().next().unwrap_or_default().is_ascii_digit()
         })?;
 
-        let icbtext = self.convert_pcbtext(&(self.data.path.text_loc.clone() + "/PCBTEXT"), "data/icbtext.toml")?;
+        let icbtext = self.convert_pcbtext(&(self.data.path.text_loc.clone() + "/PCBTEXT"), "data/icbtext")?;
         let bad_users = self.convert_trashcan(&self.data.path.tcan_file.clone(), "config/bad_users.txt")?;
 
         let bad_email = self.create_file(include_str!("../../data/bad_email.txt"), "config/bad_email.txt")?;
@@ -407,17 +407,42 @@ impl PCBoardImporter {
 
         let resolved_file = self.resolve_file(pcb_text_file)?;
 
-        let mut text_file = IcbTextFile::load(&resolved_file)?;
-        for (i, entry) in text_file.iter_mut().enumerate() {
-            entry.text = self.scan_line_for_commands(&entry.text, &format!("PCBTEXT, entry {}", i))?;
-        }
-        if let Err(err) = text_file.save(&destination) {
-            self.logger.log_boxed_error(&*err);
-        }
-        self.logger.converted_file(&resolved_file, &destination, true);
-        self.logger.log("");
+        if let Some(parent) = resolved_file.parent() {
+            for entry in fs::read_dir(parent)?.flatten() {
+                if entry.path().is_dir() {
+                    continue;
+                }
+                if entry
+                    .file_name()
+                    .to_str()
+                    .unwrap()
+                    .to_ascii_uppercase()
+                    .starts_with(&resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase())
+                {
+                    if let Ok(mut text_file) = IcbTextFile::load(&entry.path()) {
+                        for (i, entry) in text_file.iter_mut().enumerate() {
+                            entry.text = self.scan_line_for_commands(&entry.text, &format!("PCBTEXT, entry {}", i))?;
+                        }
+                        let destination = PathBuf::from(
+                            destination
+                                .with_extension(entry.path().extension().unwrap_or_default().to_ascii_lowercase())
+                                .to_string_lossy()
+                                .to_string()
+                                + ".toml",
+                        );
+                        println!("------------- PCBTEXT import: {} ->{}", entry.path().display(), destination.display());
 
-        Ok(PathBuf::from(new_rel_name))
+                        if let Err(err) = text_file.save(&destination) {
+                            self.logger.log_boxed_error(&*err);
+                        }
+                        self.logger.converted_file(&resolved_file, &destination, true);
+                        self.logger.log("");
+                    }
+                }
+            }
+        }
+
+        Ok(PathBuf::from(new_rel_name.to_string() + ".toml"))
     }
 
     pub fn scan_line_for_commands(&mut self, line: &str, context: &str) -> Res<String> {

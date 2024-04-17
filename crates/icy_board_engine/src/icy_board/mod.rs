@@ -91,7 +91,7 @@ pub struct IcyBoard {
     pub users: UserBase,
     pub config: IcbConfig,
     pub conferences: ConferenceBase,
-    pub display_text: IcbTextFile,
+    pub default_display_text: IcbTextFile,
 
     // TODO: proper board statistics.
     pub num_callers: usize,
@@ -106,10 +106,10 @@ pub struct IcyBoard {
 
 impl IcyBoard {
     pub fn new() -> Self {
-        let display_text = IcbTextFile::default();
+        let default_display_text = IcbTextFile::default();
 
         IcyBoard {
-            display_text,
+            default_display_text,
             root_path: PathBuf::new(),
             users: UserBase::default(),
             config: IcbConfig::new(),
@@ -165,7 +165,7 @@ impl IcyBoard {
         })?;
 
         let load_path = RelativePath::from_path(&config.paths.icbtext)?.to_path(parent_path);
-        let display_text = IcbTextFile::load(&load_path).map_err(|e| {
+        let default_display_text = IcbTextFile::load(&load_path).map_err(|e| {
             log::error!("Error loading display text: {} from {}", e, load_path.display());
             e
         })?;
@@ -206,7 +206,7 @@ impl IcyBoard {
             users,
             config,
             conferences,
-            display_text,
+            default_display_text,
             languages,
             protocols,
             sec_levels,

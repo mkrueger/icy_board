@@ -157,26 +157,8 @@ impl PcbBoardCommand {
                         }
                     }
                     "L" => {
-                        let to_txt = self
-                            .state
-                            .board
-                            .lock()
-                            .unwrap()
-                            .display_text
-                            .get_display_text(IceText::To)?
-                            .text
-                            .trim_start()
-                            .replace("~", " ");
-                        let subj_txt = self
-                            .state
-                            .board
-                            .lock()
-                            .unwrap()
-                            .display_text
-                            .get_display_text(IceText::Subject)?
-                            .text
-                            .trim_start()
-                            .replace("~", " ");
+                        let to_txt = self.state.display_text.get_display_text(IceText::To)?.text.trim_start().replace("~", " ");
+                        let subj_txt = self.state.display_text.get_display_text(IceText::Subject)?.text.trim_start().replace("~", " ");
 
                         let to_part = format!("{}{}", to_txt, to);
                         let subj_part = format!("{}{}", subj_txt, subj);

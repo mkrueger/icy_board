@@ -629,7 +629,6 @@ pub fn cursec(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
 
 pub fn gettoken(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     if let Some(tok) = vm.icy_board_state.session.tokens.pop_front() {
-        log::info!("gettoken: {}", tok);
         Ok(VariableValue::new_string(tok))
     } else {
         Ok(VariableValue::new_string(String::new()))

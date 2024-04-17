@@ -29,7 +29,7 @@ use super::{
     conferences::Conference,
     file_areas::FileAreaList,
     icb_config::{IcbColor, DEFAULT_PCBOARD_DATE_FORMAT},
-    icb_text::{IcbTextStyle, IceText},
+    icb_text::{IcbTextFile, IcbTextStyle, IceText},
     pcboard_data::Node,
     surveys::SurveyList,
     user_base::User,
@@ -130,6 +130,7 @@ pub struct Session {
     pub cur_user: i32,
     pub cur_security: u8,
     pub cur_groups: Vec<String>,
+    pub language: String,
 
     pub page_len: u16,
 
@@ -205,7 +206,7 @@ impl Session {
             user_name: String::new(),
             date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
             cursor_pos: Position::default(),
-
+            language: String::new(),
             yes_char: 'Y',
             no_char: 'N',
             yes_no_mask: "YyNn".to_string(),
@@ -289,7 +290,9 @@ impl KeyChar {
 }
 
 pub struct IcyBoardState {
+    root_path: PathBuf,
     pub connection: Box<dyn Connection>,
+
     pub board: Arc<Mutex<IcyBoard>>,
 
     pub node_state: Arc<Mutex<NodeState>>,
@@ -301,6 +304,8 @@ pub struct IcyBoardState {
     pub current_user: Option<User>,
 
     pub session: Session,
+
+    pub display_text: IcbTextFile,
 
     /// 0 = no debug, 1 - errors, 2 - errors and warnings, 3 - all
     pub debug_level: i32,
@@ -332,13 +337,17 @@ impl IcyBoardState {
     pub fn new(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<NodeState>>, connection: Box<dyn Connection>) -> Self {
         let mut session = Session::new();
         session.date_format = board.lock().unwrap().config.board.date_format.clone();
+        let display_text = board.lock().unwrap().default_display_text.clone();
+        let root_path = board.lock().unwrap().root_path.clone();
         Self {
+            root_path,
             board,
             connection,
             node_state,
             nodes: Vec::new(),
             current_user: None,
             debug_level: 0,
+            display_text,
             env_vars: HashMap::new(),
             session,
             transfer_statistics: TransferStatistics::default(),
@@ -347,7 +356,22 @@ impl IcyBoardState {
             char_buffer: VecDeque::new(),
         }
     }
+    fn update_language(&mut self) {
+        if !self.session.language.is_empty() {
+            let lang_file = &self.board.lock().unwrap().config.paths.icbtext;
+            let lang_file = lang_file.with_extension(format!("{}.toml", self.session.language));
+            let lang_file = self.resolve_path(&lang_file);
 
+            log::info!("Loading language file: {}", lang_file.display());
+            if lang_file.exists() {
+                if let Ok(display_text) = IcbTextFile::load(&lang_file) {
+                    self.display_text = display_text;
+                    return;
+                }
+            }
+        }
+        self.display_text = self.board.lock().unwrap().default_display_text.clone();
+    }
     /// Turns on keyboard check & resets the keyboard check timer.
     pub fn reset_keyboard_check_timer(&mut self) {
         self.session.keyboard_timer_check = true;
@@ -403,34 +427,6 @@ impl IcyBoardState {
         } else {
             Ok(())
         }
-    }
-
-    pub fn set_current_user(&mut self, user_number: usize) -> Res<()> {
-        self.session.cur_user = user_number as i32;
-        self.node_state.lock().unwrap().cur_user = user_number as i32;
-        let last_conference = if let Ok(mut board) = self.board.lock() {
-            if user_number >= board.users.len() {
-                log::error!("User number {} is out of range", user_number);
-                return Err(IcyBoardError::UserNumberInvalid(user_number).into());
-            }
-            let mut user = board.users[user_number].clone();
-            user.stats.last_on = Utc::now();
-            user.stats.num_times_on += 1;
-            let conf = user.last_conference as i32;
-            board.statistics.add_caller(user.get_name().clone());
-            if !user.date_format.is_empty() {
-                self.session.date_format = user.date_format.clone();
-            }
-            self.session.cur_security = user.security_level;
-            self.session.page_len = user.page_len;
-            self.session.user_name = user.get_name().clone();
-            self.current_user = Some(user);
-            conf
-        } else {
-            return Err(IcyBoardError::Error("board locked".to_string()).into());
-        };
-        self.join_conference(last_conference);
-        return Ok(());
     }
 
     pub fn join_conference(&mut self, conference: i32) {
@@ -569,8 +565,12 @@ impl IcyBoardState {
 
         None
     }
+
     pub fn resolve_path<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
-        PathBuf::from(self.board.lock().unwrap().resolve_file(&file))
+        if !file.as_ref().is_absolute() {
+            return self.root_path.join(file);
+        }
+        file.as_ref().to_path_buf()
     }
 
     fn shutdown_connections(&mut self) {
@@ -590,7 +590,56 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub fn save_current_user(&self) -> Res<()> {
+    pub fn set_current_user(&mut self, user_number: usize) -> Res<()> {
+        let old_language = self.session.language.clone();
+
+        self.session.cur_user = user_number as i32;
+        self.node_state.lock().unwrap().cur_user = user_number as i32;
+        let last_conference = if let Ok(mut board) = self.board.lock() {
+            if user_number >= board.users.len() {
+                log::error!("User number {} is out of range", user_number);
+                return Err(IcyBoardError::UserNumberInvalid(user_number).into());
+            }
+            let mut user = board.users[user_number].clone();
+            user.stats.last_on = Utc::now();
+            user.stats.num_times_on += 1;
+            let conf = user.last_conference as i32;
+            board.statistics.add_caller(user.get_name().clone());
+            if !user.date_format.is_empty() {
+                self.session.date_format = user.date_format.clone();
+            }
+            self.session.language = user.language.clone();
+            self.session.cur_security = user.security_level;
+            self.session.page_len = user.page_len;
+            self.session.user_name = user.get_name().clone();
+            self.current_user = Some(user);
+            conf
+        } else {
+            return Err(IcyBoardError::Error("board locked".to_string()).into());
+        };
+        if self.session.language != old_language {
+            self.update_language();
+        }
+        self.join_conference(last_conference);
+        return Ok(());
+    }
+
+    pub fn save_current_user(&mut self) -> Res<()> {
+        let old_language = self.session.language.clone();
+        self.session.date_format = if let Some(user) = &self.current_user {
+            self.session.language = user.language.clone();
+            if !user.date_format.is_empty() {
+                user.date_format.clone()
+            } else {
+                self.session.date_format.clone()
+            }
+        } else {
+            self.session.date_format.clone()
+        };
+        if self.session.language != old_language {
+            self.update_language();
+        }
+
         if let Ok(mut board) = self.board.lock() {
             if let Some(user) = &self.current_user {
                 for u in 0..board.users.len() {
@@ -603,6 +652,51 @@ impl IcyBoardState {
         }
         log::error!("User not found in user list");
         Ok(())
+    }
+
+    fn find_more_specific_file(&self, base_name: String) -> PathBuf {
+        if let Some(result) = self.find_more_specific_file_with_graphics(base_name.clone() + &self.session.cur_security.to_string()) {
+            return result;
+        }
+        if let Some(result) = self.find_more_specific_file_with_graphics(base_name.clone()) {
+            return result;
+        }
+
+        PathBuf::from(base_name)
+    }
+
+    fn find_more_specific_file_with_graphics(&self, base_name: String) -> Option<PathBuf> {
+        if self.session.disp_options.grapics_mode == GraphicsMode::Rip {
+            if let Some(result) = self.find_more_specific_file_with_language(base_name.clone() + "r") {
+                return Some(result);
+            }
+        }
+        if self.session.disp_options.grapics_mode == GraphicsMode::Avatar {
+            if let Some(result) = self.find_more_specific_file_with_language(base_name.clone() + "v") {
+                return Some(result);
+            }
+        }
+        if self.session.disp_options.grapics_mode != GraphicsMode::Off {
+            if let Some(result) = self.find_more_specific_file_with_language(base_name.clone() + "g") {
+                return Some(result);
+            }
+        }
+
+        self.find_more_specific_file_with_language(base_name)
+    }
+
+    fn find_more_specific_file_with_language(&self, base_name: String) -> Option<PathBuf> {
+        if !self.session.language.is_empty() {
+            let lang_file = PathBuf::from(&base_name).with_extension(format!("{}", self.session.language));
+            if lang_file.exists() {
+                return Some(lang_file);
+            }
+        }
+        let lang_file = PathBuf::from(base_name);
+        if lang_file.exists() {
+            return Some(lang_file);
+        }
+        None
     }
 }
 
@@ -869,7 +963,7 @@ impl IcyBoardState {
                     }
                 }
                 if result.is_empty() {
-                    let entry = self.board.lock().unwrap().display_text.get_display_text(IceText::Unlimited).unwrap();
+                    let entry = self.display_text.get_display_text(IceText::Unlimited).unwrap();
                     if entry.style != IcbTextStyle::Plain {
                         let _ = self.set_color(target, entry.style.to_color());
                     }

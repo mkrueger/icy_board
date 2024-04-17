@@ -279,6 +279,10 @@ pub struct User {
 
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
+    pub language: String,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub bus_data_phone: String,
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -522,7 +526,7 @@ impl User {
             last_conference: u.user.last_conference,
             elapsed_time_on: u.user.elapsed_time_on,
             date_last_dir_read: u.user.date_last_dir_read.to_utc_date_time(),
-
+            language: String::new(),
             stats: UserStats {
                 first_dt_on: first_date_on.to_utc_date_time(),
                 last_on: u.user.last_date_on.to_utc_date_time(),

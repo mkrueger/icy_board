@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{IcyBoardSerializer, PCBoardImport, PCBoardTextImport};
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct Language {
     pub description: String,
     pub locale: String,
@@ -14,7 +14,7 @@ pub struct Language {
     pub no_char: char,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct SupportedLanguages {
     pub date_formats: Vec<(String, String)>,
 
@@ -57,7 +57,7 @@ impl PCBoardTextImport for SupportedLanguages {
             }
 
             let description = splitted_line[0].to_string();
-            let extension = splitted_line[1].to_string().to_ascii_lowercase();
+            let extension = splitted_line[1].to_ascii_lowercase().trim_start_matches('.').to_string();
             let lang = if let Ok(lang_code) = splitted_line[2].parse() {
                 convert_dos_country_code(lang_code)
             } else {

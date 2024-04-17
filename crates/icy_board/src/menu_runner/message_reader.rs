@@ -226,7 +226,7 @@ impl PcbBoardCommand {
     }
 
     fn read_msgs_from_base(&mut self, message_base: JamMessageBase, action: &Command) -> Res<()> {
-        let viewer = MessageViewer::load(&self.state.board.lock().unwrap().display_text)?;
+        let viewer = MessageViewer::load(&self.state.display_text)?;
 
         while !self.state.session.disp_options.abort_printout {
             let prompt = if self.state.session.expert_mode {
