@@ -206,6 +206,12 @@ pub enum CommandType {
 
     // SYSOP '4' command
     RestoreMessage,
+
+    // '@'
+    ReadEmail,
+
+    // '@W'
+    WriteEmail,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Default)]

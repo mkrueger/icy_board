@@ -168,6 +168,7 @@ impl NodeMonitoringScreen {
                             icy_board_engine::icy_board::state::UserActivity::LoggingIn => get_text("icbmoni_user_log_in"),
                             icy_board_engine::icy_board::state::UserActivity::BrowseMenu => get_text("icbmoni_user_browse_menu"),
                             icy_board_engine::icy_board::state::UserActivity::EnterMessage => get_text("icbmoni_user_enter_message"),
+                            icy_board_engine::icy_board::state::UserActivity::CommentToSysop => get_text("icbmoni_comment_to_sysop"),
                             icy_board_engine::icy_board::state::UserActivity::BrowseFiles => get_text("icbmoni_user_browse_files"),
                             icy_board_engine::icy_board::state::UserActivity::ReadMessages => get_text("icbmoni_user_read_messages"),
                             icy_board_engine::icy_board::state::UserActivity::ReadBulletins => get_text("icbmoni_user_read_bulletins"),

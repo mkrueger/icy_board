@@ -163,6 +163,7 @@ pub struct Session {
 
     // needed to copy that for new users.
     pub user_name: String,
+    pub sysop_name: String,
 
     pub date_format: String,
 
@@ -208,6 +209,8 @@ impl Session {
             yes_char: 'Y',
             no_char: 'N',
             yes_no_mask: "YyNn".to_string(),
+
+            sysop_name: "SYSOP".to_string(),
         }
     }
 
@@ -242,6 +245,7 @@ pub enum UserActivity {
     ReadMessages,
     ReadBulletins,
     TakeSurvey,
+    CommentToSysop,
 }
 
 pub struct NodeState {
@@ -587,6 +591,7 @@ impl IcyBoardState {
     }
 }
 
+#[derive(PartialEq)]
 enum PcbState {
     Default,
     GotAt,
@@ -725,7 +730,11 @@ impl IcyBoardState {
                         }
                     }
                     PcbState::ReadAtSequence(s) => {
-                        if *c == '@' {
+                        if c.is_whitespace() {
+                            self.write_chars(target, &['@'])?;
+                            self.write_chars(target, s.chars().collect::<Vec<char>>().as_slice())?;
+                            state = PcbState::Default;
+                        } else if *c == '@' {
                             state = PcbState::Default;
                             if let Some(s) = self.translate_variable(target, &s) {
                                 self.write_chars(target, s.chars().collect::<Vec<char>>().as_slice())?;
@@ -750,6 +759,19 @@ impl IcyBoardState {
                             let color = (c.to_digit(16).unwrap() | (ch1.to_digit(16).unwrap() << 4)) as u8;
                             self.set_color(target, color.into())?;
                         }
+                    }
+                }
+            }
+
+            if state != PcbState::Default {
+                match state {
+                    PcbState::Default => {}
+                    PcbState::GotAt => self.write_chars(target, &['@'])?,
+                    PcbState::ReadColor1 => self.write_chars(target, &['@', *data.last().unwrap()])?,
+                    PcbState::ReadColor2(ch1) => self.write_chars(target, &['@', ch1, *data.last().unwrap()])?,
+                    PcbState::ReadAtSequence(s) => {
+                        self.write_chars(target, &['@'])?;
+                        self.write_chars(target, s.chars().collect::<Vec<char>>().as_slice())?;
                     }
                 }
             }
@@ -1158,4 +1180,59 @@ impl IcyBoardState {
         let local_time = date_time.with_timezone(&Local);
         local_time.format("%H:%M").to_string()
     }
+}
+
+pub mod control_codes {
+    pub const NUL: char = '\x00';
+    pub const CTRL_A: char = '\x01';
+    pub const CTRL_B: char = '\x02';
+    pub const CTRL_C: char = '\x03';
+    pub const CTRL_D: char = '\x04';
+    pub const CTRL_E: char = '\x05';
+    pub const CTRL_F: char = '\x06';
+    pub const CTRL_G: char = '\x07';
+    pub const CTRL_H: char = '\x08';
+    pub const CTRL_I: char = '\x09';
+    pub const CTRL_J: char = '\x0A';
+    pub const CTRL_K: char = '\x0B';
+    pub const CTRL_L: char = '\x0C';
+    pub const CTRL_M: char = '\x0D';
+    pub const CTRL_N: char = '\x0E';
+    pub const CTRL_O: char = '\x0F';
+    pub const CTRL_P: char = '\x10';
+    pub const CTRL_Q: char = '\x11';
+    pub const CTRL_R: char = '\x12';
+    pub const CTRL_S: char = '\x13';
+    pub const CTRL_T: char = '\x14';
+    pub const CTRL_U: char = '\x15';
+    pub const CTRL_V: char = '\x16';
+    pub const CTRL_W: char = '\x17';
+    pub const CTRL_X: char = '\x18';
+    pub const CTRL_Y: char = '\x19';
+    pub const CTRL_Z: char = '\x1A';
+    pub const ESC: char = '\x1B';
+    pub const DEL_HIGH: char = '\x7F';
+
+    pub const LEFT: char = CTRL_S;
+    pub const RIGHT: char = CTRL_D;
+    pub const UP: char = CTRL_E;
+    pub const DOWN: char = CTRL_X;
+
+    pub const PG_UP: char = CTRL_R;
+    pub const PG_DN: char = CTRL_C;
+
+    pub const DEL: char = CTRL_G;
+    pub const BS: char = CTRL_H;
+    pub const TAB: char = CTRL_I;
+
+    pub const HOME: char = CTRL_W;
+    pub const END: char = CTRL_P;
+
+    pub const INS: char = CTRL_V;
+
+    pub const CTRL_LEFT: char = CTRL_A;
+    pub const CTRL_RIGHT: char = CTRL_F;
+    pub const CTRL_END: char = CTRL_K;
+
+    pub const RETURN: char = CTRL_M;
 }

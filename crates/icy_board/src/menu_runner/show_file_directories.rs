@@ -49,25 +49,27 @@ impl PcbBoardCommand {
                 display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )?
         };
-        let mut joined = false;
-        if let Ok(number) = directory_number.parse::<i32>() {
-            if 1 <= number && (number as usize) <= file_areas.len() {
-                let area = &file_areas[number as usize - 1];
 
-                if area.list_security.user_can_access(&self.state.session) {
-                    self.display_file_area(action, &area)?;
+        if !directory_number.is_empty() {
+            let mut joined = false;
+            if let Ok(number) = directory_number.parse::<i32>() {
+                if 1 <= number && (number as usize) <= file_areas.len() {
+                    let area = &file_areas[number as usize - 1];
+
+                    if area.list_security.user_can_access(&self.state.session) {
+                        self.display_file_area(action, &area)?;
+                    }
+
+                    joined = true;
                 }
+            }
 
-                joined = true;
+            if !joined {
+                self.state.session.op_text = directory_number;
+                self.state
+                    .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::NOTBLANK)?;
             }
         }
-
-        if !joined {
-            self.state.session.op_text = directory_number;
-            self.state
-                .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::NOTBLANK)?;
-        }
-
         self.state.new_line()?;
         self.state.press_enter()?;
         self.display_menu = true;

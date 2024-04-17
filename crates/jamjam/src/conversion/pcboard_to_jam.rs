@@ -93,7 +93,7 @@ pub fn convert_pcboard_to_jam(pcboard_path: &Path, jam_dest_path: &Path, aka: &E
 
         let new_msg = JamMessage::new(msg.header.msg_number, aka)
             .with_reply_to(msg.header.reply_to)
-            .with_date_time(time)
+            .with_date_time(time.and_utc())
             .with_text(msg.text)
             .with_attributes(attribute)
             .with_password(&msg.header.password)

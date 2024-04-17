@@ -183,6 +183,7 @@ impl Tui {
                             match key.code {
                                 KeyCode::Char('h') => {
                                     self.status_bar = (self.status_bar + 1) % 2;
+                                    redraw = true;
                                 }
                                 KeyCode::Char('x') => {
                                     let _ = restore_terminal();
@@ -191,15 +192,23 @@ impl Tui {
                                 }
                                 _ => {}
                             }
-                        } else {
+                        } else if key.modifiers.contains(KeyModifiers::CONTROL) {
                             match key.code {
                                 KeyCode::Char(c) => {
-                                    if (c == 'x' || c == 'c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                                    if c == 'x' || c == 'c' {
                                         let _ = disable_raw_mode();
                                         return Ok(());
                                     }
-                                    self.add_input(c.to_string().chars())?
                                 }
+
+                                KeyCode::Left => self.add_input("\x01".chars())?,
+                                KeyCode::Right => self.add_input("\x06".chars())?,
+                                KeyCode::End => self.add_input("\x0B".chars())?,
+                                _ => {}
+                            }
+                        } else {
+                            match key.code {
+                                KeyCode::Char(c) => self.add_input(c.to_string().chars())?,
                                 KeyCode::Enter => self.add_input("\r".chars())?,
                                 KeyCode::Backspace => self.add_input("\x08".chars())?,
                                 KeyCode::Esc => self.add_input("\x1B".chars())?,
@@ -348,6 +357,7 @@ impl Tui {
         for c in c_seq {
             s.push(c);
         }
+
         self.connection.write_all(s.as_bytes())?;
         Ok(())
     }

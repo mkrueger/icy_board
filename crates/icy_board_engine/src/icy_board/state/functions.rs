@@ -283,7 +283,6 @@ impl IcyBoardState {
         };
         self.check_time_left();
 
-        let old_color = self.user_screen.caret.get_attribute().as_u8(icy_engine::IceMode::Blink);
         if display_flags & display_flags::LFBEFORE != 0 {
             self.new_line()?;
         }
@@ -299,21 +298,17 @@ impl IcyBoardState {
         }
         if display_flags & display_flags::FIELDLEN != 0 {
             self.print(TerminalTarget::Both, " (")?;
-            if let Some(default) = &default_string {
-                self.reset_color()?;
-                self.print(TerminalTarget::Both, default)?;
-
-                if self.use_graphics() {
-                    self.set_color(TerminalTarget::Both, color.clone())?;
-                }
-            } else {
-                self.forward(len)?;
-            }
+            self.forward(len)?;
             self.print(TerminalTarget::Both, ")")?;
             self.backward(len + 1)?;
+            self.reset_color()?;
+            if let Some(default) = &default_string {
+                self.print(TerminalTarget::Both, default)?;
+                self.backward(default.len() as i32)?;
+            }
         }
         if self.use_graphics() {
-            self.set_color(TerminalTarget::Both, old_color.into())?;
+            self.reset_color()?;
         }
 
         let mut output = String::new();
@@ -394,7 +389,7 @@ impl IcyBoardState {
                 "",
                 None,
                 if (flags & pwd_flags::SHOW_WRONG_PWD_MSG) != 0 {
-                    display_flags::ECHODOTS
+                    display_flags::FIELDLEN | display_flags::ECHODOTS | display_flags::NEWLINE
                 } else {
                     display_flags::FIELDLEN | display_flags::ECHODOTS | display_flags::ERASELINE
                 },

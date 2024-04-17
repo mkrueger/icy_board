@@ -81,6 +81,9 @@ pub enum IcyBoardError {
 
     #[error("Internal board lock error (report!).")]
     ErrorLockingBoard,
+
+    #[error("Error opening home directory ({0})")]
+    HomeDirMissing(String),
 }
 
 pub struct IcyBoard {
@@ -462,43 +465,51 @@ pub fn convert_to_utf8<P: AsRef<Path>, Q: AsRef<Path>>(from: &P, to: &Q) -> Res<
     Ok(())
 }
 
+pub(crate) fn load_internal<T: IcyBoardSerializer, P: AsRef<Path>>(path: &P) -> Res<T> {
+    match fs::read_to_string(path) {
+        Ok(txt) => match toml::from_str::<T>(&txt) {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                log::error!("Loading {} toml file '{}': {}", T::FILE_TYPE, path.as_ref().display(), e);
+                Err(IcyError::ErrorLoadingFile(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
+            }
+        },
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                Err(IcyError::FileNotFound(path.as_ref().to_string_lossy().to_string()).into())
+            } else {
+                log::error!("Loading {} file '{}': {}", T::FILE_TYPE, path.as_ref().display(), e);
+                Err(IcyError::ErrorLoadingFile(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
+            }
+        }
+    }
+}
+
+pub(crate) fn save_internal<T: IcyBoardSerializer, P: AsRef<Path>>(s: &T, path: &P) -> Res<()> {
+    match toml::to_string(s) {
+        Ok(txt) => match fs::write(path, txt) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                log::error!("Error writing {} file '{}': {}", T::FILE_TYPE, path.as_ref().display(), e);
+                Err(IcyError::ErrorGeneratingToml(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
+            }
+        },
+        Err(e) => {
+            log::error!("Error generating {} toml file '{}': {}", T::FILE_TYPE, path.as_ref().display(), e);
+            Err(IcyError::ErrorGeneratingToml(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
+        }
+    }
+}
+
 pub trait IcyBoardSerializer: serde::de::DeserializeOwned + serde::ser::Serialize {
     const FILE_TYPE: &'static str;
 
     fn load<P: AsRef<Path>>(path: &P) -> Res<Self> {
-        match fs::read_to_string(path) {
-            Ok(txt) => match toml::from_str(&txt) {
-                Ok(result) => Ok(result),
-                Err(e) => {
-                    log::error!("Loading {} toml file '{}': {}", Self::FILE_TYPE, path.as_ref().display(), e);
-                    Err(IcyError::ErrorLoadingFile(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
-                }
-            },
-            Err(e) => {
-                if e.kind() == std::io::ErrorKind::NotFound {
-                    Err(IcyError::FileNotFound(path.as_ref().to_string_lossy().to_string()).into())
-                } else {
-                    log::error!("Loading {} file '{}': {}", Self::FILE_TYPE, path.as_ref().display(), e);
-                    Err(IcyError::ErrorLoadingFile(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
-                }
-            }
-        }
+        load_internal::<Self, P>(path)
     }
 
     fn save<P: AsRef<Path>>(&self, path: &P) -> Res<()> {
-        match toml::to_string(self) {
-            Ok(txt) => match fs::write(path, txt) {
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    log::error!("Error writing {} file '{}': {}", Self::FILE_TYPE, path.as_ref().display(), e);
-                    Err(IcyError::ErrorGeneratingToml(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
-                }
-            },
-            Err(e) => {
-                log::error!("Error generating {} toml file '{}': {}", Self::FILE_TYPE, path.as_ref().display(), e);
-                Err(IcyError::ErrorGeneratingToml(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
-            }
-        }
+        save_internal::<Self, P>(self, path)
     }
 }
 

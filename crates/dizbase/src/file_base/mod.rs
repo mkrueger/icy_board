@@ -182,7 +182,6 @@ impl FileBase {
                 if let Ok(metadata) = self.read_metadata(header) {
                     for m in metadata {
                         if m.metadata_type == MetadaType::FileID {
-                            println!("found file id for {}", header.name);
                             if find_match(m.data, bytes) {
                                 return true;
                             }

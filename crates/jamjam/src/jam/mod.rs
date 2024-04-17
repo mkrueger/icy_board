@@ -6,7 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs::File, io::Read};
 
 use bstr::BString;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use rand::random;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use thiserror::Error;
@@ -212,7 +212,6 @@ impl JamMessageBase {
         let header_path = self.file_name.with_extension(extensions::HEADER_DATA);
         let header_file = OpenOptions::new().write(true).open(header_path)?;
         let mut writer = BufWriter::new(header_file);
-        println!("header info : {} ", self.header_info.active_msgs);
         self.header_info.update(&mut writer)?;
         writer.flush()?;
         Ok(())
@@ -514,8 +513,18 @@ impl JamMessage {
         self
     }
 
-    pub fn with_date_time(mut self, time: NaiveDateTime) -> Self {
-        self.header.date_written = time.and_utc().timestamp() as u32;
+    pub fn with_date_time(mut self, time: DateTime<Utc>) -> Self {
+        self.header.date_written = time.timestamp() as u32;
+        self.header
+            .sub_fields
+            .push(MessageSubfield::new(SubfieldType::DateWritten, BString::from(time.to_rfc3339())));
+        self
+    }
+
+    pub fn with_packout_date(mut self, time: DateTime<Utc>) -> Self {
+        self.header
+            .sub_fields
+            .push(MessageSubfield::new(SubfieldType::PackoutDate, BString::from(time.to_rfc3339())));
         self
     }
 
@@ -580,6 +589,15 @@ impl JamMessage {
     pub fn get_from(&self) -> Option<&BString> {
         for sub in self.header.sub_fields.iter() {
             if *sub.get_type() == SubfieldType::SenderName {
+                return Some(sub.get_string());
+            }
+        }
+        None
+    }
+
+    pub fn get_to(&self) -> Option<&BString> {
+        for sub in self.header.sub_fields.iter() {
+            if *sub.get_type() == SubfieldType::RecvName {
                 return Some(sub.get_string());
             }
         }

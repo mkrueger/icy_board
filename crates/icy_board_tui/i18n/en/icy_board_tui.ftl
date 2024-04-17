@@ -38,6 +38,7 @@ icbmoni_no_caller = No Caller this Node
 icbmoni_user_log_in = Logging Into System
 icbmoni_user_browse_menu = Browsing Menus
 icbmoni_user_enter_message = Enter Message
+icbmoni_comment_to_sysop = Comment to Sysop
 icbmoni_user_browse_files = Browsing Files
 icbmoni_user_read_messages = Read Messages
 icbmoni_user_read_bulletins = Read Bulletins

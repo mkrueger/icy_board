@@ -148,9 +148,9 @@ impl PcbBoardCommand {
             };
 
             if pw1 == pw2 {
+                new_user.password.password = Password::PlainText(pw1);
                 break;
             }
-            new_user.password.password = Password::PlainText(pw1);
             if let Ok(board) = self.state.board.lock() {
                 if board.config.user_password_policy.password_expire_days > 0 {
                     new_user.password.expire_date = Utc::now() + chrono::Duration::days(board.config.user_password_policy.password_expire_days as i64);

@@ -604,6 +604,7 @@ impl PCBoardImporter {
         let user_inf = PcbUserInf::read_users(&PathBuf::from(&inf_file))?;
 
         let user_base = UserBase::import_pcboard(
+            self.output_directory.join("home"),
             &users
                 .iter()
                 .map(|u| PcbUser {
@@ -612,7 +613,6 @@ impl PCBoardImporter {
                 })
                 .collect::<Vec<PcbUser>>(),
         );
-
         let destination = self.output_directory.join(new_rel_name);
 
         user_base.save(&destination)?;

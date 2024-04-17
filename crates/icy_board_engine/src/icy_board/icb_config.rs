@@ -149,7 +149,7 @@ pub struct ColorConfiguration {
 #[derive(PartialEq, Clone)]
 pub enum IcbColor {
     None,
-    Dos(u8),
+    Dos(u8), // Color Code with fg + bg color
     IcyEngine(Color),
 }
 

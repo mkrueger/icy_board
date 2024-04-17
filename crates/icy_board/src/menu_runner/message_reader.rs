@@ -189,40 +189,12 @@ impl MessageViewer {
 impl PcbBoardCommand {
     pub fn read_messages(&mut self, action: &Command) -> Res<()> {
         self.state.node_state.lock().unwrap().user_activity = UserActivity::ReadMessages;
-
-        let viewer = MessageViewer::load(&self.state.board.lock().unwrap().display_text)?;
-
         let message_base_file = &self.state.session.current_conference.message_areas[0].filename;
         let msgbase_file_resolved = self.state.board.lock().unwrap().resolve_file(message_base_file);
 
         match JamMessageBase::open(&msgbase_file_resolved) {
             Ok(message_base) => {
-                while !self.state.session.disp_options.abort_printout {
-                    let prompt = if self.state.session.expert_mode {
-                        IceText::MessageReadCommandExpert
-                    } else {
-                        IceText::MessageReadCommand
-                    };
-                    self.state.session.op_text = format!("{}-{}", message_base.base_messagenumber(), message_base.active_messages());
-
-                    let text = self.state.input_field(
-                        prompt,
-                        40,
-                        MASK_COMMAND,
-                        &action.help,
-                        None,
-                        display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
-                    )?;
-                    if text.is_empty() {
-                        break;
-                    }
-
-                    if let Ok(number) = text.parse::<u32>() {
-                        self.read_message_number(&message_base, &viewer, number)?;
-                    }
-                }
-                self.state.press_enter()?;
-                self.display_menu = true;
+                self.read_msgs_from_base(message_base, action)?;
                 Ok(())
             }
             Err(err) => {
@@ -244,6 +216,45 @@ impl PcbBoardCommand {
                 Ok(())
             }
         }
+    }
+
+    pub fn read_email(&mut self, action: &Command) -> Res<()> {
+        let name = self.state.session.user_name.to_string();
+        let msg_base = self.get_email_msgbase(&name)?;
+        self.read_msgs_from_base(msg_base, action)?;
+        Ok(())
+    }
+
+    fn read_msgs_from_base(&mut self, message_base: JamMessageBase, action: &Command) -> Res<()> {
+        let viewer = MessageViewer::load(&self.state.board.lock().unwrap().display_text)?;
+
+        while !self.state.session.disp_options.abort_printout {
+            let prompt = if self.state.session.expert_mode {
+                IceText::MessageReadCommandExpert
+            } else {
+                IceText::MessageReadCommand
+            };
+            self.state.session.op_text = format!("{}-{}", message_base.base_messagenumber(), message_base.active_messages());
+
+            let text = self.state.input_field(
+                prompt,
+                40,
+                MASK_COMMAND,
+                &action.help,
+                None,
+                display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
+            )?;
+            if text.is_empty() {
+                break;
+            }
+
+            if let Ok(number) = text.parse::<u32>() {
+                self.read_message_number(&message_base, &viewer, number)?;
+            }
+        }
+        self.state.press_enter()?;
+        self.display_menu = true;
+        Ok(())
     }
 
     fn read_message_number(&mut self, message_base: &JamMessageBase, viewer: &MessageViewer, number: u32) -> Res<()> {

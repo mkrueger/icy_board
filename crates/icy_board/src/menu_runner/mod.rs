@@ -1,3 +1,5 @@
+use std::fs;
+
 use icy_board_engine::{
     icy_board::{
         commands::{Command, CommandType},
@@ -9,6 +11,7 @@ use icy_board_engine::{
     vm::TerminalTarget,
 };
 use icy_ppe::Res;
+use jamjam::jam::{JamMessage, JamMessageBase};
 mod comment_to_sysop;
 mod delete_message;
 mod find_files;
@@ -39,10 +42,17 @@ impl PcbBoardCommand {
             self.display_menu = false;
         }
 
-        let command = self
-            .state
-            .input_field(IceText::CommandPrompt, 40, MASK_COMMAND, "", None, display_flags::UPCASE)?;
-
+        let command = self.state.input_field(
+            IceText::CommandPrompt,
+            40,
+            MASK_COMMAND,
+            "",
+            None,
+            display_flags::UPCASE | display_flags::NEWLINE,
+        )?;
+        if command.is_empty() {
+            return Ok(());
+        }
         let mut cmds = command.split(' ');
 
         let command = cmds.next().unwrap_or_default();
@@ -197,6 +207,11 @@ impl PcbBoardCommand {
                 self.restore_message(action)?;
             }
 
+            CommandType::ReadEmail => {
+                // R
+                self.read_email(action)?;
+            }
+
             _ => {
                 return Err(Box::new(IcyBoardError::UnknownAction(format!("{:?}", action.command_type))));
             }
@@ -251,25 +266,27 @@ impl PcbBoardCommand {
                 display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )?
         };
-        let mut joined = false;
-        if let Ok(number) = conf_number.parse::<i32>() {
-            if 0 <= number && (number as usize) <= self.state.board.lock().unwrap().conferences.len() {
-                self.state.join_conference(number);
-                self.state.session.op_text = format!(
-                    "{} ({})",
-                    self.state.session.current_conference.name, self.state.session.current_conference_number
-                );
-                self.state
-                    .display_text(IceText::ConferenceJoined, display_flags::NEWLINE | display_flags::NOTBLANK)?;
+        if !conf_number.is_empty() {
+            let mut joined = false;
+            if let Ok(number) = conf_number.parse::<i32>() {
+                if 0 <= number && (number as usize) <= self.state.board.lock().unwrap().conferences.len() {
+                    self.state.join_conference(number);
+                    self.state.session.op_text = format!(
+                        "{} ({})",
+                        self.state.session.current_conference.name, self.state.session.current_conference_number
+                    );
+                    self.state
+                        .display_text(IceText::ConferenceJoined, display_flags::NEWLINE | display_flags::NOTBLANK)?;
 
-                joined = true;
+                    joined = true;
+                }
             }
-        }
 
-        if !joined {
-            self.state.session.op_text = conf_number;
-            self.state
-                .display_text(IceText::InvalidConferenceNumber, display_flags::NEWLINE | display_flags::NOTBLANK)?;
+            if !joined {
+                self.state.session.op_text = conf_number;
+                self.state
+                    .display_text(IceText::InvalidConferenceNumber, display_flags::NEWLINE | display_flags::NOTBLANK)?;
+            }
         }
 
         self.state.new_line()?;
@@ -539,5 +556,44 @@ impl PcbBoardCommand {
         }
 
         Ok(false)
+    }
+
+    fn get_email_msgbase(&mut self, user_name: &str) -> Res<JamMessageBase> {
+        let home_dir = if let Ok(board) = self.state.board.lock() {
+            let name = if user_name == self.state.session.sysop_name {
+                &board.users[0].get_name()
+            } else {
+                user_name
+            };
+            board.users.home_dir.join(name.to_lowercase().replace(' ', "_"))
+        } else {
+            return Err(IcyBoardError::ErrorLockingBoard.into());
+        };
+
+        if !home_dir.exists() {
+            log::error!("Homedir for user {} does not exist", user_name);
+            self.state.display_text(IceText::MessageBaseError, display_flags::NEWLINE)?;
+            return Err(IcyBoardError::HomeDirMissing(user_name.to_string()).into());
+        }
+
+        let msg_dir = home_dir.join("msg");
+        fs::create_dir_all(&msg_dir)?;
+        let msg_base = msg_dir.join("email");
+        Ok(if msg_base.with_extension("jhr").exists() {
+            JamMessageBase::open(msg_base)?
+        } else {
+            log::info!("Creating new email message base for user {}", user_name);
+            JamMessageBase::create(msg_base)?
+        })
+    }
+
+    fn send_message(&mut self, conf: i32, area: i32, msg: JamMessage) -> Res<()> {
+        if conf < 0 {
+            let user_name = msg.get_to().unwrap().to_string();
+            let mut msg_base = self.get_email_msgbase(&user_name)?;
+            msg_base.write_message(&msg)?;
+            msg_base.write_jhr_header()?;
+        }
+        Ok(())
     }
 }

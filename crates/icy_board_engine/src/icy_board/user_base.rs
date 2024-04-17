@@ -1,5 +1,7 @@
 use std::{
+    fs,
     ops::{Deref, Index},
+    path::PathBuf,
     str::FromStr,
 };
 
@@ -9,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     icb_config::{PasswordStorageMethod, DEFAULT_PCBOARD_DATE_FROMAT},
-    is_false, is_null_16, is_null_64,
+    is_false, is_null_16, is_null_64, load_internal, save_internal,
     user_inf::{AccountUserInf, BankUserInf, QwkConfigUserInf},
     IcyBoardSerializer, PcbUser,
 };
@@ -550,10 +552,10 @@ impl User {
 #[derive(Serialize, Deserialize, Default)]
 pub struct UserBase {
     last_id: u64,
+    pub home_dir: PathBuf,
 
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(rename = "user")]
+    #[serde(skip_deserializing)]
+    #[serde(skip_serializing)]
     users: Vec<User>,
 }
 
@@ -571,13 +573,14 @@ impl UserBase {
         self.users.is_empty()
     }
 
-    pub fn import_pcboard(pcb_user: &[PcbUser]) -> Self {
+    pub fn import_pcboard(home_dir: PathBuf, pcb_user: &[PcbUser]) -> Self {
         let mut users = Vec::new();
         for u in pcb_user {
             users.push(User::import_pcb(users.len() as u64 + 1, u));
         }
         Self {
             last_id: users.len() as u64,
+            home_dir,
             users,
         }
     }
@@ -590,6 +593,37 @@ impl UserBase {
 
 impl IcyBoardSerializer for UserBase {
     const FILE_TYPE: &'static str = "user base";
+
+    fn load<P: AsRef<std::path::Path>>(path: &P) -> icy_ppe::Res<Self> {
+        let mut res = load_internal::<Self, P>(path)?;
+
+        for name in fs::read_dir(&res.home_dir)?.flatten() {
+            if !name.path().is_dir() {
+                continue;
+            }
+            let user_file = name.path().join("user.toml");
+            if !user_file.exists() {
+                log::error!("Can't read user file for {} ", name.path().display());
+                continue;
+            }
+            let user_txt = fs::read_to_string(user_file)?;
+            let user: User = toml::from_str(&user_txt)?;
+            res.users.push(user);
+        }
+        Ok(res)
+    }
+
+    fn save<P: AsRef<std::path::Path>>(&self, path: &P) -> icy_ppe::Res<()> {
+        std::fs::create_dir_all(&self.home_dir)?;
+        for user in &self.users {
+            let home_dir = self.home_dir.join(user.get_name().to_ascii_lowercase().replace(' ', "_"));
+            std::fs::create_dir_all(&home_dir)?;
+            let user_txt = toml::to_string(user)?;
+            fs::write(home_dir.join("user.toml"), user_txt)?;
+        }
+        save_internal::<Self, P>(self, path)?;
+        Ok(())
+    }
 }
 
 impl Index<usize> for UserBase {

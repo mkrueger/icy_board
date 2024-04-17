@@ -262,6 +262,9 @@ const ORIGIN: &[u8; 7] = b"ORIGIN ";
 const REQRR: &[u8; 7] = b"REQRR  ";
 const ACKRR: &[u8; 7] = b"ACKRR  ";
 const ACKNAME: &[u8; 7] = b"ACKNAME";
+
+/// Date when this message is deleted automatically
+/// Note: All messages with packout date are public messages
 const PACKOUT: &[u8; 7] = b"PACKOUT";
 const TO2: &[u8; 7] = b"TO2    ";
 const FROM2: &[u8; 7] = b"FROM2  ";

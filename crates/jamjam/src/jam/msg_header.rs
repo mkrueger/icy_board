@@ -396,6 +396,17 @@ pub enum SubfieldType {
     /// hours and minutes. E.g. 0100 indicates an offset of one hour east of
     /// UTC.
     TZUTCInfo,
+
+    /// IcyBoard extensions
+
+    // Note: DateReceived doesn't make sense to add here
+    //       The unix time however can be guessed it's the next unix time after the DateWritten
+    /// Like DateWritten but as RFC3339
+    DateWritten,
+    /// Like DateProcessed but as RFC3339
+    DateProcessed,
+    // PCBoard packout date (RFC3339) for auto delete
+    PackoutDate,
 }
 
 impl From<u32> for SubfieldType {
@@ -421,6 +432,10 @@ impl From<u32> for SubfieldType {
             2002 => SubfieldType::Path2D,
             2003 => SubfieldType::Flags,
             2204 => SubfieldType::TZUTCInfo,
+
+            7001 => SubfieldType::DateWritten,
+            7002 => SubfieldType::DateProcessed,
+            7003 => SubfieldType::PackoutDate,
             _ => SubfieldType::Unknown(value),
         }
     }
@@ -449,6 +464,11 @@ impl From<SubfieldType> for u32 {
             SubfieldType::Path2D => 2002,
             SubfieldType::Flags => 2003,
             SubfieldType::TZUTCInfo => 2204,
+
+            SubfieldType::DateWritten => 7001,
+            SubfieldType::DateProcessed => 7002,
+            SubfieldType::PackoutDate => 7003,
+
             SubfieldType::Unknown(value) => value,
         }
     }

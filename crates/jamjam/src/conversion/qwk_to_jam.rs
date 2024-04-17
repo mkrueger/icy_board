@@ -12,7 +12,7 @@ pub fn convert_qwk_to_jam(qwk_mail: &[QWKMessage], jam_base: &mut JamMessageBase
             .with_from(mail.from.clone())
             .with_to(mail.to.clone())
             .with_subject(mail.subj.clone())
-            .with_date_time(mail.date_time())
+            .with_date_time(mail.date_time().and_utc())
             .with_is_deleted(mail.is_deleted());
 
         jam_base.write_message(&jam_msg)?;
@@ -38,7 +38,6 @@ mod tests {
         msg_base.index_offset_bug = true;
 
         let mail: Vec<QWKMessage> = msg_base.iter().flatten().collect();
-        println!("{:?}", mail.len());
         convert_qwk_to_jam(&mail, &mut JamMessageBase::create(PathBuf::from("/home/mkrueger/Downloads/jam_base")).unwrap()).unwrap();
     }
 }
