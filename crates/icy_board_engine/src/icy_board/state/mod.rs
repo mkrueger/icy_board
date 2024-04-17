@@ -28,7 +28,7 @@ use super::{
     bulletins::BullettinList,
     conferences::Conference,
     file_areas::FileAreaList,
-    icb_config::{IcbColor, DEFAULT_PCBOARD_DATE_FROMAT},
+    icb_config::{IcbColor, DEFAULT_PCBOARD_DATE_FORMAT},
     icb_text::{IcbTextStyle, IceText},
     pcboard_data::Node,
     surveys::SurveyList,
@@ -203,7 +203,7 @@ impl Session {
             more_requested: false,
             cancel_batch: false,
             user_name: String::new(),
-            date_format: DEFAULT_PCBOARD_DATE_FROMAT.to_string(),
+            date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
             cursor_pos: Position::default(),
 
             yes_char: 'Y',
@@ -366,7 +366,7 @@ impl IcyBoardState {
     }
 
     fn use_graphics(&self) -> bool {
-        self.session.disp_options.grapics_mode != GraphicsMode::Off
+        !self.session.disp_options.disable_color && self.session.disp_options.grapics_mode != GraphicsMode::Off
     }
 
     fn check_time_left(&self) {
@@ -589,6 +589,21 @@ impl IcyBoardState {
         // TODO
         Ok(())
     }
+
+    pub fn save_current_user(&self) -> Res<()> {
+        if let Ok(mut board) = self.board.lock() {
+            if let Some(user) = &self.current_user {
+                for u in 0..board.users.len() {
+                    if board.users[u].get_name() == user.get_name() {
+                        board.users.set_user(user.clone(), u)?;
+                        return Ok(());
+                    }
+                }
+            }
+        }
+        log::error!("User not found in user list");
+        Ok(())
+    }
 }
 
 #[derive(PartialEq)]
@@ -809,7 +824,7 @@ impl IcyBoardState {
 
             "CITY" => {
                 if let Some(user) = &self.current_user {
-                    result = user.city.to_string();
+                    result = user.city_or_state.to_string();
                 }
             }
             "CLREOL" => {

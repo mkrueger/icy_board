@@ -6,11 +6,11 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use icy_ppe::datetime::IcbDate;
+use icy_ppe::{datetime::IcbDate, Res};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    icb_config::{PasswordStorageMethod, DEFAULT_PCBOARD_DATE_FROMAT},
+    icb_config::{PasswordStorageMethod, DEFAULT_PCBOARD_DATE_FORMAT},
     is_false, is_null_16, is_null_64, load_internal, save_internal,
     user_inf::{AccountUserInf, BankUserInf, QwkConfigUserInf},
     IcyBoardSerializer, PcbUser,
@@ -207,7 +207,7 @@ pub struct UserFlags {
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
-    pub short_header: bool,
+    pub use_short_filedescr: bool,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
@@ -235,20 +235,27 @@ pub struct User {
     pub alias: String,
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
-    pub verify: String,
+    pub verify_answer: String,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub city_or_state: String,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub city: String,
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
+    pub state: String,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub street1: String,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub street2: String,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub state: String,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub zip: String,
@@ -319,7 +326,7 @@ pub struct User {
     pub flags: UserFlags,
 
     /// Protocol (A->Z)
-    pub protocol: char,
+    pub protocol: String,
 
     /// Page length when display data on the screen
     pub page_len: u16,
@@ -376,7 +383,7 @@ impl User {
             (String::new(), IcbDate::new(0, 0, 0), String::new(), String::new())
         };
 
-        let (street1, street2, _city2, state, zip, country) = if let Some(address) = &u.inf.address {
+        let (street1, street2, city, state, zip, country) = if let Some(address) = &u.inf.address {
             (
                 address.street1.clone(),
                 address.street2.clone(),
@@ -454,15 +461,16 @@ impl User {
             name: u.user.name.clone(),
             id,
             alias,
-            verify,
-            city: u.user.city.clone(),
+            verify_answer: verify,
+            city_or_state: u.user.city.clone(),
 
-            date_format: DEFAULT_PCBOARD_DATE_FROMAT.to_string(),
+            date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
             gender,
             birth_date: birth_date.to_utc_date_time(),
             email,
             web,
 
+            city,
             street1,
             street2,
             state,
@@ -503,13 +511,13 @@ impl User {
                 dont_ask_fse: u.user.dont_ask_fse,
                 use_fsedefault: u.user.use_fsedefault,
                 scroll_msg_body: u.user.scroll_msg_body,
-                short_header: u.user.short_header,
+                use_short_filedescr: u.user.short_header,
                 wide_editor: u.user.wide_editor,
                 delete_flag: u.user.delete_flag,
                 use_graphics: true,
                 disabled_flag: false,
             },
-            protocol: u.user.protocol,
+            protocol: u.user.protocol.to_string(),
             page_len: u.user.page_len as u16,
             last_conference: u.user.last_conference,
             elapsed_time_on: u.user.elapsed_time_on,
@@ -588,6 +596,16 @@ impl UserBase {
     pub fn new_user(&mut self, new_user: User) -> usize {
         self.users.push(new_user);
         self.users.len() - 1
+    }
+
+    pub fn set_user(&mut self, new_user: User, i: usize) -> Res<()> {
+        let home_dir = self.home_dir.join(new_user.get_name().to_ascii_lowercase().replace(' ', "_"));
+        std::fs::create_dir_all(&home_dir).unwrap();
+        let user_txt = toml::to_string(&new_user)?;
+        fs::write(home_dir.join("user.toml"), user_txt)?;
+
+        self.users[i] = new_user;
+        Ok(())
     }
 }
 

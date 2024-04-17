@@ -15,7 +15,7 @@ use icy_board_engine::icy_board::{
     group_list::GroupList,
     icb_config::{
         BoardInformation, ColorConfiguration, ConfigPaths, IcbColor, IcbConfig, NewUserSettings, PasswordStorageMethod, SubscriptionMode, SysopInformation,
-        SysopSecurityLevels, UserPasswordPolicy, DEFAULT_PCBOARD_DATE_FROMAT,
+        SysopSecurityLevels, UserPasswordPolicy, DEFAULT_PCBOARD_DATE_FORMAT,
     },
     icb_text::IcbTextFile,
     language::SupportedLanguages,
@@ -211,7 +211,7 @@ impl PCBoardImporter {
                 operator: String::new(),
                 notice: String::new(),
                 capabilities: String::new(),
-                date_format: DEFAULT_PCBOARD_DATE_FROMAT.to_string(),
+                date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
             },
             num_nodes: 32,
             func_keys: self.data.func_keys.clone(),
@@ -259,10 +259,9 @@ impl PCBoardImporter {
             new_user_settings: NewUserSettings {
                 sec_level: self.data.user_levels.agree_to_register as u8,
                 new_user_groups: "new_users".to_string(),
-                ask_city: true,
-                ask_state: false,
-                ask_zip: false,
-                ask_country: false,
+                ask_city_or_state: true,
+                ask_address: false,
+                ask_verification: false,
                 ask_bus_data_phone: true,
                 ask_voice_phone: true,
                 ask_comment: true,
@@ -274,6 +273,7 @@ impl PCBoardImporter {
                 ask_birthdate: true,
                 ask_email: true,
                 ask_web_address: true,
+                ask_use_short_descr: true,
             },
         };
 

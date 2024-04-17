@@ -255,16 +255,16 @@ pub struct ConfigPaths {
     pub group_file: PathBuf,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct NewUserSettings {
     pub sec_level: u8,
 
     pub new_user_groups: String,
 
-    pub ask_city: bool,
-    pub ask_state: bool,
-    pub ask_zip: bool,
-    pub ask_country: bool,
+    pub ask_city_or_state: bool,
+
+    pub ask_address: bool,
+    pub ask_verification: bool,
 
     pub ask_bus_data_phone: bool,
     pub ask_voice_phone: bool,
@@ -279,6 +279,7 @@ pub struct NewUserSettings {
     pub ask_birthdate: bool,
     pub ask_email: bool,
     pub ask_web_address: bool,
+    pub ask_use_short_descr: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -309,7 +310,7 @@ pub struct IcbConfig {
     pub user_password_policy: UserPasswordPolicy,
 }
 
-pub const DEFAULT_PCBOARD_DATE_FROMAT: &str = "%m/%d/%C";
+pub const DEFAULT_PCBOARD_DATE_FORMAT: &str = "%m/%d/%C";
 
 impl IcbConfig {
     pub fn new() -> Self {
@@ -320,7 +321,7 @@ impl IcbConfig {
                 operator: String::new(),
                 notice: String::new(),
                 capabilities: String::new(),
-                date_format: DEFAULT_PCBOARD_DATE_FROMAT.to_string(),
+                date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
             },
 
             sysop: SysopInformation {
@@ -398,10 +399,9 @@ impl IcbConfig {
             new_user_settings: NewUserSettings {
                 sec_level: 10,
                 new_user_groups: "new_users".to_string(),
-                ask_city: true,
-                ask_state: true,
-                ask_zip: true,
-                ask_country: true,
+                ask_city_or_state: true,
+                ask_address: true,
+                ask_verification: true,
                 ask_bus_data_phone: true,
                 ask_voice_phone: true,
                 ask_comment: true,
@@ -413,6 +413,7 @@ impl IcbConfig {
                 ask_birthdate: true,
                 ask_email: true,
                 ask_web_address: true,
+                ask_use_short_descr: true,
             },
         }
     }

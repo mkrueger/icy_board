@@ -156,7 +156,7 @@ pub enum CommandType {
     ViewSettings,
 
     /// W command
-    WriteUserSettings,
+    WriteSettings,
 
     /// X command
     ExpertMode,

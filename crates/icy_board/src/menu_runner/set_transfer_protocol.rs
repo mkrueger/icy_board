@@ -1,5 +1,10 @@
 use icy_board_engine::{
-    icy_board::{commands::Command, icb_config::IcbColor, icb_text::IceText, state::functions::display_flags},
+    icy_board::{
+        commands::Command,
+        icb_config::IcbColor,
+        icb_text::IceText,
+        state::functions::{display_flags, MASK_ALNUM},
+    },
     vm::TerminalTarget,
 };
 use icy_ppe::Res;
@@ -12,18 +17,21 @@ impl PcbBoardCommand {
         if self.displaycmdfile("prot")? {
             return Ok(());
         }
+        let cur_protocol = if let Some(user) = &mut self.state.current_user {
+            user.protocol.clone()
+        } else {
+            String::new()
+        };
 
-        let protocol = self.ask_protocols()?;
+        let protocol = self.ask_protocols(cur_protocol)?;
         if !protocol.is_empty() {
-            let selected_protocol = protocol.chars().next().unwrap_or(' ').to_ascii_uppercase();
-            if let Some(user) = &mut self.state.current_user {
-                user.protocol = selected_protocol;
-            }
+            let selected_protocol = protocol.to_ascii_uppercase();
+
             self.state.display_text(IceText::DefaultProtocol, display_flags::DEFAULT)?;
             let txt = if let Ok(board) = self.state.board.lock() {
                 let mut res = String::new();
                 for protocol in board.protocols.iter() {
-                    if protocol.char_code == selected_protocol {
+                    if &protocol.char_code == &selected_protocol {
                         res.clone_from(&protocol.description);
                         break;
                     }
@@ -32,6 +40,9 @@ impl PcbBoardCommand {
             } else {
                 "Error".to_string()
             };
+            if let Some(user) = &mut self.state.current_user {
+                user.protocol = selected_protocol;
+            }
             self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11))?;
             self.state.print(TerminalTarget::Both, &txt)?;
             self.state.new_line()?;
@@ -42,24 +53,28 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    pub fn ask_protocols(&mut self) -> Res<String> {
+    pub fn ask_protocols(&mut self, cur_protocol: String) -> Res<String> {
         let mut protocols = Vec::new();
-        let mut valid_protocols = String::new();
-        let cur_protocol = if let Some(user) = &mut self.state.current_user { user.protocol } else { ' ' };
         self.state.new_line()?;
         if let Ok(board) = self.state.board.lock() {
             for protocol in board.protocols.iter() {
                 if !protocol.is_enabled {
                     continue;
                 }
-                valid_protocols.push(protocol.char_code.to_ascii_uppercase());
                 if protocol.char_code == cur_protocol {
                     protocols.push(format!("=> ({}) {}", protocol.char_code, protocol.description));
                 } else {
                     protocols.push(format!("   ({}) {}", protocol.char_code, protocol.description));
                 }
             }
+
+            if "N" == cur_protocol {
+                protocols.push(format!("=> (N) {}", board.display_text.get_display_text(IceText::None).unwrap().text));
+            } else {
+                protocols.push(format!("   (N) {}", board.display_text.get_display_text(IceText::None).unwrap().text));
+            }
         }
+
         self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11))?;
         for line in protocols {
             self.state.print(TerminalTarget::Both, &line)?;
@@ -68,7 +83,7 @@ impl PcbBoardCommand {
         let protocol = self.state.input_field(
             IceText::DesiredProtocol,
             1,
-            &valid_protocols,
+            &MASK_ALNUM,
             "",
             Some(cur_protocol.to_string()),
             display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER | display_flags::UPCASE | display_flags::FIELDLEN,

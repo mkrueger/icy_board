@@ -154,7 +154,7 @@ impl<'a> VirtualMachine<'a> {
         self.variable_table.set_value(U_PAGELEN, VariableValue::new_int(cur_user.page_len as i32));
         self.variable_table
             .set_value(U_EXPSEC, VariableValue::new_int(cur_user.exp_security_level as i32));
-        self.variable_table.set_value(U_CITY, VariableValue::new_string(cur_user.city.clone()));
+        self.variable_table.set_value(U_CITY, VariableValue::new_string(cur_user.city_or_state.clone()));
         self.variable_table
             .set_value(U_BDPHONE, VariableValue::new_string(cur_user.bus_data_phone.clone()));
         self.variable_table
@@ -171,17 +171,19 @@ impl<'a> VirtualMachine<'a> {
         }
 
         self.variable_table.set_value(U_SCROLL, VariableValue::new_bool(cur_user.flags.scroll_msg_body));
-        self.variable_table.set_value(U_LONGHDR, VariableValue::new_bool(!cur_user.flags.short_header));
+        self.variable_table
+            .set_value(U_LONGHDR, VariableValue::new_bool(!cur_user.flags.use_short_filedescr));
 
         self.variable_table.set_value(U_DEF79, VariableValue::new_bool(cur_user.flags.wide_editor));
         self.variable_table.set_value(U_ALIAS, VariableValue::new_string(cur_user.alias.to_string()));
 
-        self.variable_table.set_value(U_VER, VariableValue::new_string(cur_user.verify.to_string()));
+        self.variable_table
+            .set_value(U_VER, VariableValue::new_string(cur_user.verify_answer.to_string()));
 
         self.variable_table
             .get_var_entry_mut(U_ADDR)
             .value
-            .set_array_value(2, 0, 0, VariableValue::new_string(cur_user.city.clone()));
+            .set_array_value(2, 0, 0, VariableValue::new_string(cur_user.city_or_state.clone()));
 
         self.variable_table
             .get_var_entry_mut(U_ADDR)
@@ -249,7 +251,8 @@ impl<'a> VirtualMachine<'a> {
         }
 
         if self.variable_table.get_version() >= 340 {
-            self.variable_table.set_value(U_SHORTDESC, VariableValue::new_bool(cur_user.flags.short_header));
+            self.variable_table
+                .set_value(U_SHORTDESC, VariableValue::new_bool(cur_user.flags.use_short_filedescr));
             self.variable_table.set_value(U_GENDER, VariableValue::new_string(cur_user.gender.clone()));
             self.variable_table
                 .set_value(U_BIRTHDATE, VariableValue::new_string(cur_user.birth_date.to_string()));
@@ -269,20 +272,20 @@ impl<'a> VirtualMachine<'a> {
         cur_user.page_len = self.variable_table.get_value(U_PAGELEN).as_int() as u16;
         cur_user.exp_security_level = self.variable_table.get_value(U_EXPSEC).as_int() as u8;
 
-        cur_user.city = self.variable_table.get_value(U_CITY).as_string();
+        cur_user.city_or_state = self.variable_table.get_value(U_CITY).as_string();
         cur_user.bus_data_phone = self.variable_table.get_value(U_BDPHONE).as_string();
         cur_user.home_voice_phone = self.variable_table.get_value(U_HVPHONE).as_string();
-        cur_user.protocol = self.variable_table.get_value(U_TRANS).as_string().chars().next().unwrap_or('Z');
+        cur_user.protocol = self.variable_table.get_value(U_TRANS).as_string();
         cur_user.user_comment = self.variable_table.get_value(U_CMNT1).as_string();
         cur_user.sysop_comment = self.variable_table.get_value(U_CMNT2).as_string();
 
         cur_user.password.password = Password::PlainText(self.variable_table.get_value(U_PWD).as_string());
 
         cur_user.flags.scroll_msg_body = self.variable_table.get_value(U_SCROLL).as_bool();
-        cur_user.flags.short_header = self.variable_table.get_value(U_LONGHDR).as_bool();
+        cur_user.flags.use_short_filedescr = self.variable_table.get_value(U_LONGHDR).as_bool();
         cur_user.flags.wide_editor = self.variable_table.get_value(U_DEF79).as_bool();
         cur_user.alias = self.variable_table.get_value(U_ALIAS).as_string();
-        cur_user.verify = self.variable_table.get_value(U_VER).as_string();
+        cur_user.verify_answer = self.variable_table.get_value(U_VER).as_string();
         cur_user.street1 = self.variable_table.get_value(U_ADDR).get_array_value(0, 0, 0).as_string();
         cur_user.street2 = self.variable_table.get_value(U_ADDR).get_array_value(1, 0, 0).as_string();
         /* TODO?
@@ -308,7 +311,7 @@ impl<'a> VirtualMachine<'a> {
         }
 
         if self.variable_table.get_version() >= 340 {
-            cur_user.flags.short_header = self.variable_table.get_value(U_SHORTDESC).as_bool();
+            cur_user.flags.use_short_filedescr = self.variable_table.get_value(U_SHORTDESC).as_bool();
 
             cur_user.gender = self.variable_table.get_value(U_GENDER).as_string();
             cur_user.birth_date = IcbDate::parse(&self.variable_table.get_value(U_BIRTHDATE).as_string()).to_utc_date_time();

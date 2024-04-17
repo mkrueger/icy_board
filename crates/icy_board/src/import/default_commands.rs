@@ -47,7 +47,7 @@ pub fn add_default_commands(data: &PcbBoardData, cmd_list: &mut CommandList) {
     cmd_list.push(convert_cmd("T", CommandType::SetTransferProtocol, data.user_levels.cmd_t));
     cmd_list.push(convert_cmd("U", CommandType::UploadFile, data.user_levels.cmd_u));
     cmd_list.push(convert_cmd("V", CommandType::ViewSettings, data.user_levels.cmd_v));
-    cmd_list.push(convert_cmd("W", CommandType::WriteUserSettings, data.user_levels.cmd_w));
+    cmd_list.push(convert_cmd("W", CommandType::WriteSettings, data.user_levels.cmd_w));
     cmd_list.push(convert_cmd("X", CommandType::ExpertMode, data.user_levels.cmd_x));
     cmd_list.push(convert_cmd("Y", CommandType::PersonalMail, data.user_levels.cmd_y));
     cmd_list.push(convert_cmd("Z", CommandType::ZippyDirectoryScan, data.user_levels.cmd_z));

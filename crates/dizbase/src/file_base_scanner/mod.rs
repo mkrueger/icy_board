@@ -97,13 +97,13 @@ fn scan_zip(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {
     let reader = BufReader::new(file);
     let mut archive = zip::ZipArchive::new(reader)?;
     let mut short_descr = Vec::new();
-    let mut last_prio = 0;
+    let mut last_prio = -1;
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
         if let Some(outpath) = file.enclosed_name() {
             if let Some(prio) = is_short_desc(&outpath.file_name().unwrap()) {
-                if prio >= last_prio {
+                if prio <= last_prio {
                     continue;
                 }
                 last_prio = prio;
@@ -132,7 +132,7 @@ fn get_file_id(mut content: Vec<u8>) -> String {
 
 fn scan_lha(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {
     let mut lha_reader = delharc::parse_file(path)?;
-    let mut last_prio = 0;
+    let mut last_prio = -1;
     let mut short_descr = Vec::new();
     loop {
         let header = lha_reader.header();
@@ -140,7 +140,7 @@ fn scan_lha(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {
 
         if let Some(name) = filename.file_name() {
             if let Some(prio) = is_short_desc(name) {
-                if prio >= last_prio {
+                if prio <= last_prio {
                     continue;
                 }
                 last_prio = prio;

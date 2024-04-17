@@ -100,6 +100,12 @@ impl PcbBoardCommand {
 
         let mut files = base.iter();
         self.state.session.disable_auto_more = true;
+        let short_header = if let Some(user) = &self.state.current_user {
+            user.flags.use_short_filedescr
+        } else {
+            false
+        };
+
         while let Some(file) = files.next() {
             let header = file?;
 
@@ -136,6 +142,9 @@ impl PcbBoardCommand {
                         printed_lines = true;
                         if self.state.session.more_requested && !self.filebase_more(action)? {
                             return Ok(());
+                        }
+                        if short_header {
+                            break;
                         }
                         self.state.set_color(TerminalTarget::Both, IcbColor::Dos(3))?;
                     }

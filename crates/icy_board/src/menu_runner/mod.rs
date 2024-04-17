@@ -22,6 +22,7 @@ mod set_transfer_protocol;
 mod show_bulletins;
 mod show_file_directories;
 mod take_survey;
+mod write_settings;
 
 pub struct PcbBoardCommand {
     pub state: IcyBoardState,
@@ -178,6 +179,11 @@ impl PcbBoardCommand {
                 // T
                 self.set_transfer_protocol(action)?;
             }
+
+            CommandType::WriteSettings => {
+                // W
+                self.write_settings(action)?;
+            }
             CommandType::ExpertMode => {
                 // X
                 self.set_expert_mode()?;
@@ -320,7 +326,7 @@ impl PcbBoardCommand {
                 output.push_str(&format!(
                     "{:<24} {:<30} {} {}\r\n",
                     u.get_name(),
-                    u.city,
+                    u.city_or_state,
                     self.state.format_date(u.stats.last_on),
                     self.state.format_time(u.stats.last_on)
                 ));
@@ -377,6 +383,10 @@ impl PcbBoardCommand {
             return;
         } */
 
+        if !self.state.session.disp_options.disable_color {
+            self.state.reset_color()?;
+        }
+
         if let Some(token) = self.state.session.tokens.pop_front() {
             let token = token.to_ascii_uppercase();
 
@@ -406,17 +416,14 @@ impl PcbBoardCommand {
                     self.state.session.disp_options.grapics_mode = GraphicsMode::Rip;
                     self.state.display_text(IceText::RIPModeOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
                 }
-                _ => {}
+                _ => {
+                    self.state
+                        .display_text(IceText::GraphicsUnavailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                    return Ok(());
+                }
             }
-        }
-
-        {
-            if !self.state.session.disp_options.disable_color {
-                self.state.reset_color()?;
-            }
-
+        } else {
             self.state.session.disp_options.disable_color = !self.state.session.disp_options.disable_color;
-
             let msg = if self.state.session.disp_options.disable_color {
                 IceText::GraphicsOff
             } else {
@@ -587,7 +594,7 @@ impl PcbBoardCommand {
         })
     }
 
-    fn send_message(&mut self, conf: i32, area: i32, msg: JamMessage) -> Res<()> {
+    fn send_message(&mut self, conf: i32, _area: i32, msg: JamMessage) -> Res<()> {
         if conf < 0 {
             let user_name = msg.get_to().unwrap().to_string();
             let mut msg_base = self.get_email_msgbase(&user_name)?;

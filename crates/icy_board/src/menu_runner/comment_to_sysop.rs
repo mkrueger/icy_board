@@ -48,7 +48,7 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    fn write_message(&mut self, conf: i32, area: i32, to: &str, subj: &str, ret_receipt: bool) -> Res<()> {
+    fn write_message(&mut self, conf: i32, area: i32, to: &str, subj: &str, _ret_receipt: bool) -> Res<()> {
         self.displaycmdfile("preedit")?;
         self.state.new_line()?;
 

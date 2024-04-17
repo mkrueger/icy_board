@@ -139,7 +139,6 @@ impl FileBase {
 
         let metadata_file = self.file_name.with_extension(extensions::FILE_METADATA);
         let mut file = OpenOptions::new().append(true).open(metadata_file)?;
-
         header.metadata_offset = file.seek(std::io::SeekFrom::End(0))?;
         file.write_all(&(metadata.len() as u32).to_le_bytes())?;
         file.write_all(&metadata)?;

@@ -92,7 +92,7 @@ pub struct Protocol {
     pub is_batch: bool,
 
     #[serde(default)]
-    pub char_code: char,
+    pub char_code: String,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -152,7 +152,7 @@ impl PCBoardTextImport for SupportedProtocols {
 
             res.protocols.push(Protocol {
                 description,
-                char_code,
+                char_code: char_code.to_string(),
                 is_enabled,
                 is_batch,
                 send_command: command.clone(),

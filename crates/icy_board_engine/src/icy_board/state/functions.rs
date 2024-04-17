@@ -65,7 +65,7 @@ lazy_static::lazy_static! {
     + ('0'..='9').collect::<String>().as_str()
     + "!#$%&'()-.:[\\]^_`~";
     pub static ref MASK_ASCII: String = (' '..='~').collect::<String>();
-    pub static ref MASK_WEB: String = ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + ('0'..='9').collect::<String>().as_str() + "@!#$%&'*+-/=?^_`{|}~";
+    pub static ref MASK_WEB: String = ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + ('0'..='9').collect::<String>().as_str() + "@.:!#$%&'*+-/=?^_`{|}~";
 
     pub static ref MASK_PHONE: String = ('0'..='9').collect::<String>() + "/()-+ ";
 
@@ -372,6 +372,13 @@ impl IcyBoardState {
             self.new_line()?;
         }
         self.session.num_lines_printed = 0;
+
+        if output.is_empty() {
+            if let Some(default) = default_string {
+                return Ok(default);
+            }
+        }
+
         Ok(output)
     }
 

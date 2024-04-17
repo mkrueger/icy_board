@@ -253,6 +253,12 @@ impl PcbBoardCommand {
 
     fn display_files(&mut self, action: &Command, base: &FileBase, files: Vec<&FileHeader>) -> Res<()> {
         self.state.session.disable_auto_more = true;
+        let short_header = if let Some(user) = &self.state.current_user {
+            user.flags.use_short_filedescr
+        } else {
+            false
+        };
+
         for header in &files {
             let metadata = base.read_metadata(header)?;
 
@@ -288,6 +294,9 @@ impl PcbBoardCommand {
                         if self.state.session.more_requested && !self.filebase_more(action)? {
                             self.state.session.cancel_batch = true;
                             return Ok(());
+                        }
+                        if short_header {
+                            break;
                         }
                         self.state.set_color(TerminalTarget::Both, IcbColor::Dos(3))?;
                     }
