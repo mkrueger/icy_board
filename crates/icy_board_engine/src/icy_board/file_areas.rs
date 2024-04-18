@@ -159,5 +159,5 @@ impl PCBoardRecordImporter<FileArea> for FileAreaList {
 }
 
 impl IcyBoardSerializer for FileAreaList {
-    const FILE_TYPE: &'static str = "surveys";
+    const FILE_TYPE: &'static str = "file areas";
 }

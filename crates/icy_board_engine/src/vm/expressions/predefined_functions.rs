@@ -1457,9 +1457,71 @@ pub fn uselmrs(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> 
     panic!("TODO")
 }
 pub fn confinfo(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let conf_num = vm.eval_expr(&args[0])?.as_int() as usize;
+    let conf_field = vm.eval_expr(&args[1])?.as_int();
+    if let Some(conference) = &vm.icy_board_state.board.lock().unwrap().conferences.get(conf_num) {
+        match conf_field {
+            1 => Ok(VariableValue::new_string(conference.name.clone())),
+            2 => Ok(VariableValue::new_bool(conference.is_public)),
+            3 => Ok(VariableValue::new_bool(conference.auto_rejoin)),
+            4 => Ok(VariableValue::new_bool(conference.view_members)),
+            5 => Ok(VariableValue::new_bool(conference.private_uploads)),
+            6 => Ok(VariableValue::new_bool(conference.private_msgs)),
+            7 => Ok(VariableValue::new_bool(false)), // conference.echo_mail
+            8 => Ok(VariableValue::new_int(conference.required_security.level() as i32)),
+            9 => Ok(VariableValue::new_int(conference.add_conference_security)),
+            10 => Ok(VariableValue::new_int(conference.add_conference_time)),
+            11 => Ok(VariableValue::new_int(0)),                // message blocks
+            12 => Ok(VariableValue::new_string(String::new())), // message file
+            13 => Ok(VariableValue::new_string(conference.users_menu.to_string_lossy().to_string())),
+            14 => Ok(VariableValue::new_string(conference.sysop_menu.to_string_lossy().to_string())),
+            15 => Ok(VariableValue::new_string(conference.news_file.to_string_lossy().to_string())),
+            16 => Ok(VariableValue::new_int(conference.pub_upload_sort as i32)),
+            17 => Ok(VariableValue::new_string(conference.pub_upload_dir_file.to_string_lossy().to_string())),
+            18 => Ok(VariableValue::new_string(conference.pub_upload_location.to_string_lossy().to_string())),
+            19 => Ok(VariableValue::new_int(conference.private_upload_sort as i32)),
+            20 => Ok(VariableValue::new_string(conference.private_upload_dir_file.to_string_lossy().to_string())),
+            21 => Ok(VariableValue::new_string(conference.private_upload_location.to_string_lossy().to_string())),
+            22 => Ok(VariableValue::new_string(conference.doors_menu.to_string_lossy().to_string())),
+            23 => Ok(VariableValue::new_string(conference.doors_file.to_string_lossy().to_string())),
+            24 => Ok(VariableValue::new_string(conference.blt_menu.to_string_lossy().to_string())),
+            25 => Ok(VariableValue::new_string(conference.blt_file.to_string_lossy().to_string())),
+            26 => Ok(VariableValue::new_string(conference.survey_menu.to_string_lossy().to_string())),
+            27 => Ok(VariableValue::new_string(conference.survey_file.to_string_lossy().to_string())),
+            28 => Ok(VariableValue::new_string(conference.file_area_menu.to_string_lossy().to_string())),
+            29 => Ok(VariableValue::new_string(conference.file_area_file.to_string_lossy().to_string())),
+            30 => Ok(VariableValue::new_string(conference.attachment_location.to_string_lossy().to_string())), // PthNameLoc ???
+            31 => Ok(VariableValue::new_bool(false)),                                                          // force echo
+            32 => Ok(VariableValue::new_bool(false)),                                                          // read only
+            33 => Ok(VariableValue::new_bool(conference.private_msgs)),
+            34 => Ok(VariableValue::new_int(0)),      // ret receipt level
+            35 => Ok(VariableValue::new_bool(false)), // record origin
+            36 => Ok(VariableValue::new_bool(false)), // prompt for routing
+            37 => Ok(VariableValue::new_bool(conference.allow_aliases)),
+            38 => Ok(VariableValue::new_bool(false)),                                      // show intro  on ra
+            39 => Ok(VariableValue::new_int(conference.required_security.level() as i32)), // req level to enter mail
+            40 => Ok(VariableValue::new_string(conference.password.to_string())),
+            41 => Ok(VariableValue::new_string(conference.intro_file.to_string_lossy().to_string())),
+            42 => Ok(VariableValue::new_string(conference.attachment_location.to_string_lossy().to_string())),
+            43 => Ok(VariableValue::new_string(String::new())),                      // reg flags
+            44 => Ok(VariableValue::new_byte(conference.required_security.level())), // attach level
+            45 => Ok(VariableValue::new_byte(0)),                                    // carbon limit
+            46 => Ok(VariableValue::new_string(conference.command_file.to_string_lossy().to_string())),
+            47 => Ok(VariableValue::new_bool(true)),  // old index
+            48 => Ok(VariableValue::new_bool(true)),  // long to names
+            49 => Ok(VariableValue::new_byte(0)),     // carbon level
+            50 => Ok(VariableValue::new_byte(0)),     // conf type
+            51 => Ok(VariableValue::new_int(0)),      // export ptr
+            52 => Ok(VariableValue::new_double(0.0)), // charge time
+            53 => Ok(VariableValue::new_double(0.0)), // charge msg read
+            54 => Ok(VariableValue::new_double(0.0)), // charge msg write
+            _ => Ok(VariableValue::new_int(-1)),
+        }
+    } else {
+        Ok(VariableValue::new_int(-1))
+    }
 }
+
 pub fn tinkey(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     inkey(vm, args)
 }

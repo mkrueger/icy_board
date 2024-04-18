@@ -20,6 +20,7 @@ use icy_board_engine::icy_board::{
     icb_text::IcbTextFile,
     language::SupportedLanguages,
     menu::Menu,
+    message_areas::MessageAreaList,
     pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader},
     pcboard_data::PcbBoardData,
     read_with_encoding_detection,
@@ -339,7 +340,7 @@ impl PCBoardImporter {
         let conferences = PcbConferenceHeader::import_pcboard(&conf, self.data.num_conf as usize)?;
         let add_conferences = PcbAdditionalConferenceHeader::import_pcboard(&conf_add)?;
 
-        let mut conf_base = ConferenceBase::import_pcboard(&conferences, &add_conferences);
+        let mut conf_base = ConferenceBase::import_pcboard(&self.output_directory, &conferences, &add_conferences);
 
         for (i, conf) in conf_base.iter_mut().enumerate() {
             let output = if i == 0 { "conferences/main".to_string() } else { format!("conferences/{i}") };
@@ -366,9 +367,14 @@ impl PCBoardImporter {
             conf.file_area_menu = self.convert_conference_display_file(&output, &conf.file_area_menu)?;
             conf.file_area_file = self.convert_dirlist_file(&destination, &output, &conf.file_area_file)?;
 
-            for area in conf.message_areas.iter_mut() {
+            conf.message_area_menu = PathBuf::from(output.to_string() + "/messages");
+            conf.message_area_file = PathBuf::from(output.to_string() + "/messages.toml");
+
+            let mut list = MessageAreaList::load(&destination.join("messages.toml"))?;
+            for area in list.iter_mut() {
                 area.filename = self.convert_message_base(&destination, &output, &area.filename)?;
             }
+            list.save(&destination.join("messages.toml"))?;
         }
 
         let destination = self.output_directory.join(new_rel_name);

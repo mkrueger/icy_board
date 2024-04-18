@@ -20,8 +20,8 @@ impl PcbBoardCommand {
         self.state.session.more_requested = false;
 
         let file_area_file = self.state.resolve_path(&self.state.session.current_conference.file_area_file);
-
         let file_areas = FileAreaList::load(&file_area_file)?;
+
         if file_areas.is_empty() {
             self.state
                 .display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;

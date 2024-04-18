@@ -36,6 +36,7 @@ pub mod icb_config;
 pub mod icb_text;
 pub mod language;
 pub mod menu;
+pub mod message_areas;
 pub mod pcb;
 pub mod sec_levels;
 pub mod security;

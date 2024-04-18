@@ -30,6 +30,7 @@ use super::{
     file_areas::FileAreaList,
     icb_config::{IcbColor, DEFAULT_PCBOARD_DATE_FORMAT},
     icb_text::{IcbTextFile, IcbTextStyle, IceText},
+    message_areas::MessageAreaList,
     pcboard_data::Node,
     surveys::SurveyList,
     user_base::User,
@@ -125,6 +126,8 @@ pub struct Session {
     pub current_message_area: usize,
     pub current_conference: Conference,
     pub current_file_areas: FileAreaList,
+    pub current_message_areas: MessageAreaList,
+
     pub login_date: DateTime<Local>,
 
     pub cur_user: i32,
@@ -186,6 +189,7 @@ impl Session {
             current_conference_number: 0,
             current_conference: Conference::default(),
             current_file_areas: FileAreaList::default(),
+            current_message_areas: MessageAreaList::default(),
             login_date: Local::now(),
             cur_user: -1,
             cur_security: 0,
@@ -446,8 +450,37 @@ impl IcyBoardState {
                 self.session.current_conference = board.conferences[conference as usize].clone();
             }
 
-            let file_area_file = self.resolve_path(&self.session.current_conference.file_area_file);
-            self.session.current_file_areas = FileAreaList::load(&file_area_file).unwrap();
+            self.session.current_file_areas.clear();
+
+            if !self.session.current_conference.file_area_file.as_os_str().is_empty() {
+                let file_area_file = self.resolve_path(&self.session.current_conference.file_area_file);
+                if file_area_file.exists() {
+                    match FileAreaList::load(&file_area_file) {
+                        Ok(areas) => {
+                            self.session.current_file_areas = areas;
+                        }
+                        Err(err) => {
+                            log::error!("Error loading file areas {}: {}", file_area_file.display(), err);
+                        }
+                    }
+                }
+            }
+
+            self.session.current_message_areas.clear();
+            if !self.session.current_conference.message_area_file.as_os_str().is_empty() {
+                let message_area_file = self.resolve_path(&self.session.current_conference.message_area_file);
+                if message_area_file.exists() {
+                    match MessageAreaList::load(&message_area_file) {
+                        Ok(areas) => {
+                            self.session.current_message_areas = areas;
+                        }
+                        Err(err) => {
+                            log::error!("Error loading message areas {}: {}", message_area_file.display(), err);
+                        }
+                    }
+                }
+            }
+
             // todo unwrap
         }
     }

@@ -1,6 +1,7 @@
 use std::{
     ops::{Deref, DerefMut},
-    path::PathBuf,
+    os::unix::fs,
+    path::{Path, PathBuf},
 };
 
 use serde::{Deserialize, Serialize};
@@ -8,27 +9,13 @@ use serde::{Deserialize, Serialize};
 use super::{
     commands::Command,
     is_false, is_null_8, is_null_i32,
+    message_areas::{MessageArea, MessageAreaList},
     pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader},
     security::RequiredSecurity,
     user_base::Password,
     IcyBoardSerializer,
 };
 
-#[derive(Default, Clone, Serialize, Deserialize)]
-pub struct MessageArea {
-    pub name: String,
-    pub filename: PathBuf,
-    read_only: bool,
-    allow_aliases: bool,
-
-    #[serde(default)]
-    #[serde(skip_serializing_if = "RequiredSecurity::is_empty")]
-    req_level_to_enter: RequiredSecurity,
-
-    #[serde(default)]
-    #[serde(skip_serializing_if = "RequiredSecurity::is_empty")]
-    req_level_to_save_attach: RequiredSecurity,
-}
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Conference {
     pub name: String,
@@ -113,7 +100,8 @@ pub struct Conference {
     pub file_area_menu: PathBuf,
     pub file_area_file: PathBuf,
 
-    pub message_areas: Vec<MessageArea>,
+    pub message_area_menu: PathBuf,
+    pub message_area_file: PathBuf,
 
     #[serde(skip)]
     pub commands: Vec<Command>,
@@ -137,7 +125,7 @@ impl ConferenceBase {
         self.entries.is_empty()
     }
 
-    pub fn import_pcboard(conferences: &[PcbConferenceHeader], add_conferences: &[PcbAdditionalConferenceHeader]) -> ConferenceBase {
+    pub fn import_pcboard(output_directory: &Path, conferences: &[PcbConferenceHeader], add_conferences: &[PcbAdditionalConferenceHeader]) -> ConferenceBase {
         let mut confs = Vec::new();
         for (i, c) in conferences.iter().enumerate() {
             let d = &add_conferences[i];
@@ -150,8 +138,12 @@ impl ConferenceBase {
                 req_level_to_enter: RequiredSecurity::new(d.req_level_to_enter),
                 req_level_to_save_attach: RequiredSecurity::new(d.attach_level),
             };
+            let output = if i == 0 { "conferences/main".to_string() } else { format!("conferences/{i}") };
+            let destination = output_directory.join(&output);
+            std::fs::create_dir_all(&destination).unwrap();
 
-            let message_areas = vec![general_area];
+            let areas = MessageAreaList::new(vec![general_area]);
+            areas.save(&destination.join(&"messages.toml")).unwrap();
 
             let new = Conference {
                 name: c.name.clone(),
@@ -189,7 +181,8 @@ impl ConferenceBase {
                 survey_file: PathBuf::from(&c.script_file),
                 file_area_menu: PathBuf::from(&c.dir_menu),
                 file_area_file: PathBuf::from(&c.dir_file),
-                message_areas,
+                message_area_menu: PathBuf::from("messages"),
+                message_area_file: PathBuf::from("messages.toml"),
             };
             confs.push(new);
         }
