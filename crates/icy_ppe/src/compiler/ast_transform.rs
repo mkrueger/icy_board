@@ -119,13 +119,16 @@ impl AstVisitorMut for AstTransformationVisitor {
     fn visit_repeat_until_statement(&mut self, repeat_until: &crate::ast::RepeatUntilStatement) -> Statement {
         let mut statements = Vec::new();
 
+        let loop_label = self.next_label();
         let continue_label = self.next_label();
         let break_label = self.next_label();
 
         self.continue_break_labels.push((continue_label.clone(), break_label.clone()));
 
-        statements.push(LabelStatement::create_empty_statement(continue_label.clone()));
+        statements.push(LabelStatement::create_empty_statement(loop_label.clone()));
         statements.extend(repeat_until.get_statements().iter().map(|s| s.visit_mut(self)));
+
+        statements.push(LabelStatement::create_empty_statement(continue_label.clone()));
 
         statements.push(IfStatement::create_empty_statement(
             repeat_until.get_condition().clone(),
