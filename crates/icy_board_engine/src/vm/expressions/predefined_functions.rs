@@ -380,9 +380,14 @@ pub fn u_name(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
 }
 
 pub fn u_ldate(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    // vm.pcb_data.users[vm.cur_user].last_date_on
-    // TODO
-    Ok(VariableValue::new(VariableType::Date, VariableData::default()))
+    if let Some(user) = &vm.icy_board_state.current_user {
+        Ok(VariableValue::new(
+            VariableType::Date,
+            VariableData::from_int(IcbDate::from_utc(user.stats.last_on).to_pcboard_date()),
+        ))
+    } else {
+        Ok(VariableValue::new(VariableType::Date, VariableData::default()))
+    }
 }
 
 pub fn u_ltime(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -436,36 +441,36 @@ pub fn u_msgwr(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> 
 }
 
 pub fn year(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let var = vm.eval_expr(&args[0])?.as_int();
+    Ok(VariableValue::new_int(IcbDate::from_pcboard(var as u32).get_year() as i32))
 }
 pub fn month(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let var = vm.eval_expr(&args[0])?.as_int();
+    Ok(VariableValue::new_int(IcbDate::from_pcboard(var as u32).get_month() as i32))
 }
 pub fn day(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let var = vm.eval_expr(&args[0])?.as_int();
+    Ok(VariableValue::new_int(IcbDate::from_pcboard(var as u32).get_day() as i32))
 }
 pub fn dow(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
 pub fn hour(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let var = vm.eval_expr(&args[0])?.as_int();
+    Ok(VariableValue::new_int(IcbTime::from_pcboard(var).get_hour() as i32))
 }
 pub fn min(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let var = vm.eval_expr(&args[0])?.as_int();
+    Ok(VariableValue::new_int(IcbTime::from_pcboard(var).get_minute() as i32))
 }
 pub fn sec(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let var = vm.eval_expr(&args[0])?.as_int();
+    Ok(VariableValue::new_int(IcbTime::from_pcboard(var).get_second() as i32))
 }
 pub fn timeap(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let var = vm.eval_expr(&args[0])?.as_int();
+    Ok(VariableValue::new_string(IcbTime::from_pcboard(var).to_string()))
 }
 pub fn ver(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(1540))
@@ -537,11 +542,9 @@ pub fn mask_path(_vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<VariableVal
 pub fn mask_ascii(_vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_string(MASK_ASCII.to_string()))
 }
-
 pub fn curconf(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.icy_board_state.session.current_conference_number))
 }
-
 pub fn pcbdat(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_string(vm.icy_board_state.get_pcbdat()?))
 }
@@ -556,13 +559,14 @@ pub fn ppepath(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> 
 }
 
 pub fn valdate(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let date = vm.eval_expr(&args[0])?.as_string();
+    Ok(VariableValue::new_bool(!IcbDate::parse(&date).is_empty()))
 }
 pub fn valtime(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let time = vm.eval_expr(&args[0])?.as_string();
+    Ok(VariableValue::new_bool(!IcbTime::parse(&time).is_empty()))
 }
+
 pub fn pcbnode(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.icy_board_state.node_state.lock().unwrap().node_number as i32))
 }
@@ -623,8 +627,7 @@ pub fn un_oper(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> 
     }
 }
 pub fn cursec(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_int(vm.icy_board_state.session.cur_security as i32))
 }
 
 pub fn gettoken(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
