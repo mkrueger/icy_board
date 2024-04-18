@@ -167,7 +167,7 @@ impl PCBoardImporter {
         let chat_menu = self.convert_display_file(&self.data.path.chat_menu.clone(), "art/chtm")?;
         let no_ansi = self.convert_display_file(&self.data.path.no_ansi.clone(), "art/noansi")?;
 
-        let user_base = self.convert_user_base(&self.data.path.usr_file.clone(), &self.data.path.inf_file.clone(), "data/user_base.toml")?;
+        let user_base = self.convert_user_base(&self.data.path.usr_file.clone(), &self.data.path.inf_file.clone(), "home")?;
 
         let protocol_data_file = self.convert_data::<SupportedProtocols>(&self.data.path.protocol_data_file.clone(), "config/protocols.toml")?;
         let language_file = self.convert_data::<SupportedLanguages>(&self.data.path.pcml_dat_file.clone(), "config/languages.toml")?;
@@ -232,8 +232,8 @@ impl PCBoardImporter {
                 notice: String::new(),
                 capabilities: String::new(),
                 date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
+                num_nodes: 4,
             },
-            num_nodes: 32,
             func_keys: self.data.func_keys.clone(),
             subscription_info: SubscriptionMode {
                 is_enabled: self.data.subscription_info.is_enabled,
@@ -252,6 +252,7 @@ impl PCBoardImporter {
                 security_file_path: PathBuf::from("art/secmsgs"),
                 command_display_path: PathBuf::from("art/cmd_display"),
                 tmp_path: PathBuf::from("tmp/"),
+                home_dir: PathBuf::from("home/"),
                 icbtext,
                 user_base,
                 conferences,
@@ -647,7 +648,6 @@ impl PCBoardImporter {
         let user_inf = PcbUserInf::read_users(&PathBuf::from(&inf_file))?;
 
         let user_base = UserBase::import_pcboard(
-            self.output_directory.join("home"),
             &users
                 .iter()
                 .map(|u| PcbUser {
@@ -658,8 +658,7 @@ impl PCBoardImporter {
         );
         let destination = self.output_directory.join(new_rel_name);
 
-        user_base.save(&destination)?;
-        self.logger.create_new_file(destination.display().to_string());
+        user_base.save_users(&destination)?;
 
         Ok(PathBuf::from(new_rel_name))
     }

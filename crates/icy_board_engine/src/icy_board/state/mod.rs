@@ -657,7 +657,7 @@ impl IcyBoardState {
             if let Some(user) = &self.current_user {
                 for u in 0..board.users.len() {
                     if board.users[u].get_name() == user.get_name() {
-                        board.users.set_user(user.clone(), u)?;
+                        board.set_user(user.clone(), u)?;
                         return Ok(());
                     }
                 }

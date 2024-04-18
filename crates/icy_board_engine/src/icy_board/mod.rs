@@ -23,7 +23,7 @@ use self::{
     pcboard_data::PcbBoardData,
     sec_levels::SecurityLevelDefinitions,
     statistics::Statistics,
-    user_base::UserBase,
+    user_base::{User, UserBase},
     xfer_protocols::SupportedProtocols,
 };
 
@@ -87,6 +87,7 @@ pub enum IcyBoardError {
 }
 
 pub struct IcyBoard {
+    pub file_name: PathBuf,
     pub root_path: PathBuf,
     pub users: UserBase,
     pub config: IcbConfig,
@@ -110,6 +111,7 @@ impl IcyBoard {
 
         IcyBoard {
             default_display_text,
+            file_name: PathBuf::new(),
             root_path: PathBuf::new(),
             users: UserBase::default(),
             config: IcbConfig::new(),
@@ -149,14 +151,22 @@ impl IcyBoard {
     }
 
     pub fn load<P: AsRef<Path>>(path: &P) -> Res<Self> {
-        let config = IcbConfig::load(path)?;
-
-        let parent_path = path.as_ref().parent().unwrap();
-        let load_path = &RelativePath::from_path(&config.paths.user_base)?.to_path(parent_path);
-        let users = UserBase::load(&load_path).map_err(|e| {
-            log::error!("Error loading user base: {} from {}", e, load_path.display());
+        let config = IcbConfig::load(path).map_err(|e| {
+            log::error!("Error loading icy board config file: {} from {}", e, path.as_ref().display());
             e
         })?;
+        let p = path.as_ref().canonicalize().unwrap();
+        let parent_path = p.parent().unwrap();
+        /*
+        let load_path = &RelativePath::from_path(&config.paths.user_base)?.to_path(parent_path);
+        let mut users = UserBase::load(&load_path).map_err(|e| {
+            log::error!("Error loading user base: {} from {}", e, load_path.display());
+            println!("Error loading user base: {} from {}", e, load_path.display());
+            e
+        })?;*/
+        let mut users = UserBase::default();
+        let load_path = RelativePath::from_path(&config.paths.home_dir)?.to_path(parent_path);
+        users.load_users(&load_path)?;
 
         let load_path = RelativePath::from_path(&config.paths.conferences)?.to_path(parent_path);
         let conferences = ConferenceBase::load(&load_path).map_err(|e| {
@@ -165,6 +175,7 @@ impl IcyBoard {
         })?;
 
         let load_path = RelativePath::from_path(&config.paths.icbtext)?.to_path(parent_path);
+        println!("1 {}", load_path.display());
         let default_display_text = IcbTextFile::load(&load_path).map_err(|e| {
             log::error!("Error loading display text: {} from {}", e, load_path.display());
             e
@@ -201,7 +212,8 @@ impl IcyBoard {
         })?;
 
         Ok(IcyBoard {
-            root_path: path.as_ref().parent().unwrap().canonicalize()?,
+            file_name: path.as_ref().to_path_buf(),
+            root_path: parent_path.to_path_buf(),
             num_callers: 0,
             users,
             config,
@@ -217,9 +229,8 @@ impl IcyBoard {
     }
 
     pub fn save_userbase(&mut self) -> Res<()> {
-        let path = self.resolve_file(&self.config.paths.user_base);
-        log::info!("Saving user base to {}", path);
-        if let Err(e) = self.users.save(&path) {
+        let home_dir = PathBuf::from(self.resolve_file(&self.config.paths.home_dir));
+        if let Err(e) = self.users.save_users(&home_dir) {
             log::error!("Error saving user base: {}", e);
             Err(e)
         } else {
@@ -387,6 +398,15 @@ impl IcyBoard {
         fs::write(cnames.with_extension("@@@"), legacy_headers)?;
         fs::write(cnames.with_extension("add"), add_headers)?;
 
+        Ok(())
+    }
+
+    pub fn set_user(&mut self, new_user: User, i: usize) -> Res<()> {
+        let home_dir = UserBase::get_user_home_dir(&self.config.paths.home_dir, new_user.get_name());
+        std::fs::create_dir_all(&home_dir).unwrap();
+        let user_txt = toml::to_string(&new_user)?;
+        fs::write(home_dir.join("user.toml"), user_txt)?;
+        self.users[i] = new_user;
         Ok(())
     }
 }

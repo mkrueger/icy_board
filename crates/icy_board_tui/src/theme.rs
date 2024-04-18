@@ -20,6 +20,7 @@ pub struct Theme {
 
     pub content_box: Style,
     pub content_box_title: Style,
+    pub config_title: Style,
 
     pub table_header: Style,
 
@@ -73,7 +74,7 @@ pub const THEME: Theme = /* Theme {
         status_line_text: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_CYAN),
         item: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
         selected_item: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
-
+        config_title: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_CYAN),
         value: Style::new().bg(DOS_BLACK).fg(LIGHT_GRAY),
         edit_value: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
         table_header: Style::new().bg(DOS_BLUE).fg(DOS_WHITE),

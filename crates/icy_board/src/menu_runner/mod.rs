@@ -6,6 +6,7 @@ use icy_board_engine::{
         icb_text::IceText,
         security::RequiredSecurity,
         state::{functions::display_flags, GraphicsMode, IcyBoardState, UserActivity},
+        user_base::UserBase,
         IcyBoardError,
     },
     vm::TerminalTarget,
@@ -591,7 +592,8 @@ impl PcbBoardCommand {
             } else {
                 user_name
             };
-            board.users.home_dir.join(name.to_lowercase().replace(' ', "_"))
+            let home_dir = UserBase::get_user_home_dir(&board.config.paths.home_dir, name);
+            home_dir
         } else {
             return Err(IcyBoardError::ErrorLockingBoard.into());
         };

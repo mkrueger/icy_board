@@ -97,6 +97,9 @@ pub struct BoardInformation {
 
     /// Local date format
     pub date_format: String,
+
+    /// Maximum number of active nodes
+    pub num_nodes: u16,
 }
 
 #[derive(Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -289,6 +292,9 @@ pub struct ConfigPaths {
 
     /// name and location of multi language definitions
     pub group_file: PathBuf,
+
+    /// home directory for user files
+    pub home_dir: PathBuf,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -337,8 +343,6 @@ pub struct IcbConfig {
     ///  function key definitions
     pub func_keys: [String; 10],
 
-    pub num_nodes: u16,
-
     #[serde(rename = "subs")]
     pub subscription_info: SubscriptionMode,
 
@@ -358,6 +362,7 @@ impl IcbConfig {
                 notice: String::new(),
                 capabilities: String::new(),
                 date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
+                num_nodes: 4,
             },
 
             sysop: SysopInformation {
@@ -380,7 +385,6 @@ impl IcbConfig {
             },
             color_configuration: ColorConfiguration::default(),
             func_keys: Default::default(),
-            num_nodes: 32,
             subscription_info: SubscriptionMode {
                 is_enabled: false,
                 subscription_length: 0,
@@ -401,6 +405,7 @@ impl IcbConfig {
                 conferences: PathBuf::from("config/conferences.toml"),
                 security_file_path: PathBuf::from("art/secmsgs/"),
                 command_display_path: PathBuf::from("art/cmd_display/"),
+                home_dir: PathBuf::from("home/"),
 
                 welcome: PathBuf::new(),
                 newuser: PathBuf::new(),

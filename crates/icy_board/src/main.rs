@@ -115,7 +115,7 @@ pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) -> Res<()> {
 
     match IcyBoard::load(config_file) {
         Ok(icy_board) => {
-            let mut bbs = Arc::new(Mutex::new(BBS::new(icy_board.config.num_nodes as usize)));
+            let mut bbs = Arc::new(Mutex::new(BBS::new(icy_board.config.board.num_nodes as usize)));
             let board = Arc::new(Mutex::new(icy_board));
 
             {

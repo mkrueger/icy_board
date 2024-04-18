@@ -1,7 +1,7 @@
 use std::{
     fs,
-    ops::{Deref, Index},
-    path::PathBuf,
+    ops::{Deref, Index, IndexMut},
+    path::{Path, PathBuf},
     str::FromStr,
 };
 
@@ -11,9 +11,9 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     icb_config::{PasswordStorageMethod, DEFAULT_PCBOARD_DATE_FORMAT},
-    is_false, is_null_16, is_null_64, load_internal, save_internal,
+    is_false, is_null_16, is_null_64,
     user_inf::{AccountUserInf, BankUserInf, QwkConfigUserInf},
-    IcyBoardSerializer, PcbUser,
+    PcbUser,
 };
 
 #[derive(Clone, PartialEq)]
@@ -229,7 +229,6 @@ pub struct UserFlags {
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct User {
     name: String,
-    id: u64,
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub alias: String,
@@ -356,19 +355,11 @@ pub struct User {
 }
 
 impl User {
-    pub fn new(id: u64) -> Self {
-        User { id, ..Default::default() }
-    }
-
-    pub fn get_id(&self) -> u64 {
-        self.id
-    }
-
     pub fn get_name(&self) -> &String {
         &self.name
     }
 
-    fn import_pcb(id: u64, u: &PcbUser) -> Self {
+    fn import_pcb(u: &PcbUser) -> Self {
         let alias = if let Some(alias) = &u.inf.alias { alias.alias.clone() } else { String::new() };
         let verify = if let Some(verify) = &u.inf.verify {
             verify.verify.clone()
@@ -441,7 +432,8 @@ impl User {
                 stats.num_verify_errors,
             )
         } else {
-            (IcbDate::new(0, 0, 0), 0, 0, 0, 0, 0, 0, 0, 0, 0)
+            // Fake creation date. IcyBoard sorts users by this date. This should mimic the order from pcboard.
+            (IcbDate::new(1, 1, 1980 + u.user.rec_num as u16), 0, 0, 0, 0, 0, 0, 0, 0, 0)
         };
         let mut custom_comment1 = String::new();
         let mut custom_comment2 = String::new();
@@ -463,7 +455,6 @@ impl User {
 
         Self {
             name: u.user.name.clone(),
-            id,
             alias,
             verify_answer: verify,
             city_or_state: u.user.city.clone(),
@@ -563,9 +554,6 @@ impl User {
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct UserBase {
-    last_id: u64,
-    pub home_dir: PathBuf,
-
     #[serde(skip_deserializing)]
     #[serde(skip_serializing)]
     users: Vec<User>,
@@ -576,25 +564,16 @@ impl UserBase {
         self.users.len()
     }
 
-    pub fn next_id(&mut self) -> u64 {
-        self.last_id += 1;
-        self.last_id
-    }
-
     pub fn is_empty(&self) -> bool {
         self.users.is_empty()
     }
 
-    pub fn import_pcboard(home_dir: PathBuf, pcb_user: &[PcbUser]) -> Self {
+    pub fn import_pcboard(pcb_user: &[PcbUser]) -> Self {
         let mut users = Vec::new();
         for u in pcb_user {
-            users.push(User::import_pcb(users.len() as u64 + 1, u));
+            users.push(User::import_pcb(u));
         }
-        Self {
-            last_id: users.len() as u64,
-            home_dir,
-            users,
-        }
+        Self { users }
     }
 
     pub fn new_user(&mut self, new_user: User) -> usize {
@@ -602,24 +581,13 @@ impl UserBase {
         self.users.len() - 1
     }
 
-    pub fn set_user(&mut self, new_user: User, i: usize) -> Res<()> {
-        let home_dir = self.home_dir.join(new_user.get_name().to_ascii_lowercase().replace(' ', "_"));
-        std::fs::create_dir_all(&home_dir).unwrap();
-        let user_txt = toml::to_string(&new_user)?;
-        fs::write(home_dir.join("user.toml"), user_txt)?;
-
-        self.users[i] = new_user;
-        Ok(())
-    }
-}
-
-impl IcyBoardSerializer for UserBase {
-    const FILE_TYPE: &'static str = "user base";
-
-    fn load<P: AsRef<std::path::Path>>(path: &P) -> icy_ppe::Res<Self> {
-        let mut res = load_internal::<Self, P>(path)?;
-
-        for name in fs::read_dir(&res.home_dir)?.flatten() {
+    pub fn load_users(&mut self, home_dir: &Path) -> Res<()> {
+        println!("home dir: {}", home_dir.display());
+        let read_dir = fs::read_dir(&home_dir).map_err(|e| {
+            log::error!("Error loading home directories {} from {}", e, home_dir.display());
+            e
+        })?;
+        for name in read_dir.flatten() {
             if !name.path().is_dir() {
                 continue;
             }
@@ -630,9 +598,34 @@ impl IcyBoardSerializer for UserBase {
             }
             let user_txt = fs::read_to_string(user_file)?;
             let user: User = toml::from_str(&user_txt)?;
-            res.users.push(user);
+            self.users.push(user);
         }
-        res.users.sort_by(|a, b| a.id.cmp(&b.id));
+        self.users.sort_by(|a, b| a.stats.first_dt_on.cmp(&b.stats.first_dt_on));
+
+        Ok(())
+    }
+
+    pub fn save_users(&self, home_dir: &Path) -> Res<()> {
+        std::fs::create_dir_all(&home_dir)?;
+        for user in &self.users {
+            let home_dir = Self::get_user_home_dir(home_dir, user.get_name());
+            std::fs::create_dir_all(&home_dir)?;
+            let user_txt = toml::to_string(user)?;
+            fs::write(home_dir.join("user.toml"), user_txt)?;
+        }
+        Ok(())
+    }
+
+    pub fn get_user_home_dir(home_dir: &Path, user_name: &str) -> PathBuf {
+        home_dir.join(user_name.to_ascii_lowercase().replace(' ', "_"))
+    }
+}
+/*
+impl IcyBoardSerializer for UserBase {
+    const FILE_TYPE: &'static str = "user base";
+
+    fn load<P: AsRef<std::path::Path>>(path: &P) -> icy_ppe::Res<Self> {
+        let mut res = load_internal::<Self, P>(path)?;
         Ok(res)
     }
 
@@ -648,11 +641,16 @@ impl IcyBoardSerializer for UserBase {
         Ok(())
     }
 }
-
+*/
 impl Index<usize> for UserBase {
     type Output = User;
     fn index(&self, i: usize) -> &User {
         &self.users[i]
+    }
+}
+impl IndexMut<usize> for UserBase {
+    fn index_mut(&mut self, i: usize) -> &mut User {
+        &mut self.users[i]
     }
 }
 

@@ -131,8 +131,8 @@ impl PcbBoardCommand {
 
     fn new_user(&mut self) -> Res<bool> {
         let mut tries = 0;
-        let id = self.state.board.lock().unwrap().users.next_id();
-        let mut new_user = User::new(id);
+
+        let mut new_user = User::default();
         let settings = self.state.board.lock().unwrap().config.new_user_settings.clone();
         new_user.security_level = settings.sec_level;
         new_user.stats.first_dt_on = Utc::now();

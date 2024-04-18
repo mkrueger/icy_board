@@ -31,7 +31,7 @@ pub struct NodeMonitoringScreen {
 
 impl NodeMonitoringScreen {
     pub fn new(board: &Arc<Mutex<IcyBoard>>) -> Self {
-        let nodes = board.lock().unwrap().config.num_nodes;
+        let nodes = board.lock().unwrap().config.board.num_nodes;
         Self {
             nodes: nodes as usize,
             scroll_state: ScrollbarState::default().content_length(nodes as usize),
