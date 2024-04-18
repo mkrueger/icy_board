@@ -11,7 +11,7 @@ use icy_board_engine::{
 };
 use icy_ppe::Res;
 
-use super::{PcbBoardCommand, MASK_COMMAND};
+use super::{find_files::FileList, PcbBoardCommand, MASK_COMMAND};
 
 impl PcbBoardCommand {
     pub fn show_file_directories(&mut self, action: &Command) -> Res<()> {
@@ -100,27 +100,20 @@ impl PcbBoardCommand {
         self.state.new_line()?;
 
         let files: Vec<FileHeader> = base.iter().flatten().collect();
-        let c: Vec<&FileHeader> = files.iter().collect();
-        self.display_file_list(action, &base, &c)?;
+        let files: Vec<&FileHeader> = files.iter().collect();
+
+        let mut list = FileList {
+            base: &base,
+            files,
+            help: &action.help,
+        };
+        list.display_file_list(self)?;
+
         if self.state.session.num_lines_printed > 0 {
-            self.filebase_more(action)?;
+            list.filebase_more(self)?;
         }
         self.state.session.disable_auto_more = false;
         self.state.session.more_requested = false;
         Ok(())
-    }
-
-    pub fn filebase_more(&mut self, action: &Command) -> Res<bool> {
-        let input = self.state.input_field(
-            IceText::FilesMorePrompt,
-            40,
-            MASK_COMMAND,
-            &action.help,
-            None,
-            display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
-        )?;
-        self.state.session.more_requested = false;
-        self.state.session.num_lines_printed = 0;
-        Ok(input.to_ascii_uppercase() != self.state.session.no_char.to_string())
     }
 }

@@ -100,11 +100,17 @@ impl PcbBoardCommand {
                 self.state.run_ppe(&question, Some(t.path()))?;
                 output.push(fs::read_to_string(t.path())?);
 
-                let mut file = OpenOptions::new().append(true).open(answer_file)?;
-                for line in output {
-                    writeln!(file, "{}", line)?;
+                match OpenOptions::new().create(true).append(true).open(&answer_file) {
+                    Ok(mut file) => {
+                        for line in output {
+                            writeln!(file, "{}", line)?;
+                        }
+                    }
+                    Err(err) => {
+                        log::error!("Error opening answer file {} : {}", answer_file.display(), err);
+                        return Err(err.into());
+                    }
                 }
-
                 return Ok(());
             }
         }
@@ -119,10 +125,10 @@ impl PcbBoardCommand {
                 }
                 let txt = self.state.input_field(
                     IceText::CompleteQuestion,
-                    11,
+                    1,
                     "",
                     "",
-                    None,
+                    Some(self.state.session.no_char.to_string()),
                     display_flags::YESNO | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::UPCASE,
                 )?;
                 if txt.starts_with(self.state.session.yes_char) {
@@ -143,9 +149,16 @@ impl PcbBoardCommand {
                         output.push(format!("Q: {}", question));
                         output.push(format!("A: {}", answer));
                     }
-                    let mut file = OpenOptions::new().append(true).open(answer_file)?;
-                    for line in output {
-                        writeln!(file, "{}", line)?;
+                    match OpenOptions::new().create(true).append(true).open(&answer_file) {
+                        Ok(mut file) => {
+                            for line in output {
+                                writeln!(file, "{}", line)?;
+                            }
+                        }
+                        Err(err) => {
+                            log::error!("Error opening answer file {} : {}", answer_file.display(), err);
+                            return Err(err.into());
+                        }
                     }
                 }
             }

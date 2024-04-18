@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     fs,
     io::{Read, Write},
     path::{Path, PathBuf},
@@ -173,6 +173,10 @@ pub struct Session {
     pub yes_char: char,
     pub no_char: char,
     pub yes_no_mask: String,
+
+    pub use_fse: bool,
+
+    pub flagged_files: HashSet<PathBuf>,
 }
 
 impl Session {
@@ -203,6 +207,7 @@ impl Session {
             disable_auto_more: false,
             more_requested: false,
             cancel_batch: false,
+            use_fse: true,
             user_name: String::new(),
             date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
             cursor_pos: Position::default(),
@@ -212,6 +217,7 @@ impl Session {
             yes_no_mask: "YyNn".to_string(),
 
             sysop_name: "SYSOP".to_string(),
+            flagged_files: HashSet::new(),
         }
     }
 
@@ -229,6 +235,10 @@ impl Session {
         } else {
             String::new()
         }
+    }
+
+    pub fn flag_for_download(&mut self, file: PathBuf) {
+        self.flagged_files.insert(file);
     }
 }
 
@@ -612,6 +622,8 @@ impl IcyBoardState {
             self.session.cur_security = user.security_level;
             self.session.page_len = user.page_len;
             self.session.user_name = user.get_name().clone();
+            self.session.use_fse = user.flags.use_fsedefault;
+
             self.current_user = Some(user);
             conf
         } else {
@@ -628,6 +640,7 @@ impl IcyBoardState {
         let old_language = self.session.language.clone();
         self.session.date_format = if let Some(user) = &self.current_user {
             self.session.language = user.language.clone();
+            self.session.use_fse = user.flags.use_fsedefault;
             if !user.date_format.is_empty() {
                 user.date_format.clone()
             } else {
@@ -747,6 +760,22 @@ impl IcyBoardState {
         }
     }
 
+    pub fn up(&mut self, chars: i32) -> Res<()> {
+        if self.use_ansi() {
+            self.write_raw(TerminalTarget::Both, format!("\x1B[{}A", chars).chars().collect::<Vec<char>>().as_slice())
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn down(&mut self, chars: i32) -> Res<()> {
+        if self.use_ansi() {
+            self.write_raw(TerminalTarget::Both, format!("\x1B[{}B", chars).chars().collect::<Vec<char>>().as_slice())
+        } else {
+            Ok(())
+        }
+    }
+
     /// # Errors
     pub fn print(&mut self, target: TerminalTarget, str: &str) -> Res<()> {
         self.write_raw(target, str.chars().collect::<Vec<char>>().as_slice())
@@ -765,9 +794,10 @@ impl IcyBoardState {
 
         for c in data {
             if target != TerminalTarget::Sysop || self.session.is_sysop {
-                self.user_screen
+                let _ = self
+                    .user_screen
                     .parser
-                    .print_char(&mut self.user_screen.buffer, 0, &mut self.user_screen.caret, *c)?;
+                    .print_char(&mut self.user_screen.buffer, 0, &mut self.user_screen.caret, *c);
                 if *c == '\n' {
                     self.next_line()?;
                 }
@@ -778,9 +808,10 @@ impl IcyBoardState {
                 }
             }
             if target != TerminalTarget::User {
-                self.sysop_screen
+                let _ = self
+                    .sysop_screen
                     .parser
-                    .print_char(&mut self.sysop_screen.buffer, 0, &mut self.sysop_screen.caret, *c)?;
+                    .print_char(&mut self.sysop_screen.buffer, 0, &mut self.sysop_screen.caret, *c);
                 if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
                     sysop_bytes.push(cp437);
                 } else {

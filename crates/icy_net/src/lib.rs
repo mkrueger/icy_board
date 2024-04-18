@@ -6,7 +6,7 @@ pub mod protocol;
 
 use thiserror::Error;
 
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 #[derive(Error, Debug)]
 pub enum NetError {

@@ -583,7 +583,6 @@ impl PCBoardImporter {
         let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             self.logger.log(&format!("already converted ({})", file));
-
             return Ok(PathBuf::from(file));
         }
 
@@ -631,9 +630,8 @@ impl PCBoardImporter {
             }
         }
         if !found {
-            self.logger.log(&format!("searched for {}, but not found any matching file.", upper_name));
-
-            return Ok(PathBuf::new());
+            self.logger
+                .log(&format!("Warning: Searched for {}, but didn't find any matching file.", upper_name));
         }
 
         self.converted_files.insert(upper_file_name.clone(), new_name.to_string());

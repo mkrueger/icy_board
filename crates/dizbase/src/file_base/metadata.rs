@@ -2,6 +2,8 @@
 pub enum MetadaType {
     /// Unknown meta data type
     Unknown(u8),
+    /// The full file name of the file
+    FilePath,
     /// The uploader of the file.
     UploaderName,
     /// The password of the file  (Murmur64a hash)
@@ -16,6 +18,7 @@ pub enum MetadaType {
 impl MetadaType {
     pub fn from_data(data: u8) -> Self {
         match data {
+            0 => MetadaType::FilePath,
             1 => MetadaType::UploaderName,
             2 => MetadaType::Password,
             3 => MetadaType::Tags,
@@ -28,6 +31,7 @@ impl MetadaType {
     pub fn to_data(&self) -> u8 {
         match self {
             MetadaType::Unknown(data) => *data,
+            MetadaType::FilePath => 0,
             MetadaType::UploaderName => 1,
             MetadaType::Password => 2,
             MetadaType::Tags => 3,

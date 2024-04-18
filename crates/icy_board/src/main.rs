@@ -32,6 +32,7 @@ mod call_wait_screen;
 mod icy_engine_output;
 mod import;
 pub mod menu_runner;
+pub mod mods;
 mod node_monitoring_screen;
 mod tui;
 

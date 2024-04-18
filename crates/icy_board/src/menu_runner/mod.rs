@@ -14,6 +14,7 @@ use icy_ppe::Res;
 use jamjam::jam::{JamMessage, JamMessageBase};
 mod comment_to_sysop;
 mod delete_message;
+mod download;
 mod find_files;
 mod login;
 mod message_reader;
@@ -29,7 +30,7 @@ pub struct PcbBoardCommand {
     pub state: IcyBoardState,
     pub display_menu: bool,
 }
-const MASK_COMMAND: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;':,.<>?/\\\" ";
+pub const MASK_COMMAND: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;':,.<>?/\\\" ";
 const MASK_NUMBER: &str = "0123456789";
 
 impl PcbBoardCommand {
@@ -116,6 +117,12 @@ impl PcbBoardCommand {
                 // C
                 self.comment_to_sysop(action)?;
             }
+
+            CommandType::Download => {
+                // D
+                self.download(action)?;
+            }
+
             CommandType::FileDirectory => {
                 // F
                 self.show_file_directories(action)?;
@@ -123,17 +130,7 @@ impl PcbBoardCommand {
 
             CommandType::Goodbye => {
                 // G
-                self.displaycmdfile("g")?;
-
-                // force logoff - no flagged files scan
-                if let Some(token) = self.state.session.tokens.pop_front() {
-                    if token.to_ascii_uppercase() == self.state.session.yes_char.to_string().to_ascii_uppercase() {
-                        self.state.goodbye()?;
-                    }
-                }
-
-                // todo : check flagged files & parse input
-                self.state.goodbye()?;
+                self.goodbye_cmd()?;
             }
             CommandType::Help => {
                 // H
@@ -227,6 +224,17 @@ impl PcbBoardCommand {
                 return Err(Box::new(IcyBoardError::UnknownAction(format!("{:?}", action.command_type))));
             }
         }
+        Ok(())
+    }
+
+    pub fn goodbye_cmd(&mut self) -> Res<()> {
+        self.displaycmdfile("g")?;
+        if let Some(token) = self.state.session.tokens.pop_front() {
+            if token.to_ascii_uppercase() == self.state.session.yes_char.to_string().to_ascii_uppercase() {
+                self.state.goodbye()?;
+            }
+        }
+        self.state.goodbye()?;
         Ok(())
     }
 
@@ -496,7 +504,11 @@ impl PcbBoardCommand {
             if !found {
                 help_loc = help_loc.join(format!("hlp{}", help_cmd).as_str());
             }
+            let am = self.state.session.disable_auto_more;
+            self.state.session.disable_auto_more = false;
+            self.state.session.disp_options.non_stop = false;
             let res = self.state.display_file(&help_loc)?;
+            self.state.session.disable_auto_more = am;
 
             if res {
                 self.state.press_enter()?;
@@ -541,6 +553,8 @@ impl PcbBoardCommand {
         let welcome_screen = self.state.board.lock().unwrap().config.paths.welcome.clone();
         let welcome_screen = self.state.resolve_path(&welcome_screen);
         self.state.display_file(&welcome_screen)?;
+        self.state.press_enter()?;
+        self.display_menu = true;
         Ok(())
     }
 

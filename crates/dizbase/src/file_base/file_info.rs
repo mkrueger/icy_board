@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use chrono::Utc;
 
 use super::{
@@ -12,7 +14,9 @@ pub struct FileInfo {
 
 impl FileInfo {
     /// Creates a new file info
-    pub fn new(name: String) -> Self {
+    pub fn new(path: &Path) -> Self {
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+
         let file_date = Utc::now().timestamp() as u64;
         let header = FileHeader {
             name,
@@ -24,7 +28,7 @@ impl FileInfo {
             long_description_offset: 0,
             attribute: 0,
         };
-        Self { header, metadata: Vec::new() }
+        Self { header, metadata: Vec::new() }.with_file_name(path)
     }
 
     pub fn with_size(mut self, size: u64) -> Self {
@@ -80,6 +84,12 @@ impl FileInfo {
 
     pub fn with_file_id(mut self, file_id: String) -> Self {
         self.metadata.push(MetadataHeader::new(MetadaType::FileID, file_id.as_bytes().to_vec()));
+        self
+    }
+
+    fn with_file_name(mut self, path: &Path) -> Self {
+        self.metadata
+            .push(MetadataHeader::new(MetadaType::FilePath, path.as_os_str().as_encoded_bytes().to_vec()));
         self
     }
 

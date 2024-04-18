@@ -26,7 +26,7 @@ pub fn scan_file_directory(scan_dir: &PathBuf, out_file_base: &PathBuf) -> crate
         if path.path().is_dir() {
             continue;
         }
-        let mut info = FileInfo::new(path.path().file_name().unwrap().to_string_lossy().to_string());
+        let mut info = FileInfo::new(path.path());
 
         if let Ok(file) = fs::read(&path.path()) {
             info = info.with_size(file.len() as u64);

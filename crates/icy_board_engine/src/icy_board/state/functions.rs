@@ -326,12 +326,7 @@ impl IcyBoardState {
                 if !help.is_empty() {
                     if let Some(cmd) = self.try_find_command(&output) {
                         if cmd.command_type == CommandType::Help {
-                            let help_loc = self.board.lock().unwrap().config.paths.help_path.clone();
-                            let help_loc = help_loc.join(help);
-                            let am = self.session.disable_auto_more;
-                            self.session.disable_auto_more = false;
-                            self.display_file(&help_loc)?;
-                            self.session.disable_auto_more = am;
+                            self.show_help(help)?;
                             return self.input_string(color, prompt, len, valid_mask, help, default_string, display_flags);
                         }
                     }
@@ -383,6 +378,16 @@ impl IcyBoardState {
         }
 
         Ok(output)
+    }
+
+    pub fn show_help(&mut self, help: &str) -> Res<()> {
+        let help_loc = self.board.lock().unwrap().config.paths.help_path.clone();
+        let help_loc = help_loc.join(help);
+        let am = self.session.disable_auto_more;
+        self.session.disable_auto_more = false;
+        self.display_file(&help_loc)?;
+        self.session.disable_auto_more = am;
+        Ok(())
     }
 
     pub fn check_password<F: Fn(&str) -> bool>(&mut self, ice_text: IceText, flags: u32, call_back: F) -> Res<bool> {

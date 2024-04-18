@@ -128,6 +128,10 @@ fn search_file_base(file: &PathBuf, pattern: &str) {
                             println!("  {:10?} {}", m.get_type(), String::from_utf8_lossy(&m.data));
                             continue;
                         }
+                        MetadaType::FilePath => {
+                            println!("  {:10?} {}", m.get_type(), String::from_utf8_lossy(&m.data));
+                            continue;
+                        }
                     }
                 }
             }
@@ -184,6 +188,10 @@ fn list_file_base(file: &PathBuf) {
                             println!("  {:10?} {}", m.get_type(), t);
                         }
                         MetadaType::Sauce => {
+                            println!("  {:10?} {}", m.get_type(), String::from_utf8_lossy(&m.data));
+                            continue;
+                        }
+                        MetadaType::FilePath => {
                             println!("  {:10?} {}", m.get_type(), String::from_utf8_lossy(&m.data));
                             continue;
                         }

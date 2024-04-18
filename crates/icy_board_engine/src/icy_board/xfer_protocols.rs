@@ -6,7 +6,7 @@ use super::{is_false, is_true, set_true, PCBoardImport, PCBoardTextImport};
 use icy_ppe::Res;
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Clone)]
+#[derive(Default, Debug, Clone)]
 pub enum SendRecvCommand {
     ASCII,
     XModem,

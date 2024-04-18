@@ -199,6 +199,9 @@ impl Tui {
                                         let _ = disable_raw_mode();
                                         return Ok(());
                                     }
+                                    if ('a'..='z').contains(&c) {
+                                        self.add_input(((c as u8 - b'a' + 1) as char).to_string().chars())?;
+                                    }
                                 }
 
                                 KeyCode::Left => self.add_input("\x01".chars())?,
@@ -361,7 +364,9 @@ impl Tui {
             s.push(c);
         }
 
-        self.connection.write_all(s.as_bytes())?;
+        if let Err(_) = self.connection.write_all(s.as_bytes()) {
+            return Ok(());
+        }
         Ok(())
     }
 }
