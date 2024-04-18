@@ -2,15 +2,13 @@ use std::sync::Arc;
 
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
-use icy_board_tui::{theme::THEME, TerminalType};
+use icy_board_tui::{config_menu::ResultState, theme::THEME, TerminalType};
 use ratatui::{
     layout::{Constraint, Margin, Rect},
     text::Text,
     widgets::{Cell, Clear, HighlightSpacing, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState, Widget},
     Frame,
 };
-
-use crate::app::ResultState;
 
 use super::TabPage;
 

@@ -14,10 +14,12 @@ pub struct SysopSecurityLevels {
     pub read_all_comments: u8,
     pub read_all_mail: u8,
     pub copy_move_messages: u8,
+    pub enter_color_codes_in_messages: u8,
     pub use_broadcast_command: u8,
     pub view_private_uploads: u8,
     pub edit_message_headers: u8,
     pub protect_unprotect_messages: u8,
+    pub set_pack_out_date_on_messages: u8,
 }
 
 #[derive(Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
@@ -302,6 +304,8 @@ pub struct NewUserSettings {
     pub sec_level: u8,
 
     pub new_user_groups: String,
+    pub allow_one_name_users: bool,
+    pub use_newask: bool,
 
     pub ask_city_or_state: bool,
 
@@ -323,6 +327,42 @@ pub struct NewUserSettings {
     pub ask_web_address: bool,
     pub ask_use_short_descr: bool,
 }
+#[derive(Clone, Serialize, Deserialize)]
+pub struct BoardOptions {
+    /// Only allow pw change in 'w' command.
+    pub disable_full_record_updating: bool,
+
+    /// Run in NewAsk mode.
+    pub is_closed_board: bool,
+
+    /// DisplayNewsBehavior
+    pub display_news_behavior: DisplayNewsBehavior,
+
+    pub display_userinfo_at_login: bool,
+
+    /// max number of lines in a message
+    pub max_msg_lines: u16,
+
+    // keyboard timeout in minutes
+    pub keyboard_timeout: u16,
+
+    pub check_files_uploaded: bool,
+    pub display_uploader: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
+
+pub enum DisplayNewsBehavior {
+    /// Display news on login
+    #[serde(rename = "Y")]
+    OnlyNewer,
+    /// Display news on command
+    #[serde(rename = "N")]
+    OncePerDay,
+    /// Display news on command if news is available
+    #[serde(rename = "A")]
+    Always,
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct IcbConfig {
@@ -330,6 +370,8 @@ pub struct IcbConfig {
     pub sysop: SysopInformation,
 
     pub new_user_settings: NewUserSettings,
+
+    pub options: BoardOptions,
 
     #[serde(rename = "sysop_sec")]
     pub sysop_security_level: SysopSecurityLevels,
@@ -378,18 +420,20 @@ impl IcbConfig {
                 read_all_comments: 110,
                 read_all_mail: 110,
                 copy_move_messages: 110,
+                enter_color_codes_in_messages: 110,
                 use_broadcast_command: 110,
                 view_private_uploads: 110,
                 edit_message_headers: 110,
                 protect_unprotect_messages: 110,
+                set_pack_out_date_on_messages: 110,
             },
             color_configuration: ColorConfiguration::default(),
             func_keys: Default::default(),
             subscription_info: SubscriptionMode {
                 is_enabled: false,
-                subscription_length: 0,
-                default_expired_level: 0,
-                warning_days: 0,
+                subscription_length: 365,
+                default_expired_level: 10,
+                warning_days: 30,
             },
             user_password_policy: UserPasswordPolicy {
                 min_length: 0,
@@ -432,6 +476,8 @@ impl IcbConfig {
             new_user_settings: NewUserSettings {
                 sec_level: 10,
                 new_user_groups: "new_users".to_string(),
+                allow_one_name_users: false,
+                use_newask: false,
                 ask_city_or_state: true,
                 ask_address: true,
                 ask_verification: true,
@@ -447,6 +493,16 @@ impl IcbConfig {
                 ask_email: true,
                 ask_web_address: true,
                 ask_use_short_descr: true,
+            },
+            options: BoardOptions {
+                disable_full_record_updating: false,
+                is_closed_board: false,
+                display_news_behavior: DisplayNewsBehavior::OnlyNewer,
+                display_userinfo_at_login: false,
+                max_msg_lines: 100,
+                check_files_uploaded: true,
+                display_uploader: false,
+                keyboard_timeout: 5,
             },
         }
     }

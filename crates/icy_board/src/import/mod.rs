@@ -14,8 +14,8 @@ use icy_board_engine::icy_board::{
     file_areas::FileAreaList,
     group_list::GroupList,
     icb_config::{
-        BoardInformation, ColorConfiguration, ConfigPaths, IcbColor, IcbConfig, NewUserSettings, PasswordStorageMethod, SubscriptionMode, SysopInformation,
-        SysopSecurityLevels, UserPasswordPolicy, DEFAULT_PCBOARD_DATE_FORMAT,
+        BoardInformation, BoardOptions, ColorConfiguration, ConfigPaths, DisplayNewsBehavior, IcbColor, IcbConfig, NewUserSettings, PasswordStorageMethod,
+        SubscriptionMode, SysopInformation, SysopSecurityLevels, UserPasswordPolicy, DEFAULT_PCBOARD_DATE_FORMAT,
     },
     icb_text::IcbTextFile,
     language::SupportedLanguages,
@@ -219,10 +219,12 @@ impl PCBoardImporter {
                 read_all_comments: self.data.sysop_security.read_all_comments as u8,
                 read_all_mail: self.data.sysop_security.read_all_mail as u8,
                 copy_move_messages: self.data.sysop_security.copy_move_messages as u8,
+                enter_color_codes_in_messages: self.data.sysop_security.enter_at_vars_in_messages as u8,
                 use_broadcast_command: self.data.sysop_security.use_broadcast_command as u8,
                 view_private_uploads: self.data.sysop_security.view_private_uploads as u8,
                 edit_message_headers: self.data.sysop_security.edit_message_headers as u8,
                 protect_unprotect_messages: self.data.sysop_security.protect_unprotect_messages as u8,
+                set_pack_out_date_on_messages: self.data.sysop_security.set_pack_out_date_on_messages as u8,
             },
             color_configuration,
             board: BoardInformation {
@@ -280,6 +282,8 @@ impl PCBoardImporter {
             new_user_settings: NewUserSettings {
                 sec_level: self.data.user_levels.agree_to_register as u8,
                 new_user_groups: "new_users".to_string(),
+                allow_one_name_users: self.data.allow_one_name_users,
+                use_newask: self.data.use_new_ask_file,
                 ask_city_or_state: true,
                 ask_address: false,
                 ask_verification: false,
@@ -295,6 +299,21 @@ impl PCBoardImporter {
                 ask_email: true,
                 ask_web_address: true,
                 ask_use_short_descr: true,
+            },
+
+            options: BoardOptions {
+                disable_full_record_updating: self.data.allow_pwrd_only,
+                is_closed_board: self.data.closed_board,
+                display_news_behavior: match self.data.display_news {
+                    'N' => DisplayNewsBehavior::OncePerDay,
+                    'A' => DisplayNewsBehavior::Always,
+                    _ => DisplayNewsBehavior::OnlyNewer,
+                },
+                display_userinfo_at_login: self.data.display_userinfo_at_login,
+                max_msg_lines: self.data.max_msg_lines as u16,
+                check_files_uploaded: self.data.test_uploads,
+                display_uploader: self.data.upload_by,
+                keyboard_timeout: self.data.kbd_timeout as u16,
             },
         };
 

@@ -45,12 +45,6 @@ enum TabPageType {
     About,
 }
 
-#[derive(Default)]
-pub struct ResultState {
-    pub in_edit_mode: bool,
-    pub status_line: String,
-}
-
 impl App {
     pub fn new(icy_board: IcyBoard, file: PathBuf, full_screen: bool) -> Self {
         let icy_board = Arc::new(icy_board);

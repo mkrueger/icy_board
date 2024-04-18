@@ -104,7 +104,7 @@ pub struct PcbBoardData {
     ///  test files after upload
     pub test_uploads: bool,
     ///  include settings display on login (v14.5)
-    pub show_settings: bool,
+    pub display_userinfo_at_login: bool,
     ///  allow shelling to DOS (v14.5)
     pub allow_shell: bool,
     ///  use Slave Card updating (v14.5)
@@ -170,7 +170,7 @@ pub struct PcbBoardData {
     ///  use NEWASK plus built-in questions (v14.5)
     pub use_new_ask_file: bool,
     ///  allow one-name users to log into system (v14.5)
-    pub allow_one_name: bool,
+    pub allow_one_name_users: bool,
     /// stop the clock during capture file download (v14.5)
     pub stop_clock_on_cap: bool,
     ///  start time to allow sysop page (v14.5)
@@ -921,7 +921,7 @@ impl PcbBoardData {
         ret.fast_cnames = read_bool(&mut reader, encoding)?;
         ret.sysop_security.subs = read_int(&mut reader, encoding)?;
         ret.upload_by = read_bool(&mut reader, encoding)?;
-        ret.show_settings = read_bool(&mut reader, encoding)?;
+        ret.display_userinfo_at_login = read_bool(&mut reader, encoding)?;
         ret.allow_shell = read_bool(&mut reader, encoding)?;
         ret.slaves = read_bool(&mut reader, encoding)?;
         ret.subscription_info.subscription_length = read_int(&mut reader, encoding)?;
@@ -942,7 +942,7 @@ impl PcbBoardData {
 
         ret.quick_scan = read_bool(&mut reader, encoding)?;
         ret.subscription_info.warning_days = read_int(&mut reader, encoding)?;
-        ret.allow_one_name = read_bool(&mut reader, encoding)?;
+        ret.allow_one_name_users = read_bool(&mut reader, encoding)?;
         ret.subscription_info.default_expired_level = read_int(&mut reader, encoding)? as u8;
 
         ret.user_levels.cmd_test_file = read_int(&mut reader, encoding)?;
@@ -1315,7 +1315,7 @@ impl PcbBoardData {
         append_bool(&mut res, encoding, self.fast_cnames);
         append_int(&mut res, encoding, self.sysop_security.subs);
         append_bool(&mut res, encoding, self.upload_by);
-        append_bool(&mut res, encoding, self.show_settings);
+        append_bool(&mut res, encoding, self.display_userinfo_at_login);
         append_bool(&mut res, encoding, self.allow_shell);
 
         append_bool(&mut res, encoding, self.slaves);
@@ -1334,7 +1334,7 @@ impl PcbBoardData {
         append_line(&mut res, encoding, &self.path.inf_file);
         append_bool(&mut res, encoding, self.quick_scan);
         append_int(&mut res, encoding, self.subscription_info.warning_days);
-        append_bool(&mut res, encoding, self.allow_one_name);
+        append_bool(&mut res, encoding, self.allow_one_name_users);
         append_int(&mut res, encoding, self.subscription_info.default_expired_level as i32);
         append_int(&mut res, encoding, self.user_levels.cmd_test_file);
         append_line(&mut res, encoding, &self.cap_file);

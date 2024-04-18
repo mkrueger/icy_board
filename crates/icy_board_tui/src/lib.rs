@@ -6,6 +6,7 @@ use crossterm::{
 };
 
 pub mod colors;
+pub mod config_menu;
 pub mod term;
 pub mod text_field;
 pub mod theme;
