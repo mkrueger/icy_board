@@ -907,8 +907,8 @@ impl ErrorRepoter {
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Encoding {
-    Utf8,
     CP437,
+    Utf8,
 }
 
 /// .
@@ -925,7 +925,7 @@ pub fn load_with_encoding(file_name: &Path, encoding: Encoding) -> std::io::Resu
         }
         res
     } else {
-        String::from_utf8_lossy(&src_data).to_string()
+        codepages::tables::get_utf8(&src_data)
     };
     Ok(src)
 }

@@ -62,7 +62,7 @@ impl AstVisitorMut for AstTransformationVisitor {
         let mut if_exit_label = self.next_label();
 
         statements.push(IfStatement::create_empty_statement(
-            if_then.get_condition().negate_expression().clone(),
+            if_then.get_condition().negate_expression(),
             GotoStatement::create_empty_statement(if_exit_label.clone()),
         ));
         statements.extend(if_then.get_statements().iter().map(|s| s.visit_mut(self)));
@@ -197,6 +197,7 @@ impl AstVisitorMut for AstTransformationVisitor {
     fn visit_for_statement(&mut self, for_stmt: &ForStatement) -> Statement {
         let mut statements = Vec::new();
 
+        let loop_label = self.next_label();
         let continue_label = self.next_label();
         let break_label = self.next_label();
 
@@ -212,7 +213,7 @@ impl AstVisitorMut for AstTransformationVisitor {
 
         // create loop
         self.continue_break_labels.push((continue_label.clone(), break_label.clone()));
-        statements.push(LabelStatement::create_empty_statement(continue_label.clone()));
+        statements.push(LabelStatement::create_empty_statement(loop_label.clone()));
 
         let increment = if let Some(increment) = for_stmt.get_step_expr() {
             increment.visit_mut(self)
@@ -253,6 +254,7 @@ impl AstVisitorMut for AstTransformationVisitor {
 
         // create step & increment
 
+        statements.push(LabelStatement::create_empty_statement(continue_label.clone()));
         statements.push(LetStatement::create_empty_statement(
             for_stmt.get_identifier().clone(),
             Token::Eq,
@@ -261,7 +263,7 @@ impl AstVisitorMut for AstTransformationVisitor {
         ));
 
         // loop & exit;
-        statements.push(GotoStatement::create_empty_statement(continue_label.clone()));
+        statements.push(GotoStatement::create_empty_statement(loop_label.clone()));
         statements.push(LabelStatement::create_empty_statement(break_label.clone()));
         self.continue_break_labels.pop();
         Statement::Block(BlockStatement::empty(statements))
