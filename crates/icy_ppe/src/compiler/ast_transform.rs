@@ -1,7 +1,8 @@
 use crate::{
     ast::{
-        AstVisitorMut, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression, ForStatement, GotoStatement,
-        IdentifierExpression, IfStatement, LabelStatement, LetStatement, SelectStatement, Statement, VariableDeclarationStatement, VariableSpecifier,
+        AstNode, AstVisitorMut, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression, ForStatement,
+        FunctionDeclarationAstNode, GotoStatement, IdentifierExpression, IfStatement, LabelStatement, LetStatement, ReturnStatement, SelectStatement,
+        Statement, VariableDeclarationStatement, VariableSpecifier,
     },
     decompiler::evaluation_visitor::OptimizationVisitor,
     parser::lexer::{Spanned, Token},
@@ -11,6 +12,7 @@ use crate::{
 pub struct AstTransformationVisitor {
     labels: usize,
     continue_break_labels: Vec<(unicase::Ascii<String>, unicase::Ascii<String>)>,
+    cur_function: Option<unicase::Ascii<String>>,
 }
 
 impl AstTransformationVisitor {
@@ -340,6 +342,46 @@ impl AstVisitorMut for AstTransformationVisitor {
             Spanned::create_empty(Token::Eq),
             val_expr,
         ))
+    }
+
+    fn visit_function_declaration(&mut self, func_decl: &FunctionDeclarationAstNode) -> AstNode {
+        self.cur_function = Some(func_decl.get_identifier().clone());
+
+        let res = AstNode::FunctionDeclaration(FunctionDeclarationAstNode::new(
+            func_decl.get_declare_token().clone(),
+            func_decl.get_function_token().clone(),
+            Spanned {
+                span: func_decl.get_identifier_token().span.clone(),
+                token: Token::Identifier(self.visit_identifier(func_decl.get_identifier())),
+            },
+            func_decl.get_leftpar_token().clone(),
+            func_decl.get_parameters().iter().map(|param| param.visit_mut(self)).collect(),
+            func_decl.get_rightpar_token().clone(),
+            func_decl.get_return_type_token().clone(),
+            func_decl.get_return_type(),
+        ));
+        self.cur_function = None;
+        res
+    }
+
+    fn visit_return_statement(&mut self, return_stmt: &ReturnStatement) -> Statement {
+        let mut statements = Vec::new();
+        if let Some(expr) = return_stmt.get_expression() {
+            statements.push(Statement::Let(LetStatement::new(
+                None,
+                Spanned {
+                    span: return_stmt.get_return_token().span.clone(),
+                    token: Token::Identifier(self.cur_function.clone().unwrap()), // Parser doesn't allow return expression outside of function
+                },
+                None,
+                Vec::new(),
+                None,
+                Spanned::create_empty(Token::Eq),
+                expr.visit_mut(self),
+            )));
+        }
+        statements.push(ReturnStatement::create_empty_statement(None));
+        Statement::Block(BlockStatement::empty(statements))
     }
 
     fn visit_variable_declaration_statement(&mut self, var_decl: &VariableDeclarationStatement) -> Statement {

@@ -30,24 +30,29 @@ impl Parser {
         let while_token = self.save_spanned_token();
         self.next_token();
 
-        if self.get_cur_token() != Some(Token::LPar) {
+        let mut lpar_token = None;
+        if self.lang_version < 400 && self.get_cur_token() != Some(Token::LPar) {
             self.report_error(self.lex.span(), ParserErrorType::IfWhileConditionNotFound);
             return None;
+        } else if self.get_cur_token() == Some(Token::LPar) {
+            lpar_token = Some(self.save_spanned_token());
+            self.next_token();
         }
-        let lpar_token = self.save_spanned_token();
 
-        self.next_token();
         let Some(cond) = self.parse_expression() else {
             self.report_error(self.lex.span(), ParserErrorType::IfWhileConditionNotFound);
             return None;
         };
 
-        if self.get_cur_token() != Some(Token::RPar) {
-            self.report_error(self.lex.span(), ParserErrorType::MissingCloseParens(self.save_token()));
-            return None;
+        let mut rightpar_token = None;
+        if lpar_token.is_some() {
+            if self.get_cur_token() != Some(Token::RPar) {
+                self.report_error(self.lex.span(), ParserErrorType::MissingCloseParens(self.save_token()));
+                return None;
+            }
+            rightpar_token = Some(self.save_spanned_token());
+            self.next_token();
         }
-        let rightpar_token = self.save_spanned_token();
-        self.next_token();
 
         if self.get_cur_token() == Some(Token::Identifier(unicase::Ascii::new("DO".to_string()))) {
             let do_token = self.save_spanned_token();
@@ -649,10 +654,26 @@ impl Parser {
                 self.next_token();
                 Some(Statement::Continue(ContinueStatement::new(tok)))
             }
-            Some(Token::EndProc | Token::EndFunc | Token::Return) => {
+            Some(Token::EndProc | Token::EndFunc) => {
                 let tok = self.save_spanned_token();
                 self.next_token();
-                Some(Statement::Return(ReturnStatement::new(tok)))
+                Some(Statement::Return(ReturnStatement::new(tok, None)))
+            }
+
+            Some(Token::Return) => {
+                let tok = self.save_spanned_token();
+                self.next_token();
+                if self.get_cur_token() == Some(Token::Eol) || matches!(self.get_cur_token(), Some(Token::Comment(_, _))) {
+                    return Some(Statement::Return(ReturnStatement::new(tok, None)));
+                }
+                if let Some(expr) = self.parse_expression() {
+                    if !self.in_function {
+                        self.report_error(expr.get_span(), ParserErrorType::ReturnExpressionOutsideFunc);
+                        return None;
+                    }
+                    return Some(Statement::Return(ReturnStatement::new(tok, Some(expr))));
+                }
+                Some(Statement::Return(ReturnStatement::new(tok, None)))
             }
             Some(Token::Gosub) => {
                 let gosub_token = self.save_spanned_token();

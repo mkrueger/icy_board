@@ -394,16 +394,18 @@ impl fmt::Display for ContinueStatement {
 #[derive(Debug, PartialEq, Clone)]
 pub struct ReturnStatement {
     return_token: Spanned<Token>,
+    expression: Option<Expression>,
 }
 
 impl ReturnStatement {
-    pub fn new(return_token: Spanned<Token>) -> Self {
-        Self { return_token }
+    pub fn new(return_token: Spanned<Token>, expression: Option<Expression>) -> Self {
+        Self { return_token, expression }
     }
 
-    pub fn empty() -> Self {
+    pub fn empty(expression: Option<Expression>) -> Self {
         Self {
             return_token: Spanned::create_empty(Token::Return),
+            expression,
         }
     }
 
@@ -411,8 +413,12 @@ impl ReturnStatement {
         &self.return_token
     }
 
-    pub fn create_empty_statement() -> Statement {
-        Statement::Return(ReturnStatement::empty())
+    pub fn get_expression(&self) -> &Option<Expression> {
+        &self.expression
+    }
+
+    pub fn create_empty_statement(expression: Option<Expression>) -> Statement {
+        Statement::Return(ReturnStatement::empty(expression))
     }
 }
 
@@ -771,18 +777,18 @@ impl IfThenStatement {
 #[derive(Debug, PartialEq, Clone)]
 pub struct WhileStatement {
     while_token: Spanned<Token>,
-    leftpar_token: Spanned<Token>,
+    leftpar_token: Option<Spanned<Token>>,
     condition: Box<Expression>,
-    rightpar_token: Spanned<Token>,
+    rightpar_token: Option<Spanned<Token>>,
     statement: Box<Statement>,
 }
 
 impl WhileStatement {
     pub fn new(
         while_token: Spanned<Token>,
-        leftpar_token: Spanned<Token>,
+        leftpar_token: Option<Spanned<Token>>,
         condition: Expression,
-        rightpar_token: Spanned<Token>,
+        rightpar_token: Option<Spanned<Token>>,
         statement: Statement,
     ) -> Self {
         Self {
@@ -797,9 +803,9 @@ impl WhileStatement {
     pub fn empty(condition: Expression, statement: Statement) -> Self {
         Self {
             while_token: Spanned::create_empty(Token::While),
-            leftpar_token: Spanned::create_empty(Token::LPar),
+            leftpar_token: None,
             condition: Box::new(condition),
-            rightpar_token: Spanned::create_empty(Token::RPar),
+            rightpar_token: None,
             statement: Box::new(statement),
         }
     }
@@ -807,7 +813,7 @@ impl WhileStatement {
     pub fn get_while_token(&self) -> &Spanned<Token> {
         &self.while_token
     }
-    pub fn get_lpar_token(&self) -> &Spanned<Token> {
+    pub fn get_lpar_token(&self) -> &Option<Spanned<Token>> {
         &self.leftpar_token
     }
 
@@ -819,7 +825,7 @@ impl WhileStatement {
         &mut self.condition
     }
 
-    pub fn get_rpar_token(&self) -> &Spanned<Token> {
+    pub fn get_rpar_token(&self) -> &Option<Spanned<Token>> {
         &self.rightpar_token
     }
 
@@ -839,9 +845,9 @@ impl WhileStatement {
 #[derive(Debug, PartialEq, Clone)]
 pub struct WhileDoStatement {
     while_token: Spanned<Token>,
-    leftpar_token: Spanned<Token>,
+    leftpar_token: Option<Spanned<Token>>,
     condition: Box<Expression>,
-    rightpar_token: Spanned<Token>,
+    rightpar_token: Option<Spanned<Token>>,
     do_token: Spanned<Token>,
     statements: Vec<Statement>,
     endwhile_token: Spanned<Token>,
@@ -850,9 +856,9 @@ pub struct WhileDoStatement {
 impl WhileDoStatement {
     pub fn new(
         while_token: Spanned<Token>,
-        leftpar_token: Spanned<Token>,
+        leftpar_token: Option<Spanned<Token>>,
         condition: Expression,
-        rightpar_token: Spanned<Token>,
+        rightpar_token: Option<Spanned<Token>>,
         do_token: Spanned<Token>,
         statements: Vec<Statement>,
         endwhile_token: Spanned<Token>,
@@ -871,9 +877,9 @@ impl WhileDoStatement {
     pub fn empty(condition: Expression, statements: Vec<Statement>) -> Self {
         Self {
             while_token: Spanned::create_empty(Token::While),
-            leftpar_token: Spanned::create_empty(Token::LPar),
+            leftpar_token: None,
             condition: Box::new(condition),
-            rightpar_token: Spanned::create_empty(Token::RPar),
+            rightpar_token: None,
             do_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new("Do".to_string()))),
             statements,
             endwhile_token: Spanned::create_empty(Token::EndWhile),
@@ -884,7 +890,7 @@ impl WhileDoStatement {
         &self.while_token
     }
 
-    pub fn get_lpar_token(&self) -> &Spanned<Token> {
+    pub fn get_lpar_token(&self) -> &Option<Spanned<Token>> {
         &self.leftpar_token
     }
 
@@ -896,7 +902,7 @@ impl WhileDoStatement {
         &mut self.condition
     }
 
-    pub fn get_rpar_token(&self) -> &Spanned<Token> {
+    pub fn get_rpar_token(&self) -> &Option<Spanned<Token>> {
         &self.rightpar_token
     }
 

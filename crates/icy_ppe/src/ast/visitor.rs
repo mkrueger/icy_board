@@ -101,6 +101,7 @@ pub trait AstVisitor<T: Default>: Sized {
         T::default()
     }
     fn visit_return_statement(&mut self, return_stmt: &ReturnStatement) -> T {
+        walk_return_stmt(self, return_stmt);
         T::default()
     }
     fn visit_let_statement(&mut self, let_stmt: &LetStatement) -> T {
@@ -230,6 +231,12 @@ pub fn walk_for_stmt<T: Default, V: AstVisitor<T>>(visitor: &mut V, for_stmt: &F
     }
     for stmt in for_stmt.get_statements() {
         stmt.visit(visitor);
+    }
+}
+
+pub fn walk_return_stmt<T: Default, V: AstVisitor<T>>(visitor: &mut V, ret_stmt: &ReturnStatement) {
+    if let Some(expr) = ret_stmt.get_expression() {
+        expr.visit(visitor);
     }
 }
 
@@ -489,7 +496,10 @@ pub trait AstVisitorMut: Sized {
         Statement::Gosub(gosub.clone())
     }
     fn visit_return_statement(&mut self, return_stmt: &ReturnStatement) -> Statement {
-        Statement::Return(return_stmt.clone())
+        Statement::Return(ReturnStatement::new(
+            return_stmt.get_return_token().clone(),
+            return_stmt.get_expression().as_ref().map(|expr| expr.visit_mut(self)),
+        ))
     }
 
     fn visit_let_statement(&mut self, let_stmt: &LetStatement) -> Statement {

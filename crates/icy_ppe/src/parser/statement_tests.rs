@@ -56,7 +56,11 @@ fn test_parse_comment_statement() {
 
 #[test]
 fn test_parse_return_statement() {
-    check_statement("RETURN", &ReturnStatement::create_empty_statement());
+    check_statement("RETURN", &ReturnStatement::create_empty_statement(None));
+    check_statement(
+        "RETURN 123",
+        &ReturnStatement::create_empty_statement(Some(ConstantExpression::create_empty_expression(Constant::Integer(123)))),
+    );
 }
 
 #[test]
@@ -136,7 +140,7 @@ fn test_if_then_statement() {
         END IF",
         &IfThenStatement::create_empty_statement(
             IdentifierExpression::create_empty_expression(unicase::Ascii::new("A".to_string())),
-            vec![BreakStatement::create_empty_statement(), ReturnStatement::create_empty_statement()],
+            vec![BreakStatement::create_empty_statement(), ReturnStatement::create_empty_statement(None)],
             vec![],
             None,
         ),
@@ -336,7 +340,7 @@ fn test_while_do_statement() {
         END WHILE",
         &WhileDoStatement::create_empty_statement(
             IdentifierExpression::create_empty_expression(unicase::Ascii::new("A".to_string())),
-            vec![BreakStatement::create_empty_statement(), ReturnStatement::create_empty_statement()],
+            vec![BreakStatement::create_empty_statement(), ReturnStatement::create_empty_statement(None)],
         ),
     );
 

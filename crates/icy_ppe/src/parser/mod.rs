@@ -135,6 +135,9 @@ pub enum ParserErrorType {
 
     #[error("Version ({2}) not supported for function ({0:?}:{1})")]
     FunctionVersionNotSupported(FuncOpCode, u16, u16),
+
+    #[error("Return with expression is only valid inside functions")]
+    ReturnExpressionOutsideFunc,
 }
 
 #[derive(Error, Debug, Clone, PartialEq)]
@@ -171,6 +174,7 @@ pub struct Parser {
     parsed_begin: bool,
     got_statement: bool,
     got_funcs: bool,
+    in_function: bool,
 }
 lazy_static::lazy_static! {
     static ref PROC_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("PROC".to_string());
@@ -194,6 +198,7 @@ impl Parser {
             parsed_begin: false,
             got_statement: false,
             got_funcs: false,
+            in_function: false,
         }
     }
 
@@ -808,7 +813,7 @@ impl Parser {
             self.skip_eol();
 
             let mut statements = Vec::new();
-
+            self.in_function = true;
             while self.get_cur_token() != Some(Token::EndProc) && self.get_cur_token() != Some(Token::EndFunc) {
                 if self.get_cur_token().is_none() {
                     self.report_error(self.lex.span(), ParserErrorType::EndExpected);
@@ -817,6 +822,8 @@ impl Parser {
                 statements.push(self.parse_statement());
                 self.skip_eol();
             }
+            self.in_function = false;
+
             let endfunc_token = self.save_spanned_token();
             if endfunc_token.token == Token::EndProc {
                 self.errors

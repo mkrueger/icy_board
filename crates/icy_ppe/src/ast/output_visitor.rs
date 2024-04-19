@@ -13,6 +13,7 @@ pub static mut DEFAULT_OUTPUT_FUNC: OutputFunc = OutputFunc::Upper;
 
 #[derive(Default)]
 pub struct OutputVisitor {
+    pub version: u16,
     pub output_func: OutputFunc,
     pub skip_comments: bool,
     pub output: String,
@@ -173,9 +174,13 @@ impl AstVisitor<()> for OutputVisitor {
 
     fn visit_if_then_statement(&mut self, if_then: &super::IfThenStatement) {
         self.output_keyword("If");
-        self.output.push_str(" (");
+        if self.version < 400 {
+            self.output.push_str(" (");
+        }
         if_then.get_condition().visit(self);
-        self.output.push(')');
+        if self.version < 400 {
+            self.output.push(')');
+        }
         self.output_keyword(" Then");
         self.eol();
 
@@ -266,9 +271,14 @@ impl AstVisitor<()> for OutputVisitor {
 
     fn visit_while_do_statement(&mut self, while_do_stmt: &super::WhileDoStatement) {
         self.output_keyword("While");
-        self.output.push_str(" (");
+        self.output.push_str(" ");
+        if self.version < 400 {
+            self.output.push_str("(");
+        }
         while_do_stmt.get_condition().visit(self);
-        self.output.push(')');
+        if self.version < 400 {
+            self.output.push(')');
+        }
         self.output_keyword(" Do");
         self.eol();
 
@@ -351,8 +361,12 @@ impl AstVisitor<()> for OutputVisitor {
         self.output(gosub.get_label());
     }
 
-    fn visit_return_statement(&mut self, _return_stmt: &super::ReturnStatement) {
+    fn visit_return_statement(&mut self, return_stmt: &super::ReturnStatement) {
         self.output_keyword("Return");
+        if let Some(expr) = return_stmt.get_expression() {
+            self.output.push(' ');
+            expr.visit(self);
+        }
     }
 
     fn visit_let_statement(&mut self, let_stmt: &super::LetStatement) {
