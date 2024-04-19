@@ -10,7 +10,7 @@ pub use predefined_functions::*;
 
 type PredefFunc = fn(vm: &mut crate::vm::VirtualMachine, arguments: &[PPEExpr]) -> Res<VariableValue>;
 
-pub static FUNCTION_TABLE: [PredefFunc; 294] = [
+pub static FUNCTION_TABLE: [PredefFunc; 296] = [
     predefined_functions::invalid,
     predefined_functions::invalid,
     predefined_functions::invalid,
@@ -302,6 +302,9 @@ pub static FUNCTION_TABLE: [PredefFunc; 294] = [
     predefined_functions::getbankbal,
     predefined_functions::getmsghdr,
     predefined_functions::setmsghdr,
+    // new functions
+    predefined_functions::invalid, // Member Reference Operator
+    predefined_functions::new_confinfo,
     // ALIASES
     predefined_functions::tostring,
     predefined_functions::tosword,

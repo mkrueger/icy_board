@@ -59,6 +59,11 @@ impl AstVisitor<()> for OutputVisitor {
         self.output(identifier.get_identifier());
     }
 
+    fn visit_member_reference_expression(&mut self, member_ref: &super::MemberReferenceExpression) {
+        member_ref.get_expression().visit(self);
+        self.output(&format!(".{}", member_ref.get_identifier()));
+    }
+
     fn visit_constant_expression(&mut self, constant: &super::ConstantExpression) {
         match constant.get_constant_value() {
             super::Constant::Builtin(b) => {

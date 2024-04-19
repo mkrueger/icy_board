@@ -10,10 +10,10 @@ use thiserror::Error;
 
 use crate::{
     ast::{Ast, AstNode, Expression, Statement},
-    executable::{Executable, ExpressionNegator, OpCode, PPECommand, PPEExpr, PPEScript, VariableType, LAST_PPLC},
+    executable::{Executable, ExpressionNegator, OpCode, PPECommand, PPEExpr, PPEScript, VariableType},
     parser::{
         lexer::{Spanned, Token},
-        ErrorRepoter,
+        ErrorRepoter, UserTypeRegistry,
     },
     semantic::{LookupVariabeleTable, SemanticVisitor},
 };
@@ -68,6 +68,12 @@ pub enum CompilationErrorType {
 
     #[error("Indexer called on function or procedure ({0})")]
     IndexerCalledOnFunction(String),
+
+    #[error("Member not found")]
+    InvalidMemberReferenceExpression,
+
+    #[error("Type not found.")]
+    TypeNotFound,
 }
 
 #[derive(Error, Debug)]
@@ -76,9 +82,10 @@ pub enum CompilationWarningType {
     UnusedLabel(String),
 }
 
-#[derive(Default)]
-pub struct PPECompiler {
+pub struct PPECompiler<'a> {
     lookup_table: LookupVariabeleTable,
+    semantic_visitor: SemanticVisitor<'a>,
+
     cur_offset: usize,
 
     label_table: Vec<i32>,
@@ -87,7 +94,19 @@ pub struct PPECompiler {
     commands: PPEScript,
 }
 
-impl PPECompiler {
+impl<'a> PPECompiler<'a> {
+    pub fn new(language_version: u16, type_registry: &'a UserTypeRegistry) -> Self {
+        let semantic_visitor = SemanticVisitor::new(language_version, Arc::new(Mutex::new(ErrorRepoter::default())), type_registry);
+        Self {
+            lookup_table: LookupVariabeleTable::default(),
+            semantic_visitor,
+            cur_offset: 0,
+            label_table: Vec::new(),
+            label_lookup_table: HashMap::new(),
+            commands: PPEScript::default(),
+        }
+    }
+
     pub fn get_script(&self) -> &PPEScript {
         &self.commands
     }
@@ -99,9 +118,8 @@ impl PPECompiler {
     /// Panics if .
     pub fn compile(&mut self, prg: &Ast) {
         let prg = prg.visit_mut(&mut AstTransformationVisitor::default());
-        let mut sv = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorRepoter::default())));
-        prg.visit(&mut sv);
-        self.lookup_table = sv.generate_variable_table();
+        prg.visit(&mut self.semantic_visitor);
+        self.lookup_table = self.semantic_visitor.generate_variable_table();
         // println!("{}", prg);
         for d in &prg.nodes {
             match d {

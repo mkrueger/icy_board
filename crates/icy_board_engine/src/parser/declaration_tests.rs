@@ -5,10 +5,12 @@ use crate::{
     executable::{VariableType, LAST_PPLC},
 };
 
-use super::{Encoding, Parser};
+use super::{Encoding, Parser, UserTypeRegistry};
 
 fn parse_ast_node(input: &str, assert_eof: bool) -> AstNode {
-    let mut parser = Parser::new(PathBuf::from("."), input, Encoding::Utf8, LAST_PPLC);
+    let reg = UserTypeRegistry::default();
+
+    let mut parser = Parser::new(PathBuf::from("."), &reg, input, Encoding::Utf8, LAST_PPLC);
     parser.next_token();
     let res = parser.parse_ast_node().unwrap();
     if assert_eof {

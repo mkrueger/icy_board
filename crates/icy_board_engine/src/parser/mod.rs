@@ -10,7 +10,9 @@ use crate::{
         Ast, AstNode, BlockStatement, CommentAstNode, Constant, DimensionSpecifier, FunctionDeclarationAstNode, FunctionImplementation, ParameterSpecifier,
         ProcedureDeclarationAstNode, ProcedureImplementation, Statement, VariableSpecifier,
     },
+    compiler::user_data::{UserData, UserDataRegistry},
     executable::{FuncOpCode, FunctionDefinition, OpCode, StatementDefinition, VariableType},
+    icy_board::{conferences::Conference, file_areas::FileArea, message_areas::MessageArea},
 };
 
 use self::lexer::{Lexer, Spanned, Token};
@@ -165,8 +167,58 @@ pub enum ParserWarningType {
     FunctionClosedWithEndProc,
 }
 
-pub struct Parser {
+#[derive(Default)]
+pub struct UserTypeRegistry {
+    pub registered_types: HashMap<unicase::Ascii<String>, VariableType>,
+    pub type_lookup: HashMap<unicase::Ascii<String>, usize>,
+    pub types: Vec<UserDataRegistry>,
+}
+
+pub const FIRST_ID: usize = 30;
+pub const CONFERENCE_ID: usize = 30;
+pub const MESSAGE_AREA_ID: usize = 31;
+pub const FILE_AREA_ID: usize = 32;
+
+impl UserTypeRegistry {
+    pub fn icy_board_registry() -> Self {
+        let mut reg = UserTypeRegistry::default();
+        reg.register::<Conference>();
+        reg.register::<MessageArea>();
+        reg.register::<FileArea>();
+        reg
+    }
+
+    pub fn get_type(&self, identifier: &unicase::Ascii<String>) -> Option<VariableType> {
+        if let Some(vt) = self.registered_types.get(identifier) {
+            return Some(*vt);
+        }
+        None
+    }
+
+    pub fn register<T: UserData>(&mut self) {
+        let mut registry = UserDataRegistry::default();
+        T::register_members(&mut registry);
+        self.type_lookup.insert(unicase::Ascii::new(T::TYPE_NAME.to_string()), self.types.len());
+        self.registered_types.insert(
+            unicase::Ascii::new(T::TYPE_NAME.to_string()),
+            VariableType::UserData((FIRST_ID + self.types.len()) as u8),
+        );
+        self.types.push(registry);
+    }
+
+    pub fn get_type_from_id(&self, d: u8) -> Option<&UserDataRegistry> {
+        let d = d as usize;
+        if d < FIRST_ID || d >= self.types.len() + FIRST_ID {
+            return None;
+        }
+        Some(&self.types[d - FIRST_ID])
+    }
+}
+
+pub struct Parser<'a> {
     pub errors: Arc<Mutex<ErrorRepoter>>,
+
+    pub type_registry: &'a UserTypeRegistry,
     lang_version: u16,
     pub require_user_variables: bool,
 
@@ -187,8 +239,8 @@ lazy_static::lazy_static! {
     static ref FUNC_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("FUNC".to_string());
 }
 
-impl Parser {
-    pub fn new(file: PathBuf, text: &str, encoding: Encoding, lang_version: u16) -> Self {
+impl<'a> Parser<'a> {
+    pub fn new(file: PathBuf, type_registry: &'a UserTypeRegistry, text: &str, encoding: Encoding, lang_version: u16) -> Self {
         let errors = Arc::new(Mutex::new(ErrorRepoter::default()));
 
         let lex = Lexer::new(file, lang_version, text, encoding, errors.clone());
@@ -199,6 +251,7 @@ impl Parser {
             lookahead_token: None,
             lex,
             require_user_variables: false,
+            type_registry,
 
             use_funcs: false,
             parsed_begin: false,
@@ -460,12 +513,15 @@ lazy_static::lazy_static! {
 
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     pub fn get_variable_type(&self) -> Option<VariableType> {
         if let Some(token) = &self.cur_token {
             if let Token::Identifier(id) = &token.token {
                 if let Some(vt) = TYPE_HASHES.get(id) {
                     return Some(*vt);
+                }
+                if let Some(ut) = self.type_registry.get_type(id) {
+                    return Some(ut);
                 }
                 None
             } else {
@@ -624,7 +680,7 @@ impl Parser {
                 rightpar_token,
             )));
         }
-        if FunctionDefinition::get_function_definition(&identifier) >= 0 {
+        if FunctionDefinition::get_function_definition(&identifier, -1) >= 0 {
             self.report_error(identifier_token.span, ParserErrorType::FunctionAlreadyDefined(self.save_token()));
             return None;
         }
@@ -861,9 +917,9 @@ impl Parser {
 /// # Panics
 ///
 /// Panics if .
-pub fn parse_ast(file_name: PathBuf, input: &str, encoding: Encoding, version: u16) -> (Ast, Arc<Mutex<ErrorRepoter>>) {
+pub fn parse_ast(file_name: PathBuf, input: &str, user_types: &UserTypeRegistry, encoding: Encoding, version: u16) -> (Ast, Arc<Mutex<ErrorRepoter>>) {
     let mut nodes = Vec::new();
-    let mut parser = Parser::new(file_name.clone(), input, encoding, version);
+    let mut parser = Parser::new(file_name.clone(), user_types, input, encoding, version);
     parser.next_token();
     parser.skip_eol();
 

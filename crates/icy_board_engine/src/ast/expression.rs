@@ -128,6 +128,7 @@ pub enum Expression {
     Indexer(IndexerExpression),
     Unary(UnaryExpression),
     Binary(BinaryExpression),
+    MemberReference(MemberReferenceExpression),
 
     ArrayInitializer(ArrayInitializerExpression),
 }
@@ -136,6 +137,7 @@ impl Expression {
     pub fn get_span(&self) -> core::ops::Range<usize> {
         match self {
             Expression::Identifier(i) => i.get_identifier_token().span.clone(),
+            Expression::MemberReference(i) => i.get_expression().get_span().start..i.get_identifier_token().span.end,
             Expression::Const(c) => c.get_constant_token().span.clone(),
             Expression::Parens(p) => p.get_lpar_token().span.start..p.get_rpar_token().span.end,
             Expression::PredefinedFunctionCall(pc) => pc.get_identifier_token().span.start..pc.get_rpar_token().span.end,
@@ -150,6 +152,7 @@ impl Expression {
     pub fn visit<T: Default, V: AstVisitor<T>>(&self, visitor: &mut V) -> T {
         match self {
             Expression::Identifier(expr) => visitor.visit_identifier_expression(expr),
+            Expression::MemberReference(expr) => visitor.visit_member_reference_expression(expr),
             Expression::Const(expr) => visitor.visit_constant_expression(expr),
             Expression::Parens(expr) => visitor.visit_parens_expression(expr),
             Expression::PredefinedFunctionCall(expr) => visitor.visit_predefined_function_call_expression(expr),
@@ -165,6 +168,7 @@ impl Expression {
     pub fn visit_mut<V: AstVisitorMut>(&self, visitor: &mut V) -> Self {
         match self {
             Expression::Identifier(expr) => visitor.visit_identifier_expression(expr),
+            Expression::MemberReference(expr) => visitor.visit_member_reference_expression(expr),
             Expression::Const(expr) => visitor.visit_constant_expression(expr),
             Expression::Parens(expr) => visitor.visit_parens_expression(expr),
             Expression::PredefinedFunctionCall(expr) => visitor.visit_predefined_function_call_expression(expr),
@@ -281,6 +285,71 @@ impl IdentifierExpression {
 impl fmt::Display for IdentifierExpression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.get_identifier())
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct MemberReferenceExpression {
+    expression: Box<Expression>,
+    dot_token: Spanned<Token>,
+    identifier_token: Spanned<Token>,
+}
+
+impl MemberReferenceExpression {
+    pub fn new(expression: Expression, dot_token: Spanned<Token>, identifier_token: Spanned<Token>) -> Self {
+        Self {
+            expression: Box::new(expression),
+            dot_token,
+            identifier_token,
+        }
+    }
+
+    pub fn empty(expression: Expression, identifier: unicase::Ascii<String>) -> Self {
+        Self {
+            expression: Box::new(expression),
+            dot_token: Spanned::create_empty(Token::Dot),
+            identifier_token: Spanned::create_empty(Token::Identifier(identifier)),
+        }
+    }
+
+    pub fn get_expression(&self) -> &Expression {
+        &self.expression
+    }
+
+    pub fn get_dot_token(&self) -> &Spanned<Token> {
+        &self.dot_token
+    }
+
+    pub fn get_identifier_token(&self) -> &Spanned<Token> {
+        &self.identifier_token
+    }
+
+    /// Returns a reference to the get identifier of this [`IdentifierExpression`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if .
+    pub fn get_identifier(&self) -> &unicase::Ascii<String> {
+        if let Token::Identifier(id) = &self.identifier_token.token {
+            return id;
+        }
+        panic!("Expected identifier token")
+    }
+
+    pub fn set_identifier(&mut self, new_id: unicase::Ascii<String>) {
+        if let Token::Identifier(id) = &mut self.identifier_token.token {
+            *id = new_id;
+        }
+    }
+
+    pub fn create_empty_expression(expression: Expression, identifier: unicase::Ascii<String>) -> Expression {
+        Expression::MemberReference(MemberReferenceExpression::empty(expression, identifier))
+    }
+}
+
+impl fmt::Display for MemberReferenceExpression {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}.{}", self.get_expression(), self.get_identifier())
     }
 }
 

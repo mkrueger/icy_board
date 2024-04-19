@@ -1129,7 +1129,6 @@ impl PcbBoardData {
         ret.fido_auto_add = read_bool(&mut reader, encoding)?;
         ret.fido_re_address = read_bool(&mut reader, encoding)?;
         ret.fido_route_echo_mail = read_bool(&mut reader, encoding)?;
-        println!("2");
 
         ret.minimize_log_on_off = read_int(&mut reader, encoding)?;
         ret.minimize_protocols = read_int(&mut reader, encoding)?;

@@ -8,6 +8,10 @@ impl AstVisitor<usize> for ExpressionDepthVisitor {
         1
     }
 
+    fn visit_member_reference_expression(&mut self, _: &super::MemberReferenceExpression) -> usize {
+        1
+    }
+
     fn visit_constant_expression(&mut self, _: &ConstantExpression) -> usize {
         1
     }

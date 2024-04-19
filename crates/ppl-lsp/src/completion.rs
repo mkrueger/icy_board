@@ -1,6 +1,9 @@
+use std::sync::{Arc, Mutex};
+
 use icy_board_engine::{
     ast::{walk_predefined_call_statement, Ast, AstVisitor, IdentifierExpression, PredefinedCallStatement},
-    executable::{StatementSignature, FUNCTION_DEFINITIONS, STATEMENT_DEFINITIONS},
+    executable::{StatementSignature, FUNCTION_DEFINITIONS, LAST_PPLC, STATEMENT_DEFINITIONS},
+    parser::{ErrorRepoter, UserTypeRegistry},
     semantic::{ReferenceType, SemanticVisitor},
 };
 use tower_lsp::lsp_types::CompletionItem;
@@ -38,9 +41,9 @@ const TYPES: [&str; 26] = [
 /// return (need_to_continue_search, founded reference)
 pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
     let mut map = CompletionVisitor::new(offset);
-    let mut semantic_visitor = SemanticVisitor::default();
+    let mut reg = UserTypeRegistry::default();
+    let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorRepoter::default())), &mut reg);
     ast.visit(&mut semantic_visitor);
-
     ast.visit(&mut map);
 
     if map.items.is_empty() {

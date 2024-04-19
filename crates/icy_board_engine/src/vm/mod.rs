@@ -1,8 +1,10 @@
 use crate::ast::BinOp;
 use crate::ast::Statement;
 use crate::ast::UnaryOp;
+use crate::compiler::user_data::UserDataValue;
 use crate::datetime::IcbDate;
 use crate::executable::Executable;
+use crate::executable::GenericVariableData;
 use crate::executable::PPECommand;
 use crate::executable::PPEExpr;
 use crate::executable::PPEScript;
@@ -10,6 +12,7 @@ use crate::executable::PPEStatement;
 use crate::executable::VariableTable;
 use crate::executable::VariableType;
 use crate::executable::VariableValue;
+use crate::parser::UserTypeRegistry;
 use crate::Res;
 use std::collections::HashMap;
 use std::path::Path;
@@ -120,6 +123,7 @@ impl ReturnAddress {
 
 pub struct VirtualMachine<'a> {
     io: &'a mut dyn PCBoardIO,
+    pub type_registry: &'a UserTypeRegistry,
     pub file_name: PathBuf,
     pub variable_table: VariableTable,
 
@@ -131,6 +135,8 @@ pub struct VirtualMachine<'a> {
     pub icy_board_state: &'a mut IcyBoardState,
 
     pub pcb_node: Option<Node>,
+
+    pub user_data: Vec<Box<dyn UserDataValue>>,
 
     pub return_addresses: Vec<ReturnAddress>,
     call_local_value_stack: Vec<VariableValue>,
@@ -320,10 +326,29 @@ impl<'a> VirtualMachine<'a> {
         }
     }
 
-    fn eval_expr(&mut self, expr: &PPEExpr) -> Res<VariableValue> {
+    pub fn eval_expr(&mut self, expr: &PPEExpr) -> Res<VariableValue> {
         match expr {
             PPEExpr::Invalid => Err(VMError::InternalVMError.into()),
             PPEExpr::Value(id) => Ok(self.variable_table.get_value(*id).clone()),
+
+            PPEExpr::Member(base_expr, id) => {
+                let val = self.eval_expr(base_expr)?;
+                if let VariableType::UserData(user_type) = val.get_type() {
+                    if let GenericVariableData::UserData(field_id) = val.generic_data {
+                        if let Some(user_type) = self.type_registry.get_type_from_id(user_type) {
+                            match &user_type.id_table[*id] {
+                                crate::compiler::user_data::UserDataEntry::Field(name) => {
+                                    return self.user_data[field_id].get_field_value(self, name);
+                                }
+                                crate::compiler::user_data::UserDataEntry::Procedure(_) => todo!(),
+                                crate::compiler::user_data::UserDataEntry::Function(_) => todo!(),
+                            }
+                        }
+                    }
+                }
+                return Err(VMError::InternalVMError.into());
+            }
+
             PPEExpr::UnaryExpression(op, expr) => {
                 let val = self.eval_expr(expr)?;
                 match op {
@@ -615,8 +640,11 @@ pub fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn PCBoard
         label_table.insert(stmt.span.start * 2, i);
     }
     let file_name = file_name.as_ref().to_path_buf();
+    let reg = UserTypeRegistry::icy_board_registry();
+
     let mut vm = VirtualMachine {
         file_name,
+        type_registry: &reg,
         return_addresses: Vec::new(),
         script,
         io,
@@ -630,6 +658,7 @@ pub fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn PCBoard
         call_local_value_stack: Vec::new(),
         write_back_stack: Vec::new(),
         push_pop_stack: Vec::new(),
+        user_data: Vec::new(),
     };
     vm.run()?;
     Ok(true)

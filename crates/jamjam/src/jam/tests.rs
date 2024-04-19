@@ -54,7 +54,6 @@ fn test_iter_mystic() {
     let base = JamMessageBase::open("data/jam/general").unwrap();
     for msg in base.iter() {
         let msg = msg.unwrap();
-        println!("{} {} {}", msg.reply1st, msg.reply_to, msg.replynext);
         for sub in msg.sub_fields.iter() {
             if *sub.get_type() == SubfieldType::MsgID {
                 assert_eq!(JamMessageBase::get_crc(sub.get_string()), msg.msgid_crc);

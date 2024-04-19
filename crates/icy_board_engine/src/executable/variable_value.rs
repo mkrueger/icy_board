@@ -13,6 +13,8 @@ use crate::{
 #[derive(Clone, Copy, PartialEq, Debug, Default, Eq, Hash)]
 #[allow(dead_code)]
 pub enum VariableType {
+    None,
+
     /// unsigned character (1 byte) 0 = FALSE, non-0 = TRUE
     Boolean,
 
@@ -94,6 +96,7 @@ impl From<VariableType> for u8 {
             VariableType::DDate => 17,
             VariableType::Table => 18,
             VariableType::UserData(b) => b,
+            VariableType::None => 255,
         }
     }
 }
@@ -135,6 +138,7 @@ impl VariableType {
 impl fmt::Display for VariableType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            VariableType::None => write!(f, "None"),
             VariableType::Boolean => write!(f, "Boolean"),   // BOOL 0 = false, 1 = true
             VariableType::Unsigned => write!(f, "Unsigned"), // u32
             VariableType::Date => write!(f, "Date"),         // 2*u8 - julian date
@@ -225,6 +229,8 @@ pub enum GenericVariableData {
     Dim3(Vec<Vec<Vec<VariableValue>>>),
 
     Table(PPLTable),
+
+    UserData(usize),
 }
 
 impl GenericVariableData {
@@ -1204,8 +1210,12 @@ impl VariableValue {
             VariableType::Table => {
                 panic!("Not supported for tables.")
             }
-            VariableType::Function | VariableType::Procedure | VariableType::UserData(_) => {
+            VariableType::Function | VariableType::Procedure | VariableType::None => {
                 panic!("Unknown variable type")
+            }
+            VariableType::UserData(x) => {
+                log::error!("can't convert {:?} to user data type {x}", self);
+                data.int_value = -1;
             }
         }
 

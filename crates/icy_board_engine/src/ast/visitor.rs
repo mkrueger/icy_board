@@ -4,9 +4,9 @@ use super::{
     ArrayInitializerExpression, Ast, AstNode, BinaryExpression, BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstantExpression,
     ContinueStatement, ElseBlock, ElseIfBlock, Expression, ForStatement, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation,
     GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, IndexerExpression, LabelStatement, LetStatement, LoopStatement,
-    ParameterSpecifier, ParensExpression, PredefinedCallStatement, PredefinedFunctionCallExpression, ProcedureCallStatement, ProcedureDeclarationAstNode,
-    ProcedureImplementation, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, UnaryExpression, VariableDeclarationStatement,
-    VariableSpecifier, WhileDoStatement, WhileStatement,
+    MemberReferenceExpression, ParameterSpecifier, ParensExpression, PredefinedCallStatement, PredefinedFunctionCallExpression, ProcedureCallStatement,
+    ProcedureDeclarationAstNode, ProcedureImplementation, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, UnaryExpression,
+    VariableDeclarationStatement, VariableSpecifier, WhileDoStatement, WhileStatement,
 };
 
 #[allow(unused_variables)]
@@ -15,6 +15,13 @@ pub trait AstVisitor<T: Default>: Sized {
     fn visit_identifier_expression(&mut self, identifier: &IdentifierExpression) -> T {
         T::default()
     }
+
+    // visit expressions
+    fn visit_member_reference_expression(&mut self, member_reference_expression: &MemberReferenceExpression) -> T {
+        member_reference_expression.get_expression().visit(self);
+        T::default()
+    }
+
     fn visit_constant_expression(&mut self, constant: &ConstantExpression) -> T {
         T::default()
     }
@@ -360,6 +367,17 @@ pub trait AstVisitorMut: Sized {
             span: identifier.get_identifier_token().span.clone(),
             token: Token::Identifier(self.visit_identifier(identifier.get_identifier())),
         }))
+    }
+
+    fn visit_member_reference_expression(&mut self, member_ref: &MemberReferenceExpression) -> Expression {
+        Expression::MemberReference(MemberReferenceExpression::new(
+            member_ref.get_expression().visit_mut(self),
+            member_ref.get_dot_token().clone(),
+            Spanned {
+                span: member_ref.get_identifier_token().span.clone(),
+                token: Token::Identifier(self.visit_identifier(member_ref.get_identifier())),
+            },
+        ))
     }
 
     fn visit_constant_expression(&mut self, constant: &ConstantExpression) -> Expression {

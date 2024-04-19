@@ -235,6 +235,9 @@ impl Decompiler {
                     IdentifierExpression::create_empty_expression(unicase::Ascii::new(entry.name.clone()))
                 }
             },
+            PPEExpr::Member(_expr, _id) => {
+                todo!()
+            }
             PPEExpr::UnaryExpression(op, expr) => {
                 let mut expr = self.decompile_expression(expr);
 

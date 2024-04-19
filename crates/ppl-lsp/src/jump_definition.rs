@@ -1,7 +1,15 @@
-use icy_board_engine::{ast::Ast, parser::lexer::Spanned, semantic::SemanticVisitor};
+use std::sync::{Arc, Mutex};
+
+use icy_board_engine::{
+    ast::Ast,
+    executable::LAST_PPLC,
+    parser::{lexer::Spanned, ErrorRepoter, UserTypeRegistry},
+    semantic::SemanticVisitor,
+};
 
 pub fn get_definition(ast: &Ast, offset: usize) -> Option<Spanned<String>> {
-    let mut semantic_visitor = SemanticVisitor::default();
+    let mut reg = UserTypeRegistry::default();
+    let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorRepoter::default())), &mut reg);
     ast.visit(&mut semantic_visitor);
 
     for (_, refs) in &semantic_visitor.references {

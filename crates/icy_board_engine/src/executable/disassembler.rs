@@ -160,6 +160,17 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
         .unwrap();
     }
 
+    fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> () {
+        expr.visit(self);
+        execute!(
+            stdout(),
+            SetForegroundColor(Color::Blue),
+            Print(format!(".[{:03X}]", id)),
+            SetAttribute(Attribute::Reset),
+        )
+        .unwrap();
+    }
+
     fn visit_proc_call(&mut self, id: usize, args: &[PPEExpr]) {
         Self::output_op_code(OpCode::PCALL);
         execute!(

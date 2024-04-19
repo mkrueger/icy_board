@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::ast::{BinOp, UnaryOp};
 
-use super::{DeserializationErrorType, Executable, FunctionDefinition, GenericVariableData, OpCode, StatementDefinition, VariableValue};
+use super::{DeserializationErrorType, Executable, FuncOpCode, FunctionDefinition, GenericVariableData, OpCode, StatementDefinition, VariableValue};
 
 #[derive(Debug)]
 pub struct DeserializationError {
@@ -290,8 +290,8 @@ impl PPECommand {
 pub enum PPEExpr {
     #[default]
     Invalid,
-
     Value(usize),
+    Member(Box<PPEExpr>, usize),
     UnaryExpression(UnaryOp, Box<PPEExpr>),
     BinaryExpression(BinOp, Box<PPEExpr>, Box<PPEExpr>),
     Dim(usize, Vec<PPEExpr>),
@@ -314,6 +314,11 @@ impl PPEExpr {
                 vec.push(*id as i16);
                 vec.push(0);
             }
+            PPEExpr::Member(expr, id) => {
+                expr.serialize(vec);
+                vec.push(FuncOpCode::MemberReference as i16);
+                vec.push(*id as i16);
+            }
             PPEExpr::Dim(id, vars) => {
                 vec.push(*id as i16);
                 vec.push(vars.len() as i16);
@@ -326,6 +331,7 @@ impl PPEExpr {
                 for arg in args {
                     arg.serialize(vec);
                 }
+
                 vec.push(func.opcode as i16);
             }
             PPEExpr::FunctionCall(func, args) => {
@@ -352,6 +358,7 @@ impl PPEExpr {
         match self {
             PPEExpr::Invalid => 0,
             PPEExpr::Value(_) => 2,
+            PPEExpr::Member(expr, _) => expr.get_size() + 2,
             PPEExpr::Dim(_, args) => 2 + Self::count_size(args) + args.len(),
             PPEExpr::PredefinedFunctionCall(_, args) => Self::count_size(args) + 1,
             PPEExpr::FunctionCall(_, args) => Self::count_size(args) + 2 + args.len(),
@@ -390,6 +397,7 @@ impl PPEExpr {
         match self {
             PPEExpr::Invalid => panic!("Invalid expression"),
             PPEExpr::Value(id) => visitor.visit_value(*id),
+            PPEExpr::Member(expr, id) => visitor.visit_member(expr, *id),
             PPEExpr::UnaryExpression(op, expr) => visitor.visit_unary_expression(*op, expr),
             PPEExpr::BinaryExpression(op, left, right) => visitor.visit_binary_expression(*op, left, right),
             PPEExpr::Dim(id, dim) => visitor.visit_dim_expression(*id, dim),
@@ -408,6 +416,7 @@ impl PPEExpr {
         match self {
             PPEExpr::Invalid => panic!("Invalid expression"),
             PPEExpr::Value(id) => visitor.visit_value(*id),
+            PPEExpr::Member(expr, id) => visitor.visit_member(expr, *id),
             PPEExpr::UnaryExpression(op, expr) => visitor.visit_unary_expression(*op, expr),
             PPEExpr::BinaryExpression(op, left, right) => visitor.visit_binary_expression(*op, left, right),
             PPEExpr::Dim(id, dim) => visitor.visit_dim_expression(*id, dim),
@@ -424,6 +433,7 @@ pub trait PPEVisitor<T>: Sized {
         }
     }
     fn visit_value(&mut self, id: usize) -> T;
+    fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> T;
     fn visit_unary_expression(&mut self, op: UnaryOp, expr: &PPEExpr) -> T;
     fn visit_binary_expression(&mut self, op: BinOp, left: &PPEExpr, right: &PPEExpr) -> T;
     fn visit_dim_expression(&mut self, id: usize, dim: &[PPEExpr]) -> T;
@@ -447,6 +457,9 @@ pub trait PPEVisitor<T>: Sized {
 pub trait PPEVisitorMut: Sized {
     fn visit_value(&mut self, id: usize) -> PPEExpr {
         PPEExpr::Value(id)
+    }
+    fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> PPEExpr {
+        PPEExpr::Member(Box::new(expr.visit_mut(self)), id)
     }
     fn visit_unary_expression(&mut self, op: UnaryOp, expr: &PPEExpr) -> PPEExpr {
         PPEExpr::UnaryExpression(op, Box::new(expr.visit_mut(self)))
@@ -487,6 +500,14 @@ pub enum PPEError {
 impl<'a> PPEVisitor<Result<VariableValue, PPEError>> for PPEConstantValueVisitor<'a> {
     fn visit_value(&mut self, id: usize) -> Result<VariableValue, PPEError> {
         Ok(self.executable.variable_table.get_value(id).clone())
+    }
+
+    fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> Result<VariableValue, PPEError> {
+        let val = expr.visit(self)?;
+        match &val.generic_data {
+            GenericVariableData::Dim1(data) => Ok(data[id].clone()),
+            _ => Err(PPEError::UnsupportedDimension(1, val)),
+        }
     }
 
     fn visit_unary_expression(&mut self, op: UnaryOp, expr: &PPEExpr) -> Result<VariableValue, PPEError> {

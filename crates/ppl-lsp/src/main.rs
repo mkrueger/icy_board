@@ -5,7 +5,7 @@ use dashmap::DashMap;
 use i18n_embed_fl::fl;
 use icy_board_engine::ast::{walk_function_declaration, walk_function_implementation, Ast, AstVisitor};
 use icy_board_engine::executable::{OpCode, VariableType, LAST_PPLC};
-use icy_board_engine::parser::{parse_ast, Encoding};
+use icy_board_engine::parser::{parse_ast, Encoding, UserTypeRegistry};
 use icy_board_engine::semantic::SemanticVisitor;
 use ppl_language_server::completion::get_completion;
 use ppl_language_server::jump_definition::get_definition;
@@ -363,9 +363,10 @@ impl Backend {
         let rope = ropey::Rope::from_str(&params.text);
         let uri = params.uri.to_string();
         self.document_map.insert(uri.clone(), rope.clone());
-        let (ast, errors) = parse_ast(PathBuf::from(uri), &params.text, Encoding::Utf8, LAST_PPLC);
+        let reg = UserTypeRegistry::default();
+        let (ast, errors) = parse_ast(PathBuf::from(uri), &params.text, &reg, Encoding::Utf8, LAST_PPLC);
 
-        let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, errors);
+        let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, errors, &reg);
 
         ast.visit(&mut semantic_visitor);
 

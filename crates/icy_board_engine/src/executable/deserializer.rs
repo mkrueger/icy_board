@@ -305,6 +305,16 @@ impl PPEDeserializer {
                     self.offset += 1;
                     break;
                 }
+                if id == FuncOpCode::MemberReference as i16 {
+                    let expr = self.pop_expr().unwrap();
+                    self.offset += 1;
+                    let member_id = executable.script_buffer[self.offset];
+                    self.offset += 1;
+
+                    self.push_expr(PPEExpr::Member(Box::new(expr), member_id as usize));
+                    continue;
+                }
+
                 let func = -id as usize;
                 let func_def = &FUNCTION_DEFINITIONS[func];
                 match func_def.args {

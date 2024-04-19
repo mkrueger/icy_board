@@ -5,17 +5,32 @@ use crate::{
 
 use super::PPECompiler;
 
-pub struct ExpressionCompiler<'a> {
-    pub compiler: &'a mut PPECompiler,
+pub struct ExpressionCompiler<'a, 'b> {
+    pub compiler: &'a mut PPECompiler<'b>,
 }
 
-impl<'a> AstVisitor<PPEExpr> for ExpressionCompiler<'a> {
+impl<'a, 'b> AstVisitor<PPEExpr> for ExpressionCompiler<'a, 'b> {
     fn visit_identifier_expression(&mut self, identifier: &crate::ast::IdentifierExpression) -> PPEExpr {
         if let Some(decl) = self.compiler.lookup_table.lookup_variable(identifier.get_identifier()) {
             return PPEExpr::Value(decl.header.id);
         }
         log::error!("Variable not found: {}", identifier.get_identifier());
         PPEExpr::Value(0)
+    }
+
+    fn visit_member_reference_expression(&mut self, member_reference_expression: &crate::ast::MemberReferenceExpression) -> PPEExpr {
+        let base = member_reference_expression.get_expression().visit(self);
+        let type_id = self
+            .compiler
+            .semantic_visitor
+            .user_type_lookup
+            .get(&member_reference_expression.get_identifier_token().span.start)
+            .unwrap();
+        let typ = self.compiler.semantic_visitor.type_registry.get_type_from_id(*type_id).unwrap();
+
+        let member_id = typ.member_id_lookup.get(&member_reference_expression.get_identifier()).unwrap();
+
+        PPEExpr::Member(Box::new(base), *member_id)
     }
 
     fn visit_constant_expression(&mut self, constant: &crate::ast::ConstantExpression) -> PPEExpr {

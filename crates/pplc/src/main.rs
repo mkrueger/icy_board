@@ -2,7 +2,7 @@ use ariadne::{Label, Report, ReportKind, Source};
 use clap::Parser;
 use icy_board_engine::{
     compiler::PPECompiler,
-    parser::{load_with_encoding, parse_ast, Encoding},
+    parser::{load_with_encoding, parse_ast, Encoding, UserTypeRegistry},
     semantic::SemanticVisitor,
 };
 
@@ -87,7 +87,8 @@ fn main() {
         Ok(src) => {
             println!();
             println!("Parsing...");
-            let (mut ast, errors) = parse_ast(PathBuf::from(&file_name), &src, encoding, ppl_version);
+            let reg = UserTypeRegistry::icy_board_registry();
+            let (mut ast, errors) = parse_ast(PathBuf::from(&file_name), &src, &reg, encoding, ppl_version);
             if arguments.nouvar {
                 ast.require_user_variables = false;
             }
@@ -96,7 +97,7 @@ fn main() {
             }
             println!("Compiling...");
 
-            let mut sv = SemanticVisitor::new(ppl_version, errors);
+            let mut sv = SemanticVisitor::new(ppl_version, errors, &reg);
             ast.visit(&mut sv);
 
             let errors = sv.errors.clone();
@@ -136,7 +137,7 @@ fn main() {
                 }
             }
             println!();
-            let mut compiler = PPECompiler::default();
+            let mut compiler = PPECompiler::new(ppl_version, &reg);
             compiler.compile(&ast);
 
             match compiler.create_executable(runtime_version) {

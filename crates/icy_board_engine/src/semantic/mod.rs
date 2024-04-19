@@ -19,7 +19,7 @@ use crate::{
     parser::{
         self,
         lexer::{Spanned, Token},
-        ErrorRepoter, ParserErrorType,
+        ErrorRepoter, ParserErrorType, UserTypeRegistry,
     },
 };
 
@@ -134,13 +134,15 @@ impl VariableLookups {
     }
 }
 
-#[derive(Default)]
-pub struct SemanticVisitor {
+pub struct SemanticVisitor<'a> {
     version: u16,
+    pub type_registry: &'a UserTypeRegistry,
 
     pub errors: Arc<Mutex<ErrorRepoter>>,
     pub references: Vec<(ReferenceType, References)>,
 
+    /// Maps member references -> user type IDs
+    pub user_type_lookup: HashMap<usize, u8>,
     pub expression_lookup: HashMap<core::ops::Range<usize>, usize>,
     pub require_user_variables: bool,
 
@@ -285,16 +287,18 @@ impl LookupVariabeleTable {
     }
 }
 
-impl SemanticVisitor {
-    pub fn new(version: u16, errors: Arc<Mutex<ErrorRepoter>>) -> Self {
+impl<'a> SemanticVisitor<'a> {
+    pub fn new(version: u16, errors: Arc<Mutex<ErrorRepoter>>, type_registry: &'a UserTypeRegistry) -> Self {
         let mut result = Self {
             version,
             errors,
             references: Vec::new(),
+            type_registry,
 
             label_count: 0,
             label_lookup_table: HashMap::new(),
             expression_lookup: HashMap::new(),
+            user_type_lookup: HashMap::new(),
 
             global_lookup: VariableLookups::default(),
             local_variable_lookup: None,
@@ -749,8 +753,8 @@ impl SemanticVisitor {
     }
 }
 
-impl AstVisitor<()> for SemanticVisitor {
-    fn visit_identifier_expression(&mut self, identifier: &IdentifierExpression) {
+impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
+    fn visit_identifier_expression(&mut self, identifier: &IdentifierExpression) -> VariableType {
         if let Some(idx) = self.lookup_variable(identifier.get_identifier()) {
             let (rt, r) = &mut self.references[idx];
             if matches!(rt, ReferenceType::Function(_)) {
@@ -762,32 +766,86 @@ impl AstVisitor<()> for SemanticVisitor {
                 self.expression_lookup.insert(identifier.span.clone(), idx);
                 r.usages.push(Spanned::new(identifier.token.to_string(), identifier.span.clone()));
             }
+            r.variable_type
         } else {
             self.errors.lock().unwrap().report_error(
                 identifier.get_identifier_token().span.clone(),
                 CompilationErrorType::VariableNotFound(identifier.get_identifier().to_string()),
             );
+            VariableType::None
         }
     }
 
-    fn visit_constant_expression(&mut self, constant: &ConstantExpression) {
-        self.add_constant(constant.get_constant_value());
+    fn visit_member_reference_expression(&mut self, member_reference_expression: &crate::ast::MemberReferenceExpression) -> VariableType {
+        let t = member_reference_expression.get_expression().visit(self);
+        if let VariableType::UserData(d) = t {
+            self.user_type_lookup.insert(member_reference_expression.get_identifier_token().span.start, d);
+
+            if let Some(t) = self.type_registry.get_type_from_id(d) {
+                for (name, t) in &t.fields {
+                    if name == member_reference_expression.get_identifier() {
+                        return *t;
+                    }
+                }
+                for (name, (_args, t)) in &t.functions {
+                    if name == member_reference_expression.get_identifier() {
+                        return *t;
+                    }
+                }
+                for (name, _args) in &t.procedures {
+                    if name == member_reference_expression.get_identifier() {
+                        return VariableType::None;
+                    }
+                }
+                self.errors.lock().unwrap().report_error(
+                    member_reference_expression.get_identifier_token().span.clone(),
+                    CompilationErrorType::InvalidMemberReferenceExpression,
+                );
+            } else {
+                self.errors.lock().unwrap().report_error(
+                    member_reference_expression.get_expression().get_span().clone(),
+                    CompilationErrorType::TypeNotFound,
+                );
+            }
+        } else {
+            self.errors.lock().unwrap().report_error(
+                member_reference_expression.get_identifier_token().span.clone(),
+                CompilationErrorType::InvalidMemberReferenceExpression,
+            );
+        }
+        VariableType::None
     }
 
-    fn visit_predefined_function_call_expression(&mut self, call: &PredefinedFunctionCallExpression) {
+    fn visit_constant_expression(&mut self, constant: &ConstantExpression) -> VariableType {
+        self.add_constant(constant.get_constant_value());
+        match constant.get_constant_value() {
+            Constant::Integer(_) => VariableType::Integer,
+            Constant::String(_) => VariableType::String,
+            Constant::Boolean(_) => VariableType::Boolean,
+            Constant::Money(_) => VariableType::Money,
+            Constant::Unsigned(_) => VariableType::Unsigned,
+            Constant::Double(_) => VariableType::Double,
+            Constant::Builtin(_) => VariableType::Integer,
+        }
+    }
+
+    fn visit_predefined_function_call_expression(&mut self, call: &PredefinedFunctionCallExpression) -> VariableType {
         self.add_reference(
             ReferenceType::PredefinedFunc(call.get_func().opcode),
             VariableType::Function,
             call.get_identifier_token(),
         );
         walk_predefined_function_call_expression(self, call);
+
+        call.get_func().return_type
     }
 
-    fn visit_comment(&mut self, _comment: &CommentAstNode) {
+    fn visit_comment(&mut self, _comment: &CommentAstNode) -> VariableType {
         // nothing yet
+        VariableType::None
     }
 
-    fn visit_predefined_call_statement(&mut self, call_stmt: &PredefinedCallStatement) {
+    fn visit_predefined_call_statement(&mut self, call_stmt: &PredefinedCallStatement) -> VariableType {
         let def = call_stmt.get_func();
         if def.opcode == OpCode::GETUSER
             || def.opcode == OpCode::PUTUSER
@@ -873,11 +931,13 @@ impl AstVisitor<()> for SemanticVisitor {
             call_stmt.get_identifier_token(),
         );
         walk_predefined_call_statement(self, call_stmt);
+        VariableType::None
     }
 
-    fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) {
+    fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) -> VariableType {
         let mut found = false;
         let mut arg_count = 0;
+        let mut res = VariableType::None;
         if let Some(idx) = self.lookup_variable(call.get_identifier()) {
             let (rt, r) = &mut self.references[idx];
             if matches!(rt, ReferenceType::Function(_)) || matches!(rt, ReferenceType::Variable(_)) {
@@ -896,6 +956,8 @@ impl AstVisitor<()> for SemanticVisitor {
                 r.usages
                     .push(Spanned::new(call.get_identifier().to_string(), call.get_identifier_token().span.clone()));
                 found = true;
+
+                res = r.variable_type;
             }
         }
 
@@ -908,14 +970,16 @@ impl AstVisitor<()> for SemanticVisitor {
             );
         }
         walk_function_call_expression(self, call);
+        res
     }
 
-    fn visit_indexer_expression(&mut self, indexer: &crate::ast::IndexerExpression) -> () {
+    fn visit_indexer_expression(&mut self, indexer: &crate::ast::IndexerExpression) -> VariableType {
         let mut found = false;
+        let mut res = VariableType::None;
         let arg_count = 0;
         if let Some(idx) = self.lookup_variable(indexer.get_identifier()) {
-            let (rt, _r) = &mut self.references[idx];
-            if matches!(rt, ReferenceType::Function(_)) || matches!(rt, ReferenceType::Variable(_)) {
+            let (rt, r) = &mut self.references[idx];
+            if matches!(rt, ReferenceType::Function(_)) {
                 self.errors.lock().unwrap().report_error(
                     indexer.get_identifier_token().span.clone(),
                     CompilationErrorType::IndexerCalledOnFunction(indexer.get_identifier().to_string()),
@@ -923,6 +987,7 @@ impl AstVisitor<()> for SemanticVisitor {
 
                 found = true;
             }
+            res = r.variable_type;
         }
 
         if found {
@@ -934,21 +999,25 @@ impl AstVisitor<()> for SemanticVisitor {
             );
         }
         walk_indexer_expression(self, indexer);
+        res
     }
 
-    fn visit_goto_statement(&mut self, goto: &GotoStatement) {
+    fn visit_goto_statement(&mut self, goto: &GotoStatement) -> VariableType {
         self.add_label_usage(goto.get_label_token());
+        VariableType::None
     }
 
-    fn visit_gosub_statement(&mut self, gosub: &GosubStatement) {
+    fn visit_gosub_statement(&mut self, gosub: &GosubStatement) -> VariableType {
         self.add_label_usage(gosub.get_label_token());
+        VariableType::None
     }
 
-    fn visit_label_statement(&mut self, label: &LabelStatement) {
+    fn visit_label_statement(&mut self, label: &LabelStatement) -> VariableType {
         self.set_label_declaration(label.get_label_token());
+        VariableType::None
     }
 
-    fn visit_let_statement(&mut self, let_stmt: &LetStatement) {
+    fn visit_let_statement(&mut self, let_stmt: &LetStatement) -> VariableType {
         if let Some(idx) = self.lookup_variable(let_stmt.get_identifier()) {
             if self.references[idx].1.variable_type == VariableType::Procedure {
                 self.errors
@@ -982,9 +1051,10 @@ impl AstVisitor<()> for SemanticVisitor {
             arg.visit(self);
         }
         let_stmt.get_value_expression().visit(self);
+        VariableType::None
     }
 
-    fn visit_variable_declaration_statement(&mut self, var_decl: &VariableDeclarationStatement) {
+    fn visit_variable_declaration_statement(&mut self, var_decl: &VariableDeclarationStatement) -> VariableType {
         for v in var_decl.get_variables() {
             if self.has_variable_defined(v.get_identifier()) {
                 self.errors.lock().unwrap().report_error(
@@ -1010,9 +1080,10 @@ impl AstVisitor<()> for SemanticVisitor {
                 v.get_cube_size(),
             );
         }
+        VariableType::None
     }
 
-    fn visit_procedure_call_statement(&mut self, call: &ProcedureCallStatement) {
+    fn visit_procedure_call_statement(&mut self, call: &ProcedureCallStatement) -> VariableType {
         let mut found = false;
         if let Some(idx) = self.lookup_variable(call.get_identifier()) {
             if matches!(self.references[idx].0, ReferenceType::Variable(_)) {
@@ -1061,15 +1132,16 @@ impl AstVisitor<()> for SemanticVisitor {
         }
 
         walk_procedure_call_statement(self, call);
+        VariableType::None
     }
 
-    fn visit_procedure_declaration(&mut self, proc_decl: &ProcedureDeclarationAstNode) {
+    fn visit_procedure_declaration(&mut self, proc_decl: &ProcedureDeclarationAstNode) -> VariableType {
         if self.has_variable_defined(proc_decl.get_identifier()) {
             self.errors.lock().unwrap().report_error(
                 proc_decl.get_identifier_token().span.clone(),
                 CompilationErrorType::VariableAlreadyDefined(proc_decl.get_identifier().to_string()),
             );
-            return;
+            return VariableType::None;
         }
         let id = self.references.len();
         self.global_lookup.variable_lookup.insert(proc_decl.get_identifier().clone(), id);
@@ -1087,15 +1159,16 @@ impl AstVisitor<()> for SemanticVisitor {
             parameters: 0..0,
             local_variables: 0..0,
         });
+        VariableType::None
     }
 
-    fn visit_function_declaration(&mut self, func_decl: &FunctionDeclarationAstNode) {
+    fn visit_function_declaration(&mut self, func_decl: &FunctionDeclarationAstNode) -> VariableType {
         if self.has_variable_defined(func_decl.get_identifier()) {
             self.errors.lock().unwrap().report_error(
                 func_decl.get_identifier_token().span.clone(),
                 CompilationErrorType::VariableAlreadyDefined(func_decl.get_identifier().to_string()),
             );
-            return;
+            return VariableType::None;
         }
         let id = self.references.len();
         self.global_lookup.variable_lookup.insert(func_decl.get_identifier().clone(), id);
@@ -1112,9 +1185,10 @@ impl AstVisitor<()> for SemanticVisitor {
             parameters: 0..0,
             local_variables: 0..0,
         });
+        VariableType::None
     }
 
-    fn visit_function_implementation(&mut self, function: &FunctionImplementation) {
+    fn visit_function_implementation(&mut self, function: &FunctionImplementation) -> VariableType {
         if let Some(idx) = self.lookup_variable(function.get_identifier()) {
             let identifier = function.get_identifier_token();
             self.expression_lookup.insert(identifier.span.clone(), idx);
@@ -1159,9 +1233,10 @@ impl AstVisitor<()> for SemanticVisitor {
                 break;
             }
         }
+        VariableType::None
     }
 
-    fn visit_procedure_implementation(&mut self, procedure: &ProcedureImplementation) {
+    fn visit_procedure_implementation(&mut self, procedure: &ProcedureImplementation) -> VariableType {
         if let Some(idx) = self.lookup_variable(procedure.get_identifier()) {
             let identifier = procedure.get_identifier_token();
             self.expression_lookup.insert(identifier.span.clone(), idx);
@@ -1200,9 +1275,10 @@ impl AstVisitor<()> for SemanticVisitor {
                 break;
             }
         }
+        VariableType::None
     }
 
-    fn visit_ast(&mut self, program: &crate::ast::Ast) {
+    fn visit_ast(&mut self, program: &crate::ast::Ast) -> VariableType {
         for node in &program.nodes {
             match node {
                 crate::ast::AstNode::Function(_) | crate::ast::AstNode::Procedure(_) => {}
@@ -1263,5 +1339,6 @@ impl AstVisitor<()> for SemanticVisitor {
                 }
             }
         }
+        VariableType::None
     }
 }

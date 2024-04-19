@@ -14,7 +14,7 @@ use super::{
     Parser, ParserWarningType,
 };
 
-impl Parser {
+impl<'a> Parser<'a> {
     pub fn skip_eol(&mut self) {
         while self.get_cur_token() == Some(Token::Eol) {
             self.next_token();

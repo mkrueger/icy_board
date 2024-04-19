@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use crate::{
     executable::LAST_PPLC,
-    parser::{parse_ast, Encoding},
+    parser::{parse_ast, Encoding, UserTypeRegistry},
 };
 
 use super::SemanticVisitor;
@@ -137,9 +137,10 @@ fn find_references(arg: &str) {
         }
         txt.push(ch);
     }
-    let (ast, errors) = parse_ast(PathBuf::from("."), &txt, Encoding::Utf8, LAST_PPLC);
+    let reg = UserTypeRegistry::default();
+    let (ast, errors) = parse_ast(PathBuf::from("."), &txt, &reg, Encoding::Utf8, LAST_PPLC);
 
-    let mut visitor = SemanticVisitor::new(LAST_PPLC, errors.clone());
+    let mut visitor = SemanticVisitor::new(LAST_PPLC, errors.clone(), &reg);
     ast.visit(&mut visitor);
 
     if !errors.lock().unwrap().errors.is_empty() {

@@ -54,11 +54,17 @@ fn test_function_call_serialization() {
     test_serialize(&val, &[8, 0, 2, 0, 0, 3, 0, 0]);
 }
 
+#[test]
+fn test_member_reference_serialization() {
+    let val = PPEExpr::Member(Box::new(PPEExpr::Value(2)), 32);
+    test_serialize(&val, &[2, 0, FuncOpCode::MemberReference as i16, 32]);
+}
+
 fn test_serialize(val: &PPEExpr, expected: &[i16]) {
     assert_eq!(val.get_size(), expected.len(), "Serialization size mismatch for {val:?}");
     let mut result = Vec::new();
     val.serialize(&mut result);
-    assert_eq!(result, expected);
+    assert_eq!(result, expected, "Serialization mismatch for {val:?}");
 
     test_deserialization(&result, val);
 }
@@ -108,8 +114,8 @@ fn test_deserialization(script: &[i16], expected: &PPEExpr) {
     let mut deserializer = super::PPEDeserializer::default();
     let expr = deserializer.deserialize_expression(&exe).unwrap().unwrap();
 
-    assert_eq!(expr, *expected);
-    assert_eq!(expr.get_size(), exe.script_buffer.len());
+    assert_eq!(expr, *expected, "Deserialization mismatch for {expected:?}");
+    assert_eq!(expr.get_size(), exe.script_buffer.len(), "Deserialization size mismatch for {expected:?}");
 
-    assert_eq!(deserializer.offset, exe.script_buffer.len());
+    assert_eq!(deserializer.offset, exe.script_buffer.len(), "Deserialization offset mismatch for {expected:?}");
 }

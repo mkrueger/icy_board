@@ -3,13 +3,14 @@ use std::path::PathBuf;
 use crate::{
     ast::Expression,
     executable::LAST_PPLC,
-    parser::{Encoding, Parser},
+    parser::{Encoding, Parser, UserTypeRegistry},
 };
 
 use super::evaluation_visitor::OptimizationVisitor;
 
 fn parse_expression(input: &str) -> Expression {
-    let mut parser = Parser::new(PathBuf::from("."), input, Encoding::Utf8, LAST_PPLC);
+    let reg = UserTypeRegistry::default();
+    let mut parser = Parser::new(PathBuf::from("."), &reg, input, Encoding::Utf8, LAST_PPLC);
     parser.next_token();
     let res = parser.parse_expression().unwrap();
     assert_eq!(parser.get_cur_token(), None);

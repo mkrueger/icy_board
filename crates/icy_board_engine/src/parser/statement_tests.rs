@@ -12,11 +12,12 @@ use crate::{
 
 use super::{
     lexer::{Spanned, Token},
-    Encoding, Parser,
+    Encoding, Parser, UserTypeRegistry,
 };
 
 fn parse_statement(input: &str, assert_eof: bool) -> Statement {
-    let mut parser = Parser::new(PathBuf::from("."), input, Encoding::Utf8, LAST_PPLC);
+    let reg = UserTypeRegistry::default();
+    let mut parser = Parser::new(PathBuf::from("."), &reg, input, Encoding::Utf8, LAST_PPLC);
     parser.next_token();
     let res = parser.parse_statement().expect("Failed to parse statement: {}");
     if assert_eof {

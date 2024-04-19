@@ -11,6 +11,10 @@ impl AstVisitorMut for NegateExpressionVisitor {
         UnaryExpression::create_empty_expression(UnaryOp::Not, Expression::Identifier(expr.clone()))
     }
 
+    fn visit_member_reference_expression(&mut self, member_ref: &super::MemberReferenceExpression) -> Expression {
+        UnaryExpression::create_empty_expression(UnaryOp::Not, Expression::MemberReference(member_ref.clone()))
+    }
+
     fn visit_constant_expression(&mut self, expr: &ConstantExpression) -> Expression {
         match expr.get_constant_value() {
             Constant::Boolean(b) => ConstantExpression::create_empty_expression(Constant::Boolean(!b)),

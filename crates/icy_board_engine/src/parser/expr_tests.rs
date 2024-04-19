@@ -1,12 +1,14 @@
 use crate::{
     ast::{BinOp, BinaryExpression, Constant, ConstantExpression, Expression, ParensExpression, PredefinedFunctionCallExpression, UnaryExpression, UnaryOp},
     executable::{FuncOpCode, LAST_PPLC},
-    parser::{Encoding, Parser},
+    parser::{Encoding, Parser, UserTypeRegistry},
 };
 use std::path::PathBuf;
 
 fn parse_expression(input: &str) -> Expression {
-    let mut parser = Parser::new(PathBuf::from("."), input, Encoding::Utf8, LAST_PPLC);
+    let reg = UserTypeRegistry::default();
+
+    let mut parser = Parser::new(PathBuf::from("."), &reg, input, Encoding::Utf8, LAST_PPLC);
     parser.next_token();
     let res = parser.parse_expression().unwrap();
     assert_eq!(parser.get_cur_token(), None);
@@ -19,7 +21,8 @@ fn check_expression(input: &str, check: &Expression) {
 }
 
 fn _check_error(input: &str) {
-    let mut parser = Parser::new(PathBuf::from("."), input, Encoding::Utf8, LAST_PPLC);
+    let reg = UserTypeRegistry::default();
+    let mut parser = Parser::new(PathBuf::from("."), &reg, input, Encoding::Utf8, LAST_PPLC);
     parser.next_token();
     let expr = parser.parse_expression();
     assert!(!parser.errors.lock().unwrap().has_errors(), "No error found parsed expr {expr:?}");

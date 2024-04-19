@@ -55,6 +55,10 @@ impl SemanticTokenVisitor {
 impl AstVisitor<()> for SemanticTokenVisitor {
     fn visit_identifier_expression(&mut self, _identifier: &IdentifierExpression) {}
 
+    fn visit_member_reference_expression(&mut self, member_reference_expression: &icy_board_engine::ast::MemberReferenceExpression) {
+        member_reference_expression.get_expression().visit(self);
+    }
+
     fn visit_constant_expression(&mut self, const_expr: &ConstantExpression) {
         match const_expr.get_constant_value() {
             Constant::String(_) => {

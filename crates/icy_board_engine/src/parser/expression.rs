@@ -2,13 +2,13 @@ use super::{lexer::Token, Parser};
 use crate::{
     ast::{
         ArrayInitializerExpression, BinOp, BinaryExpression, ConstantExpression, Expression, FunctionCallExpression, IdentifierExpression, IndexerExpression,
-        ParensExpression, PredefinedFunctionCallExpression, UnaryExpression,
+        MemberReferenceExpression, ParensExpression, PredefinedFunctionCallExpression, UnaryExpression,
     },
     executable::{FunctionDefinition, FUNCTION_DEFINITIONS},
     parser::ParserErrorType,
 };
 
-impl Parser {
+impl<'a> Parser<'a> {
     pub fn parse_expression(&mut self) -> Option<Expression> {
         self.parse_bool()
     }
@@ -177,7 +177,7 @@ impl Parser {
     fn parse_primary(&mut self) -> Option<Expression> {
         let t = self.cur_token.clone()?;
 
-        match &t.token {
+        let expr = match &t.token {
             Token::Const(c) => {
                 self.next_token();
                 Some(Expression::Const(ConstantExpression::new(t.clone(), c.clone())))
@@ -222,9 +222,10 @@ impl Parser {
 
                     self.next_token();
 
-                    let predef = FunctionDefinition::get_function_definition(id);
+                    let predef = FunctionDefinition::get_function_definition(id, arguments.len() as i32);
                     if predef >= 0 {
                         let def = &FUNCTION_DEFINITIONS[predef as usize];
+
                         if (def.args as usize) < arguments.len() {
                             self.errors.lock().unwrap().report_error(
                                 identifier_token.span.clone(),
@@ -367,6 +368,25 @@ impl Parser {
                 Some(Expression::ArrayInitializer(ArrayInitializerExpression::new(lbrace_token, list, rbrace_token)))
             }
             _ => None,
+        };
+
+        if self.get_cur_token() == Some(Token::Dot) {
+            if let Some(expr) = expr {
+                let dot_token = self.save_spanned_token();
+                self.next_token();
+                let identifier_token = self.save_spanned_token();
+                if !matches!(identifier_token.token, Token::Identifier(_)) {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(self.save_token_span(), ParserErrorType::IdentifierExpected(self.save_token()));
+                    return None;
+                }
+                self.next_token();
+                return Some(Expression::MemberReference(MemberReferenceExpression::new(expr, dot_token, identifier_token)));
+            }
         }
+
+        expr
     }
 }

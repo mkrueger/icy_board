@@ -91,6 +91,7 @@ pub enum Token {
 
     Comma,
 
+    Dot,
     DotDot,
 
     LPar,
@@ -238,6 +239,7 @@ impl fmt::Display for Token {
             Token::And => write!(f, "&"),
             Token::Or => write!(f, "|"),
             Token::Not => write!(f, "!"),
+            Token::Dot => write!(f, "."),
             Token::DotDot => write!(f, ".."),
 
             Token::Label(s) => write!(f, ":{s}"),
@@ -770,6 +772,11 @@ impl Lexer {
                     Some(Token::DotDot)
                 } else {
                     self.put_back();
+
+                    if self.lang_version >= 400 {
+                        return Some(Token::Dot);
+                    }
+
                     self.errors.lock().unwrap().report_error(self.token_start..self.token_end,LexingErrorType::InvalidToken);
                     return None;
                 }

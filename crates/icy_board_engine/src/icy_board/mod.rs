@@ -19,6 +19,7 @@ use self::{
     icb_config::IcbConfig,
     icb_text::IcbTextFile,
     language::SupportedLanguages,
+    message_areas::MessageAreaList,
     pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader, PcbLegacyConferenceHeader},
     pcboard_data::PcbBoardData,
     sec_levels::SecurityLevelDefinitions,
@@ -176,7 +177,6 @@ impl IcyBoard {
         })?;
 
         let load_path = RelativePath::from_path(&config.paths.icbtext)?.to_path(parent_path);
-        println!("1 {}", load_path.display());
         let default_display_text = IcbTextFile::load(&load_path).map_err(|e| {
             log::error!("Error loading display text: {} from {}", e, load_path.display());
             e
@@ -215,7 +215,7 @@ impl IcyBoard {
             }
         };
 
-        Ok(IcyBoard {
+        let mut board = IcyBoard {
             file_name: path.as_ref().to_path_buf(),
             root_path: parent_path.to_path_buf(),
             num_callers: 0,
@@ -229,7 +229,25 @@ impl IcyBoard {
             commands,
             statistics,
             groups: GroupList::default(),
-        })
+        };
+
+        for conf in board.conferences.iter_mut() {
+            let message_area_file = if conf.message_area_file.is_absolute() {
+                conf.message_area_file.clone()
+            } else {
+                board.root_path.join(&conf.message_area_file)
+            };
+            conf.message_areas = MessageAreaList::load(&message_area_file)?;
+
+            let file_area_file = if conf.file_area_file.is_absolute() {
+                conf.file_area_file.clone()
+            } else {
+                board.root_path.join(&conf.file_area_file)
+            };
+            conf.file_areas = FileAreaList::load(&file_area_file)?;
+        }
+
+        Ok(board)
     }
 
     pub fn save_userbase(&mut self) -> Res<()> {

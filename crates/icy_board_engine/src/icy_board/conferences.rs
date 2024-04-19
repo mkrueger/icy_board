@@ -5,8 +5,15 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+use crate::{
+    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
+    executable::{GenericVariableData, PPEExpr, VariableData, VariableType, VariableValue},
+    parser::{FILE_AREA_ID, MESSAGE_AREA_ID},
+};
+
 use super::{
     commands::Command,
+    file_areas::FileAreaList,
     is_false, is_null_8, is_null_i32,
     message_areas::{MessageArea, MessageAreaList},
     pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader},
@@ -104,6 +111,10 @@ pub struct Conference {
 
     #[serde(skip)]
     pub commands: Vec<Command>,
+    #[serde(skip)]
+    pub message_areas: MessageAreaList,
+    #[serde(skip)]
+    pub file_areas: FileAreaList,
 }
 
 impl Conference {}
@@ -120,6 +131,7 @@ impl ConferenceBase {
     pub fn len(&self) -> usize {
         self.entries.len()
     }
+
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
@@ -134,6 +146,7 @@ impl ConferenceBase {
                 filename: PathBuf::from(&c.message_file),
                 read_only: d.read_only,
                 allow_aliases: d.allow_aliases,
+                req_level_to_list: RequiredSecurity::new(d.req_level_to_enter),
                 req_level_to_enter: RequiredSecurity::new(d.req_level_to_enter),
                 req_level_to_save_attach: RequiredSecurity::new(d.attach_level),
             };
@@ -182,6 +195,8 @@ impl ConferenceBase {
                 file_area_file: PathBuf::from(&c.dir_file),
                 message_area_menu: PathBuf::from("messages"),
                 message_area_file: PathBuf::from("messages.toml"),
+                message_areas: MessageAreaList::default(),
+                file_areas: FileAreaList::default(),
             };
             confs.push(new);
         }
@@ -211,21 +226,108 @@ impl DerefMut for ConferenceBase {
     }
 }
 
-/*
-impl Index<usize> for ConferenceBase {
-    type Output = Conference;
-    fn index(&self, i: usize) -> &Conference {
-        &self.entries[i]
-    }
-}
-
-impl IndexMut<usize> for ConferenceBase {
-    fn index_mut(&mut self, i: usize) -> &mut Conference {
-        &mut self.entries[i]
-    }
-}
-*/
-
 impl IcyBoardSerializer for ConferenceBase {
     const FILE_TYPE: &'static str = "conferences";
+}
+
+impl UserData for Conference {
+    const TYPE_NAME: &'static str = "Conference";
+
+    fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
+        registry.add_field(NAME.clone(), VariableType::String);
+        registry.add_field(ISPUBLIC.clone(), VariableType::Boolean);
+        registry.add_field(FILE_AREAS.clone(), VariableType::Boolean);
+        registry.add_field(MESSAGE_AREAS.clone(), VariableType::Boolean);
+
+        registry.add_procedure(HAS_ACCESS.clone(), Vec::new());
+        registry.add_function(GET_FILE_AREA.clone(), vec![VariableType::Integer], VariableType::UserData(FILE_AREA_ID as u8));
+        registry.add_function(
+            MESSAGE_AREAS.clone(),
+            vec![VariableType::Integer],
+            VariableType::UserData(MESSAGE_AREA_ID as u8),
+        );
+    }
+}
+
+lazy_static::lazy_static! {
+    pub static ref NAME: unicase::Ascii<String> = unicase::Ascii::new("Name".to_string());
+    pub static ref ISPUBLIC: unicase::Ascii<String> = unicase::Ascii::new("IsPublic".to_string());
+    pub static ref FILE_AREAS: unicase::Ascii<String> = unicase::Ascii::new("FileAreas".to_string());
+    pub static ref MESSAGE_AREAS: unicase::Ascii<String> = unicase::Ascii::new("MessageAreas".to_string());
+
+    pub static ref HAS_ACCESS: unicase::Ascii<String> = unicase::Ascii::new("HasAccess".to_string());
+    pub static ref GET_FILE_AREA: unicase::Ascii<String> = unicase::Ascii::new("GetFileArea".to_string());
+    pub static ref GET_MSG_AREA: unicase::Ascii<String> = unicase::Ascii::new("GetMsgArea".to_string());
+
+}
+
+impl UserDataValue for Conference {
+    fn get_field_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
+        if *name == *NAME {
+            return Ok(VariableValue::new_string(self.name.clone()));
+        }
+        if *name == *ISPUBLIC {
+            return Ok(VariableValue::new_bool(self.required_security.user_can_access(&vm.icy_board_state.session)));
+        }
+        if *name == *FILE_AREAS {
+            return Ok(VariableValue::new_int(self.file_areas.len() as i32));
+        }
+        if *name == *MESSAGE_AREAS {
+            return Ok(VariableValue::new_int(self.message_areas.len() as i32));
+        }
+
+        Ok(VariableValue::new_int(-1))
+    }
+
+    fn set_field_value(&mut self, _vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()> {
+        if *name == *NAME {
+            self.name = val.as_string();
+            return Ok(());
+        }
+        if *name == *ISPUBLIC {
+            self.is_public = val.as_bool();
+            return Ok(());
+        }
+        Ok(())
+    }
+
+    fn call_function(&mut self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
+        if *name == *HAS_ACCESS {
+            let res = self.required_security.user_can_access(&vm.icy_board_state.session);
+            return Ok(VariableValue::new_bool(res));
+        }
+
+        if *name == *GET_FILE_AREA {
+            let area = vm.eval_expr(&arguments[0])?.as_int();
+            if let Some(res) = self.file_areas.get(area as usize) {
+                vm.user_data.push(Box::new((*res).clone()));
+                return Ok(VariableValue {
+                    data: VariableData::from_int(0),
+                    generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
+                    vtype: VariableType::UserData(FILE_AREA_ID as u8),
+                });
+            } else {
+                log::error!("PPL: File area not found ({})", area);
+            }
+        }
+
+        if *name == *GET_MSG_AREA {
+            let area = vm.eval_expr(&arguments[0])?.as_int();
+            if let Some(res) = self.message_areas.get(area as usize) {
+                vm.user_data.push(Box::new((*res).clone()));
+                return Ok(VariableValue {
+                    data: VariableData::from_int(0),
+                    generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
+                    vtype: VariableType::UserData(MESSAGE_AREA_ID as u8),
+                });
+            } else {
+                log::error!("PPL: Message area not found ({})", area);
+            }
+        }
+
+        Err("Function not found".into())
+    }
+    fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine, _name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<()> {
+        Err("Function not found".into())
+    }
 }

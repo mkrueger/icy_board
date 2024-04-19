@@ -5,8 +5,9 @@ use std::path::PathBuf;
 
 use crate::ast::constant::STACK_LIMIT;
 use crate::datetime::{IcbDate, IcbTime};
-use crate::executable::{PPEExpr, VariableData, VariableType, VariableValue};
+use crate::executable::{GenericVariableData, PPEExpr, VariableData, VariableType, VariableValue};
 use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_NUM, MASK_PATH, MASK_PWD};
+use crate::parser::CONFERENCE_ID;
 use crate::vm::VirtualMachine;
 use crate::Res;
 use codepages::tables::CP437_TO_UNICODE;
@@ -1469,6 +1470,22 @@ pub fn uselmrs(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> 
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
+pub fn new_confinfo(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
+    let conf_num = vm.eval_expr(&args[0])?.as_int() as usize;
+    if let Some(conference) = &vm.icy_board_state.board.lock().unwrap().conferences.get(conf_num) {
+        vm.user_data.push(Box::new((*conference).clone()));
+        Ok(VariableValue {
+            data: VariableData::from_int(0),
+            generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
+            vtype: VariableType::UserData(CONFERENCE_ID as u8),
+        })
+    } else {
+        log::error!("PPL: Can't get conference {} (CONFINFO)", conf_num);
+        Ok(VariableValue::new_string(String::new()))
+    }
+}
+
 pub fn confinfo(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     let conf_num = vm.eval_expr(&args[0])?.as_int() as usize;
     let conf_field = vm.eval_expr(&args[1])?.as_int();
