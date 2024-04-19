@@ -609,7 +609,7 @@ pub trait AstVisitorMut: Sized {
             },
             function.get_leftpar_token().clone(),
             function.get_parameters().iter().map(|arg| arg.visit_mut(self)).collect(),
-            function.rightpar_token.clone(),
+            function.get_rightpar_token().clone(),
             function.get_return_type_token().clone(),
             function.get_return_type(),
             function.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
