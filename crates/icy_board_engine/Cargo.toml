@@ -7,7 +7,6 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-icy_ppe = { workspace = true }
 icy_engine = { workspace = true }
 icy_net = { workspace = true }
 codepages = { workspace = true }

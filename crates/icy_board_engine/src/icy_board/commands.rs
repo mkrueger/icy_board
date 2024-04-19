@@ -1,4 +1,4 @@
-use icy_ppe::Res;
+use crate::Res;
 use serde::{Deserialize, Serialize};
 
 use super::{security::RequiredSecurity, IcyBoardSerializer, PCBoardRecordImporter};
@@ -250,7 +250,7 @@ impl PCBoardRecordImporter<Command> for CommandList {
     }
 
     fn load_pcboard_record(data: &[u8]) -> Res<Command> {
-        let name = icy_ppe::tables::import_cp437_string(&data[..15], true);
+        let name = crate::tables::import_cp437_string(&data[..15], true);
         let security = data[15];
 
         let uc = name.to_uppercase();
@@ -262,7 +262,7 @@ impl PCBoardRecordImporter<Command> for CommandList {
             CommandType::StuffText
         };
 
-        let parameter = icy_ppe::tables::import_cp437_string(&data[16..56], true);
+        let parameter = crate::tables::import_cp437_string(&data[16..56], true);
         Ok(Command {
             keyword: name,
             display: "".to_string(),

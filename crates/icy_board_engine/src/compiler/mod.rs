@@ -1,5 +1,6 @@
 pub use ast_transform::*;
 pub mod ast_transform;
+pub mod user_data;
 
 use std::{
     collections::HashMap,

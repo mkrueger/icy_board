@@ -3,7 +3,7 @@ use std::{
     path::PathBuf,
 };
 
-use icy_ppe::Res;
+use crate::Res;
 use serde::{Deserialize, Serialize};
 
 use super::{is_null_8, IcyBoardSerializer, PCBoardRecordImporter};
@@ -47,8 +47,8 @@ impl PCBoardRecordImporter<Survey> for SurveyList {
     }
 
     fn load_pcboard_record(data: &[u8]) -> Res<Survey> {
-        let question_file = PathBuf::from(icy_ppe::tables::import_cp437_string(&data[..Self::RECORD_SIZE / 2], true));
-        let answer_file = PathBuf::from(icy_ppe::tables::import_cp437_string(&data[Self::RECORD_SIZE / 2..], true));
+        let question_file = PathBuf::from(crate::tables::import_cp437_string(&data[..Self::RECORD_SIZE / 2], true));
+        let answer_file = PathBuf::from(crate::tables::import_cp437_string(&data[Self::RECORD_SIZE / 2..], true));
         Ok(Survey {
             question_file,
             answer_file,

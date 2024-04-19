@@ -65,7 +65,7 @@ impl VarHeader {
         buffer.extend(u16::to_le_bytes(self.matrix_size as u16));
         buffer.extend(u16::to_le_bytes(self.cube_size as u16));
 
-        buffer.push(self.variable_type as u8);
+        buffer.push(self.variable_type.into());
         buffer.push(self.flags);
         buffer
     }
@@ -245,7 +245,7 @@ impl TableEntry {
                 buffer.push(0);
                 buffer.push(0);
             }
-            buffer.push(self.header.variable_type as u8);
+            buffer.push(self.header.variable_type.into());
             buffer.push(0);
             unsafe {
                 self.value.data.function_value.append(&mut buffer);
@@ -283,7 +283,7 @@ impl TableEntry {
             }
 
             // variable type
-            buffer.push(self.header.variable_type as u8);
+            buffer.push(self.header.variable_type.into());
             buffer.push(0);
 
             buffer.extend_from_slice(&u64::to_le_bytes(self.value.get_u64_value()));

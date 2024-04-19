@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
 };
 
-use icy_ppe::{tables::export_cp437_string, Res};
+use crate::{tables::export_cp437_string, Res};
 use serde::{Deserialize, Serialize};
 
 use super::{is_false, security::RequiredSecurity, user_base::Password, IcyBoardError, IcyBoardSerializer, PCBoardRecordImporter};
@@ -123,11 +123,11 @@ impl PCBoardRecordImporter<FileArea> for FileAreaList {
     }
 
     fn load_pcboard_record(data: &[u8]) -> Res<FileArea> {
-        let file_base = PathBuf::from(icy_ppe::tables::import_cp437_string(&data[..Self::PATH_SIZE], true));
+        let file_base = PathBuf::from(crate::tables::import_cp437_string(&data[..Self::PATH_SIZE], true));
         let data = &data[Self::PATH_SIZE..];
-        let path = PathBuf::from(icy_ppe::tables::import_cp437_string(&data[..Self::PATH_SIZE], true));
+        let path = PathBuf::from(crate::tables::import_cp437_string(&data[..Self::PATH_SIZE], true));
         let data = &data[Self::PATH_SIZE..];
-        let name = icy_ppe::tables::import_cp437_string(&data[..Self::NAME_SIZE], true);
+        let name = crate::tables::import_cp437_string(&data[..Self::NAME_SIZE], true);
         let data = &data[Self::NAME_SIZE..];
 
         let (sort_order, sort_direction) = match data[0] {

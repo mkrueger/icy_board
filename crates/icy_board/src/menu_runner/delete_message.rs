@@ -1,9 +1,9 @@
 use super::{PcbBoardCommand, MASK_COMMAND};
+use crate::Res;
 use icy_board_engine::{
     icy_board::{commands::Command, icb_text::IceText, message_areas::MessageAreaList, state::functions::display_flags, IcyBoardSerializer},
     vm::TerminalTarget,
 };
-use icy_ppe::Res;
 use jamjam::jam::JamMessageBase;
 
 impl PcbBoardCommand {

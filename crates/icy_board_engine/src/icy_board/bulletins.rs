@@ -3,7 +3,7 @@ use std::{
     path::PathBuf,
 };
 
-use icy_ppe::{tables::import_cp437_string, Res};
+use crate::{tables::import_cp437_string, Res};
 use serde::{Deserialize, Serialize};
 
 use super::{is_null_8, IcyBoardSerializer, PCBoardRecordImporter};

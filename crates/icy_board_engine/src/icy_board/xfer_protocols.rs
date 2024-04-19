@@ -3,7 +3,7 @@ use std::path::Path;
 
 use super::IcyBoardSerializer;
 use super::{is_false, is_true, set_true, PCBoardImport, PCBoardTextImport};
-use icy_ppe::Res;
+use crate::Res;
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Clone)]

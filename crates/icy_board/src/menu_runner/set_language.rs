@@ -1,8 +1,8 @@
+use crate::Res;
 use icy_board_engine::{
     icy_board::{commands::Command, icb_config::IcbColor, icb_text::IceText, state::functions::display_flags, IcyBoardError},
     vm::TerminalTarget,
 };
-use icy_ppe::Res;
 
 use super::{PcbBoardCommand, MASK_NUMBER};
 

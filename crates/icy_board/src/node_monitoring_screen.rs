@@ -3,6 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::Res;
 use chrono::{Local, Timelike};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use icy_board_engine::icy_board::IcyBoard;
@@ -10,7 +11,6 @@ use icy_board_tui::{
     get_text,
     theme::{DOS_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_YELLOW},
 };
-use icy_ppe::Res;
 use ratatui::{
     prelude::*,
     widgets::{block::Title, *},

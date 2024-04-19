@@ -3,8 +3,8 @@ use std::{
     io::{BufRead, BufReader},
 };
 
+use crate::{parser::Encoding, Res};
 use codepages::tables::{CP437_TO_UNICODE, UNICODE_TO_CP437};
-use icy_ppe::{parser::Encoding, Res};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PcbSysopInfo {

@@ -1,10 +1,10 @@
 use std::{
     fs,
-    io::Write,
     path::{Path, PathBuf},
 };
 
-use icy_ppe::Res;
+use crate::Res;
+use codepages::tables::write_with_bom;
 use qfile::{QFilePath, QTraitSync};
 use relative_path::RelativePath;
 use thiserror::Error;
@@ -273,7 +273,7 @@ impl IcyBoard {
         pcb_dat.path.group_chat = self.resolve_file(&self.config.paths.group_chat);
         pcb_dat.path.no_ansi = self.resolve_file(&self.config.paths.no_ansi);
 
-        let res = pcb_dat.serialize(icy_ppe::parser::Encoding::CP437);
+        let res = pcb_dat.serialize(crate::parser::Encoding::CP437);
         fs::write(file, res)?;
 
         Ok(())
@@ -464,23 +464,12 @@ pub fn read_with_encoding_detection<P: AsRef<Path>>(path: &P) -> Res<String> {
             let import = if data.starts_with(&UTF8_BOM) {
                 String::from_utf8_lossy(&data[UTF8_BOM.len()..]).to_string()
             } else {
-                icy_ppe::tables::import_cp437_string(&data, false)
+                crate::tables::import_cp437_string(&data, false)
             };
             Ok(import)
         }
         Err(e) => Err(IcyBoardError::FileError(path.as_ref().to_path_buf(), e.to_string()).into()),
     }
-}
-
-pub fn write_with_bom<P: AsRef<Path>>(path: &P, buf: &str) -> Res<()> {
-    match fs::File::create(path) {
-        Ok(mut file) => {
-            file.write_all(&UTF8_BOM)?;
-            file.write_all(buf.as_bytes())?;
-        }
-        Err(e) => return Err(IcyBoardError::ErrorCreatingFile(path.as_ref().to_string_lossy().to_string(), e.to_string()).into()),
-    }
-    Ok(())
 }
 
 pub fn convert_to_utf8<P: AsRef<Path>, Q: AsRef<Path>>(from: &P, to: &Q) -> Res<()> {

@@ -14,6 +14,7 @@ use crossterm::{
     ExecutableCommand,
 };
 
+use crate::Res;
 use icy_board_engine::{
     icy_board::{
         state::{IcyBoardState, NodeState, Session},
@@ -27,7 +28,6 @@ use icy_board_tui::{
 };
 use icy_engine::{ansi, TextPane};
 use icy_net::{channel::ChannelConnection, ConnectionType};
-use icy_ppe::Res;
 use ratatui::{
     prelude::*,
     widgets::{canvas::Canvas, Paragraph},

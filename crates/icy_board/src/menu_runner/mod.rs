@@ -1,5 +1,6 @@
 use std::fs;
 
+use crate::Res;
 use icy_board_engine::{
     icy_board::{
         commands::{Command, CommandType},
@@ -11,7 +12,6 @@ use icy_board_engine::{
     },
     vm::TerminalTarget,
 };
-use icy_ppe::Res;
 use jamjam::jam::{JamMessage, JamMessageBase};
 mod comment_to_sysop;
 mod delete_message;

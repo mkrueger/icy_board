@@ -6,7 +6,7 @@ use std::{
     time::SystemTime,
 };
 
-use icy_ppe::Res;
+use crate::Res;
 
 use crate::vm::VMError;
 

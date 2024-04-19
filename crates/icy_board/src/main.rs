@@ -14,8 +14,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, Clear, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use icy_board_engine::icy_board::IcyBoard;
-use icy_ppe::Res;
+use icy_board_engine::{icy_board::IcyBoard, Res};
 use import::{
     console_logger::{print_error, ConsoleLogger},
     PCBoardImporter,

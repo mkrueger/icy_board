@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use icy_ppe::{
+use crate::{
     datetime::{IcbDate, IcbTime},
     tables::import_cp437_string,
     Res,

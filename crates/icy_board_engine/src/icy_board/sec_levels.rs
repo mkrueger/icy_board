@@ -1,6 +1,6 @@
 use super::IcyBoardSerializer;
 use super::{is_false, is_null_32, is_null_64, is_null_8, PCBoardImport, PCBoardTextImport};
-use icy_ppe::Res;
+use crate::Res;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 

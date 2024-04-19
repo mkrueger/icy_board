@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use icy_ppe::Res;
+use crate::Res;
 use qfile::{QFilePath, QTraitSync};
 
 use self::{

@@ -544,7 +544,7 @@ impl SemanticVisitor {
             self.label_count
         };
 
-        self.add_reference(ReferenceType::Label(idx), VariableType::Unknown, label_token);
+        self.add_reference(ReferenceType::Label(idx), VariableType::UserData(255), label_token);
     }
 
     fn set_label_declaration(&mut self, label_token: &Spanned<Token>) {
@@ -585,7 +585,7 @@ impl SemanticVisitor {
         self.references.push((
             reftype,
             References {
-                variable_type: VariableType::Unknown,
+                variable_type: VariableType::Integer,
                 implementation: None,
                 header: None,
                 return_types: vec![],
@@ -914,7 +914,7 @@ impl AstVisitor<()> for SemanticVisitor {
         let mut found = false;
         let arg_count = 0;
         if let Some(idx) = self.lookup_variable(indexer.get_identifier()) {
-            let (rt, r) = &mut self.references[idx];
+            let (rt, _r) = &mut self.references[idx];
             if matches!(rt, ReferenceType::Function(_)) || matches!(rt, ReferenceType::Variable(_)) {
                 self.errors.lock().unwrap().report_error(
                     indexer.get_identifier_token().span.clone(),

@@ -1,3 +1,4 @@
+use crate::Res;
 use icy_board_engine::{
     icy_board::{
         commands::Command,
@@ -8,7 +9,6 @@ use icy_board_engine::{
     },
     vm::TerminalTarget,
 };
-use icy_ppe::Res;
 use jamjam::jam::{msg_header::JamMessageHeader, JamMessageBase};
 
 use super::{PcbBoardCommand, MASK_COMMAND};

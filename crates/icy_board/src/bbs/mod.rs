@@ -6,6 +6,7 @@ use std::{
     vec,
 };
 
+use crate::Res;
 use icy_board_engine::{
     icy_board::{
         state::{IcyBoardState, NodeState},
@@ -14,7 +15,6 @@ use icy_board_engine::{
     vm::TerminalTarget,
 };
 use icy_net::{telnet::TelnetConnection, Connection, ConnectionType};
-use icy_ppe::Res;
 
 use crate::menu_runner::PcbBoardCommand;
 

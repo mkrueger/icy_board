@@ -3,7 +3,6 @@ resolver = "2"
 members = [
 	"crates/icy_board", 
 	"crates/icy_board_engine", 
-	"crates/icy_ppe", 
 	"crates/jamjam",
 	"crates/dizbase",
 	"crates/codepages",
@@ -16,7 +15,8 @@ members = [
 	"crates/icy_board_tui",
 	"crates/mkicbmnu",
 	"crates/icy_net",
-	"crates/mkicbtxt", "crates/icbsetup", 
+	"crates/mkicbtxt", 
+	"crates/icbsetup", 
 ]
 [workspace.package]
 version = "0.1.0"
@@ -30,7 +30,6 @@ jamjam = { path = "crates/jamjam" }
 icy_board_tui = { path = "crates/icy_board_tui" }
 
 icy_net = { path = "crates/icy_net" }
-icy_ppe = { path = "crates/icy_ppe" }
 icy_board_engine = { path = "crates/icy_board_engine" }
 icy_engine = { git ="https://github.com/mkrueger/icy_tools" }
 

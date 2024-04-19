@@ -3,14 +3,14 @@
 use std::fs;
 use std::path::PathBuf;
 
+use crate::ast::constant::STACK_LIMIT;
+use crate::datetime::{IcbDate, IcbTime};
+use crate::executable::{PPEExpr, VariableData, VariableType, VariableValue};
 use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_NUM, MASK_PATH, MASK_PWD};
 use crate::vm::VirtualMachine;
+use crate::Res;
 use codepages::tables::CP437_TO_UNICODE;
 use icy_engine::update_crc32;
-use icy_ppe::ast::constant::STACK_LIMIT;
-use icy_ppe::datetime::{IcbDate, IcbTime};
-use icy_ppe::executable::{PPEExpr, VariableData, VariableType, VariableValue};
-use icy_ppe::Res;
 use radix_fmt::radix;
 use rand::Rng; // 0.8.5
 use substring::Substring;

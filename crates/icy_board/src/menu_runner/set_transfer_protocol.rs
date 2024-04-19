@@ -1,3 +1,4 @@
+use crate::Res;
 use icy_board_engine::{
     icy_board::{
         commands::Command,
@@ -7,7 +8,6 @@ use icy_board_engine::{
     },
     vm::TerminalTarget,
 };
-use icy_ppe::Res;
 
 use super::PcbBoardCommand;
 

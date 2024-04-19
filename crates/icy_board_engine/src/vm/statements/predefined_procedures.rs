@@ -1,10 +1,10 @@
 use std::{fs, thread, time::Duration};
 
-use codepages::tables::CP437_TO_UNICODE;
-use icy_ppe::{
+use crate::{
     executable::{PPEExpr, VariableType, VariableValue},
     Res,
 };
+use codepages::tables::CP437_TO_UNICODE;
 
 use crate::{
     icy_board::icb_text::IceText,

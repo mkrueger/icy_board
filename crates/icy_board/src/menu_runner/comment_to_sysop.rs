@@ -2,6 +2,7 @@ use crate::mods::editor::{EditResult, EditState};
 
 use super::PcbBoardCommand;
 
+use crate::Res;
 use bstr::BString;
 use chrono::Utc;
 use icy_board_engine::icy_board::{
@@ -10,7 +11,6 @@ use icy_board_engine::icy_board::{
     state::{functions::display_flags, UserActivity},
 };
 use icy_engine::Position;
-use icy_ppe::Res;
 use jamjam::jam::JamMessage;
 
 impl PcbBoardCommand {

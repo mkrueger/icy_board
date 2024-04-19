@@ -5,7 +5,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use icy_ppe::{
+use crate::{
     compiler::PPECompiler,
     executable::{Executable, LAST_PPLC},
     parser::{parse_ast, Encoding},

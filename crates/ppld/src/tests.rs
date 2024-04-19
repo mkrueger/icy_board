@@ -1,6 +1,6 @@
 use std::env;
 
-use icy_ppe::{
+use icy_board_engine::{
     ast::{output_visitor, OutputFunc},
     executable::Executable,
 };

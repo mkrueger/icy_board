@@ -1,4 +1,4 @@
-use icy_ppe::executable::VariableType;
+use crate::executable::VariableType;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

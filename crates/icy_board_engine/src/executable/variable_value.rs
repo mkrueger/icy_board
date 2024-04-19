@@ -10,60 +10,92 @@ use crate::{
     executable::{FunctionValue, ProcedureValue},
 };
 
-#[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Debug, Default, Eq, Hash)]
 #[allow(dead_code)]
 pub enum VariableType {
     /// unsigned character (1 byte) 0 = FALSE, non-0 = TRUE
-    Boolean = 0,
+    Boolean,
 
     /// 4-byte unsigned integer Range: 0 - 4,294,967,295
-    Unsigned = 1,
+    Unsigned,
 
     /// unsigned integer (2 bytes) `PCBoard` julian date (count of days since 1/1/1900)
-    Date = 2,
+    Date,
 
     /// Julian date in earth date format Deals with dates formatted YYMM.DD Range: Same as DATE
-    EDate = 3,
+    EDate,
 
     /// signed long integer (4 bytes) Range: -2,147,483,648 → +2,147,483,647
     #[default]
-    Integer = 4,
+    Integer,
     /// signed long integer (4 bytes) Range: -$21,474,836.48 → +$21,474,836.47
-    Money = 5,
+    Money,
     ///  4-byte floating point number Range: +/-3.4E-38 - +/-3.4E+38 (7-digit precision)
-    Float = 6,
+    Float,
     /// far character pointer (4 bytes) NULL is an empty string non-NULL points to a string of some length less than or equal to 256
-    String = 7,
+    String,
 
     /// signed long integer (4 bytes) Count of seconds since midnight
-    Time = 8,
+    Time,
 
     /// 1-byte unsigned integer Range: 0 - 255
-    Byte = 9,
+    Byte,
     /// 2-byte unsigned integer Range: 0 - 65,535
-    Word = 10,
+    Word,
     /// 1-byte signed Integer Range: -128 - 127
-    SByte = 11,
+    SByte,
     /// 2-byte signed integer Range: -32,768 - 32,767
-    SWord = 12,
+    SWord,
 
     /// Allows up to 2048 characters per big string (up from 256 for STRING variables) May include CHR(0) characters in the middle of the big string (unlike STRING variables which may not)
-    BigStr = 13,
+    BigStr,
     /// 8-byte floating point number Range: +/-1.7E-308 - +/-1.7E+308 (15-digit precision)
-    Double = 14,
+    Double,
 
-    Function = 15,
-    Procedure = 16,
+    Function,
+    Procedure,
 
     /// Signed long integer for julian date. DDATE is for use with `DBase` date fields.
     /// It holds a long integer for julian dates.
     /// When coerced to string type it is in the format CCYYMMDD or 19940527
-    DDate = 17,
+    DDate,
 
-    Table = 18,
+    Table,
 
-    Unknown = 255,
+    UserData(u8),
+}
+
+impl From<u8> for VariableType {
+    fn from(b: u8) -> Self {
+        VariableType::from_byte(b)
+    }
+}
+
+impl From<VariableType> for u8 {
+    fn from(b: VariableType) -> u8 {
+        match b {
+            VariableType::Boolean => 0,
+            VariableType::Unsigned => 1,
+            VariableType::Date => 2,
+            VariableType::EDate => 3,
+            VariableType::Integer => 4,
+            VariableType::Money => 5,
+            VariableType::Float => 6,
+            VariableType::String => 7,
+            VariableType::Time => 8,
+            VariableType::Byte => 9,
+            VariableType::Word => 10,
+            VariableType::SByte => 11,
+            VariableType::SWord => 12,
+            VariableType::BigStr => 13,
+            VariableType::Double => 14,
+            VariableType::Function => 15,
+            VariableType::Procedure => 16,
+            VariableType::DDate => 17,
+            VariableType::Table => 18,
+            VariableType::UserData(b) => b,
+        }
+    }
 }
 
 impl VariableType {
@@ -95,10 +127,7 @@ impl VariableType {
             16 => VariableType::Procedure,
             17 => VariableType::DDate,
             18 => VariableType::Table,
-            _ => {
-                log::warn!("Invalid variable type: {}", b);
-                VariableType::Integer
-            }
+            _ => VariableType::UserData(b),
         }
     }
 }
@@ -125,7 +154,7 @@ impl fmt::Display for VariableType {
             VariableType::Procedure => write!(f, "PROC"),    // 2*u8
             VariableType::DDate => write!(f, "DDate"),       // i32
             VariableType::Table => write!(f, "Table"),       // Generic key-value table
-            VariableType::Unknown => write!(f, "Unknown"),
+            VariableType::UserData(u) => write!(f, "UserData({})", u),
         }
     }
 }
@@ -1175,7 +1204,7 @@ impl VariableValue {
             VariableType::Table => {
                 panic!("Not supported for tables.")
             }
-            VariableType::Function | VariableType::Procedure | VariableType::Unknown => {
+            VariableType::Function | VariableType::Procedure | VariableType::UserData(_) => {
                 panic!("Unknown variable type")
             }
         }

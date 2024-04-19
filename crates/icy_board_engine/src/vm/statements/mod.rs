@@ -2,7 +2,7 @@
 #[allow(clippy::missing_errors_doc)]
 #[allow(clippy::missing_panics_doc)]
 pub mod predefined_procedures;
-use icy_ppe::{executable::PPEExpr, Res};
+use crate::{executable::PPEExpr, Res};
 pub use predefined_procedures::*;
 
 type PredefProc = fn(vm: &mut crate::vm::VirtualMachine, arguments: &[PPEExpr]) -> Res<()>;

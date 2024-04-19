@@ -1,8 +1,8 @@
-use icy_ppe::{
+use icy_board_engine::{
     ast::{
         walk_binary_expression, walk_block_stmt, walk_for_stmt, walk_function_call_expression, walk_function_implementation, walk_if_stmt, walk_if_then_stmt,
         walk_let_stmt, walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation, walk_repeat_until_stmt, walk_select_stmt,
-        walk_while_do_stmt, walk_while_stmt, Ast, AstVisitor, Constant, ParameterSpecifier,
+        walk_while_do_stmt, walk_while_stmt, Ast, AstVisitor, Constant, ConstantExpression, IdentifierExpression, ParameterSpecifier,
     },
     parser::lexer::{Spanned, Token},
 };
@@ -53,9 +53,9 @@ impl SemanticTokenVisitor {
 }
 
 impl AstVisitor<()> for SemanticTokenVisitor {
-    fn visit_identifier_expression(&mut self, _identifier: &icy_ppe::ast::IdentifierExpression) {}
+    fn visit_identifier_expression(&mut self, _identifier: &IdentifierExpression) {}
 
-    fn visit_constant_expression(&mut self, const_expr: &icy_ppe::ast::ConstantExpression) {
+    fn visit_constant_expression(&mut self, const_expr: &ConstantExpression) {
         match const_expr.get_constant_value() {
             Constant::String(_) => {
                 self.highlight_token(const_expr.get_constant_token(), SemanticTokenType::STRING);
@@ -70,40 +70,40 @@ impl AstVisitor<()> for SemanticTokenVisitor {
         }
     }
 
-    fn visit_binary_expression(&mut self, binary: &icy_ppe::ast::BinaryExpression) {
+    fn visit_binary_expression(&mut self, binary: &icy_board_engine::ast::BinaryExpression) {
         walk_binary_expression(self, binary);
     }
 
-    fn visit_unary_expression(&mut self, unary: &icy_ppe::ast::UnaryExpression) {
+    fn visit_unary_expression(&mut self, unary: &icy_board_engine::ast::UnaryExpression) {
         unary.get_expression().visit(self)
     }
 
-    fn visit_function_call_expression(&mut self, call: &icy_ppe::ast::FunctionCallExpression) {
+    fn visit_function_call_expression(&mut self, call: &icy_board_engine::ast::FunctionCallExpression) {
         walk_function_call_expression(self, call);
     }
 
-    fn visit_parens_expression(&mut self, parens: &icy_ppe::ast::ParensExpression) {
+    fn visit_parens_expression(&mut self, parens: &icy_board_engine::ast::ParensExpression) {
         parens.get_expression().visit(self)
     }
 
-    fn visit_comment(&mut self, comment: &icy_ppe::ast::CommentAstNode) {
+    fn visit_comment(&mut self, comment: &icy_board_engine::ast::CommentAstNode) {
         self.highlight_token(comment.get_comment_token(), SemanticTokenType::COMMENT);
     }
 
-    fn visit_block_statement(&mut self, block: &icy_ppe::ast::BlockStatement) {
+    fn visit_block_statement(&mut self, block: &icy_board_engine::ast::BlockStatement) {
         self.highlight_token(block.get_begin_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(block.get_end_token(), SemanticTokenType::KEYWORD);
 
         walk_block_stmt(self, block);
     }
 
-    fn visit_if_statement(&mut self, if_stmt: &icy_ppe::ast::IfStatement) {
+    fn visit_if_statement(&mut self, if_stmt: &icy_board_engine::ast::IfStatement) {
         self.highlight_token(if_stmt.get_if_token(), SemanticTokenType::KEYWORD);
 
         walk_if_stmt(self, if_stmt);
     }
 
-    fn visit_if_then_statement(&mut self, if_then: &icy_ppe::ast::IfThenStatement) {
+    fn visit_if_then_statement(&mut self, if_then: &icy_board_engine::ast::IfThenStatement) {
         self.highlight_token(if_then.get_if_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(if_then.get_then_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(if_then.get_endif_token(), SemanticTokenType::KEYWORD);
@@ -116,55 +116,55 @@ impl AstVisitor<()> for SemanticTokenVisitor {
         walk_if_then_stmt(self, if_then);
     }
 
-    fn visit_gosub_statement(&mut self, gosub: &icy_ppe::ast::GosubStatement) {
+    fn visit_gosub_statement(&mut self, gosub: &icy_board_engine::ast::GosubStatement) {
         self.highlight_token(gosub.get_gosub_token(), SemanticTokenType::KEYWORD);
     }
 
-    fn visit_return_statement(&mut self, return_stmt: &icy_ppe::ast::ReturnStatement) {
+    fn visit_return_statement(&mut self, return_stmt: &icy_board_engine::ast::ReturnStatement) {
         self.highlight_token(return_stmt.get_return_token(), SemanticTokenType::KEYWORD);
     }
 
-    fn visit_let_statement(&mut self, let_stmt: &icy_ppe::ast::LetStatement) {
+    fn visit_let_statement(&mut self, let_stmt: &icy_board_engine::ast::LetStatement) {
         if let Some(let_token) = let_stmt.get_let_token() {
             self.highlight_token(let_token, SemanticTokenType::KEYWORD);
         }
         walk_let_stmt(self, let_stmt);
     }
 
-    fn visit_goto_statement(&mut self, goto: &icy_ppe::ast::GotoStatement) {
+    fn visit_goto_statement(&mut self, goto: &icy_board_engine::ast::GotoStatement) {
         self.highlight_token(goto.get_goto_token(), SemanticTokenType::KEYWORD);
     }
 
-    fn visit_label_statement(&mut self, _label: &icy_ppe::ast::LabelStatement) {}
+    fn visit_label_statement(&mut self, _label: &icy_board_engine::ast::LabelStatement) {}
 
-    fn visit_procedure_call_statement(&mut self, call: &icy_ppe::ast::ProcedureCallStatement) {
+    fn visit_procedure_call_statement(&mut self, call: &icy_board_engine::ast::ProcedureCallStatement) {
         walk_procedure_call_statement(self, call);
     }
 
-    fn visit_predefined_call_statement(&mut self, call: &icy_ppe::ast::PredefinedCallStatement) {
+    fn visit_predefined_call_statement(&mut self, call: &icy_board_engine::ast::PredefinedCallStatement) {
         self.highlight_token(call.get_identifier_token(), SemanticTokenType::FUNCTION);
 
         walk_predefined_call_statement(self, call);
     }
 
-    fn visit_variable_declaration_statement(&mut self, var_decl: &icy_ppe::ast::VariableDeclarationStatement) {
+    fn visit_variable_declaration_statement(&mut self, var_decl: &icy_board_engine::ast::VariableDeclarationStatement) {
         self.highlight_token(var_decl.get_type_token(), SemanticTokenType::TYPE);
     }
 
-    fn visit_procedure_declaration(&mut self, proc_decl: &icy_ppe::ast::ProcedureDeclarationAstNode) {
+    fn visit_procedure_declaration(&mut self, proc_decl: &icy_board_engine::ast::ProcedureDeclarationAstNode) {
         self.highlight_token(proc_decl.get_declare_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(proc_decl.get_procedure_token(), SemanticTokenType::KEYWORD);
         self.higlight_parameters(proc_decl.get_parameters());
     }
 
-    fn visit_function_declaration(&mut self, func_decl: &icy_ppe::ast::FunctionDeclarationAstNode) {
+    fn visit_function_declaration(&mut self, func_decl: &icy_board_engine::ast::FunctionDeclarationAstNode) {
         self.highlight_token(func_decl.get_declare_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(func_decl.get_function_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(func_decl.get_return_type_token(), SemanticTokenType::TYPE);
         self.higlight_parameters(func_decl.get_parameters());
     }
 
-    fn visit_function_implementation(&mut self, function: &icy_ppe::ast::FunctionImplementation) {
+    fn visit_function_implementation(&mut self, function: &icy_board_engine::ast::FunctionImplementation) {
         self.highlight_token(function.get_endfunc_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(function.get_function_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(function.get_return_type_token(), SemanticTokenType::TYPE);
@@ -172,14 +172,14 @@ impl AstVisitor<()> for SemanticTokenVisitor {
         walk_function_implementation(self, function);
     }
 
-    fn visit_procedure_implementation(&mut self, procedure: &icy_ppe::ast::ProcedureImplementation) {
+    fn visit_procedure_implementation(&mut self, procedure: &icy_board_engine::ast::ProcedureImplementation) {
         self.highlight_token(procedure.get_endproc_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(procedure.get_procedure_token(), SemanticTokenType::KEYWORD);
         self.higlight_parameters(procedure.get_parameters());
         walk_procedure_implementation(self, procedure);
     }
 
-    fn visit_select_statement(&mut self, select_stmt: &icy_ppe::ast::SelectStatement) {
+    fn visit_select_statement(&mut self, select_stmt: &icy_board_engine::ast::SelectStatement) {
         self.highlight_token(select_stmt.get_select_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(select_stmt.get_case_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(select_stmt.get_endselect_token(), SemanticTokenType::KEYWORD);
@@ -193,26 +193,26 @@ impl AstVisitor<()> for SemanticTokenVisitor {
         walk_select_stmt(self, select_stmt);
     }
 
-    fn visit_while_statement(&mut self, while_stmt: &icy_ppe::ast::WhileStatement) {
+    fn visit_while_statement(&mut self, while_stmt: &icy_board_engine::ast::WhileStatement) {
         self.highlight_token(while_stmt.get_while_token(), SemanticTokenType::KEYWORD);
 
         walk_while_stmt(self, while_stmt);
     }
 
-    fn visit_while_do_statement(&mut self, while_do: &icy_ppe::ast::WhileDoStatement) {
+    fn visit_while_do_statement(&mut self, while_do: &icy_board_engine::ast::WhileDoStatement) {
         self.highlight_token(while_do.get_while_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(while_do.get_do_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(while_do.get_endwhile_token(), SemanticTokenType::KEYWORD);
         walk_while_do_stmt(self, while_do);
     }
 
-    fn visit_repeat_until_statement(&mut self, repeat_until_stmt: &icy_ppe::ast::RepeatUntilStatement) {
+    fn visit_repeat_until_statement(&mut self, repeat_until_stmt: &icy_board_engine::ast::RepeatUntilStatement) {
         self.highlight_token(repeat_until_stmt.get_repeat_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(repeat_until_stmt.get_until_token(), SemanticTokenType::KEYWORD);
         walk_repeat_until_stmt(self, repeat_until_stmt);
     }
 
-    fn visit_for_statement(&mut self, for_stmt: &icy_ppe::ast::ForStatement) {
+    fn visit_for_statement(&mut self, for_stmt: &icy_board_engine::ast::ForStatement) {
         self.highlight_token(for_stmt.get_for_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(for_stmt.get_to_token(), SemanticTokenType::KEYWORD);
         if let Some(step) = for_stmt.get_step_token() {
@@ -223,11 +223,11 @@ impl AstVisitor<()> for SemanticTokenVisitor {
         walk_for_stmt(self, for_stmt);
     }
 
-    fn visit_break_statement(&mut self, break_stmt: &icy_ppe::ast::BreakStatement) {
+    fn visit_break_statement(&mut self, break_stmt: &icy_board_engine::ast::BreakStatement) {
         self.highlight_token(break_stmt.get_break_token(), SemanticTokenType::KEYWORD);
     }
 
-    fn visit_continue_statement(&mut self, continue_stmt: &icy_ppe::ast::ContinueStatement) {
+    fn visit_continue_statement(&mut self, continue_stmt: &icy_board_engine::ast::ContinueStatement) {
         self.highlight_token(continue_stmt.get_continue_token(), SemanticTokenType::KEYWORD);
     }
 }

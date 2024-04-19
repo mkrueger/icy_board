@@ -1,6 +1,6 @@
 use ariadne::{Label, Report, ReportKind, Source};
 use clap::Parser;
-use icy_ppe::{
+use icy_board_engine::{
     compiler::PPECompiler,
     parser::{load_with_encoding, parse_ast, Encoding},
     semantic::SemanticVisitor,
@@ -145,7 +145,7 @@ fn main() {
                         println!();
                         executable.print_variable_table();
                         println!();
-                        let mut visitor = icy_ppe::executable::disassembler::DisassembleVisitor::new(&executable);
+                        let mut visitor = icy_board_engine::executable::disassembler::DisassembleVisitor::new(&executable);
                         visitor.generate_statement_data = true;
                         compiler.get_script().visit(&mut visitor);
                         println!();

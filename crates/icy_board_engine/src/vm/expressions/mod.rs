@@ -2,7 +2,7 @@
 #[allow(clippy::missing_errors_doc)]
 #[allow(clippy::missing_panics_doc)]
 pub mod predefined_functions;
-use icy_ppe::{
+use crate::{
     executable::{PPEExpr, VariableValue},
     Res,
 };

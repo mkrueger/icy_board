@@ -1,3 +1,4 @@
+use crate::Res;
 use chrono::Local;
 use icy_board_engine::{
     icy_board::{
@@ -12,7 +13,6 @@ use icy_board_engine::{
     vm::TerminalTarget,
 };
 use icy_engine::Position;
-use icy_ppe::Res;
 
 use crate::menu_runner::MASK_COMMAND;
 

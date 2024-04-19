@@ -3,10 +3,10 @@ use std::path::PathBuf;
 
 use dashmap::DashMap;
 use i18n_embed_fl::fl;
-use icy_ppe::ast::{walk_function_declaration, walk_function_implementation, Ast, AstVisitor};
-use icy_ppe::executable::{OpCode, VariableType, LAST_PPLC};
-use icy_ppe::parser::{parse_ast, Encoding};
-use icy_ppe::semantic::SemanticVisitor;
+use icy_board_engine::ast::{walk_function_declaration, walk_function_implementation, Ast, AstVisitor};
+use icy_board_engine::executable::{OpCode, VariableType, LAST_PPLC};
+use icy_board_engine::parser::{parse_ast, Encoding};
+use icy_board_engine::semantic::SemanticVisitor;
 use ppl_language_server::completion::get_completion;
 use ppl_language_server::jump_definition::get_definition;
 use ppl_language_server::reference::get_reference;
@@ -423,26 +423,26 @@ struct TooltipVisitor {
 }
 
 impl AstVisitor<()> for TooltipVisitor {
-    fn visit_variable_declaration_statement(&mut self, var_decl: &icy_ppe::ast::VariableDeclarationStatement) {
+    fn visit_variable_declaration_statement(&mut self, var_decl: &icy_board_engine::ast::VariableDeclarationStatement) {
         if var_decl.get_type_token().span.contains(&self.offset) {
             self.tooltip = get_type_hover(var_decl.get_variable_type());
         }
     }
 
-    fn visit_parameter_specifier(&mut self, param: &icy_ppe::ast::ParameterSpecifier) {
+    fn visit_parameter_specifier(&mut self, param: &icy_board_engine::ast::ParameterSpecifier) {
         if param.get_type_token().span.contains(&self.offset) {
             self.tooltip = get_type_hover(param.get_variable_type());
         }
     }
 
-    fn visit_function_declaration(&mut self, func_decl: &icy_ppe::ast::FunctionDeclarationAstNode) {
+    fn visit_function_declaration(&mut self, func_decl: &icy_board_engine::ast::FunctionDeclarationAstNode) {
         if func_decl.get_return_type_token().span.contains(&self.offset) {
             self.tooltip = get_type_hover(func_decl.get_return_type());
         }
         walk_function_declaration(self, func_decl);
     }
 
-    fn visit_function_implementation(&mut self, function: &icy_ppe::ast::FunctionImplementation) {
+    fn visit_function_implementation(&mut self, function: &icy_board_engine::ast::FunctionImplementation) {
         if function.get_return_type_token().span.contains(&self.offset) {
             self.tooltip = get_type_hover(function.get_return_type());
         }
@@ -450,7 +450,7 @@ impl AstVisitor<()> for TooltipVisitor {
         walk_function_implementation(self, function);
     }
 
-    fn visit_predefined_call_statement(&mut self, call: &icy_ppe::ast::PredefinedCallStatement) {
+    fn visit_predefined_call_statement(&mut self, call: &icy_board_engine::ast::PredefinedCallStatement) {
         if call.get_identifier_token().span.contains(&self.offset) {
             self.tooltip = get_statement_hover(call.get_func().opcode);
         }

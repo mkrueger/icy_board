@@ -1,5 +1,6 @@
 use std::{ffi::OsString, path::PathBuf};
 
+use crate::Res;
 use dizbase::file_base::{file_header::FileHeader, metadata::MetadaType, FileBase};
 use humanize_bytes::humanize_bytes_decimal;
 use icy_board_engine::{
@@ -14,7 +15,6 @@ use icy_board_engine::{
     },
     vm::TerminalTarget,
 };
-use icy_ppe::Res;
 
 use super::{PcbBoardCommand, MASK_COMMAND};
 

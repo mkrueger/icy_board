@@ -15,7 +15,7 @@ use crossterm::ExecutableCommand;
 use icy_board_engine::icy_board::state::IcyBoardState;
 use icy_board_engine::vm::run;
 use icy_board_engine::vm::DiskIO;
-use icy_ppe::executable::Executable;*/
+use crate::executable::Executable;*/
 use semver::Version; /*
                      use std::ffi::OsStr;
                      use std::io::stdout;

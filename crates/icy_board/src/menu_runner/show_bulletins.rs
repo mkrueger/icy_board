@@ -1,10 +1,10 @@
+use crate::Res;
 use icy_board_engine::icy_board::{
     bulletins::MASK_BULLETINS,
     commands::Command,
     icb_text::IceText,
     state::{functions::display_flags, UserActivity},
 };
-use icy_ppe::Res;
 
 use super::PcbBoardCommand;
 

@@ -1,7 +1,7 @@
 use std::path::Path;
 
+use crate::{tables::import_cp437_string, Res};
 use chrono::Utc;
-use icy_ppe::{tables::import_cp437_string, Res};
 use serde::{Deserialize, Serialize};
 
 use super::{IcyBoardSerializer, PCBoardBinImporter, PCBoardImport};

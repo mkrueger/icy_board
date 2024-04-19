@@ -6,7 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-icy_ppe = { workspace = true}
 icy_board_engine = { workspace = true}
 icy_board_tui = { workspace = true}
 jamjam = { workspace = true}

@@ -1,10 +1,9 @@
-use icy_ppe::{
-    ast::{walk_predefined_call_statement, Ast, AstVisitor},
+use icy_board_engine::{
+    ast::{walk_predefined_call_statement, Ast, AstVisitor, IdentifierExpression, PredefinedCallStatement},
     executable::{StatementSignature, FUNCTION_DEFINITIONS, STATEMENT_DEFINITIONS},
+    semantic::{ReferenceType, SemanticVisitor},
 };
 use tower_lsp::lsp_types::CompletionItem;
-
-use icy_ppe::semantic::{self, SemanticVisitor};
 
 pub enum ImCompleteCompletionItem {
     Variable(String),
@@ -78,7 +77,7 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
         }
 
         for (rt, r) in semantic_visitor.references {
-            if matches!(rt, semantic::ReferenceType::Procedure(_)) {
+            if matches!(rt, ReferenceType::Procedure(_)) {
                 if let Some(decl) = &r.declaration {
                     map.items.push(CompletionItem {
                         label: decl.token.to_string(),
@@ -89,7 +88,7 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
                     });
                 }
             }
-            if matches!(rt, semantic::ReferenceType::Variable(_)) {
+            if matches!(rt, ReferenceType::Variable(_)) {
                 if let Some(decl) = &r.declaration {
                     map.items.push(CompletionItem {
                         label: decl.token.to_string(),
@@ -103,7 +102,7 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
         }
     } else {
         for (rt, r) in &semantic_visitor.references {
-            if matches!(rt, semantic::ReferenceType::Function(_)) {
+            if matches!(rt, ReferenceType::Function(_)) {
                 if let Some(decl) = &r.declaration {
                     map.items.push(CompletionItem {
                         label: decl.token.to_string(),
@@ -115,7 +114,7 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
                 }
             }
 
-            if matches!(rt, semantic::ReferenceType::Variable(_)) {
+            if matches!(rt, ReferenceType::Variable(_)) {
                 if let Some(decl) = &r.declaration {
                     map.items.push(CompletionItem {
                         label: decl.token.to_string(),
@@ -157,13 +156,13 @@ impl CompletionVisitor {
 }
 
 impl AstVisitor<()> for CompletionVisitor {
-    fn visit_identifier_expression(&mut self, identifier: &icy_ppe::ast::IdentifierExpression) {
+    fn visit_identifier_expression(&mut self, identifier: &IdentifierExpression) {
         if identifier.get_identifier_token().span.end == self.offset {
             self.add_functions();
         }
     }
 
-    fn visit_predefined_call_statement(&mut self, call: &icy_ppe::ast::PredefinedCallStatement) {
+    fn visit_predefined_call_statement(&mut self, call: &PredefinedCallStatement) {
         walk_predefined_call_statement(self, call);
     }
 }

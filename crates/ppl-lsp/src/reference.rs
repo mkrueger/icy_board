@@ -1,6 +1,4 @@
-use icy_ppe::{ast::Ast, parser::lexer::Spanned};
-
-use icy_ppe::semantic::SemanticVisitor;
+use icy_board_engine::{ast::Ast, parser::lexer::Spanned, semantic::SemanticVisitor};
 
 #[derive(Debug, Clone)]
 pub enum ReferenceSymbol {

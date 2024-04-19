@@ -1,3 +1,4 @@
+use crate::Res;
 use dizbase::file_base::{file_header::FileHeader, FileBase};
 use icy_board_engine::{
     icy_board::{
@@ -9,7 +10,6 @@ use icy_board_engine::{
     },
     vm::TerminalTarget,
 };
-use icy_ppe::Res;
 
 use super::{find_files::FileList, PcbBoardCommand, MASK_COMMAND};
 

@@ -5,8 +5,8 @@ use std::{
     str::FromStr,
 };
 
+use crate::{datetime::IcbDate, Res};
 use chrono::{DateTime, Utc};
-use icy_ppe::{datetime::IcbDate, Res};
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -624,12 +624,12 @@ impl UserBase {
 impl IcyBoardSerializer for UserBase {
     const FILE_TYPE: &'static str = "user base";
 
-    fn load<P: AsRef<std::path::Path>>(path: &P) -> icy_ppe::Res<Self> {
+    fn load<P: AsRef<std::path::Path>>(path: &P) -> crate::Res<Self> {
         let mut res = load_internal::<Self, P>(path)?;
         Ok(res)
     }
 
-    fn save<P: AsRef<std::path::Path>>(&self, path: &P) -> icy_ppe::Res<()> {
+    fn save<P: AsRef<std::path::Path>>(&self, path: &P) -> crate::Res<()> {
         std::fs::create_dir_all(&self.home_dir)?;
         for user in &self.users {
             let home_dir = self.home_dir.join(user.get_name().to_ascii_lowercase().replace(' ', "_"));

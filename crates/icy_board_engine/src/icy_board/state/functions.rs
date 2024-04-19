@@ -3,9 +3,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::Res;
 use codepages::tables::CP437_TO_UNICODE;
 use icy_engine::IceMode;
-use icy_ppe::Res;
 
 use crate::{
     icy_board::{

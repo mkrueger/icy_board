@@ -8,13 +8,13 @@ use std::{
     time::Duration,
 };
 
+use crate::{executable::Executable, Res};
 use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use codepages::tables::UNICODE_TO_CP437;
 use icy_engine::TextAttribute;
 use icy_engine::{ansi, Buffer, BufferParser, Caret};
 use icy_engine::{ansi::constants::COLOR_OFFSETS, Position};
 use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
-use icy_ppe::{executable::Executable, Res};
 
 use crate::{
     icy_board::IcyBoardError,
