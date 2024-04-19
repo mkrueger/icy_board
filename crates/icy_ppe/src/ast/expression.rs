@@ -125,10 +125,11 @@ pub enum Expression {
     Parens(ParensExpression),
     PredefinedFunctionCall(PredefinedFunctionCallExpression),
     FunctionCall(FunctionCallExpression),
+    Indexer(IndexerExpression),
     Unary(UnaryExpression),
     Binary(BinaryExpression),
 
-    ArrayExpression(ArrayExpression),
+    ArrayInitializer(ArrayInitializerExpression),
 }
 
 impl Expression {
@@ -136,12 +137,13 @@ impl Expression {
         match self {
             Expression::Identifier(i) => i.get_identifier_token().span.clone(),
             Expression::Const(c) => c.get_constant_token().span.clone(),
-            Expression::Parens(p) => p.get_lpar_token_token().span.start..p.get_rpar_token_token().span.end,
-            Expression::PredefinedFunctionCall(pc) => pc.get_identifier_token().span.start..pc.get_rpar_token_token().span.end,
-            Expression::FunctionCall(fc) => fc.get_identifier_token().span.start..fc.get_rpar_token_token().span.end,
+            Expression::Parens(p) => p.get_lpar_token().span.start..p.get_rpar_token().span.end,
+            Expression::PredefinedFunctionCall(pc) => pc.get_identifier_token().span.start..pc.get_rpar_token().span.end,
+            Expression::FunctionCall(fc) => fc.get_identifier_token().span.start..fc.get_rpar_token().span.end,
+            Expression::Indexer(fc) => fc.get_identifier_token().span.start..fc.get_rbracket_token().span.end,
             Expression::Unary(u) => u.get_op_token().span.start..u.get_expression().get_span().end,
             Expression::Binary(b) => b.get_left_expression().get_span().start..b.get_right_expression().get_span().end,
-            Expression::ArrayExpression(b) => b.get_expressions().first().unwrap().get_span().start..b.get_expressions().last().unwrap().get_span().end,
+            Expression::ArrayInitializer(b) => b.get_expressions().first().unwrap().get_span().start..b.get_expressions().last().unwrap().get_span().end,
         }
     }
 
@@ -152,9 +154,10 @@ impl Expression {
             Expression::Parens(expr) => visitor.visit_parens_expression(expr),
             Expression::PredefinedFunctionCall(expr) => visitor.visit_predefined_function_call_expression(expr),
             Expression::FunctionCall(expr) => visitor.visit_function_call_expression(expr),
+            Expression::Indexer(expr) => visitor.visit_indexer_expression(expr),
             Expression::Unary(expr) => visitor.visit_unary_expression(expr),
             Expression::Binary(expr) => visitor.visit_binary_expression(expr),
-            Expression::ArrayExpression(expr) => visitor.visit_array_expression(expr),
+            Expression::ArrayInitializer(expr) => visitor.visit_array_expression(expr),
         }
     }
 
@@ -166,9 +169,10 @@ impl Expression {
             Expression::Parens(expr) => visitor.visit_parens_expression(expr),
             Expression::PredefinedFunctionCall(expr) => visitor.visit_predefined_function_call_expression(expr),
             Expression::FunctionCall(expr) => visitor.visit_function_call_expression(expr),
+            Expression::Indexer(expr) => visitor.visit_indexer_expression(expr),
             Expression::Unary(expr) => visitor.visit_unary_expression(expr),
             Expression::Binary(expr) => visitor.visit_binary_expression(expr),
-            Expression::ArrayExpression(expr) => visitor.visit_array_expression(expr),
+            Expression::ArrayInitializer(expr) => visitor.visit_array_expression(expr),
         }
     }
 
@@ -344,7 +348,7 @@ impl ParensExpression {
         }
     }
 
-    pub fn get_lpar_token_token(&self) -> &Spanned<Token> {
+    pub fn get_lpar_token(&self) -> &Spanned<Token> {
         &self.lpar_token
     }
 
@@ -356,7 +360,7 @@ impl ParensExpression {
         &mut self.expression
     }
 
-    pub fn get_rpar_token_token(&self) -> &Spanned<Token> {
+    pub fn get_rpar_token(&self) -> &Spanned<Token> {
         &self.rpar_token
     }
 
@@ -401,7 +405,7 @@ impl FunctionCallExpression {
     pub fn get_identifier_token(&self) -> &Spanned<Token> {
         &self.identifier_token
     }
-    pub fn get_lpar_token_token(&self) -> &Spanned<Token> {
+    pub fn get_lpar_token(&self) -> &Spanned<Token> {
         &self.lpar_token
     }
 
@@ -417,7 +421,7 @@ impl FunctionCallExpression {
         self.arguments = arguments;
     }
 
-    pub fn get_rpar_token_token(&self) -> &Spanned<Token> {
+    pub fn get_rpar_token(&self) -> &Spanned<Token> {
         &self.rpar_token
     }
 
@@ -452,6 +456,90 @@ impl fmt::Display for FunctionCallExpression {
             }
         }
         write!(f, ")")
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct IndexerExpression {
+    identifier_token: Spanned<Token>,
+    lbracket_token: Spanned<Token>,
+    arguments: Vec<Expression>,
+    rbracket_token: Spanned<Token>,
+}
+
+impl IndexerExpression {
+    pub fn new(identifier_token: Spanned<Token>, leftbracket_token: Spanned<Token>, arguments: Vec<Expression>, rightbracket_token: Spanned<Token>) -> Self {
+        Self {
+            identifier_token,
+            lbracket_token: leftbracket_token,
+            arguments,
+            rbracket_token: rightbracket_token,
+        }
+    }
+
+    pub fn empty(identifier: unicase::Ascii<String>, arguments: Vec<Expression>) -> Self {
+        Self {
+            identifier_token: Spanned::create_empty(Token::Identifier(identifier)),
+            lbracket_token: Spanned::create_empty(Token::LPar),
+            arguments,
+            rbracket_token: Spanned::create_empty(Token::RPar),
+        }
+    }
+
+    pub fn get_identifier_token(&self) -> &Spanned<Token> {
+        &self.identifier_token
+    }
+    pub fn get_lbracket_token(&self) -> &Spanned<Token> {
+        &self.lbracket_token
+    }
+
+    pub fn get_arguments(&self) -> &Vec<Expression> {
+        &self.arguments
+    }
+
+    pub fn get_arguments_mut(&mut self) -> &mut Vec<Expression> {
+        &mut self.arguments
+    }
+
+    pub fn set_arguments(&mut self, arguments: Vec<Expression>) {
+        self.arguments = arguments;
+    }
+
+    pub fn get_rbracket_token(&self) -> &Spanned<Token> {
+        &self.rbracket_token
+    }
+
+    /// Returns a reference to the get identifier of this [`IdentifierExpression`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if .
+    pub fn get_identifier(&self) -> &unicase::Ascii<String> {
+        if let Token::Identifier(id) = &self.identifier_token.token {
+            return id;
+        }
+        panic!("Expected identifier token")
+    }
+
+    pub fn create_empty_expression(identifier: unicase::Ascii<String>, arguments: Vec<Expression>) -> Expression {
+        Expression::Indexer(IndexerExpression::empty(identifier, arguments))
+    }
+
+    pub fn set_identifier(&mut self, identifier: unicase::Ascii<String>) {
+        self.identifier_token.token = Token::Identifier(identifier);
+    }
+}
+
+impl fmt::Display for IndexerExpression {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}[", self.get_identifier())?;
+        for (i, arg) in self.get_arguments().iter().enumerate() {
+            write!(f, "{arg}")?;
+            if i < self.get_arguments().len() - 1 {
+                write!(f, ", ")?;
+            }
+        }
+        write!(f, "]")
     }
 }
 
@@ -495,7 +583,7 @@ impl PredefinedFunctionCallExpression {
     pub fn get_identifier_token(&self) -> &Spanned<Token> {
         &self.identifier_token
     }
-    pub fn get_lpar_token_token(&self) -> &Spanned<Token> {
+    pub fn get_lpar_token(&self) -> &Spanned<Token> {
         &self.lpar_token
     }
 
@@ -507,7 +595,7 @@ impl PredefinedFunctionCallExpression {
         &mut self.arguments
     }
 
-    pub fn get_rpar_token_token(&self) -> &Spanned<Token> {
+    pub fn get_rpar_token(&self) -> &Spanned<Token> {
         &self.rpar_token
     }
 
@@ -704,13 +792,13 @@ impl fmt::Display for BinaryExpression {
 
 /// { expr1, expr2, ..., exprn }
 #[derive(Debug, PartialEq, Clone)]
-pub struct ArrayExpression {
+pub struct ArrayInitializerExpression {
     lbrace_token: Spanned<Token>,
     expressions: Vec<Expression>,
     rbrace_token: Spanned<Token>,
 }
 
-impl ArrayExpression {
+impl ArrayInitializerExpression {
     pub fn new(leftpar_token: Spanned<Token>, expressions: Vec<Expression>, rightpar_token: Spanned<Token>) -> Self {
         Self {
             lbrace_token: leftpar_token,
@@ -727,7 +815,7 @@ impl ArrayExpression {
         }
     }
 
-    pub fn get_lbrace_token_token(&self) -> &Spanned<Token> {
+    pub fn get_lbrace_token(&self) -> &Spanned<Token> {
         &self.lbrace_token
     }
 
@@ -739,7 +827,7 @@ impl ArrayExpression {
         &mut self.expressions
     }
 
-    pub fn get_rbrace_token_token(&self) -> &Spanned<Token> {
+    pub fn get_rbrace_token(&self) -> &Spanned<Token> {
         &self.rbrace_token
     }
 
@@ -748,7 +836,7 @@ impl ArrayExpression {
     }
 }
 
-impl fmt::Display for ArrayExpression {
+impl fmt::Display for ArrayInitializerExpression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{{")?;
         for (i, arg) in self.get_expressions().iter().enumerate() {

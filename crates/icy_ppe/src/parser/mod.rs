@@ -55,6 +55,9 @@ pub enum ParserErrorType {
     #[error("Missing close ')' found: {0}")]
     MissingCloseParens(Token),
 
+    #[error("Missing close ']' found: {0}")]
+    MissingCloseBracket(Token),
+
     #[error("Invalid token - label expected ({0})")]
     LabelExpected(Token),
 
@@ -521,7 +524,7 @@ impl Parser {
             }
             rightpar_token = Some(self.save_spanned_token());
             self.next_token();
-        } else if self.lang_version >= 400 {
+        } else if self.lang_version >= 350 {
             if let Some(Token::Eq) = self.get_cur_token() {
                 let eq_token = self.next_token();
                 let initializer = self.parse_expression();

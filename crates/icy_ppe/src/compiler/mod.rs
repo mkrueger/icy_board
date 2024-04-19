@@ -64,6 +64,9 @@ pub enum CompilationErrorType {
 
     #[error("FUNCTION/PROCEDURE parameters not match with declaration ({0})")]
     ParameterMismatch(String),
+
+    #[error("Indexer called on function or procedure ({0})")]
+    IndexerCalledOnFunction(String),
 }
 
 #[derive(Error, Debug)]

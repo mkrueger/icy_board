@@ -1666,7 +1666,7 @@ impl LetStatement {
         &mut self.arguments
     }
 
-    pub fn get_rpar_token_token(&self) -> &Option<Spanned<Token>> {
+    pub fn get_rpar_token(&self) -> &Option<Spanned<Token>> {
         &self.rightpar_token
     }
 

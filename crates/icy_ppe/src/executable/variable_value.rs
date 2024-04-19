@@ -1,5 +1,6 @@
 use std::{
     cmp::Ordering,
+    collections::HashMap,
     fmt,
     ops::{Add, Div, Mul, Neg, Rem, Sub},
 };
@@ -60,6 +61,8 @@ pub enum VariableType {
     /// When coerced to string type it is in the format CCYYMMDD or 19940527
     DDate = 17,
 
+    Table = 18,
+
     Unknown = 255,
 }
 
@@ -91,6 +94,7 @@ impl VariableType {
             15 => VariableType::Function,
             16 => VariableType::Procedure,
             17 => VariableType::DDate,
+            18 => VariableType::Table,
             _ => {
                 log::warn!("Invalid variable type: {}", b);
                 VariableType::Integer
@@ -120,6 +124,7 @@ impl fmt::Display for VariableType {
             VariableType::Function => write!(f, "FUNC"),     // 2*u8
             VariableType::Procedure => write!(f, "PROC"),    // 2*u8
             VariableType::DDate => write!(f, "DDate"),       // i32
+            VariableType::Table => write!(f, "Table"),       // Generic key-value table
             VariableType::Unknown => write!(f, "Unknown"),
         }
     }
@@ -180,7 +185,7 @@ impl fmt::Debug for VariableData {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Default, Clone)]
 pub enum GenericVariableData {
     #[default]
     None,
@@ -189,7 +194,10 @@ pub enum GenericVariableData {
     Dim1(Vec<VariableValue>),
     Dim2(Vec<Vec<VariableValue>>),
     Dim3(Vec<Vec<Vec<VariableValue>>>),
+
+    Table(PPLTable),
 }
+
 impl GenericVariableData {
     pub(crate) fn create_array(base_value: VariableValue, dim: u8, vector_size: usize, matrix_size: usize, cube_size: usize) -> GenericVariableData {
         match dim {
@@ -1164,6 +1172,9 @@ impl VariableValue {
             VariableType::DDate => {
                 data.ddate_value = self.as_int();
             }
+            VariableType::Table => {
+                panic!("Not supported for tables.")
+            }
             VariableType::Function | VariableType::Procedure | VariableType::Unknown => {
                 panic!("Unknown variable type")
             }
@@ -1196,4 +1207,9 @@ mod tests {
     fn check_variable_size() {
         assert_eq!(8, std::mem::size_of::<VariableData>());
     }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PPLTable {
+    pub table: HashMap<VariableValue, VariableValue>,
 }

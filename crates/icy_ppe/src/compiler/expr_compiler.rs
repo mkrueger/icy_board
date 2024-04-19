@@ -76,6 +76,29 @@ impl<'a> AstVisitor<PPEExpr> for ExpressionCompiler<'a> {
         PPEExpr::Dim(table_idx, arguments)
     }
 
+    fn visit_indexer_expression(&mut self, indexer: &crate::ast::IndexerExpression) -> PPEExpr {
+        let arguments = indexer.get_arguments().iter().map(|e| e.visit(self)).collect();
+
+        if self.compiler.lookup_table.has_variable(indexer.get_identifier()) {
+            let Some(table_idx) = self.compiler.lookup_variable_index(indexer.get_identifier()) else {
+                log::error!("function not found: {}", indexer.get_identifier().to_string());
+                return PPEExpr::Value(0);
+            };
+
+            let var = self.compiler.lookup_table.variable_table.get_var_entry(table_idx);
+            if var.value.get_type() == VariableType::Function {
+                return PPEExpr::FunctionCall(var.header.id, arguments);
+            }
+            if var.header.dim as usize != arguments.len() {
+                log::error!("Invalid dimensions for function call: {}", indexer.get_identifier().to_string());
+                return PPEExpr::Value(0);
+            }
+            return PPEExpr::Dim(var.header.id, arguments);
+        }
+        log::error!("Invalid indexer call: {}", indexer.get_identifier().to_string());
+        return PPEExpr::Value(0);
+    }
+
     fn visit_parens_expression(&mut self, parens: &crate::ast::ParensExpression) -> PPEExpr {
         parens.get_expression().visit(self)
     }

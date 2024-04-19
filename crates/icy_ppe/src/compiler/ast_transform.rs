@@ -340,7 +340,7 @@ impl AstVisitorMut for AstTransformationVisitor {
             },
             let_stmt.get_lpar_token().clone(),
             let_stmt.get_arguments().iter().map(|arg| arg.visit_mut(self)).collect(),
-            let_stmt.get_rpar_token_token().clone(),
+            let_stmt.get_rpar_token().clone(),
             Spanned::create_empty(Token::Eq),
             val_expr,
         ))
@@ -396,7 +396,7 @@ impl AstVisitorMut for AstTransformationVisitor {
         for var in var_decl.get_variables() {
             if let Some(init) = var.get_initalizer() {
                 match init {
-                    Expression::ArrayExpression(array) => {
+                    Expression::ArrayInitializer(array) => {
                         let stmt = Statement::VariableDeclaration(VariableDeclarationStatement::new(
                             var_decl.get_type_token().clone(),
                             var_decl.get_variable_type(),

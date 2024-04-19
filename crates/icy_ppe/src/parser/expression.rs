@@ -1,8 +1,8 @@
 use super::{lexer::Token, Parser};
 use crate::{
     ast::{
-        ArrayExpression, BinOp, BinaryExpression, ConstantExpression, Expression, FunctionCallExpression, IdentifierExpression, ParensExpression,
-        PredefinedFunctionCallExpression, UnaryExpression,
+        ArrayInitializerExpression, BinOp, BinaryExpression, ConstantExpression, Expression, FunctionCallExpression, IdentifierExpression, IndexerExpression,
+        ParensExpression, PredefinedFunctionCallExpression, UnaryExpression,
     },
     executable::{FunctionDefinition, FUNCTION_DEFINITIONS},
     parser::ParserErrorType,
@@ -261,8 +261,53 @@ impl Parser {
                     )));
                 }
 
+                if self.lang_version >= 350 && self.get_cur_token() == Some(Token::LBracket) {
+                    let leftpar_token = self.save_spanned_token();
+
+                    self.next_token();
+                    let mut arguments = Vec::new();
+
+                    while self.get_cur_token() != Some(Token::RBracket) {
+                        let Some(value) = self.parse_expression() else {
+                            self.errors
+                                .lock()
+                                .unwrap()
+                                .report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
+                            self.next_token();
+                            return None;
+                        };
+                        arguments.push(value);
+                        if self.get_cur_token() == Some(Token::Comma) {
+                            self.next_token();
+                            continue;
+                        }
+
+                        if self.get_cur_token() != Some(Token::RBracket) && self.get_cur_token() != Some(Token::Comma) {
+                            break;
+                        }
+                    }
+
+                    if self.get_cur_token() != Some(Token::RBracket) {
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(self.save_token_span(), ParserErrorType::MissingCloseBracket(self.save_token()));
+                        return None;
+                    }
+                    let rightpar_token = self.save_spanned_token();
+
+                    self.next_token();
+
+                    return Some(Expression::Indexer(IndexerExpression::new(
+                        identifier_token,
+                        leftpar_token,
+                        arguments,
+                        rightpar_token,
+                    )));
+                }
                 Some(Expression::Identifier(IdentifierExpression::new(identifier_token)))
             }
+
             Token::LPar => {
                 self.next_token();
                 let Some(expr) = self.parse_expression() else {
@@ -319,7 +364,7 @@ impl Parser {
                 let rbrace_token = self.save_spanned_token();
 
                 self.next_token();
-                Some(Expression::ArrayExpression(ArrayExpression::new(lbrace_token, list, rbrace_token)))
+                Some(Expression::ArrayInitializer(ArrayInitializerExpression::new(lbrace_token, list, rbrace_token)))
             }
             _ => None,
         }

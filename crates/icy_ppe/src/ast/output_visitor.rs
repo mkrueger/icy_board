@@ -115,6 +115,18 @@ impl AstVisitor<()> for OutputVisitor {
         self.output.push(')');
     }
 
+    fn visit_indexer_expression(&mut self, call: &super::IndexerExpression) {
+        self.output(call.get_identifier());
+        self.output.push('[');
+        for (i, arg) in call.get_arguments().iter().enumerate() {
+            arg.visit(self);
+            if i < call.get_arguments().len() - 1 {
+                self.output.push_str(", ");
+            }
+        }
+        self.output.push(']');
+    }
+
     fn visit_parens_expression(&mut self, parens: &super::ParensExpression) {
         self.output.push('(');
         parens.get_expression().visit(self);
@@ -174,11 +186,11 @@ impl AstVisitor<()> for OutputVisitor {
 
     fn visit_if_then_statement(&mut self, if_then: &super::IfThenStatement) {
         self.output_keyword("If");
-        if self.version < 400 {
+        if self.version < 350 {
             self.output.push_str(" (");
         }
         if_then.get_condition().visit(self);
-        if self.version < 400 {
+        if self.version < 350 {
             self.output.push(')');
         }
         self.output_keyword(" Then");
@@ -272,11 +284,11 @@ impl AstVisitor<()> for OutputVisitor {
     fn visit_while_do_statement(&mut self, while_do_stmt: &super::WhileDoStatement) {
         self.output_keyword("While");
         self.output.push_str(" ");
-        if self.version < 400 {
+        if self.version < 350 {
             self.output.push_str("(");
         }
         while_do_stmt.get_condition().visit(self);
-        if self.version < 400 {
+        if self.version < 350 {
             self.output.push(')');
         }
         self.output_keyword(" Do");

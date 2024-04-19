@@ -155,6 +155,9 @@ pub enum Token {
     LBrace,
     RBrace,
 
+    LBracket,
+    RBracket,
+
     Loop,
     EndLoop,
 
@@ -217,6 +220,8 @@ impl fmt::Display for Token {
             Token::RPar => write!(f, ")"),
             Token::LBrace => write!(f, "{{"),
             Token::RBrace => write!(f, "}}"),
+            Token::LBracket => write!(f, "["),
+            Token::RBracket => write!(f, "]"),
             Token::Comma => write!(f, ","),
             Token::PoW => write!(f, "^"),
             Token::Mul => write!(f, "*"),
@@ -341,7 +346,7 @@ lazy_static::lazy_static! {
         }
         m
     };
-    static ref TOKEN_LOOKUP_TABLE_400: HashMap<unicase::Ascii<String>, Token> = {
+    static ref TOKEN_LOOKUP_TABLE_350: HashMap<unicase::Ascii<String>, Token> = {
         let mut m = HashMap::new();
         m.insert(unicase::Ascii::new("if".to_string()), Token::If);
         m.insert(unicase::Ascii::new("let".to_string()), Token::Let);
@@ -387,7 +392,7 @@ lazy_static::lazy_static! {
 impl Lexer {
     pub fn new(file: PathBuf, version: u16, text: &str, encoding: Encoding, errors: Arc<Mutex<ErrorRepoter>>) -> Self {
         Self {
-            lookup_table: if version < 400 { &*TOKEN_LOOKUP_TABLE } else { &*TOKEN_LOOKUP_TABLE_400 },
+            lookup_table: if version < 350 { &*TOKEN_LOOKUP_TABLE } else { &*TOKEN_LOOKUP_TABLE_350 },
             file,
             lang_version: version,
             encoding,
@@ -545,11 +550,27 @@ impl Lexer {
                 Some(Token::Label(identifier))
             },
 
-            '(' | '[' => Some(Token::LPar),
-            ')' | ']' => Some(Token::RPar),
+            '(' => Some(Token::LPar),
+            ')' => Some(Token::RPar),
+
+            '['  => {
+                if self.lang_version < 350 {
+                    Some(Token::LPar)
+                } else {
+                    Some(Token::LBracket)
+                }
+            }
+
+            ']'  => {
+                if self.lang_version < 350 {
+                    Some(Token::LPar)
+                } else {
+                    Some(Token::RBracket)
+                }
+            }
 
             '{'  => {
-                if self.lang_version < 400 {
+                if self.lang_version < 350 {
                     self.errors.lock().unwrap().report_warning(self.token_start..self.token_end,LexingErrorType::DontUseBraces);
                     Some(Token::LPar)
                 } else {
@@ -558,7 +579,7 @@ impl Lexer {
             }
 
             '}'  => {
-                if self.lang_version < 400 {
+                if self.lang_version < 350 {
                     self.errors.lock().unwrap().report_warning(self.token_start..self.token_end,LexingErrorType::DontUseBraces);
                     Some(Token::RPar)
                 } else {
@@ -577,7 +598,7 @@ impl Lexer {
                     self.errors.lock().unwrap().report_warning(self.token_start..self.token_end,LexingErrorType::PowWillGetRemoved);
                     Some(Token::PoW)
                 } else {
-                    if self.lang_version >= 400 && next == Some('=') {
+                    if self.lang_version >= 350 && next == Some('=') {
                         return Some(Token::MulAssign);
                     }
                     self.put_back();
@@ -585,7 +606,7 @@ impl Lexer {
                 }
              },
             '/' => {
-                if self.lang_version >= 400 {
+                if self.lang_version >= 350 {
                     let next = self.next_ch();
                     if next == Some('=') {
                         return Some(Token::DivAssign);
@@ -595,7 +616,7 @@ impl Lexer {
                 Some(Token::Div)
             },
             '%' => {
-                if self.lang_version >= 400 {
+                if self.lang_version >= 350 {
                     let next = self.next_ch();
                     if next == Some('=') {
                         return Some(Token::ModAssign);
@@ -605,7 +626,7 @@ impl Lexer {
                 Some(Token::Mod)
             }
             '+' => {
-                if self.lang_version >= 400 {
+                if self.lang_version >= 350 {
                     let next = self.next_ch();
                     if next == Some('=') {
                         return Some(Token::AddAssign);
@@ -615,7 +636,7 @@ impl Lexer {
                 Some(Token::Add)
             }
             '-' => {
-                if self.lang_version >= 400 {
+                if self.lang_version >= 350 {
                     let next = self.next_ch();
                     if next == Some('=') {
                         return Some(Token::SubAssign);
@@ -641,7 +662,7 @@ impl Lexer {
                  if let Some('&') = next {
                     Some(Token::And)
                 } else {
-                    if self.lang_version >= 400 {
+                    if self.lang_version >= 350 {
                         if next == Some('=') {
                             return Some(Token::AndAssign);
                         }
@@ -656,7 +677,7 @@ impl Lexer {
                  if let Some('|') = next {
                     Some(Token::Or)
                 } else {
-                    if self.lang_version >= 400 {
+                    if self.lang_version >= 350 {
                         if next == Some('=') {
                             return Some(Token::OrAssign);
                         }

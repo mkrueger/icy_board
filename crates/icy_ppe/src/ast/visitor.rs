@@ -1,12 +1,12 @@
 use crate::parser::lexer::{Spanned, Token};
 
 use super::{
-    ArrayExpression, Ast, AstNode, BinaryExpression, BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstantExpression,
+    ArrayInitializerExpression, Ast, AstNode, BinaryExpression, BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstantExpression,
     ContinueStatement, ElseBlock, ElseIfBlock, Expression, ForStatement, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation,
-    GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement, LoopStatement, ParameterSpecifier,
-    ParensExpression, PredefinedCallStatement, PredefinedFunctionCallExpression, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation,
-    RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, UnaryExpression, VariableDeclarationStatement, VariableSpecifier, WhileDoStatement,
-    WhileStatement,
+    GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, IndexerExpression, LabelStatement, LetStatement, LoopStatement,
+    ParameterSpecifier, ParensExpression, PredefinedCallStatement, PredefinedFunctionCallExpression, ProcedureCallStatement, ProcedureDeclarationAstNode,
+    ProcedureImplementation, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, UnaryExpression, VariableDeclarationStatement,
+    VariableSpecifier, WhileDoStatement, WhileStatement,
 };
 
 #[allow(unused_variables)]
@@ -22,7 +22,7 @@ pub trait AstVisitor<T: Default>: Sized {
         walk_binary_expression(self, binary);
         T::default()
     }
-    fn visit_array_expression(&mut self, array_expr: &ArrayExpression) -> T {
+    fn visit_array_expression(&mut self, array_expr: &ArrayInitializerExpression) -> T {
         walk_array_expression(self, array_expr);
         T::default()
     }
@@ -37,6 +37,11 @@ pub trait AstVisitor<T: Default>: Sized {
         walk_function_call_expression(self, call);
         T::default()
     }
+    fn visit_indexer_expression(&mut self, indexer: &IndexerExpression) -> T {
+        walk_indexer_expression(self, indexer);
+        T::default()
+    }
+
     fn visit_parens_expression(&mut self, parens: &ParensExpression) -> T {
         parens.get_expression().visit(self)
     }
@@ -274,7 +279,7 @@ pub fn walk_binary_expression<T: Default, V: AstVisitor<T>>(visitor: &mut V, bin
     binary.get_right_expression().visit(visitor);
 }
 
-pub fn walk_array_expression<T: Default, V: AstVisitor<T>>(visitor: &mut V, arr_expr: &ArrayExpression) {
+pub fn walk_array_expression<T: Default, V: AstVisitor<T>>(visitor: &mut V, arr_expr: &ArrayInitializerExpression) {
     for arg in arr_expr.get_expressions() {
         arg.visit(visitor);
     }
@@ -288,6 +293,12 @@ pub fn walk_predefined_function_call_expression<T: Default, V: AstVisitor<T>>(vi
 
 pub fn walk_function_call_expression<T: Default, V: AstVisitor<T>>(visitor: &mut V, call: &FunctionCallExpression) {
     for arg in call.get_arguments() {
+        arg.visit(visitor);
+    }
+}
+
+pub fn walk_indexer_expression<T: Default, V: AstVisitor<T>>(visitor: &mut V, indexer: &IndexerExpression) {
+    for arg in indexer.get_arguments() {
         arg.visit(visitor);
     }
 }
@@ -361,8 +372,8 @@ pub trait AstVisitorMut: Sized {
         Expression::Binary(BinaryExpression::empty(left, binary.get_op(), right))
     }
 
-    fn visit_array_expression(&mut self, array_expr: &ArrayExpression) -> Expression {
-        Expression::ArrayExpression(ArrayExpression::empty(
+    fn visit_array_expression(&mut self, array_expr: &ArrayInitializerExpression) -> Expression {
+        Expression::ArrayInitializer(ArrayInitializerExpression::empty(
             array_expr.get_expressions().iter().map(|arg| arg.visit_mut(self)).collect(),
         ))
     }
@@ -385,9 +396,21 @@ pub trait AstVisitorMut: Sized {
                 span: call.get_identifier_token().span.clone(),
                 token: Token::Identifier(self.visit_identifier(call.get_identifier())),
             },
-            call.get_lpar_token_token().clone(),
+            call.get_lpar_token().clone(),
             call.get_arguments().iter().map(|arg| arg.visit_mut(self)).collect(),
-            call.get_rpar_token_token().clone(),
+            call.get_rpar_token().clone(),
+        ))
+    }
+
+    fn visit_indexer_expression(&mut self, call: &IndexerExpression) -> Expression {
+        Expression::Indexer(IndexerExpression::new(
+            Spanned {
+                span: call.get_identifier_token().span.clone(),
+                token: Token::Identifier(self.visit_identifier(call.get_identifier())),
+            },
+            call.get_lbracket_token().clone(),
+            call.get_arguments().iter().map(|arg| arg.visit_mut(self)).collect(),
+            call.get_rbracket_token().clone(),
         ))
     }
 
@@ -527,7 +550,7 @@ pub trait AstVisitorMut: Sized {
             },
             let_stmt.get_lpar_token().clone(),
             let_stmt.get_arguments().iter().map(|arg| arg.visit_mut(self)).collect(),
-            let_stmt.get_rpar_token_token().clone(),
+            let_stmt.get_rpar_token().clone(),
             let_stmt.get_eq_token().clone(),
             let_stmt.get_value_expression().visit_mut(self),
         ))

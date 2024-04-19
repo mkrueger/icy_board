@@ -5,11 +5,11 @@ use std::{
 
 use crate::{
     ast::{
-        walk_function_call_expression, walk_function_implementation, walk_predefined_call_statement, walk_predefined_function_call_expression,
-        walk_procedure_call_statement, walk_procedure_implementation, AstVisitor, CommentAstNode, Constant, ConstantExpression, Expression,
-        FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, LabelStatement,
-        LetStatement, ParameterSpecifier, PredefinedCallStatement, PredefinedFunctionCallExpression, ProcedureCallStatement, ProcedureDeclarationAstNode,
-        ProcedureImplementation, VariableDeclarationStatement,
+        walk_function_call_expression, walk_function_implementation, walk_indexer_expression, walk_predefined_call_statement,
+        walk_predefined_function_call_expression, walk_procedure_call_statement, walk_procedure_implementation, AstVisitor, CommentAstNode, Constant,
+        ConstantExpression, Expression, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement,
+        IdentifierExpression, LabelStatement, LetStatement, ParameterSpecifier, PredefinedCallStatement, PredefinedFunctionCallExpression,
+        ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, VariableDeclarationStatement,
     },
     compiler::CompilationErrorType,
     executable::{
@@ -910,6 +910,32 @@ impl AstVisitor<()> for SemanticVisitor {
         walk_function_call_expression(self, call);
     }
 
+    fn visit_indexer_expression(&mut self, indexer: &crate::ast::IndexerExpression) -> () {
+        let mut found = false;
+        let arg_count = 0;
+        if let Some(idx) = self.lookup_variable(indexer.get_identifier()) {
+            let (rt, r) = &mut self.references[idx];
+            if matches!(rt, ReferenceType::Function(_)) || matches!(rt, ReferenceType::Variable(_)) {
+                self.errors.lock().unwrap().report_error(
+                    indexer.get_identifier_token().span.clone(),
+                    CompilationErrorType::IndexerCalledOnFunction(indexer.get_identifier().to_string()),
+                );
+
+                found = true;
+            }
+        }
+
+        if found {
+            self.check_arg_count(arg_count, indexer.get_arguments().len(), indexer.get_identifier_token());
+        } else {
+            self.errors.lock().unwrap().report_error(
+                indexer.get_identifier_token().span.clone(),
+                CompilationErrorType::FunctionNotFound(indexer.get_identifier().to_string()),
+            );
+        }
+        walk_indexer_expression(self, indexer);
+    }
+
     fn visit_goto_statement(&mut self, goto: &GotoStatement) {
         self.add_label_usage(goto.get_label_token());
     }
@@ -967,7 +993,7 @@ impl AstVisitor<()> for SemanticVisitor {
                 );
                 continue;
             }
-            let (dims, vs) = if let Some(Expression::ArrayExpression(arr_expr)) = v.get_initalizer() {
+            let (dims, vs) = if let Some(Expression::ArrayInitializer(arr_expr)) = v.get_initalizer() {
                 for expr in arr_expr.get_expressions() {
                     expr.visit(self);
                 }

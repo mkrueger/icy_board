@@ -31,7 +31,7 @@ impl Parser {
         self.next_token();
 
         let mut lpar_token = None;
-        if self.lang_version < 400 && self.get_cur_token() != Some(Token::LPar) {
+        if self.lang_version < 350 && self.get_cur_token() != Some(Token::LPar) {
             self.report_error(self.lex.span(), ParserErrorType::IfWhileConditionNotFound);
             return None;
         } else if self.get_cur_token() == Some(Token::LPar) {
@@ -277,7 +277,7 @@ impl Parser {
         let if_token = self.save_spanned_token();
         self.next_token();
         let mut lpar_token = None;
-        if self.lang_version < 400 && self.get_cur_token() != Some(Token::LPar) {
+        if self.lang_version < 350 && self.get_cur_token() != Some(Token::LPar) {
             self.report_error(self.lex.span(), ParserErrorType::IfWhileConditionNotFound);
             return None;
         } else if self.get_cur_token() == Some(Token::LPar) {
@@ -784,7 +784,7 @@ impl Parser {
         }
         if self.get_cur_token() != Some(Token::LPar) {
             // check 'pseudo keywords'
-            if self.lang_version < 400 {
+            if self.lang_version < 350 {
                 if *identifier == *QUIT_TOKEN {
                     return Some(Statement::Break(BreakStatement::new(id_token)));
                 }

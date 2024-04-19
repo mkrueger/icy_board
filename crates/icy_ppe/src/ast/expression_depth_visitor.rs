@@ -28,6 +28,10 @@ impl AstVisitor<usize> for ExpressionDepthVisitor {
         1
     }
 
+    fn visit_indexer_expression(&mut self, _: &super::IndexerExpression) -> usize {
+        1
+    }
+
     fn visit_parens_expression(&mut self, parens: &ParensExpression) -> usize {
         1 + parens.get_expression().visit(self)
     }

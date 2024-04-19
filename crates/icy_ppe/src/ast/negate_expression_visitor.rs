@@ -26,6 +26,10 @@ impl AstVisitorMut for NegateExpressionVisitor {
         UnaryExpression::create_empty_expression(UnaryOp::Not, Expression::FunctionCall(expr.clone()))
     }
 
+    fn visit_indexer_expression(&mut self, expr: &super::IndexerExpression) -> Expression {
+        UnaryExpression::create_empty_expression(UnaryOp::Not, Expression::Indexer(expr.clone()))
+    }
+
     fn visit_parens_expression(&mut self, expr: &ParensExpression) -> Expression {
         UnaryExpression::create_empty_expression(UnaryOp::Not, Expression::Parens(expr.clone()))
     }
