@@ -339,9 +339,11 @@ impl SemanticVisitor {
             }
         }
 
-        let start = variable_table.variable_table.len() + 1;
-        for i in 0..self.global_lookup.variable_lookup.len() {
-            let (rt, r) = &mut self.references[start + i];
+        let mut variables: Vec<usize> = self.global_lookup.variable_lookup.values().map(|u| *u).collect();
+        variables.sort();
+        for i in variables {
+            let (rt, r) = &mut self.references[i];
+
             if !matches!(rt, ReferenceType::Variable(_)) {
                 continue;
             }
@@ -351,6 +353,7 @@ impl SemanticVisitor {
             }
             variable_table.push(r.create_table_entry());
         }
+
         for f in &self.function_containers {
             let (_rt, r) = &mut self.references[f.id];
             if r.usages.is_empty() {
@@ -512,6 +515,7 @@ impl SemanticVisitor {
             }
         }
         log::info!("Label ref {:?}", identifier_token);
+
         self.expression_lookup.insert(identifier_token.span.clone(), self.references.len());
         self.references.push((
             reftype,
@@ -963,7 +967,6 @@ impl AstVisitor<()> for SemanticVisitor {
                 );
                 continue;
             }
-
             self.add_variable(
                 var_decl.get_variable_type(),
                 v.get_identifier_token(),

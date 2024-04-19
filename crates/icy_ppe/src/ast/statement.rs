@@ -470,14 +470,20 @@ impl BlockStatement {
 #[derive(Debug, PartialEq, Clone)]
 pub struct IfStatement {
     if_token: Spanned<Token>,
-    leftpar_token: Spanned<Token>,
+    leftpar_token: Option<Spanned<Token>>,
     condition: Box<Expression>,
-    rightpar_token: Spanned<Token>,
+    rightpar_token: Option<Spanned<Token>>,
     statement: Box<Statement>,
 }
 
 impl IfStatement {
-    pub fn new(if_token: Spanned<Token>, leftpar_token: Spanned<Token>, condition: Expression, rightpar_token: Spanned<Token>, statement: Statement) -> Self {
+    pub fn new(
+        if_token: Spanned<Token>,
+        leftpar_token: Option<Spanned<Token>>,
+        condition: Expression,
+        rightpar_token: Option<Spanned<Token>>,
+        statement: Statement,
+    ) -> Self {
         Self {
             if_token,
             leftpar_token,
@@ -490,9 +496,9 @@ impl IfStatement {
     pub fn empty(condition: Expression, statement: Statement) -> Self {
         Self {
             if_token: Spanned::create_empty(Token::While),
-            leftpar_token: Spanned::create_empty(Token::LPar),
+            leftpar_token: None,
             condition: Box::new(condition),
-            rightpar_token: Spanned::create_empty(Token::RPar),
+            rightpar_token: None,
             statement: Box::new(statement),
         }
     }
@@ -500,7 +506,7 @@ impl IfStatement {
     pub fn get_if_token(&self) -> &Spanned<Token> {
         &self.if_token
     }
-    pub fn get_lpar_token(&self) -> &Spanned<Token> {
+    pub fn get_lpar_token(&self) -> &Option<Spanned<Token>> {
         &self.leftpar_token
     }
 
@@ -512,7 +518,7 @@ impl IfStatement {
         &mut self.condition
     }
 
-    pub fn get_rpar_token(&self) -> &Spanned<Token> {
+    pub fn get_rpar_token(&self) -> &Option<Spanned<Token>> {
         &self.rightpar_token
     }
 
@@ -650,9 +656,9 @@ impl ElseBlock {
 #[derive(Debug, PartialEq, Clone)]
 pub struct IfThenStatement {
     if_token: Spanned<Token>,
-    leftpar_token: Spanned<Token>,
+    leftpar_token: Option<Spanned<Token>>,
     condition: Box<Expression>,
-    rightpar_token: Spanned<Token>,
+    rightpar_token: Option<Spanned<Token>>,
     then_token: Spanned<Token>,
     statements: Vec<Statement>,
 
@@ -665,9 +671,9 @@ impl IfThenStatement {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         if_token: Spanned<Token>,
-        leftpar_token: Spanned<Token>,
+        leftpar_token: Option<Spanned<Token>>,
         condition: Expression,
-        rightpar_token: Spanned<Token>,
+        rightpar_token: Option<Spanned<Token>>,
         then_token: Spanned<Token>,
         statements: Vec<Statement>,
         else_if_blocks: Vec<ElseIfBlock>,
@@ -690,7 +696,7 @@ impl IfThenStatement {
     pub fn get_if_token(&self) -> &Spanned<Token> {
         &self.if_token
     }
-    pub fn get_lpar_token(&self) -> &Spanned<Token> {
+    pub fn get_lpar_token(&self) -> &Option<Spanned<Token>> {
         &self.leftpar_token
     }
 
@@ -702,7 +708,7 @@ impl IfThenStatement {
         &mut self.condition
     }
 
-    pub fn get_rpar_token(&self) -> &Spanned<Token> {
+    pub fn get_rpar_token(&self) -> &Option<Spanned<Token>> {
         &self.rightpar_token
     }
 
@@ -741,9 +747,9 @@ impl IfThenStatement {
     pub fn empty(condition: Expression, statements: Vec<Statement>, else_if_blocks: Vec<ElseIfBlock>, else_block: Option<ElseBlock>) -> Self {
         Self {
             if_token: Spanned::create_empty(Token::If),
-            leftpar_token: Spanned::create_empty(Token::LPar),
+            leftpar_token: None,
             condition: Box::new(condition),
-            rightpar_token: Spanned::create_empty(Token::RPar),
+            rightpar_token: None,
             then_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new("THEN".to_string()))),
             statements,
             else_if_blocks,

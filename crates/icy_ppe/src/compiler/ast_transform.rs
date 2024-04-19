@@ -1,7 +1,7 @@
 use crate::{
     ast::{
         AstVisitorMut, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression, ForStatement, GotoStatement,
-        IdentifierExpression, IfStatement, LabelStatement, LetStatement, SelectStatement, Statement,
+        IdentifierExpression, IfStatement, LabelStatement, LetStatement, SelectStatement, Statement, VariableDeclarationStatement, VariableSpecifier,
     },
     decompiler::evaluation_visitor::OptimizationVisitor,
     parser::lexer::{Spanned, Token},
@@ -340,5 +340,36 @@ impl AstVisitorMut for AstTransformationVisitor {
             Spanned::create_empty(Token::Eq),
             val_expr,
         ))
+    }
+
+    fn visit_variable_declaration_statement(&mut self, var_decl: &VariableDeclarationStatement) -> Statement {
+        let mut statements = Vec::new();
+        for var in var_decl.get_variables() {
+            let stmt = Statement::VariableDeclaration(VariableDeclarationStatement::new(
+                var_decl.get_type_token().clone(),
+                var_decl.get_variable_type(),
+                vec![VariableSpecifier::new(
+                    var.get_identifier_token().clone(),
+                    None,
+                    var.get_dimensions().clone(),
+                    None,
+                    None,
+                    None,
+                )],
+            ));
+            statements.push(stmt);
+            if let Some(init) = var.get_initalizer() {
+                statements.push(Statement::Let(LetStatement::new(
+                    None,
+                    var.get_identifier_token().clone(),
+                    None,
+                    Vec::new(),
+                    None,
+                    Spanned::create_empty(Token::Eq),
+                    init.visit_mut(self),
+                )));
+            }
+        }
+        Statement::Block(BlockStatement::empty(statements))
     }
 }

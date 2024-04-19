@@ -1,6 +1,5 @@
 use std::{
     ops::{Deref, DerefMut},
-    os::unix::fs,
     path::{Path, PathBuf},
 };
 

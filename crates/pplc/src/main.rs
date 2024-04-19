@@ -56,8 +56,8 @@ lazy_static::lazy_static! {
 
 fn main() {
     let arguments = Cli::parse();
-    let version = if let Some(v) = arguments.ppl_version { v } else { 330 };
-    let valid_versions: Vec<u16> = vec![100, 200, 300, 310, 330, 340];
+    let version = if let Some(v) = arguments.ppl_version { v } else { 400 };
+    let valid_versions: Vec<u16> = vec![100, 200, 300, 310, 330, 340, 400];
     if !valid_versions.contains(&version) {
         println!("Invalid version number valid values {valid_versions:?}");
         return;

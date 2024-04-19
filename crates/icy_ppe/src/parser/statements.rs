@@ -271,26 +271,29 @@ impl Parser {
     fn parse_if(&mut self) -> Option<Statement> {
         let if_token = self.save_spanned_token();
         self.next_token();
-
-        if self.get_cur_token() != Some(Token::LPar) {
+        let mut lpar_token = None;
+        if self.lang_version < 400 && self.get_cur_token() != Some(Token::LPar) {
             self.report_error(self.lex.span(), ParserErrorType::IfWhileConditionNotFound);
             return None;
+        } else if self.get_cur_token() == Some(Token::LPar) {
+            lpar_token = Some(self.save_spanned_token());
+            self.next_token();
         }
-        let lpar_token = self.save_spanned_token();
-        self.next_token();
         let Some(cond) = self.parse_expression() else {
             self.report_error(self.lex.span(), ParserErrorType::IfWhileConditionNotFound);
 
             return None;
         };
 
-        if self.get_cur_token() != Some(Token::RPar) {
-            self.report_error(self.lex.span(), ParserErrorType::MissingCloseParens(self.save_token()));
-
-            return None;
+        let mut rightpar_token = None;
+        if lpar_token.is_some() {
+            if self.get_cur_token() != Some(Token::RPar) {
+                self.report_error(self.lex.span(), ParserErrorType::MissingCloseParens(self.save_token()));
+                return None;
+            }
+            rightpar_token = Some(self.save_spanned_token());
+            self.next_token();
         }
-        let rightpar_token = self.save_spanned_token();
-        self.next_token();
 
         if !is_do_then(&self.cur_token) {
             self.skip_eol();

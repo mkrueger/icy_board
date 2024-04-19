@@ -95,7 +95,7 @@ impl PPECompiler {
     /// Panics if .
     pub fn compile(&mut self, prg: &Ast) {
         let prg = prg.visit_mut(&mut AstTransformationVisitor::default());
-
+        println!("{}", prg);
         let mut sv = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorRepoter::default())));
         prg.visit(&mut sv);
         self.lookup_table = sv.generate_variable_table();
@@ -193,21 +193,7 @@ impl PPECompiler {
                 Some(PPECommand::IfNot(Box::new(cond_buffer), self.get_label_index(goto_stmt.get_label())))
             }
 
-            Statement::VariableDeclaration(var_del) => {
-                for v in var_del.get_variables() {
-                    if let Some(initializer) = v.get_initalizer() {
-                        let Some(decl_idx) = self.lookup_variable_index(v.get_identifier()) else {
-                            log::error!("Variable not found: {}", v.get_identifier());
-                            return None;
-                        };
-                        let decl = self.lookup_table.variable_table.get_var_entry(decl_idx);
-                        let variable = PPEExpr::Value(decl.header.id);
-                        let value = self.comp_expr(initializer);
-                        return Some(PPECommand::Let(Box::new(variable), Box::new(value)));
-                    }
-                }
-                None
-            }
+            Statement::VariableDeclaration(_) => None,
 
             Statement::Let(let_smt) => {
                 let var_name = let_smt.get_identifier();

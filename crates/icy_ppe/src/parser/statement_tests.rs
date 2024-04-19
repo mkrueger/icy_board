@@ -160,6 +160,19 @@ fn test_if_then_statement() {
 }
 
 #[test]
+fn test_if_then_statement2() {
+    check_statement(
+        r"if A THEN
+        END IF",
+        &IfThenStatement::create_empty_statement(
+            IdentifierExpression::create_empty_expression(unicase::Ascii::new("A".to_string())),
+            vec![],
+            vec![],
+            None,
+        ),
+    );
+}
+#[test]
 fn test_if_do_statement() {
     check_statement(
         r"if (A) DO
