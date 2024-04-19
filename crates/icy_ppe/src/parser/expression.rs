@@ -1,7 +1,7 @@
 use super::{lexer::Token, Parser};
 use crate::{
     ast::{
-        BinOp, BinaryExpression, ConstantExpression, Expression, FunctionCallExpression, IdentifierExpression, ParensExpression,
+        ArrayExpression, BinOp, BinaryExpression, ConstantExpression, Expression, FunctionCallExpression, IdentifierExpression, ParensExpression,
         PredefinedFunctionCallExpression, UnaryExpression,
     },
     executable::{FunctionDefinition, FUNCTION_DEFINITIONS},
@@ -282,6 +282,44 @@ impl Parser {
                 }
                 self.next_token();
                 Some(ret)
+            }
+
+            Token::LBrace => {
+                let lbrace_token = self.save_spanned_token();
+                self.next_token();
+                let mut list = Vec::new();
+                while self.get_cur_token() != Some(Token::RBrace) {
+                    self.skip_eol_and_comments();
+                    let Some(expr) = self.parse_expression() else {
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(self.save_token_span(), ParserErrorType::ExpressionExpected(self.save_token()));
+                        return None;
+                    };
+                    list.push(expr);
+                    self.skip_eol_and_comments();
+
+                    match self.get_cur_token() {
+                        Some(Token::RBrace) => break,
+                        Some(Token::Comma) => {
+                            self.next_token();
+                            self.skip_eol_and_comments();
+                            continue;
+                        }
+                        _ => {
+                            self.errors
+                                .lock()
+                                .unwrap()
+                                .report_error(self.save_token_span(), ParserErrorType::CommaOrRBraceExpected);
+                            return None;
+                        }
+                    }
+                }
+                let rbrace_token = self.save_spanned_token();
+
+                self.next_token();
+                Some(Expression::ArrayExpression(ArrayExpression::new(lbrace_token, list, rbrace_token)))
             }
             _ => None,
         }

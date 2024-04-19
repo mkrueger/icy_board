@@ -105,7 +105,14 @@ impl PPECompiler {
                 AstNode::Procedure(_proc) => {}
                 AstNode::FunctionDeclaration(_func) => {}
                 AstNode::ProcedureDeclaration(_proc) => {}
-                AstNode::VariableDeclaration(_stmt) => {}
+                AstNode::VariableDeclaration(stmt) => {
+                    // may get transformed by the ast transformer.
+                    if let Statement::Block(block) = stmt {
+                        for s in block.get_statements() {
+                            self.compile_add_statement(s);
+                        }
+                    }
+                }
                 AstNode::Main(block) => {
                     for s in block.get_statements() {
                         self.compile_add_statement(s);

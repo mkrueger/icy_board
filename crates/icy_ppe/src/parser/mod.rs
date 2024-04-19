@@ -138,6 +138,9 @@ pub enum ParserErrorType {
 
     #[error("Return with expression is only valid inside functions")]
     ReturnExpressionOutsideFunc,
+
+    #[error("',' or '}}' expected")]
+    CommaOrRBraceExpected,
 }
 
 #[derive(Error, Debug, Clone, PartialEq)]

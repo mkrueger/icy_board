@@ -967,11 +967,19 @@ impl AstVisitor<()> for SemanticVisitor {
                 );
                 continue;
             }
+            let (dims, vs) = if let Some(Expression::ArrayExpression(arr_expr)) = v.get_initalizer() {
+                for expr in arr_expr.get_expressions() {
+                    expr.visit(self);
+                }
+                (1, arr_expr.get_expressions().len())
+            } else {
+                (v.get_dimensions().len() as u8, v.get_vector_size())
+            };
             self.add_variable(
                 var_decl.get_variable_type(),
                 v.get_identifier_token(),
-                v.get_dimensions().len() as u8,
-                v.get_vector_size(),
+                dims,
+                vs,
                 v.get_matrix_size(),
                 v.get_cube_size(),
             );

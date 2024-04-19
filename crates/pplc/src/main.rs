@@ -42,6 +42,10 @@ struct Cli {
     #[arg(long)]
     ppl_version: Option<u16>,
 
+    /// version number for the runtime, valid: 100, 200, 300, 310, 330 (default), 340
+    #[arg(long)]
+    runtime_version: Option<u16>,
+
     /// input file is CP437
     #[arg(long)]
     dos: bool,
@@ -56,9 +60,14 @@ lazy_static::lazy_static! {
 
 fn main() {
     let arguments = Cli::parse();
-    let version = if let Some(v) = arguments.ppl_version { v } else { 400 };
+    let ppl_version = if let Some(v) = arguments.ppl_version { v } else { 400 };
+    let runtime_version = if let Some(v) = arguments.ppl_version { v } else { 330 };
     let valid_versions: Vec<u16> = vec![100, 200, 300, 310, 330, 340, 400];
-    if !valid_versions.contains(&version) {
+    if !valid_versions.contains(&ppl_version) {
+        println!("Invalid version number valid values {valid_versions:?}");
+        return;
+    }
+    if !valid_versions.contains(&runtime_version) {
         println!("Invalid version number valid values {valid_versions:?}");
         return;
     }
@@ -78,7 +87,7 @@ fn main() {
         Ok(src) => {
             println!();
             println!("Parsing...");
-            let (mut ast, errors) = parse_ast(PathBuf::from(&file_name), &src, encoding, version);
+            let (mut ast, errors) = parse_ast(PathBuf::from(&file_name), &src, encoding, ppl_version);
             if arguments.nouvar {
                 ast.require_user_variables = false;
             }
@@ -87,7 +96,7 @@ fn main() {
             }
             println!("Compiling...");
 
-            let mut sv = SemanticVisitor::new(version, errors);
+            let mut sv = SemanticVisitor::new(ppl_version, errors);
             ast.visit(&mut sv);
 
             let errors = sv.errors.clone();
@@ -130,7 +139,7 @@ fn main() {
             let mut compiler = PPECompiler::default();
             compiler.compile(&ast);
 
-            match compiler.create_executable(version) {
+            match compiler.create_executable(runtime_version) {
                 Ok(executable) => {
                     if arguments.disassemble {
                         println!();

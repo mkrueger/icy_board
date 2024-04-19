@@ -127,6 +127,8 @@ pub enum Expression {
     FunctionCall(FunctionCallExpression),
     Unary(UnaryExpression),
     Binary(BinaryExpression),
+
+    ArrayExpression(ArrayExpression),
 }
 
 impl Expression {
@@ -139,6 +141,7 @@ impl Expression {
             Expression::FunctionCall(fc) => fc.get_identifier_token().span.start..fc.get_rpar_token_token().span.end,
             Expression::Unary(u) => u.get_op_token().span.start..u.get_expression().get_span().end,
             Expression::Binary(b) => b.get_left_expression().get_span().start..b.get_right_expression().get_span().end,
+            Expression::ArrayExpression(b) => b.get_expressions().first().unwrap().get_span().start..b.get_expressions().last().unwrap().get_span().end,
         }
     }
 
@@ -151,6 +154,7 @@ impl Expression {
             Expression::FunctionCall(expr) => visitor.visit_function_call_expression(expr),
             Expression::Unary(expr) => visitor.visit_unary_expression(expr),
             Expression::Binary(expr) => visitor.visit_binary_expression(expr),
+            Expression::ArrayExpression(expr) => visitor.visit_array_expression(expr),
         }
     }
 
@@ -164,6 +168,7 @@ impl Expression {
             Expression::FunctionCall(expr) => visitor.visit_function_call_expression(expr),
             Expression::Unary(expr) => visitor.visit_unary_expression(expr),
             Expression::Binary(expr) => visitor.visit_binary_expression(expr),
+            Expression::ArrayExpression(expr) => visitor.visit_array_expression(expr),
         }
     }
 
@@ -694,5 +699,64 @@ impl BinaryExpression {
 impl fmt::Display for BinaryExpression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} {} {}", self.get_left_expression(), self.get_op(), self.get_right_expression())
+    }
+}
+
+/// { expr1, expr2, ..., exprn }
+#[derive(Debug, PartialEq, Clone)]
+pub struct ArrayExpression {
+    lbrace_token: Spanned<Token>,
+    expressions: Vec<Expression>,
+    rbrace_token: Spanned<Token>,
+}
+
+impl ArrayExpression {
+    pub fn new(leftpar_token: Spanned<Token>, expressions: Vec<Expression>, rightpar_token: Spanned<Token>) -> Self {
+        Self {
+            lbrace_token: leftpar_token,
+            expressions,
+            rbrace_token: rightpar_token,
+        }
+    }
+
+    pub fn empty(expressions: Vec<Expression>) -> Self {
+        Self {
+            lbrace_token: Spanned::create_empty(Token::LBrace),
+            expressions,
+            rbrace_token: Spanned::create_empty(Token::RBrace),
+        }
+    }
+
+    pub fn get_lbrace_token_token(&self) -> &Spanned<Token> {
+        &self.lbrace_token
+    }
+
+    pub fn get_expressions(&self) -> &Vec<Expression> {
+        &self.expressions
+    }
+
+    pub fn get_expressions_mut(&mut self) -> &mut Vec<Expression> {
+        &mut self.expressions
+    }
+
+    pub fn get_rbrace_token_token(&self) -> &Spanned<Token> {
+        &self.rbrace_token
+    }
+
+    pub fn create_empty_expression(constant_value: Expression) -> Expression {
+        Expression::Parens(ParensExpression::empty(constant_value))
+    }
+}
+
+impl fmt::Display for ArrayExpression {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{{")?;
+        for (i, arg) in self.get_expressions().iter().enumerate() {
+            write!(f, "{arg}")?;
+            if i < self.get_expressions().len() - 1 {
+                write!(f, ", ")?;
+            }
+        }
+        write!(f, "}}")
     }
 }

@@ -30,6 +30,12 @@ pub enum LexingErrorType {
 
     #[error("Can't find parent of path {0}")]
     PathError(String),
+
+    #[error("Use ^ instead of **")]
+    PowWillGetRemoved,
+
+    #[error("Don't use braces, they will get another meaning in the future. Use '(', ')' instead.")]
+    DontUseBraces,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -146,6 +152,9 @@ pub enum Token {
     Repeat,
     Until,
 
+    LBrace,
+    RBrace,
+
     Loop,
     EndLoop,
 
@@ -206,8 +215,10 @@ impl fmt::Display for Token {
             Token::Identifier(s) => write!(f, "{s}"),
             Token::LPar => write!(f, "("),
             Token::RPar => write!(f, ")"),
+            Token::LBrace => write!(f, "{{"),
+            Token::RBrace => write!(f, "}}"),
             Token::Comma => write!(f, ","),
-            Token::PoW => write!(f, "**"),
+            Token::PoW => write!(f, "^"),
             Token::Mul => write!(f, "*"),
             Token::Div => write!(f, "/"),
             Token::Mod => write!(f, "%"),
@@ -534,8 +545,27 @@ impl Lexer {
                 Some(Token::Label(identifier))
             },
 
-            '(' | '[' | '{' => Some(Token::LPar),
-            ')' | ']' | '}' => Some(Token::RPar),
+            '(' | '[' => Some(Token::LPar),
+            ')' | ']' => Some(Token::RPar),
+
+            '{'  => {
+                if self.lang_version < 400 {
+                    self.errors.lock().unwrap().report_warning(self.token_start..self.token_end,LexingErrorType::DontUseBraces);
+                    Some(Token::LPar)
+                } else {
+                    Some(Token::LBrace)
+                }
+            }
+
+            '}'  => {
+                if self.lang_version < 400 {
+                    self.errors.lock().unwrap().report_warning(self.token_start..self.token_end,LexingErrorType::DontUseBraces);
+                    Some(Token::RPar)
+                } else {
+                    Some(Token::RBrace)
+                }
+            }
+
             ',' => Some(Token::Comma),
             '^' => Some(Token::PoW),
             '*' => {
@@ -544,6 +574,7 @@ impl Lexer {
                 }
                 let next = self.next_ch();
                 if let Some('*') = next {
+                    self.errors.lock().unwrap().report_warning(self.token_start..self.token_end,LexingErrorType::PowWillGetRemoved);
                     Some(Token::PoW)
                 } else {
                     if self.lang_version >= 400 && next == Some('=') {

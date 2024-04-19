@@ -1,10 +1,10 @@
 use crate::parser::lexer::{Spanned, Token};
 
 use super::{
-    Ast, AstNode, BinaryExpression, BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstantExpression, ContinueStatement, ElseBlock,
-    ElseIfBlock, Expression, ForStatement, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement,
-    IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement, LoopStatement, ParameterSpecifier, ParensExpression,
-    PredefinedCallStatement, PredefinedFunctionCallExpression, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation,
+    ArrayExpression, Ast, AstNode, BinaryExpression, BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstantExpression,
+    ContinueStatement, ElseBlock, ElseIfBlock, Expression, ForStatement, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation,
+    GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement, LoopStatement, ParameterSpecifier,
+    ParensExpression, PredefinedCallStatement, PredefinedFunctionCallExpression, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation,
     RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, UnaryExpression, VariableDeclarationStatement, VariableSpecifier, WhileDoStatement,
     WhileStatement,
 };
@@ -20,6 +20,10 @@ pub trait AstVisitor<T: Default>: Sized {
     }
     fn visit_binary_expression(&mut self, binary: &BinaryExpression) -> T {
         walk_binary_expression(self, binary);
+        T::default()
+    }
+    fn visit_array_expression(&mut self, array_expr: &ArrayExpression) -> T {
+        walk_array_expression(self, array_expr);
         T::default()
     }
     fn visit_unary_expression(&mut self, unary: &UnaryExpression) -> T {
@@ -270,6 +274,12 @@ pub fn walk_binary_expression<T: Default, V: AstVisitor<T>>(visitor: &mut V, bin
     binary.get_right_expression().visit(visitor);
 }
 
+pub fn walk_array_expression<T: Default, V: AstVisitor<T>>(visitor: &mut V, arr_expr: &ArrayExpression) {
+    for arg in arr_expr.get_expressions() {
+        arg.visit(visitor);
+    }
+}
+
 pub fn walk_predefined_function_call_expression<T: Default, V: AstVisitor<T>>(visitor: &mut V, call: &PredefinedFunctionCallExpression) {
     for arg in call.get_arguments() {
         arg.visit(visitor);
@@ -349,6 +359,12 @@ pub trait AstVisitorMut: Sized {
         let left = binary.get_left_expression().visit_mut(self);
         let right = binary.get_right_expression().visit_mut(self);
         Expression::Binary(BinaryExpression::empty(left, binary.get_op(), right))
+    }
+
+    fn visit_array_expression(&mut self, array_expr: &ArrayExpression) -> Expression {
+        Expression::ArrayExpression(ArrayExpression::empty(
+            array_expr.get_expressions().iter().map(|arg| arg.visit_mut(self)).collect(),
+        ))
     }
 
     fn visit_unary_expression(&mut self, unary: &UnaryExpression) -> Expression {
