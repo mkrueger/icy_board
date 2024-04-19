@@ -191,15 +191,39 @@ New loops
 ``` REPEAT ... UNTIL [CONDITION] ``` Statement
 ``` LOOP ... ENDLOOP``` Statement
 
-Variable initalizers:
+Variable initializers:
 
-``` TYPE VAR=[INITALIZER]``` Statement
+``` TYPE VAR=[INITIALIZER]``` Statement
 
 Operator Assignment for binary (non condition operators):
 
 ``` A += 1``` Statement
 
-With "lang" version 'Quit' and 'Loop' are no longer synonyms for 'break' and 'continue'. Existing sources should be easily adapted.
+Works for ```+-*/%``` and ```&|```
+
+Return can now return values inside functions:
+
+``` RETURN expr``` Statement
+
+1:1 same semantic as:
+
+```PPL
+FUNC_NAME = expr
+RETURN 
+```
+
+No more brackets needed for if or while statements!
+
+Example:
+```PPL
+IF A <> B THEN
+...
+ENDIF
+
+WHILE IsValid() PRINTLN "Success."
+```
+
+Note: With "lang" version >=400 'Quit' and 'Loop' are no longer synonyms for 'break' and 'continue'. Existing sources should be easily adapted.
 But never saw them in the wild.
 
 ### Runner
