@@ -1211,10 +1211,12 @@ impl AstVisitor<()> for SemanticVisitor {
                         .report_warning(decl.span.clone(), CompilationErrorType::UnusedFunction(decl.token.to_string()));
                 }
             } else if r.usages.is_empty() {
-                self.errors
-                    .lock()
-                    .unwrap()
-                    .report_warning(decl.span.clone(), CompilationErrorType::UnusedVariable(decl.token.to_string()));
+                if decl.token.to_string() != ":~BEGIN~" {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_warning(decl.span.clone(), CompilationErrorType::UnusedVariable(decl.token.to_string()));
+                }
             }
         }
 

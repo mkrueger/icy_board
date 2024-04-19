@@ -13,7 +13,8 @@ BEGIN
   FOR i = 0 TO HICONFNUM()
     STRING name = CONFINFO(i, 1)
     IF name <> "" && Has_Access(i) THEN
-      IF GetX() > 45 PRINTLN "     "
+      IF GetX() > 45
+        PRINTLN "     "
       PRINT "@X0E", LEFT(TOSTRING(i), 3)," - ", "@X0F", LEFT(name,30)
       CONTINUE
     ENDIF
@@ -24,13 +25,9 @@ BEGIN
 END
 
 FUNCTION Has_Access(INTEGER conf) BOOLEAN
-  If CURSEC() >= SYSOPSEC() || CONFREG(conf) THEN
-    RETURN TRUE
-  ENDIF
-
-  IF CONFEXP(conf) || !CONFINFO(conf, 2) THEN
-      RETURN FALSE
-  ENDIF
-
+  IF CURSEC() >= SYSOPSEC() || CONFREG(conf)
+     RETURN TRUE
+  IF CONFEXP(conf) || !CONFINFO(conf, 2)
+     RETURN FALSE
   RETURN CURSEC() >= CONFINFO(conf, 8)
 ENDFUNC
