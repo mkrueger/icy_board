@@ -1665,10 +1665,10 @@ impl IcbTextFile {
             Ok(data) => Self::deserialize(&data, path.as_ref().display().to_string()),
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::NotFound {
-                    Err(IcyError::FileNotFound(path.as_ref().to_string_lossy().to_string()).into())
+                    Err(IcyError::FileNotFound("ICBTEXT".to_string(), path.as_ref().to_string_lossy().to_string()).into())
                 } else {
                     log::error!("Error loading icb text file '{}': {}", path.as_ref().display(), e);
-                    Err(IcyError::ErrorLoadingFile(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
+                    Err(IcyError::ErrorLoadingFile("ICBTEXT".to_string(), path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
                 }
             }
         }

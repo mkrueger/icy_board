@@ -1,5 +1,10 @@
-use std::{fs::File, io::BufReader, path::Path};
+use std::{
+    fs::File,
+    io::{BufReader, Read},
+    path::Path,
+};
 
+use byteorder::ReadBytesExt;
 use codepages::tables::UNICODE_TO_CP437;
 use icy_ppe::{parser::Encoding, tables::import_cp437_string, Res};
 
@@ -98,6 +103,147 @@ impl PcbLegacyConferenceHeader {
         append_cp437(&mut res, &self.pth_name_loc, 33);
 
         res
+    }
+
+    pub fn to_conference_header(&self) -> PcbAdditionalConferenceHeader {
+        PcbAdditionalConferenceHeader {
+            force_echo: self.echo_mail,
+            read_only: false,
+            no_private_msgs: !self.priv_msgs,
+            ret_receipt_level: 0,
+            record_origin: false,
+            prompt_for_routing: false,
+            allow_aliases: false,
+            show_intro_on_ra: false,
+            req_level_to_enter: self.req_sec_level as u8,
+            password: String::new(),
+            intro: String::new(),
+            attach_loc: String::new(),
+            reg_flags: 0,
+            attach_level: 0,
+            carbon_limit: 0,
+            cmd_lst: String::new(),
+            old_index: false,
+            long_to_names: false,
+            carbon_level: 0,
+            conf_type: 0,
+            export_ptr: 0,
+            charge_time: 0.0,
+            charge_msg_read: 0.0,
+            charge_msg_write: 0.0,
+        }
+    }
+
+    #[allow(clippy::field_reassign_with_default)]
+    pub fn deserialize(reader: &mut BufReader<File>) -> Res<Self> {
+        let mut name = [14; 0];
+        reader.read_exact(&mut name)?;
+        let name = import_cp437_string(&mut name, true);
+        let public_conf = reader.read_u8()? != 0;
+        let auto_rejoin = reader.read_u8()? != 0;
+        let view_members = reader.read_u8()? != 0;
+        let priv_uplds = reader.read_u8()? != 0;
+        let priv_msgs = reader.read_u8()? != 0;
+        let echo_mail = reader.read_u8()? != 0;
+        let req_sec_level = reader.read_u16::<byteorder::LittleEndian>()?;
+        let add_sec = reader.read_u16::<byteorder::LittleEndian>()?;
+        let add_time = reader.read_u16::<byteorder::LittleEndian>()?;
+        let msg_blocks = reader.read_u8()?;
+        let mut msg_file = [32; 0];
+        reader.read_exact(&mut msg_file)?;
+        let msg_file = import_cp437_string(&mut msg_file, true);
+        let mut user_menu = [32; 0];
+        reader.read_exact(&mut user_menu)?;
+        let user_menu = import_cp437_string(&mut user_menu, true);
+        let mut sysop_menu = [32; 0];
+        reader.read_exact(&mut sysop_menu)?;
+        let sysop_menu = import_cp437_string(&mut sysop_menu, true);
+        let mut news_file = [32; 0];
+        reader.read_exact(&mut news_file)?;
+        let news_file = import_cp437_string(&mut news_file, true);
+        let pub_upld_sort = reader.read_u8()?;
+        let mut upld_dir = [29; 0];
+        reader.read_exact(&mut upld_dir)?;
+        let upld_dir = import_cp437_string(&mut upld_dir, true);
+        let mut pub_upld_loc = [26; 0];
+        reader.read_exact(&mut pub_upld_loc)?;
+        let pub_upld_loc = import_cp437_string(&mut pub_upld_loc, true);
+        let prv_upld_sort = reader.read_u8()?;
+        let mut priv_dir = [29; 0];
+        reader.read_exact(&mut priv_dir)?;
+        let priv_dir = import_cp437_string(&mut priv_dir, true);
+        let mut prv_upld_loc = [26; 0];
+        reader.read_exact(&mut prv_upld_loc)?;
+        let prv_upld_loc = import_cp437_string(&mut prv_upld_loc, true);
+
+        let mut drs_menu = [29; 0];
+        reader.read_exact(&mut drs_menu)?;
+        let drs_menu = import_cp437_string(&mut drs_menu, true);
+
+        let mut drs_file = [33; 0];
+        reader.read_exact(&mut drs_file)?;
+        let drs_file = import_cp437_string(&mut drs_file, true);
+
+        let mut blt_menu = [29; 0];
+        reader.read_exact(&mut blt_menu)?;
+        let blt_menu = import_cp437_string(&mut blt_menu, true);
+
+        let mut blt_name_loc = [33; 0];
+        reader.read_exact(&mut blt_name_loc)?;
+        let blt_name_loc = import_cp437_string(&mut blt_name_loc, true);
+
+        let mut scr_menu = [29; 0];
+        reader.read_exact(&mut scr_menu)?;
+        let scr_menu = import_cp437_string(&mut scr_menu, true);
+
+        let mut scr_name_loc = [33; 0];
+        reader.read_exact(&mut scr_name_loc)?;
+        let scr_name_loc = import_cp437_string(&mut scr_name_loc, true);
+
+        let mut dir_menu = [29; 0];
+        reader.read_exact(&mut dir_menu)?;
+        let dir_menu = import_cp437_string(&mut dir_menu, true);
+
+        let mut dir_name_loc = [33; 0];
+        reader.read_exact(&mut dir_name_loc)?;
+        let dir_name_loc = import_cp437_string(&mut dir_name_loc, true);
+
+        let mut pth_name_loc = [33; 0];
+        reader.read_exact(&mut pth_name_loc)?;
+        let pth_name_loc = import_cp437_string(&mut pth_name_loc, true);
+
+        Ok(Self {
+            name,
+            public_conf,
+            auto_rejoin,
+            view_members,
+            priv_uplds,
+            priv_msgs,
+            echo_mail,
+            req_sec_level,
+            add_sec,
+            add_time,
+            msg_blocks,
+            msg_file,
+            user_menu,
+            sysop_menu,
+            news_file,
+            pub_upld_sort,
+            upld_dir,
+            pub_upld_loc,
+            prv_upld_sort,
+            priv_dir,
+            prv_upld_loc,
+            drs_menu,
+            drs_file,
+            blt_menu,
+            blt_name_loc,
+            scr_menu,
+            scr_name_loc,
+            dir_menu,
+            dir_name_loc,
+            pth_name_loc,
+        })
     }
 }
 
@@ -342,6 +488,16 @@ impl PcbAdditionalConferenceHeader {
                 charge_msg_write,
             });
             data = &data[Self::RECORD_SIZE..];
+        }
+        Ok(res)
+    }
+
+    pub fn import_old_pcboard<P: AsRef<Path>>(path: &P) -> Res<Vec<Self>> {
+        let mut res = Vec::new();
+        let data = std::fs::File::open(path)?;
+        let mut reader = BufReader::new(data);
+        while let Ok(old) = PcbLegacyConferenceHeader::deserialize(&mut reader) {
+            res.push(old.to_conference_header());
         }
         Ok(res)
     }

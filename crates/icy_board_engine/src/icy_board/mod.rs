@@ -207,10 +207,13 @@ impl IcyBoard {
         })?;
 
         let load_path = RelativePath::from_path(&config.paths.statistics_file)?.to_path(parent_path);
-        let statistics = Statistics::load(&load_path).map_err(|e| {
-            log::error!("Error loading statistics: {} from {}", e, load_path.display());
-            e
-        })?;
+        let statistics = match Statistics::load(&load_path) {
+            Ok(stat) => stat,
+            Err(e) => {
+                log::error!("Error loading statistics: {} from {}, generating default.", e, load_path.display());
+                Statistics::default()
+            }
+        };
 
         Ok(IcyBoard {
             file_name: path.as_ref().to_path_buf(),
@@ -492,15 +495,15 @@ pub(crate) fn load_internal<T: IcyBoardSerializer, P: AsRef<Path>>(path: &P) -> 
             Ok(result) => Ok(result),
             Err(e) => {
                 log::error!("Loading {} toml file '{}': {}", T::FILE_TYPE, path.as_ref().display(), e);
-                Err(IcyError::ErrorLoadingFile(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
+                Err(IcyError::ErrorLoadingFile(T::FILE_TYPE.to_string(), path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
             }
         },
         Err(e) => {
             if e.kind() == std::io::ErrorKind::NotFound {
-                Err(IcyError::FileNotFound(path.as_ref().to_string_lossy().to_string()).into())
+                Err(IcyError::FileNotFound(T::FILE_TYPE.to_string(), path.as_ref().to_string_lossy().to_string()).into())
             } else {
                 log::error!("Loading {} file '{}': {}", T::FILE_TYPE, path.as_ref().display(), e);
-                Err(IcyError::ErrorLoadingFile(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
+                Err(IcyError::ErrorLoadingFile(T::FILE_TYPE.to_string(), path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
             }
         }
     }
@@ -570,7 +573,7 @@ pub trait PCBoardRecordImporter<T>: Sized + Default {
             }
             Err(err) => {
                 log::error!("Importing file '{}' from pcboard binary file: {}", path.as_ref().display(), err);
-                Err(IcyError::ErrorLoadingFile(path.as_ref().to_string_lossy().to_string(), err.to_string()).into())
+                Err(IcyError::ErrorLoadingFile("PCBOARD BIN FILE".to_string(), path.as_ref().to_string_lossy().to_string(), err.to_string()).into())
             }
         }
     }
@@ -592,7 +595,7 @@ pub trait PCBoardBinImporter: Sized + Default {
             }
             Err(err) => {
                 log::error!("Importing file '{}' from pcboard binary file: {}", path.as_ref().display(), err);
-                Err(IcyError::ErrorLoadingFile(path.as_ref().to_string_lossy().to_string(), err.to_string()).into())
+                Err(IcyError::ErrorLoadingFile("PCBOARD BIN FILE".to_string(), path.as_ref().to_string_lossy().to_string(), err.to_string()).into())
             }
         }
     }
@@ -606,7 +609,7 @@ pub trait PCBoardTextImport: PCBoardImport {
             Ok(data) => Self::import_data(data),
             Err(err) => {
                 log::error!("Importing file '{}' from pcboard binary file: {}", path.as_ref().display(), err);
-                Err(IcyError::ErrorLoadingFile(path.as_ref().to_string_lossy().to_string(), err.to_string()).into())
+                Err(IcyError::ErrorLoadingFile("PCBOARD TEXT FILE".to_string(), path.as_ref().to_string_lossy().to_string(), err.to_string()).into())
             }
         }
     }

@@ -787,8 +787,7 @@ pub fn cdon(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     panic!("TODO")
 }
 pub fn langext(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_string(vm.icy_board_state.session.language.clone()))
 }
 pub fn ansion(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_bool(!vm.icy_board_state.session.disp_options.disable_color))
@@ -855,8 +854,12 @@ pub fn u_stat(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     panic!("TODO")
 }
 pub fn defcolor(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let color = vm.icy_board_state.board.lock().unwrap().config.color_configuration.default.clone();
+    match color {
+        crate::icy_board::icb_config::IcbColor::None => Ok(VariableValue::new_int(7)),
+        crate::icy_board::icb_config::IcbColor::Dos(col) => Ok(VariableValue::new_int(col as i32)),
+        crate::icy_board::icb_config::IcbColor::IcyEngine(_) => Ok(VariableValue::new_int(7)),
+    }
 }
 pub fn abs(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     let val = vm.eval_expr(&args[0])?.as_int();
@@ -864,8 +867,18 @@ pub fn abs(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
 }
 
 pub fn grafmode(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    match vm.icy_board_state.session.disp_options.grapics_mode {
+        crate::icy_board::state::GraphicsMode::Off => Ok(VariableValue::new_string("N".to_string())),
+        crate::icy_board::state::GraphicsMode::Ansi => {
+            // never returned "A" for ANSI
+            Ok(VariableValue::new_string("G".to_string()))
+        }
+        crate::icy_board::state::GraphicsMode::Avatar => {
+            // Avatar is new!
+            Ok(VariableValue::new_string("V".to_string()))
+        }
+        crate::icy_board::state::GraphicsMode::Rip => Ok(VariableValue::new_string("R".to_string())),
+    }
 }
 
 pub fn psa(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {

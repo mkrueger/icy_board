@@ -960,13 +960,14 @@ impl PcbBoardData {
         ret.allow_pwrd_comment = read_bool(&mut reader, encoding)?;
         ret.guard_logoff = read_bool(&mut reader, encoding)?;
         ret.num_desc_lines = read_int(&mut reader, encoding)?;
-
         // End of 14.5 files
         let Ok(chat_file) = read_line(&mut reader, encoding) else {
             return Ok(ret);
         };
         ret.path.chat_file = chat_file;
+
         ret.path.stats_file = read_line(&mut reader, encoding)?;
+
         ret.path.chat_menu = read_line(&mut reader, encoding)?;
         ret.path.no_ansi = read_line(&mut reader, encoding)?;
         ret.slow_drives = read_line(&mut reader, encoding)?;
@@ -987,10 +988,15 @@ impl PcbBoardData {
         ret.auto_make_msgs = read_bool(&mut reader, encoding)?;
         ret.verify_cdloss = read_bool(&mut reader, encoding)?;
         ret.encrypt = read_bool(&mut reader, encoding)?;
-        ret.upload_credit = read_int(&mut reader, encoding)?;
+
+        let Ok(upload_credit) = read_int(&mut reader, encoding) else {
+            return Ok(ret);
+        };
+        ret.upload_credit = upload_credit;
         ret.byte_credit = read_int(&mut reader, encoding)?;
 
         ret.colors.default = read_int(&mut reader, encoding)?;
+
         ret.colors.msg_hdr_date = read_int(&mut reader, encoding)?;
         ret.colors.msg_hdr_to = read_int(&mut reader, encoding)?;
         ret.colors.msg_hdr_from = read_int(&mut reader, encoding)?;
@@ -1123,6 +1129,7 @@ impl PcbBoardData {
         ret.fido_auto_add = read_bool(&mut reader, encoding)?;
         ret.fido_re_address = read_bool(&mut reader, encoding)?;
         ret.fido_route_echo_mail = read_bool(&mut reader, encoding)?;
+        println!("2");
 
         ret.minimize_log_on_off = read_int(&mut reader, encoding)?;
         ret.minimize_protocols = read_int(&mut reader, encoding)?;

@@ -1,4 +1,5 @@
 use std::{
+    fs,
     io::stdout,
     path::{Path, PathBuf},
     process,
@@ -77,6 +78,8 @@ fn main() -> Res<()> {
                     }
                     Err(e) => {
                         print_error(e.to_string());
+                        let destination = importer.output_directory.join("importlog.txt");
+                        fs::write(destination, &importer.logger.output)?;
                     }
                 },
                 Err(e) => {

@@ -67,47 +67,51 @@ pub struct PCBoardImporter {
 
 impl PCBoardImporter {
     pub fn new(file_name: &str, output: Box<dyn OutputLogger>, output_directory: PathBuf) -> Res<Self> {
-        let data = PcbBoardData::import_pcboard(file_name)?;
-        let mut paths = HashMap::new();
+        match PcbBoardData::import_pcboard(file_name) {
+            Ok(data) => {
+                let mut paths = HashMap::new();
 
-        let file_path = PathBuf::from(file_name);
-        let mut help = data.path.help_loc.clone();
-        if help.ends_with('\\') {
-            help.pop();
+                let file_path = PathBuf::from(file_name);
+                let mut help = data.path.help_loc.clone();
+                if help.ends_with('\\') {
+                    help.pop();
+                }
+
+                help = help.replace('\\', "/");
+
+                let help_loc = PathBuf::from(&help);
+                let mut path = file_path.parent().unwrap().to_path_buf();
+
+                let upper = path.to_string_lossy().to_ascii_uppercase();
+
+                let source_directory = path.clone();
+                output.start_action(format!("Importing PCBoard from base path {}\n", source_directory.display()));
+
+                path.push(help_loc.file_name().unwrap());
+                if !path.exists() {
+                    return Err(Box::new(IcyBoardError::Error("Can't resolve C: file".to_string())));
+                }
+
+                //let len = to_str().unwrap().len();
+                let k = help_loc.parent().unwrap().to_str().unwrap().to_string();
+                let v = file_path.parent().unwrap().to_path_buf().to_str().unwrap().to_string();
+                paths.insert(k, v);
+
+                let mut map_paths = HashMap::new();
+                map_paths.insert(upper.clone() + "\\PPE", output_directory.join("ppe"));
+                map_paths.insert(upper.clone(), output_directory.clone());
+
+                Ok(Self {
+                    output,
+                    data,
+                    output_directory,
+                    resolve_paths: paths,
+                    logger: ImportLog::default(),
+                    converted_files: HashMap::new(),
+                })
+            }
+            Err(err) => Err(Box::new(IcyBoardError::Error(format!("Error reading PCBoard data: {}", err.to_string())))),
         }
-
-        help = help.replace('\\', "/");
-
-        let help_loc = PathBuf::from(&help);
-        let mut path = file_path.parent().unwrap().to_path_buf();
-
-        let upper = path.to_string_lossy().to_ascii_uppercase();
-
-        let source_directory = path.clone();
-        output.start_action(format!("Importing PCBoard from base path {}\n", source_directory.display()));
-
-        path.push(help_loc.file_name().unwrap());
-        if !path.exists() {
-            return Err(Box::new(IcyBoardError::Error("Can't resolve C: file".to_string())));
-        }
-
-        //let len = to_str().unwrap().len();
-        let k = help_loc.parent().unwrap().to_str().unwrap().to_string();
-        let v = file_path.parent().unwrap().to_path_buf().to_str().unwrap().to_string();
-        paths.insert(k, v);
-
-        let mut map_paths = HashMap::new();
-        map_paths.insert(upper.clone() + "\\PPE", output_directory.join("ppe"));
-        map_paths.insert(upper.clone(), output_directory.clone());
-
-        Ok(Self {
-            output,
-            data,
-            output_directory,
-            resolve_paths: paths,
-            logger: ImportLog::default(),
-            converted_files: HashMap::new(),
-        })
     }
 
     pub fn resolve_file(&self, file: &str) -> Res<PathBuf> {
@@ -118,6 +122,11 @@ impl PCBoardImporter {
                 _ => x,
             })
             .collect();
+
+        // hack for "/path" - assume that PCB is on the same drive & top level dir (like C:\PCB)
+        if s.starts_with("/") {
+            s = format!("{}/..{}", self.resolve_paths.values().next().unwrap(), s);
+        }
 
         for (k, v) in &self.resolve_paths {
             if s.starts_with(k) {
@@ -336,12 +345,30 @@ impl PCBoardImporter {
         self.output.start_action("Convert conferences…".into());
 
         let conf = self.resolve_file(conference_file)?;
-        let conf_add = self.resolve_file(&(conference_file.to_string() + ".ADD"))?;
+        if !conf.exists() {
+            self.output.warning(format!("Can't find conference file {}", conf.display()));
+            self.logger.log(&format!("Can't find conference file {}", conf.display()).as_str());
+            return Ok(PathBuf::new());
+        }
         let conferences = PcbConferenceHeader::import_pcboard(&conf, self.data.num_conf as usize)?;
-        let add_conferences = PcbAdditionalConferenceHeader::import_pcboard(&conf_add)?;
+
+        let conf_add = self.resolve_file(&(conference_file.to_string() + ".ADD"))?;
+        let conf_old_add = self.resolve_file(&(conference_file.to_string() + ".@@@"))?;
+
+        let add_conferences = if conf_add.exists() {
+            self.logger.log(&format!("import conference header {}", conf_add.display()).as_str());
+            PcbAdditionalConferenceHeader::import_pcboard(&conf_add)?
+        } else if conf_old_add.exists() {
+            self.logger.log(&format!("read old conference header {}", conf_old_add.display()).as_str());
+            PcbAdditionalConferenceHeader::import_old_pcboard(&conf_old_add)?
+        } else {
+            self.output.warning(format!("Can't find conference add file {}", conf_add.display()));
+            self.logger.log(&format!("Can't find conference add file {}", conf_add.display()).as_str());
+            vec![PcbAdditionalConferenceHeader::default(); conferences.len()]
+        };
+        self.logger.log("imported conference headers, converting...");
 
         let mut conf_base = ConferenceBase::import_pcboard(&self.output_directory, &conferences, &add_conferences);
-
         for (i, conf) in conf_base.iter_mut().enumerate() {
             let output = if i == 0 { "conferences/main".to_string() } else { format!("conferences/{i}") };
             let destination = self.output_directory.join(&output);
@@ -361,7 +388,10 @@ impl PCBoardImporter {
 
             conf.blt_menu = self.convert_conference_display_file(&output, &conf.blt_menu)?;
             conf.blt_file = self.convert_bullettin_file(&destination, &output, &conf.blt_file)?;
+
+            self.logger.log(&format!("convert survey menus {}", conf.survey_menu.display()).as_str());
             conf.survey_menu = self.convert_conference_display_file(&output, &conf.survey_menu)?;
+
             conf.survey_file = self.convert_questionnaires(&destination, &output, &conf.survey_file)?;
 
             conf.file_area_menu = self.convert_conference_display_file(&output, &conf.file_area_menu)?;
@@ -524,9 +554,27 @@ impl PCBoardImporter {
                     self.logger.translated_file(&resolved_file, &menu_path);
                     return Ok(out_path);
                 }
-                _ => {}
+                _ => {
+                    let out_path = self
+                        .output_directory
+                        .parent()
+                        .unwrap()
+                        .join("gen")
+                        .join(resolved_file.file_name().unwrap().to_ascii_lowercase());
+                    self.converted_files.insert(upper_file_name.clone(), out_path.to_str().unwrap().to_string());
+
+                    match self.import_and_scan_file(&resolved_file, &out_path) {
+                        Err(err) => {
+                            self.logger.log_boxed_error(&*err);
+                            return Ok(resolved_file.to_str().unwrap().to_string());
+                        }
+                        _ => {}
+                    }
+                    return Ok(out_path.to_str().unwrap().to_string());
+                }
             }
         }
+
         let output_path = self.output_directory.join("gen").join(resolved_file.file_name().unwrap().to_ascii_lowercase());
         convert_to_utf8(&resolved_file, &output_path)?;
         self.converted_files.insert(upper_file_name.clone(), output_path.to_str().unwrap().to_string());
@@ -767,7 +815,7 @@ impl PCBoardImporter {
 
     fn convert_data<T: PCBoardImport>(&mut self, file: &str, new_rel_name: &str) -> Res<PathBuf> {
         if file.is_empty() {
-            return Ok(PathBuf::new());
+            return Ok(PathBuf::from(new_rel_name));
         }
 
         let resolved_file = self.resolve_file(file)?;
@@ -788,15 +836,16 @@ impl PCBoardImporter {
     }
 
     fn convert_default_cmd_lst(&mut self, file: &str, new_rel_name: &str) -> Res<PathBuf> {
-        if file.is_empty() {
-            return Ok(PathBuf::new());
-        }
-        let resolved_file = self.resolve_file(file)?;
-        let resolved_file = PathBuf::from(&resolved_file);
-        let mut res = if resolved_file.exists() {
-            CommandList::import_pcboard(&resolved_file)?
-        } else {
+        let mut res = if file.is_empty() {
             CommandList::default()
+        } else {
+            let resolved_file = self.resolve_file(file)?;
+            let resolved_file = PathBuf::from(&resolved_file);
+            if resolved_file.exists() {
+                CommandList::import_pcboard(&resolved_file)?
+            } else {
+                CommandList::default()
+            }
         };
 
         add_default_commands(&self.data, &mut res);
@@ -864,9 +913,23 @@ impl PCBoardImporter {
 
         for entry in list.iter_mut() {
             if let Ok(new_entry) = self.resolve_file(entry.file.to_str().unwrap()) {
+                if !new_entry.exists() {
+                    self.logger
+                        .log(&format!("Warning, can't import bulletin  {}, doesn't exist.", new_entry.display()));
+                    continue;
+                }
+
                 let name = new_entry.file_name().unwrap().to_str().unwrap().to_string().to_ascii_lowercase();
                 let new_name = format!("{}/{}", output, &name);
-                entry.file = self.convert_display_file(new_entry.to_str().unwrap(), &new_name)?;
+
+                match self.convert_display_file(new_entry.to_str().unwrap(), &new_name) {
+                    Ok(new_name) => {
+                        entry.file = new_name;
+                    }
+                    Err(err) => {
+                        self.logger.log_boxed_error(&*err);
+                    }
+                }
             } else {
                 self.logger.log(&format!(
                     "Warning, can't resolve bulletin entry {} in file {}",
@@ -914,9 +977,21 @@ impl PCBoardImporter {
 
         for entry in list.iter_mut() {
             if let Ok(new_entry) = self.resolve_file(entry.question_file.to_str().unwrap()) {
+                if !new_entry.exists() {
+                    self.logger
+                        .log(&format!("Warning, can't import questionaire  {}, doesn't exist.", new_entry.display()));
+                    continue;
+                }
                 let name = new_entry.file_name().unwrap().to_str().unwrap().to_string().to_ascii_lowercase();
                 let new_name = format!("{}/{}", output, &name);
-                entry.question_file = self.convert_display_file(new_entry.to_str().unwrap(), &new_name)?;
+                match self.convert_display_file(new_entry.to_str().unwrap(), &new_name) {
+                    Ok(new_name) => {
+                        entry.question_file = new_name;
+                    }
+                    Err(err) => {
+                        self.logger.log_boxed_error(&*err);
+                    }
+                }
             } else {
                 self.logger.log(&format!(
                     "Warning, can't resolve script questionary {} in file {}",
@@ -929,7 +1004,14 @@ impl PCBoardImporter {
             if let Ok(new_entry) = self.resolve_file(entry.answer_file.to_str().unwrap()) {
                 let name = new_entry.file_name().unwrap().to_str().unwrap().to_string().to_ascii_lowercase();
                 let new_name = format!("{}/{}", output, &name);
-                entry.answer_file = self.convert_display_file(new_entry.to_str().unwrap(), &new_name)?;
+                match self.convert_display_file(new_entry.to_str().unwrap(), &new_name) {
+                    Ok(new_name) => {
+                        entry.answer_file = new_name;
+                    }
+                    Err(err) => {
+                        self.logger.log_boxed_error(&*err);
+                    }
+                }
             } else {
                 self.logger.log(&format!(
                     "Warning, can't resolve script questionary {} in file {}",

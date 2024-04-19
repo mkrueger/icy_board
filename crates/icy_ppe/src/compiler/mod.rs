@@ -98,7 +98,7 @@ impl PPECompiler {
         let mut sv = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorRepoter::default())));
         prg.visit(&mut sv);
         self.lookup_table = sv.generate_variable_table();
-       // println!("{}", prg);
+        // println!("{}", prg);
         for d in &prg.nodes {
             match d {
                 AstNode::Function(_func) => {}

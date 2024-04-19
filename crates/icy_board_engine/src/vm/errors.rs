@@ -30,11 +30,11 @@ pub enum IcyError {
     #[error("Sort dest array should be int, was {0}.")]
     SortDestinationArrayIntRequired(VariableType),
 
-    #[error("Error loading file ({0}): {1}")]
-    ErrorLoadingFile(String, String),
+    #[error("loading {0} file ({1}): {2}")]
+    ErrorLoadingFile(String, String, String),
 
-    #[error("File not found ({0})")]
-    FileNotFound(String),
+    #[error("{0} file not found ({1})")]
+    FileNotFound(String, String),
 
     #[error("Invalid MNU file ({0}) : {1}")]
     InvalidMNU(String, String),
