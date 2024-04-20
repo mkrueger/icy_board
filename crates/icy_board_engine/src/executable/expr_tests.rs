@@ -32,6 +32,13 @@ fn test_predefined_functions_serialization() {
 }
 
 #[test]
+fn test_predefined_functions_without_argument() {
+    let i = -(FuncOpCode::HICONFNUM as i32);
+    let val = PPEExpr::PredefinedFunctionCall(&FUNCTION_DEFINITIONS[i as usize], vec![]);
+    test_serialize(&val, &[FuncOpCode::HICONFNUM as i16]);
+}
+
+#[test]
 fn test_binary_expression_serialization() {
     let val = PPEExpr::BinaryExpression(crate::ast::BinOp::Add, Box::new(PPEExpr::Value(2)), Box::new(PPEExpr::Value(3)));
     test_serialize(&val, &[2, 0, 3, 0, FuncOpCode::PLUS as i16]);
@@ -46,12 +53,12 @@ fn test_unary_expression_serialization() {
 #[test]
 fn test_function_call_serialization() {
     let val = PPEExpr::FunctionCall(6, vec![]);
-    test_serialize(&val, &[6, 0]);
+    test_serialize(&val, &[6]);
     let val = PPEExpr::FunctionCall(7, vec![PPEExpr::Value(5)]);
-    test_serialize(&val, &[7, 0, 5, 0, 0]);
+    test_serialize(&val, &[7, 0, 5, 0]);
 
     let val = PPEExpr::FunctionCall(8, vec![PPEExpr::Value(2), PPEExpr::Value(3)]);
-    test_serialize(&val, &[8, 0, 2, 0, 0, 3, 0, 0]);
+    test_serialize(&val, &[8, 0, 2, 0, 0, 3, 0]);
 }
 
 #[test]

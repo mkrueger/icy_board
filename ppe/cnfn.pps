@@ -1,13 +1,16 @@
-﻿DECLARE FUNCTION Has_Access(INTEGER conf) BOOLEAN
+﻿' This file utilizes some PPL 3.50 features 
+' It's compileable & runnable on PCBoard 3.x with --runtime 330 
+
+DECLARE FUNCTION Has_Access(INTEGER conf) BOOLEAN
 INTEGER i
 
 BEGIN
   CLS
   PRINTLN "@X17╒═════════════════════════════════════════════════════════════════════════════╕"
-  PRINTLN "@X17│  @X1BYou are now in @X1F@INCONF:60@@X17│"
+  PRINTLN "│  @X1BYou are now in @X1F@INCONF:60@@X17│"
   PRINTLN "│  @X1EYou can access the following conferences:                                  @X17│"
   PRINTLN "╘═════════════════════════════════════════════════════════════════════════════╛"
-  PRINTLN ""
+  PRINTLN
 
   FOR i = 0 TO HICONFNUM()
     STRING name = CONFINFO(i, 1)

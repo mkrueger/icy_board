@@ -98,7 +98,7 @@ impl Executable {
                 SetAttribute(Attribute::Reset),
                 Print(" code/compressed size,".to_string()),
                 SetAttribute(Attribute::Bold),
-                Print(format!("{} bytes", i - 2 - HEADER_SIZE)),
+                Print(format!("{} bytes", i.saturating_sub(2).saturating_sub(HEADER_SIZE))),
                 SetAttribute(Attribute::Reset),
                 Print(" variable table".to_string()),
                 Print("\n".to_string()),

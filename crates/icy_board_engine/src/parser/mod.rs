@@ -420,7 +420,7 @@ impl<'a> Parser<'a> {
                 self.use_funcs = true;
                 let cmt = self.save_spanned_token();
                 self.next_token();
-                return Some(AstNode::VariableDeclaration(Statement::Comment(CommentAstNode::new(cmt))));
+                return Some(AstNode::TopLevelStatement(Statement::Comment(CommentAstNode::new(cmt))));
             }
             _ => {
                 let stmt = self.parse_statement();
@@ -439,7 +439,7 @@ impl<'a> Parser<'a> {
                         self.report_error(self.lex.span(), ParserErrorType::NoStatementsAfterFunctions);
                         return None;
                     }
-                    if !self.got_statement && !matches!(stmt, Statement::VariableDeclaration(_)) {
+                    if !self.got_statement && !matches!(stmt, Statement::VariableDeclaration(_)) && !matches!(stmt, Statement::Comment(_)) {
                         let mut main_block = vec![stmt];
                         loop {
                             let Some(cur_token) = &self.cur_token else {
@@ -455,7 +455,7 @@ impl<'a> Parser<'a> {
                         self.got_statement = true;
                         return Some(AstNode::Main(BlockStatement::empty(main_block)));
                     }
-                    return Some(AstNode::VariableDeclaration(stmt));
+                    return Some(AstNode::TopLevelStatement(stmt));
                 }
             }
         }
@@ -680,7 +680,7 @@ impl<'a> Parser<'a> {
                 rightpar_token,
             )));
         }
-        if FunctionDefinition::get_function_definition(&identifier, -1) >= 0 {
+        if !FunctionDefinition::get_function_definitions(&identifier).is_empty() {
             self.report_error(identifier_token.span, ParserErrorType::FunctionAlreadyDefined(self.save_token()));
             return None;
         }

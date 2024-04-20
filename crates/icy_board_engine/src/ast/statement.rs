@@ -1686,14 +1686,6 @@ impl LetStatement {
     }
 }
 
-pub fn get_var_name(expr: &Expression) -> unicase::Ascii<String> {
-    if let Expression::FunctionCall(call_expr) = expr {
-        call_expr.get_identifier().clone()
-    } else {
-        unicase::Ascii::new(expr.to_string())
-    }
-}
-
 impl Statement {
     pub fn param_list_to_string(l: &Vec<Expression>) -> String {
         let mut res = String::new();

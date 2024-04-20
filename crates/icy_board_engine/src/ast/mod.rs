@@ -37,7 +37,10 @@ use crate::parser::lexer::{Spanned, Token};
 pub enum AstNode {
     Function(FunctionImplementation),
     Procedure(ProcedureImplementation),
-    VariableDeclaration(Statement),
+
+    /// Can be a variable declaration or comment for example
+    /// But should be treated as a real statement
+    TopLevelStatement(Statement),
     ProcedureDeclaration(ProcedureDeclarationAstNode),
     FunctionDeclaration(FunctionDeclarationAstNode),
     Main(BlockStatement),
@@ -48,7 +51,7 @@ impl AstNode {
         match self {
             AstNode::Function(f) => visitor.visit_function_implementation(f),
             AstNode::Procedure(p) => visitor.visit_procedure_implementation(p),
-            AstNode::VariableDeclaration(s) => s.visit(visitor),
+            AstNode::TopLevelStatement(s) => s.visit(visitor),
             AstNode::ProcedureDeclaration(p) => visitor.visit_procedure_declaration(p),
             AstNode::FunctionDeclaration(f) => visitor.visit_function_declaration(f),
             AstNode::Main(m) => visitor.visit_main(m),
@@ -60,7 +63,7 @@ impl AstNode {
         match self {
             AstNode::Function(f) => visitor.visit_function_implementation(f),
             AstNode::Procedure(p) => visitor.visit_procedure_implementation(p),
-            AstNode::VariableDeclaration(s) => AstNode::VariableDeclaration(s.visit_mut(visitor)),
+            AstNode::TopLevelStatement(s) => AstNode::TopLevelStatement(s.visit_mut(visitor)),
             AstNode::ProcedureDeclaration(p) => visitor.visit_procedure_declaration(p),
             AstNode::FunctionDeclaration(f) => visitor.visit_function_declaration(f),
             AstNode::Main(m) => AstNode::Main(visitor.visit_block(m)),
@@ -74,7 +77,7 @@ impl AstNode {
     /// Panics if .
     pub fn is_similar(&self, check: &AstNode) -> bool {
         match (self, check) {
-            (AstNode::VariableDeclaration(s1), AstNode::VariableDeclaration(s2)) => s1.is_similar(s2),
+            (AstNode::TopLevelStatement(s1), AstNode::TopLevelStatement(s2)) => s1.is_similar(s2),
 
             (AstNode::FunctionDeclaration(f1), AstNode::FunctionDeclaration(f2)) => {
                 if f1.get_identifier() != f2.get_identifier() {

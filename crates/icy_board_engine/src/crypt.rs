@@ -101,7 +101,7 @@ pub fn encrypt2(block: &mut [u8]) {
 
 #[allow(clippy::pedantic)]
 pub fn decrypt(block: &mut [u8], version: u16) {
-    if version < 300 {
+    if version < 300 || version >= 400 {
         return;
     }
     if version >= 330 {
@@ -117,7 +117,7 @@ pub fn decrypt(block: &mut [u8], version: u16) {
 
 #[allow(clippy::pedantic)]
 pub fn encrypt(block: &mut [u8], version: u16) {
-    if version < 300 {
+    if version < 300 || version >= 400 {
         return;
     }
     if version >= 340 {

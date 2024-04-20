@@ -323,17 +323,14 @@ pub struct FunctionDefinition {
 }
 
 impl FunctionDefinition {
-    pub fn get_function_definition(str: &str, args: i32) -> i32 {
-        let mut found = -1;
+    pub fn get_function_definitions(str: &str) -> Vec<usize> {
+        let mut ret = Vec::new();
         for (i, item) in FUNCTION_DEFINITIONS.iter().enumerate() {
             if item.name.eq_ignore_ascii_case(str) {
-                if args == item.args as i32 {
-                    return i as i32;
-                }
-                found = i as i32;
+                ret.push(i);
             }
         }
-        found
+        ret
     }
 }
 

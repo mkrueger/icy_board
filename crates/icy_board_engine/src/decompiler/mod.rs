@@ -146,24 +146,24 @@ impl Decompiler {
 
         for (k, bugs) in &self.script.bugged_offsets {
             for bug in bugs {
-                ast.nodes.push(AstNode::VariableDeclaration(CommentAstNode::create_empty_statement(format!(
+                ast.nodes.push(AstNode::TopLevelStatement(CommentAstNode::create_empty_statement(format!(
                     "{k:04X}: statement: {bug}"
                 ))));
             }
         }
 
         if !self.script.bugged_offsets.is_empty() {
-            ast.nodes.push(AstNode::VariableDeclaration(CommentAstNode::create_empty_statement(format!(
+            ast.nodes.push(AstNode::TopLevelStatement(CommentAstNode::create_empty_statement(format!(
                 " {} error(s) detected while decompiling",
                 self.script.bugged_offsets.len(),
             ))));
 
             ast.nodes
-                .push(AstNode::VariableDeclaration(CommentAstNode::create_empty_statement(String::new())));
-            ast.nodes.push(AstNode::VariableDeclaration(CommentAstNode::create_empty_statement(
+                .push(AstNode::TopLevelStatement(CommentAstNode::create_empty_statement(String::new())));
+            ast.nodes.push(AstNode::TopLevelStatement(CommentAstNode::create_empty_statement(
                 "Some PPEs got altered to avoid decompilation. PCBoard doesn't handle unary expressions correcty.".to_string(),
             )));
-            ast.nodes.push(AstNode::VariableDeclaration(CommentAstNode::create_empty_statement(
+            ast.nodes.push(AstNode::TopLevelStatement(CommentAstNode::create_empty_statement(
                 "Search for 'PPLC bug' and look out for !!!<expr> or !<expr>*!<expr> cases.".to_string(),
             )));
         }
@@ -177,7 +177,7 @@ impl Decompiler {
                     continue;
                 }
                 let var_decl = generate_variable_declaration(var);
-                ast.nodes.push(AstNode::VariableDeclaration(var_decl));
+                ast.nodes.push(AstNode::TopLevelStatement(var_decl));
             }
         }
     }
@@ -259,12 +259,13 @@ impl Decompiler {
                 IndexerExpression::create_empty_expression(self.get_variable_name(*id), dims.iter().map(|e| self.decompile_expression(e)).collect())
             }
             PPEExpr::PredefinedFunctionCall(f, args) => FunctionCallExpression::create_empty_expression(
-                unicase::Ascii::new(f.name.to_string()),
+                IdentifierExpression::create_empty_expression(unicase::Ascii::new(f.name.to_string())),
                 args.iter().map(|e| self.decompile_expression(e)).collect(),
             ),
-            PPEExpr::FunctionCall(f, args) => {
-                FunctionCallExpression::create_empty_expression(self.get_variable_name(*f), args.iter().map(|e| self.decompile_expression(e)).collect())
-            }
+            PPEExpr::FunctionCall(f, args) => FunctionCallExpression::create_empty_expression(
+                IdentifierExpression::create_empty_expression(self.get_variable_name(*f)),
+                args.iter().map(|e| self.decompile_expression(e)).collect(),
+            ),
         }
     }
 
@@ -291,7 +292,7 @@ impl Decompiler {
             }
             PPECommand::Let(left, expr) => {
                 let (identifier, arguments) = match self.decompile_expression(left) {
-                    Expression::FunctionCall(f) => (f.get_identifier().clone(), f.get_arguments().clone()),
+                    Expression::FunctionCall(f) => (unicase::Ascii::new(f.get_expression().to_string()), f.get_arguments().clone()),
                     Expression::Identifier(id) => (id.get_identifier().clone(), Vec::new()),
                     x => panic!("Invalid expression {x:?}"),
                 };

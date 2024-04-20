@@ -169,8 +169,61 @@ impl<'a> Parser<'a> {
                 return Some(UnaryExpression::create_empty_expression(crate::ast::UnaryOp::Not, e));
             }
         }
+        self.parse_function_call_expression()
+    }
 
-        self.parse_primary()
+    fn parse_function_call_expression(&mut self) -> Option<Expression> {
+        let primary = self.parse_primary();
+
+        if let Some(expr) = primary {
+            if self.get_cur_token() == Some(Token::LPar) {
+                let leftpar_token = self.save_spanned_token();
+
+                self.next_token();
+                let mut arguments = Vec::new();
+
+                while self.get_cur_token() != Some(Token::RPar) {
+                    let Some(value) = self.parse_expression() else {
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
+                        self.next_token();
+                        return None;
+                    };
+                    arguments.push(value);
+                    if self.get_cur_token() == Some(Token::Comma) {
+                        self.next_token();
+                        continue;
+                    }
+
+                    if self.get_cur_token() != Some(Token::RPar) && self.get_cur_token() != Some(Token::Comma) {
+                        break;
+                    }
+                }
+
+                if self.get_cur_token() != Some(Token::RPar) {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(self.save_token_span(), ParserErrorType::MissingCloseParens(self.save_token()));
+                    return None;
+                }
+                let rightpar_token = self.save_spanned_token();
+
+                self.next_token();
+
+                return Some(Expression::FunctionCall(FunctionCallExpression::new(
+                    expr,
+                    leftpar_token,
+                    arguments,
+                    rightpar_token,
+                )));
+            }
+            Some(expr)
+        } else {
+            None
+        }
     }
 
     fn parse_primary(&mut self) -> Option<Expression> {
@@ -184,51 +237,6 @@ impl<'a> Parser<'a> {
             Token::Identifier(_id) => {
                 let identifier_token = self.save_spanned_token();
                 self.next_token();
-                if self.get_cur_token() == Some(Token::LPar) {
-                    let leftpar_token = self.save_spanned_token();
-
-                    self.next_token();
-                    let mut arguments = Vec::new();
-
-                    while self.get_cur_token() != Some(Token::RPar) {
-                        let Some(value) = self.parse_expression() else {
-                            self.errors
-                                .lock()
-                                .unwrap()
-                                .report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
-                            self.next_token();
-                            return None;
-                        };
-                        arguments.push(value);
-                        if self.get_cur_token() == Some(Token::Comma) {
-                            self.next_token();
-                            continue;
-                        }
-
-                        if self.get_cur_token() != Some(Token::RPar) && self.get_cur_token() != Some(Token::Comma) {
-                            break;
-                        }
-                    }
-
-                    if self.get_cur_token() != Some(Token::RPar) {
-                        self.errors
-                            .lock()
-                            .unwrap()
-                            .report_error(self.save_token_span(), ParserErrorType::MissingCloseParens(self.save_token()));
-                        return None;
-                    }
-                    let rightpar_token = self.save_spanned_token();
-
-                    self.next_token();
-
-                    return Some(Expression::FunctionCall(FunctionCallExpression::new(
-                        identifier_token,
-                        leftpar_token,
-                        arguments,
-                        rightpar_token,
-                    )));
-                }
-
                 if self.lang_version >= 350 && self.get_cur_token() == Some(Token::LBracket) {
                     let leftpar_token = self.save_spanned_token();
 

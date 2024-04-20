@@ -289,6 +289,7 @@ pub fn walk_array_expression<T: Default, V: AstVisitor<T>>(visitor: &mut V, arr_
 }
 
 pub fn walk_function_call_expression<T: Default, V: AstVisitor<T>>(visitor: &mut V, call: &FunctionCallExpression) {
+    call.get_expression().visit(visitor);
     for arg in call.get_arguments() {
         arg.visit(visitor);
     }
@@ -393,10 +394,7 @@ pub trait AstVisitorMut: Sized {
 
     fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) -> Expression {
         Expression::FunctionCall(FunctionCallExpression::new(
-            Spanned {
-                span: call.get_identifier_token().span.clone(),
-                token: Token::Identifier(self.visit_identifier(call.get_identifier())),
-            },
+            call.get_expression().visit_mut(self),
             call.get_lpar_token().clone(),
             call.get_arguments().iter().map(|arg| arg.visit_mut(self)).collect(),
             call.get_rpar_token().clone(),

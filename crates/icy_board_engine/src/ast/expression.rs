@@ -139,7 +139,7 @@ impl Expression {
             Expression::MemberReference(i) => i.get_expression().get_span().start..i.get_identifier_token().span.end,
             Expression::Const(c) => c.get_constant_token().span.clone(),
             Expression::Parens(p) => p.get_lpar_token().span.start..p.get_rpar_token().span.end,
-            Expression::FunctionCall(fc) => fc.get_identifier_token().span.start..fc.get_rpar_token().span.end,
+            Expression::FunctionCall(fc) => fc.get_expression().get_span().start..fc.get_rpar_token().span.end,
             Expression::Indexer(fc) => fc.get_identifier_token().span.start..fc.get_rbracket_token().span.end,
             Expression::Unary(u) => u.get_op_token().span.start..u.get_expression().get_span().end,
             Expression::Binary(b) => b.get_left_expression().get_span().start..b.get_right_expression().get_span().end,
@@ -182,7 +182,7 @@ impl Expression {
             (Expression::Const(c1), Expression::Const(c2)) => c1.constant_value == c2.constant_value,
             (Expression::Parens(e1), Expression::Parens(e2)) => e1.get_expression().is_similar(e2.get_expression()),
             (Expression::FunctionCall(f1), Expression::FunctionCall(f2)) => {
-                f1.get_identifier() == f2.get_identifier() && f1.get_arguments().iter().zip(f2.get_arguments().iter()).all(|(a, b)| a.is_similar(b))
+                f1.get_expression().is_similar(f2.get_expression()) && f1.get_arguments().iter().zip(f2.get_arguments().iter()).all(|(a, b)| a.is_similar(b))
             }
             (Expression::Unary(expr1), Expression::Unary(expr2)) => {
                 expr1.get_op() == expr2.get_op() && expr1.get_expression().is_similar(expr2.get_expression())
@@ -439,34 +439,39 @@ impl fmt::Display for ParensExpression {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionCallExpression {
-    identifier_token: Spanned<Token>,
+    expression: Box<Expression>,
     lpar_token: Spanned<Token>,
     arguments: Vec<Expression>,
     rpar_token: Spanned<Token>,
 }
 
 impl FunctionCallExpression {
-    pub fn new(identifier_token: Spanned<Token>, leftpar_token: Spanned<Token>, arguments: Vec<Expression>, rightpar_token: Spanned<Token>) -> Self {
+    pub fn new(expression: Expression, leftpar_token: Spanned<Token>, arguments: Vec<Expression>, rightpar_token: Spanned<Token>) -> Self {
         Self {
-            identifier_token,
+            expression: Box::new(expression),
             lpar_token: leftpar_token,
             arguments,
             rpar_token: rightpar_token,
         }
     }
 
-    pub fn empty(identifier: unicase::Ascii<String>, arguments: Vec<Expression>) -> Self {
+    pub fn empty(expression: Expression, arguments: Vec<Expression>) -> Self {
         Self {
-            identifier_token: Spanned::create_empty(Token::Identifier(identifier)),
+            expression: Box::new(expression),
             lpar_token: Spanned::create_empty(Token::LPar),
             arguments,
             rpar_token: Spanned::create_empty(Token::RPar),
         }
     }
 
-    pub fn get_identifier_token(&self) -> &Spanned<Token> {
-        &self.identifier_token
+    pub fn get_expression(&self) -> &Expression {
+        &self.expression
     }
+
+    pub fn get_expression_mut(&mut self) -> &mut Expression {
+        &mut self.expression
+    }
+
     pub fn get_lpar_token(&self) -> &Spanned<Token> {
         &self.lpar_token
     }
@@ -487,30 +492,14 @@ impl FunctionCallExpression {
         &self.rpar_token
     }
 
-    /// Returns a reference to the get identifier of this [`IdentifierExpression`].
-    ///
-    /// # Panics
-    ///
-    /// Panics if .
-    pub fn get_identifier(&self) -> &unicase::Ascii<String> {
-        if let Token::Identifier(id) = &self.identifier_token.token {
-            return id;
-        }
-        panic!("Expected identifier token")
-    }
-
-    pub(crate) fn create_empty_expression(identifier: unicase::Ascii<String>, arguments: Vec<Expression>) -> Expression {
-        Expression::FunctionCall(FunctionCallExpression::empty(identifier, arguments))
-    }
-
-    pub fn set_identifier(&mut self, identifier: unicase::Ascii<String>) {
-        self.identifier_token.token = Token::Identifier(identifier);
+    pub(crate) fn create_empty_expression(expression: Expression, arguments: Vec<Expression>) -> Expression {
+        Expression::FunctionCall(FunctionCallExpression::empty(expression, arguments))
     }
 }
 
 impl fmt::Display for FunctionCallExpression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}(", self.get_identifier())?;
+        write!(f, "{}(", self.get_expression())?;
         for (i, arg) in self.get_arguments().iter().enumerate() {
             write!(f, "{arg}")?;
             if i < self.get_arguments().len() - 1 {

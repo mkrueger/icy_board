@@ -97,7 +97,7 @@ impl AstVisitor<()> for OutputVisitor {
     }
 
     fn visit_function_call_expression(&mut self, call: &super::FunctionCallExpression) {
-        self.output(call.get_identifier());
+        call.get_expression().visit(self);
         self.output.push('(');
         for (i, arg) in call.get_arguments().iter().enumerate() {
             arg.visit(self);
