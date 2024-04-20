@@ -17,7 +17,7 @@ impl PcbBoardCommand {
         self.state.session.disable_auto_more = false;
         self.state.session.more_requested = false;
 
-        if self.state.session.current_conference.file_areas.is_empty() {
+        if self.state.session.current_conference.directories.is_empty() {
             self.state
                 .display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
             self.state.press_enter()?;
@@ -26,7 +26,7 @@ impl PcbBoardCommand {
         let directory_number = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
-            let mnu = self.state.session.current_conference.file_area_menu.clone();
+            let mnu = self.state.session.current_conference.dir_menu.clone();
             let mnu = self.state.resolve_path(&mnu);
             self.state.display_menu(&mnu)?;
             self.state.new_line()?;
@@ -48,12 +48,11 @@ impl PcbBoardCommand {
         if !directory_number.is_empty() {
             let mut joined = false;
             if let Ok(number) = directory_number.parse::<i32>() {
-                if 1 <= number && (number as usize) <= self.state.session.current_conference.file_areas.len() {
-                    let area = &self.state.session.current_conference.file_areas[number as usize - 1];
+                if 1 <= number && (number as usize) <= self.state.session.current_conference.directories.len() {
+                    let area = &self.state.session.current_conference.directories[number as usize - 1];
                     if area.list_security.user_can_access(&self.state.session) {
                         self.display_file_area(action, number as usize - 1)?;
                     }
-
                     joined = true;
                 }
             }
@@ -71,7 +70,7 @@ impl PcbBoardCommand {
     }
 
     fn display_file_area(&mut self, action: &Command, area: usize) -> Res<()> {
-        let area = &self.state.session.current_conference.file_areas[area];
+        let area = &self.state.session.current_conference.directories[area];
 
         let colors = self.state.board.lock().unwrap().config.color_configuration.clone();
         let file_base_path = self.state.resolve_path(&area.file_base);

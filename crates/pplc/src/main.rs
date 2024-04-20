@@ -3,7 +3,6 @@ use clap::Parser;
 use icy_board_engine::{
     compiler::PPECompiler,
     parser::{load_with_encoding, parse_ast, Encoding, UserTypeRegistry},
-    semantic::SemanticVisitor,
 };
 
 use crossterm::{
@@ -78,7 +77,7 @@ fn main() {
     let file_name = if arguments.file.extension().is_none() {
         arguments.file.with_extension("pps")
     } else {
-        arguments.file
+        arguments.file.clone()
     };
 
     let encoding = if arguments.dos { Encoding::CP437 } else { Encoding::Utf8 };
@@ -97,49 +96,14 @@ fn main() {
             }
             println!("Compiling...");
 
-            let mut sv = SemanticVisitor::new(ppl_version, errors, &reg);
-            ast.visit(&mut sv);
-
-            let errors = sv.errors.clone();
-
-            if errors.lock().unwrap().has_errors() || (errors.lock().unwrap().has_warnings() && !arguments.nowarnings) {
-                let mut error_count = 0;
-                let mut warning_count = 0;
-                let file_name = file_name.to_string_lossy().to_string();
-                for err in &errors.lock().unwrap().errors {
-                    error_count += 1;
-                    Report::build(ReportKind::Error, &file_name, err.span.start)
-                        .with_code(error_count)
-                        .with_message(format!("{}", err.error))
-                        .with_label(Label::new((&file_name, err.span.clone())).with_color(ariadne::Color::Red))
-                        .finish()
-                        .print((&file_name, Source::from(&src)))
-                        .unwrap();
-                }
-
-                if !arguments.nowarnings {
-                    for err in &errors.lock().unwrap().warnings {
-                        warning_count += 1;
-                        Report::build(ReportKind::Warning, &file_name, err.span.start)
-                            .with_code(warning_count)
-                            .with_message(format!("{}", err.error))
-                            .with_label(Label::new((&file_name, err.span.clone())).with_color(ariadne::Color::Yellow))
-                            .finish()
-                            .print((&file_name, Source::from(&src)))
-                            .unwrap();
-                    }
-                    println!("{} errors, {} warnings", error_count, warning_count);
-                } else {
-                    println!("{} errors", error_count);
-                }
-                if errors.lock().unwrap().has_errors() {
-                    return;
-                }
+            if check_errors(errors.clone(), &arguments, &file_name, &src) {
+                return;
             }
-            println!();
-            let mut compiler = PPECompiler::new(ppl_version, &reg);
+            let mut compiler = PPECompiler::new(ppl_version, &reg, errors.clone());
             compiler.compile(&ast);
-
+            if check_errors(errors.clone(), &arguments, &file_name, &src) {
+                return;
+            }
             match compiler.create_executable(runtime_version) {
                 Ok(executable) => {
                     if arguments.disassemble {
@@ -196,4 +160,40 @@ fn main() {
             println!();
         }
     }
+}
+
+fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser::ErrorRepoter>>, arguments: &Cli, file_name: &PathBuf, src: &String) -> bool {
+    if errors.lock().unwrap().has_errors() || (errors.lock().unwrap().has_warnings() && !arguments.nowarnings) {
+        let mut error_count = 0;
+        let mut warning_count = 0;
+        let file_name = file_name.to_string_lossy().to_string();
+        for err in &errors.lock().unwrap().errors {
+            error_count += 1;
+            Report::build(ReportKind::Error, &file_name, err.span.start)
+                .with_code(error_count)
+                .with_message(format!("{}", err.error))
+                .with_label(Label::new((&file_name, err.span.clone())).with_color(ariadne::Color::Red))
+                .finish()
+                .print((&file_name, Source::from(src)))
+                .unwrap();
+        }
+
+        if !arguments.nowarnings {
+            for err in &errors.lock().unwrap().warnings {
+                warning_count += 1;
+                Report::build(ReportKind::Warning, &file_name, err.span.start)
+                    .with_code(warning_count)
+                    .with_message(format!("{}", err.error))
+                    .with_label(Label::new((&file_name, err.span.clone())).with_color(ariadne::Color::Yellow))
+                    .finish()
+                    .print((&file_name, Source::from(src)))
+                    .unwrap();
+            }
+            println!("{} errors, {} warnings", error_count, warning_count);
+        } else {
+            println!("{} errors", error_count);
+        }
+        return error_count > 0;
+    }
+    return false;
 }

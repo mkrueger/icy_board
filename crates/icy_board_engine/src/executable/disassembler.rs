@@ -207,6 +207,22 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
         self.print_arguments(arguments);
         print!(")");
     }
+    fn visit_member_function_call(&mut self, expr: &PPEExpr, arguments: &[PPEExpr], id: usize) {
+        execute!(
+            stdout(),
+            SetForegroundColor(Color::Magenta),
+            Print(format!("Member:#{:02X}", id)),
+            SetAttribute(Attribute::Reset),
+            Print(" on ["),
+            SetForegroundColor(Color::Green),
+            Print(format!("{:?}", expr)),
+            SetAttribute(Attribute::Reset),
+            Print("] ("),
+        )
+        .unwrap();
+        self.print_arguments(arguments);
+        print!(")");
+    }
 
     fn visit_unary_expression(&mut self, op: crate::ast::UnaryOp, expr: &PPEExpr) {
         execute!(

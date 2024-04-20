@@ -301,10 +301,11 @@ pub enum FuncOpCode {
     GetMsgHdr = -289,
     SetMsgHdr = -290,
     MemberReference = -291,
-    NewConfInfo = -292,
+    MemberCall = -292,
+    NewConfInfo = -293,
 }
 
-pub const LAST_FUNC: i16 = -292;
+pub const LAST_FUNC: i16 = -293;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -334,7 +335,7 @@ impl FunctionDefinition {
     }
 }
 
-pub static FUNCTION_DEFINITIONS: [FunctionDefinition; 296] = [
+pub static FUNCTION_DEFINITIONS: [FunctionDefinition; 297] = [
     FunctionDefinition {
         name: "END",
         version: 100,
@@ -2379,6 +2380,14 @@ pub static FUNCTION_DEFINITIONS: [FunctionDefinition; 296] = [
         name: "MemberReference",
         version: 400,
         opcode: FuncOpCode::MemberReference,
+        return_type: VariableType::None,
+        args: -1,
+    },
+    FunctionDefinition {
+        // SPECIAL CASE!
+        name: "MemberCall",
+        version: 400,
+        opcode: FuncOpCode::MemberCall,
         return_type: VariableType::None,
         args: -1,
     },

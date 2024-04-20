@@ -2889,3 +2889,16 @@ style = "Yellow"
 [DateFormatDesired]
 text = "Date Format Desired (Enter)=no change"
 style = "Green"
+
+[NoAreasAvailable]
+text = "Sorry, @FIRST@, no Areas are presently available."
+style = "Red"
+
+[AreaListCommand]
+text = "(H)elp, (1-@NUMAREA@), Area List Command"
+style = "Yellow"
+
+[AreaListCommandExpert]
+text = "(H)elp, (1-@NUMAREA@), Area List Command"
+style = "Yellow"
+

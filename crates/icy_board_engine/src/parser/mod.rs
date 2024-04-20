@@ -12,7 +12,7 @@ use crate::{
     },
     compiler::user_data::{UserData, UserDataRegistry},
     executable::{FuncOpCode, FunctionDefinition, OpCode, StatementDefinition, VariableType},
-    icy_board::{conferences::Conference, file_areas::FileArea, message_areas::MessageArea},
+    icy_board::{conferences::Conference, file_directory::FileDirectory, message_area::MessageArea},
 };
 
 use self::lexer::{Lexer, Spanned, Token};
@@ -177,14 +177,14 @@ pub struct UserTypeRegistry {
 pub const FIRST_ID: usize = 30;
 pub const CONFERENCE_ID: usize = 30;
 pub const MESSAGE_AREA_ID: usize = 31;
-pub const FILE_AREA_ID: usize = 32;
+pub const FILE_DIRECTORY_ID: usize = 32;
 
 impl UserTypeRegistry {
     pub fn icy_board_registry() -> Self {
         let mut reg = UserTypeRegistry::default();
         reg.register::<Conference>();
         reg.register::<MessageArea>();
-        reg.register::<FileArea>();
+        reg.register::<FileDirectory>();
         reg
     }
 

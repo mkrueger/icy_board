@@ -238,6 +238,9 @@ impl Decompiler {
             PPEExpr::Member(_expr, _id) => {
                 todo!()
             }
+            PPEExpr::MemberFunctionCall(_, _, _) => {
+                todo!()
+            }
             PPEExpr::UnaryExpression(op, expr) => {
                 let mut expr = self.decompile_expression(expr);
 

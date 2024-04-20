@@ -127,8 +127,6 @@ impl TelnetConnection {
                                 data[write_ptr] = telnet_cmd::SE;
                                 write_ptr += 1;
 
-                                //println!("Sending terminal type: {:?}", buf);
-
                                 self.tcp_stream.write_all(&buf)?;
                             }
                         }

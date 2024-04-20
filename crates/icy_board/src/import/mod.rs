@@ -13,7 +13,7 @@ use icy_board_engine::icy_board::{
     commands::CommandList,
     conferences::ConferenceBase,
     convert_to_utf8,
-    file_areas::FileAreaList,
+    file_directory::DirectoryList,
     group_list::GroupList,
     icb_config::{
         BoardInformation, BoardOptions, ColorConfiguration, ConfigPaths, DisplayNewsBehavior, IcbColor, IcbConfig, NewUserSettings, PasswordStorageMethod,
@@ -22,7 +22,7 @@ use icy_board_engine::icy_board::{
     icb_text::IcbTextFile,
     language::SupportedLanguages,
     menu::Menu,
-    message_areas::MessageAreaList,
+    message_area::AreaList,
     pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader},
     pcboard_data::PcbBoardData,
     read_with_encoding_detection,
@@ -161,12 +161,12 @@ impl PCBoardImporter {
             file_name.chars().next().unwrap_or_default().is_ascii_digit()
         })?;
 
-        let icbtext = self.convert_pcbtext(&(self.data.path.text_loc.clone() + "/PCBTEXT"), "data/icbtext")?;
+        let icbtext = self.convert_pcbtext(&(self.data.path.text_loc.clone() + "/PCBTEXT"), "config/icbtext")?;
         let bad_users = self.convert_trashcan(&self.data.path.tcan_file.clone(), "config/bad_users.txt")?;
 
         let bad_email = self.create_file(include_str!("../../data/bad_email.txt"), "config/bad_email.txt")?;
         let bad_passwords = self.create_file(include_str!("../../data/bad_passwords.txt"), "config/bad_passwords.txt")?;
-        let vip_users = self.create_file(include_str!("../../data/bad_passwords.txt"), "config/vip_users.txt")?;
+        let vip_users = self.create_file(include_str!("../../data/vip_users.txt"), "config/vip_users.txt")?;
 
         let group_file = self.create_group_file("config/groups.toml")?;
 
@@ -180,13 +180,13 @@ impl PCBoardImporter {
         let chat_menu = self.convert_display_file(&self.data.path.chat_menu.clone(), "art/chtm")?;
         let no_ansi = self.convert_display_file(&self.data.path.no_ansi.clone(), "art/noansi")?;
 
-        let user_base = self.convert_user_base(&self.data.path.usr_file.clone(), &self.data.path.inf_file.clone(), "home")?;
+        self.convert_user_base(&self.data.path.usr_file.clone(), &self.data.path.inf_file.clone(), "home")?;
 
         let protocol_data_file = self.convert_data::<SupportedProtocols>(&self.data.path.protocol_data_file.clone(), "config/protocols.toml")?;
         let language_file = self.convert_data::<SupportedLanguages>(&self.data.path.pcml_dat_file.clone(), "config/languages.toml")?;
         let security_level_file = self.convert_data::<SupportedLanguages>(&self.data.path.pwd_file.clone(), "config/security_levels.toml")?;
         let command_file = self.convert_default_cmd_lst(&self.data.path.cmd_lst.clone(), "config/commands.toml")?;
-        let statistics_file = self.convert_data::<Statistics>(&self.data.path.stats_file.clone(), "data/statistics.toml")?;
+        let statistics_file = self.convert_data::<Statistics>(&self.data.path.stats_file.clone(), "config/statistics.toml")?;
 
         let conferences = self.convert_conferences(&self.data.path.conference_file.clone(), "config/conferences.toml")?;
 
@@ -269,7 +269,6 @@ impl PCBoardImporter {
                 tmp_path: PathBuf::from("tmp/"),
                 home_dir: PathBuf::from("home/"),
                 icbtext,
-                user_base,
                 conferences,
                 welcome,
                 newuser,
@@ -397,17 +396,17 @@ impl PCBoardImporter {
 
             conf.survey_file = self.convert_questionnaires(&destination, &output, &conf.survey_file)?;
 
-            conf.file_area_menu = self.convert_conference_display_file(&output, &conf.file_area_menu)?;
-            conf.file_area_file = self.convert_dirlist_file(&destination, &output, &conf.file_area_file)?;
+            conf.dir_menu = self.convert_conference_display_file(&output, &conf.dir_menu)?;
+            conf.dir_file = self.convert_dirlist_file(&destination, &output, &conf.dir_file)?;
 
-            conf.message_area_menu = PathBuf::from(output.to_string() + "/messages");
-            conf.message_area_file = PathBuf::from(output.to_string() + "/messages.toml");
+            conf.area_menu = PathBuf::from(output.to_string() + "/area");
+            conf.area_file = PathBuf::from(output.to_string() + "/area.toml");
 
-            let mut list = MessageAreaList::load(&destination.join("messages.toml"))?;
+            let mut list = AreaList::load(&destination.join("area.toml"))?;
             for area in list.iter_mut() {
                 area.filename = self.convert_message_base(&destination, &output, &area.filename)?;
             }
-            list.save(&destination.join("messages.toml"))?;
+            list.save(&destination.join("area.toml"))?;
         }
 
         let destination = self.output_directory.join(new_rel_name);
@@ -434,12 +433,11 @@ impl PCBoardImporter {
         self.logger.log_error(fs::create_dir(&self.output_directory).err())?;
         self.logger.created_directory(self.output_directory.clone());
 
-        const REQUIRED_DIRECTORIES: [&str; 12] = [
+        const REQUIRED_DIRECTORIES: [&str; 11] = [
             "gen",
             "conferences",
             "conferences/main",
             "ppe",
-            "data",
             "config",
             "config/menus",
             "art",
@@ -1049,7 +1047,7 @@ impl PCBoardImporter {
             return Ok(PathBuf::from(file));
         }
 
-        let Ok(mut list) = FileAreaList::import_pcboard(&resolved_file) else {
+        let Ok(mut list) = DirectoryList::import_pcboard(&resolved_file) else {
             self.logger.log(&format!("Warning, can't import dir.lst file {}", resolved_file.display()));
             self.output.warning(format!("Warning, can't import dir.lst file {}", resolved_file.display()));
             return Ok(resolved_file);

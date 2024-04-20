@@ -32,7 +32,7 @@ pub enum SortDirection {
 /// A survey is a question and answer pair.
 /// PCBoard calles them "Questionnairies" but we call them surveys.
 #[derive(Clone, Serialize, Deserialize, Default)]
-pub struct FileArea {
+pub struct FileDirectory {
     pub name: String,
     pub file_base: PathBuf,
     pub path: PathBuf,
@@ -73,12 +73,12 @@ pub struct FileArea {
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
-pub struct FileAreaList {
+pub struct DirectoryList {
     #[serde(rename = "area")]
-    areas: Vec<FileArea>,
+    areas: Vec<FileDirectory>,
 }
 
-impl FileAreaList {
+impl DirectoryList {
     const PATH_SIZE: usize = 0x1E;
     const NAME_SIZE: usize = 0x23;
 
@@ -107,27 +107,27 @@ impl FileAreaList {
     }
 }
 
-impl Deref for FileAreaList {
-    type Target = Vec<FileArea>;
+impl Deref for DirectoryList {
+    type Target = Vec<FileDirectory>;
     fn deref(&self) -> &Self::Target {
         &self.areas
     }
 }
 
-impl DerefMut for FileAreaList {
+impl DerefMut for DirectoryList {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.areas
     }
 }
 
-impl PCBoardRecordImporter<FileArea> for FileAreaList {
+impl PCBoardRecordImporter<FileDirectory> for DirectoryList {
     const RECORD_SIZE: usize = Self::PATH_SIZE * 2 + Self::NAME_SIZE + 1;
 
-    fn push(&mut self, value: FileArea) {
+    fn push(&mut self, value: FileDirectory) {
         self.areas.push(value);
     }
 
-    fn load_pcboard_record(data: &[u8]) -> Res<FileArea> {
+    fn load_pcboard_record(data: &[u8]) -> Res<FileDirectory> {
         let file_base = PathBuf::from(crate::tables::import_cp437_string(&data[..Self::PATH_SIZE], true));
         let data = &data[Self::PATH_SIZE..];
         let path = PathBuf::from(crate::tables::import_cp437_string(&data[..Self::PATH_SIZE], true));
@@ -144,7 +144,7 @@ impl PCBoardRecordImporter<FileArea> for FileAreaList {
             _ => return Err(IcyBoardError::InvalidDirListSortOrder(data[0]).into()),
         };
 
-        Ok(FileArea {
+        Ok(FileDirectory {
             name,
             file_base,
             path,
@@ -163,17 +163,17 @@ impl PCBoardRecordImporter<FileArea> for FileAreaList {
     }
 }
 
-impl IcyBoardSerializer for FileAreaList {
+impl IcyBoardSerializer for DirectoryList {
     const FILE_TYPE: &'static str = "file areas";
 }
 
-impl UserData for FileArea {
-    const TYPE_NAME: &'static str = "Conference";
+impl UserData for FileDirectory {
+    const TYPE_NAME: &'static str = "Directory";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_field(NAME.clone(), VariableType::String);
 
-        registry.add_procedure(HAS_ACCESS.clone(), Vec::new());
+        registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
     }
 }
 
@@ -182,11 +182,12 @@ lazy_static::lazy_static! {
     pub static ref HAS_ACCESS: unicase::Ascii<String> = unicase::Ascii::new("HasAccess".to_string());
 }
 
-impl UserDataValue for FileArea {
+impl UserDataValue for FileDirectory {
     fn get_field_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *NAME {
             return Ok(VariableValue::new_string(self.name.clone()));
         }
+        log::error!("Invalid user data call on FileDirectory ({})", name);
         Ok(VariableValue::new_int(-1))
     }
 
@@ -198,14 +199,16 @@ impl UserDataValue for FileArea {
         Ok(())
     }
 
-    fn call_function(&mut self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
+    fn call_function(&self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
             let res = self.list_security.user_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
+        log::error!("Invalid function call on FileDirectory ({})", name);
         Err("Function not found".into())
     }
-    fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine, _name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<()> {
+    fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<()> {
+        log::error!("Invalid method call on FileDirectory ({})", name);
         Err("Function not found".into())
     }
 }

@@ -1041,7 +1041,10 @@ impl IcyBoardState {
             }
             "NUMCONF" => result = self.board.lock().unwrap().conferences.len().to_string(),
             "NUMDIR" => {
-                result = self.session.current_conference.file_areas.len().to_string();
+                result = self.session.current_conference.directories.len().to_string();
+            }
+            "NUMAREA" => {
+                result = self.session.current_conference.areas.len().to_string();
             }
             "NUMTIMESON" => {
                 if let Some(user) = &self.current_user {

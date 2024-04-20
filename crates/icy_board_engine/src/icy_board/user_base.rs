@@ -582,7 +582,6 @@ impl UserBase {
     }
 
     pub fn load_users(&mut self, home_dir: &Path) -> Res<()> {
-        println!("home dir: {}", home_dir.display());
         let read_dir = fs::read_dir(&home_dir).map_err(|e| {
             log::error!("Error loading home directories {} from {}", e, home_dir.display());
             e

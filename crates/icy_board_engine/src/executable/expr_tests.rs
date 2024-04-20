@@ -67,6 +67,12 @@ fn test_member_reference_serialization() {
     test_serialize(&val, &[2, 0, FuncOpCode::MemberReference as i16, 32]);
 }
 
+#[test]
+fn test_member_call_serialization() {
+    let val = PPEExpr::MemberFunctionCall(Box::new(PPEExpr::Value(2)), vec![PPEExpr::Value(1)], 32);
+    test_serialize(&val, &[2, 0, 1, 0, FuncOpCode::MemberCall as i16, 1, 32]);
+}
+
 fn test_serialize(val: &PPEExpr, expected: &[i16]) {
     assert_eq!(val.get_size(), expected.len(), "Serialization size mismatch for {val:?}");
     let mut result = Vec::new();

@@ -33,39 +33,39 @@ pub struct MessageArea {
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
-pub struct MessageAreaList {
+pub struct AreaList {
     #[serde(rename = "area")]
     areas: Vec<MessageArea>,
 }
 
-impl MessageAreaList {
+impl AreaList {
     pub fn new(areas: Vec<MessageArea>) -> Self {
         Self { areas }
     }
 }
 
-impl Deref for MessageAreaList {
+impl Deref for AreaList {
     type Target = Vec<MessageArea>;
     fn deref(&self) -> &Self::Target {
         &self.areas
     }
 }
 
-impl DerefMut for MessageAreaList {
+impl DerefMut for AreaList {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.areas
     }
 }
-impl IcyBoardSerializer for MessageAreaList {
+impl IcyBoardSerializer for AreaList {
     const FILE_TYPE: &'static str = "message areas";
 }
 
 impl UserData for MessageArea {
-    const TYPE_NAME: &'static str = "Conference";
+    const TYPE_NAME: &'static str = "Area";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_field(NAME.clone(), VariableType::String);
-        registry.add_procedure(HAS_ACCESS.clone(), Vec::new());
+        registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
     }
 }
 
@@ -79,6 +79,7 @@ impl UserDataValue for MessageArea {
         if *name == *NAME {
             return Ok(VariableValue::new_string(self.name.clone()));
         }
+        log::error!("Invalid user data call on MessageArea ({})", name);
         Ok(VariableValue::new_int(-1))
     }
 
@@ -90,14 +91,16 @@ impl UserDataValue for MessageArea {
         Ok(())
     }
 
-    fn call_function(&mut self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
+    fn call_function(&self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
             let res = self.req_level_to_list.user_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
+        log::error!("Invalid function call on MessageArea ({})", name);
         Err("Function not found".into())
     }
-    fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine, _name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<()> {
+    fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<()> {
+        log::error!("Invalid method call on MessageArea ({})", name);
         Err("Function not found".into())
     }
 }

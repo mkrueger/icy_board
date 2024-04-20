@@ -8,14 +8,15 @@ use serde::{Deserialize, Serialize};
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
     executable::{GenericVariableData, PPEExpr, VariableData, VariableType, VariableValue},
-    parser::{FILE_AREA_ID, MESSAGE_AREA_ID},
+    icy_board::file_directory::FileDirectory,
+    parser::{FILE_DIRECTORY_ID, MESSAGE_AREA_ID},
 };
 
 use super::{
     commands::Command,
-    file_areas::FileAreaList,
+    file_directory::DirectoryList,
     is_false, is_null_8, is_null_i32,
-    message_areas::{MessageArea, MessageAreaList},
+    message_area::{AreaList, MessageArea},
     pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader},
     security::RequiredSecurity,
     user_base::Password,
@@ -103,18 +104,20 @@ pub struct Conference {
     pub survey_menu: PathBuf,
     pub survey_file: PathBuf,
 
-    pub file_area_menu: PathBuf,
-    pub file_area_file: PathBuf,
+    pub dir_menu: PathBuf,
+    pub dir_file: PathBuf,
 
-    pub message_area_menu: PathBuf,
-    pub message_area_file: PathBuf,
+    pub area_menu: PathBuf,
+    pub area_file: PathBuf,
 
     #[serde(skip)]
     pub commands: Vec<Command>,
+
     #[serde(skip)]
-    pub message_areas: MessageAreaList,
+    pub areas: AreaList,
+
     #[serde(skip)]
-    pub file_areas: FileAreaList,
+    pub directories: DirectoryList,
 }
 
 impl Conference {}
@@ -154,7 +157,7 @@ impl ConferenceBase {
             let destination = output_directory.join(&output);
             std::fs::create_dir_all(&destination).unwrap();
 
-            let areas = MessageAreaList::new(vec![general_area]);
+            let areas = AreaList::new(vec![general_area]);
             areas.save(&destination.join(&"messages.toml")).unwrap();
 
             let new = Conference {
@@ -191,12 +194,12 @@ impl ConferenceBase {
                 blt_file: PathBuf::from(&c.blt_file),
                 survey_menu: PathBuf::from(&c.script_menu),
                 survey_file: PathBuf::from(&c.script_file),
-                file_area_menu: PathBuf::from(&c.dir_menu),
-                file_area_file: PathBuf::from(&c.dir_file),
-                message_area_menu: PathBuf::from("messages"),
-                message_area_file: PathBuf::from("messages.toml"),
-                message_areas: MessageAreaList::default(),
-                file_areas: FileAreaList::default(),
+                dir_menu: PathBuf::from(&c.dir_menu),
+                dir_file: PathBuf::from(&c.dir_file),
+                area_menu: PathBuf::from("messages"),
+                area_file: PathBuf::from("messages.toml"),
+                areas: AreaList::default(),
+                directories: DirectoryList::default(),
             };
             confs.push(new);
         }
@@ -239,30 +242,31 @@ impl UserData for Conference {
         registry.add_field(FILE_AREAS.clone(), VariableType::Boolean);
         registry.add_field(MESSAGE_AREAS.clone(), VariableType::Boolean);
 
-        registry.add_procedure(HAS_ACCESS.clone(), Vec::new());
-        registry.add_function(GET_FILE_AREA.clone(), vec![VariableType::Integer], VariableType::UserData(FILE_AREA_ID as u8));
+        registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(
-            MESSAGE_AREAS.clone(),
+            GET_FILE_AREA.clone(),
             vec![VariableType::Integer],
-            VariableType::UserData(MESSAGE_AREA_ID as u8),
+            VariableType::UserData(FILE_DIRECTORY_ID as u8),
         );
+        registry.add_function(GET_MSG_AREA.clone(), vec![VariableType::Integer], VariableType::UserData(MESSAGE_AREA_ID as u8));
     }
 }
 
 lazy_static::lazy_static! {
     pub static ref NAME: unicase::Ascii<String> = unicase::Ascii::new("Name".to_string());
     pub static ref ISPUBLIC: unicase::Ascii<String> = unicase::Ascii::new("IsPublic".to_string());
-    pub static ref FILE_AREAS: unicase::Ascii<String> = unicase::Ascii::new("FileAreas".to_string());
-    pub static ref MESSAGE_AREAS: unicase::Ascii<String> = unicase::Ascii::new("MessageAreas".to_string());
+    pub static ref FILE_AREAS: unicase::Ascii<String> = unicase::Ascii::new("Directories".to_string());
+    pub static ref MESSAGE_AREAS: unicase::Ascii<String> = unicase::Ascii::new("Areas".to_string());
 
     pub static ref HAS_ACCESS: unicase::Ascii<String> = unicase::Ascii::new("HasAccess".to_string());
-    pub static ref GET_FILE_AREA: unicase::Ascii<String> = unicase::Ascii::new("GetFileArea".to_string());
-    pub static ref GET_MSG_AREA: unicase::Ascii<String> = unicase::Ascii::new("GetMsgArea".to_string());
+    pub static ref GET_FILE_AREA: unicase::Ascii<String> = unicase::Ascii::new("GetDir".to_string());
+    pub static ref GET_MSG_AREA: unicase::Ascii<String> = unicase::Ascii::new("GetArea".to_string());
 
 }
 
 impl UserDataValue for Conference {
     fn get_field_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
+        println!("GET FIELD VALUE: {}", name);
         if *name == *NAME {
             return Ok(VariableValue::new_string(self.name.clone()));
         }
@@ -270,28 +274,22 @@ impl UserDataValue for Conference {
             return Ok(VariableValue::new_bool(self.required_security.user_can_access(&vm.icy_board_state.session)));
         }
         if *name == *FILE_AREAS {
-            return Ok(VariableValue::new_int(self.file_areas.len() as i32));
+            return Ok(VariableValue::new_int(self.directories.len() as i32));
         }
         if *name == *MESSAGE_AREAS {
-            return Ok(VariableValue::new_int(self.message_areas.len() as i32));
+            return Ok(VariableValue::new_int(self.areas.len() as i32));
         }
 
+        log::error!("Invalid user data call on Conference ({})", name);
         Ok(VariableValue::new_int(-1))
     }
 
-    fn set_field_value(&mut self, _vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()> {
-        if *name == *NAME {
-            self.name = val.as_string();
-            return Ok(());
-        }
-        if *name == *ISPUBLIC {
-            self.is_public = val.as_bool();
-            return Ok(());
-        }
+    fn set_field_value(&mut self, _vm: &mut crate::vm::VirtualMachine, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+        // Currently unsupported !
         Ok(())
     }
 
-    fn call_function(&mut self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
+    fn call_function(&self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
             let res = self.required_security.user_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
@@ -299,35 +297,49 @@ impl UserDataValue for Conference {
 
         if *name == *GET_FILE_AREA {
             let area = vm.eval_expr(&arguments[0])?.as_int();
-            if let Some(res) = self.file_areas.get(area as usize) {
+            if let Some(res) = self.directories.get(area as usize) {
                 vm.user_data.push(Box::new((*res).clone()));
                 return Ok(VariableValue {
                     data: VariableData::from_int(0),
                     generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
-                    vtype: VariableType::UserData(FILE_AREA_ID as u8),
+                    vtype: VariableType::UserData(FILE_DIRECTORY_ID as u8),
                 });
-            } else {
-                log::error!("PPL: File area not found ({})", area);
             }
+            log::error!("PPL: File area not found ({})", area);
+
+            vm.user_data.push(Box::new(FileDirectory::default()));
+            return Ok(VariableValue {
+                data: VariableData::from_int(0),
+                generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
+                vtype: VariableType::UserData(FILE_DIRECTORY_ID as u8),
+            });
         }
 
         if *name == *GET_MSG_AREA {
             let area = vm.eval_expr(&arguments[0])?.as_int();
-            if let Some(res) = self.message_areas.get(area as usize) {
+            if let Some(res) = self.areas.get(area as usize) {
                 vm.user_data.push(Box::new((*res).clone()));
                 return Ok(VariableValue {
                     data: VariableData::from_int(0),
                     generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
                     vtype: VariableType::UserData(MESSAGE_AREA_ID as u8),
                 });
-            } else {
-                log::error!("PPL: Message area not found ({})", area);
             }
-        }
+            log::error!("PPL: Message area not found ({})", area);
 
+            vm.user_data.push(Box::new(MessageArea::default()));
+            return Ok(VariableValue {
+                data: VariableData::from_int(0),
+                generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
+                vtype: VariableType::UserData(FILE_DIRECTORY_ID as u8),
+            });
+        }
+        log::error!("Invalid function call on Conference ({})", name);
         Err("Function not found".into())
     }
-    fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine, _name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<()> {
+
+    fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<()> {
+        log::error!("Invalid method call on Conference ({})", name);
         Err("Function not found".into())
     }
 }

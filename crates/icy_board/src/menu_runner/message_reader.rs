@@ -174,7 +174,7 @@ impl MessageViewer {
         let txt = self.format_hdr_text(
             &self.confarea.text,
             &state.session.current_conference.name,
-            &state.session.current_conference.message_areas[area].name,
+            &state.session.current_conference.areas[area].name,
         );
         state.print(TerminalTarget::Both, &txt)?;
         state.reset_color()?;
@@ -188,12 +188,65 @@ impl MessageViewer {
 }
 
 impl PcbBoardCommand {
+    pub fn show_message_areas(&mut self, action: &Command) -> Res<Option<usize>> {
+        self.state.node_state.lock().unwrap().user_activity = UserActivity::BrowseFiles;
+        self.state.session.disable_auto_more = false;
+        self.state.session.more_requested = false;
+
+        if self.state.session.current_conference.areas.is_empty() {
+            self.state
+                .display_text(IceText::NoAreasAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+            self.state.press_enter()?;
+            return Ok(None);
+        }
+        let area_number = if let Some(token) = self.state.session.tokens.pop_front() {
+            token
+        } else {
+            let mnu = self.state.session.current_conference.area_menu.clone();
+            let mnu = self.state.resolve_path(&mnu);
+            self.state.display_menu(&mnu)?;
+            self.state.new_line()?;
+
+            self.state.input_field(
+                if self.state.session.expert_mode {
+                    IceText::AreaListCommandExpert
+                } else {
+                    IceText::AreaListCommand
+                },
+                40,
+                MASK_COMMAND,
+                &action.help,
+                None,
+                display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
+            )?
+        };
+
+        if !area_number.is_empty() {
+            if let Ok(number) = area_number.parse::<i32>() {
+                if 1 <= number && (number as usize) <= self.state.session.current_conference.areas.len() {
+                    let area = &self.state.session.current_conference.directories[number as usize - 1];
+                    if area.list_security.user_can_access(&self.state.session) {
+                        return Ok(Some(number as usize - 1));
+                    }
+                }
+            }
+
+            self.state.session.op_text = area_number;
+            self.state
+                .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::NOTBLANK)?;
+        }
+        Ok(None)
+    }
+
     pub fn read_messages(&mut self, action: &Command) -> Res<()> {
         self.state.node_state.lock().unwrap().user_activity = UserActivity::ReadMessages;
-
-        let message_base_file = &self.state.session.current_conference.message_areas[0].filename;
+        let Ok(Some(area)) = self.show_message_areas(action) else {
+            self.state.press_enter()?;
+            self.display_menu = true;
+            return Ok(());
+        };
+        let message_base_file = &self.state.session.current_conference.areas[area].filename;
         let msgbase_file_resolved = self.state.board.lock().unwrap().resolve_file(message_base_file);
-
         match JamMessageBase::open(&msgbase_file_resolved) {
             Ok(message_base) => {
                 self.read_msgs_from_base(message_base, action)?;

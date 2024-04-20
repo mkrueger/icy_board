@@ -1,0 +1,32 @@
+﻿INTEGER i
+
+BEGIN
+  CLS
+  PRINTLN "@X17╒═════════════════════════════════════════════════════════════════════════════╕"
+  PRINTLN "│  @X1EYou have access to the following directories in this conference:           @X17│"
+  PRINTLN "╘═════════════════════════════════════════════════════════════════════════════╛"
+  PRINTLN
+
+  CONFERENCE CONF = CONFINFO(CURCONF())
+  
+  FOR i = 1 to CONF.Directories
+    IF GetX() > 45
+      PRINTLN
+    Directory dir = CONF.GetDir(i - 1)
+    
+    IF !dir.HasAccess() CONTINUE
+
+    PRINT "@X0E", Left(String(i),2), "- "
+    IF (STRIP(dir.Name, " ") = "Unused") then
+      COLOR @X08
+    ELSE
+      COLOR @X0F
+    ENDIF
+    PRINT LEFT(dir.Name,35)
+  NEXT
+  
+  IF GetX() > 45
+    PRINTLN CHR(13)
+   
+  PRINTLN "@X0EU - @X0FRecent File Uploads"
+END

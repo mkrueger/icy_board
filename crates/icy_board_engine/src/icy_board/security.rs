@@ -27,6 +27,10 @@ impl RequiredSecurity {
     }
 
     pub fn user_can_access(&self, session: &Session) -> bool {
+        if session.is_sysop {
+            return true;
+        }
+
         if session.cur_security < self.level {
             return false;
         }

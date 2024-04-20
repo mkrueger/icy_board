@@ -1518,8 +1518,8 @@ pub fn confinfo(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue>
             25 => Ok(VariableValue::new_string(conference.blt_file.to_string_lossy().to_string())),
             26 => Ok(VariableValue::new_string(conference.survey_menu.to_string_lossy().to_string())),
             27 => Ok(VariableValue::new_string(conference.survey_file.to_string_lossy().to_string())),
-            28 => Ok(VariableValue::new_string(conference.file_area_menu.to_string_lossy().to_string())),
-            29 => Ok(VariableValue::new_string(conference.file_area_file.to_string_lossy().to_string())),
+            28 => Ok(VariableValue::new_string(conference.dir_menu.to_string_lossy().to_string())),
+            29 => Ok(VariableValue::new_string(conference.dir_file.to_string_lossy().to_string())),
             30 => Ok(VariableValue::new_string(conference.attachment_location.to_string_lossy().to_string())), // PthNameLoc ???
             31 => Ok(VariableValue::new_bool(false)),                                                          // force echo
             32 => Ok(VariableValue::new_bool(false)),                                                          // read only

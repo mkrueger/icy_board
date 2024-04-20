@@ -565,7 +565,7 @@ impl Lexer {
 
             ']'  => {
                 if self.lang_version < 350 {
-                    Some(Token::LPar)
+                    Some(Token::RPar)
                 } else {
                     Some(Token::RBracket)
                 }

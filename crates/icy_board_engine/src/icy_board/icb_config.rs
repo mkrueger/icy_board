@@ -243,8 +243,6 @@ pub struct ConfigPaths {
 
     pub icbtext: PathBuf,
 
-    pub user_base: PathBuf,
-
     pub conferences: PathBuf,
 
     /// name and location of welcome file
@@ -444,8 +442,7 @@ impl IcbConfig {
             paths: ConfigPaths {
                 help_path: PathBuf::from("art/help/"),
                 tmp_path: PathBuf::from("tmp/"),
-                icbtext: PathBuf::from("data/icbtext.toml"),
-                user_base: PathBuf::from("data/user_base.toml"),
+                icbtext: PathBuf::from("config/icbtext.toml"),
                 conferences: PathBuf::from("config/conferences.toml"),
                 security_file_path: PathBuf::from("art/secmsgs/"),
                 command_display_path: PathBuf::from("art/cmd_display/"),

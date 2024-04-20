@@ -6,6 +6,8 @@ use crate::{
 };
 
 pub trait UserDataMemberRegistry {
+    fn get_member_id(&self, name: &unicase::Ascii<String>) -> Option<usize>;
+
     fn add_field(&mut self, name: unicase::Ascii<String>, var_type: VariableType);
 
     fn add_procedure(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>);
@@ -23,7 +25,7 @@ pub trait UserDataValue: Sync {
     fn get_field_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> Res<VariableValue>;
     fn set_field_value(&mut self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()>;
 
-    fn call_function(&mut self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, arguments: &[PPEExpr]) -> crate::Res<VariableValue>;
+    fn call_function(&self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, arguments: &[PPEExpr]) -> crate::Res<VariableValue>;
     fn call_method(&mut self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, arguments: &[PPEExpr]) -> crate::Res<()>;
 }
 
@@ -44,6 +46,10 @@ pub struct UserDataRegistry {
 }
 
 impl UserDataMemberRegistry for UserDataRegistry {
+    fn get_member_id(&self, name: &unicase::Ascii<String>) -> Option<usize> {
+        self.member_id_lookup.get(name).copied()
+    }
+
     fn add_field(&mut self, name: unicase::Ascii<String>, var_type: VariableType) {
         self.member_id_lookup.insert(name.clone(), self.id_table.len());
         self.id_table.push(UserDataEntry::Field(name.clone()));

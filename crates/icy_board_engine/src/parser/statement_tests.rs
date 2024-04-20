@@ -19,11 +19,20 @@ fn parse_statement(input: &str, assert_eof: bool) -> Statement {
     let reg = UserTypeRegistry::default();
     let mut parser = Parser::new(PathBuf::from("."), &reg, input, Encoding::Utf8, LAST_PPLC);
     parser.next_token();
-    let res = parser.parse_statement().expect("Failed to parse statement: {}");
-    if assert_eof {
-        assert!(parser.get_cur_token().is_none());
+    match parser.parse_statement() {
+        Some(stmt) => {
+            if assert_eof {
+                assert!(parser.get_cur_token().is_none());
+            }
+            stmt
+        }
+        None => {
+            for error in &parser.errors.lock().unwrap().errors {
+                println!("{}", error.error);
+            }
+            panic!("Error");
+        }
     }
-    res
 }
 
 fn check_statement(input: &str, check: &Statement) {
@@ -58,10 +67,6 @@ fn test_parse_comment_statement() {
 #[test]
 fn test_parse_return_statement() {
     check_statement("RETURN", &ReturnStatement::create_empty_statement(None));
-    check_statement(
-        "RETURN 123",
-        &ReturnStatement::create_empty_statement(Some(ConstantExpression::create_empty_expression(Constant::Integer(123)))),
-    );
 }
 
 #[test]

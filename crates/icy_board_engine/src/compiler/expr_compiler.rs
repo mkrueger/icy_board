@@ -61,16 +61,15 @@ impl<'a, 'b> AstVisitor<PPEExpr> for ExpressionCompiler<'a, 'b> {
 
         match function_type {
             SemanticInfo::PredefinedFunc(op_code) => {
-                println!(
-                    "Predefined function call: {:?} opcode:{:?}",
-                    op_code.get_definition().name,
-                    op_code.get_definition().opcode as i16
-                );
-
                 return PPEExpr::PredefinedFunctionCall(
                     op_code.get_definition(), // to de-alias aliases
                     call.get_arguments().iter().map(|e| e.visit(self)).collect(),
                 );
+            }
+            SemanticInfo::MemberFunctionCall(idx) => {
+                let idx = *idx;
+                let expr = call.get_expression().visit(self);
+                return PPEExpr::MemberFunctionCall(Box::new(expr), arguments, idx);
             }
             SemanticInfo::FunctionReference(idx) => {
                 let reference_index = self.compiler.semantic_visitor.function_containers[*idx].id;

@@ -38,6 +38,19 @@ fn get_token(src: &str) -> Token {
     }
 }
 
+fn get_token_ver(src: &str, ver: u16) -> Token {
+    let mut lex = Lexer::new(PathBuf::from("."), ver, src, Encoding::Utf8, Arc::new(Mutex::new(ErrorRepoter::default())));
+    match lex.next_token() {
+        Some(t) => {
+            //println!("got token: {t:?}");
+            t
+        }
+        None => {
+            panic!("Error")
+        }
+    }
+}
+
 #[test]
 fn test_string() {
     assert_eq!(Token::Const(Constant::String(String::new())), get_token("\"\""));
@@ -91,11 +104,17 @@ fn test_parens() {
     assert_eq!(Token::LPar, get_token("("));
     assert_eq!(Token::RPar, get_token(")"));
 
-    assert_eq!(Token::LPar, get_token("["));
-    assert_eq!(Token::RPar, get_token("]"));
+    assert_eq!(Token::LBracket, get_token("["));
+    assert_eq!(Token::RBracket, get_token("]"));
 
-    assert_eq!(Token::LPar, get_token("{"));
-    assert_eq!(Token::RPar, get_token("}"));
+    assert_eq!(Token::LPar, get_token_ver("[", 340));
+    assert_eq!(Token::RPar, get_token_ver("]", 340));
+
+    assert_eq!(Token::LBrace, get_token("{"));
+    assert_eq!(Token::RBrace, get_token("}"));
+
+    assert_eq!(Token::LPar, get_token_ver("{", 340));
+    assert_eq!(Token::RPar, get_token_ver("}", 340));
 }
 
 #[test]

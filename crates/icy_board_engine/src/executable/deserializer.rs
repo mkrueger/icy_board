@@ -27,7 +27,10 @@ pub enum DeserializationErrorType {
     TooFewArgumentsForUnaryExpression(UnaryOp),
 
     #[error("Too few function arguments for {0:?}, expected {1}, got {2}")]
-    TooFewFunctionArguments(FuncOpCode, i8, usize),
+    TooFewBuiltInFunctionArguments(FuncOpCode, i8, usize),
+
+    #[error("Too few function arguments")]
+    TooFewFunctionArguments,
 
     #[error("Index out of bounds")]
     IndexOutOfBounds,
@@ -271,7 +274,10 @@ impl PPEDeserializer {
             if id > 0 {
                 let id = id as usize;
                 let Some(val) = executable.variable_table.try_get_value(id) else {
-                    log::warn!("Potential error in expression deserialization: No variable table entry for {}, skipping.", id);
+                    log::warn!(
+                        "Potential error in expression deserialization: No variable table entry for {:02X}, skipping.",
+                        id
+                    );
                     self.offset += 1;
                     break;
                 };
@@ -315,6 +321,28 @@ impl PPEDeserializer {
                     continue;
                 }
 
+                if id == FuncOpCode::MemberCall as i16 {
+                    self.offset += 1;
+                    let arg_count = executable.script_buffer[self.offset];
+                    self.offset += 1;
+                    let member_id = executable.script_buffer[self.offset];
+                    self.offset += 1;
+
+                    let mut arguments = Vec::new();
+                    for _ in 0..arg_count {
+                        if let Some(expr) = self.pop_expr() {
+                            arguments.push(expr);
+                        } else {
+                            self.report_bug(DeserializationErrorType::TooFewFunctionArguments);
+                            return self.deserialize_expression(executable);
+                        }
+                    }
+
+                    let expr = self.pop_expr().unwrap();
+                    self.push_expr(PPEExpr::MemberFunctionCall(Box::new(expr), arguments, member_id as usize));
+                    continue;
+                }
+
                 let func = -id as usize;
                 let func_def = &FUNCTION_DEFINITIONS[func];
                 match func_def.args {
@@ -354,7 +382,7 @@ impl PPEDeserializer {
                             self.push_expr(PPEExpr::PredefinedFunctionCall(func_def, vec![]));
                         } else {
                             if (self.expr_stack.len() as i8) < func_def.args {
-                                return Err(DeserializationErrorType::TooFewFunctionArguments(
+                                return Err(DeserializationErrorType::TooFewBuiltInFunctionArguments(
                                     func_def.opcode,
                                     func_def.args,
                                     self.expr_stack.len(),

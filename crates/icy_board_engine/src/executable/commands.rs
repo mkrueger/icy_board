@@ -295,8 +295,10 @@ pub enum PPEExpr {
     UnaryExpression(UnaryOp, Box<PPEExpr>),
     BinaryExpression(BinOp, Box<PPEExpr>, Box<PPEExpr>),
     Dim(usize, Vec<PPEExpr>),
+
     PredefinedFunctionCall(&'static FunctionDefinition, Vec<PPEExpr>),
     FunctionCall(usize, Vec<PPEExpr>),
+    MemberFunctionCall(Box<PPEExpr>, Vec<PPEExpr>, usize),
 }
 
 impl PPEExpr {
@@ -319,6 +321,16 @@ impl PPEExpr {
                 vec.push(FuncOpCode::MemberReference as i16);
                 vec.push(*id as i16);
             }
+            PPEExpr::MemberFunctionCall(expr, args, id) => {
+                expr.serialize(vec);
+                for arg in args {
+                    arg.serialize(vec);
+                }
+                vec.push(FuncOpCode::MemberCall as i16);
+                vec.push(args.len() as i16);
+                vec.push(*id as i16);
+            }
+
             PPEExpr::Dim(id, vars) => {
                 vec.push(*id as i16);
                 vec.push(vars.len() as i16);
@@ -362,6 +374,7 @@ impl PPEExpr {
             PPEExpr::Dim(_, args) => 2 + Self::count_size(args) + args.len(),
             PPEExpr::PredefinedFunctionCall(_, args) => Self::count_size(args) + 1,
             PPEExpr::FunctionCall(_, args) => Self::count_size(args) + 2 + args.len(),
+            PPEExpr::MemberFunctionCall(expr, args, _) => expr.get_size() + 1 + Self::count_size(args) + 2,
             PPEExpr::UnaryExpression(_, expr) => expr.get_size() + 1,
             PPEExpr::BinaryExpression(_, left_expr, right_expr) => left_expr.get_size() + right_expr.get_size() + 1,
         }
@@ -403,6 +416,7 @@ impl PPEExpr {
             PPEExpr::Dim(id, dim) => visitor.visit_dim_expression(*id, dim),
             PPEExpr::PredefinedFunctionCall(def, arguments) => visitor.visit_predefined_function_call(def, arguments),
             PPEExpr::FunctionCall(id, arguments) => visitor.visit_function_call(*id, arguments),
+            PPEExpr::MemberFunctionCall(expr, arguments, id) => visitor.visit_member_function_call(expr, arguments, *id),
         }
     }
 
@@ -422,6 +436,7 @@ impl PPEExpr {
             PPEExpr::Dim(id, dim) => visitor.visit_dim_expression(*id, dim),
             PPEExpr::PredefinedFunctionCall(def, arguments) => visitor.visit_predefined_function_call(def, arguments),
             PPEExpr::FunctionCall(id, arguments) => visitor.visit_function_call(*id, arguments),
+            PPEExpr::MemberFunctionCall(expr, arguments, id) => visitor.visit_member_function_call(expr, arguments, *id),
         }
     }
 }
@@ -439,6 +454,7 @@ pub trait PPEVisitor<T>: Sized {
     fn visit_dim_expression(&mut self, id: usize, dim: &[PPEExpr]) -> T;
     fn visit_predefined_function_call(&mut self, def: &FunctionDefinition, arguments: &[PPEExpr]) -> T;
     fn visit_function_call(&mut self, id: usize, arguments: &[PPEExpr]) -> T;
+    fn visit_member_function_call(&mut self, expr: &PPEExpr, arguments: &[PPEExpr], id: usize) -> T;
 
     fn visit_end(&mut self) -> T;
     fn visit_return(&mut self) -> T;
@@ -475,6 +491,9 @@ pub trait PPEVisitorMut: Sized {
     }
     fn visit_function_call(&mut self, id: usize, arguments: &[PPEExpr]) -> PPEExpr {
         PPEExpr::FunctionCall(id, arguments.iter().map(|e| e.visit_mut(self)).collect())
+    }
+    fn visit_member_function_call(&mut self, expr: &PPEExpr, arguments: &[PPEExpr], id: usize) -> PPEExpr {
+        PPEExpr::MemberFunctionCall(Box::new(expr.visit_mut(self)), arguments.iter().map(|e| e.visit_mut(self)).collect(), id)
     }
 }
 
@@ -592,6 +611,10 @@ impl<'a> PPEVisitor<Result<VariableValue, PPEError>> for PPEConstantValueVisitor
         Err(PPEError::OnlyConstantsAllowed)
     }
 
+    fn visit_member_function_call(&mut self, _expr: &PPEExpr, _arguments: &[PPEExpr], _id: usize) -> Result<VariableValue, PPEError> {
+        Err(PPEError::OnlyConstantsAllowed)
+    }
+
     fn visit_end(&mut self) -> Result<VariableValue, PPEError> {
         todo!()
     }
@@ -653,6 +676,10 @@ impl PPEVisitorMut for ExpressionNegator {
         }
     }
 
+    fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> PPEExpr {
+        PPEExpr::UnaryExpression(UnaryOp::Not, Box::new(PPEExpr::Member(Box::new(expr.clone()), id)))
+    }
+
     fn visit_binary_expression(&mut self, op: BinOp, left: &PPEExpr, right: &PPEExpr) -> PPEExpr {
         match op {
             BinOp::PoW | BinOp::Mul | BinOp::Div | BinOp::Mod | BinOp::Add | BinOp::Sub => PPEExpr::UnaryExpression(
@@ -696,5 +723,12 @@ impl PPEVisitorMut for ExpressionNegator {
 
     fn visit_function_call(&mut self, id: usize, arguments: &[PPEExpr]) -> PPEExpr {
         PPEExpr::UnaryExpression(UnaryOp::Not, Box::new(PPEExpr::FunctionCall(id, arguments.to_vec())))
+    }
+
+    fn visit_member_function_call(&mut self, expr: &PPEExpr, arguments: &[PPEExpr], id: usize) -> PPEExpr {
+        PPEExpr::UnaryExpression(
+            UnaryOp::Not,
+            Box::new(PPEExpr::MemberFunctionCall(Box::new(expr.clone()), arguments.to_vec(), id)),
+        )
     }
 }

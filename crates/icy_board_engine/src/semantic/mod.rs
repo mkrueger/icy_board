@@ -11,7 +11,7 @@ use crate::{
         ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation,
         VariableDeclarationStatement,
     },
-    compiler::CompilationErrorType,
+    compiler::{user_data::UserDataMemberRegistry, CompilationErrorType},
     executable::{
         EntryType, FuncOpCode, FunctionDefinition, FunctionValue, GenericVariableData, OpCode, ProcedureValue, TableEntry, VarHeader, VariableData,
         VariableTable, VariableType, VariableValue, FUNCTION_DEFINITIONS, USER_VARIABLES,
@@ -40,6 +40,8 @@ pub enum ReferenceType {
 #[derive(Debug, Clone, PartialEq)]
 pub enum SemanticInfo {
     PredefinedFunc(FuncOpCode),
+
+    MemberFunctionCall(usize),
 
     PredefFunctionGroup(Vec<usize>),
 
@@ -797,7 +799,6 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
         } else if let Some(idx) = self.lookup_variable(identifier.get_identifier()) {
             let (rt, r) = &mut self.references[idx];
             let identifier = identifier.get_identifier_token();
-
             if let ReferenceType::Function(func_idx) = rt {
                 r.return_types.push(Spanned::new(identifier.token.to_string(), identifier.span.clone()));
                 self.function_type_lookup
@@ -806,6 +807,7 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
                 self.function_type_lookup
                     .insert(identifier.span.start, SemanticInfo::VariableReference(*func_idx));
             }
+
             r.usages.push(Spanned::new(identifier.token.to_string(), identifier.span.clone()));
 
             r.variable_type
@@ -821,21 +823,22 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
     fn visit_member_reference_expression(&mut self, member_reference_expression: &crate::ast::MemberReferenceExpression) -> VariableType {
         let t = member_reference_expression.get_expression().visit(self);
         if let VariableType::UserData(d) = t {
-            self.user_type_lookup.insert(member_reference_expression.get_identifier_token().span.start, d);
-
             if let Some(t) = self.type_registry.get_type_from_id(d) {
                 for (name, t) in &t.fields {
                     if name == member_reference_expression.get_identifier() {
+                        self.user_type_lookup.insert(member_reference_expression.get_identifier_token().span.start, d);
                         return *t;
                     }
                 }
                 for (name, (_args, t)) in &t.functions {
                     if name == member_reference_expression.get_identifier() {
+                        self.user_type_lookup.insert(member_reference_expression.get_identifier_token().span.start, d);
                         return *t;
                     }
                 }
                 for (name, _args) in &t.procedures {
                     if name == member_reference_expression.get_identifier() {
+                        self.user_type_lookup.insert(member_reference_expression.get_identifier_token().span.start, d);
                         return VariableType::None;
                     }
                 }
@@ -990,6 +993,36 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
                 self.check_expr_arg_count(arg_count, call.get_arguments().len(), call.get_expression());
             }
             Some(SemanticInfo::VariableReference(idx)) => {
+                if let Expression::MemberReference(member) = call.get_expression() {
+                    if let Some(user_type) = self.user_type_lookup.get(&member.get_identifier_token().span.start) {
+                        if let Some(registry) = self.type_registry.get_type_from_id(*user_type) {
+                            for (name, (pars, t)) in &registry.functions {
+                                if name == member.get_identifier() {
+                                    self.check_expr_arg_count(pars.len(), call.get_arguments().len(), call.get_expression());
+                                    if let Some(member) = registry.get_member_id(name) {
+                                        self.function_type_lookup.insert(start, SemanticInfo::MemberFunctionCall(member));
+                                        return *t;
+                                    } else {
+                                        self.errors.lock().unwrap().report_error(
+                                            member.get_identifier_token().span.clone(),
+                                            CompilationErrorType::FunctionNotFound(member.get_identifier().to_string()),
+                                        );
+                                        return res;
+                                    }
+                                }
+                            }
+                            self.errors.lock().unwrap().report_error(
+                                member.get_identifier_token().span.clone(),
+                                CompilationErrorType::FunctionNotFound(member.get_identifier().to_string()),
+                            );
+                            return res;
+                        }
+                    } else {
+                        // error already reported.
+                        return res;
+                    }
+                }
+
                 let (rt, r) = &mut self.references[*idx];
 
                 let arg_count = if let ReferenceType::Variable(_func) = rt {
@@ -1012,7 +1045,6 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
                             );
                             return res;
                         }
-                        println!("Found function: {:?}", def.opcode);
                         self.function_type_lookup.insert(start, SemanticInfo::PredefinedFunc(def.opcode));
                         return def.return_type;
                     }
@@ -1376,13 +1408,11 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
                         .unwrap()
                         .report_warning(decl.span.clone(), CompilationErrorType::UnusedFunction(decl.token.to_string()));
                 }
-            } else if r.usages.is_empty() {
-                if decl.token.to_string() != ":~BEGIN~" {
-                    self.errors
-                        .lock()
-                        .unwrap()
-                        .report_warning(decl.span.clone(), CompilationErrorType::UnusedVariable(decl.token.to_string()));
-                }
+            } else if matches!(rt, ReferenceType::Variable(_)) && r.usages.is_empty() {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_warning(decl.span.clone(), CompilationErrorType::UnusedVariable(decl.token.to_string()));
             }
         }
 

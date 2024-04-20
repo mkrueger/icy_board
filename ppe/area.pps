@@ -1,0 +1,30 @@
+﻿INTEGER i
+
+BEGIN
+  CLS
+  PRINTLN "@X17╒═════════════════════════════════════════════════════════════════════════════╕"
+  PRINTLN "│  @X1EYou have access to the following areas in this conference:                 @X17│"
+  PRINTLN "╘═════════════════════════════════════════════════════════════════════════════╛"
+  PRINTLN
+  
+  CONFERENCE CONF = CONFINFO(CURCONF())
+  
+  FOR i = 1 to CONF.Areas
+    IF GetX() > 45
+      PRINTLN
+    Area a = CONF.GetArea(i - 1)
+    
+    IF !a.HasAccess() CONTINUE
+
+    PRINT "@X0E", Left(String(i),2), "- "
+    IF (STRIP(a.Name, " ") = "Unused") then
+      COLOR @X08
+    ELSE
+      COLOR @X0F
+    ENDIF
+    PRINT LEFT(a.Name,35)
+  NEXT
+  
+  IF GetX() > 45
+    PRINTLN CHR(13)
+END

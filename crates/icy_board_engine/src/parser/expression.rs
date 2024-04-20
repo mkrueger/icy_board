@@ -11,6 +11,7 @@ impl<'a> Parser<'a> {
     pub fn parse_expression(&mut self) -> Option<Expression> {
         self.parse_bool()
     }
+
     fn parse_bool(&mut self) -> Option<Expression> {
         // it's correct on the upper level - it's very unusual
         if self.get_cur_token() == Some(Token::Not) {
@@ -171,7 +172,6 @@ impl<'a> Parser<'a> {
         }
         self.parse_function_call_expression()
     }
-
     fn parse_function_call_expression(&mut self) -> Option<Expression> {
         let primary = self.parse_primary();
 
@@ -210,7 +210,6 @@ impl<'a> Parser<'a> {
                     return None;
                 }
                 let rightpar_token = self.save_spanned_token();
-
                 self.next_token();
 
                 return Some(Expression::FunctionCall(FunctionCallExpression::new(

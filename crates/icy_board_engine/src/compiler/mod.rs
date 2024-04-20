@@ -95,8 +95,8 @@ pub struct PPECompiler<'a> {
 }
 
 impl<'a> PPECompiler<'a> {
-    pub fn new(language_version: u16, type_registry: &'a UserTypeRegistry) -> Self {
-        let semantic_visitor = SemanticVisitor::new(language_version, Arc::new(Mutex::new(ErrorRepoter::default())), type_registry);
+    pub fn new(language_version: u16, type_registry: &'a UserTypeRegistry, errors: Arc<Mutex<ErrorRepoter>>) -> Self {
+        let semantic_visitor = SemanticVisitor::new(language_version, errors, type_registry);
         Self {
             lookup_table: LookupVariabeleTable::default(),
             semantic_visitor,

@@ -15,6 +15,7 @@ use crate::executable::VariableValue;
 use crate::parser::UserTypeRegistry;
 use crate::Res;
 use std::collections::HashMap;
+use std::mem;
 use std::path::Path;
 use std::path::PathBuf;
 use thiserror::Error;
@@ -70,6 +71,15 @@ pub enum VMError {
 
     #[error("Write back stack empty")]
     WriteBackStackEmpty,
+
+    #[error("No user type base expression")]
+    NoUserTypeBase,
+
+    #[error("Type not found in registry")]
+    TypeNotFoundInRegistry(u8),
+
+    #[error("Object not found (internal VM error) ({0})")]
+    NoObjectFound(u8),
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -331,22 +341,79 @@ impl<'a> VirtualMachine<'a> {
             PPEExpr::Invalid => Err(VMError::InternalVMError.into()),
             PPEExpr::Value(id) => Ok(self.variable_table.get_value(*id).clone()),
 
-            PPEExpr::Member(base_expr, id) => {
+            PPEExpr::Member(base_expr, member_id) => {
                 let val = self.eval_expr(base_expr)?;
-                if let VariableType::UserData(user_type) = val.get_type() {
-                    if let GenericVariableData::UserData(field_id) = val.generic_data {
-                        if let Some(user_type) = self.type_registry.get_type_from_id(user_type) {
-                            match &user_type.id_table[*id] {
-                                crate::compiler::user_data::UserDataEntry::Field(name) => {
-                                    return self.user_data[field_id].get_field_value(self, name);
+                let VariableType::UserData(type_id) = val.get_type() else {
+                    log::error!("No user type base for value: {:?} on expr {:?}", val, base_expr);
+                    return Err(VMError::NoUserTypeBase.into());
+                };
+                let Some(registry) = self.type_registry.get_type_from_id(type_id) else {
+                    log::error!("No user data registry entry for value: {:?} type :{} on expr {:?}", val, type_id, base_expr);
+                    return Err(VMError::TypeNotFoundInRegistry(type_id).into());
+                };
+                let GenericVariableData::UserData(object_id) = val.generic_data else {
+                    // should never happen.
+                    return Err(VMError::NoObjectFound(type_id).into());
+                };
+
+                match &registry.id_table[*member_id] {
+                    crate::compiler::user_data::UserDataEntry::Field(name) => {
+                        log::warn!("Get {} on {}", name, object_id);
+                        let val = self.user_data[object_id].get_field_value(self, name);
+                        return val;
+                    }
+                    crate::compiler::user_data::UserDataEntry::Procedure(_) | crate::compiler::user_data::UserDataEntry::Function(_) => {
+                        return Ok(VariableValue {
+                            vtype: val.vtype,
+                            data: val.data,
+                            generic_data: GenericVariableData::UserData(object_id),
+                        });
+                    }
+                }
+            }
+
+            PPEExpr::MemberFunctionCall(base_expr, arguments, id) => {
+                let val = self.eval_expr(base_expr)?;
+                let VariableType::UserData(type_id) = val.get_type() else {
+                    log::error!("No user type base for value: {:?} on expr {:?}", val, base_expr);
+                    return Err(VMError::NoUserTypeBase.into());
+                };
+                let Some(registry) = self.type_registry.get_type_from_id(type_id) else {
+                    log::error!("No user data registry entry for value: {:?} type :{} on expr {:?}", val, type_id, base_expr);
+                    return Err(VMError::TypeNotFoundInRegistry(type_id).into());
+                };
+                let GenericVariableData::UserData(object_id) = val.generic_data else {
+                    // should never happen.
+                    return Err(VMError::NoObjectFound(type_id).into());
+                };
+
+                match &registry.id_table[*id] {
+                    crate::compiler::user_data::UserDataEntry::Field(_) => {
+                        todo!();
+                    }
+                    crate::compiler::user_data::UserDataEntry::Procedure(_) => todo!(),
+                    crate::compiler::user_data::UserDataEntry::Function(name) => {
+                        let mut moved_data: Vec<Box<dyn UserDataValue>> = Vec::new();
+                        mem::swap(&mut moved_data, &mut self.user_data);
+                        log::warn!("Call {} on {}", name, object_id);
+                        match moved_data[object_id].call_function(self, name, arguments) {
+                            Ok(mut result) => {
+                                mem::swap(&mut moved_data, &mut self.user_data);
+                                if !moved_data.is_empty() {
+                                    if let GenericVariableData::UserData(data) = result.generic_data {
+                                        result.generic_data = GenericVariableData::UserData(data + self.user_data.len());
+                                    }
+                                    self.user_data.extend(moved_data.drain(..));
                                 }
-                                crate::compiler::user_data::UserDataEntry::Procedure(_) => todo!(),
-                                crate::compiler::user_data::UserDataEntry::Function(_) => todo!(),
+                                return Ok(result);
+                            }
+                            Err(e) => {
+                                mem::swap(&mut moved_data, &mut self.user_data);
+                                return Err(e);
                             }
                         }
                     }
                 }
-                return Err(VMError::InternalVMError.into());
             }
 
             PPEExpr::UnaryExpression(op, expr) => {
@@ -487,7 +554,6 @@ impl<'a> VirtualMachine<'a> {
                                 if (1 << i) & pass_flags != 0 {
                                     let id = first + i;
                                     let val = self.variable_table.get_value(id).clone();
-                                    // println!("push pass value {}", val);
                                     pass_values.push(val);
                                 }
                             }
@@ -513,7 +579,6 @@ impl<'a> VirtualMachine<'a> {
                                         return Err(VMError::PassValueStackEmpty.into());
                                     };
                                     if let Some(argument_expr) = self.write_back_stack.pop() {
-                                        //println!("pop pass value {}", val);
                                         self.set_variable(&argument_expr, val)?;
                                     } else {
                                         return Err(VMError::WriteBackStackEmpty.into());
@@ -586,14 +651,12 @@ impl<'a> VirtualMachine<'a> {
             let id = first + i;
             if self.variable_table.get_var_entry(id).header.flags & 0x1 == 0x0 {
                 let val = self.variable_table.get_value(id).clone();
-                //println!("store {:02X} to {}", id, val);
                 self.call_local_value_stack.push(val);
             }
         }
         for i in 0..parameters {
             let id = first + i;
             let value = self.eval_expr(&arguments[i])?;
-            //  println!("set parameter {:02X} to {}", id, value);
             self.variable_table.set_value(id, value);
 
             if (1 << i) & pass_flags != 0 {
@@ -607,7 +670,6 @@ impl<'a> VirtualMachine<'a> {
                 (header.flags, header.variable_type)
             };
             if (flags & 0x1) == 0x0 {
-                // println!("reset local {:02X}", id);
                 self.variable_table.set_value(id, vtype.create_empty_value());
             }
         }
@@ -628,7 +690,6 @@ impl<'a> VirtualMachine<'a> {
         self.icy_board_state.board.lock().unwrap().resolve_file(file)
     }
 }
-
 /// .
 /// # Errors
 pub fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn PCBoardIO, icy_board_state: &mut IcyBoardState) -> Res<bool> {

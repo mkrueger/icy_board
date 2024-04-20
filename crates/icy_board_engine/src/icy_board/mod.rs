@@ -14,12 +14,12 @@ use crate::vm::errors::IcyError;
 use self::{
     commands::CommandList,
     conferences::ConferenceBase,
-    file_areas::FileAreaList,
+    file_directory::DirectoryList,
     group_list::GroupList,
     icb_config::IcbConfig,
     icb_text::IcbTextFile,
     language::SupportedLanguages,
-    message_areas::MessageAreaList,
+    message_area::AreaList,
     pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader, PcbLegacyConferenceHeader},
     pcboard_data::PcbBoardData,
     sec_levels::SecurityLevelDefinitions,
@@ -31,13 +31,13 @@ use self::{
 pub mod bulletins;
 pub mod commands;
 pub mod conferences;
-pub mod file_areas;
+pub mod file_directory;
 pub mod group_list;
 pub mod icb_config;
 pub mod icb_text;
 pub mod language;
 pub mod menu;
-pub mod message_areas;
+pub mod message_area;
 pub mod pcb;
 pub mod sec_levels;
 pub mod security;
@@ -232,15 +232,15 @@ impl IcyBoard {
         };
 
         for conf in board.conferences.iter_mut() {
-            let message_area_file = if conf.message_area_file.is_absolute() {
-                conf.message_area_file.clone()
+            let message_area_file = if conf.area_file.is_absolute() {
+                conf.area_file.clone()
             } else {
-                board.root_path.join(&conf.message_area_file)
+                board.root_path.join(&conf.area_file)
             };
             if message_area_file.exists() {
-                match MessageAreaList::load(&message_area_file) {
+                match AreaList::load(&message_area_file) {
                     Ok(areas) => {
-                        conf.message_areas = areas;
+                        conf.areas = areas;
                     }
                     Err(err) => {
                         log::error!("Error loading message areas {}: {}", message_area_file.display(), err);
@@ -248,15 +248,15 @@ impl IcyBoard {
                 }
             }
 
-            let file_area_file = if conf.file_area_file.is_absolute() {
-                conf.file_area_file.clone()
+            let file_area_file = if conf.dir_file.is_absolute() {
+                conf.dir_file.clone()
             } else {
-                board.root_path.join(&conf.file_area_file)
+                board.root_path.join(&conf.dir_file)
             };
             if file_area_file.exists() {
-                match FileAreaList::load(&file_area_file) {
+                match DirectoryList::load(&file_area_file) {
                     Ok(areas) => {
-                        conf.file_areas = areas;
+                        conf.directories = areas;
                     }
                     Err(err) => {
                         log::error!("Error loading file areas {}: {}", file_area_file.display(), err);
@@ -327,7 +327,7 @@ impl IcyBoard {
 
             // Convert dir file
             let dir_file = base_loc.join(&format!("dir{}", dirs));
-            let dir_file = if let Ok(area_list) = FileAreaList::load(&self.resolve_file(&conf.file_area_file)) {
+            let dir_file = if let Ok(area_list) = DirectoryList::load(&self.resolve_file(&conf.dir_file)) {
                 area_list.export_pcboard(&dir_file)?;
 
                 let dir_file = dir_file.to_string_lossy().to_string();

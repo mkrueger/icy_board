@@ -8,7 +8,7 @@ BEGIN
   CLS
   PRINTLN "@X17╒═════════════════════════════════════════════════════════════════════════════╕"
   PRINTLN "│  @X1BYou are now in @X1F@INCONF:60@@X17│"
-  PRINTLN "│  @X1EYou can access the following conferences:                                  @X17│"
+  PRINTLN "│  @X1EYou have access the following conferences:                                 @X17│"
   PRINTLN "╘═════════════════════════════════════════════════════════════════════════════╛"
   PRINTLN
 
@@ -16,14 +16,14 @@ BEGIN
     STRING name = CONFINFO(i, 1)
     IF name <> "" && Has_Access(i) THEN
       IF GetX() > 45
-        PRINTLN "     "
+        PRINTLN
       PRINT "@X0E", LEFT(TOSTRING(i), 3)," - ", "@X0F", LEFT(name,30)
       CONTINUE
     ENDIF
     IF Abort() END
   NEXT
 
-  PRINTLN "     ", CHR(13)
+  PRINTLN CHR(13)
 END
 
 FUNCTION Has_Access(INTEGER conf) BOOLEAN

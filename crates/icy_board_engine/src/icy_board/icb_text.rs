@@ -1530,9 +1530,16 @@ pub enum IceText {
 
     /// `Date Format Desired (Enter)=no change`
     DateFormatDesired = 754,
+
+    /// `Sorry, @FIRST@, no Areas are presently available.`
+    NoAreasAvailable = 755,
+    /// `(H)elp, (1-@NUMDIR@), File List Command`
+    AreaListCommand = 756,
+    /// `(H)elp, (1-@NUMDIR@), File List Command`
+    AreaListCommandExpert = 757,
 }
 
-const LAST_ENTRY: usize = 754;
+const LAST_ENTRY: usize = 757;
 
 impl IceText {
     pub fn from(i: usize) -> Self {
