@@ -372,7 +372,6 @@ impl<'a> Parser<'a> {
     }
 
     fn report_error(&mut self, span: std::ops::Range<usize>, save_token: ParserErrorType) {
-        //println!("{}", std::backtrace::Backtrace::force_capture());
         self.errors.lock().unwrap().report_error(span, save_token);
         while self.get_cur_token().is_some() && self.get_cur_token() != Some(Token::Eol) && !matches!(self.get_cur_token(), Some(Token::Comment(_, _))) {
             self.next_token();

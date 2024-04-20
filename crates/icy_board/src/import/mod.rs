@@ -507,7 +507,8 @@ impl PCBoardImporter {
                                 .to_string()
                                 + ".toml",
                         );
-                        println!("------------- PCBTEXT import: {} ->{}", entry.path().display(), destination.display());
+                        self.logger
+                            .log(&format!("------------- PCBTEXT import: {} ->{}", entry.path().display(), destination.display()));
 
                         if let Err(err) = text_file.save(&destination) {
                             self.logger.log_boxed_error(&*err);

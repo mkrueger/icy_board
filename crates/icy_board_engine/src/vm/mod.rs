@@ -358,7 +358,6 @@ impl<'a> VirtualMachine<'a> {
 
                 match &registry.id_table[*member_id] {
                     crate::compiler::user_data::UserDataEntry::Field(name) => {
-                        log::warn!("Get {} on {}", name, object_id);
                         let val = self.user_data[object_id].get_field_value(self, name);
                         return val;
                     }
@@ -395,7 +394,6 @@ impl<'a> VirtualMachine<'a> {
                     crate::compiler::user_data::UserDataEntry::Function(name) => {
                         let mut moved_data: Vec<Box<dyn UserDataValue>> = Vec::new();
                         mem::swap(&mut moved_data, &mut self.user_data);
-                        log::warn!("Call {} on {}", name, object_id);
                         match moved_data[object_id].call_function(self, name, arguments) {
                             Ok(mut result) => {
                                 mem::swap(&mut moved_data, &mut self.user_data);

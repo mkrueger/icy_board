@@ -76,13 +76,21 @@ impl JamMessageBase {
     /// opens an existing message base with base path (without any extension)
     pub fn open<P: AsRef<Path>>(file_name: P) -> crate::Result<Self> {
         let header_file_name = file_name.as_ref().with_extension(extensions::HEADER_DATA);
-        let header_info = JHRHeaderInfo::load(&mut File::open(header_file_name)?)?;
-        Ok(Self {
-            file_name: file_name.as_ref().into(),
-            header_info,
-            last_read_record: -1,
-            locked: AtomicBool::new(false),
-        })
+        match File::open(header_file_name) {
+            Ok(mut file) => {
+                let header_info = JHRHeaderInfo::load(&mut file)?;
+                Ok(Self {
+                    file_name: file_name.as_ref().into(),
+                    header_info,
+                    last_read_record: -1,
+                    locked: AtomicBool::new(false),
+                })
+            }
+            Err(err) => {
+                log::error!("Error opening message base: {} from {}", err, file_name.as_ref().display());
+                return Err(err.into());
+            }
+        }
     }
 
     pub fn get_filename(&self) -> &Path {
@@ -140,7 +148,10 @@ impl JamMessageBase {
 
     pub fn create_with_passwordcrc<P: AsRef<Path>>(file_name: P, passwordcrc: u32) -> crate::Result<Self> {
         let header_file_name = file_name.as_ref().with_extension(extensions::HEADER_DATA);
-        JHRHeaderInfo::create(&header_file_name, passwordcrc)?;
+        if let Err(err) = JHRHeaderInfo::create(&header_file_name, passwordcrc) {
+            log::error!("Error creating message base: {}", header_file_name.display());
+            return Err(err.into());
+        }
         fs::write(file_name.as_ref().with_extension(extensions::TEXT_DATA), "")?;
         fs::write(file_name.as_ref().with_extension(extensions::MESSAGE_INDEX), "")?;
         fs::write(file_name.as_ref().with_extension(extensions::LASTREAD_INFO), "")?;
@@ -180,19 +191,19 @@ impl JamMessageBase {
         crc ^ CRC_SEED
     }
 
-    pub fn write_message(&mut self, message: &JamMessage) -> crate::Result<()> {
+    pub fn write_message(&mut self, message: &JamMessage) -> crate::Result<u32> {
         let mut header = message.create_jam_header();
         let text_file_name = self.file_name.with_extension(extensions::TEXT_DATA);
-        let mut text_file = OpenOptions::new().append(true).open(text_file_name)?;
+        let mut text_file = OpenOptions::new().create(true).append(true).open(text_file_name)?;
 
         self.header_info.active_msgs += 1;
-
+        header.message_number = self.header_info.active_msgs;
         header.offset = text_file.metadata()?.len() as u32;
         header.txt_len = message.get_text().len() as u32;
         text_file.write_all(message.get_text())?;
 
         let header_path = self.file_name.with_extension(extensions::HEADER_DATA);
-        let header_file = OpenOptions::new().append(true).open(header_path)?;
+        let header_file = OpenOptions::new().create(true).append(true).open(header_path)?;
         let message_header_offset = header_file.metadata()?.len() as u32;
 
         let mut writer = BufWriter::new(header_file);
@@ -200,17 +211,17 @@ impl JamMessageBase {
         writer.flush()?;
 
         let index_file_name = self.file_name.with_extension(extensions::MESSAGE_INDEX);
-        let mut index_file = OpenOptions::new().append(true).open(index_file_name)?;
+        let mut index_file = OpenOptions::new().create(true).append(true).open(index_file_name)?;
         let crc = if let Some(to) = header.get_to() { Self::get_crc(to) } else { CRC_SEED };
         index_file.write_all(&crc.to_le_bytes())?;
         index_file.write_all(&message_header_offset.to_le_bytes())?;
-        Ok(())
+        Ok(header.message_number)
     }
 
     /// Writes the current header to disk.
     pub fn write_jhr_header(&mut self) -> crate::Result<()> {
         let header_path = self.file_name.with_extension(extensions::HEADER_DATA);
-        let header_file = OpenOptions::new().write(true).open(header_path)?;
+        let header_file = OpenOptions::new().create(true).write(true).open(header_path)?;
         let mut writer = BufWriter::new(header_file);
         self.header_info.update(&mut writer)?;
         writer.flush()?;

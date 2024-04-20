@@ -44,14 +44,21 @@ impl PcbBoardCommand {
             display_flags::NEWLINE | display_flags::UPCASE | display_flags::YESNO | display_flags::FIELDLEN,
         )?;
         self.state.node_state.lock().unwrap().user_activity = UserActivity::CommentToSysop;
-        self.write_message(-1, -1, &to, &subj, receipt == self.state.session.yes_char.to_uppercase().to_string())?;
+        self.write_message(
+            -1,
+            -1,
+            &to,
+            &subj,
+            receipt == self.state.session.yes_char.to_uppercase().to_string(),
+            IceText::SavingComment,
+        )?;
 
         self.state.press_enter()?;
         self.display_menu = true;
         Ok(())
     }
 
-    fn write_message(&mut self, conf: i32, area: i32, to: &str, subj: &str, _ret_receipt: bool) -> Res<()> {
+    pub fn write_message(&mut self, conf: i32, area: i32, to: &str, subj: &str, _ret_receipt: bool, text: IceText) -> Res<()> {
         self.displaycmdfile("preedit")?;
 
         let mut editor = EditState {
@@ -76,7 +83,7 @@ impl PcbBoardCommand {
                     .with_date_time(Utc::now())
                     .with_text(BString::from(msg));
 
-                self.send_message(conf, area, msg)?;
+                self.send_message(conf, area, msg, text)?;
             }
         }
         Ok(())

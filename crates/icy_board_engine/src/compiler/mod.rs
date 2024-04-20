@@ -120,7 +120,6 @@ impl<'a> PPECompiler<'a> {
         let prg = prg.visit_mut(&mut AstTransformationVisitor::default());
         prg.visit(&mut self.semantic_visitor);
         self.lookup_table = self.semantic_visitor.generate_variable_table();
-        // println!("{}", prg);
         for d in &prg.nodes {
             match d {
                 AstNode::Function(_func) => {}

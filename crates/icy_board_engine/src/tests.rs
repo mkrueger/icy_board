@@ -62,9 +62,7 @@ fn run_test(data: &str, output: &str) {/*
     let mut sv = SemanticVisitor::new(LAST_PPLC, errors);
     ast.visit(&mut sv);
     if sv.errors.lock().unwrap().has_errors() {
-        println!("Errors:");
         for e in &sv.errors.lock().unwrap().errors {
-            println!("{}", e.error);
         }
         panic!();
     }

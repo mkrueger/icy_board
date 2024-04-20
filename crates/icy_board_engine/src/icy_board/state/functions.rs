@@ -149,7 +149,7 @@ impl IcyBoardState {
             log::info!("{}", txt);
         }
 
-        let old_color = self.user_screen.caret.get_attribute().as_u8(icy_engine::IceMode::Blink);
+        // let old_color = self.user_screen.caret.get_attribute().as_u8(icy_engine::IceMode::Blink);
         if display_flags & display_flags::LFBEFORE != 0 {
             self.new_line()?;
         }
@@ -168,9 +168,6 @@ impl IcyBoardState {
         }
         if display_flags & display_flags::LFAFTER != 0 {
             self.new_line()?;
-        }
-        if self.use_graphics() {
-            self.set_color(TerminalTarget::Both, old_color.into())?;
         }
         Ok(())
     }
@@ -277,7 +274,6 @@ impl IcyBoardState {
     ) -> Res<String> {
         self.session.num_lines_printed = 0;
 
-        log::warn!("{:08X}", display_flags);
         let mut prompt = prompt;
         let display_question = if prompt.ends_with(TXT_STOPCHAR) {
             prompt.pop();

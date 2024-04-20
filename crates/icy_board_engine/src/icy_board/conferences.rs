@@ -32,6 +32,10 @@ pub struct Conference {
     pub is_public: bool,
 
     #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    pub is_read_only: bool,
+
+    #[serde(default)]
     #[serde(skip_serializing_if = "Password::is_empty")]
     pub password: Password,
 
@@ -163,6 +167,7 @@ impl ConferenceBase {
             let new = Conference {
                 name: c.name.clone(),
                 is_public: c.public_conference,
+                is_read_only: d.read_only,
                 use_main_commands: true,
                 commands: Vec::new(),
                 password: Password::PlainText(d.password.clone()),

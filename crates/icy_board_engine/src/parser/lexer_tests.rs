@@ -28,10 +28,7 @@ fn get_token(src: &str) -> Token {
         Arc::new(Mutex::new(ErrorRepoter::default())),
     );
     match lex.next_token() {
-        Some(t) => {
-            //println!("got token: {t:?}");
-            t
-        }
+        Some(t) => t,
         None => {
             panic!("Error")
         }
@@ -41,10 +38,7 @@ fn get_token(src: &str) -> Token {
 fn get_token_ver(src: &str, ver: u16) -> Token {
     let mut lex = Lexer::new(PathBuf::from("."), ver, src, Encoding::Utf8, Arc::new(Mutex::new(ErrorRepoter::default())));
     match lex.next_token() {
-        Some(t) => {
-            //println!("got token: {t:?}");
-            t
-        }
+        Some(t) => t,
         None => {
             panic!("Error")
         }

@@ -16,6 +16,7 @@ use jamjam::jam::{JamMessage, JamMessageBase};
 mod comment_to_sysop;
 mod delete_message;
 mod download;
+mod enter_message;
 mod find_files;
 mod login;
 mod message_reader;
@@ -122,6 +123,10 @@ impl PcbBoardCommand {
             CommandType::Download => {
                 // D
                 self.download(action)?;
+            }
+            CommandType::EnterMessage => {
+                // E
+                self.enter_message(action)?;
             }
 
             CommandType::FileDirectory => {
@@ -592,7 +597,7 @@ impl PcbBoardCommand {
             } else {
                 user_name
             };
-            let home_dir = UserBase::get_user_home_dir(&board.config.paths.home_dir, name);
+            let home_dir = UserBase::get_user_home_dir(&self.state.resolve_path(&board.config.paths.home_dir), name);
             home_dir
         } else {
             return Err(IcyBoardError::ErrorLockingBoard.into());
@@ -615,13 +620,37 @@ impl PcbBoardCommand {
         })
     }
 
-    fn send_message(&mut self, conf: i32, _area: i32, msg: JamMessage) -> Res<()> {
-        if conf < 0 {
+    fn send_message(&mut self, conf: i32, area: i32, msg: JamMessage, text: IceText) -> Res<()> {
+        let msg_base = if conf < 0 {
             let user_name = msg.get_to().unwrap().to_string();
-            let mut msg_base = self.get_email_msgbase(&user_name)?;
-            msg_base.write_message(&msg)?;
-            msg_base.write_jhr_header()?;
+            self.get_email_msgbase(&user_name)
+        } else {
+            let msg_base = self.state.board.lock().unwrap().conferences[conf as usize].areas[area as usize]
+                .filename
+                .clone();
+            let msg_base = self.state.resolve_path(&msg_base);
+            if msg_base.with_extension("jhr").exists() {
+                JamMessageBase::open(msg_base)
+            } else {
+                JamMessageBase::create(msg_base)
+            }
+        };
+
+        match msg_base {
+            Ok(mut msg_base) => {
+                let number = msg_base.write_message(&msg)?;
+                msg_base.write_jhr_header()?;
+
+                self.state.display_text(text, display_flags::DEFAULT)?;
+                self.state.println(TerminalTarget::Both, &number.to_string())?;
+                self.state.new_line()?;
+            }
+            Err(err) => {
+                log::error!("while opening message base: {}", err.to_string());
+                self.state.display_text(IceText::MessageBaseError, display_flags::NEWLINE)?;
+            }
         }
+
         Ok(())
     }
 }

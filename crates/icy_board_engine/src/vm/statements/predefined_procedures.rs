@@ -522,7 +522,7 @@ pub fn broadcast(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let hinode = vm.eval_expr(&args[1])?.as_int();
     let message = vm.eval_expr(&args[2])?.as_string();
     // TODO: Broadcast
-    println!("Broadcasting message from {lonode} to {hinode}: {message}");
+    log::error!("Broadcasting message from {lonode} to {hinode}: {message}");
     Ok(())
 }
 

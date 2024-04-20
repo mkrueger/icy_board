@@ -87,11 +87,12 @@ impl Tui {
 
                 if let Err(err) = cmd.do_command() {
                     cmd.state.session.disp_options.reset_printout();
-                    log::error!("Error: {}", err);
+                    log::error!("session thread 'do_command': {}", err);
                     if cmd.state.set_color(TerminalTarget::Both, 4.into()).is_ok() {
                         let _ = cmd.state.print(TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err));
                         let _ = cmd.state.reset_color();
                     }
+                    return Ok(());
                 }
                 cmd.state.session.disp_options.reset_printout();
                 if cmd.state.session.request_logoff {
