@@ -3,11 +3,10 @@ INTEGER i
 
 BEGIN
   CLS
-
-  PRINTLN "@X18┌@X17────────────────────────────────────────────────────────────────────────────┐@X18@X07"
-  PRINTLN "@X18│  @X1BYou are now in the @X1F@INCONF:50@     @X17│@X18@X07"
-  PRINTLN "@X18│  @X1EYou are authorized for the following conferences:                         @X17│@X18@X07"
-  PRINTLN "@X18└────────────────────────────────────────────────────────────────────────────@X17┘@X18@X07"
+  PRINTLN "@X17╒═════════════════════════════════════════════════════════════════════════════╕"
+  PRINTLN "@X17│  @X1BYou are now in @X1F@INCONF:60@@X17│"
+  PRINTLN "│  @X1EYou can access the following conferences:                                  @X17│"
+  PRINTLN "╘═════════════════════════════════════════════════════════════════════════════╛"
   PRINTLN ""
 
   FOR i = 0 TO HICONFNUM()

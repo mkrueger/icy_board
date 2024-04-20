@@ -3,10 +3,8 @@ use dizbase::file_base::{file_header::FileHeader, FileBase};
 use icy_board_engine::{
     icy_board::{
         commands::Command,
-        file_areas::FileAreaList,
         icb_text::IceText,
         state::{functions::display_flags, UserActivity},
-        IcyBoardSerializer,
     },
     vm::TerminalTarget,
 };
@@ -19,10 +17,7 @@ impl PcbBoardCommand {
         self.state.session.disable_auto_more = false;
         self.state.session.more_requested = false;
 
-        let file_area_file = self.state.resolve_path(&self.state.session.current_conference.file_area_file);
-        let file_areas = FileAreaList::load(&file_area_file)?;
-
-        if file_areas.is_empty() {
+        if self.state.session.current_conference.file_areas.is_empty() {
             self.state
                 .display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
             self.state.press_enter()?;
@@ -53,11 +48,10 @@ impl PcbBoardCommand {
         if !directory_number.is_empty() {
             let mut joined = false;
             if let Ok(number) = directory_number.parse::<i32>() {
-                if 1 <= number && (number as usize) <= file_areas.len() {
-                    let area = &file_areas[number as usize - 1];
-
+                if 1 <= number && (number as usize) <= self.state.session.current_conference.file_areas.len() {
+                    let area = &self.state.session.current_conference.file_areas[number as usize - 1];
                     if area.list_security.user_can_access(&self.state.session) {
-                        self.display_file_area(action, &area)?;
+                        self.display_file_area(action, number as usize - 1)?;
                     }
 
                     joined = true;
@@ -76,7 +70,9 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    fn display_file_area(&mut self, action: &Command, area: &&icy_board_engine::icy_board::file_areas::FileArea) -> Res<()> {
+    fn display_file_area(&mut self, action: &Command, area: usize) -> Res<()> {
+        let area = &self.state.session.current_conference.file_areas[area];
+
         let colors = self.state.board.lock().unwrap().config.color_configuration.clone();
         let file_base_path = self.state.resolve_path(&area.file_base);
         let Ok(base) = FileBase::open(&file_base_path) else {

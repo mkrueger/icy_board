@@ -171,11 +171,13 @@ impl MessageViewer {
         /*        let txt = self.format_hdr_text(&self.read.text, "", "");
                 state.print(TerminalTarget::Both, &txt)?;
         */
-        let message_area_file = state.resolve_path(&state.session.current_conference.message_area_file);
-        let message_areas = MessageAreaList::load(&message_area_file)?;
 
         let area = state.session.current_message_area;
-        let txt = self.format_hdr_text(&self.confarea.text, &state.session.current_conference.name, &message_areas[area].name);
+        let txt = self.format_hdr_text(
+            &self.confarea.text,
+            &state.session.current_conference.name,
+            &state.session.current_conference.message_areas[area].name,
+        );
         state.print(TerminalTarget::Both, &txt)?;
         state.reset_color()?;
 
@@ -190,10 +192,8 @@ impl MessageViewer {
 impl PcbBoardCommand {
     pub fn read_messages(&mut self, action: &Command) -> Res<()> {
         self.state.node_state.lock().unwrap().user_activity = UserActivity::ReadMessages;
-        let message_area_file = self.state.resolve_path(&self.state.session.current_conference.message_area_file);
-        let message_areas = MessageAreaList::load(&message_area_file)?;
 
-        let message_base_file = &message_areas[0].filename;
+        let message_base_file = &self.state.session.current_conference.message_areas[0].filename;
         let msgbase_file_resolved = self.state.board.lock().unwrap().resolve_file(message_base_file);
 
         match JamMessageBase::open(&msgbase_file_resolved) {

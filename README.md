@@ -185,7 +185,7 @@ I think it improves the language and it's open for discussion. Note that some al
 
 #### PPL 4.0
 
-New Constructs (Language Version 400):
+New Constructs (Language Version 350):
 
 New loops
 ``` REPEAT ... UNTIL [CONDITION] ``` Statement
@@ -195,8 +195,20 @@ Variable initializers:
 
 ``` TYPE VAR=[INITIALIZER]``` Statement
 
+It's possible to initialize dim expressions as well:
+
+``` TYPE VAR={ expr1, expr2, ..., exprn }``` means:
+
+```PPL
+TYPE VAR(n)
+VAR(0) = expr1
+...
+VAR(n - 1) = exprn
+```
+
 Operator Assignment for binary (non condition operators):
 
+Example:
 ``` A += 1``` Statement
 
 Works for ```+-*/%``` and ```&|```
@@ -223,8 +235,36 @@ ENDIF
 WHILE IsValid() PRINTLN "Success."
 ```
 
-Note: With "lang" version >=400 'Quit' and 'Loop' are no longer synonyms for 'break' and 'continue'. Existing sources should be easily adapted.
+Note: With "lang" version >=350 'Quit' and 'Loop' are no longer synonyms for 'break' and 'continue'. Existing sources should be easily adapted.
 But never saw them in the wild.
+
+All this is doesn't affect the resulting binary - it's possible to compile these features for PCBoard compatible PPLs.
+
+
+##### Language Version 400
+
+Language Version breaks compatibility with older PCBoards. 
+Changes:
+
+* (), {} and [] is different. [] is for indexer expressions it's encouraged to use that for arrays. And '{', '}' is exclusive for array initializers.
+
+Member references. 400 introduces new BBS types:
+* Conference, MessageArea, FileArea
+
+For example:
+```PPL
+CONFERENCE CUR = CONFINFO(i) 
+
+IF CUR.HasAccess() 
+  PRINTLN CUR.Name
+```
+
+It's basically pre defined objects. This change requires a slight change in PPE.
+
+* Pre defined functions can now have overloads. See "CONFINFO" from above. CONFINFO has two versions: One old one with 2 parameters and the new one with 1.
+The new version returns a CONFERENCE object where the old one basically an "Object" of varying types, depending on the requested conference field.
+
+API still TBD. CONFINFO(i) which returns the CONFERENCE is the only new function so far. However it contains some member functions for message & file areas. All BBS "objects" should be accessible through PPL. It should no longer be needed to gather information through manual reading of config files anymore.
 
 ### Runner
 

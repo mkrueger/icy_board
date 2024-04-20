@@ -237,14 +237,32 @@ impl IcyBoard {
             } else {
                 board.root_path.join(&conf.message_area_file)
             };
-            conf.message_areas = MessageAreaList::load(&message_area_file)?;
+            if message_area_file.exists() {
+                match MessageAreaList::load(&message_area_file) {
+                    Ok(areas) => {
+                        conf.message_areas = areas;
+                    }
+                    Err(err) => {
+                        log::error!("Error loading message areas {}: {}", message_area_file.display(), err);
+                    }
+                }
+            }
 
             let file_area_file = if conf.file_area_file.is_absolute() {
                 conf.file_area_file.clone()
             } else {
                 board.root_path.join(&conf.file_area_file)
             };
-            conf.file_areas = FileAreaList::load(&file_area_file)?;
+            if file_area_file.exists() {
+                match FileAreaList::load(&file_area_file) {
+                    Ok(areas) => {
+                        conf.file_areas = areas;
+                    }
+                    Err(err) => {
+                        log::error!("Error loading file areas {}: {}", file_area_file.display(), err);
+                    }
+                }
+            }
         }
 
         Ok(board)

@@ -8,9 +8,7 @@ use jamjam::jam::JamMessageBase;
 
 impl PcbBoardCommand {
     pub fn delete_message(&mut self, action: &Command) -> Res<()> {
-        let message_area_file = self.state.resolve_path(&self.state.session.current_conference.message_area_file);
-        let message_areas = MessageAreaList::load(&message_area_file)?;
-        let message_base_file = &message_areas[0].filename;
+        let message_base_file = &self.state.session.current_conference.message_areas[0].filename;
         let msgbase_file_resolved = self.state.board.lock().unwrap().resolve_file(message_base_file);
 
         match JamMessageBase::open(&msgbase_file_resolved) {

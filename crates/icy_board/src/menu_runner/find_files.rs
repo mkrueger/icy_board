@@ -22,7 +22,7 @@ impl PcbBoardCommand {
     pub fn find_files(&mut self, action: &Command) -> Res<()> {
         self.state.node_state.lock().unwrap().user_activity = UserActivity::BrowseFiles;
 
-        if self.state.session.current_file_areas.is_empty() {
+        if self.state.session.current_conference.file_areas.is_empty() {
             self.state
                 .display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
             self.state.press_enter()?;
@@ -71,8 +71,11 @@ impl PcbBoardCommand {
         let mut joined = false;
         if search_area == "A" {
             self.state.session.cancel_batch = false;
-            for area in 0..self.state.session.current_file_areas.len() {
-                if self.state.session.current_file_areas[area].list_security.user_can_access(&self.state.session) {
+            for area in 0..self.state.session.current_conference.file_areas.len() {
+                if self.state.session.current_conference.file_areas[area]
+                    .list_security
+                    .user_can_access(&self.state.session)
+                {
                     self.search_file_area(action, area, search_pattern.clone())?;
                 }
                 if self.state.session.cancel_batch {
@@ -81,9 +84,8 @@ impl PcbBoardCommand {
             }
             joined = true;
         } else if let Ok(number) = search_area.parse::<i32>() {
-            if 1 <= number && (number as usize) <= self.state.session.current_file_areas.len() {
-                let area = &self.state.session.current_file_areas[number as usize - 1];
-
+            if 1 <= number && (number as usize) <= self.state.session.current_conference.file_areas.len() {
+                let area = &self.state.session.current_conference.file_areas[number as usize - 1];
                 if area.list_security.user_can_access(&self.state.session) {
                     self.search_file_area(action, number as usize - 1, search_pattern)?;
                 }
@@ -105,10 +107,10 @@ impl PcbBoardCommand {
     }
 
     fn search_file_area(&mut self, action: &Command, area: usize, search_pattern: String) -> Res<()> {
-        let file_base_path = self.state.resolve_path(&self.state.session.current_file_areas[area].file_base);
+        let file_base_path = self.state.resolve_path(&self.state.session.current_conference.file_areas[area].file_base);
         let Ok(mut base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());
-            self.state.session.op_text = self.state.session.current_file_areas[area].file_base.to_str().unwrap().to_string();
+            self.state.session.op_text = self.state.session.current_conference.file_areas[area].file_base.to_str().unwrap().to_string();
             self.state
                 .display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)?;
             return Ok(());
@@ -117,8 +119,10 @@ impl PcbBoardCommand {
         self.state.display_text(IceText::ScanningDirectory, display_flags::DEFAULT)?;
         self.state.print(TerminalTarget::Both, &format!(" {} ", area + 1))?;
         self.state.set_color(TerminalTarget::Both, IcbColor::Dos(10))?;
-        self.state
-            .print(TerminalTarget::Both, &format!("({})", self.state.session.current_file_areas[area].name))?;
+        self.state.print(
+            TerminalTarget::Both,
+            &format!("({})", self.state.session.current_conference.file_areas[area].name),
+        )?;
         self.state.new_line()?;
         base.load_headers()?;
         let files = base.find_files(search_pattern.as_str())?;
@@ -132,8 +136,11 @@ impl PcbBoardCommand {
     }
 
     pub fn find_new_files(&mut self, action: &Command, time_stamp: u64) -> Res<()> {
-        for area in 0..self.state.session.current_file_areas.len() {
-            if self.state.session.current_file_areas[area].list_security.user_can_access(&self.state.session) {
+        for area in 0..self.state.session.current_conference.file_areas.len() {
+            if self.state.session.current_conference.file_areas[area]
+                .list_security
+                .user_can_access(&self.state.session)
+            {
                 self.find_newer_files(action, area, time_stamp)?;
             }
             if self.state.session.cancel_batch {
@@ -145,7 +152,7 @@ impl PcbBoardCommand {
     }
 
     fn find_newer_files(&mut self, action: &Command, area: usize, time_stamp: u64) -> Res<()> {
-        let file_base_path = self.state.resolve_path(&self.state.session.current_file_areas[area].file_base);
+        let file_base_path = self.state.resolve_path(&self.state.session.current_conference.file_areas[area].file_base);
         let Ok(mut base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());
             return Ok(());
@@ -163,7 +170,7 @@ impl PcbBoardCommand {
     }
 
     pub fn zippy_directory_scan(&mut self, action: &Command) -> Res<()> {
-        if self.state.session.current_file_areas.is_empty() {
+        if self.state.session.current_conference.file_areas.is_empty() {
             self.state
                 .display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
             self.state.press_enter()?;
@@ -212,8 +219,11 @@ impl PcbBoardCommand {
         let mut joined = false;
         if search_area == "A" {
             self.state.session.cancel_batch = false;
-            for area in 0..self.state.session.current_file_areas.len() {
-                if self.state.session.current_file_areas[area].list_security.user_can_access(&self.state.session) {
+            for area in 0..self.state.session.current_conference.file_areas.len() {
+                if self.state.session.current_conference.file_areas[area]
+                    .list_security
+                    .user_can_access(&self.state.session)
+                {
                     self.pattern_search_file_area(action, area, search_pattern.clone())?;
                 }
                 if self.state.session.cancel_batch {
@@ -222,8 +232,8 @@ impl PcbBoardCommand {
             }
             joined = true;
         } else if let Ok(number) = search_area.parse::<i32>() {
-            if 1 <= number && (number as usize) <= self.state.session.current_file_areas.len() {
-                let area = &self.state.session.current_file_areas[number as usize - 1];
+            if 1 <= number && (number as usize) <= self.state.session.current_conference.file_areas.len() {
+                let area = &self.state.session.current_conference.file_areas[number as usize - 1];
 
                 if area.list_security.user_can_access(&self.state.session) {
                     self.pattern_search_file_area(action, number as usize - 1, search_pattern)?;
@@ -246,10 +256,10 @@ impl PcbBoardCommand {
     }
 
     fn pattern_search_file_area(&mut self, action: &Command, area: usize, search_pattern: String) -> Res<()> {
-        let file_base_path = self.state.resolve_path(&self.state.session.current_file_areas[area].file_base);
+        let file_base_path = self.state.resolve_path(&self.state.session.current_conference.file_areas[area].file_base);
         let Ok(mut base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());
-            self.state.session.op_text = self.state.session.current_file_areas[area].file_base.to_str().unwrap().to_string();
+            self.state.session.op_text = self.state.session.current_conference.file_areas[area].file_base.to_str().unwrap().to_string();
             self.state
                 .display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)?;
             return Ok(());
@@ -258,8 +268,10 @@ impl PcbBoardCommand {
         self.state.display_text(IceText::ScanningDirectory, display_flags::DEFAULT)?;
         self.state.print(TerminalTarget::Both, &format!(" {} ", area + 1))?;
         self.state.set_color(TerminalTarget::Both, IcbColor::Dos(10))?;
-        self.state
-            .print(TerminalTarget::Both, &format!("({})", self.state.session.current_file_areas[area].name))?;
+        self.state.print(
+            TerminalTarget::Both,
+            &format!("({})", self.state.session.current_conference.file_areas[area].name),
+        )?;
         self.state.new_line()?;
         base.load_headers()?;
         let files = base.find_files_with_pattern(search_pattern.as_str())?;
