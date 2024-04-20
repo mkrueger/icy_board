@@ -975,7 +975,15 @@ pub fn helppath(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue>
 }
 pub fn temppath(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_string(
-        vm.icy_board_state.board.lock().unwrap().config.paths.tmp_path.to_string_lossy().to_string(),
+        vm.icy_board_state
+            .board
+            .lock()
+            .unwrap()
+            .config
+            .paths
+            .tmp_work_path
+            .to_string_lossy()
+            .to_string(),
     ))
 }
 pub fn modem(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {

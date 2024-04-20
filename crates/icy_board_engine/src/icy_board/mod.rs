@@ -194,7 +194,7 @@ impl IcyBoard {
             e
         })?;
 
-        let load_path = RelativePath::from_path(&config.paths.security_level_file)?.to_path(parent_path);
+        let load_path = RelativePath::from_path(&config.paths.pwrd_sec_level_file)?.to_path(parent_path);
         let sec_levels = SecurityLevelDefinitions::load(&load_path).map_err(|e| {
             log::error!("Error loading security levels: {} from {}", e, load_path.display());
             e
@@ -298,7 +298,7 @@ impl IcyBoard {
         pcb_dat.path.conference_file = cnames.to_string_lossy().to_string();
 
         pcb_dat.num_conf = self.conferences.len() as i32 - 1;
-        pcb_dat.path.sec_loc = self.resolve_file(&self.config.paths.security_level_file);
+        pcb_dat.path.sec_loc = self.resolve_file(&self.config.paths.pwrd_sec_level_file);
         pcb_dat.path.cmd_display_files_loc = self.resolve_file(&self.config.paths.command_display_path);
         pcb_dat.path.welcome_file = self.resolve_file(&self.config.paths.welcome);
         pcb_dat.path.newuser_file = self.resolve_file(&self.config.paths.newuser);

@@ -42,11 +42,6 @@ impl ImportLog {
         self.output.push_str(&format!("Copied {} to {}\n", src.display(), destination.display()));
     }
 
-    pub(crate) fn log_cant_convert_file(&mut self, file: &str, context: &str) {
-        self.output
-            .push_str(&format!("Can't convert {}, leaving in place. (used in {})\n", file, context));
-    }
-
     pub(crate) fn create_new_file(&mut self, new_name: impl Into<String>) {
         self.output.push_str(&format!("Created {}.\n", new_name.into()));
     }

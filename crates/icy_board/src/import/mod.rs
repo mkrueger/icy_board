@@ -117,7 +117,12 @@ impl PCBoardImporter {
         }
     }
 
-    pub fn resolve_file(&self, file: &str) -> Res<PathBuf> {
+    pub fn resolve_file(&self, file: &str) -> PathBuf {
+        let path = PathBuf::from(file);
+        if path.exists() {
+            return path;
+        }
+
         let mut s: String = file
             .chars()
             .map(|x| match x {
@@ -133,17 +138,21 @@ impl PCBoardImporter {
 
         for (k, v) in &self.resolve_paths {
             if s.starts_with(k) {
-                s = v.clone() + &s[k.len()..];
+                if v.ends_with('/') || s.chars().skip(k.len()).next().unwrap() == '/' {
+                    s = v.clone() + &s[k.len()..];
+                } else {
+                    s = v.clone() + "/" + &s[k.len()..];
+                }
             }
         }
 
         if let Ok(mut file_path) = QFilePath::add_path(s.clone()) {
             if let Ok(file) = file_path.get_path_buf() {
-                return Ok(file);
+                return file;
             }
         }
         let res = PathBuf::from(s);
-        Ok(res)
+        res
     }
 
     pub fn start_import(&mut self) -> Res<()> {
@@ -190,7 +199,7 @@ impl PCBoardImporter {
 
         let conferences = self.convert_conferences(&self.data.path.conference_file.clone(), "config/conferences.toml")?;
 
-        let color_file = self.resolve_file(&self.data.path.color_file)?;
+        let color_file = self.resolve_file(&self.data.path.color_file);
 
         let mut color_configuration = ColorConfiguration {
             default: IcbColor::Dos(self.data.colors.default as u8),
@@ -266,7 +275,7 @@ impl PCBoardImporter {
                 help_path: PathBuf::from("art/help"),
                 security_file_path: PathBuf::from("art/secmsgs"),
                 command_display_path: PathBuf::from("art/cmd_display"),
-                tmp_path: PathBuf::from("tmp/"),
+                tmp_work_path: PathBuf::from("work/"),
                 home_dir: PathBuf::from("home/"),
                 icbtext,
                 conferences,
@@ -280,11 +289,12 @@ impl PCBoardImporter {
                 chat_menu,
                 no_ansi,
                 protocol_data_file,
-                security_level_file,
+                pwrd_sec_level_file: security_level_file,
                 language_file,
                 command_file,
                 statistics_file,
                 group_file,
+                log_file: PathBuf::from("output.log"),
 
                 bad_users,
                 bad_email,
@@ -323,9 +333,12 @@ impl PCBoardImporter {
                 },
                 display_userinfo_at_login: self.data.display_userinfo_at_login,
                 max_msg_lines: self.data.max_msg_lines as u16,
+                scan_all_mail_at_login: self.data.scan_all,
+                prompt_to_read_mail: self.data.prompt_to_read_mail,
                 check_files_uploaded: self.data.test_uploads,
                 display_uploader: self.data.upload_by,
                 keyboard_timeout: self.data.kbd_timeout as u16,
+                upload_descr_lines: self.data.num_ul_desc_lines as u8,
             },
         };
 
@@ -346,7 +359,7 @@ impl PCBoardImporter {
     fn convert_conferences(&mut self, conference_file: &str, new_rel_name: &str) -> Res<PathBuf> {
         self.output.start_action("Convert conferences…".into());
 
-        let conf = self.resolve_file(conference_file)?;
+        let conf = self.resolve_file(conference_file);
         if !conf.exists() {
             self.output.warning(format!("Can't find conference file {}", conf.display()));
             self.logger.log(&format!("Can't find conference file {}", conf.display()).as_str());
@@ -354,8 +367,8 @@ impl PCBoardImporter {
         }
         let conferences = PcbConferenceHeader::import_pcboard(&conf, self.data.num_conf as usize)?;
 
-        let conf_add = self.resolve_file(&(conference_file.to_string() + ".ADD"))?;
-        let conf_old_add = self.resolve_file(&(conference_file.to_string() + ".@@@"))?;
+        let conf_add = self.resolve_file(&(conference_file.to_string() + ".ADD"));
+        let conf_old_add = self.resolve_file(&(conference_file.to_string() + ".@@@"));
 
         let add_conferences = if conf_add.exists() {
             self.logger.log(&format!("import conference header {}", conf_add.display()).as_str());
@@ -402,11 +415,18 @@ impl PCBoardImporter {
             conf.area_menu = PathBuf::from(output.to_string() + "/area");
             conf.area_file = PathBuf::from(output.to_string() + "/area.toml");
 
-            let mut list = AreaList::load(&destination.join("area.toml"))?;
-            for area in list.iter_mut() {
-                area.filename = self.convert_message_base(&destination, &output, &area.filename)?;
+            match AreaList::load(&destination.join("area.toml")) {
+                Ok(mut list) => {
+                    for area in list.iter_mut() {
+                        area.filename = self.convert_message_base(&destination, &output, &area.filename)?;
+                    }
+                    list.save(&destination.join("area.toml"))?;
+                }
+                Err(err) => {
+                    self.logger.log("Can't load message area file.");
+                    self.logger.log_boxed_error(&*err);
+                }
             }
-            list.save(&destination.join("area.toml"))?;
         }
 
         let destination = self.output_directory.join(new_rel_name);
@@ -421,7 +441,7 @@ impl PCBoardImporter {
             return Ok(PathBuf::new());
         };
 
-        let resolved_file = self.resolve_file(file_name.to_str().unwrap())?;
+        let resolved_file = self.resolve_file(file_name.to_str().unwrap());
 
         let name = resolved_file.file_name().unwrap().to_str().unwrap().to_string().to_ascii_lowercase();
         let new_name = format!("{}/{}", output, &name);
@@ -444,7 +464,7 @@ impl PCBoardImporter {
             "art/cmd_display",
             "art/secmsgs",
             "art/help",
-            "tmp",
+            "work",
         ];
 
         for dir in REQUIRED_DIRECTORIES.iter() {
@@ -462,7 +482,7 @@ impl PCBoardImporter {
         let destination = self.output_directory.join(new_rel_name);
         self.output.start_action(format!("Create ICBTEXT {}…", destination.display()));
 
-        let resolved_file = self.resolve_file(pcb_text_file)?;
+        let resolved_file = self.resolve_file(pcb_text_file);
 
         if let Some(parent) = resolved_file.parent() {
             for entry in fs::read_dir(parent)?.flatten() {
@@ -502,30 +522,27 @@ impl PCBoardImporter {
         Ok(PathBuf::from(new_rel_name.to_string() + ".toml"))
     }
 
-    pub fn scan_line_for_commands(&mut self, line: &str, context: &str) -> Res<String> {
+    pub fn scan_line_for_commands(&mut self, line: &str, _context: &str) -> Res<String> {
         if let Some(call) = PPECall::try_parse_line(line) {
-            if let Ok(resolved_file) = self.resolve_file(&call.file) {
-                if !resolved_file.exists() {
-                    self.output.warning(format!("Can't find file {}", resolved_file.display()));
-                    self.logger.log(&format!("Can't find file {}", resolved_file.display()));
-                    return Ok(line.to_string());
-                }
-                let new_name = self.convert_file(resolved_file)?;
-
-                let mut new_line = String::new();
-                for (i, ch) in line.chars().enumerate() {
-                    if i == 1 {
-                        new_line.push_str(&new_name);
-                    }
-                    if i >= 1 && i <= call.file.len() {
-                        continue;
-                    }
-                    new_line.push(ch);
-                }
-                return Ok(new_line);
-            } else {
-                self.logger.log_cant_convert_file(&call.file, context);
+            let resolved_file = self.resolve_file(&call.file);
+            if !resolved_file.exists() {
+                self.output.warning(format!("Can't find file {}", resolved_file.display()));
+                self.logger.log(&format!("Can't find file {}", resolved_file.display()));
+                return Ok(line.to_string());
             }
+            let new_name = self.convert_file(resolved_file)?;
+
+            let mut new_line = String::new();
+            for (i, ch) in line.chars().enumerate() {
+                if i == 1 {
+                    new_line.push_str(&new_name);
+                }
+                if i >= 1 && i <= call.file.len() {
+                    continue;
+                }
+                new_line.push(ch);
+            }
+            return Ok(new_line);
         }
         Ok(line.to_string())
     }
@@ -617,7 +634,7 @@ impl PCBoardImporter {
             return Ok(PathBuf::new());
         }
 
-        let resolved_file = self.resolve_file(trashcan_file)?;
+        let resolved_file = self.resolve_file(trashcan_file);
         let resolved_file = PathBuf::from(&resolved_file);
         let trashcan_header = include_str!("../../data/bad_users.txt");
 
@@ -649,9 +666,10 @@ impl PCBoardImporter {
             self.logger.log(&format!("Original file not defined: {}", new_name));
             return Ok(PathBuf::new());
         }
-        let Ok(resolved_file) = self.resolve_file(file) else {
-            self.output.warning(format!("File not found {}", file));
-            self.logger.log(&format!("File not found {}", file));
+        let resolved_file = self.resolve_file(file);
+        if !resolved_file.exists() {
+            self.output.warning(format!("File not found {}", resolved_file.display()));
+            self.logger.log(&format!("File not found {}", resolved_file.display()));
             return Ok(PathBuf::new());
         };
 
@@ -715,8 +733,8 @@ impl PCBoardImporter {
 
     fn convert_user_base(&mut self, usr_file: &str, inf_file: &str, new_rel_name: &str) -> Res<PathBuf> {
         self.output.start_action("Convert user base…".into());
-        let usr_file = self.resolve_file(usr_file)?;
-        let inf_file = self.resolve_file(inf_file)?;
+        let usr_file = self.resolve_file(usr_file);
+        let inf_file = self.resolve_file(inf_file);
 
         let users = PcbUserRecord::read_users(&PathBuf::from(&usr_file))?;
         let user_inf = PcbUserInf::read_users(&PathBuf::from(&inf_file))?;
@@ -738,9 +756,17 @@ impl PCBoardImporter {
     }
 
     fn copy_display_directory<F: Fn(&Path) -> bool>(&mut self, category: &str, dir_loc: &str, rel_output: &str, filter: F) -> Res<()> {
-        let help_loc = self.resolve_file(dir_loc)?;
-        let help_loc = PathBuf::from(&help_loc);
         self.logger.log(&format!("\n=== Converting {} ===", category));
+        if dir_loc.is_empty() {
+            self.logger.log(&format!("\ndir wasn't set."));
+            return Ok(());
+        }
+        let help_loc = self.resolve_file(dir_loc);
+        let help_loc = PathBuf::from(&help_loc);
+        if !help_loc.is_dir() {
+            self.logger.log(&format!("\ndir {} doesn't exist", help_loc.display()));
+            return Ok(());
+        }
 
         let o = self.output_directory.join(rel_output);
         if help_loc.exists() {
@@ -776,7 +802,7 @@ impl PCBoardImporter {
             return Ok(new_rel_name);
         };
 
-        let resolved_file = self.resolve_file(attach_dir.to_str().unwrap())?;
+        let resolved_file = self.resolve_file(attach_dir.to_str().unwrap());
         let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
@@ -819,7 +845,7 @@ impl PCBoardImporter {
             return Ok(PathBuf::from(new_rel_name));
         }
 
-        let resolved_file = self.resolve_file(file)?;
+        let resolved_file = self.resolve_file(file);
         self.output.start_action(format!("Convert {}…", resolved_file.display()));
         let resolved_file = PathBuf::from(&resolved_file);
         let res = if resolved_file.exists() {
@@ -840,7 +866,7 @@ impl PCBoardImporter {
         let mut res = if file.is_empty() {
             CommandList::default()
         } else {
-            let resolved_file = self.resolve_file(file)?;
+            let resolved_file = self.resolve_file(file);
             let resolved_file = PathBuf::from(&resolved_file);
             if resolved_file.exists() {
                 CommandList::import_pcboard(&resolved_file)?
@@ -862,7 +888,7 @@ impl PCBoardImporter {
         if src_file.to_str().unwrap().is_empty() {
             return Ok(PathBuf::new());
         }
-        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap())?;
+        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
         let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
@@ -897,7 +923,7 @@ impl PCBoardImporter {
         if src_file.to_str().unwrap().is_empty() {
             return Ok(PathBuf::new());
         }
-        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap())?;
+        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
         let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
@@ -913,32 +939,32 @@ impl PCBoardImporter {
         let destination = PathBuf::from(dest_path).join(resolved_file.file_name().unwrap().to_ascii_lowercase());
 
         for entry in list.iter_mut() {
-            if let Ok(new_entry) = self.resolve_file(entry.file.to_str().unwrap()) {
-                if !new_entry.exists() {
-                    self.logger
-                        .log(&format!("Warning, can't import bulletin  {}, doesn't exist.", new_entry.display()));
-                    continue;
-                }
-
-                let name = new_entry.file_name().unwrap().to_str().unwrap().to_string().to_ascii_lowercase();
-                let new_name = format!("{}/{}", output, &name);
-
-                match self.convert_display_file(new_entry.to_str().unwrap(), &new_name) {
-                    Ok(new_name) => {
-                        entry.file = new_name;
-                    }
-                    Err(err) => {
-                        self.logger.log_boxed_error(&*err);
-                    }
-                }
-            } else {
-                self.logger.log(&format!(
-                    "Warning, can't resolve bulletin entry {} in file {}",
-                    entry.file.display(),
-                    destination.display()
-                ));
-                self.output.warning(format!("Warning, can't resolve {}", entry.file.display()));
+            let new_entry = self.resolve_file(entry.file.to_str().unwrap());
+            if !new_entry.exists() {
+                self.logger
+                    .log(&format!("Warning, can't import bulletin  {}, doesn't exist.", new_entry.display()));
+                continue;
             }
+
+            let name = new_entry.file_name().unwrap().to_str().unwrap().to_string().to_ascii_lowercase();
+            let new_name = format!("{}/{}", output, &name);
+
+            match self.convert_display_file(new_entry.to_str().unwrap(), &new_name) {
+                Ok(new_name) => {
+                    entry.file = new_name;
+                }
+                Err(err) => {
+                    self.logger.log_boxed_error(&*err);
+                }
+            } /*
+              } else {
+                  self.logger.log(&format!(
+                      "Warning, can't resolve bulletin entry {} in file {}",
+                      entry.file.display(),
+                      destination.display()
+                  ));
+                  self.output.warning(format!("Warning, can't resolve {}", entry.file.display()));
+              }*/
         }
 
         if destination.exists() {
@@ -959,7 +985,7 @@ impl PCBoardImporter {
         if src_file.to_str().unwrap().is_empty() {
             return Ok(PathBuf::new());
         }
-        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap())?;
+        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
         let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
@@ -977,42 +1003,43 @@ impl PCBoardImporter {
         let destination = PathBuf::from(dest_path).join(resolved_file.file_name().unwrap().to_ascii_lowercase());
 
         for entry in list.iter_mut() {
-            if let Ok(new_entry) = self.resolve_file(entry.question_file.to_str().unwrap()) {
-                if !new_entry.exists() {
-                    self.logger
-                        .log(&format!("Warning, can't import questionaire  {}, doesn't exist.", new_entry.display()));
-                    continue;
-                }
-                let name = new_entry.file_name().unwrap().to_str().unwrap().to_string().to_ascii_lowercase();
-                let new_name = format!("{}/{}", output, &name);
-                match self.convert_display_file(new_entry.to_str().unwrap(), &new_name) {
-                    Ok(new_name) => {
-                        entry.question_file = new_name;
-                    }
-                    Err(err) => {
-                        self.logger.log_boxed_error(&*err);
-                    }
-                }
-            } else {
-                self.logger.log(&format!(
-                    "Warning, can't resolve script questionary {} in file {}",
-                    entry.question_file.display(),
-                    destination.display()
-                ));
-                self.output.warning(format!("Warning, can't resolve {}", entry.question_file.display()));
+            let new_entry = self.resolve_file(entry.question_file.to_str().unwrap());
+            if !new_entry.exists() {
+                self.logger
+                    .log(&format!("Warning, can't import questionaire  {}, doesn't exist.", new_entry.display()));
+                continue;
             }
-
-            if let Ok(new_entry) = self.resolve_file(entry.answer_file.to_str().unwrap()) {
-                let name = new_entry.file_name().unwrap().to_str().unwrap().to_string().to_ascii_lowercase();
-                let new_name = format!("{}/{}", output, &name);
-                match self.convert_display_file(new_entry.to_str().unwrap(), &new_name) {
-                    Ok(new_name) => {
-                        entry.answer_file = new_name;
-                    }
-                    Err(err) => {
-                        self.logger.log_boxed_error(&*err);
-                    }
+            let name = new_entry.file_name().unwrap().to_str().unwrap().to_string().to_ascii_lowercase();
+            let new_name = format!("{}/{}", output, &name);
+            match self.convert_display_file(new_entry.to_str().unwrap(), &new_name) {
+                Ok(new_name) => {
+                    entry.question_file = new_name;
                 }
+                Err(err) => {
+                    self.logger.log_boxed_error(&*err);
+                }
+            } /*
+                          } else {
+                              self.logger.log(&format!(
+                                  "Warning, can't resolve script questionary {} in file {}",
+                                  entry.question_file.display(),
+                                  destination.display()
+                              ));
+                              self.output.warning(format!("Warning, can't resolve {}", entry.question_file.display()));
+                          }
+              */
+            let new_entry = self.resolve_file(entry.answer_file.to_str().unwrap());
+            let name = new_entry.file_name().unwrap().to_str().unwrap().to_string().to_ascii_lowercase();
+            let new_name = format!("{}/{}", output, &name);
+            match self.convert_display_file(new_entry.to_str().unwrap(), &new_name) {
+                Ok(new_name) => {
+                    entry.answer_file = new_name;
+                }
+                Err(err) => {
+                    self.logger.log_boxed_error(&*err);
+                }
+            }
+            /*
             } else {
                 self.logger.log(&format!(
                     "Warning, can't resolve script questionary {} in file {}",
@@ -1020,7 +1047,7 @@ impl PCBoardImporter {
                     destination.display()
                 ));
                 self.output.warning(format!("Warning, can't resolve {}", entry.answer_file.display()));
-            }
+            }*/
         }
 
         if destination.exists() {
@@ -1039,9 +1066,10 @@ impl PCBoardImporter {
         self.logger.log(&format!("\n=== Converting DIR.LST {} ===", src_file.display()));
 
         if src_file.to_str().unwrap().is_empty() {
+            self.logger.log(&format!("Original file not defined: {}", src_file.display()));
             return Ok(PathBuf::new());
         }
-        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap())?;
+        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
         let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
@@ -1058,7 +1086,7 @@ impl PCBoardImporter {
 
         for (i, entry) in list.iter_mut().enumerate() {
             entry.file_base = PathBuf::from(format!("{}/dir{:02}", output, i));
-            entry.path = self.resolve_file(entry.path.to_str().unwrap())?;
+            entry.path = self.resolve_file(entry.path.to_str().unwrap());
             let base_path = PathBuf::from(dest_path).join(format!("dir{:02}", i));
             self.logger
                 .log(&format!("Create file base for {} : {}", entry.path.display(), base_path.display()));

@@ -105,7 +105,7 @@ impl GeneralTab {
             ConfigEntry::Item(ListItem::new(
                 "sec_level",
                 "Security Level".to_string(),
-                ListValue::U8(icy_board.config.new_user_settings.sec_level),
+                ListValue::U32(icy_board.config.new_user_settings.sec_level as u32, 0, 255),
             )),
             ConfigEntry::Item(ListItem::new(
                 "new_user_groups",
@@ -199,6 +199,180 @@ impl GeneralTab {
             )));
         }
 
+        let message = vec![
+            ConfigEntry::Item(
+                ListItem::new(
+                    "max_lines",
+                    "Max Message".to_string(),
+                    ListValue::U32(icy_board.config.options.max_msg_lines as u32, 17, 400),
+                )
+                .with_status("Maximum Lines in the Message Editor (17-400)."),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "Scan ALL at Login".to_string(),
+                    ListValue::Bool(icy_board.config.options.scan_all_mail_at_login),
+                )
+                .with_status("Default to Scan ALL Conferences at Login"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "Read Mail Prompt".to_string(),
+                    ListValue::Bool(icy_board.config.options.prompt_to_read_mail),
+                )
+                .with_status("Prompt to Read Mail w hen Mail Waiting"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "Header DATE Line".to_string(),
+                    ListValue::Color(icy_board.config.color_configuration.msg_hdr_date.clone()),
+                )
+                .with_status("Color for Message Header DATE Line"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "Header TO Line".to_string(),
+                    ListValue::Color(icy_board.config.color_configuration.msg_hdr_to.clone()),
+                )
+                .with_status("Color for Message Header TO Line"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "Header FROM Line".to_string(),
+                    ListValue::Color(icy_board.config.color_configuration.msg_hdr_from.clone()),
+                )
+                .with_status("Color for Message Header FROM Line"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "Header SUBJ Line".to_string(),
+                    ListValue::Color(icy_board.config.color_configuration.msg_hdr_subj.clone()),
+                )
+                .with_status("Color for Message Header SUBJ Line"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "Header READ Line".to_string(),
+                    ListValue::Color(icy_board.config.color_configuration.msg_hdr_read.clone()),
+                )
+                .with_status("Color for Message Header READ Line"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "Header CONF Line".to_string(),
+                    ListValue::Color(icy_board.config.color_configuration.msg_hdr_conf.clone()),
+                )
+                .with_status("Color for Message Header CONF Line"),
+            ),
+        ];
+
+        let file_transfer = vec![
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "Verify File Uploads".to_string(),
+                    ListValue::Bool(icy_board.config.options.check_files_uploaded),
+                )
+                .with_status("Verify/Test uploaded files"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "Show 'Uploaded By'".to_string(),
+                    ListValue::Bool(icy_board.config.options.display_uploader),
+                )
+                .with_status("Include 'Uploaded By' in Description"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "Max UL descr Lines".to_string(),
+                    ListValue::U32(icy_board.config.options.upload_descr_lines as u32, 1, 60),
+                )
+                .with_status("Maximum Number of Lines in Upload Description"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "File HEAD Color".to_string(),
+                    ListValue::Color(icy_board.config.color_configuration.file_head.clone()),
+                )
+                .with_status("Color for File HEAD"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "File NAME Color".to_string(),
+                    ListValue::Color(icy_board.config.color_configuration.file_name.clone()),
+                )
+                .with_status("Color for File NAME"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "File Size Color".to_string(),
+                    ListValue::Color(icy_board.config.color_configuration.file_size.clone()),
+                )
+                .with_status("Color for Size of Files"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "File DATE Color".to_string(),
+                    ListValue::Color(icy_board.config.color_configuration.file_date.clone()),
+                )
+                .with_status("Color for File DATE"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "File DESCR1 Color".to_string(),
+                    ListValue::Color(icy_board.config.color_configuration.file_description.clone()),
+                )
+                .with_status("Color for File first line of Description"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "File DESCR2 Color".to_string(),
+                    ListValue::Color(icy_board.config.color_configuration.file_description_low.clone()),
+                )
+                .with_status("Color for File Description"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "File Text Color".to_string(),
+                    ListValue::Color(icy_board.config.color_configuration.file_text.clone()),
+                )
+                .with_status("Color for Text in Files"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "File Deleted Color".to_string(),
+                    ListValue::Color(icy_board.config.color_configuration.file_deleted.clone()),
+                )
+                .with_status("Color for 'Deleted' in Files"),
+            ),
+        ];
+        let switches = vec![ConfigEntry::Item(
+            ListItem::new(
+                "scan_all",
+                "Keyboard Timeout".to_string(),
+                ListValue::U32(icy_board.config.options.keyboard_timeout as u32, 0, 255),
+            )
+            .with_status("Keyboard Timeout (in min, 0=off)"),
+        )];
+
         Self {
             state: ConfigMenuState::default(),
             config: ConfigMenu {
@@ -207,6 +381,9 @@ impl GeneralTab {
                     ConfigEntry::Group("Board Information".to_string(), board_info),
                     ConfigEntry::Group("New User Settings".to_string(), new_user_info),
                     ConfigEntry::Group("Function Keys".to_string(), function_keys),
+                    ConfigEntry::Group("Messages".to_string(), message),
+                    ConfigEntry::Group("File Transfer".to_string(), file_transfer),
+                    ConfigEntry::Group("Switches".to_string(), switches),
                 ],
             },
         }

@@ -266,7 +266,6 @@ lazy_static::lazy_static! {
 
 impl UserDataValue for Conference {
     fn get_field_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
-        println!("GET FIELD VALUE: {}", name);
         if *name == *NAME {
             return Ok(VariableValue::new_string(self.name.clone()));
         }

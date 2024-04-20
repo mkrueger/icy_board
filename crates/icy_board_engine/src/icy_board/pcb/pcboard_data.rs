@@ -192,7 +192,7 @@ pub struct PcbBoardData {
     ///  guard logoff command (v14.5)
     pub guard_logoff: bool,
     ///  number of upload description lines (v14.5)
-    pub num_desc_lines: i32,
+    pub num_ul_desc_lines: i32,
     ///  user security levels (v15.0)
     pub user_levels: UserSecurityLevels,
 
@@ -959,7 +959,7 @@ impl PcbBoardData {
         ret.confirm_caller = read_bool(&mut reader, encoding)?;
         ret.allow_pwrd_comment = read_bool(&mut reader, encoding)?;
         ret.guard_logoff = read_bool(&mut reader, encoding)?;
-        ret.num_desc_lines = read_int(&mut reader, encoding)?;
+        ret.num_ul_desc_lines = read_int(&mut reader, encoding)?;
         // End of 14.5 files
         let Ok(chat_file) = read_line(&mut reader, encoding) else {
             return Ok(ret);
@@ -1356,7 +1356,7 @@ impl PcbBoardData {
         append_bool(&mut res, encoding, self.confirm_caller);
         append_bool(&mut res, encoding, self.allow_pwrd_comment);
         append_bool(&mut res, encoding, self.guard_logoff);
-        append_int(&mut res, encoding, self.num_desc_lines);
+        append_int(&mut res, encoding, self.num_ul_desc_lines);
 
         append_line(&mut res, encoding, &self.path.chat_file);
         append_line(&mut res, encoding, &self.path.stats_file);

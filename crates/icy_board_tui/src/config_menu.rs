@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use crossterm::event::{KeyCode, KeyEvent};
+use icy_board_engine::icy_board::icb_config::IcbColor;
 use ratatui::{layout::Rect, style::Stylize, text::Text, widgets::Widget, Frame};
 
 use crate::{
@@ -16,9 +17,10 @@ pub struct ResultState {
 
 pub enum ListValue {
     Text(u16, String),
-    File(u16, String),
-    U8(u8),
+    Path(u16, PathBuf),
+    U32(u32, u32, u32),
     Bool(bool),
+    Color(IcbColor),
     ValueList(String, Vec<String>),
 }
 
@@ -48,15 +50,27 @@ impl ListItem {
 
     fn render(&self, area: Rect, frame: &mut Frame) {
         match &self.value {
-            ListValue::Text(edit_len, text) | ListValue::File(edit_len, text) => {
+            ListValue::Text(edit_len, text) => {
                 let mut area = area;
                 area.width = *edit_len;
                 Text::from(text.clone()).style(THEME.value).render(area, frame.buffer_mut());
             }
 
-            ListValue::U8(u8) => {
-                Text::from(u8.to_string()).style(THEME.value).render(area, frame.buffer_mut());
+            ListValue::Path(edit_len, text) => {
+                let mut area = area;
+                area.width = *edit_len;
+                Text::from(format!("{}", text.display())).style(THEME.value).render(area, frame.buffer_mut());
             }
+
+            ListValue::U32(u, _min, _max) => {
+                Text::from(u.to_string()).style(THEME.value).render(area, frame.buffer_mut());
+            }
+
+            ListValue::Color(color) => match color {
+                IcbColor::None => Text::from("Plain").style(THEME.value).render(area, frame.buffer_mut()),
+                IcbColor::Dos(u8) => Text::from(format!("@X{:02}", *u8)).style(THEME.value).render(area, frame.buffer_mut()),
+                IcbColor::IcyEngine(_) => todo!(),
+            },
             ListValue::Bool(value) => {
                 Text::from(if *value { "Yes" } else { "No" })
                     .style(THEME.value)
@@ -70,14 +84,22 @@ impl ListItem {
 
     fn render_editor(&mut self, area: Rect, frame: &mut Frame) {
         match &self.value {
-            ListValue::Text(_edit_len, text) | ListValue::File(_edit_len, text) => {
+            ListValue::Text(_edit_len, text) => {
                 let field = TextField::new().with_value(text.to_string());
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
             }
-            ListValue::U8(_value) => {
+
+            ListValue::Path(_edit_len, text) => {
+                let field = TextField::new().with_value(format!("{}", text.display()));
+                frame.render_stateful_widget(field, area, &mut self.text_field_state);
+            }
+            ListValue::U32(_value, _min, _max) => {
                 self.render(area, frame);
             }
             ListValue::Bool(_value) => {
+                self.render(area, frame);
+            }
+            ListValue::Color(_value) => {
                 self.render(area, frame);
             }
             ListValue::ValueList(_cur_value, _) => {
@@ -104,10 +126,15 @@ impl ListItem {
         }
 
         match &mut self.value {
-            ListValue::File(_edit_len, text) | ListValue::Text(_edit_len, text) => {
+            ListValue::Text(_edit_len, text) => {
                 self.text_field_state.handle_input(key, text);
             }
-            ListValue::Bool(_) | ListValue::U8(_) | ListValue::ValueList(_, _) => {}
+            ListValue::Path(_edit_len, path) => {
+                let mut text = format!("{}", path.display());
+                self.text_field_state.handle_input(key, &mut text);
+                *path = PathBuf::from(text);
+            }
+            ListValue::Bool(_) | ListValue::Color(_) | ListValue::U32(_, _, _) | ListValue::ValueList(_, _) => {}
         }
         ResultState {
             in_edit_mode: true,

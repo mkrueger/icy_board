@@ -22,6 +22,7 @@ pub struct App {
     full_screen: bool,
 
     general_tab: GeneralTab,
+    path_tab: PathTab,
     conferences_tab: ConferencesTab,
     about_tab: AboutTab,
 }
@@ -38,7 +39,7 @@ enum Mode {
 enum TabPageType {
     #[default]
     System,
-    Options,
+    Paths,
     Net,
     Server,
     Conferences,
@@ -50,11 +51,13 @@ impl App {
         let icy_board = Arc::new(icy_board);
         let general_tab = GeneralTab::new(icy_board.clone());
         let command_tab = ConferencesTab::new(icy_board.clone());
+        let path_tab = PathTab::new(icy_board.clone());
         Self {
             full_screen,
             icy_board,
             _file: file,
             general_tab,
+            path_tab,
             mode: Mode::default(),
             tab: TabPageType::System,
             conferences_tab: command_tab,
@@ -107,7 +110,7 @@ impl App {
     fn get_tab(&self) -> &dyn TabPage {
         match self.tab {
             TabPageType::System => &self.general_tab,
-            TabPageType::Options => &self.general_tab,
+            TabPageType::Paths => &self.path_tab,
             TabPageType::Net => &self.general_tab,
             TabPageType::Server => &self.general_tab,
             TabPageType::Conferences => &self.conferences_tab,
@@ -118,7 +121,7 @@ impl App {
     fn get_tab_mut(&mut self) -> &mut dyn TabPage {
         match self.tab {
             TabPageType::System => &mut self.general_tab,
-            TabPageType::Options => &mut self.general_tab,
+            TabPageType::Paths => &mut self.path_tab,
             TabPageType::Net => &mut self.general_tab,
             TabPageType::Server => &mut self.general_tab,
             TabPageType::Conferences => &mut self.conferences_tab,

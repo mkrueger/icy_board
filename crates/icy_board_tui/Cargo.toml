@@ -15,9 +15,9 @@ ratatui = { workspace = true }
 semver = { workspace = true }
 log = { workspace = true }
 
-
 unicase = { workspace = true }
 color-eyre = { workspace = true }
+icy_board_engine = { workspace = true }
 
 i18n-embed = { workspace = true }
 i18n-embed-fl = { workspace = true }

@@ -523,7 +523,7 @@ impl IcyBoardState {
 
     pub fn get_pcbdat(&self) -> Res<String> {
         if let Ok(board) = self.board.lock() {
-            let path = board.resolve_file(&board.config.paths.tmp_path);
+            let path = board.resolve_file(&board.config.paths.tmp_work_path);
 
             let path = PathBuf::from(path);
             if !path.is_dir() {

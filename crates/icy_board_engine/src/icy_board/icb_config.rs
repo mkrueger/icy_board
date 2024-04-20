@@ -239,7 +239,7 @@ pub struct ConfigPaths {
     /// file name == command name
     pub command_display_path: PathBuf,
 
-    pub tmp_path: PathBuf,
+    pub tmp_work_path: PathBuf,
 
     pub icbtext: PathBuf,
 
@@ -279,7 +279,7 @@ pub struct ConfigPaths {
     pub protocol_data_file: PathBuf,
 
     /// name and location of security level config file
-    pub security_level_file: PathBuf, // *
+    pub pwrd_sec_level_file: PathBuf, // *
 
     /// name and location of command file
     pub command_file: PathBuf,
@@ -295,6 +295,9 @@ pub struct ConfigPaths {
 
     /// home directory for user files
     pub home_dir: PathBuf,
+
+    /// log file
+    pub log_file: PathBuf,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -340,11 +343,14 @@ pub struct BoardOptions {
 
     /// max number of lines in a message
     pub max_msg_lines: u16,
+    pub scan_all_mail_at_login: bool,
+    pub prompt_to_read_mail: bool,
 
     // keyboard timeout in minutes
     pub keyboard_timeout: u16,
 
     pub check_files_uploaded: bool,
+    pub upload_descr_lines: u8,
     pub display_uploader: bool,
 }
 
@@ -441,7 +447,7 @@ impl IcbConfig {
             },
             paths: ConfigPaths {
                 help_path: PathBuf::from("art/help/"),
-                tmp_path: PathBuf::from("tmp/"),
+                tmp_work_path: PathBuf::from("work/"),
                 icbtext: PathBuf::from("config/icbtext.toml"),
                 conferences: PathBuf::from("config/conferences.toml"),
                 security_file_path: PathBuf::from("art/secmsgs/"),
@@ -464,11 +470,12 @@ impl IcbConfig {
                 vip_users: PathBuf::new(),
 
                 protocol_data_file: PathBuf::new(),
-                security_level_file: PathBuf::new(),
+                pwrd_sec_level_file: PathBuf::new(),
                 language_file: PathBuf::new(),
                 command_file: PathBuf::new(),
                 statistics_file: PathBuf::new(),
                 group_file: PathBuf::new(),
+                log_file: PathBuf::from("output.log"),
             },
             new_user_settings: NewUserSettings {
                 sec_level: 10,
@@ -497,9 +504,12 @@ impl IcbConfig {
                 display_news_behavior: DisplayNewsBehavior::OnlyNewer,
                 display_userinfo_at_login: false,
                 max_msg_lines: 100,
+                scan_all_mail_at_login: true,
+                prompt_to_read_mail: true,
                 check_files_uploaded: true,
                 display_uploader: false,
                 keyboard_timeout: 5,
+                upload_descr_lines: 20,
             },
         }
     }
