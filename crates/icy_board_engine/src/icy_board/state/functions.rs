@@ -277,6 +277,7 @@ impl IcyBoardState {
     ) -> Res<String> {
         self.session.num_lines_printed = 0;
 
+        log::warn!("{:08X}", display_flags);
         let mut prompt = prompt;
         let display_question = if prompt.ends_with(TXT_STOPCHAR) {
             prompt.pop();
@@ -297,10 +298,12 @@ impl IcyBoardState {
         }
         self.display_line(&prompt)?;
         if display_question {
-            self.print(TerminalTarget::Both, "? ")?;
+            self.print(TerminalTarget::Both, "?")?;
         }
+        self.print(TerminalTarget::Both, " ")?;
+
         if display_flags & display_flags::FIELDLEN != 0 {
-            self.print(TerminalTarget::Both, " (")?;
+            self.print(TerminalTarget::Both, "(")?;
             self.forward(len)?;
             self.print(TerminalTarget::Both, ")")?;
             self.backward(len + 1)?;

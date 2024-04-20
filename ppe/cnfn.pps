@@ -8,7 +8,7 @@ BEGIN
   CLS
   PRINTLN "@X17╒═════════════════════════════════════════════════════════════════════════════╕"
   PRINTLN "│  @X1BYou are now in @X1F@INCONF:60@@X17│"
-  PRINTLN "│  @X1EYou have access the following conferences:                                 @X17│"
+  PRINTLN "│  @X1EYou have access to the following conferences:                               @X17│"
   PRINTLN "╘═════════════════════════════════════════════════════════════════════════════╛"
   PRINTLN
 

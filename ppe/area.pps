@@ -24,6 +24,7 @@ BEGIN
     ENDIF
     PRINT LEFT(a.Name,35)
   NEXT
+  PRINTLN
   
   IF GetX() > 45
     PRINTLN CHR(13)

@@ -1,0 +1,76 @@
+﻿DECLARE PROCEDURE PrintChoices()
+
+STRING comments(5)
+STRING choices = {
+   "  @X0E1. @X0FEvery call",
+   "  @X0E2. @X0FFrequently",
+   "  @X0E3. @X0FRarely    ",
+   "  @X0E4. @X0FNever     "
+}
+STRING msg_areas = "4"
+STRING file_directories = "4"
+STRING other = "4"
+INTEGER cmt_len = 72
+INTEGER i
+STRING do_cmt = YESCHAR()
+
+BEGIN
+  PRINTLN "@X3B▓▒░@X3F     Message Areas    @X3B░▒▓"
+  PrintChoices()
+  INPUTSTR "Which option best describes your use of the message bases on this system", msg_areas, @X0A, 1, "1234", FIELDLEN + NEWLINE + LFAFTER
+  msg_areas = RIGHT(choices[msg_areas], 10)
+  
+  PRINTLN "@X3B▓▒░@X3F      File Areas      @X3B░▒▓"
+  PrintChoices()
+  INPUTSTR "Which option best describes your use of the file areas on this system", file_directories, @X0A, 1, "1234", FIELDLEN + NEWLINE + LFAFTER
+  file_directories = RIGHT(choices[file_directories], 10)
+  
+  PRINTLN "@X3B▓▒░@X3F    Other Features    @X3B░▒▓"
+  PrintChoices()
+  INPUTSTR "Which option best describes your use of the other features of this system",other, @X0A, 1, "1234", FIELDLEN + NEWLINE + LFAFTER
+  other = RIGHT(choices[other], 10)
+  
+  INPUTYN "Do you want to leave additional comments about this system", do_cmt, @X0A
+  
+  IF UPPER(do_cmt) = YESCHAR() THEN
+     PRINTLN
+     PRINTLN "@X0B@X00You may enter @X0F5@X0B lines of @X0F", cmt_len, "@X0B characters for your comments."
+     PRINTLN "Press ENTER on a blank line to finish entering your comments."
+     PRINTLN
+      
+     INTEGER line = -1
+     REPEAT
+        line += 1
+        PRINT "@X0E", line, ": "
+        INPUTSTR "_", comments[line], @X03, cmt_len, MASK_ASCII(), LFAFTER
+     UNTIL line >= 4 || comments[line] == ""
+  ENDIF
+  
+  FPUTLN 0, ""
+  FPUTLN 0, "  Usage"
+  FPUTLN 0, "  ----------------------------------------"
+  FPUTLN 0, ""
+  FPUTLN 0, "    Message Areas    : " + msg_areas
+  FPUTLN 0, "    File Directories : " + file_directories
+  FPUTLN 0, "    Other features   : " + other
+  FOR i = 0 TO 5
+      IF comments[i] != "" THEN
+         FPUTLN 0, ""
+         FPUTLN 0, "  Comments"
+         FPUTLN 0, "  -----------------------------------------"
+         FOR i = 0 TO 5
+            if comments[i] == "" BREAK
+            FPUTLN 0, "    " + comments[i]
+         NEXT
+         BREAK
+      ENDIF
+  NEXT
+END
+
+PROCEDURE PrintChoices()
+   DEFCOLOR
+   PRINTLN
+   FOR i = 0 TO 4
+     PRINTLN choices[i]
+   NEXT
+ENDPROC

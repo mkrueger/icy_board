@@ -1066,19 +1066,23 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
     fn visit_indexer_expression(&mut self, indexer: &crate::ast::IndexerExpression) -> VariableType {
         let mut found = false;
         let mut res = VariableType::None;
-        let arg_count = 0;
-        if let Some(idx) = self.lookup_variable(indexer.get_identifier()) {
+        let arg_count = if let Some(idx) = self.lookup_variable(indexer.get_identifier()) {
             let (rt, r) = &mut self.references[idx];
             if matches!(rt, ReferenceType::Function(_)) {
                 self.errors.lock().unwrap().report_error(
                     indexer.get_identifier_token().span.clone(),
                     CompilationErrorType::IndexerCalledOnFunction(indexer.get_identifier().to_string()),
                 );
-
-                found = true;
+                return VariableType::None;
             }
+            found = true;
             res = r.variable_type;
-        }
+            r.usages
+                .push(Spanned::new(indexer.get_identifier().to_string(), indexer.get_identifier_token().span.clone()));
+            r.header.as_ref().unwrap().dim as usize
+        } else {
+            0
+        };
 
         if found {
             self.check_arg_count(arg_count, indexer.get_arguments().len(), indexer.get_identifier_token());

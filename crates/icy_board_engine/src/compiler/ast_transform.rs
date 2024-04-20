@@ -135,8 +135,8 @@ impl AstVisitorMut for AstTransformationVisitor {
         statements.push(LabelStatement::create_empty_statement(continue_label.clone()));
 
         statements.push(IfStatement::create_empty_statement(
-            repeat_until.get_condition().clone(),
-            GotoStatement::create_empty_statement(continue_label.clone()),
+            repeat_until.get_condition().negate_expression(),
+            GotoStatement::create_empty_statement(loop_label.clone()),
         ));
         statements.push(LabelStatement::create_empty_statement(break_label.clone()));
         self.continue_break_labels.pop();

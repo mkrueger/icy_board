@@ -200,8 +200,7 @@ pub fn putuser(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
 }
 
 pub fn defcolor(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    vm.icy_board_state.reset_color()
 }
 
 pub fn delete(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
