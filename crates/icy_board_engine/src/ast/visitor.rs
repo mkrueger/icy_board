@@ -4,9 +4,9 @@ use super::{
     ArrayInitializerExpression, Ast, AstNode, BinaryExpression, BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstantExpression,
     ContinueStatement, ElseBlock, ElseIfBlock, Expression, ForStatement, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation,
     GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, IndexerExpression, LabelStatement, LetStatement, LoopStatement,
-    MemberReferenceExpression, ParameterSpecifier, ParensExpression, PredefinedCallStatement, PredefinedFunctionCallExpression, ProcedureCallStatement,
-    ProcedureDeclarationAstNode, ProcedureImplementation, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, UnaryExpression,
-    VariableDeclarationStatement, VariableSpecifier, WhileDoStatement, WhileStatement,
+    MemberReferenceExpression, ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode,
+    ProcedureImplementation, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, UnaryExpression, VariableDeclarationStatement,
+    VariableSpecifier, WhileDoStatement, WhileStatement,
 };
 
 #[allow(unused_variables)]
@@ -35,10 +35,6 @@ pub trait AstVisitor<T: Default>: Sized {
     }
     fn visit_unary_expression(&mut self, unary: &UnaryExpression) -> T {
         unary.get_expression().visit(self)
-    }
-    fn visit_predefined_function_call_expression(&mut self, call: &PredefinedFunctionCallExpression) -> T {
-        walk_predefined_function_call_expression(self, call);
-        T::default()
     }
     fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) -> T {
         walk_function_call_expression(self, call);
@@ -292,12 +288,6 @@ pub fn walk_array_expression<T: Default, V: AstVisitor<T>>(visitor: &mut V, arr_
     }
 }
 
-pub fn walk_predefined_function_call_expression<T: Default, V: AstVisitor<T>>(visitor: &mut V, call: &PredefinedFunctionCallExpression) {
-    for arg in call.get_arguments() {
-        arg.visit(visitor);
-    }
-}
-
 pub fn walk_function_call_expression<T: Default, V: AstVisitor<T>>(visitor: &mut V, call: &FunctionCallExpression) {
     for arg in call.get_arguments() {
         arg.visit(visitor);
@@ -399,13 +389,6 @@ pub trait AstVisitorMut: Sized {
     fn visit_unary_expression(&mut self, unary: &UnaryExpression) -> Expression {
         let expr = unary.get_expression().visit_mut(self);
         Expression::Unary(UnaryExpression::empty(unary.get_op(), expr))
-    }
-
-    fn visit_predefined_function_call_expression(&mut self, call: &PredefinedFunctionCallExpression) -> Expression {
-        Expression::PredefinedFunctionCall(PredefinedFunctionCallExpression::empty(
-            call.get_func(),
-            call.get_arguments().iter().map(|arg| arg.visit_mut(self)).collect(),
-        ))
     }
 
     fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) -> Expression {

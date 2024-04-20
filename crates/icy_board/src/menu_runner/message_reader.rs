@@ -3,9 +3,7 @@ use icy_board_engine::{
     icy_board::{
         commands::Command,
         icb_text::{IceText, TextEntry},
-        message_areas::MessageAreaList,
         state::{functions::display_flags, IcyBoardState, UserActivity},
-        IcyBoardSerializer,
     },
     vm::TerminalTarget,
 };

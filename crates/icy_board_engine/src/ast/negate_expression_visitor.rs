@@ -1,7 +1,4 @@
-use super::{
-    AstVisitorMut, BinaryExpression, Constant, ConstantExpression, Expression, FunctionCallExpression, ParensExpression, PredefinedFunctionCallExpression,
-    UnaryExpression, UnaryOp,
-};
+use super::{AstVisitorMut, BinaryExpression, Constant, ConstantExpression, Expression, FunctionCallExpression, ParensExpression, UnaryExpression, UnaryOp};
 
 #[derive(Default)]
 pub struct NegateExpressionVisitor {}
@@ -20,10 +17,6 @@ impl AstVisitorMut for NegateExpressionVisitor {
             Constant::Boolean(b) => ConstantExpression::create_empty_expression(Constant::Boolean(!b)),
             _ => UnaryExpression::create_empty_expression(UnaryOp::Not, Expression::Const(expr.clone())),
         }
-    }
-
-    fn visit_predefined_function_call_expression(&mut self, expr: &PredefinedFunctionCallExpression) -> Expression {
-        UnaryExpression::create_empty_expression(UnaryOp::Not, Expression::PredefinedFunctionCall(expr.clone()))
     }
 
     fn visit_function_call_expression(&mut self, expr: &FunctionCallExpression) -> Expression {

@@ -5,11 +5,11 @@ use std::{
 
 use crate::{
     ast::{
-        walk_function_call_expression, walk_function_implementation, walk_indexer_expression, walk_predefined_call_statement,
-        walk_predefined_function_call_expression, walk_procedure_call_statement, walk_procedure_implementation, AstVisitor, CommentAstNode, Constant,
-        ConstantExpression, Expression, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement,
-        IdentifierExpression, LabelStatement, LetStatement, ParameterSpecifier, PredefinedCallStatement, PredefinedFunctionCallExpression,
-        ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, VariableDeclarationStatement,
+        walk_function_call_expression, walk_function_implementation, walk_indexer_expression, walk_predefined_call_statement, walk_procedure_call_statement,
+        walk_procedure_implementation, AstVisitor, CommentAstNode, Constant, ConstantExpression, Expression, FunctionCallExpression,
+        FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, LabelStatement, LetStatement,
+        ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation,
+        VariableDeclarationStatement,
     },
     compiler::CompilationErrorType,
     executable::{
@@ -35,6 +35,13 @@ pub enum ReferenceType {
 
     Function(usize),
     Procedure(usize),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum FunctionType {
+    PredefinedFunc(FuncOpCode),
+    Function(usize),
+    Variable(usize),
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -143,6 +150,8 @@ pub struct SemanticVisitor<'a> {
 
     /// Maps member references -> user type IDs
     pub user_type_lookup: HashMap<usize, u8>,
+    pub function_type_lookup: HashMap<usize, FunctionType>,
+
     pub expression_lookup: HashMap<core::ops::Range<usize>, usize>,
     pub require_user_variables: bool,
 
@@ -299,6 +308,7 @@ impl<'a> SemanticVisitor<'a> {
             label_lookup_table: HashMap::new(),
             expression_lookup: HashMap::new(),
             user_type_lookup: HashMap::new(),
+            function_type_lookup: HashMap::new(),
 
             global_lookup: VariableLookups::default(),
             local_variable_lookup: None,
@@ -829,17 +839,6 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
         }
     }
 
-    fn visit_predefined_function_call_expression(&mut self, call: &PredefinedFunctionCallExpression) -> VariableType {
-        self.add_reference(
-            ReferenceType::PredefinedFunc(call.get_func().opcode),
-            VariableType::Function,
-            call.get_identifier_token(),
-        );
-        walk_predefined_function_call_expression(self, call);
-
-        call.get_func().return_type
-    }
-
     fn visit_comment(&mut self, _comment: &CommentAstNode) -> VariableType {
         // nothing yet
         VariableType::None
@@ -938,6 +937,57 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
         let mut found = false;
         let mut arg_count = 0;
         let mut res = VariableType::None;
+
+        /*
+
+        Move to semantic visitor:
+
+                           let predef = FunctionDefinition::get_function_definition(id, arguments.len() as i32);
+                           if predef >= 0 {
+                               let def = &FUNCTION_DEFINITIONS[predef as usize];
+
+                               if (def.args as usize) < arguments.len() {
+                                   self.errors.lock().unwrap().report_error(
+                                       identifier_token.span.clone(),
+                                       ParserErrorType::TooFewArguments(identifier_token.token.to_string(), arguments.len(), def.args),
+                                   );
+                               }
+                               if (def.args as usize) > arguments.len() {
+                                   self.errors.lock().unwrap().report_error(
+                                       identifier_token.span.clone(),
+                                       ParserErrorType::TooManyArguments(identifier_token.token.to_string(), arguments.len(), def.args),
+                                   );
+                               }
+
+                               if self.lang_version < def.version {
+                                   self.report_error(
+                                       identifier_token.span,
+                                       ParserErrorType::FunctionVersionNotSupported(def.opcode, def.version, self.lang_version),
+                                   );
+                                   return None;
+                               }
+                               return Some(Expression::PredefinedFunctionCall(PredefinedFunctionCallExpression::new(
+                                   identifier_token,
+                                   def,
+                                   leftpar_token,
+                                   arguments,
+                                   rightpar_token,
+                               )));
+                           }*/
+
+        /* TODO: predefined functions
+
+        fn visit_predefined_function_call_expression(&mut self, call: &PredefinedFunctionCallExpression) -> VariableType {
+            self.add_reference(
+                ReferenceType::PredefinedFunc(call.get_func().opcode),
+                VariableType::Function,
+                call.get_identifier_token(),
+            );
+            walk_predefined_function_call_expression(self, call);
+
+            call.get_func().return_type
+        }*/
+
         if let Some(idx) = self.lookup_variable(call.get_identifier()) {
             let (rt, r) = &mut self.references[idx];
             if matches!(rt, ReferenceType::Function(_)) || matches!(rt, ReferenceType::Variable(_)) {
@@ -956,7 +1006,11 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
                 r.usages
                     .push(Spanned::new(call.get_identifier().to_string(), call.get_identifier_token().span.clone()));
                 found = true;
-
+                if let ReferenceType::Function(func) = rt {
+                    self.function_type_lookup.insert(idx, FunctionType::Function(*func));
+                } else if let ReferenceType::Variable(func) = rt {
+                    self.function_type_lookup.insert(idx, FunctionType::Variable(*func));
+                }
                 res = r.variable_type;
             }
         }

@@ -1,10 +1,9 @@
 use crate::{
     ast::{
         constant::{ConstantType, BUILTIN_CONSTS},
-        AstVisitorMut, BinOp, BinaryExpression, Constant, ConstantExpression, Expression, PredefinedCallStatement, PredefinedFunctionCallExpression, Statement,
-        UnaryExpression, UnaryOp,
+        AstVisitorMut, BinOp, BinaryExpression, Constant, ConstantExpression, Expression, PredefinedCallStatement, Statement, UnaryExpression, UnaryOp,
     },
-    executable::{FuncOpCode, OpCode},
+    executable::OpCode,
 };
 struct ConstantReplaceVisitor {
     replace_category: ConstantType,
@@ -123,25 +122,28 @@ impl AstVisitorMut for ConstantScanVisitor {
         let expr = unary.get_expression().visit_mut(self);
         UnaryExpression::create_empty_expression(unary.get_op(), expr)
     }
+    /*
 
-    fn visit_predefined_function_call_expression(&mut self, call: &crate::ast::PredefinedFunctionCallExpression) -> Expression {
-        let mut args: Vec<Expression> = Vec::new();
+    TODO: Implement this function for 'function call expression'
 
-        let op = call.get_func().opcode;
+       fn visit_predefined_function_call_expression(&mut self, call: &crate::ast::PredefinedFunctionCallExpression) -> Expression {
+           let mut args: Vec<Expression> = Vec::new();
 
-        for (i, arg) in call.get_arguments().iter().enumerate() {
-            let new_arg = if op == FuncOpCode::CRC32 && i == 0 {
-                arg.visit_mut(&mut ConstantReplaceVisitor::new(ConstantType::Crc))
-            } else if op == FuncOpCode::PCBACCOUNT && i == 0 {
-                arg.visit_mut(&mut ConstantReplaceVisitor::new(ConstantType::PcbAccount))
-            } else if op == FuncOpCode::SCANMSGHDR && i == 2 {
-                arg.visit_mut(&mut ConstantReplaceVisitor::new(ConstantType::ScanMsgHdr))
-            } else {
-                arg.visit_mut(self)
-            };
-            args.push(new_arg);
-        }
+           let op = call.get_func().opcode;
 
-        Expression::PredefinedFunctionCall(PredefinedFunctionCallExpression::empty(call.get_func(), args))
-    }
+           for (i, arg) in call.get_arguments().iter().enumerate() {
+               let new_arg = if op == FuncOpCode::CRC32 && i == 0 {
+                   arg.visit_mut(&mut ConstantReplaceVisitor::new(ConstantType::Crc))
+               } else if op == FuncOpCode::PCBACCOUNT && i == 0 {
+                   arg.visit_mut(&mut ConstantReplaceVisitor::new(ConstantType::PcbAccount))
+               } else if op == FuncOpCode::SCANMSGHDR && i == 2 {
+                   arg.visit_mut(&mut ConstantReplaceVisitor::new(ConstantType::ScanMsgHdr))
+               } else {
+                   arg.visit_mut(self)
+               };
+               args.push(new_arg);
+           }
+
+           Expression::PredefinedFunctionCall(PredefinedFunctionCallExpression::empty(call.get_func(), args))
+       }*/
 }

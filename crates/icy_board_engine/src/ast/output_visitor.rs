@@ -96,18 +96,6 @@ impl AstVisitor<()> for OutputVisitor {
         unary.get_expression().visit(self);
     }
 
-    fn visit_predefined_function_call_expression(&mut self, call: &super::PredefinedFunctionCallExpression) {
-        self.output_keyword(call.get_identifier());
-        self.output.push('(');
-        for (i, arg) in call.get_arguments().iter().enumerate() {
-            arg.visit(self);
-            if i < call.get_arguments().len() - 1 {
-                self.output.push_str(", ");
-            }
-        }
-        self.output.push(')');
-    }
-
     fn visit_function_call_expression(&mut self, call: &super::FunctionCallExpression) {
         self.output(call.get_identifier());
         self.output.push('(');

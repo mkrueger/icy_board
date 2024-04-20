@@ -1,6 +1,7 @@
 use crate::{
     ast::AstVisitor,
     executable::{PPEExpr, VariableType},
+    semantic::FunctionType,
 };
 
 use super::PPECompiler;
@@ -49,46 +50,35 @@ impl<'a, 'b> AstVisitor<PPEExpr> for ExpressionCompiler<'a, 'b> {
         PPEExpr::UnaryExpression(unary.get_op(), Box::new(expression))
     }
 
-    fn visit_predefined_function_call_expression(&mut self, call: &crate::ast::PredefinedFunctionCallExpression) -> PPEExpr {
-        let def = call.get_func();
-        PPEExpr::PredefinedFunctionCall(
-            def.opcode.get_definition(), // to de-alias aliases
-            call.get_arguments().iter().map(|e| e.visit(self)).collect(),
-        )
-    }
+    fn visit_function_call_expression(&mut self, call: &crate::ast::FunctionCallExpression) -> PPEExpr {
+        let arguments = call.get_arguments().iter().map(|e| e.visit(self)).collect();
+        let function_type = self
+            .compiler
+            .semantic_visitor
+            .function_type_lookup
+            .get(&call.get_identifier_token().span.start)
+            .unwrap();
 
-    fn visit_function_call_expression(&mut self, func_call: &crate::ast::FunctionCallExpression) -> PPEExpr {
-        let arguments = func_call.get_arguments().iter().map(|e| e.visit(self)).collect();
-
-        if self.compiler.lookup_table.has_variable(func_call.get_identifier()) {
-            let Some(table_idx) = self.compiler.lookup_variable_index(func_call.get_identifier()) else {
-                log::error!("function not found: {}", func_call.get_identifier().to_string());
-                return PPEExpr::Value(0);
-            };
-
-            let var = self.compiler.lookup_table.variable_table.get_var_entry(table_idx);
-
-            if var.value.get_type() == VariableType::Function {
+        match function_type {
+            FunctionType::PredefinedFunc(op_code) => {
+                return PPEExpr::PredefinedFunctionCall(
+                    op_code.get_definition(), // to de-alias aliases
+                    call.get_arguments().iter().map(|e| e.visit(self)).collect(),
+                );
+            }
+            FunctionType::Function(table_idx) => {
+                let var = self.compiler.lookup_table.variable_table.get_var_entry(*table_idx);
                 return PPEExpr::FunctionCall(var.header.id, arguments);
             }
-            if var.header.dim as usize != arguments.len() {
-                log::error!("Invalid dimensions for function call: {}", func_call.get_identifier().to_string());
-
-                return PPEExpr::Value(0);
+            FunctionType::Variable(table_idx) => {
+                let var = self.compiler.lookup_table.variable_table.get_var_entry(*table_idx);
+                if var.header.dim as usize != arguments.len() {
+                    log::error!("Invalid dimensions for function call: {}", call.get_identifier().to_string());
+                    return PPEExpr::Value(0);
+                }
+                return PPEExpr::Dim(var.header.id, arguments);
             }
-            return PPEExpr::Dim(var.header.id, arguments);
         }
-
-        let Some(table_idx) = self.compiler.lookup_variable_index(func_call.get_identifier()) else {
-            log::error!("function not found: {}", func_call.get_identifier().to_string());
-            return PPEExpr::Value(0);
-        };
-        let var = &self.compiler.lookup_table.variable_table.get_var_entry(table_idx);
-        if var.header.dim as usize != arguments.len() {
-            log::error!("Invalid dimensions for function call: {}", func_call.get_identifier().to_string());
-            return PPEExpr::Value(0);
-        }
-        PPEExpr::Dim(table_idx, arguments)
     }
 
     fn visit_indexer_expression(&mut self, indexer: &crate::ast::IndexerExpression) -> PPEExpr {

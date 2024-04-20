@@ -2,9 +2,8 @@ use super::{lexer::Token, Parser};
 use crate::{
     ast::{
         ArrayInitializerExpression, BinOp, BinaryExpression, ConstantExpression, Expression, FunctionCallExpression, IdentifierExpression, IndexerExpression,
-        MemberReferenceExpression, ParensExpression, PredefinedFunctionCallExpression, UnaryExpression,
+        MemberReferenceExpression, ParensExpression, UnaryExpression,
     },
-    executable::{FunctionDefinition, FUNCTION_DEFINITIONS},
     parser::ParserErrorType,
 };
 
@@ -182,7 +181,7 @@ impl<'a> Parser<'a> {
                 self.next_token();
                 Some(Expression::Const(ConstantExpression::new(t.clone(), c.clone())))
             }
-            Token::Identifier(id) => {
+            Token::Identifier(_id) => {
                 let identifier_token = self.save_spanned_token();
                 self.next_token();
                 if self.get_cur_token() == Some(Token::LPar) {
@@ -222,38 +221,6 @@ impl<'a> Parser<'a> {
 
                     self.next_token();
 
-                    let predef = FunctionDefinition::get_function_definition(id, arguments.len() as i32);
-                    if predef >= 0 {
-                        let def = &FUNCTION_DEFINITIONS[predef as usize];
-
-                        if (def.args as usize) < arguments.len() {
-                            self.errors.lock().unwrap().report_error(
-                                identifier_token.span.clone(),
-                                ParserErrorType::TooFewArguments(identifier_token.token.to_string(), arguments.len(), def.args),
-                            );
-                        }
-                        if (def.args as usize) > arguments.len() {
-                            self.errors.lock().unwrap().report_error(
-                                identifier_token.span.clone(),
-                                ParserErrorType::TooManyArguments(identifier_token.token.to_string(), arguments.len(), def.args),
-                            );
-                        }
-
-                        if self.lang_version < def.version {
-                            self.report_error(
-                                identifier_token.span,
-                                ParserErrorType::FunctionVersionNotSupported(def.opcode, def.version, self.lang_version),
-                            );
-                            return None;
-                        }
-                        return Some(Expression::PredefinedFunctionCall(PredefinedFunctionCallExpression::new(
-                            identifier_token,
-                            def,
-                            leftpar_token,
-                            arguments,
-                            rightpar_token,
-                        )));
-                    }
                     return Some(Expression::FunctionCall(FunctionCallExpression::new(
                         identifier_token,
                         leftpar_token,

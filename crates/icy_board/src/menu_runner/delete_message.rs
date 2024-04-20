@@ -1,7 +1,7 @@
 use super::{PcbBoardCommand, MASK_COMMAND};
 use crate::Res;
 use icy_board_engine::{
-    icy_board::{commands::Command, icb_text::IceText, message_areas::MessageAreaList, state::functions::display_flags, IcyBoardSerializer},
+    icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
 };
 use jamjam::jam::JamMessageBase;

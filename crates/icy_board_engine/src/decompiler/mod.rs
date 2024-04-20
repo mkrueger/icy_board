@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     ast::{
         Ast, AstNode, BinOp, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression, FunctionCallExpression,
-        FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, LabelStatement, LetStatement,
-        ParameterSpecifier, ParensExpression, PredefinedCallStatement, PredefinedFunctionCallExpression, ProcedureCallStatement, ProcedureDeclarationAstNode,
+        FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IndexerExpression,
+        LabelStatement, LetStatement, ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode,
         ProcedureImplementation, Statement, UnaryExpression, VariableDeclarationStatement, VariableSpecifier,
     },
     executable::{DeserializationError, DeserializationErrorType, EntryType, Executable, OpCode, PPECommand, PPEExpr, PPEScript, TableEntry, VariableType},
@@ -256,11 +256,12 @@ impl Decompiler {
                 expr.visit_mut(&mut OptimizationVisitor::default())
             }
             PPEExpr::Dim(id, dims) => {
-                FunctionCallExpression::create_empty_expression(self.get_variable_name(*id), dims.iter().map(|e| self.decompile_expression(e)).collect())
+                IndexerExpression::create_empty_expression(self.get_variable_name(*id), dims.iter().map(|e| self.decompile_expression(e)).collect())
             }
-            PPEExpr::PredefinedFunctionCall(f, args) => {
-                PredefinedFunctionCallExpression::create_empty_expression(f, args.iter().map(|e| self.decompile_expression(e)).collect())
-            }
+            PPEExpr::PredefinedFunctionCall(f, args) => FunctionCallExpression::create_empty_expression(
+                unicase::Ascii::new(f.name.to_string()),
+                args.iter().map(|e| self.decompile_expression(e)).collect(),
+            ),
             PPEExpr::FunctionCall(f, args) => {
                 FunctionCallExpression::create_empty_expression(self.get_variable_name(*f), args.iter().map(|e| self.decompile_expression(e)).collect())
             }
