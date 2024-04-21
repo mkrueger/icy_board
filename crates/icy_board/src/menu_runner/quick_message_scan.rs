@@ -103,7 +103,7 @@ impl PcbBoardCommand {
                             '%'
                         }
                     } else if header.is_private() {
-                        if header.get_to().unwrap() == "SYSOP" {
+                        if header.get_to().unwrap().eq_ignore_ascii_case(b"SYSOP") {
                             if header.is_read() {
                                 '~'
                             } else {

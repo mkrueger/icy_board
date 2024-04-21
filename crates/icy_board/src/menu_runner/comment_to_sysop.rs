@@ -4,11 +4,14 @@ use super::PcbBoardCommand;
 
 use crate::Res;
 use bstr::BString;
-use chrono::Utc;
-use icy_board_engine::icy_board::{
-    commands::Command,
-    icb_text::IceText,
-    state::{functions::display_flags, UserActivity},
+use chrono::{format, Utc};
+use icy_board_engine::{
+    datetime::IcbTime,
+    icy_board::{
+        commands::Command,
+        icb_text::IceText,
+        state::{functions::display_flags, UserActivity},
+    },
 };
 use icy_engine::Position;
 use jamjam::jam::JamMessage;
@@ -33,7 +36,7 @@ impl PcbBoardCommand {
         };
 
         let to = self.state.board.lock().unwrap().config.sysop.name.clone();
-        let subj: &str = "comment";
+        let subj = format!("COMMENT {}", IcbTime::now().to_string());
 
         let receipt = self.state.input_field(
             IceText::RequireReturnReceipt,

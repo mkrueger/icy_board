@@ -335,7 +335,7 @@ impl IcbTime {
 
 impl fmt::Display for IcbTime {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:02}:{:02}:{:02}", self.hour, self.minute, self.second)
+        write!(f, "{:02}:{:02}", self.hour, self.minute)
     }
 }
 
