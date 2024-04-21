@@ -1,5 +1,7 @@
 use std::{fs, path::PathBuf};
 
+use bstr::BString;
+use chrono::Utc;
 use icy_board_engine::{
     icy_board::{
         bulletins::{Bullettin, BullettinList},
@@ -21,6 +23,7 @@ use icy_board_engine::{
     },
     Res,
 };
+use jamjam::{jam::JamMessageBase, util::echmoail::EchomailAddress};
 
 use crate::import::{console_logger::ConsoleLogger, default_commands::add_default_commands, OutputLogger};
 
@@ -300,9 +303,13 @@ impl IcyBoardCreator {
             ..Default::default()
         };
         fs::create_dir_all(&self.destination.join("conferences/main/messages"))?;
+        let mut msg_base = JamMessageBase::create(&self.destination.join(&fd.filename))?;
+        msg_base.write_message(&write_welcome_msg())?;
+        msg_base.write_jhr_header()?;
+
         list.push(fd);
+
         list.save(&self.destination.join(&conf.area_file))?;
-        // Note: Messagebase itself is created by the bbs itself
 
         self.logger.start_action("Write conference…".to_string());
         let mut base = ConferenceBase::default();
@@ -310,6 +317,34 @@ impl IcyBoardCreator {
         base.save(conf_path)?;
         Ok(())
     }
+}
+
+fn write_welcome_msg() -> jamjam::jam::JamMessage {
+    jamjam::jam::JamMessage::new(1, &EchomailAddress::default())
+        .with_date_time(Utc::now())
+        .with_from(BString::from("Mike Krueger"))
+        .with_to(BString::from("SYSOP"))
+        .with_subject(BString::from("Welcome to IcyBoard"))
+        .with_text(BString::from(
+            r#"Thank you for trying IcyBoard! I think you will like it.
+
+It was made out of passion and love for PCBoard. A BBS system that was part
+of my youth. It's a tribute to the good old days of BBS systems. 
+
+It's not just a clone of PCBoard. It's a modern BBS system with a lot of 
+new features.
+
+IcyBoard is an ongoing project I'll continue to improve it.
+I would like to get some feedback about this project. 
+
+Visit the project site at:
+https://github.com/mkrueger/icy_board
+
+And also check out my other ansi/bbs releated tools:
+https://github.com/mkrueger/icy_tools
+
+   Mike Krueger"#,
+        ))
 }
 
 fn get_default_data() -> icy_board_engine::icy_board::pcboard_data::PcbBoardData {
