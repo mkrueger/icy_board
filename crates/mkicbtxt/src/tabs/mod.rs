@@ -2,9 +2,9 @@ pub mod about;
 
 pub use about::*;
 
-pub mod general;
+pub mod record;
 use crossterm::event::KeyEvent;
-pub use general::*;
+pub use record::*;
 
 use icy_board_tui::TerminalType;
 use ratatui::{layout::Rect, Frame};

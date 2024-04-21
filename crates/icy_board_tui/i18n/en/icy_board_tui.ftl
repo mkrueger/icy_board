@@ -49,3 +49,47 @@ icbmoni_user_header = User
 icbmoni_protocol_header = Protocol
 
 
+#MkIcbTxt
+
+yes=Yes
+no=No
+
+icbtext_save_changes=Save changes?
+icbtext_edit_title=Edit Record #{ $number }
+icbtext_edit_original_text_title=Original Text:
+icbtext_edit_preview_text_title=Preview:
+icbtext_edit_edit_text_title=Edit Text:
+icbtext_edit_hard_space_info=Use the tilde (~) character to add hard-spaces to the end of a string.
+icbtext_edit_justify_left=Left
+icbtext_edit_justify_right=Right
+icbtext_edit_justify_center=Center
+icbtext_edit_justify_title=Justification: { $justify }
+icbtext_edit_record_length_title=Record Length: { $number } chars
+icbtext_edit_style=Style:
+
+icbtext_filter_title=Filter
+icbtext_filter_text=Show filtered entries: { $filter }
+
+icbtext_jump_to_title=Jump to Record #
+
+icbtext_style_plain = Plain
+icbtext_style_red = Red
+icbtext_style_green = Green
+icbtext_style_yellow = Yellow
+icbtext_style_blue = Blue
+icbtext_style_purple = Purple
+icbtext_style_cyan = Cyan
+icbtext_style_white = White
+
+icbtext_tab_record=Records
+icbtext_tab_about=About
+
+key_desc_quit=Quit
+key_desc_back=Back
+key_desc_next_prev_style=Next/Prev Style
+key_desc_restore=Restore
+key_desc_accept=Accept
+key_desc_cancel=Cancel
+key_desc_filter=Filter
+key_desc_jump=Jump
+key_desc_edit=Edit

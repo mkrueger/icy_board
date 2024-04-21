@@ -15,14 +15,14 @@ use ratatui::{
 
 use super::TabPage;
 
-pub struct GeneralTab<'a> {
+pub struct RecordTab<'a> {
     icb_txt: &'a mut IcbTextFile,
     scroll_state: ScrollbarState,
     table_state: TableState,
     filtered_entries: Vec<usize>,
 }
 
-impl<'a> GeneralTab<'a> {
+impl<'a> RecordTab<'a> {
     pub fn new(icb_txt: &'a mut IcbTextFile) -> Self {
         let scroll_state = ScrollbarState::default().content_length(icb_txt.len());
         let filtered_entries = (1..icb_txt.len()).collect_vec();
@@ -42,7 +42,7 @@ impl<'a> GeneralTab<'a> {
         self.icb_txt != icb_text
     }
 
-    pub fn get_original_text(&mut self) -> Option<&TextEntry> {
+    pub fn get_original_entry(&mut self) -> Option<&TextEntry> {
         if let Some(idx) = self.table_state.selected() {
             if idx < self.filtered_entries.len() {
                 DEFAULT_DISPLAY_TEXT.get(self.filtered_entries[idx])
@@ -54,7 +54,7 @@ impl<'a> GeneralTab<'a> {
         }
     }
 
-    pub fn get_selected_text_mut(&mut self) -> Option<&mut TextEntry> {
+    pub fn get_selected_entry_mut(&mut self) -> Option<&mut TextEntry> {
         if let Some(idx) = self.table_state.selected() {
             if idx < self.filtered_entries.len() {
                 self.icb_txt.get_mut(self.filtered_entries[idx])
@@ -70,7 +70,7 @@ impl<'a> GeneralTab<'a> {
         area.width -= 1;
         let rows = self.filtered_entries.iter().map(|i| {
             let entry = self.icb_txt.get(*i).unwrap();
-            Row::new(vec![Cell::from(get_styled_pcb_line(&entry.text))]).style(get_style(entry))
+            Row::new(vec![Cell::from(get_styled_pcb_line(&entry.text))]).style(convert_style(entry.style))
         });
 
         // let bar = " █ ";
@@ -128,10 +128,14 @@ impl<'a> GeneralTab<'a> {
             self.table_state.select(Some(number));
         }
     }
+
+    pub(crate) fn selected_record(&self) -> usize {
+        self.table_state.selected().unwrap()
+    }
 }
 
-fn get_style(txt: &icy_board_engine::icy_board::icb_text::TextEntry) -> Style {
-    let color = match txt.style {
+pub fn convert_style(text_style: icy_board_engine::icy_board::icb_text::IcbTextStyle) -> Style {
+    let color = match text_style {
         IcbTextStyle::Plain => DOS_LIGHT_GRAY,
         IcbTextStyle::Red => DOS_LIGHT_RED,
         IcbTextStyle::Green => DOS_LIGHT_GREEN,
@@ -145,7 +149,7 @@ fn get_style(txt: &icy_board_engine::icy_board::icb_text::TextEntry) -> Style {
     Style::default().fg(color)
 }
 
-impl<'a> TabPage for GeneralTab<'a> {
+impl<'a> TabPage for RecordTab<'a> {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         if self.filtered_entries.is_empty() {
             Line::from(Span::styled("No entries found".to_string(), Style::default().fg(DOS_LIGHT_RED))).render(area, frame.buffer_mut());
@@ -345,6 +349,7 @@ pub fn get_styled_pcb_line(txt: &str) -> Line {
 
 #[cfg(test)]
 mod tests {
+    use icy_board_tui::theme::{DOS_BLACK, DOS_CYAN};
 
     #[test]
     fn test_pcb_line() {
@@ -353,7 +358,7 @@ mod tests {
         assert_eq!(styled.spans[0], ratatui::text::Span::raw("Hello "));
         assert_eq!(
             styled.spans[1],
-            ratatui::text::Span::styled("World", ratatui::style::Style::default().fg(super::DOS_CYAN).bg(super::DOS_BLACK))
+            ratatui::text::Span::styled("World", ratatui::style::Style::default().fg(DOS_CYAN).bg(DOS_BLACK))
         );
     }
 }

@@ -1618,6 +1618,32 @@ impl IcbTextStyle {
             _ => IcbTextStyle::Plain,
         }
     }
+
+    pub fn next(&self) -> IcbTextStyle {
+        match self {
+            IcbTextStyle::Plain => IcbTextStyle::Red,
+            IcbTextStyle::Red => IcbTextStyle::Green,
+            IcbTextStyle::Green => IcbTextStyle::Yellow,
+            IcbTextStyle::Yellow => IcbTextStyle::Blue,
+            IcbTextStyle::Blue => IcbTextStyle::Purple,
+            IcbTextStyle::Purple => IcbTextStyle::Cyan,
+            IcbTextStyle::Cyan => IcbTextStyle::White,
+            IcbTextStyle::White => IcbTextStyle::Plain,
+        }
+    }
+
+    pub fn prev(&self) -> IcbTextStyle {
+        match self {
+            IcbTextStyle::Plain => IcbTextStyle::White,
+            IcbTextStyle::Red => IcbTextStyle::Plain,
+            IcbTextStyle::Green => IcbTextStyle::Red,
+            IcbTextStyle::Yellow => IcbTextStyle::Green,
+            IcbTextStyle::Blue => IcbTextStyle::Yellow,
+            IcbTextStyle::Purple => IcbTextStyle::Blue,
+            IcbTextStyle::Cyan => IcbTextStyle::Purple,
+            IcbTextStyle::White => IcbTextStyle::Cyan,
+        }
+    }
 }
 
 #[derive(Clone, Default, PartialEq)]

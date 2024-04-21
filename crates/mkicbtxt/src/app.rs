@@ -1,13 +1,14 @@
-use std::{path::PathBuf, time::Duration};
+use std::{collections::HashMap, path::PathBuf, time::Duration};
 
 use chrono::{Local, Timelike};
 use color_eyre::{eyre::Context, Result};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
-use icy_board_engine::icy_board::icb_text::IcbTextFile;
+use icy_board_engine::icy_board::icb_text::{IcbTextFile, IcbTextStyle, TextEntry};
 use icy_board_tui::{
+    get_text, get_text_args,
     term::next_event,
     text_field::{TextField, TextfieldState},
-    theme::{DOS_DARK_GRAY, DOS_LIGHT_GRAY, DOS_WHITE, THEME},
+    theme::{DOS_DARK_GRAY, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE, THEME},
     TerminalType,
 };
 use itertools::Itertools;
@@ -32,9 +33,9 @@ pub struct App<'a> {
     filter_state: TextfieldState,
 
     edit_state: TextfieldState,
-    edit_text: String,
+    edit_entry: TextEntry,
 
-    general_tab: GeneralTab<'a>,
+    record_tab: RecordTab<'a>,
     about_tab: AboutTab,
 
     pub save: bool,
@@ -54,7 +55,7 @@ enum Mode {
 #[derive(Debug, Clone, Copy, Default, Display, EnumIter, FromRepr, PartialEq, Eq)]
 enum TabPageType {
     #[default]
-    General,
+    Record,
     About,
 }
 
@@ -71,15 +72,15 @@ impl<'a> App<'a> {
             orig,
             full_screen,
             file,
-            general_tab: GeneralTab::new(icb_txt),
+            record_tab: RecordTab::new(icb_txt),
             mode: Mode::default(),
-            tab: TabPageType::General,
+            tab: TabPageType::Record,
             about_tab: AboutTab::default(),
             status_line: String::new(),
             filter: String::new(),
             filter_state: TextfieldState::default(),
 
-            edit_text: String::new(),
+            edit_entry: TextEntry::default(),
             edit_state: TextfieldState::default(),
             save: false,
         }
@@ -130,14 +131,14 @@ impl<'a> App<'a> {
 
     fn get_tab(&self) -> &dyn TabPage {
         match self.tab {
-            TabPageType::General => &self.general_tab,
+            TabPageType::Record => &self.record_tab,
             TabPageType::About => &self.about_tab,
         }
     }
 
     fn get_tab_mut(&mut self) -> &mut dyn TabPage {
         match self.tab {
-            TabPageType::General => &mut self.general_tab,
+            TabPageType::Record => &mut self.record_tab,
             TabPageType::About => &mut self.about_tab,
         }
     }
@@ -148,14 +149,25 @@ impl<'a> App<'a> {
             Mode::Edit => {
                 match key.code {
                     Esc => self.mode = Mode::Command,
+                    F(2) => {
+                        self.edit_entry.style = self.edit_entry.style.next();
+                    }
+                    F(3) => {
+                        self.edit_entry.style = self.edit_entry.style.prev();
+                    }
+                    F(4) => {
+                        if let Some(entry) = self.record_tab.get_original_entry() {
+                            self.edit_entry = entry.clone();
+                        }
+                    }
                     Enter => {
-                        if let Some(edit) = self.general_tab.get_selected_text_mut() {
-                            edit.text = self.edit_text.clone();
+                        if let Some(edit) = self.record_tab.get_selected_entry_mut() {
+                            *edit = self.edit_entry.clone();
                         }
                         self.mode = Mode::Command;
                     }
                     _ => {
-                        self.edit_state.handle_input(key, &mut self.edit_text);
+                        self.edit_state.handle_input(key, &mut self.edit_entry.text);
                     }
                 };
 
@@ -167,7 +179,7 @@ impl<'a> App<'a> {
 
                     _ => {
                         self.filter_state.handle_input(key, &mut self.filter);
-                        self.general_tab.set_filter(&self.filter);
+                        self.record_tab.set_filter(&self.filter);
                     }
                 };
                 return;
@@ -178,10 +190,10 @@ impl<'a> App<'a> {
                     Esc => self.mode = Mode::Command,
 
                     Enter => {
-                        if let Some(number) = self.edit_text.parse::<usize>().ok() {
+                        if let Some(number) = self.edit_entry.text.parse::<usize>().ok() {
                             if number > 0 {
-                                self.general_tab.set_filter("");
-                                self.general_tab.jump(number - 1);
+                                self.record_tab.set_filter("");
+                                self.record_tab.jump(number - 1);
                                 self.update_state();
                             }
                         }
@@ -189,7 +201,7 @@ impl<'a> App<'a> {
                     }
 
                     _ => {
-                        self.edit_state.handle_input(key, &mut self.edit_text);
+                        self.edit_state.handle_input(key, &mut self.edit_entry.text);
                     }
                 };
                 return;
@@ -211,7 +223,7 @@ impl<'a> App<'a> {
             _ => {
                 match key.code {
                     Char('q') | Esc => {
-                        if self.general_tab.is_dirty(&self.orig) {
+                        if self.record_tab.is_dirty(&self.orig) {
                             self.mode = Mode::RequestQuit;
                         } else {
                             self.mode = Mode::Quit;
@@ -221,19 +233,19 @@ impl<'a> App<'a> {
                     Char('l') | Right => self.next_tab(),
                     F(2) => self.mode = Mode::Filter,
                     F(3) => {
-                        self.edit_text = "".to_string();
+                        self.edit_entry.text = "".to_string();
                         self.edit_state = TextfieldState::default().with_max_len(4).with_position(0).with_mask("0123456789".to_string());
                         self.mode = Mode::Jump;
                     }
                     F(4) => {
-                        let txt = self.general_tab.get_original_text().unwrap().text.clone();
-                        if let Some(edit) = self.general_tab.get_selected_text_mut() {
-                            edit.text = txt;
+                        let orig_entry = self.record_tab.get_original_entry().unwrap().clone();
+                        if let Some(entry) = self.record_tab.get_selected_entry_mut() {
+                            *entry = orig_entry;
                         }
                     }
                     Char('d') | Enter => {
-                        if let Some(edit) = self.general_tab.get_selected_text_mut() {
-                            self.edit_text = edit.text.to_string();
+                        if let Some(edit) = self.record_tab.get_selected_entry_mut() {
+                            self.edit_entry = edit.clone();
                             self.edit_state = TextfieldState::default().with_position(edit.text.len() as u16);
                             self.mode = Mode::Edit;
                         }
@@ -260,38 +272,128 @@ impl<'a> App<'a> {
 
     fn ui(&mut self, frame: &mut Frame, area: Rect) {
         let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1), Constraint::Length(1), Constraint::Length(1)]);
-        let [title_bar, tab, key_bar, status_line] = vertical.areas(area);
+        let [title_bar, mut tab, key_bar, status_line] = vertical.areas(area);
 
         Block::new().style(THEME.title_bar).render(area, frame.buffer_mut());
         self.render_title_bar(title_bar, frame.buffer_mut());
+
+        if !self.filter.is_empty() {
+            let filter_area = Rect::new(tab.x, tab.y, tab.width, 1);
+            self.render_filter_text(filter_area, frame.buffer_mut());
+            tab.y += 1;
+            tab.height -= 1;
+        }
+
         self.render_selected_tab(frame, tab);
         self.render_key_help_view(key_bar, frame.buffer_mut());
         self.render_status_line(status_line, frame.buffer_mut());
 
         match self.mode {
             Mode::Edit => {
-                let edit_area = Rect::new(area.x + 2, area.y + (area.height - 3) / 2, area.width - 5, 4);
+                let edit_height = 12;
+                let edit_area = Rect::new(area.x + 1, area.y + (area.height - edit_height - 1) / 2, area.width - 3, edit_height);
 
                 Clear.render(edit_area, frame.buffer_mut());
+                let edit_title = get_text_args(
+                    "icbtext_edit_title",
+                    HashMap::from([("number".to_string(), self.record_tab.selected_record().to_string())]),
+                );
+
+                let record_length = get_text_args(
+                    "icbtext_edit_record_length_title",
+                    HashMap::from([("number".to_string(), self.edit_entry.text.len().to_string())]),
+                );
+
+                let justify = match self.edit_entry.justification {
+                    icy_board_engine::icy_board::icb_text::IcbTextJustification::Left => get_text("icbtext_edit_justify_left"),
+                    icy_board_engine::icy_board::icb_text::IcbTextJustification::Right => get_text("icbtext_edit_justify_right"),
+                    icy_board_engine::icy_board::icb_text::IcbTextJustification::Center => get_text("icbtext_edit_justify_center"),
+                };
+                let justify_title = get_text_args("icbtext_edit_justify_title", HashMap::from([("justify".to_string(), justify)]));
 
                 Block::new()
                     .borders(Borders::ALL)
-                    .title(Title::from(Span::from(" Edit ").style(THEME.content_box_title)))
+                    .title(Title::from(Span::from(format!(" {} ", edit_title)).style(THEME.content_box_title)))
+                    .title(
+                        Title::from(Span::from(format!(" {} ", record_length)).style(THEME.content_box_title))
+                            .alignment(Alignment::Center)
+                            .position(block::Position::Bottom),
+                    )
+                    .title(
+                        Title::from(Span::from(format!(" {} ", justify_title)).style(THEME.content_box_title))
+                            .alignment(Alignment::Right)
+                            .position(block::Position::Top),
+                    )
                     .style(THEME.content_box)
                     .border_type(BorderType::Double)
                     .render(edit_area, frame.buffer_mut());
 
-                let field = TextField::new().with_value(self.edit_text.to_string());
+                let field = TextField::new().with_value(self.edit_entry.text.to_string());
 
                 let mut area = edit_area.inner(&Margin { horizontal: 1, vertical: 1 });
+                area.height = 1;
 
-                if let Some(entry) = self.general_tab.get_original_text() {
+                Line::from(get_text("icbtext_edit_original_text_title"))
+                    .style(Style::default().fg(DOS_LIGHT_CYAN).italic())
+                    .render(area, frame.buffer_mut());
+
+                if let Some(entry) = self.record_tab.get_original_entry() {
+                    let mut style_area = area;
+                    style_area.x += 30;
+                    style_area.width -= 30;
+
+                    Line::from(vec![
+                        Span::styled(get_text("icbtext_edit_style"), THEME.content_box_title),
+                        Span::raw(" "),
+                        Span::styled(Self::get_style_description(entry.style), convert_style(entry.style).not_italic().bold()),
+                        Span::raw(" "),
+                    ])
+                    .alignment(Alignment::Right)
+                    .render(style_area, frame.buffer_mut());
+                    area.y += 1;
+
                     Line::from(entry.text.clone())
-                        .style(Style::default().fg(DOS_LIGHT_GRAY))
+                        .style(convert_style(entry.style))
                         .render(area, frame.buffer_mut());
                 }
+                area.y += 2;
+                Line::from(get_text("icbtext_edit_preview_text_title"))
+                    .style(Style::default().fg(DOS_LIGHT_CYAN).italic())
+                    .render(area, frame.buffer_mut());
                 area.y += 1;
+                Line::from(get_styled_pcb_line(&self.edit_entry.text))
+                    .style(convert_style(self.edit_entry.style))
+                    .render(area, frame.buffer_mut());
+                area.y += 2;
+
+                Line::from(get_text("icbtext_edit_edit_text_title"))
+                    .style(Style::default().fg(DOS_LIGHT_CYAN).italic())
+                    .render(area, frame.buffer_mut());
+
+                let mut style_area = area;
+                style_area.x += 30;
+                style_area.width -= 30;
+
+                Line::from(vec![
+                    Span::styled(get_text("icbtext_edit_style"), THEME.content_box_title),
+                    Span::raw(" "),
+                    Span::styled(
+                        Self::get_style_description(self.edit_entry.style),
+                        convert_style(self.edit_entry.style).not_italic().bold(),
+                    ),
+                    Span::raw(" "),
+                ])
+                .alignment(Alignment::Right)
+                .render(style_area, frame.buffer_mut());
+                area.y += 1;
+
                 frame.render_stateful_widget(field, area, &mut self.edit_state);
+
+                area.y += 2;
+                Line::from(get_text("icbtext_edit_hard_space_info"))
+                    .style(THEME.description_text)
+                    .alignment(Alignment::Center)
+                    .render(area, frame.buffer_mut());
             }
             Mode::Filter => {
                 let filter_area = Rect::new(area.x + 2, area.y + (area.height - 3) / 2, area.width - 5, 3);
@@ -300,7 +402,9 @@ impl<'a> App<'a> {
 
                 Block::new()
                     .borders(Borders::ALL)
-                    .title(Title::from(Span::from(" Filter ").style(THEME.content_box_title)))
+                    .title(Title::from(
+                        Span::from(format!(" {} ", get_text("icbtext_filter_title"))).style(THEME.content_box_title),
+                    ))
                     .style(THEME.content_box)
                     .border_type(BorderType::Double)
                     .render(filter_area, frame.buffer_mut());
@@ -311,25 +415,27 @@ impl<'a> App<'a> {
                 frame.render_stateful_widget(field, area, &mut self.filter_state);
             }
             Mode::Jump => {
-                let jump_size = 21;
+                let jump_size = 31;
                 let jump_area = Rect::new(area.x + 3 + (area.width - jump_size) / 2, area.y + (area.height - 3) / 2, jump_size, 3);
 
                 Clear.render(jump_area, frame.buffer_mut());
 
                 Block::new()
                     .borders(Borders::ALL)
-                    .title(Title::from(Span::from(" Jump to Record # ").style(THEME.content_box_title)))
+                    .title(Title::from(
+                        Span::from(format!(" {} ", get_text("icbtext_jump_to_title"))).style(THEME.content_box_title),
+                    ))
                     .style(THEME.content_box)
                     .border_type(BorderType::Double)
                     .render(jump_area, frame.buffer_mut());
 
-                let field = TextField::new().with_value(self.edit_text.to_string());
+                let field = TextField::new().with_value(self.edit_entry.text.to_string());
 
                 let area = jump_area.inner(&Margin { horizontal: 2, vertical: 1 });
                 frame.render_stateful_widget(field, area, &mut self.edit_state);
             }
             Mode::RequestQuit => {
-                let save_text = "Save changes? ";
+                let save_text = format!("{} ", get_text("icbtext_save_changes"));
                 let mut save_area = Rect::new(
                     area.x + (area.width - (save_text.len() as u16 + 10)) / 2,
                     area.y + (area.height - 3) / 2,
@@ -347,15 +453,28 @@ impl<'a> App<'a> {
 
                 let field = Line::from(vec![
                     Span::styled(save_text, Style::default().fg(DOS_LIGHT_GRAY)),
-                    Span::styled("Yes", Style::default().fg(if self.save { DOS_WHITE } else { DOS_DARK_GRAY })),
+                    Span::styled(get_text("yes"), Style::default().fg(if self.save { DOS_WHITE } else { DOS_DARK_GRAY })),
                     Span::styled("/", Style::default().fg(DOS_LIGHT_GRAY)),
-                    Span::styled("No", Style::default().fg(if !self.save { DOS_WHITE } else { DOS_DARK_GRAY })),
+                    Span::styled(get_text("no"), Style::default().fg(if !self.save { DOS_WHITE } else { DOS_DARK_GRAY })),
                 ]);
                 save_area.y += 1;
                 save_area.x += 1;
                 field.render(save_area.inner(&Margin { horizontal: 1, vertical: 0 }), frame.buffer_mut());
             }
             _ => {}
+        }
+    }
+
+    fn get_style_description(style: IcbTextStyle) -> String {
+        match style {
+            IcbTextStyle::Plain => get_text("icbtext_style_plain"),
+            IcbTextStyle::Red => get_text("icbtext_style_red"),
+            IcbTextStyle::Green => get_text("icbtext_style_green"),
+            IcbTextStyle::Yellow => get_text("icbtext_style_yellow"),
+            IcbTextStyle::Blue => get_text("icbtext_style_blue"),
+            IcbTextStyle::Purple => get_text("icbtext_style_purple"),
+            IcbTextStyle::Cyan => get_text("icbtext_style_cyan"),
+            IcbTextStyle::White => get_text("icbtext_style_white"),
         }
     }
 
@@ -384,6 +503,15 @@ impl<'a> App<'a> {
             .render(tabs, buf);
     }
 
+    fn render_filter_text(&self, area: Rect, buf: &mut Buffer) {
+        Line::from(get_text_args(
+            "icbtext_filter_text",
+            HashMap::from([("filter".to_string(), self.filter.to_string())]),
+        ))
+        .style(THEME.filter_text.bold())
+        .render(area, buf);
+    }
+
     fn render_selected_tab(&mut self, frame: &mut Frame, area: Rect) {
         Clear.render(area, frame.buffer_mut());
         self.get_tab_mut().render(frame, area);
@@ -391,13 +519,19 @@ impl<'a> App<'a> {
 
     fn render_key_help_view(&self, area: Rect, buf: &mut Buffer) {
         let keys = match self.mode {
-            Mode::RequestQuit => vec![("Enter", "Quit"), ("Q/Esc", "Back")],
+            Mode::RequestQuit => vec![("Enter", get_text("key_desc_quit")), ("Q/Esc", get_text("key_desc_back"))],
+            Mode::Edit => vec![
+                ("F2/F3", get_text("key_desc_next_prev_style")),
+                ("F4", get_text("key_desc_restore")),
+                ("Enter", get_text("key_desc_accept")),
+                ("Esc", get_text("key_desc_cancel")),
+            ],
             _ => vec![
-                ("F2", "Filter"),
-                ("F3", "Jump"),
-                ("F4", "Restore Default"),
-                ("Enter", "Edit"),
-                ("Q/Esc", "Quit"),
+                ("F2", get_text("key_desc_filter")),
+                ("F3", get_text("key_desc_jump")),
+                ("F4", get_text("key_desc_restore")),
+                ("Enter", get_text("key_desc_edit")),
+                ("Q/Esc", get_text("key_desc_quit")),
             ],
         };
         let spans = keys
@@ -444,7 +578,11 @@ impl TabPageType {
     }
 
     fn title(self) -> String {
-        format!(" {self} ")
+        let t = match self {
+            Self::Record => get_text("icbtext_tab_record"),
+            Self::About => get_text("icbtext_tab_about"),
+        };
+        format!(" {t} ")
     }
 }
 
