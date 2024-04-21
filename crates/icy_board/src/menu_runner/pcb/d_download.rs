@@ -40,7 +40,7 @@ impl PcbBoardCommand {
             return Ok(());
         }
 
-        let protocol_str = self.state.current_user.as_ref().unwrap().protocol.clone();
+        let protocol_str: String = self.state.current_user.as_ref().unwrap().protocol.clone();
         let mut protocol = None;
         if let Ok(board) = self.state.board.lock() {
             for p in &board.protocols.protocols {
@@ -102,8 +102,8 @@ impl PcbBoardCommand {
     }
 }
 
-struct BlockingConnection<'a> {
-    conn: &'a mut Box<dyn Connection>,
+pub struct BlockingConnection<'a> {
+    pub conn: &'a mut Box<dyn Connection>,
 }
 
 impl<'a> Connection for BlockingConnection<'a> {

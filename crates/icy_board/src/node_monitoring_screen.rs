@@ -173,6 +173,7 @@ impl NodeMonitoringScreen {
                             icy_board_engine::icy_board::state::UserActivity::ReadMessages => get_text("icbmoni_user_read_messages"),
                             icy_board_engine::icy_board::state::UserActivity::ReadBulletins => get_text("icbmoni_user_read_bulletins"),
                             icy_board_engine::icy_board::state::UserActivity::TakeSurvey => get_text("icbmoni_user_take_survey"),
+                            icy_board_engine::icy_board::state::UserActivity::UploadFiles => get_text("icbmoni_user_upload"),
                         };
                         Row::new(vec![
                             Cell::from(format!("{:<3}", i + 1)),

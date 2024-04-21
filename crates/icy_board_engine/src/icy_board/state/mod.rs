@@ -166,6 +166,7 @@ pub struct Session {
 
     // needed to copy that for new users.
     pub user_name: String,
+    pub alias_name: String,
     pub sysop_name: String,
 
     pub date_format: String,
@@ -212,6 +213,7 @@ impl Session {
             cancel_batch: false,
             use_fse: true,
             user_name: String::new(),
+            alias_name: String::new(),
             date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
             cursor_pos: Position::default(),
             language: String::new(),
@@ -221,6 +223,14 @@ impl Session {
 
             sysop_name: "SYSOP".to_string(),
             flagged_files: HashSet::new(),
+        }
+    }
+
+    pub fn get_username_or_alias(&self) -> String {
+        if self.use_alias && self.current_conference.allow_aliases {
+            self.alias_name.clone()
+        } else {
+            self.user_name.clone()
         }
     }
 
@@ -260,6 +270,7 @@ pub enum UserActivity {
     ReadBulletins,
     TakeSurvey,
     CommentToSysop,
+    UploadFiles,
 }
 
 pub struct NodeState {
@@ -623,6 +634,7 @@ impl IcyBoardState {
             self.session.cur_security = user.security_level;
             self.session.page_len = user.page_len;
             self.session.user_name = user.get_name().clone();
+            self.session.alias_name = user.alias.clone();
             self.session.use_fse = user.flags.use_fsedefault;
 
             self.current_user = Some(user);

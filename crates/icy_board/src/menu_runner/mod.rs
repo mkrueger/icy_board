@@ -160,6 +160,11 @@ impl PcbBoardCommand {
                 self.set_transfer_protocol(action)?;
             }
 
+            CommandType::UploadFile => {
+                // U
+                self.upload_file(action)?;
+            }
+
             CommandType::ViewSettings => {
                 // V
                 self.view_settings(action)?;

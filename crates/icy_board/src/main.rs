@@ -109,33 +109,30 @@ fn main() -> Res<()> {
 }
 
 pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) -> Res<()> {
-   
-
     match IcyBoard::load(config_file) {
         Ok(icy_board) => {
-            
             let log_file = icy_board.resolve_file(&icy_board.config.paths.log_file);
 
             fern::Dispatch::new()
-            // Perform allocation-free log formatting
-            .format(|out, message, record| {
-                out.finish(format_args!(
-                    "[{} {} {}] {}",
-                    Local::now().format("%Y-%m-%d %H:%M:%S"),
-                    record.level(),
-                    record.target(),
-                    message
-                ))
-            })
-            // Add blanket level filter -
-            .level(log::LevelFilter::Info)
-            // - and per-module overrides
-            .level_for("hyper", log::LevelFilter::Info)
-            // Output to stdout, files, and other Dispatch configurations
-            .chain(fern::log_file(&log_file).unwrap())
-            // Apply globally
-            .apply()
-            .unwrap();
+                // Perform allocation-free log formatting
+                .format(|out, message, record| {
+                    out.finish(format_args!(
+                        "[{} {} {}] {}",
+                        Local::now().format("%Y-%m-%d %H:%M:%S"),
+                        record.level(),
+                        record.target(),
+                        message
+                    ))
+                })
+                // Add blanket level filter -
+                .level(log::LevelFilter::Info)
+                // - and per-module overrides
+                .level_for("hyper", log::LevelFilter::Info)
+                // Output to stdout, files, and other Dispatch configurations
+                .chain(fern::log_file(&log_file).unwrap())
+                // Apply globally
+                .apply()
+                .unwrap();
 
             let mut bbs = Arc::new(Mutex::new(BBS::new(icy_board.config.board.num_nodes as usize)));
             let board = Arc::new(Mutex::new(icy_board));

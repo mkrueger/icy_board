@@ -43,6 +43,7 @@ icbmoni_user_browse_files = Browsing Files
 icbmoni_user_read_messages = Read Messages
 icbmoni_user_read_bulletins = Read Bulletins
 icbmoni_user_take_survey = Take Survey
+icbmoni_user_upload= Upload Files
 
 icbmoni_status_header = Status
 icbmoni_user_header = User
