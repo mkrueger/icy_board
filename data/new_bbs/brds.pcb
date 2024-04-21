@@ -1,0 +1,21 @@
+﻿@CLS@@X17╒ @X1ADate:          @X17═══════╤═══════╡ @X1AMain Menu @X17╞════╤══════════════ @X1ATime:       @X17╕
+│ @X16[@X1EJ@X16]@X1Foin a Conference   @X17│ @X16[@X1EQ@X16]@X1Fuick Message Scan   @X17│ @X16[@X1ETS@X16] @X1FText Search Msgs.    @X17│
+│ @X16[@X1EA@X16]@X1Fbandon Conference  @X17│ @X16[@X1E@@X16] @X1FRead E-Mail        @X17│ @X16[@X1EQWK@X16] @X1FTransfer QWK Mail   @X17│
+│ @X16[@X1ER@X16]@X1Fead Messages       @X17│ @X16[@X1E@W@X16] @X1FWrite E-Mail      @X17│ @X16[@X1ESELECT@X16] @X1Fconfs. to Scan   @X17│
+│ @X16[@X1EE@X16]@X1Fnter a Message     @X17│                        │ @X16[@X1EC@X16]@X1Fomment to SysOp        @X17│
+╞═══════════════════════╪════════════════════════╪═══════════════════════════╡
+│ @X16[@X1EF@X16]@X1File Directories    @X17│ @X16[@X1EL@X16]@X1Focate a Filename    @X17│ @X16[@X1ET@X16]@X1Fransfer Protocol       @X17│
+│ @X16[@X1ED@X16]@X1Fownload a File     @X17│ @X16[@X1EN@X16]@X1Few File Scan        @X17│ @X16[@X1EI@X16]@X1Fnitial Logon Screen    @X17│
+│ @X16[@X1EU@X16]@X1Fpload a File       @X17│ @X16[@X1EZ@X16]@X1Fippy Text Search    @X17│ @X16[@X1ETEST@X16] @X1FFile Online        @X17│
+╞═══════════════════════╪════════════════════════╪═══════════════════════════╡
+│ @X16[@X1EB@X16]@X1Fulletins           @X17│ @X16[@X1EG@X16]@X1Foodbye (Logoff)     @X17│ @X16[@X1EM@X16] @X1FToggle Color Mode     @X17│
+│ @X16[@X1ES@X16]@X1Furveys             @X17│ @X16[@X1EV@X16]@X1Fiew your statistics @X17│ @X16[@X1EX@X16]@X1Fpert Mode Toggle       @X17│
+│ @X16[@X1EO@X16] @X1FPage SysOp        @X17│ @X16[@X1EW@X16]@X1Frite account info   @X17│ @X16[@X1EP@X16]@X1Fage Length Setting     @X17│
+╞═══════════════════════╧════════════════════════╧═══════════════════════════╡
+│ @X16[@X1ECHAT@X16] @X1FWith Other Users                @X16[@X1EOPEN@X16] @X1FDoor                         @X17│
+│ @X16[@X1ENEWS@X16] @X1FDisplay System News             @X16[@X1EUSER@X16] @X1FList Conference Members      @X17│
+│ @X16[@X1EALIAS@X16] @X1FTurn Alias on/off              @X16[@X1ELANG@X16] @X1FChange Language              @X17│
+╞═════════════════════════════╡ @X1ASysop Commands @X17╞═════════════════════════════╡
+│ @X16[@X1E4@X16] @X1FRecover killed Message             @X16[@X1E11@X16] @X1FView Node Users                @X17│
+│ @X16[@X1E5@X16] @X1FList Message Headers               @X16[@X1E12@X16] @X1FLogoff Node                    @X17│
+╘════════════════════════════════════════════════════════════════════════════╛
