@@ -1,12 +1,10 @@
-use crate::Res;
+use crate::{menu_runner::PcbBoardCommand, Res};
 use icy_board_engine::icy_board::{
     bulletins::MASK_BULLETINS,
     commands::Command,
     icb_text::IceText,
     state::{functions::display_flags, UserActivity},
 };
-
-use super::PcbBoardCommand;
 
 impl PcbBoardCommand {
     pub fn show_bulletins(&mut self, action: &Command) -> Res<()> {

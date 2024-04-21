@@ -1,4 +1,4 @@
-use crate::Res;
+use crate::{menu_runner::PcbBoardCommand, Res};
 use icy_board_engine::{
     icy_board::{
         commands::Command,
@@ -8,8 +8,6 @@ use icy_board_engine::{
     },
     vm::TerminalTarget,
 };
-
-use super::PcbBoardCommand;
 
 impl PcbBoardCommand {
     pub fn set_transfer_protocol(&mut self, _action: &Command) -> Res<()> {

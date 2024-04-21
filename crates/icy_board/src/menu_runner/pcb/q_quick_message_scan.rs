@@ -1,5 +1,8 @@
-use super::{PcbBoardCommand, MASK_COMMAND};
-use crate::Res;
+use crate::{
+    menu_runner::{PcbBoardCommand, MASK_COMMAND},
+    Res,
+};
+
 use bstr::{BString, ByteSlice};
 use icy_board_engine::{
     icy_board::{

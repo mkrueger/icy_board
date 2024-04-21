@@ -3,7 +3,8 @@ use std::{
     io::Write,
 };
 
-use crate::Res;
+use crate::{menu_runner::PcbBoardCommand, Res};
+
 use chrono::Local;
 use icy_board_engine::{
     icy_board::{
@@ -19,8 +20,6 @@ use icy_board_engine::{
     },
     vm::TerminalTarget,
 };
-
-use super::PcbBoardCommand;
 
 impl PcbBoardCommand {
     pub fn take_survey(&mut self, action: &Command) -> Res<()> {

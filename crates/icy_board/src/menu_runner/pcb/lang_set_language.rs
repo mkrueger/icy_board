@@ -1,10 +1,11 @@
-use crate::Res;
+use crate::{
+    menu_runner::{PcbBoardCommand, MASK_NUMBER},
+    Res,
+};
 use icy_board_engine::{
     icy_board::{commands::Command, icb_config::IcbColor, icb_text::IceText, state::functions::display_flags, IcyBoardError},
     vm::TerminalTarget,
 };
-
-use super::{PcbBoardCommand, MASK_NUMBER};
 
 impl PcbBoardCommand {
     pub fn set_language(&mut self, _action: &Command) -> Res<()> {

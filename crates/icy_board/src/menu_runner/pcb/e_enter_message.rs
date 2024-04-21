@@ -1,6 +1,5 @@
-use super::PcbBoardCommand;
+use crate::{menu_runner::PcbBoardCommand, Res};
 
-use crate::Res;
 use icy_board_engine::icy_board::{
     commands::Command,
     icb_text::IceText,

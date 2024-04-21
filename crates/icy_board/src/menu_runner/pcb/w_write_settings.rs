@@ -1,3 +1,4 @@
+use crate::{menu_runner::PcbBoardCommand, Res};
 use icy_board_engine::{
     datetime::IcbDate,
     icy_board::{
@@ -5,10 +6,7 @@ use icy_board_engine::{
         icb_text::IceText,
         state::functions::{display_flags, MASK_ALNUM, MASK_PHONE, MASK_WEB},
     },
-    Res,
 };
-
-use super::PcbBoardCommand;
 
 impl PcbBoardCommand {
     pub fn write_settings(&mut self, _action: &Command) -> Res<()> {

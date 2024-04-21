@@ -1,7 +1,5 @@
-use crate::Res;
+use crate::{menu_runner::PcbBoardCommand, Res};
 use icy_board_engine::icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags};
-
-use super::PcbBoardCommand;
 
 impl PcbBoardCommand {
     pub fn toggle_alias(&mut self, _action: &Command) -> Res<()> {

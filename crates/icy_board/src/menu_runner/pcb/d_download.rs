@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use crate::Res;
+use crate::{menu_runner::PcbBoardCommand, Res};
 use icy_board_engine::{
     icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags, xfer_protocols::SendRecvCommand},
     vm::TerminalTarget,
@@ -14,8 +14,6 @@ use icy_net::{
     protocol::{Protocol, XYModemVariant, XYmodem, Zmodem},
     Connection,
 };
-
-use super::PcbBoardCommand;
 
 impl PcbBoardCommand {
     pub fn download(&mut self, _action: &Command) -> Res<()> {

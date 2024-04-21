@@ -1,4 +1,7 @@
-use crate::Res;
+use crate::{
+    menu_runner::{PcbBoardCommand, MASK_COMMAND},
+    Res,
+};
 use dizbase::file_base::{file_header::FileHeader, FileBase};
 use icy_board_engine::{
     icy_board::{
@@ -9,7 +12,7 @@ use icy_board_engine::{
     vm::TerminalTarget,
 };
 
-use super::{find_files::FileList, PcbBoardCommand, MASK_COMMAND};
+use super::l_find_files::FileList;
 
 impl PcbBoardCommand {
     pub fn show_file_directories(&mut self, action: &Command) -> Res<()> {

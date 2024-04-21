@@ -1,5 +1,5 @@
-use super::PcbBoardCommand;
-use crate::Res;
+use crate::{menu_runner::PcbBoardCommand, Res};
+
 use chrono::Datelike;
 use icy_board_engine::{
     icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags},

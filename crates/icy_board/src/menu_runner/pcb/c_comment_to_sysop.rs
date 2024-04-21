@@ -1,8 +1,7 @@
 use crate::mods::editor::{EditResult, EditState};
 
-use super::PcbBoardCommand;
+use crate::{menu_runner::PcbBoardCommand, Res};
 
-use crate::Res;
 use bstr::BString;
 use chrono::Utc;
 use icy_board_engine::{
