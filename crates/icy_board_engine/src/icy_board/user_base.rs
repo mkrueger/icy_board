@@ -103,7 +103,7 @@ pub struct PasswordInfo {
 pub struct UserStats {
     /// First date on
     #[serde(default)]
-    pub first_dt_on: DateTime<Utc>,
+    pub first_date_on: DateTime<Utc>,
 
     #[serde(default)]
     pub last_on: DateTime<Utc>,
@@ -524,7 +524,7 @@ impl User {
             date_last_dir_read: u.user.date_last_dir_read.to_utc_date_time(),
             language: String::new(),
             stats: UserStats {
-                first_dt_on: first_date_on.to_utc_date_time(),
+                first_date_on: first_date_on.to_utc_date_time(),
                 last_on: u.user.last_date_on.to_utc_date_time(),
                 num_times_on: u.user.num_times_on as u64,
                 messages_read: u.user.num_times_on as u64,
@@ -604,7 +604,7 @@ impl UserBase {
             let user: User = toml::from_str(&user_txt)?;
             self.users.push(user);
         }
-        self.users.sort_by(|a, b| a.stats.first_dt_on.cmp(&b.stats.first_dt_on));
+        self.users.sort_by(|a, b| a.stats.first_date_on.cmp(&b.stats.first_date_on));
 
         Ok(())
     }

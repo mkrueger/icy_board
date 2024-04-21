@@ -1,5 +1,12 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque}, fmt::Alignment, fs, io::{Read, Write}, path::{Path, PathBuf}, sync::{Arc, Mutex}, thread, time::Duration
+    collections::{HashMap, HashSet, VecDeque},
+    fmt::Alignment,
+    fs,
+    io::{Read, Write},
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+    thread,
+    time::Duration,
 };
 
 use crate::{executable::Executable, Res};
@@ -698,11 +705,10 @@ impl IcyBoardState {
             if let Some(result) = self.find_file_with_extension(&lang_file) {
                 return Some(result);
             }
-
         }
         self.find_file_with_extension(&base_name)
     }
-    
+
     fn find_file_with_extension(&self, lang_file: &String) -> Option<PathBuf> {
         let file = PathBuf::from(lang_file.clone() + ".pcb");
         if file.exists() {
@@ -716,7 +722,7 @@ impl IcyBoardState {
         if file.exists() {
             return Some(file);
         }
-        
+
         let file = PathBuf::from(lang_file);
         if file.exists() {
             return Some(file);

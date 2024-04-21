@@ -1015,8 +1015,25 @@ impl PCBoardImporter {
             let name = new_entry.file_name().unwrap().to_str().unwrap().to_string().to_ascii_lowercase();
             let new_name = format!("{}/{}", output, &name);
             match self.convert_display_file(new_entry.to_str().unwrap(), &new_name) {
-                Ok(new_name) => {
-                    entry.question_file = new_name;
+                Ok(new_rel_name) => {
+                    // Add a separator line after the first 5 lines of the question file
+                    if new_rel_name.extension().unwrap_or_default().to_string_lossy() != "ppe" {
+                        let full_path = self.output_directory.join(&new_rel_name);
+                        if let Ok(str) = fs::read_to_string(&full_path) {
+                            let mut out = String::new();
+                            for (i, line) in str.lines().enumerate() {
+                                if i == 5 {
+                                    out.push_str("**************************************************************");
+                                    out.push('\n');
+                                }
+                                out.push_str(line);
+                                out.push('\n');
+                            }
+                            fs::write(&full_path, out)?;
+                        }
+                    }
+
+                    entry.question_file = new_rel_name;
                 }
                 Err(err) => {
                     self.logger.log_boxed_error(&*err);

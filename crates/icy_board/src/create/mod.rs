@@ -76,7 +76,6 @@ impl IcyBoardCreator {
         config.paths.protocol_data_file = PathBuf::from("config/protocols.toml");
         generate_protocol_data(&self.destination.join(&config.paths.protocol_data_file))?;
 
-
         self.logger.start_action("Write security data files…".to_string());
         config.paths.pwrd_sec_level_file = PathBuf::from("config/security_levels.toml");
         generate_security_level_data(&self.destination.join(&config.paths.pwrd_sec_level_file))?;
@@ -156,15 +155,17 @@ impl IcyBoardCreator {
 
         self.logger.start_action("Create default user (SYSOP)".to_string());
 
-        let user = User {
+        let mut user = User {
             name: "SYSOP".to_string(),
             password: PasswordInfo {
                 password: Password::PlainText("".to_string()),
                 ..Default::default()
             },
+            page_len: 23,
             security_level: 110,
             ..Default::default()
         };
+        user.stats.first_date_on = chrono::Utc::now();
         let mut user_base = UserBase::default();
         user_base.new_user(user);
         user_base.save_users(&self.destination.join(&config.paths.home_dir))?;
@@ -190,7 +191,6 @@ impl IcyBoardCreator {
         conf.pub_upload_location = PathBuf::from("conferences/main/upload");
         fs::create_dir_all(&self.destination.join(&conf.pub_upload_location))?;
         conf.pub_upload_dir_file = PathBuf::from("conferences/main/upload.dir");
-
 
         self.logger.start_action("Write user & sysop menus…".to_string());
         conf.users_menu = PathBuf::from("conferences/main/brdm");
@@ -281,6 +281,7 @@ impl IcyBoardCreator {
             ..Default::default()
         };
         fs::create_dir_all(&self.destination.join(&fd.path))?;
+        dizbase::file_base::FileBase::create(&self.destination.join(&fd.file_base))?;
         list.push(fd);
         list.save(&self.destination.join(&conf.dir_file))?;
 
@@ -301,7 +302,7 @@ impl IcyBoardCreator {
         fs::create_dir_all(&self.destination.join("conferences/main/messages"))?;
         list.push(fd);
         list.save(&self.destination.join(&conf.area_file))?;
-        // Note: Messagebase itself is created by the bbs itself - like the file base
+        // Note: Messagebase itself is created by the bbs itself
 
         self.logger.start_action("Write conference…".to_string());
         let mut base = ConferenceBase::default();

@@ -118,7 +118,12 @@ impl PcbBoardCommand {
             Ok(question) => {
                 let lines: Vec<&str> = question.lines().collect();
                 self.state.reset_color()?;
-                for line in &lines[0..5] {
+                let mut start_line = 0;
+                for line in &lines {
+                    start_line += 1;
+                    if line.starts_with("*****") {
+                        break;
+                    }
                     self.state.print(icy_board_engine::vm::TerminalTarget::Both, line)?;
                     self.state.new_line()?;
                 }
@@ -131,7 +136,7 @@ impl PcbBoardCommand {
                     display_flags::YESNO | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::UPCASE,
                 )?;
                 if txt.starts_with(self.state.session.yes_char) {
-                    for question in &lines[5..] {
+                    for question in &lines[start_line..] {
                         self.state.set_color(TerminalTarget::Both, IcbColor::Dos(14))?;
                         self.state.print(TerminalTarget::Both, question)?;
                         self.state.new_line()?;

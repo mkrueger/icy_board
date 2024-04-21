@@ -133,7 +133,7 @@ impl PcbBoardCommand {
         let mut new_user = User::default();
         let settings = self.state.board.lock().unwrap().config.new_user_settings.clone();
         new_user.security_level = settings.sec_level;
-        new_user.stats.first_dt_on = Utc::now();
+        new_user.stats.first_date_on = Utc::now();
         new_user.set_name(self.state.session.user_name.clone());
         loop {
             tries += 1;

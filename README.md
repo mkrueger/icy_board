@@ -71,9 +71,10 @@ Leading & traling whitespaces are ignored
   * security level
   * group (like unix groups)
   * age 
-* Added more trashcans: bad_email, bad_passwords
+* Added more trashcans: email/passwords
 * New 'vip' users vip_users.txt (same as trashcan). But a list of users which the sysop gets a notification for logon (from RemoteAccess)
-* 
+* Surveys (questionnaires) header can now have a different header length than 5 lines
+Header is separated from questions with a line starting by "*****". Note that the pcb importer inserts a "*****" line after the 5th during import.
 
 ### Planned Enhancements/Discussion 
 
