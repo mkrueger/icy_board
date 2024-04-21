@@ -884,6 +884,9 @@ impl IcyBoardState {
                     PcbState::GotAt => {
                         if *c == 'X' || *c == 'x' {
                             state = PcbState::ReadColor1;
+                        } else if *c == '@' {
+                            self.write_chars(target, &[*c])?;
+                            state = PcbState::GotAt;
                         } else {
                             state = PcbState::ReadAtSequence(c.to_string());
                         }
@@ -895,8 +898,14 @@ impl IcyBoardState {
                             state = PcbState::Default;
                         } else if *c == '@' {
                             state = PcbState::Default;
-                            if let Some(s) = self.translate_variable(target, &s) {
-                                self.write_chars(target, s.chars().collect::<Vec<char>>().as_slice())?;
+                            if let Some(output) = self.translate_variable(target, &s) {
+                                if output.len() == 0 {
+                                    self.write_chars(target, &['@'])?;
+                                    self.write_chars(target, s.chars().collect::<Vec<char>>().as_slice())?;
+                                    state = PcbState::GotAt;
+                                } else {
+                                    self.write_chars(target, output.chars().collect::<Vec<char>>().as_slice())?;
+                                }
                             }
                         } else {
                             state = PcbState::ReadAtSequence(s + &c.to_string());
