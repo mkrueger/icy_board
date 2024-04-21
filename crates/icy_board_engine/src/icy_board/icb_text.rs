@@ -867,7 +867,7 @@ pub enum IceText {
     /// `Msgs From You:~`
     MessagesFromYou = 423,
     /// `(H)elp, (@OPTEXT@), Message Scan Command`
-    MessagesCanCommand = 424,
+    MessageScanCommand = 424,
     /// `(H)elp, (@OPTEXT@), Message Read Command`
     MessageReadCommand = 425,
     /// `No message number has been memorized!`
@@ -1245,7 +1245,7 @@ pub enum IceText {
     /// `(@TIMELEFT@ min left), (H)elp, End of Message Command`
     EndOfMessageExpertmode = 612,
     /// `(H)elp, (@OPTEXT@), Message Scan Command`
-    MessagesCanCommandExpertmode = 613,
+    MessageScanCommandExpertmode = 613,
     /// `(maximum per-conference limit reached)`
     MaxMessagesPerConference = 614,
     /// `(maximum message limit reached)`

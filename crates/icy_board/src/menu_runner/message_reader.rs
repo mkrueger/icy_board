@@ -245,6 +245,10 @@ impl PcbBoardCommand {
             self.display_menu = true;
             return Ok(());
         };
+        self.read_messages_in_area(area, action)
+    }
+
+    fn read_messages_in_area(&mut self, area: usize, action: &Command) -> Res<()> {
         let message_base_file = &self.state.session.current_conference.areas[area].filename;
         let msgbase_file_resolved = self.state.board.lock().unwrap().resolve_file(message_base_file);
         match JamMessageBase::open(&msgbase_file_resolved) {
@@ -259,7 +263,7 @@ impl PcbBoardCommand {
                     .display_text(IceText::CreatingNewMessageIndex, display_flags::NEWLINE | display_flags::LFAFTER)?;
                 if JamMessageBase::create(msgbase_file_resolved).is_ok() {
                     log::error!("successfully created new message index.");
-                    return self.read_messages(action);
+                    return self.read_messages_in_area(area, action);
                 }
                 log::error!("failed to create message index.");
 
@@ -280,7 +284,7 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    fn read_msgs_from_base(&mut self, message_base: JamMessageBase, action: &Command) -> Res<()> {
+    pub fn read_msgs_from_base(&mut self, message_base: JamMessageBase, action: &Command) -> Res<()> {
         let viewer = MessageViewer::load(&self.state.display_text)?;
 
         while !self.state.session.disp_options.abort_printout {

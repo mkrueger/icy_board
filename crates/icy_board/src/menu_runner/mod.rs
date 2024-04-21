@@ -20,6 +20,7 @@ mod enter_message;
 mod find_files;
 mod login;
 mod message_reader;
+mod quick_message_scan;
 mod recover_message;
 mod set_language;
 mod set_transfer_protocol;
@@ -169,6 +170,10 @@ impl PcbBoardCommand {
             CommandType::SetPageLength => {
                 // P
                 self.set_page_len(action)?;
+            }
+            CommandType::QuickMessageScan => {
+                // Q
+                self.quick_message_scan(action)?;
             }
             CommandType::ReadMessages => {
                 // R

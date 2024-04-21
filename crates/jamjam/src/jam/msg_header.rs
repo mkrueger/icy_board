@@ -261,6 +261,22 @@ impl JamMessageHeader {
     pub fn is_deleted(&self) -> bool {
         self.attributes & attributes::MSG_DELETED != 0
     }
+
+    pub fn is_locked(&self) -> bool {
+        self.attributes & attributes::MSG_LOCKED != 0
+    }
+
+    pub fn is_private(&self) -> bool {
+        self.attributes & attributes::MSG_PRIVATE != 0
+    }
+
+    pub fn is_read(&self) -> bool {
+        self.attributes & attributes::MSG_READ != 0
+    }
+
+    pub fn is_receipt_req(&self) -> bool {
+        self.attributes & attributes::MSG_RECEIPTREQ != 0
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

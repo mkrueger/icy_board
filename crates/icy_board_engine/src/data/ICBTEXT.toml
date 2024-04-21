@@ -1645,7 +1645,7 @@ style = "Yellow"
 text = " Msgs From You:~"
 style = "Yellow"
 
-[MessagesCanCommand]
+[MessageScanCommand]
 text = "(H)elp, (@OPTEXT@), Message Scan Command"
 style = "Yellow"
 
@@ -2335,7 +2335,7 @@ style = "Yellow"
 text = "(@TIMELEFT@ min left), (H)elp, End of Message Command"
 style = "Green"
 
-[MessagesCanCommandExpertmode]
+[MessageScanCommandExpertmode]
 text = "(H)elp, (@OPTEXT@), Message Scan Command"
 style = "Yellow"
 

@@ -162,7 +162,7 @@ impl ConferenceBase {
             std::fs::create_dir_all(&destination).unwrap();
 
             let areas = AreaList::new(vec![general_area]);
-            areas.save(&destination.join(&"messages.toml")).unwrap();
+            areas.save(&destination.join(&"area.toml")).unwrap();
 
             let new = Conference {
                 name: c.name.clone(),
@@ -201,8 +201,8 @@ impl ConferenceBase {
                 survey_file: PathBuf::from(&c.script_file),
                 dir_menu: PathBuf::from(&c.dir_menu),
                 dir_file: PathBuf::from(&c.dir_file),
-                area_menu: PathBuf::from("messages"),
-                area_file: PathBuf::from("messages.toml"),
+                area_menu: PathBuf::from("area"),
+                area_file: PathBuf::from("area.toml"),
                 areas: AreaList::default(),
                 directories: DirectoryList::default(),
             };
