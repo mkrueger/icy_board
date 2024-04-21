@@ -1,5 +1,3 @@
-use std::fs;
-
 use crate::Res;
 use icy_board_engine::{
     icy_board::{
@@ -7,7 +5,6 @@ use icy_board_engine::{
         icb_text::IceText,
         security::RequiredSecurity,
         state::{functions::display_flags, IcyBoardState, UserActivity},
-        user_base::UserBase,
         IcyBoardError,
     },
     vm::TerminalTarget,
@@ -16,8 +13,8 @@ use jamjam::jam::{JamMessage, JamMessageBase};
 
 mod login;
 mod message_reader;
+mod new;
 mod pcb;
-mod recover_message;
 
 pub struct PcbBoardCommand {
     pub state: IcyBoardState,
@@ -210,7 +207,7 @@ impl PcbBoardCommand {
             }
 
             CommandType::ReadEmail => {
-                // R
+                // @
                 self.read_email(action)?;
             }
 
@@ -274,36 +271,6 @@ impl PcbBoardCommand {
         }
 
         Ok(false)
-    }
-
-    fn get_email_msgbase(&mut self, user_name: &str) -> Res<JamMessageBase> {
-        let home_dir = if let Ok(board) = self.state.board.lock() {
-            let name = if user_name == self.state.session.sysop_name {
-                &board.users[0].get_name()
-            } else {
-                user_name
-            };
-            let home_dir = UserBase::get_user_home_dir(&self.state.resolve_path(&board.config.paths.home_dir), name);
-            home_dir
-        } else {
-            return Err(IcyBoardError::ErrorLockingBoard.into());
-        };
-
-        if !home_dir.exists() {
-            log::error!("Homedir for user {} does not exist", user_name);
-            self.state.display_text(IceText::MessageBaseError, display_flags::NEWLINE)?;
-            return Err(IcyBoardError::HomeDirMissing(user_name.to_string()).into());
-        }
-
-        let msg_dir = home_dir.join("msg");
-        fs::create_dir_all(&msg_dir)?;
-        let msg_base = msg_dir.join("email");
-        Ok(if msg_base.with_extension("jhr").exists() {
-            JamMessageBase::open(msg_base)?
-        } else {
-            log::info!("Creating new email message base for user {}", user_name);
-            JamMessageBase::create(msg_base)?
-        })
     }
 
     fn send_message(&mut self, conf: i32, area: i32, msg: JamMessage, text: IceText) -> Res<()> {

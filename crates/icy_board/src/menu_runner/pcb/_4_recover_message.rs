@@ -1,11 +1,12 @@
-use crate::Res;
+use crate::{
+    menu_runner::{PcbBoardCommand, MASK_COMMAND},
+    Res,
+};
 use icy_board_engine::{
     icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
 };
 use jamjam::jam::JamMessageBase;
-
-use super::{PcbBoardCommand, MASK_COMMAND};
 
 impl PcbBoardCommand {
     pub fn restore_message(&mut self, action: &Command) -> Res<()> {

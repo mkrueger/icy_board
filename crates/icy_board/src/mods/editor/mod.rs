@@ -410,6 +410,7 @@ impl EditState {
             }
         }
     }
+
     fn redraw_fse(&mut self, state: &mut IcyBoardState) -> Res<()> {
         state.clear_screen()?;
         self.msg_header(state)?;

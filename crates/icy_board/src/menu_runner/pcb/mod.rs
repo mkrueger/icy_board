@@ -1,3 +1,4 @@
+pub mod _4_recover_message;
 pub mod a_abandon_conference;
 pub mod alias_toggle_alias;
 pub mod b_show_bulletins;

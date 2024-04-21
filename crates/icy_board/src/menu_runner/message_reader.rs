@@ -277,13 +277,6 @@ impl PcbBoardCommand {
         }
     }
 
-    pub fn read_email(&mut self, action: &Command) -> Res<()> {
-        let name = self.state.session.user_name.to_string();
-        let msg_base = self.get_email_msgbase(&name)?;
-        self.read_msgs_from_base(msg_base, action)?;
-        Ok(())
-    }
-
     pub fn read_msgs_from_base(&mut self, message_base: JamMessageBase, action: &Command) -> Res<()> {
         let viewer = MessageViewer::load(&self.state.display_text)?;
 
