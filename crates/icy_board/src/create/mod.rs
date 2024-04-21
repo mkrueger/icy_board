@@ -107,23 +107,23 @@ impl IcyBoardCreator {
         )?;
         config.paths.closed = PathBuf::from("art/closed");
         fs::write(
-            &self.destination.join(&config.paths.newuser).with_extension("pcb"),
+            &self.destination.join(&config.paths.closed).with_extension("pcb"),
             include_str!("../../data/new_bbs/closed.pcb"),
         )?;
 
         config.paths.expire_warning = PathBuf::from("art/exp_warning");
         fs::write(
-            &self.destination.join(&config.paths.newuser).with_extension("pcb"),
+            &self.destination.join(&config.paths.expire_warning).with_extension("pcb"),
             include_str!("../../data/new_bbs/warning.pcb"),
         )?;
         config.paths.expired = PathBuf::from("art/expired");
         fs::write(
-            &self.destination.join(&config.paths.newuser).with_extension("pcb"),
+            &self.destination.join(&config.paths.expired).with_extension("pcb"),
             include_str!("../../data/new_bbs/expired.pcb"),
         )?;
         config.paths.no_ansi = PathBuf::from("art/noansi");
         fs::write(
-            &self.destination.join(&config.paths.newuser).with_extension("asc"),
+            &self.destination.join(&config.paths.no_ansi).with_extension("asc"),
             include_str!("../../data/new_bbs/noansi.asc"),
         )?;
 

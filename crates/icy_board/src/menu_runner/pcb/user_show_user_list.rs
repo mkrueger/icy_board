@@ -27,6 +27,7 @@ impl PcbBoardCommand {
             .display_text(IceText::UsersHeader, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::NOTBLANK)?;
         self.state.display_text(IceText::UserScanLine, display_flags::NOTBLANK)?;
         self.state.reset_color()?;
+        self.state.new_line()?;
         let mut output = String::new();
         for u in self.state.board.lock().unwrap().users.iter() {
             if text.is_empty() || u.get_name().to_ascii_uppercase().contains(&text.to_ascii_uppercase()) {

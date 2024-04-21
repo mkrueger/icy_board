@@ -20,6 +20,8 @@ impl PcbBoardCommand {
             self.state.reset_color()?;
         }
 
+        self.state.new_line()?;
+        
         self.state.display_text(IceText::ViewSettingsLastDateOne, display_flags::DEFAULT)?;
         self.state.println(TerminalTarget::Both, &self.state.format_date(user.stats.last_on))?;
         self.state.reset_color()?;
