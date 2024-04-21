@@ -27,6 +27,7 @@ mod set_transfer_protocol;
 mod show_bulletins;
 mod show_file_directories;
 mod take_survey;
+mod toggle_alias;
 mod write_settings;
 
 pub struct PcbBoardCommand {
@@ -219,6 +220,10 @@ impl PcbBoardCommand {
             CommandType::SetLanguage => {
                 // LANG
                 self.set_language(action)?;
+            }
+            CommandType::EnableAlias => {
+                // ALIAS
+                self.toggle_alias(action)?;
             }
 
             CommandType::RestoreMessage => {
@@ -453,7 +458,7 @@ impl PcbBoardCommand {
             } else {
                 IceText::GraphicsOn
             };
-            self.state.display_text(msg, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+            self.state.display_text(msg, display_flags::NEWLINE | display_flags::LFAFTER)?;
         }
         self.state.press_enter()?;
         self.display_menu = true;

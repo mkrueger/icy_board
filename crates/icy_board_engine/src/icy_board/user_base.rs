@@ -224,6 +224,10 @@ pub struct UserFlags {
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub use_graphics: bool,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    pub use_alias: bool,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -511,6 +515,7 @@ impl User {
                 delete_flag: u.user.delete_flag,
                 use_graphics: true,
                 disabled_flag: false,
+                use_alias: false,
             },
             protocol: u.user.protocol.to_string(),
             page_len: u.user.page_len as u16,

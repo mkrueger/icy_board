@@ -923,6 +923,9 @@ impl IcyBoardState {
                 if let Some(user) = &self.current_user {
                     result = user.alias.to_string();
                 }
+                if result.is_empty() {
+                    result = self.session.get_first_name();
+                }
             }
             "AUTOMORE" => {
                 self.session.disp_options.auto_more = true;

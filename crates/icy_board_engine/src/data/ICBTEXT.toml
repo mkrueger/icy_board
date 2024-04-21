@@ -2882,6 +2882,16 @@ style = "Yellow"
 text = "Enter node # or Handle"
 style = "Yellow"
 
+# IcyBoard Messages begin here
+
+[AliasOn]
+text = "Alias mode is now on, @ALIAS@ ..."
+style = "White"
+
+[AliasOff]
+text = "Alias mode is now off, @FIRST@ ..."
+style = "White"
+
 [MessagesConfArea]
 text = "Conf:                                 Area:"
 style = "Yellow"

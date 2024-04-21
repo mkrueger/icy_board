@@ -1525,21 +1525,29 @@ pub enum IceText {
     /// `Enter node # or Handle`
     EnterNode = 752,
 
+    // NEW TEXT
+    /// `Alias mode is now on, @FIRST@ ...`
+    AliasOn = 753,
+    /// `Alias mode is now off, @FIRST@ ...`
+    AliasOff = 754,
+
     /// `Conf:                                 Area:`
-    MessagesConfArea = 753,
+    MessagesConfArea = 755,
 
     /// `Date Format Desired (Enter)=no change`
-    DateFormatDesired = 754,
+    DateFormatDesired = 756,
 
     /// `Sorry, @FIRST@, no Areas are presently available.`
-    NoAreasAvailable = 755,
+    NoAreasAvailable = 757,
+
     /// `(H)elp, (1-@NUMDIR@), File List Command`
-    AreaListCommand = 756,
+    AreaListCommand = 758,
+
     /// `(H)elp, (1-@NUMDIR@), File List Command`
-    AreaListCommandExpert = 757,
+    AreaListCommandExpert = 759,
 }
 
-const LAST_ENTRY: usize = 757;
+const LAST_ENTRY: usize = 759;
 
 impl IceText {
     pub fn from(i: usize) -> Self {

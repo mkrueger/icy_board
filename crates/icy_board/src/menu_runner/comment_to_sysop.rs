@@ -4,7 +4,7 @@ use super::PcbBoardCommand;
 
 use crate::Res;
 use bstr::BString;
-use chrono::{format, Utc};
+use chrono::Utc;
 use icy_board_engine::{
     datetime::IcbTime,
     icy_board::{
