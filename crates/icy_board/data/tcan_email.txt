@@ -1,4 +1,4 @@
-# bad_email.txt
-# ------------
+# tcan_email.txt
+# --------------
 # This file contains a list of banned e_mails.
 #

@@ -96,9 +96,6 @@ pub struct IcyBoard {
     pub conferences: ConferenceBase,
     pub default_display_text: IcbTextFile,
 
-    // TODO: proper board statistics.
-    pub num_callers: usize,
-
     pub languages: SupportedLanguages,
     pub protocols: SupportedProtocols,
     pub sec_levels: SecurityLevelDefinitions,
@@ -118,7 +115,6 @@ impl IcyBoard {
             users: UserBase::default(),
             config: IcbConfig::new(),
             conferences: ConferenceBase::default(),
-            num_callers: 0,
             languages: SupportedLanguages::default(),
             protocols: SupportedProtocols::default(),
             sec_levels: SecurityLevelDefinitions::default(),
@@ -218,7 +214,6 @@ impl IcyBoard {
         let mut board = IcyBoard {
             file_name: path.as_ref().to_path_buf(),
             root_path: parent_path.to_path_buf(),
-            num_callers: 0,
             users,
             config,
             conferences,

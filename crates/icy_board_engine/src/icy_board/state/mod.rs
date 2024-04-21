@@ -1,11 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    fs,
-    io::{Read, Write},
-    path::{Path, PathBuf},
-    sync::{Arc, Mutex},
-    thread,
-    time::Duration,
+    collections::{HashMap, HashSet, VecDeque}, fmt::Alignment, fs, io::{Read, Write}, path::{Path, PathBuf}, sync::{Arc, Mutex}, thread, time::Duration
 };
 
 use crate::{executable::Executable, Res};
@@ -700,15 +694,34 @@ impl IcyBoardState {
 
     fn find_more_specific_file_with_language(&self, base_name: String) -> Option<PathBuf> {
         if !self.session.language.is_empty() {
-            let lang_file = PathBuf::from(&base_name).with_extension(format!("{}", self.session.language));
-            if lang_file.exists() {
-                return Some(lang_file);
+            let lang_file = base_name.clone() + "." + &self.session.language;
+            if let Some(result) = self.find_file_with_extension(&lang_file) {
+                return Some(result);
             }
+
         }
-        let lang_file = PathBuf::from(base_name);
-        if lang_file.exists() {
-            return Some(lang_file);
+        self.find_file_with_extension(&base_name)
+    }
+    
+    fn find_file_with_extension(&self, lang_file: &String) -> Option<PathBuf> {
+        let file = PathBuf::from(lang_file.clone() + ".pcb");
+        if file.exists() {
+            return Some(file);
         }
+        let file = PathBuf::from(lang_file.clone() + ".ans");
+        if file.exists() {
+            return Some(file);
+        }
+        let file = PathBuf::from(lang_file.clone() + ".asc");
+        if file.exists() {
+            return Some(file);
+        }
+        
+        let file = PathBuf::from(lang_file);
+        if file.exists() {
+            return Some(file);
+        }
+
         None
     }
 }
@@ -1054,7 +1067,7 @@ impl IcyBoardState {
                 }
             }
             "NUMCALLS" => {
-                result = self.board.lock().unwrap().num_callers.to_string();
+                result = self.board.lock().unwrap().statistics.total.calls.to_string();
             }
             "NUMCONF" => result = self.board.lock().unwrap().conferences.len().to_string(),
             "NUMDIR" => {
@@ -1169,10 +1182,38 @@ impl IcyBoardState {
             }
         }
 
-        if let Some(param) = param {
+        if let Some(mut param) = param {
+            let mut alignment = Alignment::Left;
+            if param.ends_with("C") || param.ends_with("c") {
+                alignment = Alignment::Center;
+                param = &param[..param.len() - 1];
+            } else if param.ends_with("R") || param.ends_with("r") {
+                alignment = Alignment::Right;
+                param = &param[..param.len() - 1];
+            }
             if let Ok(i) = param.parse::<usize>() {
-                while result.chars().count() < i {
-                    result.push(' ');
+                match alignment {
+                    Alignment::Left => {
+                        while result.chars().count() < i {
+                            result.push(' ');
+                        }
+                    }
+                    Alignment::Center => {
+                        let len = result.chars().count();
+                        let spaces = (i - len) / 2;
+                        for _ in 0..spaces {
+                            result.insert(0, ' ');
+                        }
+                        while result.chars().count() < i {
+                            result.push(' ');
+                        }
+                    }
+                    Alignment::Right => {
+                        let len = result.chars().count();
+                        while result.chars().count() < i - len {
+                            result.insert(0, ' ');
+                        }
+                    }
                 }
             }
         }

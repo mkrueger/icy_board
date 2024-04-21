@@ -1,6 +1,6 @@
 use std::{
     ops::{Deref, DerefMut},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use crate::{tables::import_cp437_string, Res};
@@ -15,6 +15,15 @@ pub struct Bullettin {
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_8")]
     pub required_security: u8,
+}
+
+impl Bullettin {
+    pub fn new(file: &Path) -> Self {
+        Self {
+            file: file.to_path_buf(),
+            required_security: 0,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Default)]

@@ -10,6 +10,7 @@ use bbs::{await_telnet_connections, BBS};
 use call_wait_screen::{CallWaitMessage, CallWaitScreen};
 use chrono::Local;
 use clap::{Parser, Subcommand};
+use create::IcyBoardCreator;
 use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, Clear, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
@@ -29,6 +30,7 @@ use tui::{print_exit_screen, Tui};
 
 mod bbs;
 mod call_wait_screen;
+mod create;
 mod icy_engine_output;
 mod import;
 pub mod menu_runner;
@@ -48,11 +50,12 @@ enum Commands {
     /// Import PCBDAT.DAT file to IcyBoard
     Import {
         /// PCBOARD.DAT file to import
-        name: String,
+        name: PathBuf,
         /// Output directory
-        out: String,
+        out: PathBuf,
     },
-
+    /// Creates a new IcyBoard configuration
+    Create { destination: PathBuf },
     Run {
         /// PCBOARD.DAT file to run
         file: String,
@@ -84,6 +87,18 @@ fn main() -> Res<()> {
                 Err(e) => {
                     print_error(e.to_string());
                 }
+            }
+        }
+        Commands::Create { destination } => {
+            if destination.exists() {
+                print_error("Destination already exists".to_string());
+                process::exit(1);
+            }
+            let mut creator = IcyBoardCreator::new(destination);
+
+            if let Err(err) = creator.create() {
+                print_error(err.to_string());
+                process::exit(1);
             }
         }
         Commands::Run { file } => {

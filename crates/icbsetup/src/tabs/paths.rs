@@ -105,7 +105,7 @@ impl PathTab {
                 ListItem::new(
                     "pwrd_sec",
                     "User Trashcan File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.bad_users.clone()),
+                    ListValue::Path(25, icy_board.config.paths.trashcan_user.clone()),
                 )
                 .with_status("Name/Location of User Trashcan File"),
             ),
@@ -113,7 +113,7 @@ impl PathTab {
                 ListItem::new(
                     "pwrd_sec",
                     "Password Trashcan File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.bad_passwords.clone()),
+                    ListValue::Path(25, icy_board.config.paths.trashcan_passwords.clone()),
                 )
                 .with_status("Name/Location of Password Trashcan File"),
             ),
@@ -121,7 +121,7 @@ impl PathTab {
                 ListItem::new(
                     "pwrd_sec",
                     "EMail Trashcan File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.bad_email.clone()),
+                    ListValue::Path(25, icy_board.config.paths.trashcan_email.clone()),
                 )
                 .with_status("Name/Location of EMail Trashcan File"),
             ),

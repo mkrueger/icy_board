@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use crate::Res;
 use qfile::{QFilePath, QTraitSync};
@@ -41,7 +44,7 @@ impl PcbUser {
 }
 
 pub struct PcbBoard {
-    pub file_name: String,
+    pub file_name: PathBuf,
     pub users: Vec<PcbUser>,
     pub data: PcbBoardData,
     pub conferences: Vec<PcbConferenceHeader>,
@@ -63,7 +66,7 @@ impl PcbBoard {
         let paths = HashMap::new();
 
         PcbBoard {
-            file_name: String::new(),
+            file_name: PathBuf::new(),
             num_callers: 0,
             users,
             data,
@@ -97,7 +100,7 @@ impl PcbBoard {
         s
     }
 
-    pub fn load(file: &str) -> Res<PcbBoard> {
+    pub fn load(file: &Path) -> Res<PcbBoard> {
         let data = PcbBoardData::import_pcboard(file)?;
         let users = Vec::new();
         let conferences = Vec::new();
@@ -123,7 +126,7 @@ impl PcbBoard {
         let v = file_path.parent().unwrap().to_path_buf().to_str().unwrap().to_string();
         paths.insert(k, v);
         let mut res = PcbBoard {
-            file_name: file.to_string(),
+            file_name: file.to_path_buf(),
             num_callers: 0,
             users,
             data,

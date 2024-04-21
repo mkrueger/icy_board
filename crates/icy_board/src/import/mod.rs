@@ -26,6 +26,7 @@ use icy_board_engine::icy_board::{
     pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader},
     pcboard_data::PcbBoardData,
     read_with_encoding_detection,
+    sec_levels::SecurityLevelDefinitions,
     state::functions::PPECall,
     statistics::Statistics,
     surveys::SurveyList,
@@ -69,7 +70,7 @@ pub struct PCBoardImporter {
 }
 
 impl PCBoardImporter {
-    pub fn new(file_name: &str, output: Box<dyn OutputLogger>, output_directory: PathBuf) -> Res<Self> {
+    pub fn new(file_name: &Path, output: Box<dyn OutputLogger>, output_directory: PathBuf) -> Res<Self> {
         match PcbBoardData::import_pcboard(file_name) {
             Ok(data) => {
                 let mut paths = HashMap::new();
@@ -171,10 +172,10 @@ impl PCBoardImporter {
         })?;
 
         let icbtext = self.convert_pcbtext(&(self.data.path.text_loc.clone() + "/PCBTEXT"), "config/icbtext")?;
-        let bad_users = self.convert_trashcan(&self.data.path.tcan_file.clone(), "config/bad_users.txt")?;
+        let bad_users = self.convert_trashcan(&self.data.path.tcan_file.clone(), "config/tcan_user.txt")?;
 
-        let bad_email = self.create_file(include_str!("../../data/bad_email.txt"), "config/bad_email.txt")?;
-        let bad_passwords = self.create_file(include_str!("../../data/bad_passwords.txt"), "config/bad_passwords.txt")?;
+        let tcan_email = self.create_file(include_str!("../../data/tcan_email.txt"), "config/tcan_email.txt")?;
+        let tcan_passwords = self.create_file(include_str!("../../data/tcan_passwords.txt"), "config/tcan_passwords.txt")?;
         let vip_users = self.create_file(include_str!("../../data/vip_users.txt"), "config/vip_users.txt")?;
 
         let group_file = self.create_group_file("config/groups.toml")?;
@@ -193,7 +194,7 @@ impl PCBoardImporter {
 
         let protocol_data_file = self.convert_data::<SupportedProtocols>(&self.data.path.protocol_data_file.clone(), "config/protocols.toml")?;
         let language_file = self.convert_data::<SupportedLanguages>(&self.data.path.pcml_dat_file.clone(), "config/languages.toml")?;
-        let security_level_file = self.convert_data::<SupportedLanguages>(&self.data.path.pwd_file.clone(), "config/security_levels.toml")?;
+        let security_level_file = self.convert_data::<SecurityLevelDefinitions>(&self.data.path.pwd_file.clone(), "config/security_levels.toml")?;
         let command_file = self.convert_default_cmd_lst(&self.data.path.cmd_lst.clone(), "config/commands.toml")?;
         let statistics_file = self.convert_data::<Statistics>(&self.data.path.stats_file.clone(), "config/statistics.toml")?;
 
@@ -296,9 +297,9 @@ impl PCBoardImporter {
                 group_file,
                 log_file: PathBuf::from("output.log"),
 
-                bad_users,
-                bad_email,
-                bad_passwords,
+                trashcan_user: bad_users,
+                trashcan_email: tcan_email,
+                trashcan_passwords: tcan_passwords,
                 vip_users,
             },
             new_user_settings: NewUserSettings {
@@ -624,7 +625,7 @@ impl PCBoardImporter {
         let dest = self.output_directory.join(new_rel_name);
 
         let mut groups = GroupList::default();
-        groups.add_group("sysop", "System Operators", &[1]);
+        groups.add_group("sysop", "System Operators", &["SYSOP".to_string()]);
         groups.add_group("users", "Common Users", &[]);
         groups.add_group("no_age", "Members override age check", &[]);
         groups.save(&dest)?;
@@ -638,10 +639,10 @@ impl PCBoardImporter {
 
         let resolved_file = self.resolve_file(trashcan_file);
         let resolved_file = PathBuf::from(&resolved_file);
-        let trashcan_header = include_str!("../../data/bad_users.txt");
+        let trashcan_header = include_str!("../../data/tcan_users.txt");
 
         let dest = self.output_directory.join(new_rel_name);
-        self.output.start_action(format!("Convert trashcan -> badusers.txt {}…", dest.display()));
+        self.output.start_action(format!("Convert trashcan -> tcan_users.txt {}…", dest.display()));
 
         if !resolved_file.exists() {
             fs::write(new_rel_name, trashcan_header)?;

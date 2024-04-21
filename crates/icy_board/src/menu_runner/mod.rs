@@ -265,12 +265,8 @@ impl PcbBoardCommand {
             return Ok(true);
         }
         */
-        if file.exists() {
-            self.state.display_file(&file)?;
-            return Ok(true);
-        }
 
-        Ok(false)
+        self.state.display_file(&file)
     }
 
     fn send_message(&mut self, conf: i32, area: i32, msg: JamMessage, text: IceText) -> Res<()> {

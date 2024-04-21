@@ -232,7 +232,7 @@ pub struct UserFlags {
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct User {
-    name: String,
+    pub name: String,
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub alias: String,

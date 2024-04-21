@@ -1,5 +1,5 @@
-# badusers.txt
-# ------------
+# tcan_users.txt
+# --------------
 # This file contains the names of users who have been banned from the system.
 # Each line contains a single name regex pattern.
 # 

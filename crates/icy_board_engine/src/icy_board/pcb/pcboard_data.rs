@@ -1,6 +1,7 @@
 use std::{
     fs::File,
     io::{BufRead, BufReader},
+    path::Path,
 };
 
 use crate::{parser::Encoding, Res};
@@ -740,7 +741,7 @@ impl PcbBoardData {
     ///
     /// Panics if .
     #[allow(clippy::field_reassign_with_default)]
-    pub fn import_pcboard(filename: &str) -> Res<Self> {
+    pub fn import_pcboard(filename: &Path) -> Res<Self> {
         let mut reader = BufReader::new(File::open(filename)?);
 
         let version = read_line(&mut reader, Encoding::Utf8)?;

@@ -267,11 +267,11 @@ pub struct ConfigPaths {
     pub no_ansi: PathBuf,
 
     /// Bad users file
-    pub bad_users: PathBuf,
+    pub trashcan_user: PathBuf,
     /// Bad email file
-    pub bad_email: PathBuf,
+    pub trashcan_email: PathBuf,
     /// Bad passwords file
-    pub bad_passwords: PathBuf,
+    pub trashcan_passwords: PathBuf,
     /// VIP users file
     pub vip_users: PathBuf,
 
@@ -467,9 +467,9 @@ impl IcbConfig {
                 chat_menu: PathBuf::new(),
                 no_ansi: PathBuf::new(),
 
-                bad_users: PathBuf::new(),
-                bad_email: PathBuf::new(),
-                bad_passwords: PathBuf::new(),
+                trashcan_user: PathBuf::new(),
+                trashcan_email: PathBuf::new(),
+                trashcan_passwords: PathBuf::new(),
                 vip_users: PathBuf::new(),
 
                 protocol_data_file: PathBuf::new(),

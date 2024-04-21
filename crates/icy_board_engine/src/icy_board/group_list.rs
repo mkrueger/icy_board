@@ -6,7 +6,7 @@ use super::IcyBoardSerializer;
 pub struct Group {
     pub name: String,
     pub description: String,
-    pub members: Vec<i64>,
+    pub members: Vec<String>,
 }
 
 #[derive(Default, Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -19,7 +19,7 @@ pub struct GroupList {
 }
 
 impl GroupList {
-    pub fn add_group(&mut self, name: impl Into<String>, description: impl Into<String>, members: &[i64]) {
+    pub fn add_group(&mut self, name: impl Into<String>, description: impl Into<String>, members: &[String]) {
         self.groups.push(Group {
             name: name.into(),
             description: description.into(),
