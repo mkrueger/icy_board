@@ -5,6 +5,8 @@ use super::PcbBoardCommand;
 
 impl PcbBoardCommand {
     pub fn toggle_alias(&mut self, _action: &Command) -> Res<()> {
+        self.displaycmdfile("alias")?;
+
         self.state.session.use_alias = !self.state.session.use_alias;
         if let Some(token) = self.state.session.tokens.pop_front() {
             let token = token.to_ascii_uppercase();

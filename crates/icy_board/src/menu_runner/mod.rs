@@ -28,6 +28,7 @@ mod show_bulletins;
 mod show_file_directories;
 mod take_survey;
 mod toggle_alias;
+mod view_settings;
 mod write_settings;
 
 pub struct PcbBoardCommand {
@@ -188,6 +189,11 @@ impl PcbBoardCommand {
             CommandType::SetTransferProtocol => {
                 // T
                 self.set_transfer_protocol(action)?;
+            }
+
+            CommandType::ViewSettings => {
+                // V
+                self.view_settings(action)?;
             }
 
             CommandType::WriteSettings => {
@@ -387,12 +393,12 @@ impl PcbBoardCommand {
         }
         if expert_mode {
             self.state.display_text(
-                IceText::ExpertmodeModeOn,
+                IceText::ViewSettingsExpertModeOn,
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
             )?;
         } else {
             self.state.display_text(
-                IceText::ExpertmodeModeOff,
+                IceText::ViewSettingsExpertModeOff,
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
             )?;
             self.state.press_enter()?;
@@ -433,7 +439,7 @@ impl PcbBoardCommand {
                 "AV" => {
                     self.state.session.disp_options.disable_color = false;
                     self.state.session.disp_options.grapics_mode = GraphicsMode::Avatar;
-                    self.state.display_text(IceText::AnsiOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                    self.state.display_text(IceText::AvatarOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
                 }
                 "GR" => {
                     self.state.session.disp_options.disable_color = false;

@@ -757,37 +757,37 @@ pub enum IceText {
     /// `Posted Immediately`
     PostedImmediately = 368,
     /// `Caller Num.:`
-    CallerNumber = 369,
+    ViewSettingsCallerNumber = 369,
     /// `Unable to open CHAT file.`
     CantOpenChatFile = 370,
     /// `Lst Date On:~`
-    LastDateOne = 371,
+    ViewSettingsLastDateOne = 371,
     /// `Expire Date:~`
-    ExpiredAt = 372,
+    ViewSettingsExpireDate = 372,
     /// `# Times On :`
-    NumberTimesOn = 373,
+    ViewSettingsNumberTimesOn = 373,
     /// `Page Length:`
-    PageLength = 374,
+    ViewSettingsPageLength = 374,
     /// `Expert Mode: On`
-    ExpertmodeModeOn = 375,
+    ViewSettingsExpertModeOn = 375,
     /// `Expert Mode: Off`
-    ExpertmodeModeOff = 376,
+    ViewSettingsExpertModeOff = 376,
     /// `Security Lv:`
-    SecurityLevel = 377,
+    ViewSettingsSecurityLevel = 377,
     /// `# Downloads:`
-    NumberDownloads = 378,
+    ViewSettingsNumberDownloads = 378,
     /// `# Uploads  :`
-    NumberUploads = 379,
+    ViewSettingsNumberUploads = 379,
     /// `Bytes Avail:`
-    BytesAvailable = 380,
+    ViewSettingsBytesAvailable = 380,
     /// `L/Msg. Read:`
-    LastMessageRead = 381,
+    ViewSettingsLastMessageRead = 381,
     /// `High Msg. #:`
-    HighMessageNumber = 382,
+    ViewSettingsHighMessageNumber = 382,
     /// `Active Msgs:`
-    NumberActiveMessages = 383,
+    ViewSettingsNumberActiveMessages = 383,
     /// `Tr/Protocol:~`
-    TransferProtocol = 384,
+    ViewSettingsTransferProtocol = 384,
     /// `Operational Languages Available:`
     LanguageAvailable = 385,
     /// `Alternative Language Operation Not Available.`
@@ -1531,23 +1531,46 @@ pub enum IceText {
     /// `Alias mode is now off, @FIRST@ ...`
     AliasOff = 754,
 
+    /// `~Alias Mode: On`
+    ViewSettingsAliasOn = 755,
+    /// `~Alias Mode: Off`
+    ViewSettingsAliasOff = 756,
+
+    /// `~~~Gfx Mode:~@GFXMODE@`
+    ViewSettingsGraphicsMode = 757,
+
     /// `Conf:                                 Area:`
-    MessagesConfArea = 755,
+    MessagesConfArea = 758,
 
     /// `Date Format Desired (Enter)=no change`
-    DateFormatDesired = 756,
+    DateFormatDesired = 759,
 
     /// `Sorry, @FIRST@, no Areas are presently available.`
-    NoAreasAvailable = 757,
+    NoAreasAvailable = 760,
 
     /// `(H)elp, (1-@NUMDIR@), File List Command`
-    AreaListCommand = 758,
+    AreaListCommand = 761,
 
     /// `(H)elp, (1-@NUMDIR@), File List Command`
-    AreaListCommandExpert = 759,
+    AreaListCommandExpert = 762,
+
+    /// `AVATAR mode is now on, @FIRST@ ...`
+    AvatarOn = 763,
+
+    /// `Off`
+    GfxModeOff = 764,
+
+    /// `Ansi`
+    GfxModeAnsi = 765,
+
+    /// `Avatar`
+    GfxModeAvatar = 766,
+
+    /// `Rip`
+    GfxModeRip = 767,
 }
 
-const LAST_ENTRY: usize = 759;
+const LAST_ENTRY: usize = 767;
 
 impl IceText {
     pub fn from(i: usize) -> Self {

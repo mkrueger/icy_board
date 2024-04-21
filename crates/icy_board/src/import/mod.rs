@@ -331,6 +331,7 @@ impl PCBoardImporter {
                     'A' => DisplayNewsBehavior::Always,
                     _ => DisplayNewsBehavior::OnlyNewer,
                 },
+                exclude_local_calls: self.data.exclude_locals,
                 display_userinfo_at_login: self.data.display_userinfo_at_login,
                 max_msg_lines: self.data.max_msg_lines as u16,
                 scan_all_mail_at_login: self.data.scan_all,

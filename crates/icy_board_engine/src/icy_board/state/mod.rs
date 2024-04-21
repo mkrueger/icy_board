@@ -123,6 +123,8 @@ pub struct Session {
     pub current_conference_number: i32,
     pub current_message_area: usize,
     pub current_conference: Conference,
+    pub caller_number: usize,
+    pub is_local: bool,
 
     pub login_date: DateTime<Local>,
 
@@ -187,6 +189,7 @@ impl Session {
             login_date: Local::now(),
             cur_user: -1,
             cur_security: 0,
+            caller_number: 0,
             cur_groups: Vec::new(),
             num_lines_printed: 0,
             security_violations: 0,
@@ -194,6 +197,7 @@ impl Session {
             last_new_line_y: 0,
             page_len: 24,
             is_sysop: false,
+            is_local: false,
             op_text: String::new(),
             expert_mode: false,
             use_alias: false,
@@ -344,6 +348,8 @@ impl VirtualScreen {
 impl IcyBoardState {
     pub fn new(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<NodeState>>, connection: Box<dyn Connection>) -> Self {
         let mut session = Session::new();
+        session.caller_number = board.lock().unwrap().statistics.cur_caller_number() as usize;
+
         session.date_format = board.lock().unwrap().config.board.date_format.clone();
         let display_text = board.lock().unwrap().default_display_text.clone();
         let root_path = board.lock().unwrap().root_path.clone();
@@ -1007,6 +1013,14 @@ impl IcyBoardState {
             }
             "FNUM" => {}
             "FREESPACE" => {}
+            "GFXMODE" => {
+                result = match self.session.disp_options.grapics_mode {
+                    GraphicsMode::Off => self.display_text.get_display_text(IceText::GfxModeOff).unwrap().text,
+                    GraphicsMode::Ansi => self.display_text.get_display_text(IceText::GfxModeAnsi).unwrap().text,
+                    GraphicsMode::Avatar => self.display_text.get_display_text(IceText::GfxModeAvatar).unwrap().text,
+                    GraphicsMode::Rip => self.display_text.get_display_text(IceText::GfxModeRip).unwrap().text,
+                };
+            }
             "HOMEPHONE" => {
                 if let Some(user) = &self.current_user {
                     result = user.home_voice_phone.to_string();

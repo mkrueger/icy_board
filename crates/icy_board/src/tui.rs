@@ -45,7 +45,9 @@ pub struct Tui {
 
 impl Tui {
     pub fn local_mode(board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>, sysop_mode: bool) -> Self {
-        let ui_session = Arc::new(Mutex::new(Session::new()));
+        let mut session = Session::new();
+        session.is_local = true;
+        let ui_session = Arc::new(Mutex::new(session));
         let session = ui_session.clone();
         let (ui_connection, connection) = ChannelConnection::create_pair();
         let board = board.clone();

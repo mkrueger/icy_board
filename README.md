@@ -81,6 +81,11 @@ Leading & traling whitespaces are ignored
 But I like the RA "DayTimes" system.
 * 
 
+## New @ Sequences
+
+@GFXMODE@ = Off, Ansi, Avatar or Rip (for now) depending on the current graphics mode
+@NUMAREA@ = Number of message areas in current conference
+
 # PPLEngine
 
 An engine for PPL/PPE PCBoard handling - just for fun.

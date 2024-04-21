@@ -364,14 +364,24 @@ impl GeneralTab {
                 .with_status("Color for 'Deleted' in Files"),
             ),
         ];
-        let switches = vec![ConfigEntry::Item(
-            ListItem::new(
-                "scan_all",
-                "Keyboard Timeout".to_string(),
-                ListValue::U32(icy_board.config.options.keyboard_timeout as u32, 0, 255),
-            )
-            .with_status("Keyboard Timeout (in min, 0=off)"),
-        )];
+        let switches = vec![
+            ConfigEntry::Item(
+                ListItem::new(
+                    "scan_all",
+                    "Keyboard Timeout".to_string(),
+                    ListValue::U32(icy_board.config.options.keyboard_timeout as u32, 0, 255),
+                )
+                .with_status("Keyboard Timeout (in min, 0=off)"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "exclude_local_calls",
+                    "Exclude Local".to_string(),
+                    ListValue::Bool(icy_board.config.options.exclude_local_calls),
+                )
+                .with_status("Exclude Local Logins from Statistics"),
+            ),
+        ];
 
         Self {
             state: ConfigMenuState::default(),

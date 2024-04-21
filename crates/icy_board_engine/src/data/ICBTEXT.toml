@@ -1445,53 +1445,53 @@ style = "Red"
 text = "  Posted Immediately"
 style = "Red"
 
-[CallerNumber]
+[ViewSettingsCallerNumber]
 text = "Caller Num.:"
 
 [CantOpenChatFile]
 text = "Unable to open CHAT file."
 style = "Red"
 
-[LastDateOne]
+[ViewSettingsLastDateOne]
 text = "Lst Date On:~"
 
-[ExpiredAt]
+[ViewSettingsExpireDate]
 text = "Expire Date:~"
 
-[NumberTimesOn]
+[ViewSettingsNumberTimesOn]
 text = "# Times On :"
 
-[PageLength]
+[ViewSettingsPageLength]
 text = "Page Length:"
 
-[ExpertmodeModeOn]
+[ViewSettingsExpertModeOn]
 text = "Expert Mode: On"
 
-[ExpertmodeModeOff]
+[ViewSettingsExpertModeOff]
 text = "Expert Mode: Off"
 
-[SecurityLevel]
+[ViewSettingsSecurityLevel]
 text = "Security Lv:"
 
-[NumberDownloads]
+[ViewSettingsNumberDownloads]
 text = "# Downloads:"
 
-[NumberUploads]
+[ViewSettingsNumberUploads]
 text = "# Uploads  :"
 
-[BytesAvailable]
+[ViewSettingsBytesAvailable]
 text = "Bytes Avail:"
 
-[LastMessageRead]
+[ViewSettingsLastMessageRead]
 text = "L/Msg. Read:"
 
-[HighMessageNumber]
+[ViewSettingsHighMessageNumber]
 text = "High Msg. #:"
 
-[NumberActiveMessages]
+[ViewSettingsNumberActiveMessages]
 text = "Active Msgs:"
 
-[TransferProtocol]
+[ViewSettingsTransferProtocol]
 text = "Tr/Protocol:~"
 
 [LanguageAvailable]
@@ -2892,6 +2892,15 @@ style = "White"
 text = "Alias mode is now off, @FIRST@ ..."
 style = "White"
 
+[ViewSettingsAliasOn]
+text = "~Alias Mode: On"
+
+[ViewSettingsAliasOff]
+text = "~Alias Mode: Off"
+
+[ViewSettingsGraphicsMode]
+text = "~~~Gfx Mode:~@GFXMODE@"
+
 [MessagesConfArea]
 text = "Conf:                                 Area:"
 style = "Yellow"
@@ -2912,3 +2921,18 @@ style = "Yellow"
 text = "(H)elp, (1-@NUMAREA@), Area List Command"
 style = "Yellow"
 
+[AvatarOn]
+text = "AVATAR mode is now on, @FIRST@ ..."
+style = "White"
+
+[GfxModeOff]
+text = "Off"
+
+[GfxModeAnsi]
+text = "Ansi"
+
+[GfxModeAvatar]
+text = "Avatar"
+
+[GfxModeRip]
+text = "Rip"

@@ -32,6 +32,9 @@ pub struct Statistics {
 }
 
 impl Statistics {
+    pub fn cur_caller_number(&self) -> u64 {
+        self.today.calls
+    }
     pub fn add_caller(&mut self, user_name: String) {
         self.total.calls += 1;
         self.today.calls += 1;

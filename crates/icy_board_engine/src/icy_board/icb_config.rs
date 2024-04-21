@@ -336,6 +336,9 @@ pub struct BoardOptions {
     /// Run in NewAsk mode.
     pub is_closed_board: bool,
 
+    /// Exclude local calls from all statistics
+    pub exclude_local_calls: bool,
+
     /// DisplayNewsBehavior
     pub display_news_behavior: DisplayNewsBehavior,
 
@@ -503,6 +506,7 @@ impl IcbConfig {
                 is_closed_board: false,
                 display_news_behavior: DisplayNewsBehavior::OnlyNewer,
                 display_userinfo_at_login: false,
+                exclude_local_calls: true,
                 max_msg_lines: 100,
                 scan_all_mail_at_login: true,
                 prompt_to_read_mail: true,
