@@ -212,9 +212,9 @@ impl IcyBoardState {
 
     pub fn display_file<P: AsRef<Path>>(&mut self, file_name: &P) -> Res<bool> {
         let resolved_name = self.board.lock().unwrap().resolve_file(file_name);
-        log::warn!("resolved name {}", resolved_name);
+        log::warn!("resolved name {}", resolved_name.display());
         // lookup language/security/graphics mode
-        let resolved_name = self.find_more_specific_file(resolved_name);
+        let resolved_name = self.find_more_specific_file(resolved_name.to_string_lossy().to_string());
         log::warn!("specfic name {}", resolved_name.display());
 
         let Ok(content) = fs::read(resolved_name) else {

@@ -684,7 +684,7 @@ impl<'a> VirtualMachine<'a> {
         }
     }
 
-    pub fn resolve_file<P: AsRef<Path>>(&self, file: &P) -> String {
+    pub fn resolve_file<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
         self.icy_board_state.board.lock().unwrap().resolve_file(file)
     }
 }

@@ -5,7 +5,6 @@ use std::{
     collections::VecDeque,
     fs::File,
     io::{BufReader, Read, Seek},
-    os::unix::fs::MetadataExt,
     path::PathBuf,
 };
 
@@ -106,7 +105,7 @@ impl Sz {
     fn next_file(&mut self, transfer_state: &mut TransferState) -> crate::Result<()> {
         if let Some(next_file) = self.file_queue.pop_front() {
             transfer_state.send_state.file_name = next_file.file_name().unwrap().to_string_lossy().to_string();
-            transfer_state.send_state.file_size = next_file.metadata()?.size();
+            transfer_state.send_state.file_size = next_file.metadata()?.len();
 
             self.cur_file = next_file.clone();
             let reader = BufReader::new(File::open(next_file)?);

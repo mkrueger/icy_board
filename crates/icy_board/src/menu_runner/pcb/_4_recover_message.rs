@@ -40,7 +40,7 @@ impl PcbBoardCommand {
             }
             Err(err) => {
                 log::error!("Message index load error {}", err);
-                log::error!("Creating new message index at {}", &msgbase_file_resolved);
+                log::error!("Creating new message index at {}", &msgbase_file_resolved.display());
                 self.state
                     .display_text(IceText::CreatingNewMessageIndex, display_flags::NEWLINE | display_flags::LFAFTER)?;
                 if JamMessageBase::create(msgbase_file_resolved).is_ok() {

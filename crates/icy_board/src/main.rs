@@ -112,7 +112,7 @@ pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) -> Res<()> {
     match IcyBoard::load(config_file) {
         Ok(icy_board) => {
             let log_file = icy_board.resolve_file(&icy_board.config.paths.log_file);
-
+            println!("{}", log_file.display());
             fern::Dispatch::new()
                 // Perform allocation-free log formatting
                 .format(|out, message, record| {

@@ -2,7 +2,6 @@ use std::{
     collections::VecDeque,
     fs::File,
     io::{BufReader, Read},
-    os::unix::fs::MetadataExt,
     path::PathBuf,
 };
 
@@ -82,7 +81,7 @@ impl Sy {
                 } else {
                     if let Some(next_file) = self.file_queue.pop_front() {
                         transfer_state.send_state.file_name = next_file.file_name().unwrap().to_string_lossy().to_string();
-                        transfer_state.send_state.file_size = next_file.metadata()?.size();
+                        transfer_state.send_state.file_size = next_file.metadata()?.len();
 
                         self.cur_file = next_file.clone();
                         let reader = BufReader::new(File::open(next_file)?);
@@ -315,7 +314,7 @@ impl Sy {
             let name = next_file.file_name().unwrap().as_encoded_bytes();
             block.extend_from_slice(name);
             block.push(0);
-            let size = next_file.metadata()?.size();
+            let size = next_file.metadata()?.len();
             block.extend_from_slice(format!("{}", size).as_bytes());
             transfer_state.send_state.file_name = next_file.file_name().unwrap().to_string_lossy().to_string();
             transfer_state.send_state.file_size = size;

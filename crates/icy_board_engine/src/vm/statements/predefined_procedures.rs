@@ -81,7 +81,7 @@ pub fn fcreate(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let file = vm.eval_expr(&args[1])?.as_string();
     let am = vm.eval_expr(&args[2])?.as_int();
     let sm = vm.eval_expr(&args[3])?.as_int();
-    let file = vm.resolve_file(&file);
+    let file = vm.resolve_file(&file).to_string_lossy().to_string();
     vm.io.fcreate(channel, &file, am, sm);
     Ok(())
 }
@@ -91,7 +91,7 @@ pub fn fopen(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let file = vm.eval_expr(&args[1])?.as_string();
     let am = vm.eval_expr(&args[2])?.as_int();
     let sm = vm.eval_expr(&args[3])?.as_int();
-    let file = vm.resolve_file(&file);
+    let file = vm.resolve_file(&file).to_string_lossy().to_string();
     vm.io.fopen(channel, &file, am, sm)?;
     Ok(())
 }
@@ -101,7 +101,7 @@ pub fn fappend(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let file = vm.eval_expr(&args[1])?.as_string();
     let am = vm.eval_expr(&args[2])?.as_int();
     let sm = vm.eval_expr(&args[3])?.as_int();
-    let file = vm.resolve_file(&file);
+    let file = vm.resolve_file(&file).to_string_lossy().to_string();
     vm.io.fappend(channel, &file, am, sm);
     Ok(())
 }
@@ -205,7 +205,7 @@ pub fn defcolor(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 
 pub fn delete(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let file = &vm.eval_expr(&args[0])?.as_string();
-    let file = vm.resolve_file(&file);
+    let file = vm.resolve_file(&file).to_string_lossy().to_string();
     if let Err(err) = vm.io.delete(&file) {
         log::error!("Error deleting file: {}", err);
     }
@@ -727,8 +727,8 @@ pub fn mprintln(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 pub fn rename(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let old = &vm.eval_expr(&args[0])?.as_string();
     let new = &vm.eval_expr(&args[1])?.as_string();
-    let old = vm.resolve_file(&old);
-    let new = vm.resolve_file(&new);
+    let old = vm.resolve_file(&old).to_string_lossy().to_string();
+    let new = vm.resolve_file(&new).to_string_lossy().to_string();
 
     if let Err(err) = vm.io.rename(&old, &new) {
         log::error!("Error renaming file: {}", err);

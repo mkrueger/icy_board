@@ -583,7 +583,7 @@ pub fn readline(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue>
         let line_text = file.lines().nth(line as usize - 1).unwrap_or_default();
         Ok(VariableValue::new_string(line_text.to_string()))
     } else {
-        log::warn!("PPE readline: file not found: {}", &file_name);
+        log::warn!("PPE readline: file not found: {}", file_name.display());
         Ok(VariableValue::new_string(String::new()))
     }
 }
@@ -895,10 +895,10 @@ pub fn fileinf(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> 
     let file = vm.resolve_file(&file);
     let path = PathBuf::from(&file);
     match item {
-        1 => Ok(VariableValue::new_bool(vm.io.file_exists(&file))),
+        1 => Ok(VariableValue::new_bool(file.exists())),
         2 => Ok(VariableValue::new(VariableType::Date, VariableData::default())), // TODO: File date
         3 => Ok(VariableValue::new(VariableType::Time, VariableData::default())), // TODO: File time
-        4 => Ok(VariableValue::new_int(vm.io.get_file_size(&file) as i32)),
+        4 => Ok(VariableValue::new_int(file.metadata()?.len() as i32)),
         5 => Ok(VariableValue::new_int(0)),                   // TODO: File attributes
         6 => Ok(VariableValue::new_string("C:".to_string())), // Drive
         7 => {

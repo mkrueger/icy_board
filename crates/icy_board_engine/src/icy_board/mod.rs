@@ -124,25 +124,31 @@ impl IcyBoard {
         }
     }
 
-    pub fn resolve_file<P: AsRef<Path>>(&self, file: &P) -> String {
-        let mut s: String = file
-            .as_ref()
-            .to_string_lossy()
-            .to_string()
-            .chars()
-            .map(|x| match x {
-                '\\' => '/',
-                _ => x,
-            })
-            .collect();
-
-        if !s.starts_with('/') {
-            s = self.root_path.join(s).to_string_lossy().to_string();
+    pub fn resolve_file<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
+        let mut s = PathBuf::from(file.as_ref());
+        if !s.is_absolute() {
+            s = self.root_path.join(s);
         }
+        if s.exists() {
+            return s;
+        }
+/*
+        let mut s: String = file
+        .as_ref()
+        .to_string_lossy()
+        .to_string()
+        .chars()
+        .map(|x| match x {
+            '\\' => '/',
+            _ => x,
+        })
+        .collect();
+*/
 
-        if let Ok(mut file_path) = QFilePath::add_path(s.clone()) {
+
+        if let Ok(mut file_path) = QFilePath::add_path(s.to_string_lossy()) {
             if let Ok(file) = file_path.get_path_buf() {
-                return file.to_string_lossy().to_string();
+                return file;
             }
         }
         s
@@ -153,8 +159,17 @@ impl IcyBoard {
             log::error!("Error loading icy board config file: {} from {}", e, path.as_ref().display());
             e
         })?;
-        let p = path.as_ref().canonicalize().unwrap();
+
+        let mut p = PathBuf::from(path.as_ref());
+        if !p.is_absolute() {
+            if let Ok(cur) = std::env::current_dir() {
+                p = cur.join(path.as_ref())
+            } else {
+                p = p.canonicalize().unwrap();
+            }
+        }
         let parent_path = p.parent().unwrap();
+
         /*
         let load_path = &RelativePath::from_path(&config.paths.user_base)?.to_path(parent_path);
         let mut users = UserBase::load(&load_path).map_err(|e| {
@@ -210,7 +225,6 @@ impl IcyBoard {
                 Statistics::default()
             }
         };
-
         let mut board = IcyBoard {
             file_name: path.as_ref().to_path_buf(),
             root_path: parent_path.to_path_buf(),
@@ -284,7 +298,7 @@ impl IcyBoard {
         pcb_dat.sysop_security.sysop = self.config.sysop_security_level.sysop as i32;
         pcb_dat.board_name = self.config.board.name.to_string();
 
-        pcb_dat.path.help_loc = self.resolve_file(&self.config.paths.help_path);
+        pcb_dat.path.help_loc = self.resolve_file(&self.config.paths.help_path).to_string_lossy().to_string();
 
         let base_loc = file.parent().unwrap();
 
@@ -293,16 +307,16 @@ impl IcyBoard {
         pcb_dat.path.conference_file = cnames.to_string_lossy().to_string();
 
         pcb_dat.num_conf = self.conferences.len() as i32 - 1;
-        pcb_dat.path.sec_loc = self.resolve_file(&self.config.paths.pwrd_sec_level_file);
-        pcb_dat.path.cmd_display_files_loc = self.resolve_file(&self.config.paths.command_display_path);
-        pcb_dat.path.welcome_file = self.resolve_file(&self.config.paths.welcome);
-        pcb_dat.path.newuser_file = self.resolve_file(&self.config.paths.newuser);
-        pcb_dat.path.closed_file = self.resolve_file(&self.config.paths.closed);
-        pcb_dat.path.warning_file = self.resolve_file(&self.config.paths.expire_warning);
-        pcb_dat.path.expired_file = self.resolve_file(&self.config.paths.expired);
-        pcb_dat.path.conf_menu = self.resolve_file(&self.config.paths.conf_join_menu);
-        pcb_dat.path.group_chat = self.resolve_file(&self.config.paths.group_chat);
-        pcb_dat.path.no_ansi = self.resolve_file(&self.config.paths.no_ansi);
+        pcb_dat.path.sec_loc = self.resolve_file(&self.config.paths.pwrd_sec_level_file).to_string_lossy().to_string();
+        pcb_dat.path.cmd_display_files_loc = self.resolve_file(&self.config.paths.command_display_path).to_string_lossy().to_string();
+        pcb_dat.path.welcome_file = self.resolve_file(&self.config.paths.welcome).to_string_lossy().to_string();
+        pcb_dat.path.newuser_file = self.resolve_file(&self.config.paths.newuser).to_string_lossy().to_string();
+        pcb_dat.path.closed_file = self.resolve_file(&self.config.paths.closed).to_string_lossy().to_string();
+        pcb_dat.path.warning_file = self.resolve_file(&self.config.paths.expire_warning).to_string_lossy().to_string();
+        pcb_dat.path.expired_file = self.resolve_file(&self.config.paths.expired).to_string_lossy().to_string();
+        pcb_dat.path.conf_menu = self.resolve_file(&self.config.paths.conf_join_menu).to_string_lossy().to_string();
+        pcb_dat.path.group_chat = self.resolve_file(&self.config.paths.group_chat).to_string_lossy().to_string();
+        pcb_dat.path.no_ansi = self.resolve_file(&self.config.paths.no_ansi).to_string_lossy().to_string();
 
         let res = pcb_dat.serialize(crate::parser::Encoding::CP437);
         fs::write(file, res)?;
