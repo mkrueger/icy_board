@@ -5,6 +5,7 @@ use std::{
 };
 
 use walkdir::WalkDir;
+use zip::write::ExtendedFileOptions;
 
 use super::bbstro_fingerprint::FingerprintData;
 
@@ -57,7 +58,7 @@ fn pack(src: &std::path::Path, out_file: &File, fingerprints: &FingerprintData) 
             println!("Removed BBStro {} from archive", path.path().display());
             continue;
         }
-        let options = zip::write::FileOptions::default()
+        let options = zip::write::FileOptions::<ExtendedFileOptions>::default()
             .compression_method(zip::CompressionMethod::Deflated)
             .compression_level(Some(9));
         zip.start_file(path.path().file_name().unwrap().to_string_lossy().to_string(), options)?;

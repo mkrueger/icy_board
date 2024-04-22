@@ -18,7 +18,7 @@ serde = { workspace = true }
 toml = { workspace = true }
 regex = { workspace = true }
 
-zip = "0.6"
+zip = "1.1.1"
 delharc = "0.6.0"
 unrar = "0.5.3"
 icy_sauce = { git ="https://github.com/mkrueger/icy_tools" }

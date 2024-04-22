@@ -132,19 +132,18 @@ impl IcyBoard {
         if s.exists() {
             return s;
         }
-/*
-        let mut s: String = file
-        .as_ref()
-        .to_string_lossy()
-        .to_string()
-        .chars()
-        .map(|x| match x {
-            '\\' => '/',
-            _ => x,
-        })
-        .collect();
-*/
-
+        /*
+                let mut s: String = file
+                .as_ref()
+                .to_string_lossy()
+                .to_string()
+                .chars()
+                .map(|x| match x {
+                    '\\' => '/',
+                    _ => x,
+                })
+                .collect();
+        */
 
         if let Ok(mut file_path) = QFilePath::add_path(s.to_string_lossy()) {
             if let Ok(file) = file_path.get_path_buf() {
