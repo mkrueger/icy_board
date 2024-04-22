@@ -43,7 +43,14 @@ icbmoni_user_browse_files = Browsing Files
 icbmoni_user_read_messages = Read Messages
 icbmoni_user_read_bulletins = Read Bulletins
 icbmoni_user_take_survey = Take Survey
-icbmoni_user_upload= Upload Files
+icbmoni_user_upload = Upload Files
+icbmoni_user_download = Download
+icbmoni_user_logoff = Logging off
+icbmoni_user_door = Running Door
+icbmoni_user_chat_with_sysop = Chat with Sysop
+icbmoni_user_group_chat = Group Chat
+icbmoni_user_page_sysop = Page Sysop
+icbmoni_user_read_broadcast = Read Broadcast
 
 icbmoni_status_header = Status
 icbmoni_user_header = User

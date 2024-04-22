@@ -18,8 +18,8 @@ impl PcbBoardCommand {
             )?;
             return Ok(());
         }
+        self.state.set_activity(UserActivity::EnterMessage);
 
-        self.state.node_state.lock().unwrap().user_activity = UserActivity::EnterMessage;
         let Ok(Some(area)) = self.show_message_areas(action) else {
             self.state.press_enter()?;
             self.display_menu = true;

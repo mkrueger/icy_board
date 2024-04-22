@@ -23,7 +23,7 @@ use icy_board_engine::{
 
 impl PcbBoardCommand {
     pub fn take_survey(&mut self, action: &Command) -> Res<()> {
-        self.state.node_state.lock().unwrap().user_activity = UserActivity::TakeSurvey;
+        self.state.set_activity(UserActivity::TakeSurvey);
 
         let surveys = self.state.load_surveys()?;
         if surveys.is_empty() {

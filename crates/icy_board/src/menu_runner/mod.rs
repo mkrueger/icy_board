@@ -29,7 +29,7 @@ impl PcbBoardCommand {
     }
 
     pub fn do_command(&mut self) -> Res<()> {
-        self.state.node_state.lock().unwrap().user_activity = UserActivity::BrowseMenu;
+        self.state.set_activity(UserActivity::BrowseMenu);
         if self.display_menu && !self.state.session.expert_mode {
             self.display_menu()?;
             self.display_menu = false;
@@ -204,6 +204,10 @@ impl PcbBoardCommand {
             CommandType::EnableAlias => {
                 // ALIAS
                 self.toggle_alias(action)?;
+            }
+            CommandType::WhoIsOnline => {
+                // WHO
+                self.who_display_nodes(action)?;
             }
 
             CommandType::RestoreMessage => {

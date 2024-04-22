@@ -45,7 +45,7 @@ impl PcbBoardCommand {
             Some(self.state.session.no_char.to_string()),
             display_flags::NEWLINE | display_flags::UPCASE | display_flags::YESNO | display_flags::FIELDLEN,
         )?;
-        self.state.node_state.lock().unwrap().user_activity = UserActivity::CommentToSysop;
+        self.state.set_activity(UserActivity::CommentToSysop);
         self.write_message(
             -1,
             -1,

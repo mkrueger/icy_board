@@ -189,7 +189,7 @@ impl MessageViewer {
 
 impl PcbBoardCommand {
     pub fn show_message_areas(&mut self, action: &Command) -> Res<Option<usize>> {
-        self.state.node_state.lock().unwrap().user_activity = UserActivity::BrowseFiles;
+        self.state.set_activity(UserActivity::BrowseFiles);
         self.state.session.disable_auto_more = false;
         self.state.session.more_requested = false;
 

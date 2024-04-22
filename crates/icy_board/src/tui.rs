@@ -40,7 +40,8 @@ pub struct Tui {
     session: Arc<Mutex<Session>>,
     connection: ChannelConnection,
     status_bar: usize,
-    handle: Arc<Mutex<NodeState>>,
+    handle: Arc<Mutex<Vec<Option<NodeState>>>>,
+    node: usize,
 }
 
 impl Tui {
@@ -52,9 +53,10 @@ impl Tui {
         let (ui_connection, connection) = ChannelConnection::create_pair();
         let board = board.clone();
         let ui_node = bbs.lock().unwrap().create_new_node(ConnectionType::Channel);
+        let node_state = bbs.lock().unwrap().open_connections.clone();
         let node = ui_node.clone();
         let handle = thread::spawn(move || {
-            let mut state = IcyBoardState::new(board, node, Box::new(connection));
+            let mut state = IcyBoardState::new(board, node_state, node, Box::new(connection));
             if sysop_mode {
                 state.session.is_sysop = true;
                 state.set_current_user(0).unwrap();
@@ -104,30 +106,43 @@ impl Tui {
                 thread::sleep(Duration::from_millis(20));
             }
         });
-        ui_node.lock().unwrap().handle = Some(handle);
+        bbs.lock().unwrap().get_open_connections().as_ref().lock().unwrap()[node]
+            .as_mut()
+            .unwrap()
+            .handle = Some(handle);
+
         Self {
             screen: Screen::new(),
             session: ui_session,
             connection: ui_connection,
             status_bar: 0,
-            handle: ui_node,
+            node,
+            handle: bbs.lock().unwrap().get_open_connections().clone(),
         }
     }
 
     pub fn sysop_mode(bbs: &Arc<Mutex<BBS>>, node: usize) -> Res<Self> {
         let ui_session = Arc::new(Mutex::new(Session::new()));
         let (ui_connection, connection) = ChannelConnection::create_pair();
-        if let Ok(bbs) = bbs.lock() {
-            let Some(node) = bbs.get_node(node) else {
+        if let Ok(bbs) = &mut bbs.lock() {
+            /* let Some(node) = bbs.get_node(node) else {
                 return Err(Box::new(IcyBoardError::Error("Node not found".to_string())));
-            };
-            node.lock().unwrap().connections.lock().unwrap().push(Box::new(connection));
+            };*/
+            bbs.get_open_connections().lock().unwrap()[node]
+                .as_mut()
+                .unwrap()
+                .connections
+                .lock()
+                .unwrap()
+                .push(Box::new(connection));
+
             Ok(Self {
                 screen: Screen::new(),
                 session: ui_session,
                 connection: ui_connection,
                 status_bar: 0,
-                handle: node.clone(),
+                node,
+                handle: bbs.get_open_connections().clone(),
             })
         } else {
             return Err(Box::new(IcyBoardError::Error("Node not found".to_string())));
@@ -160,9 +175,9 @@ impl Tui {
                     }
                 }
             }
-            if self.handle.lock().unwrap().handle.as_ref().unwrap().is_finished() {
+            if self.handle.lock().unwrap()[self.node].as_ref().unwrap().handle.as_ref().unwrap().is_finished() {
                 restore_terminal()?;
-                let handle = self.handle.lock().unwrap().handle.take().unwrap();
+                let handle = self.handle.lock().unwrap()[self.node].as_mut().unwrap().handle.take().unwrap();
                 if let Err(_err) = handle.join() {
                     return Err(Box::new(IcyBoardError::ThreadCrashed));
                 }

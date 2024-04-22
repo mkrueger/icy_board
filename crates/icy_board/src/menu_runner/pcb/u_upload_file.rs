@@ -19,7 +19,7 @@ use super::d_download::BlockingConnection;
 
 impl PcbBoardCommand {
     pub fn upload_file(&mut self, action: &Command) -> Res<()> {
-        self.state.node_state.lock().unwrap().user_activity = UserActivity::UploadFiles;
+        self.state.set_activity(UserActivity::UploadFiles);
         let upload_location = self.state.resolve_path(&self.state.session.current_conference.pub_upload_location);
         if !upload_location.exists() {
             self.state.display_text(

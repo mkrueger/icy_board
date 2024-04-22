@@ -569,7 +569,7 @@ pub fn valtime(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> 
 }
 
 pub fn pcbnode(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.node_state.lock().unwrap().node_number as i32))
+    Ok(VariableValue::new_int(vm.icy_board_state.node as i32))
 }
 
 pub fn readline(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {

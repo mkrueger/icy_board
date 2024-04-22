@@ -17,7 +17,8 @@ use jamjam::jam::JamMessageBase;
 
 impl PcbBoardCommand {
     pub fn quick_message_scan(&mut self, action: &Command) -> Res<()> {
-        self.state.node_state.lock().unwrap().user_activity = UserActivity::ReadMessages;
+        self.state.set_activity(UserActivity::ReadMessages);
+
         let Ok(Some(area)) = self.show_message_areas(action) else {
             self.state.press_enter()?;
             self.display_menu = true;

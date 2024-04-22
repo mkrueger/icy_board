@@ -25,5 +25,6 @@ pub mod u_upload_file;
 pub mod user_show_user_list;
 pub mod v_view_settings;
 pub mod w_write_settings;
+pub mod who_display_nodes;
 pub mod x_toggle_expert_mode;
 pub mod z_zippy_directory_scan;

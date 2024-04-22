@@ -21,7 +21,7 @@ use icy_board_engine::{
 
 impl PcbBoardCommand {
     pub fn find_files(&mut self, action: &Command) -> Res<()> {
-        self.state.node_state.lock().unwrap().user_activity = UserActivity::BrowseFiles;
+        self.state.set_activity(UserActivity::BrowseFiles);
 
         if self.state.session.current_conference.directories.is_empty() {
             self.state

@@ -9,7 +9,7 @@ use crate::{menu_runner::PcbBoardCommand, Res};
 
 impl PcbBoardCommand {
     pub fn read_messages(&mut self, action: &Command) -> Res<()> {
-        self.state.node_state.lock().unwrap().user_activity = UserActivity::ReadMessages;
+        self.state.set_activity(UserActivity::ReadMessages);
         let Ok(Some(area)) = self.show_message_areas(action) else {
             self.state.press_enter()?;
             self.display_menu = true;

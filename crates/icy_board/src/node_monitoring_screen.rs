@@ -92,7 +92,7 @@ impl NodeMonitoringScreen {
                             }
                             KeyCode::Enter => {
                                 if let Some(i) = self.table_state.selected() {
-                                    if bbs.lock().unwrap().get_node(i).is_some() {
+                                    if bbs.lock().unwrap().get_open_connections().lock().unwrap()[i].is_some() {
                                         return Ok(NodeMonitoringScreenMessage::EnterNode(i));
                                     }
                                 }
@@ -114,7 +114,7 @@ impl NodeMonitoringScreen {
         let now = Local::now();
         let mut footer = get_text("icbmoni_footer");
         if let Some(i) = self.table_state.selected() {
-            if bbs.lock().unwrap().get_node(i).is_some() {
+            if bbs.lock().unwrap().get_open_connections().lock().unwrap()[i].is_some() {
                 footer = get_text("icbmoni_on_note_footer")
             }
         }
@@ -152,9 +152,9 @@ impl NodeMonitoringScreen {
         .height(1);
 
         if let Ok(mut bbs) = bbs.lock() {
-            let rows = bbs.get_open_connections().iter().enumerate().map(|(i, node_state)| {
-                if let Some(state) = node_state {
-                    if let Ok(state) = state.lock() {
+            if let Ok(con) = bbs.get_open_connections().lock() {
+                let rows = con.iter().enumerate().map(|(i, node_state)| {
+                    if let Some(state) = node_state {
                         let user_name = if state.cur_user < 0 {
                             get_text("icbmoni_log_in")
                         } else {
@@ -174,7 +174,16 @@ impl NodeMonitoringScreen {
                             icy_board_engine::icy_board::state::UserActivity::ReadBulletins => get_text("icbmoni_user_read_bulletins"),
                             icy_board_engine::icy_board::state::UserActivity::TakeSurvey => get_text("icbmoni_user_take_survey"),
                             icy_board_engine::icy_board::state::UserActivity::UploadFiles => get_text("icbmoni_user_upload"),
+
+                            icy_board_engine::icy_board::state::UserActivity::DownloadFiles => get_text("icbmoni_user_download"),
+                            icy_board_engine::icy_board::state::UserActivity::Goodbye => get_text("icbmoni_user_logoff"),
+                            icy_board_engine::icy_board::state::UserActivity::RunningDoor => get_text("icbmoni_user_door"),
+                            icy_board_engine::icy_board::state::UserActivity::ChatWithSysop => get_text("icbmoni_user_chat_with_sysop"),
+                            icy_board_engine::icy_board::state::UserActivity::GroupChat => get_text("icbmoni_user_group_chat"),
+                            icy_board_engine::icy_board::state::UserActivity::PagingSysop => get_text("icbmoni_user_page_sysop"),
+                            icy_board_engine::icy_board::state::UserActivity::ReadBroadcast => get_text("icbmoni_user_read_broadcast"),
                         };
+
                         Row::new(vec![
                             Cell::from(format!("{:<3}", i + 1)),
                             Cell::from(activity),
@@ -189,33 +198,26 @@ impl NodeMonitoringScreen {
                             Cell::from(""),
                         ])
                     }
-                } else {
-                    Row::new(vec![
-                        Cell::from(format!("{:<3}", i + 1)),
-                        Cell::from(get_text("icbmoni_no_caller")),
-                        Cell::from(""),
-                        Cell::from(""),
-                    ])
-                }
-            });
-            let bar = " █ ";
-            let table = Table::new(
-                rows,
-                [
-                    // + 1 is for padding.
-                    Constraint::Length(4),
-                    Constraint::Min(15),
-                    Constraint::Min(25),
-                    Constraint::Min(20),
-                ],
-            )
-            .header(header)
-            .highlight_symbol(Text::from(vec!["".into(), bar.into(), bar.into(), "".into()]))
-            .highlight_style(Style::default().fg(DOS_BLUE).bg(DOS_LIGHT_GRAY))
-            .style(Style::default().fg(DOS_YELLOW).bg(DOS_BLUE))
-            .highlight_spacing(HighlightSpacing::Always);
-            let area = frame.size().inner(&Margin { vertical: 1, horizontal: 1 });
-            frame.render_stateful_widget(table, area, &mut self.table_state);
+                });
+                let bar = " █ ";
+                let table = Table::new(
+                    rows,
+                    [
+                        // + 1 is for padding.
+                        Constraint::Length(4),
+                        Constraint::Min(15),
+                        Constraint::Min(25),
+                        Constraint::Min(20),
+                    ],
+                )
+                .header(header)
+                .highlight_symbol(Text::from(vec!["".into(), bar.into(), bar.into(), "".into()]))
+                .highlight_style(Style::default().fg(DOS_BLUE).bg(DOS_LIGHT_GRAY))
+                .style(Style::default().fg(DOS_YELLOW).bg(DOS_BLUE))
+                .highlight_spacing(HighlightSpacing::Always);
+                let area = frame.size().inner(&Margin { vertical: 1, horizontal: 1 });
+                frame.render_stateful_widget(table, area, &mut self.table_state);
+            }
         }
     }
 

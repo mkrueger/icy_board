@@ -941,7 +941,7 @@ style = "Red"
 text = "Enter your text. (Enter) alone to end.~"
 style = "Green"
 
-[OutToDOS]
+[_OutToDOS]
 text = "Out to DOS"
 style = "Cyan"
 
@@ -973,8 +973,8 @@ style = "Green"
 text = "Error reading PCBPROT.DAT!  Aborting ..."
 style = "Red"
 
-[AnswerScript]
-text = "Answering Script"
+[AnswerSurvey]
+text = "Answering Survey"
 style = "Cyan"
 
 [NodeToCall]
@@ -1208,7 +1208,7 @@ style = "Cyan"
 text = "Auto Logoff Pending"
 style = "Cyan"
 
-[RecycleBBS]
+[_RecycleBBS]
 text = "DOS Recycle Pending"
 style = "Cyan"
 
@@ -1228,7 +1228,7 @@ style = "Cyan"
 text = "CHATTING with Group"
 style = "Cyan"
 
-[DropDOSDelayed]
+[_DropDOSDelayed]
 text = "Drop to DOS Pending"
 style = "Cyan"
 
@@ -1347,7 +1347,7 @@ text = "    (N) no, stop displaying this text"
 [MorehelpNonstop]
 text = "    (NS) continue reading in non-stop mode"
 
-[DropDOSNow]
+[_DropDOSNow]
 text = "Drop to DOS - Urgent"
 style = "Cyan"
 
@@ -2614,11 +2614,11 @@ style = "Red"
 text = "@OPTEXT@ Menu Command ('MENU' for options)"
 style = "Yellow"
 
-[RunningEvent]
+[_RunningEvent]
 text = "Running Event"
 style = "Cyan"
 
-[EventFinished]
+[_EventFinished]
 text = "Event finished at~"
 
 [ReplySuccessful]

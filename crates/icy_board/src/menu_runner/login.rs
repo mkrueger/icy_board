@@ -19,7 +19,7 @@ use icy_board_engine::{
 };
 impl PcbBoardCommand {
     pub fn login(&mut self) -> Res<bool> {
-        self.state.node_state.lock().unwrap().user_activity = UserActivity::LoggingIn;
+        self.state.set_activity(UserActivity::LoggingIn);
 
         self.state.reset_color()?;
         self.state.clear_screen()?;
@@ -32,7 +32,7 @@ impl PcbBoardCommand {
             .println(TerminalTarget::Both, &format!("CONNECT {} ({})", IcbDate::today(), IcbTime::now()))?;
         self.state.new_line()?;
         self.state.println(TerminalTarget::Both, &board_name)?;
-        let node_number = self.state.node_state.lock().unwrap().node_number;
+        let node_number = self.state.node;
         self.state
             .println(TerminalTarget::Both, &format!("IcyBoard v{} - Node {}", VERSION.to_string(), node_number))?;
 

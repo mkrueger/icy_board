@@ -271,12 +271,22 @@ pub enum UserActivity {
     TakeSurvey,
     CommentToSysop,
     UploadFiles,
+    DownloadFiles,
+
+    Goodbye,
+
+    RunningDoor,
+    ChatWithSysop,
+    GroupChat,
+    PagingSysop,
+    ReadBroadcast,
 }
 
 pub struct NodeState {
     pub connections: Arc<Mutex<Vec<Box<ChannelConnection>>>>,
     pub cur_user: i32,
     pub user_activity: UserActivity,
+    pub enabled_chat: bool,
     pub node_number: usize,
     pub connection_type: ConnectionType,
     pub handle: Option<thread::JoinHandle<Result<(), String>>>,
@@ -288,6 +298,7 @@ impl NodeState {
             connections: Arc::new(Mutex::new(Vec::new())),
             user_activity: UserActivity::LoggingIn,
             cur_user: -1,
+            enabled_chat: true,
             node_number,
             connection_type,
             handle: None,
@@ -319,7 +330,8 @@ pub struct IcyBoardState {
 
     pub board: Arc<Mutex<IcyBoard>>,
 
-    pub node_state: Arc<Mutex<NodeState>>,
+    pub node_state: Arc<Mutex<Vec<Option<NodeState>>>>,
+    pub node: usize,
 
     pub nodes: Vec<Node>,
 
@@ -358,7 +370,7 @@ impl VirtualScreen {
 }
 
 impl IcyBoardState {
-    pub fn new(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<NodeState>>, connection: Box<dyn Connection>) -> Self {
+    pub fn new(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<Vec<Option<NodeState>>>>, node: usize, connection: Box<dyn Connection>) -> Self {
         let mut session = Session::new();
         session.caller_number = board.lock().unwrap().statistics.cur_caller_number() as usize;
 
@@ -370,6 +382,7 @@ impl IcyBoardState {
             board,
             connection,
             node_state,
+            node,
             nodes: Vec::new(),
             current_user: None,
             debug_level: 0,
@@ -599,7 +612,7 @@ impl IcyBoardState {
         let _ = self.connection.shutdown();
 
         if let Ok(node_state) = self.node_state.lock() {
-            if let Ok(connections) = &mut node_state.connections.lock() {
+            if let Ok(connections) = &mut node_state[self.node].as_ref().unwrap().connections.lock() {
                 for conn in connections.iter_mut() {
                     let _ = conn.shutdown();
                 }
@@ -616,7 +629,7 @@ impl IcyBoardState {
         let old_language = self.session.language.clone();
 
         self.session.cur_user = user_number as i32;
-        self.node_state.lock().unwrap().cur_user = user_number as i32;
+        self.node_state.lock().unwrap()[self.node].as_mut().unwrap().cur_user = user_number as i32;
         let last_conference = if let Ok(mut board) = self.board.lock() {
             if user_number >= board.users.len() {
                 log::error!("User number {} is out of range", user_number);
@@ -742,6 +755,10 @@ impl IcyBoardState {
 
         None
     }
+
+    pub fn set_activity(&self, activity: UserActivity) {
+        self.node_state.lock().unwrap()[self.node].as_mut().unwrap().user_activity = activity;
+    }
 }
 
 #[derive(PartialEq)]
@@ -858,7 +875,7 @@ impl IcyBoardState {
         if target != TerminalTarget::User {
             // Send user only not to other connections
             if let Ok(node_state) = self.node_state.lock() {
-                if let Ok(connections) = &mut node_state.connections.lock() {
+                if let Ok(connections) = &mut node_state[self.node].as_ref().unwrap().connections.lock() {
                     for conn in connections.iter_mut() {
                         let _ = conn.write_all(&sysop_bytes);
                     }
@@ -1087,7 +1104,7 @@ impl IcyBoardState {
                 }
             }
             "NOCHAR" => result = self.session.no_char.to_string(),
-            "NODE" => result = self.node_state.lock().unwrap().node_number.to_string(),
+            "NODE" => result = self.node.to_string(),
             "NUMBLT" => {
                 if let Ok(bullettins) = self.load_bullettins() {
                     result = bullettins.len().to_string();
@@ -1258,8 +1275,8 @@ impl IcyBoardState {
         if size == 1 {
             return Ok(Some(KeyChar::new(KeySource::User, key_data[0] as char)));
         }
-        if let Ok(node_state) = self.node_state.lock() {
-            if let Ok(connections) = &mut node_state.connections.lock() {
+        if let Ok(node_state) = &self.node_state.lock() {
+            if let Ok(connections) = &mut node_state[self.node].as_ref().unwrap().connections.lock() {
                 for conn in connections.iter_mut() {
                     let size = conn.read(&mut key_data)?;
                     if size == 1 {

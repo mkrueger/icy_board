@@ -8,7 +8,7 @@ use icy_board_engine::icy_board::{
 
 impl PcbBoardCommand {
     pub fn show_bulletins(&mut self, action: &Command) -> Res<()> {
-        self.state.node_state.lock().unwrap().user_activity = UserActivity::ReadBulletins;
+        self.state.set_activity(UserActivity::ReadBulletins);
 
         let bulletins = self.state.load_bullettins()?;
         if bulletins.is_empty() {

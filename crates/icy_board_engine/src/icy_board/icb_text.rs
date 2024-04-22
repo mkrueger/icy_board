@@ -497,7 +497,7 @@ pub enum IceText {
     /// `Enter your text. (Enter) alone to end.~`
     MessageEnterText = 238,
     /// `Out to DOS`
-    OutToDOS = 239,
+    _OutToDOS = 239,
     /// `Filename to View (Enter)=none`
     ArchiveViewFileName = 240,
     /// `Error executing View of file (@OPTEXT@)`
@@ -513,7 +513,7 @@ pub enum IceText {
     /// `Error reading PCBPROT.DAT!  Aborting ...`
     ErrorInPCBPROTDATFile = 246,
     /// `Answering Script`
-    AnswerScript = 247,
+    AnswerSurvey = 247,
     /// `Enter the number of the node to CALL into chat`
     NodeToCall = 248,
     /// `Enter node (#) to ignore, (C)ancel or (W)ho`
@@ -633,7 +633,7 @@ pub enum IceText {
     /// `Auto Logoff Pending`
     LogoffPending = 306,
     /// `DOS Recycle Pending`
-    RecycleBBS = 307,
+    _RecycleBBS = 307,
     /// `Unavailable for CHAT`
     Unavailable = 308,
     /// `Transferring a File`
@@ -643,7 +643,7 @@ pub enum IceText {
     /// `CHATTING with Group`
     GroupChat = 311,
     /// `Drop to DOS Pending`
-    DropDOSDelayed = 312,
+    _DropDOSDelayed = 312,
     /// `@OPTEXT@ has made the discussion public.`
     MadeTopicPublic = 313,
     /// `Channel 1 cannot be made private.`
@@ -707,7 +707,7 @@ pub enum IceText {
     /// `(NS) continue reading in non-stop mode`
     MorehelpNonstop = 343,
     /// `Drop to DOS - Urgent`
-    DropDOSNow = 344,
+    _DropDOSNow = 344,
     /// `Force logoff now (`N'=wait until caller logs off, then drop to DOS)`
     DropNow = 345,
     /// `(V) View a file, then continue displaying files`
@@ -1385,9 +1385,9 @@ pub enum IceText {
     /// `@OPTEXT@ Menu Command ('MENU' for options)`
     MenuCommand = 682,
     /// `Running Event`
-    RunningEvent = 683,
+    _RunningEvent = 683,
     /// `Event finished at~`
-    EventFinished = 684,
+    _EventFinished = 684,
     /// `Message(s) successfully inserted.`
     ReplySuccessful = 685,
     /// `Message insertion failed.`
@@ -1927,9 +1927,8 @@ pub fn escape_toml(input: &str) -> String {
                 } else {
                     res.push_str(&format!("\\u{:04x}", c as u32));
                 }
-            },
+            }
         }
-        
     }
     res
 }

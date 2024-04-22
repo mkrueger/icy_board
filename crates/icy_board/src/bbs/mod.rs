@@ -3,7 +3,6 @@ use std::{
     sync::{Arc, Mutex},
     thread,
     time::Duration,
-    vec,
 };
 
 use crate::Res;
@@ -19,49 +18,55 @@ use icy_net::{telnet::TelnetConnection, Connection, ConnectionType};
 use crate::menu_runner::PcbBoardCommand;
 
 pub struct BBS {
-    pub open_connections: Vec<Option<Arc<Mutex<NodeState>>>>,
+    pub open_connections: Arc<Mutex<Vec<Option<NodeState>>>>,
 }
 
 impl BBS {
     fn clear_closed_connections(&mut self) {
-        for i in 0..self.open_connections.len() {
-            if let Some(node) = &self.open_connections[i] {
-                if node.lock().unwrap().handle.is_none() {
-                    self.open_connections[i] = None;
+        if let Ok(list) = &mut self.open_connections.lock() {
+            for i in 0..list.len() {
+                let is_finished = if let Some(state) = &list[i] {
+                    if let Some(handle) = &state.handle {
+                        handle.is_finished()
+                    } else {
+                        continue;
+                    }
+                } else {
                     continue;
-                }
-                if node.lock().unwrap().handle.as_mut().unwrap().is_finished() {
-                    self.open_connections[i] = None;
-                    continue;
+                };
+                if is_finished {
+                    list[i] = None;
                 }
             }
         }
     }
 
-    pub fn get_open_connections(&mut self) -> &[Option<Arc<Mutex<NodeState>>>] {
+    pub fn get_open_connections(&mut self) -> &Arc<Mutex<Vec<Option<NodeState>>>> {
         self.clear_closed_connections();
         &self.open_connections
     }
 
-    pub fn get_node(&self, node: usize) -> &Option<Arc<Mutex<NodeState>>> {
-        &self.open_connections[node]
-    }
-
-    pub fn create_new_node(&mut self, connection_type: ConnectionType) -> Arc<Mutex<NodeState>> {
+    pub fn create_new_node(&mut self, connection_type: ConnectionType) -> usize {
         self.clear_closed_connections();
-        for i in 0..self.open_connections.len() {
-            if self.open_connections[i].is_none() {
-                let node_state = Arc::new(Mutex::new(NodeState::new(i + 1, connection_type)));
-                self.open_connections[i] = Some(node_state.clone());
-                return node_state;
+        if let Ok(list) = &mut self.open_connections.lock() {
+            for i in 0..list.len() {
+                if list[i].is_none() {
+                    let node_state = NodeState::new(i + 1, connection_type);
+                    list[i] = Some(node_state);
+                    return i;
+                }
             }
         }
         panic!("Could not create new connection");
     }
 
     pub fn new(nodes: usize) -> BBS {
+        let mut vec = Vec::new();
+        for _ in 0..nodes {
+            vec.push(None);
+        }
         BBS {
-            open_connections: vec![None; nodes],
+            open_connections: Arc::new(Mutex::new(vec)),
         }
     }
 }
@@ -76,9 +81,9 @@ pub fn await_telnet_connections(board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>
         match stream {
             Ok(stream) => {
                 let board = board.clone();
-                let node_state = bbs.lock().unwrap().create_new_node(ConnectionType::Telnet);
+                let node = bbs.lock().unwrap().create_new_node(ConnectionType::Telnet);
 
-                let node = node_state.clone();
+                let node_list = bbs.lock().unwrap().get_open_connections().clone();
                 let handle = thread::spawn(move || {
                     let orig_hook = std::panic::take_hook();
                     std::panic::set_hook(Box::new(move |panic_info| {
@@ -89,12 +94,12 @@ pub fn await_telnet_connections(board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>
 
                     let connection = TelnetConnection::accept(stream).unwrap();
                     // connection succeeded
-                    if let Err(err) = handle_client(board, node_state, Box::new(connection)) {
+                    if let Err(err) = handle_client(board, node_list, node, Box::new(connection)) {
                         log::error!("Error running backround client: {}", err);
                     }
                     Ok(())
                 });
-                node.lock().unwrap().handle = Some(handle);
+                bbs.lock().unwrap().get_open_connections().lock().unwrap()[node].as_mut().unwrap().handle = Some(handle);
             }
             Err(e) => {
                 log::error!("connection failed {}", e);
@@ -105,8 +110,8 @@ pub fn await_telnet_connections(board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>
     Ok(())
 }
 
-fn handle_client(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<NodeState>>, connection: Box<dyn Connection>) -> Res<()> {
-    let state = IcyBoardState::new(board, node_state, connection);
+fn handle_client(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<Vec<Option<NodeState>>>>, node: usize, connection: Box<dyn Connection>) -> Res<()> {
+    let state = IcyBoardState::new(board, node_state, node, connection);
     let mut cmd = PcbBoardCommand::new(state);
 
     match cmd.login() {
