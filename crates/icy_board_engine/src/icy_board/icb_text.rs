@@ -1595,8 +1595,8 @@ pub enum TextError {
     #[error("ICETEXT Entry ({0}) not defined")]
     IceTextEntryNotDefined(String),
 
-    #[error("invalid ICETEXT file")]
-    NoValidIceTextFile,
+    #[error("invalid ICETEXT file ({0})")]
+    NoValidIceTextFile(String),
 
     #[error("invalid ICETEXT entry ({0})")]
     IceTextEntryInvalid(String),
@@ -1869,11 +1869,11 @@ fn load_ice_format(data: &[u8], file: String) -> Res<Vec<TextEntry>> {
         }
         Ok(_) => {
             log::error!("IcbText file doesn't conatin a table ({})", file);
-            Err(Box::new(TextError::NoValidIceTextFile))
+            Err(Box::new(TextError::NoValidIceTextFile("no table".to_string())))
         }
         Err(err) => {
             log::error!("Error parsing icb text file ({}): {} ", file, err);
-            Err(Box::new(TextError::NoValidIceTextFile))
+            Err(Box::new(TextError::NoValidIceTextFile(err.to_string())))
         }
     }
 }
@@ -1913,13 +1913,23 @@ fn import_pcboard_format(data: &[u8], file: String) -> Result<Vec<TextEntry>, Te
 pub fn escape_toml(input: &str) -> String {
     let mut res = String::new();
     for c in input.chars() {
-        if c == '\\' {
-            res.push_str("\\\\");
-        } else if c.is_ascii_alphanumeric() || c.is_ascii_punctuation() || c == ' ' {
-            res.push(c);
-        } else {
-            res.push_str(&format!("\\u{:04x}", c as u32));
+        match c {
+            '\x08' => res.push_str("\\b"),
+            '\x0C' => res.push_str("\\f"),
+            '\n' => res.push_str("\\n"),
+            '\r' => res.push_str("\\r"),
+            '\t' => res.push_str("\\t"),
+            '\\' => res.push_str("\\\\"),
+            '"' => res.push_str("\\\""),
+            _ => {
+                if c.is_ascii_alphanumeric() || c.is_ascii_punctuation() || c == ' ' {
+                    res.push(c);
+                } else {
+                    res.push_str(&format!("\\u{:04x}", c as u32));
+                }
+            },
         }
+        
     }
     res
 }
