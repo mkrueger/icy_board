@@ -18,6 +18,7 @@ fn convert_cmd(name: &str, cmd_type: CommandType, security: i32) -> icy_board_en
 }
 
 pub fn add_default_commands(data: &PcbBoardData, cmd_list: &mut CommandList) {
+    cmd_list.push(convert_cmd("!", CommandType::RedisplayCommand, 0));
     cmd_list.push(convert_cmd("A", CommandType::AbandonConference, data.user_levels.cmd_a));
     cmd_list.push(convert_cmd("B", CommandType::BulletinList, data.user_levels.cmd_b));
     cmd_list.push(convert_cmd("C", CommandType::CommentToSysop, data.user_levels.cmd_c));

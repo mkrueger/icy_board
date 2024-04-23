@@ -1785,6 +1785,14 @@ impl IcbTextFile {
         }
         Ok(())
     }
+
+    pub fn has_text(&self, text: IceText) -> bool {
+        if let Some(entry) = self.entries.get(text as usize) {
+            return !entry.text.is_empty();
+        }
+        // default has all entries
+        true
+    }
 }
 
 impl Deref for IcbTextFile {

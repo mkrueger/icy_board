@@ -123,6 +123,7 @@ pub struct Session {
     pub disp_options: DisplayOptions,
     pub current_conference_number: i32,
     pub current_message_area: usize,
+    pub current_file_directory: usize,
     pub current_conference: Conference,
     pub caller_number: usize,
     pub is_local: bool,
@@ -196,6 +197,7 @@ impl Session {
             num_lines_printed: 0,
             security_violations: 0,
             current_message_area: 0,
+            current_file_directory: 0,
             last_new_line_y: 0,
             page_len: 24,
             is_sysop: false,
@@ -519,15 +521,16 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub fn put_keyboard_buffer(&mut self, value: &str) -> Res<()> {
+    pub fn put_keyboard_buffer(&mut self, value: &str, is_visible: bool) -> Res<()> {
         let in_chars: Vec<char> = value.chars().collect();
 
+        let src = if is_visible { KeySource::User } else { KeySource::StuffedHidden };
         for (i, c) in in_chars.iter().enumerate() {
             if *c == '^' && i + 1 < in_chars.len() && in_chars[i + 1] >= 'A' && in_chars[i + 1] <= '[' {
                 let c = in_chars[i + 1] as u8 - b'@';
-                self.char_buffer.push_back(KeyChar::new(KeySource::StuffedHidden, c as char));
+                self.char_buffer.push_back(KeyChar::new(src, c as char));
             } else {
-                self.char_buffer.push_back(KeyChar::new(KeySource::StuffedHidden, *c));
+                self.char_buffer.push_back(KeyChar::new(src, *c));
             }
         }
         // self.char_buffer.push_back(KeyChar::new(KeySource::StuffedHidden, '\n'));
@@ -1000,10 +1003,10 @@ impl IcyBoardState {
             }
             "BICPS" => result = self.transfer_statistics.get_cps_both().to_string(),
             "BOARDNAME" => result = self.board.lock().unwrap().config.board.name.to_string(),
-            "BPS" => result = self.get_bps().to_string(),
+            "BPS" | "CARRIER" => result = self.get_bps().to_string(),
 
             // TODO
-            "BYTECREDIT" | "BYTELIMIT" | "BYTERATIO" | "BYTESLEFT" | "CARRIER" => {
+            "BYTECREDIT" | "BYTELIMIT" | "BYTERATIO" | "BYTESLEFT" => {
                 // todo
             }
 
@@ -1031,7 +1034,7 @@ impl IcyBoardState {
                     result = user.bus_data_phone.to_string();
                 }
             }
-            "DAYBYTES" | "DELAY" | "DIRNAME" | "DIRNUM" | "DLBYTES" | "DLFILES" | "EVENT" => {}
+            "DAYBYTES" | "DELAY" | "DLBYTES" | "DLFILES" | "EVENT" => {}
             "EXPDATE" => {
                 if let Some(user) = &self.current_user {
                     result = self.format_date(user.exp_date);
@@ -1117,6 +1120,17 @@ impl IcyBoardState {
             "NUMDIR" => {
                 result = self.session.current_conference.directories.len().to_string();
             }
+            "DIRNAME" => {
+                result = self.session.current_conference.directories[self.session.current_file_directory]
+                    .name
+                    .to_string();
+            }
+            "DIRNUM" => {
+                result = self.session.current_conference.directories.len().to_string();
+            }
+            "AREA" => {
+                result = self.session.current_conference.areas[self.session.current_message_area].name.to_string();
+            }
             "NUMAREA" => {
                 result = self.session.current_conference.areas.len().to_string();
             }
@@ -1154,7 +1168,11 @@ impl IcyBoardState {
                     result = user.get_name().to_string();
                 }
             }
-            "SECURITY" => {}
+            "SECURITY" => {
+                if let Some(user) = &self.current_user {
+                    result = user.security_level.to_string()
+                }
+            }
             "SCPS" => result = self.transfer_statistics.get_cps_download().to_string(),
             "SBYTES" => result = self.transfer_statistics.downloaded_bytes.to_string(),
             "SFILES" => result = self.transfer_statistics.downloaded_files.to_string(),
@@ -1194,12 +1212,12 @@ impl IcyBoardState {
                 if let Some(user) = &self.current_user {
                     if self.session.use_alias {
                         if user.alias.is_empty() {
-                            result = user.get_name().to_string();
+                            result = user.get_name().to_ascii_uppercase().to_string();
                         } else {
-                            result = user.alias.to_string();
+                            result = user.alias.to_ascii_uppercase().to_string();
                         }
                     } else {
-                        result = user.get_name().to_string();
+                        result = user.get_name().to_ascii_uppercase().to_string();
                     }
                 } else {
                     result = "0".to_string();

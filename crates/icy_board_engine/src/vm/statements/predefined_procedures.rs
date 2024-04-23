@@ -469,29 +469,21 @@ pub fn dir(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub fn kbdstuff(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let mut value = vm.eval_expr(&args[0])?.as_string();
-    if !value.ends_with('\r') {
-        value.push('\r');
-    }
-    vm.icy_board_state.put_keyboard_buffer(&value)?;
+    let value = vm.eval_expr(&args[0])?.as_string();
+    vm.icy_board_state.put_keyboard_buffer(&value, false)?;
     Ok(())
 }
 pub fn kbdstring(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let mut value = vm.eval_expr(&args[0])?.as_string();
+    let value = vm.eval_expr(&args[0])?.as_string();
     vm.icy_board_state.print(TerminalTarget::Both, &value)?;
-
-    // TODO: is that correct here?
-    if !value.ends_with('\r') {
-        value.push('\r');
-    }
-    vm.icy_board_state.put_keyboard_buffer(&value)?;
+    vm.icy_board_state.put_keyboard_buffer(&value, false)?;
     Ok(())
 }
 pub fn kbdfile(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let file_name = vm.eval_expr(&args[0])?.as_string();
     let fil_name = vm.resolve_file(&file_name);
     let contents = fs::read_to_string(file_name)?;
-    vm.icy_board_state.put_keyboard_buffer(&contents)?;
+    vm.icy_board_state.put_keyboard_buffer(&contents, false)?;
 
     Ok(())
 }

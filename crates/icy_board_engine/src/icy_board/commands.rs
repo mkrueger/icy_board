@@ -89,6 +89,9 @@ pub enum CommandType {
     StuffFileSilent,
 
     // user commands
+    /// ! command
+    RedisplayCommand,
+
     /// A command
     AbandonConference,
 

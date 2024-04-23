@@ -19,13 +19,19 @@ mod pcb;
 pub struct PcbBoardCommand {
     pub state: IcyBoardState,
     pub display_menu: bool,
+
+    pub saved_cmd: String,
 }
 pub const MASK_COMMAND: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;':,.<>?/\\\" ";
 const MASK_NUMBER: &str = "0123456789";
 
 impl PcbBoardCommand {
     pub fn new(state: IcyBoardState) -> Self {
-        Self { state, display_menu: true }
+        Self {
+            state,
+            display_menu: true,
+            saved_cmd: String::new(),
+        }
     }
 
     pub fn do_command(&mut self) -> Res<()> {
@@ -43,6 +49,9 @@ impl PcbBoardCommand {
             None,
             display_flags::UPCASE | display_flags::NEWLINE,
         )?;
+        if command.len() > 5 {
+            self.saved_cmd = command.clone();
+        }
         if command.is_empty() {
             return Ok(());
         }
@@ -79,6 +88,10 @@ impl PcbBoardCommand {
         }
 
         match action.command_type {
+            CommandType::RedisplayCommand => {
+                // !
+                self.redisplay_cmd()?;
+            }
             CommandType::AbandonConference => {
                 // A
                 self.abandon_conference()?;

@@ -19,6 +19,7 @@ pub mod news_display_news;
 pub mod p_set_page_len;
 pub mod q_quick_message_scan;
 pub mod r_read_messages;
+pub mod redisplay_cmd;
 pub mod s_take_survey;
 pub mod t_set_transfer_protocol;
 pub mod u_upload_file;
