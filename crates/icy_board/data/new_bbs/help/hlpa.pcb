@@ -1,0 +1,19 @@
+﻿@CLS@
+@X18┌────────────────────────────────────────────────────────────────────────────@X17┐
+@X18│ @X1DHelp: @X1E(A)bandon Conference                                                 @X17│
+@X18└@X17────────────────────────────────────────────────────────────────────────────┘
+
+@X07      @X0AAbandons the current conference and returns back to the Main Board
+      conference (a.k.a. Conference #0).
+
+   @X0BDescription
+
+      @X07On some bulletin board systems, the majority of activity takes place in
+      the Main Board (conference #0). A conference enables you to go to another
+      area of the bulletin board which may focus on another topic or subject.
+
+      The Abandon conference command will exit the current conference and
+      returns you to the Main Board. This command is the same as:
+
+           @X0EJ 0
+           J MAIN

@@ -1,0 +1,41 @@
+﻿@CLS@
+@X18┌────────────────────────────────────────────────────────────────────────────@X17┐
+@X18│ @X1DHilfe: @X1E(ALIAS) Namen ändern                                                @X17│
+@X18└@X17────────────────────────────────────────────────────────────────────────────┘
+
+@X07      @X0ADieser Befehl erlaubt es Ihnen, Ihr Pseudonym an- oder auszuschal-
+      ten, wenn Sie sich in einer Konferenz befinden, in der Pseudonyme
+      erlaubt sind.
+
+      @X0BUnterbefehle
+
+       @X0FON     Pseudonym verwenden. @X07Ihr Pseudonym ist aktiv.
+
+       @X0FOFF    Richtighn Namen verwenden. @X07Obwohl Sie sich in einer Konferenz
+              befinden, in der Pseudonyme erlaubt sind, wird Ihr richtiger
+              Name verwendet
+
+   @X0BBeschreibung
+
+      @X07Wenn Sie sich in eriner Konferenz befinden, in der Pseudonyme er-
+      laubt sind, können Sie mit diesem Befehl entscheiden, wann Ihr
+      Pseudonym aktiv ist. Wenn Sie diesen Befehl ohne Unterbefehle ein-
+      geben, wird der Zustand Ihres Pseudonyms geändert. Wenn Ihr Pseudo-
+      nym aktiv ist und Sie diesen Befehl ohne Unterbefehle aufrufen,
+      wechseln Sie zu Ihrem richtigen Namen.
+
+      Dieser Befehl hat keinen Effekt in Koferenzen in denen Aliase nicht
+      erlaubt sind.
+
+   @X0BBeispiele
+
+      @X07Dieses Beispiel wird Ihnen zeigen, was Sie eingeben müssen, wenn
+      Sie den Zustand Ihres Pseudonym entweder von an zu aus oder von
+      aus zu an ändern wollen:
+
+           @X0EALIAS
+
+      @X07Um die Verwendung Ihres Pseudonyms zu aktivieren, geben Sie fol-
+      gendes ein:
+
+           @X0EALIAS ON

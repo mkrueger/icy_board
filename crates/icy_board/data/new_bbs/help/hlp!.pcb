@@ -1,0 +1,33 @@
+﻿@CLS@
+@X18┌────────────────────────────────────────────────────────────────────────────@X17┐
+@X18│ @X1DHelp: @X1E(!) Re-Display Last Command                                          @X17│
+@X18└@X17────────────────────────────────────────────────────────────────────────────┘
+
+@X07      @X0AThis command will re-display the last command that you entered that was
+      at least five characters in length.
+
+   @X0BDescription
+
+      @X07Sometimes you may want to re-display the last command that you entered
+      for re-execution. From the Main Menu Command prompt,
+      you can use this command to re-display the last command that you
+      executed that was at least five characters in length.
+
+   @X0BExamples
+
+      @X07Enter the following to search for 'ICYBOARD' and 'LAN':
+
+           @X0ETS 1+ ICYBOARD & LAN
+
+      @X07Now join another conference:
+
+           @X0EJ 1
+
+      @X07And repeat the last command issued which was 5 characters or longer:
+
+           @X0E!
+
+      @X07After pressing ENTER the following will be displayed which you can
+      then modify or press ENTER to accept:
+
+           @X0ETS 1+ ICYBOARD & LAN

@@ -1,0 +1,34 @@
+﻿@CLS@
+@X18┌────────────────────────────────────────────────────────────────────────────@X17┐
+@X18│ @X1DHelp: @X1E(ALIAS) name change                                                  @X17│
+@X18└@X17────────────────────────────────────────────────────────────────────────────┘
+
+@X07      @X0AThis command allows you to turn your alias on or off in conferences
+      which permit alias usage.
+
+   @X0BSubcommands
+
+       @X0FON     Use your alias. @X07Your alias will be active if in a conference
+              where aliases are allowed.
+       @X0FOFF    Use your real name. @X07Even though you are in a conference where
+              aliases are allowed, your real name will be used.
+
+   @X0BDescription
+
+      @X07When you are in a conference that allows aliases, this command enables
+      you to decide when your alias will be active.
+      If your alias is active and you execute this command with no
+      subcommands, you will switch to using your real name.
+
+      This command has no effect in conferences where aliases are forbidden.
+
+   @X0BExamples
+
+      @X07This example will show you what to enter if you want to toggle the
+      status of your alias from either on to off or from off to on:
+
+           @X0EALIAS
+
+      @X07To turn usage of your alias on, enter:
+
+           @X0EALIAS ON
