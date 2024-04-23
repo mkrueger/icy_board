@@ -1,0 +1,413 @@
+  WARNING:  This document is subject to change at any time.  Any changes made
+  will be indicated by a vertical bar (|) in column 1 of the file.
+
+| Last update: 04/27/93
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+  The following is the standard message header (128 byte block) with only
+  slight modifications:
+
+  typedef struct {
+    char    Status;
+    bassngl MsgNumber;
+    bassngl RefNumber;
+    char    NumBlocks;      <- see bit #7 of ExtendedStatus
+    char    Date[8];
+    char    Time[5];
+    char    ToField[25];
+    bassngl ReplyDate;
+    char    ReplyTime[5];
+    char    ReplyStatus;
+    char    FromField[25];
+    char    SubjField[25];
+    char    Password[12];
+    char    ActiveFlag;
+    char    EchoFlag;
+    char    Reserved1[4];    <- reserved was 6 bytes
+    char    ExtendedStatus;  <- new byte - 0 for compatibility, accept 32 also
+    char    Reserved2;       <- last of original reserved bytes
+  } msgheadertype;
+
+  The message base format remains almost 100% identical to the PCBoard v14.x
+  standard.  In fact, it remains 100% compatible having just one byte
+  different, which was not previously used by PCBoard.
+
+  The byte at offset 126 (i.e.  the 127th byte of the 128 byte header) has a
+  new function.  It is now used to indicate that extended header information
+  will be found in the body of the message.
+
+  The byte, referenced as ExtendedStatus above, will contain a 0 by default to
+  indicate that no extended header information is available.  A value of 32
+  will also be accepted to indicate the same thing since some programs may be
+  placing a space instead of a null character in the reserved byte(s).
+
+  If ExtendedStatus is not equal to 0 or 32 then it is assumed that extended
+  header information is available, however, a follow-up check of the message
+  body will determine the true existence, or lack thereof, of such information.
+
+  For speed purposes, ExtendedStatus will be divided into 'bits' as follows:
+
+    bit 0 = extended header has TO information
+    bit 1 = extended header has FROM information
+    bit 2 = extended header has SUBJECT information
+    bit 3 = extended header has CARBON LIST TO information
+    bit 4 = extended header has ATTACHED FILE information
+    bit 5 = ignore - this bit is equal to decimal 32
+    bit 6 = extended header has either REQRR or ACKRR information
+    bit 7 = reserved for future use
+
+  Bit 6 indicates that either an REQRR (request return receipt) or an ACKRR
+  (acknowledge return receipt) extended header is in the message.
+
+  The following structure will be used within the contents of a message body
+  whenever an extended header is to be included:
+
+  typedef struct {
+    int   Ident;        16639 (40FF hex)
+|   char  Function[7];  TO,TO2,FROM,FROM2,SUBJECT,ATTACH,LIST,ROUTE,ORIGIN,REQRR,ACKRR,ACKNAME,PACKOUT
+    char  Colon;        always set to ":"
+    char  Descript[60]; user name, subject, filename
+    char  Status;       NONE, READ (if LIST)
+    char  CarReturn;    0xE3 or 0x0D
+  } msgextendtype;
+
+  There can be as many extended headers as desired.  In fact, no headers at all
+  is possible even though the ExtendedStatus from the message header told
+  PCBoard to expect to find one.  This, of course, has a negative impact on
+  efficiency (don't set the flag unless you really intend to put an extended
+  header in the body of the message) but maintains complete compatibility with
+  previous versions of PCBoard which totally ignored the values found where the
+  ExtendedStatus byte is now located.
+
+  The first field, Ident, serves to indicate that a truly valid header is about
+  to follow.  Ident is an integer value of 40FFh.  Stored in the file it is
+  seen as an ascii 255 character followed by an @ character.
+
+  Older software will not expect this extended header to be in there and will
+  display the header to the user.  The format of the information, however, is
+  such that it will be meaningful, albeit, somewhat annoying to see.
+
+| The function of the header is written in english.  Right now the following
+| are valid values for PCBoard:  "TO     ", "TO2    ", "FROM ", "FROM2  ",
+| "SUBJECT", "ATTACH ", "LIST ", "ROUTE ", "ORIGIN ", "REQRR  ", "ACKRR  ",
+| "ACKNAME" and "PACKOUT".  Any other values are permissable but will be
+| ignored by PCBoard v15.0 unless and until future updates to PCBoard add
+| new-standards.
+
+  The next character in the header is a colon which is then followed by the
+  appropriate text for the header.  For example, the header might be structured
+  like this:
+
+     <255><@>SUBJECT:any subject you wish to put here, up to 60 characters
+
+  Notice how an older program, which is not PCB v15.0-aware, will still display
+  something intelligible to the user who is reading the message.  Because the
+  entire text is in english the user will be faced with extra information that
+  is not utilized by the software he is using, but at the same time, the extra
+  information does not make his software incompatible or unusable.  This
+  protects the user's investment in software and time, especially if the author
+  is no longer supporting the program, or the user does not have time to switch
+  programs or upgrade to a newer package which may have more bells and whistles
+  than he cares to learn.
+
+  Of course, older packages will not be able to take advantage of the added
+  functionality since the header information will be very difficult to enter
+  properly via the keyboard.  So, while remaining compatible with older
+  software, to take advantage of the new features a user will still have to
+  upgrade to a newer release of the package.
+
+  The text for the header may be up to 60 bytes long.  If the Function is set
+  to "TO" then the header indicates a longer, or alternate, name should be used
+  when displaying the TO:  field of the message.  If the Function is set to
+  "LIST" then the header indicates the name of ONE of the users who is to
+  receive the message.  There may be more than one "LIST" header, in fact, it
+  is expected that any time you create a carbon copy list you will be sending
+  the message to two or more users.  If the Function is set to "FROM" then it
+  indicates a longer, or alternate, name should be displayed for the FROM:
+  field.  If set to "SUBJECT" then a longer, or alternate, subject is
+  displayed.  If set to "ATTACH" then the description field indicates the name
+  of the attached file.  If set to ROUTE then message routing information (for
+  netmail transfers) will be included.  If set to ORIGIN then the origin of the
+  message (for netmail transfers) will be included.  If set to REQRR then
+  PCBoard will generate a Return Receipt when the user reads the message
+  online.  Mail Doors will need to be enhanced to perform the same
+  functionaility.  If set to ACKRR this will indicate that an acknowledgement
+  to the Return Receipt is contained in the message.  One additional header,
+  the ACKNAME, will be included with ACKRR to complete the acknowledgement.
+
+  The next byte is the extended header status byte.  To help guarantee that the
+  header is valid, there are only three possible values for this field.  They
+  are:  'N', and 'R'.  These values are used as follows:
+
+     'N' indicates that there is no status - it is used just for verification
+     'R' indicates that a user in a CARBON COPY LIST has read the message
+
+  The 'R' allows PCBPack to determine when all intended recepients have read
+  the message.  Each user is listed in a separate header and each user
+  therefore has a separate status byte to indicate when it has been read.  Once
+  all users have read the message it may then be deleted.
+
+  Finally, the CarReturn byte is set to E3 hex.  This is the same character
+  that is normally used by PCBoard to indicate the end of a line.  By
+  terminating the header in this manner all non-v15.0-aware packages will be
+  able to properly display the entire header in a legible form.  The 0D hex
+  value is used by foreign systems (such as the Chinese version of PCBoard) in
+  place of E3.  This is because E3 interferes with the double-byte character
+  system used by these countries.
+
+  Remember too, that other systems/software could pass other values through
+  the extended header field.  PCBoard v15.0 will ignore (and not display)
+  any extended headers it does not understand.  Thus, if an offline reader were
+  to pass additional information into the message base it would be posted and
+  downloaded through any of the existing mail doors.  The downloader then,
+  having access to an updated reader, could take advantage of the additional
+  information that was passed to it.  For instance, a header of "GIF" might be
+  passed as well as a filename.  If the door were updated to know that it
+  should send the attached file too then the offline reader could use the
+  extended header "GIF" to know that it can display the file to the caller.
+  Possibilities are limitless.
+
+ -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+ he following outlines implementation details of the new system, covering
+ ach of the headers supported by PCBoard v15.0:
+ -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+  FROM
+  ----
+  For v15.0, this field allows a name that is longer than 25 characters to be
+| stored in the message.  In order to ENTER a name that is longer than 25
+| characters, however, the conference must have the "Allow Internet TO: Names"
+| switch enabled.  Of course, the only way to edit the FROM field is to use
+| the (E)dit Header command.
+
+  If the message header FROM field is blank (all spaces) then PCBoard will
+  display only the extended header FROM field.
+
+  If the message header FROM field is not blank, then PCBoard will display
+  the extended header FROM field, then a comma, then the message header FROM
+  field.
+
+| FROM2
+| -----
+| This field is only expected to exist if the FROM field is utilized first.
+| It allows another 60 characters to be used for the FROM field.  PCBoard will
+| automatically piece together the two FROM/FROM2 fields and will perform any
+| wrapping on screen as necessary.
+
+  TO
+  --
+  For v15.0, this field allows a name that is longer than 25 characters to be
+  stored in the message.  PCBoard only allows a caller to type in a TO name
+  longer than 25 characters if Internet style (long) addresses are enabled
+  via PCBSetup.  This is done on a per-conference basis.
+
+  If the message header TO field is blank (all spaces) then PCBoard will
+  display only the extended header TO field.
+
+  If the message header TO field is not blank, then PCBoard will display first
+  the extended header TO field, then a comma, then the message header TO field.
+
+| TO2
+| ---
+| This field is only expected to exist if the TO field is utilized first.
+| It allows another 60 characters to be used for the TO field.  PCBoard will
+| automatically piece together the two TO/TO2 fields and will perform any
+| wrapping on screen as necessary.
+
+  SUBJECT
+  -------
+  If an alternate subject is supplied it will be displayed in the message
+  header instead of the 25-character subject found in the main header.  If the
+  caller replies to the message the alternate subject is automatically carried
+  forward.
+
+  ATTACH
+  ------
+  When saving the message the caller may attach a file by uploading it while
+  in the editor.  PCBoard will use standard file transfer protocols to receive
+  the file.  The filename will be stored in the header.  NO PATH information
+  will be included.  PCBoard must be configured with each conference set to
+  a separate file attachment subdirectory.  By not including the path
+  information in the header, the files may be moved simply by changing the
+  PCBoard configuration.  If a user reads the message through PCBoard he will
+  be prompted to download the attached file.  If the user downloads the message
+  through an offline mail reader then it is up to the mail door author to
+  provide options for 'always' downloading the file, 'never' downloading the
+  file, or provide the ability to call back later to pick the file up.
+
+  The "Descript" field of the extended header will be formatted as follows:
+
+     FILENAME.EXT (FILESIZE) UNIQUE.###
+
+  The first filename is the actual name of the file that is being attached.
+
+  The file size is the proper size of the file.
+
+  The unique filename is the name which is used to STORE the file on disk.
+  Because of the possibility of more than one message having the same name
+  for a file attachment, it is necessary to use a unique storage name.
+  PCBoard will display only the first filename and size to the caller.  But
+  when the caller downloads the file, PCBoard will have to copy the stored
+  name to the proper filename first, then perform the file transfer.
+
+  PCBoard has implemented the unique filename by simply taking the original
+  filename and changing the extension to ".000" for the first file by that
+  name, ".001" for the second, ".002" for the third and so on.  In other
+  words, when a caller uploads an attached file, PCBoard will check for any
+  previously existing "FILENAME.000" file.  If one is found, then it will
+  check for a "FILENAME.001" file and so on until a unique name can be
+  posted.
+
+  For offline mail doors, the door software will have to perform the same
+  operation as PCBoard - ensuring that the file is posted in the proper
+  directory and that it has a unique name.  The extended header MAY need
+  to be updated before posting the message in the message base!
+
+  LIST
+  ----
+  When writing a message it can sometimes be advantageous to send a single
+  message to two or more individuals without:  1) making the message public,
+  or 2) making separate copies of the message for each recipient.  When
+  addressing the message the caller may indicate, by typing 'LIST' in the TO:
+  field, that he or she desires that PCBoard prompt for a list of names to
+  store in the extended header.  Each name entered is acted upon similar to
+  the TO field described above.  Each name is stored in its own unique header
+  with an initial Status byte of 'N'.  The message will be viewable only to
+  those in the list and the sysop.  As each intended recipient reads the
+  message the Status byte for the appropriate extended header will be changed
+  to an 'R'.  WARNING:  Older mail doors will not know to set this byte.  The
+  message could, in fact, be read by all users in the list, but not be flagged
+  as having be read by all, unless the mail door(s) in use are properly updated
+  to perform this function.  This merely means that PCBPack will not know to
+  delete the message by seeing if the message has been read.  Instead, it will
+  have to remove the message based on age or message number limits as set by
+  the sysop.
+
+  ROUTE
+  -----
+  PCBoard can prompt a caller for routing information if the sysop has
+  configured it to do so.  A NETMAIL system that receives the message should
+  verify that it was intended for the BBS that received it.   If the caller is
+  replying to a message then ROUTE automatically receives the contents of the
+  ORIGIN field, if one exists, and the caller is not prompted to enter the
+  routing information.
+
+  ORIGIN
+  ------
+  This field is filled in by PCBoard using a default specified in the PCBoard
+  configuration IF the sysop has configured it to do so.  If an ORIGIN field is
+  found, the NETMAIL software that is exporting the message may accept the
+  default or it may modify it in a manner that is compatible with the NETMAIL
+  package in case it is different from that used by PCBoard.
+
+  The default ORIGIN field will be straight text which simply identifies the
+  BBS system.  This is similar to the method used by PCRELAY software which
+  uses a 7 (or is it 8?) character name to indicate the origin.  The length
+  allowed by PCBoard for the ORIGIN line is the full 60 character limit of
+  the extended header.
+
+  To reiterate:  This scheme need not be used by the NETMAIL software.  The
+  ORIGIN field may be replaced with one that is compatible with the NETMAIL
+  software being used to echo a particular conference.  HOWEVER, where multiple
+  netmail systems share a single conference it is highly desireable that the
+  NETMAIL software be written to keep the origin intact and use some type of
+  look-up table to determine any other necessary information.
+
+  REQRR
+  -----
+  This packet indicates that the caller is requesting that a return receipt
+  message be generated as soon as the message is received by the addressee.
+
+  If the caller reads the message online (via PCBoard) then PCBoard will
+  immediately generate a return message addressed to the TO field.  It will
+  also use the extended header TO, SUBJECT, and ORIGIN information to get the
+  message back to the originator.  The message generated will include an
+  ACKRR to indicate that it is an acknowledgement.  No other information will
+  be in the body of the message.
+
+  The "Descript" field of the extended header, when generated by PCBoard,
+  will say "Caller has requested a Return Receipt".  This will allow those
+  using incompatible software to at least understand what is happening.
+
+  PCBoard, when displaying the message to the caller, will indicate at the
+  bottom of the message that the sender has requested a Return Receipt.  If
+  this is the first time the message has been read then it will also indicate
+  that the Return Receipt is being generated right then.
+
+  ACKRR
+  -----
+  When a caller views an ACKRR message online (via PCBoard), PCBoard will use
+  the current language (pcbtext file) to display the acknowledgement to the
+  caller appropriately.  No other information in the body of the message will
+  be shown to the caller.
+
+  The "Descript" field of the extended header will be formatted as follows:
+
+     "Acknowledge Receipt of msg ###### written on ##/##/## ##:##"
+
+  PCBoard will read the Descript field and parse out the written on
+  ##/##/## ##:## information.  If the reply message number is 0 then it
+  will also use the "msg #####" portion.  Then, using the pcbtext file,
+  it will display an appropriate message to the caller to indicate that
+  the message he or she wrote on MM/DD/YY at HH:MM has been received.
+
+  The FROM field of the message header will say "RETURN RECEIPT".  An
+  ACKNAME header will will be included in to indicate the actual name of
+  the caller having received the message.
+
+  ACKNAME
+  -------
+  This field is used in conjuction with ACKRR to indicate the name of the
+  user that received the message.
+
+  PACKOUT
+  -------
+  This field holds a date in the form MM/DD/YY which specifies the date for
+  when a message should be packed out.  As long as the message has not been
+  killed, the message will remain in the message base until that date.
+
+ -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+ uestion and Answer Section
+ -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+  Q: With the long name and subject fields possible, what is going to happen
+  to the header display in PCBoard when reading messages?
+
+  A: The following is the proposed header display format:
+
+  Date: 10-01-92 (01:01)            Number: 1100 of 1200 (Refer 1050)
+    To: A very long name can be used here, ACCOUNT NAME
+  From: From another long named user, ACCOUNT NAME
+  Subj: A very long subject - mixed case is possible throughout
+  Read: 08-15-92 (17:10)            Status: PUBLIC MESSAGE / FILE / LIST
+  Conf: MAIN BOARD (0)           Read Type: GENERAL (+)
+
+  The above example shows what a header might look like if the TO, FROM and
+  SUBJECT fields were all replaced with extended header information.  It also
+  shows what the header would look like if a file were attached and the message
+  were addressed to a list of users (carbon copy list).
+
+  Q: Where will attached files be stored?
+
+  A: Each conference can be configured with a unique subdirectory for storing
+  attached files.  The subdirectory need not be included in the DLPATH.LST file
+  since PCBoard will be able to locate the file attachment.  However, it may be
+  included in the DLPATH.LST if you want others, who are not reading the
+  message, to be able to download the file if they know the name.
+
+  Q: Will the full path of the attached file be stored in the message header?
+
+  A: No.  By storing only the name of the file, the sysop may change the
+  configuration at any time without having to process the message base to make
+  the change.  In other words, the sysop could move attached files from one
+  drive to another with a simple change in configuration.
+
+  Q: Will protocol transfers be allowed for attached uploads?  How about the
+  message text itself?
+
+  A: Yes to both questions.  The user can upload message text using a transfer
+  protocol other than ASCII.  If the message is to be saved with an attached
+  file then the caller will be prompted for the upload and, again, a protocol
+  transfer will take place.
+

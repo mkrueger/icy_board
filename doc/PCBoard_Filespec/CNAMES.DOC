@@ -1,0 +1,177 @@
+  WARNING:  This document is subject to change at any time.  Any changes made
+  will be indicated by a vertical bar (|) in column 1 of the file.
+
+| Last update: 04/05/94
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+  PCBoard v15.0 now uses two separate files for conference information.  They
+  are CNAMES.@@@ and CNAMES.ADD.  Both of which are random access (fixed length
+  records).  A discussion of each follows:
+
+
+                            CNAMES.@@@ FILE LAYOUT
+                            ----------------------
+
+  The CNAMES.@@@ files is a random access file with 2 byte (INTEGER) at the
+  start of the file that indicates the LENGTH of the conference record
+  structure.
+
+  The actual file layout is as follows:
+
+  typedef struct {
+    char Name[14];             conference name
+    bool PublicConf;           new user default registration
+    bool AutoRejoin;           auto-rejoin for this conference
+    bool ViewMembers;          allow viewing conference members
+    bool PrivUplds;            make uploads private
+    bool PrivMsgs;             make all messages private
+    bool EchoMail;             is this an Echo-Mail conference
+    int  ReqSecLevel;          security required to join non-public conf.
+    int  AddSec;               additional security level added after join
+    int  AddTime;              additional time added after join
+    char MsgBlocks;            number of message base index blocks
+    char MsgFile[32];          name and location of messages file
+    char UserMenu[32];         name and location of Users Menu
+    char SysopMenu[32];        name and location of Sysops Menu
+    char NewsFile[32];         name and location of Conference News
+    char PubUpldSort;          sort type for public upload DIR file
+    char UpldDir[29];          name and location of public upload DIR file
+    char PubUpldLoc[26];       public upload location
+    char PrvUpldSort;          sort type for public upload DIR file
+    char PrivDir[29];          name and location of private upload DIR file
+    char PrvUpldLoc[26];       private upload location
+    char DrsMenu[29];          name and location of conference doors menu
+    char DrsFile[33];          name and location of DOORS.LST file
+    char BltMenu[29];          name and location of conference blt menu
+    char BltNameLoc[33];       name and location of BLT.LST file
+    char ScrMenu[29];          name and location of conference scripts menu
+    char ScrNameLoc[33];       name and location of SCRIPT.LST
+    char DirMenu[29];          name and location of directories menu
+    char DirNameLoc[33];       name and location of DIR.LST file
+    char PthNameLoc[33];       name and location of DLPATH.LST file
+  } pcbconftype;
+
+  Accessing the file then is a simple matter of determine which record number
+  you want and multiplying it by the size of the conference record and then
+  adding the two byte offset for the header.
+
+  In other words, you might do the following:
+
+      read(cnames,&RecSize,sizeof(int));
+      lseek(cnames,(ConfNum-1)*RecSize+sizeof(int),SEEK_SET);
+      read(cnames,&ConfRec,sizeof(pcbconftype));
+
+  Note that you first read in the two byte header to determine the actual
+  record size on disk.  You can do this ONCE at the startup of your code
+  and record the value so that you never have to read it again.
+
+  The record size MAY may be larger than the size of the structure that you
+  want to read in since you may not want to use the entire structure or it
+  may be updated in a later release of PCBoard code.  So by using the two
+  byte header as your record size you will remain compatible with updates
+  to PCBoard.
+
+  Also, notice that in the lseek() function call the size of the header was
+  added to the equation so that you are positioned right where the record
+  starts in the file.
+
+  NOTE:  The file layout for the CNAMES file does not contain any kind of
+  limit as to the number of conferences which may be stored in the file.
+  However, since PCBoard uses an unsigned integer for the conference number
+  it limits the number to 65535.
+
+  HOWEVER, because the "Main Board Area" counts as one AREA - the highest
+  "numbered" conference on a system will be 65534 because one more than that
+  would create 65536 conference AREAS which would not fit inside of an
+  unsigned integer.
+
+                            CNAMES.ADD FILE LAYOUT
+                            ----------------------
+
+  The CNAMES.@@@ files is a random access file of 256 bytes per record with
+  the first record starting at offset 0 (no header information).
+
+  The actual file layout is as follows:
+
+  #define ADDCONFRESERVE     64
+
+  typedef struct {
+    bool ForceEcho;             turn off echo question, force all msgs to echo
+    bool ReadOnly;              do not allow ANY msgs to be entered in conf
+    bool NoPrivateMsgs;         do not allow PRIVATE msgs to be entered
+    char RetReceiptLevel;       level required to request return receipts
+    bool RecordOrigin;          Record ORIGIN in messages
+    bool PromptForRouting;      Prompt user for ROUTING information
+    bool AllowAliases;          Allow aliases to be used
+    bool ShowIntroOnRA;         Show the Conf INTRO in the middle of R A scan
+    char ReqLevelToEnter;       Security Level required to enter messages
+    char Password[13];          password reqd to join if private
+    char Intro[32];             name/location of conference INTRO file
+    char AttachLoc[32];         location for file attachment storage
+    char RegFlags[4];           RXS flags for automatic conf registration
+    char AttachLevel;           Level required to attach a message
+    char CarbonLimit;           max number of names in carbon list
+    char CmdLst[32];            name/location of CMD.LST use instead of default
+    bool OldIndex;              maintain old MSGS indexes?
+    bool LongToNames;           allow long TO: names to be entered
+    char CarbonLevel;           level required to enter @LIST@ messages
+    char ConfType;              one byte code for conference type (*see below)
+    long ExportPtr;             a pointer to the last message number exported
+    float ChargeTime;           amount to charge for time spent in conference
+    float ChargeMsgRead;        amount to charge for each message read
+    float ChargeMsgWrite;       amount to charge for each message written
+    char Reserved[ADDCONFRESERVE];  reserved for future growth
+    char Name2[48];             conf name #2 (**see below)
+  } addconftype;
+
+  Accessing the file then is a simple matter of determine which record number
+  you want and multiplying it by the size of the conference record.
+
+  In other words, you might do the following:
+
+      lseek(file,(ConfNum-1)*sizeof(addconftype),SEEK_SET);
+      read(file,&AddRec,sizeof(addconftype));
+
+  *NOTE:  Conference types are defined as follows:
+
+          ConfType = 0 = Normal PCBoard Conference
+          ConfType = 1 = Internet Email (Import & Export)
+          ConfType = 2 = Internet/Usenet Junk (Import Only)
+          ConfType = 3 = Usenet Moderated Newsgroup
+                         (Import Normally /
+                          Export Public Messages as Email to Moderator /
+                          Export Private Messages as Email to TO:)
+          ConfType = 4 = Usenet Public Newsgroup
+                         (Import Normally /
+                          Export Public Messages as Articles /
+                          Export Private Messages as Email to TO:)
+          ConfType = 5 = Fido Conference
+
+   **NOTE: The actual conference name is now composed of two parts.  The
+           first 13 bytes of the name are found in CNAMES.@@@, the last 47
+           bytes of the name are found in CNAMES.ADD at the end of the
+           structure (skipping over the reserved bytes).  Don't forget that
+           the first part had a NULL terminator which needs to be removed as
+           you concatenate the two strings together.
+
+
+                            CNAMES.IDX FILE LAYOUT
+                            ----------------------
+
+| The CNAMES.IDX file is used by 1) PCBoard to speed up the (J)oin Command
+| when used with a conference name, and 2) by the UUCP import utility (UUIN)
+| to speed up the importing process.
+|
+| The file is composed of one record per conference, with the record format
+| looking like this:
+|
+| typedef struct {
+|     char     Name [ 60 + 1 ];
+|     unsigned Num;
+| } cnamesidxtype;
+|
+| The Name field is NUL terminated, and the Num field is the conference
+| number.  The entire file is sorted by conference name (case insensitive).
+
+

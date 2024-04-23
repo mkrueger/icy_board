@@ -1,0 +1,349 @@
+  WARNING:  This document is subject to change at any time.  Any changes made
+  will be indicated by a vertical bar (|) in column 1 of the file.
+
+| Last update: 03/24/93
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+  The following information documents the format for PCBoard's message base
+  and message index formats.
+
+  The message base consists of 128-byte blocks of data.  A single 128 byte
+  header is placed at the start of each message base giving information such
+  as the number of messages in the message base and the low to high range of
+  message numbers within the message base.
+
+  Each individual message subsequently consists of a 128-byte header
+  describing who the message is to and from and an indicator of how many
+  128-byte blocks comprise the entire message.
+
+  The following layout is specified in a "byte offset" format such that the
+  first field begins at offset 0.
+
+  The following is a definition of the variable types that will be used below:
+
+    char   = a 1 byte character
+    str    = an array of 2 or more "char" bytes
+    bsreal = a 4 byte Basic Single Precision real number
+|   int    = a 2 byte integer
+|   long   = a 4 byte integer
+|   bitmap = a single byte with individual bits set on or off
+
+  Note that strings are not NULL terminated and that the length specified for
+  the string is full number of useable and storeable bytes.  All strings are
+  padded with spaces to fill the entire field.
+
+
+  Message Base Header
+  -------------------
+
+    Offset  Type   Length Description
+    ------ ------  ------ -----------
+       0   bsreal     4   High Message Number       (0 to 16,700,000)
+       4   bsreal     4   Low Message Number        (0 to 16,700,000)
+       8   bsreal     4   Number of Active Messages (0 to 32,767)
+      12   bsreal     4   Number of System Callers (Main Message Base Only)
+      16   str        6   The "LOCKED" field for pre-14.2 systems (see note 1)
+      22   str      106   Reserved for future use
+
+
+  Individual Message Headers
+  --------------------------
+
+    Offset   Type   Length  Description
+    ------  ------  ------  -----------
+       0    char       1    Message Status Flag (see note 2)
+       1    bsreal     4    Message Number   (0 to 16,700,000)
+       5    bsreal     4    Reference Number (0 to 16,700,000)
+       9    char       1    Number of 128 Byte Blocks in Message (see note 3)
+      10    str        8    Date of Message Entry (in "mm-dd-yy" format)
+      18    str        5    Time of Message Entry (in "hh:mm" format)
+      23    str       25    Name of the User to whom the Message is Addressed
+      48    bsreal     4    Date of the Reply Message (in yymmdd format)
+      52    str        5    Time of the Reply Message (in "hh:mm" format)
+      57    char       1    The Letter "R" if the Message has a Reply
+      58    str       25    Name of the User who wrote the Message
+      83    str       25    Subject of the Message
+     108    str       12    Password Need to Read the Message (if any)
+     120    char       1    Active Status (225 = active, 226 = inactive)
+     121    char       1    The Letter "E" if the Message is to be Echoed
+|    122    str        4    Reserved for future use
+|    127    bitmap     1    Extended Header Flags
+|    128    char       1    Reserved for future use
+
+
+| Extended Header Format
+| ----------------------
+| A mesage may contain one or more EXTENDED HEADERS within the body of the
+| message.  Please refer to HEADERS.DOC for a discussion of each of these
+| headers and their uses.
+|
+| The following is the physical layout of the Extended Header within the
+| message body.  You may assume that as soon as the Extended Header ID is not
+| found that there are no more extended headers in the message body.
+|
+|   Offset   Type   Length  Description
+|   ------  ------  ------  -----------
+|      0    int        2    Extended Header ID = must be equal to 40FFh
+|      2    str        7    Extended Header Function
+|      9    char       1    A colon (:) character
+|     10    str       60    Extended Header Description (subj, to, from, etc)
+|     70    char       1    Status (N or R)
+|     71    char       1    Line Separator (E3h, or 0Dh for foreign systems)
+|
+| While any value may be used for the Extended Header Function field, the only
+| values recognized and processed directly by PCBoard v15.0 are:
+|
+|   "TO     "      TO Name (or address for internet)
+|   "FROM   "      FROM Name (or address for internet)
+|   "SUBJECT"      Subject of the message
+|   "ATTACH "      File Attachment
+|   "LIST   "      Carbon List TO Name
+|   "ROUTE  "      Routing information for netmail
+|   "ORIGIN "      Origin information for netmail
+|   "REQRR  "      Request Return Receipt
+|   "ACKRR  "      Acknowledgement Return Receipt
+|   "ACKNAME"      Acknowledgement (FROM) Name
+|   "PACKOUT"      Pack Out Date (date to remove message)
+|
+| The Carbon List header Description Field is further subdivided as follows:
+|
+|   Offset   Type   Length  Description
+|   ------  ------  ------  -----------
+|     10    str       50    Extended Header Description (subj, to, from, etc)
+|     60    str        6    Date Message Was Read
+|     66    str        4    Time Message Was Read
+|
+| The File Attach header Description Field is formatted as follows:
+|
+|     "FILENAME (SIZE) STOREDNAME"
+|
+| The entire field is padded out to 60 spaces just like the rest of the
+| extended headers.  The FILENAME is the name of the file that the caller
+| uploaded.  The SIZE is the size of the file.  The STOREDNAME is the name
+| under which the file is actually stored on disk.
+
+
+  Index File Format
+  -----------------
+| There are now two separate Index File Formats used by PCBoard.  There is an
+| older format which was used from the beginning, and a new v15.0 specific
+| format.
+|
+| We encourage all authors to upgrade to the v15.0 format.  However, in the
+| meantime, PCBoard is capable of working with BOTH formats.  PCBoard will
+| no longer USE the old style format, but it will keep it up to date for
+| those programs that need to access it.  This functionality can be disabled
+| if the system does not make use of any software that uses the old style
+| format and this can save both time and disk space.
+|
+| The two index filenames are the same root name as used for the message base
+| plus the addition of an extension as follows:
+|
+|        .NDX      for old-style index files
+|        .IDX      for v15.0 style index files
+|
+| Example:  MSGS.NDX and MSGS.IDX would be the two index files for MSGS.
+|
+| Version 15.0 Style Index
+| ------------------------
+| This new format has several changes and at the same time some operational
+| simularities that make it easy to implement.  These changes are:
+|
+| - The index record now has the offset stored as a long integer instead of as
+|   a single precision real number.
+|
+| - The offset is no longer the number of the message block but instead is the
+|   actual offset within the file.  (the old style offset had to be multiplied
+|   by 128 to arrive at a physical offset)
+|
+| - The index record now has the most commonly accessed information that is
+|   used by PCBoard to determine the accessability of a message - that is,
+|   to decide whether or not the message can be read by the caller.  By putting
+|   all of this information into the index PCBoard no longer has to read BOTH
+|   the index AND the message header to find out of the message is readable.
+|   This also greatly speeds up the Y-scan because for most scans it no longer
+|   has to read the message base but just the information in the index file can
+|   be used.
+|
+| - A date is now included in the index making it possible to quickly locate
+|   messages that are newer than a given date.
+|
+| - The index file is not PRE-formatted.  This means that sysops no longer
+|   have to worry about filling up the message base index or setting an
+|   appropriate "block size" for the index.  PCBoard and PCBPack simply
+|   maintain an index that covers only the range of messages from low to high
+|   in the message base and nothinger more.
+|
+| The format for the index is as follows:
+|
+|   Offset   Type   Length  Description
+|   ------  ------  ------  -----------
+|      0    long       4    Offset (0 if none, >0 if active, <0 if killed)
+|      4    long       4    Message Number
+|      8    str       25    TO Name
+|     33    str       25    FROM Name
+|     58    char       1    Status Character (from Message Header)
+|     59    int        2    Date of Message (in julian date format)
+|     61    str        3    Reserved for future use
+|
+| Accessing the file is quite similar to the old style index.  Here is the
+| same example used for the Old Style Index access:
+|
+|    Message Number to Find:   1500
+|
+|    Low Message Number    :   1024
+|    Offset into INDEX File:   1500-1024 = 476, 476*64 = 30464
+|                              read 64 bytes at offset 30464 in INDEX file
+|    Offset into MSGS File :   Index.Offset
+|
+| The differences in the above as compared to Old Style Indexes are that the
+| size of the index record is now 64 bytes instead of 4 bytes.  And the Offset
+| in the record is used "as is" without having to perform any calculations
+| on it.
+|
+| Example C code implementing the above:
+|
+|        typedef struct {
+|          long     Offset;
+|          long     Num;
+|          char     To[25];
+|          char     From[25];
+|          char     Status;
+|          unsigned Date;
+|          char     Reserved[3];
+|        } indextype;
+|
+|        indextype Index;
+|
+|        LowNum = 1024;
+|        MsgNum = 1500;
+|        lseek(IndexFile,(MsgNum-LowNum)*sizeof(indextype),SEEK_SET);
+|        read(IndexFile,&Index,sizeof(indextype));
+|
+|        if (Index.Offset > 0) {
+|          lseek(MsgsFile,Offset,SEEK_SET);
+|          read(MsgsFile,Header,sizeof(Header));
+|          /* read the rest of the message here if you want */
+|        }
+|
+| The offsets contained in the index file will be 0 (indicating that no
+| message exists for that entry), a negative of the offset (example -476 in
+| the above) if the message has been killed or a positive offset value if the
+| message is active.
+
+
+  Old Style Index
+  ---------------
+  The file is preformatted to a size of 4096 times the number of message index
+  blocks.  Each message index block consists of 1024 entries each being of
+  type "bsreal" resulting in 4096 bytes per block.
+
+  Each entry in the index is the block offset into the message base for a
+  given message number minus the low message number in the message base.  Take
+  the following example for instance:
+
+     Message Number to Find:   1500
+
+     Low Message Number    :   1024
+     Offset into INDEX File:   1500-1024 = 476, 476*4 = 1904
+                               read 4 bytes at offset 1904 in INDEX file
+                               (realizing that those 4 bytes are "bsreal")
+     Offset into MSGS File :   (Value from Index - 1) * 128
+
+  The Offset into the MSGS file is then calculated according to the above
+  example by first determining where to read in the index file, grabbing the
+  block offset value from the index and then subtracting one from it and
+  multiplying by 128 (which is the size of all blocks in the message base).
+
+  Example C code implementing the above:
+
+         LowNum = 1024;
+         MsgNum = 1500;
+         lseek(IndexFile,(MsgNum-LowNum)*4,SEEK_SET);
+         read(IndexFile,Offset,sizeof(bsreal));
+
+         MsgOffset = Offset;    /* <-- using your own routines you need */
+                                /*     to convert the bsreal type to a  */
+                                /*     long integer for use below       */
+
+         if (MsgOffset > 0) {
+           lseek(MsgsFile,(MsgOffset-1)*128,SEEK_SET);
+           read(MsgsFile,Header,sizeof(Header));
+           /* read the rest of the message here if you want */
+         }
+
+  The offsets contained in the index file will be 0 (indicating that no
+  message exists for that entry), a negative of the offset (example -476 in
+  the above) if the message has been killed or a positive offset value if the
+  message is active.
+
+
+  Note 1:
+  -------
+  In the past, to lock the message base while inserting messages, PCBoard put
+  the word "LOCKED" at position 16 and locked the first 128 bytes of the file
+  which made up the entire HEADER region of the file.  This 'lock' was placed
+  on the file so that other nodes on the network could not update the file at
+  the same time.
+
+  The word "LOCKED" was used because some systems would not properly lock a
+  range of bytes within a file.  This method, however, causes a problem if a
+  system is rebooted (or locked up) prior to unlocking the file leaving it in
+  a "locked" state and unavailable for further system use.
+
+  Version 14.5 will now lock ONLY the 6 bytes starting at offset 16 (16 bytes
+  from the start of the file which is byte #17 if you start counting at 1).
+  These 6 bytes have always been defined as the "LOCKED" bytes since v14.0 and
+  in effect were always locked anyway since a lock on the first 128 bytes
+  included those 6 bytes.  Therefore programs that were originally designed to
+  work with v14.0 should continue to work properly unmodified!
+
+  The advantage to locking only the 6 bytes at offset 16 is that the first 16
+  bytes are still READABLE and that any node or process wishing to read the
+  first 16 bytes is now allowed to do so.
+
+  For instance, a (R)ead command or a (Y)our Mail command will now be allowed
+  to proceed WHILE the message base is being updated.  Previously those
+  functions would be required to wait until the lock was removed before they
+  could proceed with reading the header bytes (which defined the 'High Message
+  Number', the 'Low Message Number', the 'Number of Active Messages' and the
+  'Number of System Callers').
+
+  It is recommended that Third Party Authors use the same technique now for
+  updating the message base EVEN THOUGH the old method of locking all 128
+  bytes will continue to work fine.  The reason for the change was to enhance
+  the performance of systems where a large number of people could be reading
+  mail while a large number of messages are being written into the message
+  base.
+
+
+  Note 2:
+  -------
+  The status flags used by PCBoard for message read control are:
+ ÿ
+     ( ) - A message which can be read by anyone.
+     (*) - A private message to a specific person which has NOT
+           been read by the "addressed to" person.
+     (+) - A private message which HAS been read by the person
+           it was addressed to.
+     (-) - A message to a specific person, which was readble by anyone,
+           which has been read by the person it was addressed to.
+     (~) - A COMMENT to the sysop which has NOT been read by the
+           person defined as sysop record #1.
+     (`) - A COMMENT to the sysop which HAS been read by the person
+           defined as sysop record #1.
+     (%) - A message protected by SENDER PASSWORD which has not been read
+     (^) - A message protected by SENDER PASSWORD which has been read
+     (!) - A message protected by GROUP PASSWORD which has not been read
+     (#) - A message protected by GROUP PASSWORD which has been read
+     ($) - A message protected by GROUP PASSWORD which is addressed to ALL
+
+
+  Note 3:
+  -------
+  It should be noted that the number of message blocks indicated within the
+  message header includes the header block itself in the count.  In other
+  words, if a message has a body length of 1 block the number stored in the
+  header would be 2 counting both the message header and the body block.
+

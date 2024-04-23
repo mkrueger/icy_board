@@ -1,0 +1,47 @@
+This file, DEVELOP.ZIP, contains the following documents which cover the file
+formats used by PCBoard:
+
+-------------------------------------------------------------------------------
+PCBDAT.DOC         The PCBOARD.DAT file is a text file.  This document covers
+                   the contents of each line in the file.
+-------------------------------------------------------------------------------
+HEADERS.DOC        Discusses the Extended Headers used in MSGS for v15.x.  The
+                   MSGS file for v15.x is strictly compatible with v14.x but
+                   the use of Extended Headers allows additional functionality.
+-------------------------------------------------------------------------------
+MSGS.DOC           Documenation on the MSGS, MSGS.NDX and MSGS.IDX formats.
+-------------------------------------------------------------------------------
+PCBSYS.DOC         File format for PCBOARD.SYS.
+-------------------------------------------------------------------------------
+CNAMES.DOC         File format for CNAMES.@@@ and CNAMES.ADD files.  These
+                   files store the conference information.
+-------------------------------------------------------------------------------
+USERS.DOC          File format for the USERS file.
+-------------------------------------------------------------------------------
+USERSYS.DOC        File format for the USERS.SYS file.
+-------------------------------------------------------------------------------
+USERNET.DOC        File format for the USERNET.XXX file.
+-------------------------------------------------------------------------------
+DIR.DOC            Documentation on the structure of DIR files
+-------------------------------------------------------------------------------
+DIRLST.DOC         File format for the DIR.LST files
+-------------------------------------------------------------------------------
+DIRIDX.DOC         File format for the DIR IDX files
+-------------------------------------------------------------------------------
+FILEIDX.DOC        File format for the IDX files used inside of DLPATH.LST
+-------------------------------------------------------------------------------
+PWRD.DOC           File format for the PWRD file.
+-------------------------------------------------------------------------------
+CALLERS.DOC        File format for the caller logs.
+-------------------------------------------------------------------------------
+145INFO.DOC        Background documenation describing original changes made to
+                   PCBoard's files when version 14.5 came out which introduced
+                   the USERS.INF and USERS.SYS files, among other things.
+-------------------------------------------------------------------------------
+FIDOCFG.DOC        File format for the PCBFIDO.CFG file.
+-------------------------------------------------------------------------------
+FIDOQUE.DOC        File format for the FIDOQUE.DAT file.
+-------------------------------------------------------------------------------
+ACCOUNT.DOC        File formats for Account Tracking Files (.DBF and .TXT)
+-------------------------------------------------------------------------------
+

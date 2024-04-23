@@ -1,0 +1,53 @@
+  WARNING:  This document is subject to change at any time.  Any changes made
+  will be indicated by a vertical bar (|) in column 1 of the file.
+
+| Last update: 08/13/94
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+  The following information documents the format for PCBoard's PWRD file.
+
+  The PWRD file consists of one line per security level / password combination.
+
+  The most important aspect of the PWRD file is that, like other PCBoard files,
+  such as the FSEC file, PCBoard STOPS searching the file AS SOON as a match
+  is found.  PCBoard does not search for a "best fit" match.  It finds the
+  "first match" and then stops looking.
+
+  When reading the file, the match is made based on the security level and
+  password fields.
+
+  If the password field is blank, then only the security level is used to
+  find the match.  That is, PCBoard uses the caller's CURRENT security level
+  to locate the first line that matches.
+
+  If the password field is non-blank, then PCBoard attempts to match both
+  the caller's CURRENT security level AND the caller's password.  If a match is
+  made, then that line is used.  If the not, the line is skipped and PCBoard
+  searches for another match.
+
+  The format of the file looks something like this:
+
+|      ,10,30,32767,0,99,0,0,0,0,Y,N,N,N,N,0,0,T
+
+  Each field is comma delimited.  The order of the fields are as follows:
+
+   1) Password
+   2) Security Level
+   3) Time Limit (per day, unless Enforce Time is set to NO, then per session)
+   4) Daily K-Byte Limit
+   5) Base Baud Rate (for adjusting Daily K-Byte Limit)
+   6) Batch Limit (max files in a single download batch)
+   7) File Ratio (stored as 10 TIMES the ratio; e.g. 5.0 is stored as 50)
+   8) Byte Ratio (stored as 10 TIMES the ratio; e.g. 5.0 is stored as 50)
+   9) Total File Limit  (max files can download until sysop resets count)
+  10) Total KByte Limit (max K-bytes can download until sysop resets count)
+  11) Enforce Time Limit (NO means time limit is a per-session limit)
+  12) Allow Alias to be used
+  13) Force caller to read personal mail on login
+  14) Allow multiple users to access current user-id simultaneously
+  15) Verify Caller by checkin Verification PSA
+  16) File Ratio Credits (credits towards upload file count)
+  17) KByte Ratio Credits (credits towards upload byte count - in K)
+| 18) Accounting Enabled (Y = yes, N = No, T = Tracking Only)
+

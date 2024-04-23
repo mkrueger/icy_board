@@ -1,0 +1,535 @@
+             PCBOARD UPDATE INFORMATION FOR THIRD PARTY DEVELOPERS
+             -----------------------------------------------------
+
+              Copyright (C) 1990 by Clark Development Company, Inc
+         This information is provide for the sole purpose of providing
+       Third Party Authors with information to aid in the development of
+     PCBoard v14.5 add-on products.  All other uses are strictly forbidden.
+
+GOAL:  One major goal in designing PCBoard v14.5 has been to make it compatible
+       with the prior releases of the version 14.x software - namely, v14.0,
+       v14.1 and v14.2.
+
+       This goal includes the ability of v14.5 to read and write the same file
+       formats as used by all of the v14.x series of software.  It also means
+       that by using the same file formats many third party packages should be
+       able to be run UN-MODIFIED with the release of v14.5.
+
+       There are, however, a few file changes which are required for version
+       14.5 and they will be detailed below.  As you will see - for the most
+       part the goal has been achieved in that v14.x will operate EVEN WITH
+       most of the file changes specified below and third party software
+       should continue to operate unmodified as well.
+
+
+PCBTEXT File
+------------
+This file is the one exception to the rule and the goal expressed above.  You
+will need to keep a separate PCBTEXT file for v14.5 because it will not be
+entirely useable by v14.x software.
+
+Just as in past releases of PCBoard - when new capabilities are added to the
+software it becomes necessary to add additional text strings to the end of the
+PCBTEXT file.  That is fine because each release knows the limit of the text
+records that it must access and so the additional entries are of no consequence
+to prior releases of PCBoard.
+
+HOWEVER, the change that brings incompatibility to the v14.5 version of PCBTEXT
+is the ability of v14.5 to utilize an @-variable called @OPTEXT@ which means
+"operational text" to PCBoard.  For instance, previous releases of PCBoard may
+have included a line such as this in the PCBTEXT file:
+
+   View executed on file ()
+
+Previous releases of PCBoard would then "piece together" the appropriate text
+by substituting the "()" characters with the name of the file so that when it
+was displayed to the caller he saw "View executed on file (TEST.ZIP)" or
+something like that.  Version 14.5's MKPCBTXT replaces the above line in your
+PCBTEXT file with a line that looks like this:
+
+   View executed on file (@OPTEXT@)
+
+The above approach means that the '@OPTEXT@' variable may be placed anywhere on
+the line (increasing your flexibility in customizing the PCBTEXT file).
+However, that one change means that v14.2 and prior releases will no longer
+display the PCBTEXT entries properly.
+
+Therefore, you should keep a copy of your v14.x PCBTEXT files separate from
+your converted PCBTEXT files for v14.5's usage on the off chance that you may
+need or want to go back to a prior release of PCBoard.
+
+There is an additional new capability added to PCBTEXT which you can take
+advantage of in v14.5 that is not available in prior releases.  And that is
+the ability to have a PCBTEXT entry actually display a complete FILE to the
+caller rather than being limited to the one line entry in PCBTEXT.  You do this
+by using a Percent Sign in the followed by a filename.  Here is an example:
+
+   The v14.2 PCBTEXT file has a line that says something like this:
+
+      "Your time has been adjusted for an upcoming event"
+
+   While it gets the job done - that of informing the caller that their time
+   has been adjusted - it doesn't give them very much information and being
+   only one line long is often ignored by the caller.  With v14.5 you can
+   change the above line to read like this:
+
+      "%C:\PCB\GEN\EVENT.WRN"
+
+   The percent sign tells v14.5 to display the FILE that immediately follows
+   it to the caller instead of displaying the text in PCBTEXT.  You could then
+   create a file on your system called EVENT.WRN with the following text:
+
+     @FIRST@, your time has been adjusted to @TIMELEFT@ minutes due to an event
+     which is scheduled for @EVENT@.  If you call back after the event has
+     finished you'll receive the remainder of your daily time limit.
+
+This brings up another usage for the @OPTEXT@ variable - it means that you can
+place the @OPTEXT@ variable inside of your file and have PCBoard perform the
+text substitution at the time the file is being displayed to the caller.  Here
+is another example:
+
+   Version 14.2 has a line in PCBTEXT that says something like this:
+
+     "Uploads Not Accepted on File Format ()"
+
+   It then fills in the parenthesis with something like *.ARC if you have set
+   up your UPSEC file to not allow ARC files to be uploaded to your system.
+   With v14.5 you could replace the above line with this line and file:
+
+     "%C:\PCB\GEN\BADUPLOAD.TXT"
+
+     Sorry, @FIRST@, but this system will not accept files of the format
+     @OPTEXT@.  We prefer to keep all of our files in the ZIP format which
+     we feel is more compact than other compression methods.
+
+In the above example the file BADUPLOAD.TXT will be displayed to the caller and
+the variable @OPTEXT@ will be substituted with the "*.ARC" that previous
+releases of PCBoard would have placed within the parenthesis of the old text.
+
+Sometimes a PCBTEXT entry will be written to the callers log and other times
+the entry is actually a question that gets displayed to the caller.  You can
+still utilitize the "%" operator above by adhering to the following rules:
+
+    1) If a %filespec is followed by a space and then more text then the
+       additional text after the filespec will be displayed to the caller.
+       Example (replacing "leave comment for sysop"):
+
+          %C:\PCB\GEN\COMMENT Do you want to leave a comment
+
+       The file C:\PCB\GEN\COMMENT might explain to the caller that you'd
+       prefer that messages be addressed to ALL and after the file is
+       displayed it will then ask him "Do you want to leave a comment?".
+
+    2) If the %filespec is followed by a PLUS sign and then more text then the
+       additional text will be written to the callers log but it will NOT be
+       displayed to the caller.  Example (replacing "file not found");
+
+          %C:\PCB\GEN\NOTFOUND @OPTEXT@
+
+       In this example the file C:\PCB\GEN\NOTFOUND will be displayed to the
+       caller and then %C:\PCB\GEN\NOTFOUND filename will be written to
+       the callers log where "filename" is the name of the file not found.
+
+
+PCBOARD.DAT File
+----------------
+This file is created by PCBSETUP and hopefully by no other software out there
+(meaning: third party authors should *not* be writing to this file).
+
+There are new entries at the END of the file which are used by PCBoard v14.5
+in place of the environment variables used by previous releases of PCBoard.
+
+The first time you run PCBSETUP on an old v14.0 formatted file it will warn
+you that it is about to convert the environment variables and create a new
+PCBOARD.DAT file which will actually not be written to disk until you tell
+PCBSetup to save the file.  These new entries are:
+
+    Line 151:  Security Level needed for USERS command
+    Line 152:  Security Level needed for WHO command
+    Line 153:  Security Level needed for BATCH file transfers
+    Line 154:  Name of color definition file (usually PCBFILER.DEF)
+    Line 155:  Lowest allowed baud rate for callers (was /BAUD:xxxx)
+    Line 156:  Modem delay during recycle (was /DELAY:xx)
+    Line 157:  Number of Rings before answering the phone
+    Line 158:  IRQ number of comm port if not COM1 or COM2
+    Line 159:  BASE address of comm port if not COM1 or COM2
+    Line 160:  Leave DTR up at drop to DOS (some modems hangup if DTR is down)
+    Line 161:  Maximum lines in scrollback buffer (was /MAX:xxx)
+    Line 162:  Pre-load PCBTEXT file for faster access (uses more memory)
+    Line 163:  Pre-load CNAMES file for faster access (uses more memory)
+    Line 164:  Security Level required for a caller to use @-variables
+    Line 165:  Include "Uploaded By" line in uploaded file descriptions
+    Line 166:  Show user settings during login (was /INFO)
+    Line 167:  Allow local F5 shells to DOS
+    Line 168:  Use Slave Card updating (v14.2 did, v14.5 is faster without)
+    Line 169:  Default subscription length for new users
+    Line 170:  Maximum messages in a capture file
+    Line 171:  Maximum messages per conference in a capture file
+    Line 172:  Minutes prior to an event to stop uploads
+    Line 173:  Security Level needed to EDIT any message
+    Line 174:  Security Level needed to EDIT your own message
+    Line 175:  Share IRQ's on microchannel buses (for comm ports)
+    Line 176:  Default to scan ALL conferences at login
+    Line 177:  Level Needed to Use the 'Read Only' Command
+    Line 178:  Use NEWASK questionnaire plus standard new user questions
+    Line 179:  Location for temporary files
+    Line 180:  Name and location of USERS.INF file
+    Line 181:  Default to 'Quick Scan' method on personal message scan
+    Line 182:  Number of DAYS for warning prior to subscription expiration
+    Line 183:  Allow ONE-name users to log onto the system
+    Line 184:  Default 'Expired' Security Level
+    Line 185:  Security Level to use the TEST command
+    Line 186:  Name of the message CAPTURE file (or blank=caller number)
+    Line 187:  Perform file verification on uploads
+    Line 188:  Stop the clock during Message Capture download
+    Line 189:  Start time for sysop pages
+    Line 190:  Stop time for sysop pages
+    Line 191:  Write Caller Number to callers log
+    Line 192:  Write Connect String to callers log
+    Line 193:  Write Caller's Security Level to callers log
+    Line 194:  Read PWRD file upon joining a conference
+    Line 195:  Confirm caller name at logon time
+    Line 196:  Allow password failure comment
+    Line 197:  Warning before logoff
+    Line 198:  Maximum number of lines in upload description
+
+As you can see - all but the /NMT parameter from your SET PCB= environment
+settings has been moved into the PCBOARD.DAT file.  Once you have run PCBSetup
+you may now remove all of those settings from SET PCB= and thus reduce your
+environment size requirements.
+
+Of course, some third party packages may be reading your environment switches
+so you may want to keep the SET PCB= settings "as is" until you have determined
+that none of your software requires the settings.
+
+Line #87 which holds the value for "Display News Only When Changed" now has
+three possible values:  -1, 0 (for yes or no) and 1 (for Always).  If set to
+ALWAYS then the caller will be shown the NEWS file each and every time he
+joins the conference.
+
+
+MSGS File
+---------
+The Message Files remain unchanged for this release - so all existing software
+(third party or otherwise) should be able to read and write PCBoard v14.5
+message file formats if they were able to do so with v14.0 thru v14.2 releases
+of the software.
+
+One change to the HANDLING of the message base has been made in the area of
+handling message base updating:
+
+In the past PCBoard locked the first 128 bytes of the file which made up the
+entire HEADER region of the file.  This 'lock' was placed on the file so that
+other nodes on the network could not update the file at the same time.
+
+Version 14.5 will now lock ONLY the 6 bytes starting at offset 16 (16 bytes
+from the start of the file which is byte #17 if you start counting at 1).
+These 6 bytes have always been defined as the "LOCKED" bytes since v14.0 and
+in effect were always locked anyway since a lock on the first 128 bytes
+included those 6 bytes.  Therefore programs that were originally designed to
+work with v14.0 should continue to work properly unmodified!
+
+The advantage to locking only the 6 bytes at offset 16 is that the first 16
+bytes are still READABLE and that any node or process wishing to read the
+first 16 bytes is now allowed to do so.
+
+For instance, a (R)ead command or a (Y)our Mail command will now be allowed
+to proceed WHILE the message base is being updated.  Previously those
+functions would be required to wait until the lock was removed before they
+could proceed with reading the header bytes (which defined the 'High Message
+Number', the 'Low Message Number', the 'Number of Active Messages' and the
+'Number of System Callers').
+
+It is recommended that Third Party Authors use the same technique now for
+updating the message base EVEN THOUGH the old method of locking all 128 bytes
+will continue to work fine.  The reason for the change was to enhance the
+performance of systems where a large number of people could be reading mail
+while a large number of messages are being written into the message base.
+
+
+PCBPROT.DAT File
+----------------
+This file controls the protocols (both internal and external) that are
+available on the system.  You'll note that PCBoard v14.5 includes two new
+additional INTERNAL protocols and they are:  Ymodem and Ymodem/G - both of
+which are the "batch protocol" equivalents of 1K-Xmodem and 1K-Xmodem/G.
+
+The new text entries for these two protocols look like this:
+
+       Y,I,1024,Ymodem   (Batch U/L and D/L),N,N,N
+       G,I,1024,Ymodem/G (Batch U/L and D/L),Y,N,N
+
+Note that there are three new fields on the end of each line.  They are as
+follows:
+
+  - Requires MNP (answer YES if it needs an error corrected session)
+  - Port Open (answer YES if the port should be left open during the shell)
+  - Lock Lines (answer YES if the status lines should be frozen at the top)
+
+NOTE that PCBoard v14.0 thru v14.2 will *ignore* the new fields on the end,
+however, they will show up in the protocol description field.  Thus the new
+fields won't break v14.0 code but they will look funny if you add them in.
+
+
+PWRD File
+---------
+This file controls the caller's access to the system.  Two new fields have been
+added to the file.  They are:  "Base Baud Rate" and "Batch Limit".  Because the
+entries are on the end of the line previous versions of PCBoard will not have
+any trouble reading the file with the new fields in place - in other words,
+version 14.0 thru 14.2 will ignore the new fields.
+
+  Example usage:
+                                                         Base    Batch
+                       Password     Sec  Time  K Bytes Baud Rate Limit
+                    ออออออออออออออ อออออ อออออ อออออออ อออออออออ อออออ
+                                     10    60     100      1200    10
+
+  The two new entries above indicate the following:
+
+  Base Baud Rate:  The "1200" indicates that the 100K byte limit is based on a
+  baud rate of 1200 bps.  Therefore if a caller connects at 2400 baud he would
+  have a limit of 200K.  A caller at 19200 would have a limit of 1600K bytes.
+  NOTE:  the default value for Base Baud Rate is 0.  With a base baud rate of
+  "0" the K-Byte limit becomes an absolute value - i.e.  the value does not
+  change according to the connection speed of the caller.
+
+  Batch Limit:  The default here is 0 which means that the /BLIM:xx variable
+  (if it exists) should be queried for the batch limit.  If one is not found
+  then the PCBoard v14.2 default of 30 files is provided.
+
+Both of the above changes provide for the fact that if the sysop does NOTHING
+to the file then system will behave like a v14.2 system.  If, however, the
+sysop chooses to modify the file he can do so to gain control over his v14.5
+system - however, v14.2 will ignore the changes made to the file.
+
+In addition - v14.5 has been enhanced such that a K-Bytes value of "32767" is
+considered to be a special value meaning "unlimited download bytes".  If you
+use "32767" then PCBoard will display the text "Unlimited" to the caller when
+they view the download limit - and file transfers will ignore the number of
+bytes being downloaded in byte limit calculations.  Additionally, the new
+"Base Baud Rate" field will have no effect on a value of "32767".
+
+
+DOORS.LST File
+--------------
+This is the list of DOORS that are available to the caller.  There have been
+four new fields added to the end of each line and they are:  1) Make a
+USERS.SYS file, 2) Make a DOORS.SYS file, 3) Path to the DOOR batch file and
+4) Auto Login Door
+
+  Example usage:
+
+     Filename    Password   Sec Login USER.SYS DOOR.SYS Path to Batch Files
+    ออออออออออ ออออออออออออ อออ อออออ ออออออออ ออออออออ อออออออออออออออออออ
+  1) TESTDOOR                10   N       Y        N    C:\PCB\
+
+
+  The four new entries above indicate the following:
+
+  1) (LOGIN = YES) Users with the security level specified should be
+     automatically sent to the door during the login process.
+  2) (USERS.SYS = YES) A USERS.SYS file should be created.
+  3) (DOOR.SYS = YES)  A DOOR.SYS file should not be created.
+  4) The file TESTDOOR can be found in C:\PCB\
+
+The YES/NO values are stored as -1 for YES and 0 for NO so the above line
+would look like this in your DOORS.LST file:
+
+    TESTDOOR,,10,-1,0,C:\PCB\,0
+
+They are stored in the file in the following order:  users.sys, door.sys,
+path to files, auto login door.
+
+The defaults for the four new fields are NO, NO, blank and NO.  This means
+that a version 14.2 formatted DOORS.LST file will function the same whether
+used under PCBoard v14.2 or under v14.5.
+
+!!!WARNING!!!  As of the time this feature was added it was found that some
+!!!WARNING!!!  door programs (such as ProDoor) would not properly read the
+!!!WARNING!!!  DOORS.LST file.  Such programs should be modified so that they
+!!!WARNING!!!  do not read the rest of the line - otherwise you'll simply
+!!!WARNING!!!  have to forgo using this feature until they are updated.
+
+
+
+USERS File
+----------
+The byte at position 100 in the Users File was marked as "reserved" in
+the PCBoard Users Manual for version 14.0 thru 14.2.  With the release
+of version 14.5 this byte now takes on a meaning.  It is a set of
+"Packed Flags" (8 of them all together).  Currently only two of the 8
+flags are in use and they are in bits 0 and 1 of the byte.  Their
+meanings are as follows:
+
+   Bit 0 = Dirty Flag
+           Indicates that another node on the network has updated the
+           user record and that PCBoard should re-read the record prior
+           to writing new data to the record.
+
+   Bit 1 = Clear Screen Before Message
+           Stores the user's preference for clearing or not clearing the
+           screen prior to displaying a message on the screen.
+
+   Bit 2 = Has Mail Flag
+           When a a message is left the code will modify the ADDRESSEE's user
+           record by setting the Has Mail flag on.  This flag remains on
+           until the caller has read at least one message addressed to him in
+           each of the conferences for which the Mail Waiting flag is turned
+           on in his USERS.INF record.
+
+   Bit 3 = Don't Ask to Use Full Screen Editor
+           When this bit is set the caller will not be asked if he wants to
+           use the Full Screen Editor - instead it will default to the
+           setting in Bit 4.  When not set it will ask the question with the
+           default set to YES if the caller is in EXPERT MODE and ANSI has
+           been detected.  Otherwise it will default to NO.
+
+   Bit 4 = Use Full Screen Editor
+           If Bit 3 is set then this bit is checked.  When set it will default
+           to using the Full Screen Editor and when not set it will default to
+           the Line Editor.
+
+Four bytes at positions 385, 386, 387 and 388 are used as a long integer
+pointer into the USERS.INF record.
+
+And two bytes at positions 398 and 399 are used as an unsigned integer which
+holds the number of the conference the user was last in.  If the conference
+number is above 255 then the "Last In" byte at position 192 is stored as a
+255 and the value at positions 398 and 399 are used instead.
+
+
+CONFERENCE REGISTRATIONS IN USERS FILE
+--------------------------------------
+A note on the usage of the Registered and Expired Registration flags:
+
+PCBoard will turn the REGISTERED flag off while leaving the EXPIRED
+registration flag turned on to indicate that the caller is locked out.
+Examples:
+
+ Registered  Expired     PCBoard Shows  Explanation
+ ----------  -------  =  -------------  -----------
+     Off       Off           ""         Caller is not registered but
+                                        may join if the conference is
+                                        public and his security level
+                                        permits access.
+
+     On        Off           "R"        Caller is registered in this
+                                        conference. If he expires then
+                                        he can no longer access it
+                                        unless it is public and his
+                                        security level permits access.
+
+     On        On     =      "RX"       Caller is always registered.
+
+     Off       On     =      "L"        Caller is locked out and
+                                        cannot join the conference
+                                        regardless of whether it is
+                                        public or not.
+
+
+PCBOARD.SYS
+-----------
+Because PCBoard can now adjust the "Maximum Download Bytes" according to the
+connect speed of the caller - it will now write the updated Max K-Bytes to
+the PCBOARD.SYS file so that no change should be required in DOORS that read
+the PCBOARD.SYS file to determine the limit.  That is the only difference in
+the way existing PCBOARD.SYS fields are handled.
+
+There are some new fields at the end of the file which are NON-critical.
+Meaning, they don't need to be there but PCBoard will put them there and use
+them if found when reloading PCBoard.
+
+They are as follows (Offset 128 means the 129th byte in the file):
+
+  Offset  Variable                    Meaning
+  ------  --------                    -------
+    128   bool     UseAnsi            TRUE if caller is ansi-capable
+    129   char     LastEventDate[8]   Date of last event (MM-DD-YY)
+    137   unsigned LastEventMinute    Minute of last event (12:00am = 0)
+    139   bool     RemoteDOS          TRUE if caller has dropped to DOS
+    140   bool     EventUpComing      TRUE if event is within User's Time Limit
+    141   bool     StopUploads        TRUE if event is within Upload Guard Time
+    142   unsigned Conference         Number of Conference the caller was in
+    ..
+          bitmap   ConfJoined         Bit Map fields for High Conferences
+          bitmap   ConfScanned        Bit Map fields for High Conferences
+
+The final two fields, ConfJoined and ConfScanned are dynamically sized and
+are ONLY present if there are more than 40 total areas (counting Main Board)
+in the system.
+
+Note that the two bytes at offset 142 indicate the conference number that the
+caller was in - this information is a duplicate of that which is at offset 65
+(position 66) in the file.  However, the data at that location is only 1 byte
+in size which creates a limit of only 256 conference (0 thru 255).  If the
+caller is in a conference number beyond 255 then the byte at offset 65 will
+contain 255 and the number in the unsigned integer at offset 142 should be
+used instead.
+
+
+DIR Files
+---------
+Virtually no change here - except that because v14.5 is able to keep the
+"secondary lines" logically attached to their "primary lines" there is now a
+limit on the maximum number of secondary lines you can have.  That limit is
+59 lines.  In other words, each file description can consist of one primary
+line and up to 59 secondary lines.
+
+It should be noted, however, that GRAPHICS versions of the DIR files are no
+longer supported.  This is because v14.5 now supports on-the-fly colorizing
+of the DIR files among other reason.
+
+
+ANSI Files
+----------
+Text files with ANSI codes in them have a limit of 2046 characters before a
+carriage return/line feed sequence must be found.   Previous versions had a
+hard time working with anything over 256 bytes so this should not be a problem
+for anyone - but you do need to be aware of the fact that there IS a limit
+on the maximum line length.
+
+
+CALLER Logs
+-----------
+In most cases entries are written to the callers log EXACTLY as they appear in
+the PCBTEXT file.  In other words, if PCBTEXT has a line that says:
+
+     Graphics mode is now on @FIRST@ ...
+
+Then that is exactly what is written to the callers log - i.e. the @FIRST@
+variable does NOT get substituted prior to writing it to the callers log.
+
+This is to aid the developers of callers log analyzers and allow the sysop
+to customize his PCBTEXT file without causing problems for such analyzers.
+Basically, all that the analyzer need do is read in the text (such as record
+number 287 for the above example) from the PCBTEXT file and then scan the
+callers log for exact matches on these records.
+
+
+DOOR batch files
+----------------
+All of your door batch files should continue to work under v14.5 unmodified.
+However, there are a couple of items of interest:
+
+1) The DOORS.LST file (as mentioned above) allows you to specify the location
+   of the DOOR batch file so that you could, in effect, have a single batch
+   file for all of the various nodes on your system.  For large systems this
+   can cut down not only on the complexity of the \PCB subdirectory but save
+   quite a bit of disk space as well.
+
+2) Version 14.5 can pass command line parameters to the DOOR program.  It does
+   this by adding a line at the top of your DOOR batch file that sets the
+   PCBDOOR environment variable equal to the command line parameters that the
+   caller used when opening the door.
+
+   Example:     OPEN MYDOOR PARAM1 PARAM2 PARAM3
+
+   At the top of your DOOR batch file you would see a line that looks like
+   this:   SET PCBDOOR=PARAM1 PARAM2 PARAM3
+
+   Note that the caller can type either spaces or semicolons between each
+   parameter (the same way PCBoard accepts each command with space or
+   semicolon delimiters).  However, the PCBDOOR variable will use only spaces
+   in between each parameter.
+

@@ -1,0 +1,88 @@
+  WARNING:  This document is subject to change at any time.  Any changes made
+  will be indicated by a vertical bar (|) in column 1 of the file.
+
+| Last update: 08/16/94
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+  The later versions of PCBoard must accomodate a much larger number of nodes
+  which precludes the ability to load the entire USERNET.DAT file into memory
+  for processing.  For that reason the file format has been changed to allow
+  picking up of status changes without having to scan the entire file.  In
+  addition, new capabilities have been added.
+
+  The following constitutes the file format and file handling for usernet.xxx
+  in the PCBoard v15.0 version.
+
+    USERNET.XXX header
+    ==================
+    typedef struct {
+      unsigned Version;        PCBoard Compatibility Version Number (150)
+      unsigned NumOfNodes;     The number of nodes supported in the file
+      unsigned SizeOfRec;      The record size for each node
+    } usernethdrtype;
+
+    typedef struct {
+      char     Status;         Node status
+      bool     MailWaiting;    Flag to show mail posted while caller is online
+      unsigned Pager;          Node number of pager (if node has been paged)
+      char     Name[26];       Caller's Name (if a caller is online)
+      char     City[25];       Caller's City (if a caller is online)
+      char     Operation[49];  Current operation (door name, etc)
+      char     Message[80];    For broadcast messages
+      char     Channel;        Channel number of pager (if node has been paged)
+      long     LastUpdate;     hour:min:sec of last update on this record
+    } noderectype;
+
+    NOTE:  Prior to v15.0 the Message, Channel and LastUpdate fields did not
+    exist.  However, the function of the Message field was performed thru the
+    Operation field.
+
+  The actual layout of the file is the following:
+
+     1) header information
+     2) attention bit flags
+     3) up status bit flags
+     4) node records (1 record for each node)
+
+  The bit flags are set up such that one byte holds 8 flags, i.e.  nodes 1-8
+  fit in the first byte, nodes 9-16 fit in the second byte and so on.  The
+  number of bytes used for the bit flags is equal to the number of nodes
+  indicated in the header divided by 8 and rounded up to a full byte.
+
+  The "attention bit flags" are used to get another node's attention.  For
+  instance, if one node wants to chat with another it sets the attention bit
+  flag for the target node ON.  The same is used for dropping an alternate node
+  to DOS or forcing it to logoff.
+
+  The "up status bit flags" are used to indicate if a node is up or not.  This
+  is used so that a complete scan of the usernet.dat file is never needed in
+  order to find out which nodes are up.  (if a 1000-node version were in use
+  this means scanning only 125 bytes instead of the 100K or so that would be
+  the complete size of the usernet.xxx file)
+
+  Status Letters
+  --------------
+       0   =    Ascii 0 is used to signify that a node is not up
+      ' '  =    Space denotes that the node is up but no caller is online
+      'A'  =    Available for Chat
+      'B'  =    Remote Drop to DOS
+      'C'  =    Chatting with sysop
+      'D'  =    Out to DOS - in a door
+      'E'  =    Entering a Message
+      'F'  =    Viewing a File
+      'G'  =    Group Chat
+|     'H'  =    Handling Mail
+      'L'  =    Logoff Pending
+      'M'  =    Received broadcast message
+      'N'  =    Running Event
+      'O'  =    Logging Into System
+      'P'  =    Paging the Sysop
+      'R'  =    Recycle BBS
+      'S'  =    Answering a script questionnaire
+      'T'  =    Transfering a File
+      'U'  =    Unavailable for Chat
+      'W'  =    Drop to DOS (wait for caller to logoff)
+      'X'  =    Drop to DOS (now)
+
+

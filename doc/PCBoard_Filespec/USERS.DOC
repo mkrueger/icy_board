@@ -1,0 +1,118 @@
+  WARNING:  This document is subject to change at any time.  Any changes made
+  will be indicated by a vertical bar (|) in column 1 of the file.
+
+| Last update: 04/02/93  (the vertical bar currently indicates NEW FOR v15.0)
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+  The following information documents the format for PCBoard's USERS file
+  and index files format.  The format of the USERS.INF file is documented
+  separately in a file called USERSYS.DOC.
+
+  Each user record is 400 bytes in length.  There are no headers or other
+  special considerations contained within the users file.  Therefore, a
+  users file with 4 user records would be 1600 bytes in length.
+
+  The following layout is specified in a "byte offset" format such that the
+  first field begins at offset 0.
+
+  The following is a definition of the variable types that will be used below:
+
+    int    = a 2 byte value used to form an unsigned integer word
+    long   = a 4 byte value used to form a long integer
+    char   = a 1 byte character
+    str    = an array of 2 or more "char" bytes
+    bsreal = a 4 byte Basic Single Precision real number
+    bdreal = an 8 byte Basic Double Precision real number
+    bitmap = 1 or more bytes used to store bit flags
+
+  Note that strings are not NULL terminated and that the length specified for
+  the string is full number of useable and storeable bytes.  All strings are
+  padded with spaces to fill the entire field.
+
+  USERS FILE
+  ==========
+
+    Offset   Type   Length  Description
+    ------  ------  ------  -----------
+       0    str       25    Full Name
+      25    str       24    City
+      49    str       12    Password
+      61    str       13    Business / Data Phone Number
+      74    str       13    Home / Voice Phone Number
+      87    str        6    Last Date On (format:  YYMMDD)
+      93    str        5    Last Time On (format HH:MM)
+      98    char       1    Expert Mode (Y or N)
+      99    char       1    Default Transfer Protocol (A-Z, 0-9)
+     100    bitmap     1    Bit Flags (see below)
+     101    str        6    Date of Last DIR Scan (most recent file found)
+     107    char       1    Security Level (0-255)
+     108    int        2    Number of Times On
+     110    char       1    Page Length (# lines displayed before prompt)
+     111    int        2    Number of Files Uploaded
+     113    int        2    Number of Files Downloaded
+     115    bdreal     8    Total Bytes Downloaded Today
+     123    str       30    Comment Field #1 (user comment)
+     153    str       30    Comment Field #2 (sysop comment - user can't see)
+     183    int        2    Elapsed Time On (in minutes)
+     185    str        6    Registration Expiration Date (YYMMDD)
+     191    char       1    Expired Registration - Security Level
+     192    char       1    Last Conference In (used for v14.x compatibility)
+     193    bitmap     5    Conference Registration Flags (conf 0-39)
+     198    bitmap     5    Expired Registration Conference Flags (conf 0-39)
+     203    bitmap     5    User Selected Conference Flags (conf 0-39)
+     208    bdreal     8    Total Bytes Downloaded
+     216    bdreal     8    Total Bytes Uploaded
+     224    char       1    Delete Flag (Y or N)
+     225    bsreal     4    Last Message Read pointer (conference 0)
+     229    bsreal     4    Last Message Read pointer (conference 1)
+     ...    bsreal     4    (continued each conference)
+     381    bsreal     4    Last Message Read pointer (conference 39)
+     385    long       4    Record Number of USERS.INF Record
+|    389    bitmap     1    Bit Flags 2 (see below)
+     390    str        8    Reserved (do not use)
+     398    int        2    Last Conference In (used instead of offset 192)
+
+
+  Bit Flags
+  ---------
+  The bit flags are used to store the status of several flags using only a
+  single byte to store them.  They are stored in the following order:
+
+  Bit 0 = Dirty Flag (used to indicate another process updated the record)
+  Bit 1 = Clear Screen Between Messages
+  Bit 2 = Has Mail Flag
+  Bit 3 = Don't Ask for Full Screen Editor Use
+  Bit 4 = Full Screen Editor Default
+| Bit 5 = Scroll Message Body
+| Bit 6 = Use Short Message Headers
+| Bit 7 = Use Wide (79-column) Editor
+
+| Bit Flags 2
+| -----------
+| The bit flags are used to store the status of several flags using only a
+| single byte to store them.  They are stored in the following order:
+|
+| Bit 0 = Chat Status - OFF=Available, ON=unavailable
+| Bit 1 = reserved
+| Bit 2 = reserved
+| Bit 3 = reserved
+| Bit 4 = reserved
+| Bit 5 = reserved
+| Bit 6 = reserved
+| Bit 7 = reserved
+
+  USER INDEX FILES
+  ================
+
+    Offset   Type   Length  Description
+    ------  ------  ------  -----------
+       0    int        2    Record Number in USERS File
+       2    str       25    Full Name
+
+  There are 26 separate index files for the users.  They are separated into
+  PCNDX.A thru PCBNDX.Z storing names beginning with the letters "A" thru "Z"
+  respectively.  Names starting with character before ascii "A" are stored in
+  the PCBNDX.A file and similarly names starting with characters after ascii
+  "A" are stored in the PCBNDX.Z file.
+

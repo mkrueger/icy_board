@@ -1,0 +1,322 @@
+		      File format for All FIDO data files
+
+WARNING: This document is subject to change at any time.
+
+================================================================================
+
+The data types used here are as follows
+
+int		2 byte signed	     integer
+unsigned int	2 byte unsigned      integer
+long		4 byte signed	long integer
+unsigned long	4 byte unsigned long integer
+char		1 byte character
+
+
+PCBFIDO.CFG
+-----------
+
+First two bytes are an unsigned integer file version. PCBoard 15.22 data files
+have a version number of 3, where as 15.21 data files have a version number
+of 2.
+
+The rest of the file contains three data structures.
+
+Here is a list of all FIDO information stored in PCBFIDO.CFG
+- Directory Information for FIDO
+- EMSI Profile
+- Freq Restrictions
+- Archivers used by FIDO
+
+So this file contains a data structure for each of the four items stored
+in the same order. The structure is as follows.
+
+Corresponsing PCBsetup screen:
+pcbsetup | fido configuration | file and directory configuration
+
+typedef struct
+{
+  char		incoming_packets[66];
+  char		outgoing_packets[66];
+  char		outgoing_msg[66];
+  char		bad_packets[66];
+  char		nodelist_path[66];
+  char		work_directory[66];
+  char		passthrough[66];	   // Passthru files
+  char		securemail[66]; 	   // Secure netmail
+  char		messages[66];		   // response Messages
+
+} DIRECTORIES;
+
+Corresponsing PCBsetup screen:
+pcbsetup | fido configuration | EMSI Profile
+
+typedef struct
+{
+  char	BBS_Name[60];
+  char	City[30];
+  char	Sysop[30];
+  char	Phone[50];
+  char	Baud[10];
+  char	Flags[50];
+} EMSI_DATA;
+
+Corresponding PCBsetup screen:
+pcbsetup | fido configuration | FREQ restrictions
+
+typedef struct
+{
+  unsigned int	  stime;
+  unsigned int	  dtime;
+  unsigned long   sbytes;
+  unsigned long   dbytes;
+  char		  listed;
+  unsigned int	  baud;
+} FREQ_INFO;
+
+Corresponsing PCBsetup screen:
+pcbsetup | fido configuration | Archiver Configuration
+
+typedef struct
+{
+  char		archivers[4][66];
+  char		archiver_switches[4][80];
+  char		unarchivers[4][66];
+  char		unarchiver_switches[4][80];
+} ARCHIVERS;
+
+
+-------------------------------------------------------------------------------
+
+This file contains all areatag data and other conference specific data.
+
+Corresponsing PCBsetup screen:
+pcbsetup | Confrences | third confrence configuration screen
+
+AREAS.DAT
+---------
+
+Byte offset	type			   datum
+
+0-1		unsigned short int	   file version (15.22 = 3)
+2-3		unsigned short int	   PCBoard Conference number
+4-63		char			   Area Tag
+64-65		unsigned short int	   Aka record index (Record number for AKAS.DAT)
+66-67		unsigned short int	   Origin record index (Record number in ORIGINS.DAT)
+68		char			   highAscii setting
+69-70		unsigned short int	   Julian date for last activity in echo (import/expo
+71		char			   Allow Private messages (boolean)
+72		char			   Allow File Attach	  (boolean)
+73-82		char			   Reserved
+
+
+-------------------------------------------------------------------------------
+
+This file contains AKA info as well as information on how the aka should be used.
+
+
+Corresponsing PCBsetup screen:
+pcbsetup | fido configuration | system address
+
+AKAS.DAT
+--------
+
+
+Byte offset	type			   datum
+
+0-1		unsigned short		   file version (15.22 = 3)
+2-3		unsigned short		   zone
+4-5		unsigned short		   net
+6-7		unsigned short		   node
+8-9		unsigned short		   point
+10		char			   Primary address	 (Boolean)
+11		char			   InSeenBy		 (Boolean)
+12		char			   Present in handshake  (Boolean)
+13		char			   Up/Downlink		 (Boolean)
+14-83		char			   Conference Range
+84-93		char			   Reserved
+
+-------------------------------------------------------------------------------
+
+
+FIDOQUEUE.DAT
+-------------
+
+The record structure for this file has not changed since version 15.21. However,
+the first 128 byte header has been replaced with a 2 byte file version. Also
+note that deleted records are packed out as soon as they are deleted so you
+are less likely to find empty records.
+
+Byte Offset	type			 datum
+
+0-1		 unsigned short 	 file version (15.22 = 3)
+2-82		 char			 filename
+83-108		 char			 nodestr (fido address)
+109-110 	 unsigned short 	 flag (CRASH HOLD)
+111-112 	 unsigned short 	 failed connect count
+113		 char			 Read only flag
+114-132 	 char			 reserved
+
+
+typedef struct
+{
+  char filename[80];			/* Name of outgoing file. Full path  */
+  char nodestr[25];			/* Node to receive the file.	     */
+  int  flag;				/* Attribute (Kill-sent, crash,etc.) */
+  int  failedConnects;			/* Number of failed connections      */
+  bool readOnly;			/* Can this entry be modified by event processing */
+  char reserved[18];			/* Reserved			     */
+} QUEUE_RECORD;
+
+
+Here are the flags used in the flag field
+
+
+Q_POLL	      1 	 /* Entry is a POLL			     */
+Q_FILEREQ     2 	 /* Entry is a file request
+Q_KILLSENT    4 	 /* file is deleted after it is sent (When queue record is removed)
+Q_HOLD	      8 	 /* Entry is marked as HOLD
+Q_CRASH       16	 /* Entry is marked as CRASH
+Q_NORMAL      32	 /* Entry is marked as NORMAL
+Q_POLLED      64	 /* Entry is a POLL that has already executed
+Q_FILESEND    128	 /* Entry has file to be sent
+Q_OUTBOUND    256	 /* Entry will go out with next call
+Q_FREQED      1024	 /* Entry is FREQ that has been completed
+
+
+If an entry is marked as OUTBOUND then pcboard will send it out at the next
+dial sequence. Those marked as NORMAL will only go out when an event allows
+it. An entry marked as CRASH must also have the OUTBOUND flag set.
+-------------------------------------------------------------------------------
+
+This file contains the file request deny list.
+
+Corresponsing PCBsetup screen:
+pcbsetup | fido configuration | freq deny nodelist
+
+FREQDENY.DAT
+-----------
+
+
+Byte offset	type			   datum
+
+0-1		unsigned short		   file version (15.22 = 3)
+2-3		unsigned short		   zone
+4-5		unsigned short		   net
+6-7		unsigned short		   node
+8-9		unsigned short		   point
+10		char			   Primary address	 (Boolean)
+11		char			   InSeenBy		 (Boolean)
+12		char			   Present in handshake  (Boolean)
+13		char			   Up/Downlink		 (Boolean)
+14-83		char			   Conference Range
+84-93		char			   Reserved
+
+------------------------------------------------------------------------------
+This file contains paths and passwords for freqable files.
+
+Corresponsing PCBsetup screen:
+pcbsetup | fido configuration | freq path list
+
+FREQPATH.DAT
+------------
+
+Byte offset	type			   datum
+
+0-1		unsigned short		   file version (15.22 = 3)
+2-67		char			   file path
+68-77		char			   password
+78-87		char			   reserved
+
+-------------------------------------------------------------------------------
+
+This file contains magic names and password info for file requests
+
+
+Corresponsing PCBsetup screen:
+pcbsetup | fido configuration | freq magic names
+
+MAGICNAM.DAT
+-------------
+
+Byte offset	type			   datum
+
+0-1		unsigned short		   file version (15.22 = 3)
+2-22		char			   Magic Name
+23-89		char			   path/filename
+90-99		char			   password
+100-109 	char			   reserved
+
+------------------------------------------------------------------------------
+
+This file contains node specific archiver information.
+
+
+Corresponsing PCBsetup screen:
+pcbsetup | fido configuration | node configuration
+
+NODEARC.DAT
+-----------
+
+Byte offset	type			   datum
+
+0-1		unsigned short		   file version (15.22 = 3)
+2-3		unsigned short		   zone
+4-5		unsigned short		   net
+6-7		unsigned short		   node
+8-9		unsigned short		   point
+10-11		unsigned short		   packet type
+12-13		signed	 short int	   Archiver_index
+14-23		char			   reserved
+
+-----------------------------------------------------------------------------
+This file contains nodelist filename and location data.
+
+Corresponsing PCBsetup screen:
+pcbsetup | fido configuration | nodelist configuration
+
+NODELIST.DAT
+------------
+
+Byte offset	type			   datum
+
+0-1		unsigned short		   file version (15.22 = 3)
+2-81		char			   Base Name
+82-90		char			   Diff Name
+91-92		signed int		   Last compile
+93-102		char			   compile
+
+------------------------------------------------------------------------------
+
+This file contains origin line data.
+
+
+Corresponsing PCBsetup screen:
+pcbsetup | fido configuration | origin confrence range
+
+ORIGINS.DAT
+-----------
+
+Byte offset	type			   datum
+
+0-1		unsigned short		   file version (15.22 = 3)
+2-71		char			   Origin
+72-141		char			   Conference Range
+142-151 	char			   reserved
+-----------------------------------------------------------------------------
+
+This file contains the phone translation table.
+
+Corresponsing PCBsetup screen:
+pcbsetup | fido configuration | phone number translation
+
+PHONEX.DAT
+----------
+
+Byte offset	type			   datum
+
+0-1		unsigned short		   file version (15.22 = 3)
+2-31		char			   in
+32-63		char			   out
+64-73		char			   reserved
+----------------------------------------------------------------------------

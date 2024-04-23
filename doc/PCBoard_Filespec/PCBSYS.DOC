@@ -1,0 +1,216 @@
+  WARNING:  This document is subject to change at any time.  Any changes made
+  will be indicated by a vertical bar (|) in column 1 of the file.
+
+| Last update: 10/03/94
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+  The following file documents the format of the PCBOARD.SYS file including the
+  fields which have been standard throughout the PCBoard version 14.x series as
+  well as the new v15.0 software.
+
+  The file may be written in one of two modes:  1) as a 128 byte file which is
+  compatible with the PCBoard v14.x series or 2) as a complete file including
+  all of the extensions added in the v14.5 release.
+
+  In any case the file should be pre-filled with spaces inside the first 128
+  bytes so that any field not written is filled with spaces instead of zeroes
+  or other characters.  Typically this only really matters when a caller is not
+  online at which time only the first five fields inside of the 128 byte block
+  are valid.  The rest of the fields outside of the 128 byte block may contain
+  valid data or the file may be truncated to 128 bytes without serious loss of
+  data.
+
+| As a door author wanting to provide LOGOFF PROCESSING in your door, what we
+| recommend is that you do NOT process the logoff yourself, but instead,
+| return to PCBoard and let PCBoard perform the logoff processing.  This is a
+| matter of convenience for you, since PCBoard can grow and change and you will
+| not need to modify your application whenever the logoff processing is
+| enhanced.  If you still wish to offer a GOODBYE command, what we recommend
+| is that you simply turn DTR off and then return back to PCBoard.  PCBoard
+| will then detect carrier loss and process the logoff for you.
+|
+| If you still want to perform the logoff processing yourself, here are a few
+| of the "current" details of what is necessary:
+|
+| 1) You will need to empty the pcboard.sys file.  You do that by filling the
+|    file, from offset 9 to offset 127, with spaces, leaving everything else
+|    inside of the file intact.
+|
+| 2) You will need to update the user record in the USERS file for the amount
+|    of time spent online (don't forget to correctly calculate time used when
+|    crossing midnight).
+|
+| 3) If accounting is enabled, charge the caller for time used and write the
+|    information to the account tracking file (in text format or dBase format
+|    as appropriate to the extension of that file).
+|
+| 4) Update the PCBSTATS.DAT file with the last caller information.
+|
+| 5) Run the $$LOGOFF.BAT file if it exists.
+|
+| NOTE:  The above steps may change as PCBoard's features continue to be
+| enhanced.  In some ways, I hope the above set of steps appears daunting
+| enough to convince you to just let PCBoard do the logoff processing for you.
+| One more advantage is that, in doing so, that is one less thing for you to
+| have to do, and one less problem for you to figure out if it is done wrong.
+
+  The following layout is specified in a "byte offset" format such that the
+  first field begins at offset 0.
+
+  The following is a definition of the variable types that will be used below:
+
+   char   = a 1 byte character
+   str    = an array of 2 or more "char" bytes
+   int    = a 2 byte integer
+   long   = a 4 byte long integer
+   bsreal = a 4 byte Basic Single Precision real number
+   bitmap = an array of bytes accessed a bit at a time
+
+   Offset   Type   Length  Description
+   ------  ------  ------  -----------
+      0    str        2    Display On/Off ("-1" = On, " 0" = Off)
+      2    str        2    Printer On/Off ("-1" = On, " 0" = Off)
+      4    str        2    Page Bell On/Off ("-1" = On, " 0" = Off)
+      6    str        2    Caller Alarm On/Off ("-1" = On, " 0" = Off)
+      8    char       1    Sysop Flag (" ", "N"=sysop next, "X"=exit dos)
+      9    str        2    Error Corrected ("-1" = On, " 0" = Off)
+     11    char       1    Graphics Mode ('Y'=yes, 'N'=no, '7'=7E1)
+     12    char       1    Node Chat Status ('A'=available, 'U'=unavailable)
+     13    str        5    DTE Port Speed (PC to Modem speed)
+     18    str        5    Connect Speed shown to caller or "Local"
+     23    int        2    User's Record Number in the USERS file
+     25    str       15    User's First Name (padded to 15 characters)
+     40    str       12    User's Password (padded to 12 characters)
+     52    int        2    Time User Logged On (in minutes since midnight)
+     54    int        2    Time used so far today (negative number of minutes)
+     56    str        5    Time User Logged On (in "HH:MM" format)
+     61    int        2    Time Allowed On (from PWRD file) (see note 1 below)
+     63    int        2    Allowed K-Bytes for Download (see note 2 below)
+     65    char       1    Conference Area user was in (if <= 255)
+     66    bitmap     5    Conference Areas the user has joined this session
+     71    bitmap     5    Conference Areas the user has scanned this session
+     76    int        2    Conference Add Time in minutes
+     78    int        2    Upload/Sysop CHAT Credit Minutes (see note 3 below)
+     80    str        4    Language Extension (see note 4 below)
+     84    str       25    User's Full Name (padded to 25 characters)
+    109    int        2    Calculated Minutes Remaining (see note 5 below)
+    111    char       1    Node Number (or ' ' if no network)
+    112    str        5    Event Time (in "HH:MM" format, "00:00" if no event)
+    117    str        2    Is Event Active ("-1" = On, " 0" = Off) (see note 7)
+    119    str        2    Reserved (was Slide Event, no longer used here)
+    121    bsreal     4    Memorized Message Number
+    125    char       1    Comm Port Number (0=none, 1-8)
+    126    char       1    Reserved for PCBoard
+    127    bitmap     1    See Node 8 below for details
+    128    char       1    Use ANSI (1 = Yes, 0 = No)
+    129    int        2    Country Code
+    131    int        2    Code Page
+    133    char       1    YES character
+    134    char       1    NO character
+    135    char       1    Language 0=None, otherwise correspond with PCBML.DAT
+    136    char       3    RESERVED
+    139    char       1    Caller Exited to DOS (1 = Yes, 0 = No)
+    140    char       1    RESERVED (was Event Up Coming, no longer used)
+    141    char       1    Stop Uploads (1 = Yes, 0 = No)
+    142    int        2    Conference Area user was in (up to 65535)
+    144    bitmap  varies  High Conference Areas the user has joined (note 6)
+   varies  bitmap  varies  High Conference Areas the user has scanned (note 6)
+   variees int        2    Node Number if offset 111 is set to 255, seek to
+                           the end of the file, minus 2, to read this value
+
+  Note 1
+  ------
+  The "Time Allowed On" field is not the calculated allowed time remaining.
+  The user's record in the USERS file is not updated with the "Last Date On" or
+  "Elapsed Time On" information so far that day before the program exits to
+  either perform a DOS function or run a DOOR program.  DOOR programs,
+  therefore, should not update the USERS file in their application if the
+  caller is returning to PCBoard.  Only if the caller hangs up inside the DOOR
+  and the DOOR modifies PCBOARD.SYS should the file be changed.
+
+
+  Note 2
+  ------
+  The "Allowed K-Bytes for Download" field specifies the number of K-bytes the
+  caller may download in a day according to the PWRD file and his security
+  level and his connect speed (if specified in the PWRD file).
+
+  This is not the calculated number of K-bytes remaining.  To calculate the
+  number of bytes the caller may download you must multiply this number by 1024
+  and subtract from it the number of bytes the caller has downloaded today.
+
+  Unlike the "Elapsed Time On" field the "Number of Bytes Downloaded" field is
+  updated before PCBoard exits to DOS or to a DOOR program.
+
+  Note that if the number of K-bytes remaining is set to 32767 then PCBoard
+  considers this to be an "unlimited number" and that any bytes downloaded will
+  not count against the limit.
+
+
+  Note 3
+  ------
+  The "Upload/Sysop CHAT Credit Minutes" specifies a number of minutes that
+  should be taken off from the current "time elapsed" for the caller thus
+  extended his remaining number of minutes online for this session.
+
+  DOOR programs may adjust this field if time credit was added or removed while
+  the user was in the DOOR prior to returning to PCBoard.
+
+
+  Note 4
+  ------
+  The "Language Extension" field specifies the extension to be added to
+  filenames that PCBoard displays when the caller has chosen a language other
+  than the default.  The default is all spaces (i.e.  " ") while if the caller
+  has chosen a language such as French it may be set to ".FRE" for the
+  extension.
+
+
+  Note 5
+  ------
+  This field is provided only as a convenience to the DOOR programmer.  It
+  specifies the number of minutes PCBoard has calculated to remain at the time
+  the DOOR was opened or that the caller exited to DOS.  PCBoard does not read
+  this field back in upon returning from the DOOR program.
+
+
+  Note 6
+  ------
+  The final two conference fields are bit mapped just like the two fields at
+  offsets 66 and 71 respectively.  One key difference with these, however, is
+  that they apply only to conferences beyond conference #39 and that they are
+  dynamically sized at the byte level.  Examples:
+
+        High Conf Number    Extended Conferences    Dynamic Size
+        ----------------    --------------------    ------------
+             < 39                    0                   0
+              40                     1                   1
+              50                    11                   2
+             100                    61                   8
+
+  The formula for determine the dynamic size then is to take the high
+  conference number and subtract 39 then divide by 8.  (i.e.  Size =
+  (HighConf-39) / 8).
+
+
+  Note 7
+  ------
+  The Event Active flag no longer directly reflects the setting in PCBOARD.DAT
+  that specifies whether or not events are active.  The Event Flag for v15.0
+  will be set to ON *only* if there is an event coming that might affect the
+  current online caller's time.  Otherwise the Event Flag is set to OFF.
+
+  Note 8
+  ------
+  The structure for this byte is as follows:
+
+      Bit 0:  Used by PCBoard - reserved
+      Bit 1:  Caller wants RIP Graphics
+      Bit 2:  Caller wants to use his alias when in an alias supported conf.
+      Bit 3:  Undefined - RESERVED - do NOT use
+      Bit 4:  Undefined - RESERVED - do NOT use
+      Bit 5:  Undefined - RESERVED - do NOT use
+      Bit 6:  Undefined - RESERVED - do NOT use
+      Bit 7:  Undefined - RESERVED - do NOT use
+

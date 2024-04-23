@@ -1,0 +1,105 @@
+Some have asked for the file format for PCBoard's DIR files.  In the past this
+has never been documented thinking that it was almost intuitively obvious what
+the format is (DIR files being ascii format after all).  However, here's a
+technical breakdown of EXACTLY what it takes to make a properly formatted DIR
+file that PCBoard can recognize and process (example in between the two ******
+lines below):
+
+*******************************************************************************
+ 1) =====[  PCBoard v 14.5a Program Files  ]==================================
+ 2)
+ 3) %C:\PCB\DIR\DISCLAIM
+ 4)
+ 5) The PCBoard v14.5a software is available through a door called PCBOARD.
+ 6) To download v14.5a software simply type "PCBOARD" at the command prompt.
+ 7)
+ 8) PCBDEMO1.ZIP   315899  11-22-91  PCBoard 14.5a Demo Disk #1
+ 9) PCBDEMO2.ZIP   259140  11-22-91  PCBoard 14.5a Demo Disk #2
+10) PCBDEMO3.ZIP   192391  11-22-91  PCBoard 14.5a Demo Disk #3
+11) PCBDEMO4.ZIP   330754  11-22-91  PCBoard 14.5a Demo Disk #4
+12)
+13) PCBoard VROOM Overlay Size Adjustment
+14) -------------------------------------
+15) OVLSIZE.ZIP      7986  11-25-91  Use to adjust the size of the overlay buf
+16)                                | in the VROOM OVERLAY version of PCBoard v
+17)                                | or v14.5a.
+*******************************************************************************
+
+
+Headers, footers and any other regular text:
+--------------------------------------------
+   Lines 1-2, 4-7 and 12-13 are all considered regular text lines.  They can be
+   used for headers (text that is displayed before the file listing), footers
+   (text that can be displayed after the file listing) or if you DISABLE the
+   "sort" function for a particular DIR file they can be located anywhere in
+   the middle of the file.
+
+   The only restriction is that they be 78 characters in length or less.
+
+
+Include files:
+--------------
+   Line 3 is an example of an include file.  The file C:\PCB\DIR\DISCLAIM
+   would be displayed to the caller after showing lines 1 and 2 and before
+   showing the rest of the file.
+
+   Anything contained in the include file will be displayed with no limit on
+   file length or line width.  PCBoard does NOT display the existing line
+   (i.e. "%C:\PCB\DIR\DISCLAIM" is not displayed) to the caller.
+
+
+Primary file listings:
+----------------------
+   Lines 8-11 and 15 are all considered primary file listing lines.  The
+   important aspects of each line are as follows:
+
+   1) The file name is valid and contains no spaces within it.
+   2) The file size is flush right in column #21.  No commas please.
+   3) The file date begins in column #24 and uses dashes to separate the
+      MM-DD-YY format.  All values less than 10 include leading zeroes as
+      in "01" instead of " 1".
+   4) The file description begins in column 34 and must not extended beyond 78.
+
+
+Secondary file listings:
+------------------------
+   Secondary lines allow you to improve the description of a file by providing
+   a much longer description.  Rules for valid secondary lines are as follows:
+
+   1) Must follow a valid primary or secondary file listing.
+   2) Must begin with a space in the first column.
+   3) Must include a vertical bar (a | character) somewhere on the line (the
+      default is in column 32 just to the right of the end of the date field).
+
+   PCBoard will, when displaying the file to the caller, remove the vertical
+   bar so as not to clutter up the display with extraneous characters.
+
+
+Colorization:
+-------------
+PCBoard performs automatic colorization of the DIR files as they are being
+displayed by recognizing headers, footers, file names, sizes, dates,
+descriptions and secondary lines according to the above rules and according to
+the color scheme defined via PCBFiler's "Choose DIR Colors" function.
+
+Any additional colorations (via @-codes) desired are permissable as long as
+they are placed in non-column-sensitive areas such as:  headers, footers, file
+descriptions, secondary lines, etc.  You would not be able to place color codes
+anywhere to the left of the end of the date field in a file listing.
+
+Older versions of PCBoard allowed graphics versions of DIR files such as
+creating both a DIR10 as well as a DIR10G file.  PCBoard v14.5 and beyond no
+longer support the "G" version of the file due to the automatic colorization
+being built directly into PCBoard.  This saves both disk space as well as
+probably some lost hair which probably occured when DIRxxG files became out of
+synch with their non-colorized counterparts.
+
+
+PCBFiler's Master List
+----------------------
+PCBFiler automatically removes @-codes, includes any %FILESPEC include files,
+and removes vertical bars while it creates a master listing of your files.  In
+other words, the file created by PCBFiler is as readable (and without any
+control codes being displayed) as when PCBoard displays your files to an online
+caller who is in non-graphics mode.
+

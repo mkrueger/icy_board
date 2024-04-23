@@ -1,0 +1,139 @@
+PCBoard accesses OS/2 comm ports directly, even though PCBoard is a DOS
+application.  Many developers do not realize that a DOS application has access
+to the SAME function calls (file open, read, write, close as well as Device
+IOCtrl funcions) that OS/2 provides to native OS/2 applications.  PCBoard takes
+advantage of this fact to allow it to directly access comm ports that otherwise
+would appear to be available only to OS/2 applications.
+
+Accessing OS/2 comm ports requires that you:
+
+1) Use the standard DOS operating system function calls normally associated
+   with files to open the comm port by name (e.g.  you would open "COM2", as if
+   it were a file, to access the comm port).  You then keep track of the same
+   file handle information to read from and write to the comm port using the
+   standard DOS read file and write file function calls.  And finally, you use
+   the same file handle and standard DOS close file function call to close it.
+
+2) To set port speed, check for carrier detect, turn DTR on or off, etc, you
+   use the standard DOS IOCTL calls.  The only trick here is ... IOCTL usage
+   requires that you know what parameters to send it.  And that information is
+   provided by IBM in their OS/2 documentation.  And *that* is the only reason
+   why developers are largely unaware that the same functionality is available
+   from DOS.
+
+As a quick example to send something to an OS/2 comm port, consider the
+following C source code:
+
+    port = open("COM2",O_RDWR);
+    write(port,"HELLO OS/2 WORLD!\r\n",19);
+    close(port);
+
+Or consider this example which takes everything that comes in from the comm
+port and immediately sends it back out again:
+
+    while (1) {
+      BytesRead = read(port,Buf,sizeof(Buf));
+      if (BytesRead > 0)
+        write(port,Buf,BytesRead);
+    }
+
+As you can see, OS/2's usage of the file system makes receiving and sending
+bytes a fairly trivial matter.  What's left is how to "control" the comm port
+and that is where the IOCtrl function calls come in.
+
+Here is an example of how you can control OS/2 comm ports:
+
+    mov  ax, 0x440C      ;Ah=0x44 IOCTL,  Al=0x0C  Handle based call
+    mov  bx, [Handle]    ;load BX with the comm port handle
+
+    mov  ch, 1           ;Category 1 functions are for ASYNCH
+    mov  cl, [Func]      ;Load CL with the async function to be used
+
+    les  di, CmdPacket   ;point to a cmd packet (or NULL if no command packet)
+    mov  si, es          ;SI:DI = pointer to command packet
+
+    push ds
+    lds  dx, DataPacket  ;DS:DX = pointer to data packet (or NULL if no data)
+    int  0x21
+    pop  ds
+
+    jc   goback          ;AX has the error code to return, return it now
+    xor  ax              ;clear AX register before returning
+    goback:
+    ret
+
+The entire sequence up above can be wrapped into a function call which you can
+then call from anywhere within your C source code.  For example, you might
+wrap a prototype such as the following around it:
+
+int DevIOCtl(int Handle, int Func, void far *DataPacket, void far *CmdPacket);
+
+With the above prototype, you could then set the port speed for a comm port
+by using the following code:
+
+   long BitRate = 38400L;
+   DevIOCtl(Port,0x41,NULL,&BitRate);
+
+Or to turn the DTR signal off, you might use the following code:
+
+   int  Mask = 0xFF01;       /* FF = don't turn any off, 01 = turn DTR on */
+   long RetVal;              /* return value */
+   DevIOCtl(Port,0x46,&RetVal,&Mask);
+
+------------------------------------------------------------------------------
+
+The above examples are meant merely to give you an idea as to HOW you can
+accomplish the task of accessing OS/2 comm ports from with a DOS program.
+
+This information is NOT meant to be a complete tutorial or reference on
+accessing OS/2 comm ports.
+
+It is recommended that you obtain, from IBM, the OS/2 API Reference Guide to
+obtain information on the IOCtrl function calls.  A commonly found document,
+called GUIREF20.INF, which is viewable using OS/2's "VIEW" command, can be used
+to obtain this information.
+
+------------------------------------------------------------------------------
+
+Tips:
+
+Beyond the technical details of "how" to program OS/2 comm ports from a DOS
+application, there remains the issue of how to "optimize" your program to get
+the best performance possible.
+
+A few key ideas to keep in mind are:
+
+- You can send data as fast as you want by writing data to the comm port
+  handle.  OS/2 will take care of making sure that the data is fed to the
+  comm port as fast as it can be accepted.
+
+- Obtaining data from the comm port will "block" your application if there is
+  nothing in the comm port to be read in.  This can be highly desirable in
+  that it means your application gets *no* attention from OS/2 (no CPU cycles
+  are wasted) unless you have data in the port to be read in.
+
+  HOWEVER, if your program needs to be able to monitor local keystrokes while
+  waiting for comm port data, or if your program has some other work to do,
+  you will have to AVOID using this capability due to the fact that your DOS
+  application cannot have multiple threads of execution and you don't want the
+  entire application to be blocked.
+
+  Instead, what you might consider doing is setting the Read Timeout value
+  (IOCtrl function 53h) to a low enough value that control can be given back
+  to you quickly if there are no bytes waiting in the input buffer.
+
+- Another thing to consider is that these function calls (read/write/ioctl) are
+  "expensive" function calls in terms of CPU time.  In other words, if you
+  spend a lot of time calling these functions you may send the CPU usage right
+  through the roof.
+
+  For example, if you need to recognize when carrier is lost, you won't want to
+  set up a tight look that continually calls IOCtrl to find out if carrier is
+  lost because the CPU will be busy doing almost nothing but that function.
+  Instead, what you might want to do is create some kind of "interval" at which
+  you will make that function call (perhaps once a second, or whatever you
+  deem appropriate).
+
+With these kinds of ideas in mind, you can "tune" your application to make the
+best use of the OS/2 API's possible.
+

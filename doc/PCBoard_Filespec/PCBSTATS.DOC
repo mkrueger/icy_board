@@ -1,0 +1,29 @@
+The following information describes the PCBSTATS.DAT file which PCBoard
+maintains with information about the activity on the system and displays to
+the sysop on the call waiting screen.
+
+There is one record in the file for every node on the system, plus on
+additional record, at the top of the file, for the system statistics.  Each
+record has the following structure:
+
+  typedef struct {
+    char LastCaller[54];
+    char Time[6];
+    long NewMsgs;
+    long NewCalls;
+    long TotalUp;
+    long TotalDn;
+    bool LocalStats;         ;bool is a char type with a 0 or 1 value
+  } stattype;
+
+So record #0 is the system record, record #1 belongs to node #1, record #2
+belongs to node #2 and so on.
+
+When PCBoard updates this file, it updates *both* the local node statistics
+as well as the system statistics.  For example, if JOHN DOE logs off, his
+name appears in the local node record plus it is written to the system record.
+
+In this manner, the sysop can look at "system wide statistics" or he can switch
+to a specific node and look at "node specific statistics".
+
+

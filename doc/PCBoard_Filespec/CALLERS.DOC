@@ -1,0 +1,23 @@
+The CALLERS log is a random access text file with a record length of 64
+bytes.
+
+The following layout is specified in a "byte offset" format such that the first
+field begins at offset 0.
+
+Note that strings are not NULL terminated and that the length specified for
+the string is full number of useable and storeable bytes.  All strings are
+padded with spaces to fill the entire field.
+
+   Offset   Type   Length  Description
+   ------  ------  ------  -----------
+      0    str       62    The actual text written to the log
+     62    str        2    Carriage Return / Line Feed characters
+
+While the each record is strictly formatted to 64 bytes each making it a
+random access file - the file may be TYPE'd to the screen at a DOS prompt due
+to the inclusion of the carriage return and line feed characters at the end of
+each record.
+
+PCBoard, when displaying the callers log, takes advantage of the random access
+nature of the file format to be able to display the file in reverse order.
+

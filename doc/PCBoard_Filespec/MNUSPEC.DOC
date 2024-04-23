@@ -1,0 +1,263 @@
+| A vertical bar denotes changes since the release of PCBoard v15.0
+|
+| Current Posting Dated: 11/10/93
+
+ Menu Description (MNU) File Format
+ ----------------------------------
+
+ A PCBoard MNU file describes a SysOp defined menu that can be used for
+ many purposes.  It is a flat ASCII text file with the following format:
+
+ TOP OF FILE                             Examples
+ -----------                             --------
+ MENU NAME                               Main
+|DISPLAY FILE NAME[,FORCE[,HOT[,THRU]]]  C:\PCB\MNUS\DISP\MAIN,0,0,0
+ HELP FILE NAME                          C:\PCB\MNUS\HELP\MAIN
+ LANGUAGE SPECIFIC PROMPT COUNT          3
+ DEFAULT LANGUAGE MENU PROMPT            @X09This is the @OPTEXT@ Menu Prompt
+ EXT,LANGUAGE SPECIFIC PROMPT            .SPA,@X09Spanish prompt goes here
+ EXT,LANGUAGE SPECIFIC PROMPT            .FRE,@X09French prompt goes here
+ OPTION COUNT                            2
+ OPT,SEC,TYPE,INFO                       SUPPORT,20,5,1
+ OPT,SEC,TYPE,INFO                       SYSOP,100,5,SYSOP
+ -----------                             --------
+ BOT OF FILE                             Examples
+
+ The first line (MENU NAME) is the name of the menu (used by @OPTEXT@ in
+     prompts)
+
+|The second line (DISPLAY FILE NAME) is the base name of a display file
+|    for this menu (may have alternates).  There may be up to three extra
+|    fields (FORCE FLAG, HOT FLAG, & PASS THROUGH) after this to control
+|    forcing display of the file regardless of the users expert status, to
+|    activate menu hot keys, & to pass undefined options through to PCBoard.
+|
+|    If FORCE FLAG is specified and non-0 then the file will be displayed
+|    regardless of the users expert status; if 0 or not specified then display
+|    of the file will follow the users expert status.
+|
+|    If HOT FLAG is specified and non-0 then hot keys will be used; if 0 or not
+|    specified then normal command stacking processing will be used.
+|
+|    If PASS THROUGH is specified and non-0 and an undefined option is entered
+|    by the user then it will be passed on to PCBoard for processing; if 0 or
+|    not specified then no action will be taken on an undefined option.
+
+ The third line (HELP FILE NAME) is the base name of a help file for this
+     menu (may have alternates)
+
+ The fourth line (LANGUAGE SPECIFIC PROMPT COUNT) is used to tell PCBoard
+     if, and how many, language prompts you have defined for this menu.
+     If 0 then a default prompt from PCBTEXT will be used.
+
+ The fifth line (DEFAULT LANGUAGE MENU PROMPT) is only used if the third
+     line is greater than 0.  If it is, this is the default language
+     prompt that will be used if a language specific version of the
+|    prompt can't be found.  Note that file and PPE replacements are
+|    valid in v15.1.
+
+ The sixth and possibly seventh (or more) lines (EXT,LANGUAGE SPECIFIC
+     PROMPT) are only used if the third line is greater than 1.  If this
+     is true, there should be (third line - 1) lines with language
+     specific prompts.  The EXT portion of each line should include the
+|    dot in front of the extension (ie, .SPA).  Note that file and PPE
+|    replacements are valid in v15.1.
+
+ The eighth line (OPTION COUNT) should contain a count of available
+     options.
+
+ The ninth (and greater) lines (OPT,SEC,TYPE,INFO) are used to define the
+     option information for each option.
+
+
+ Here is an example MNU file for conferences.
+
+ TOP OF FILE
+ -----------
+ Conference
+|C:\PCB\GEN\CONF,1,1,1
+ C:\PCB\GEN\HCNF
+ 3
+ @OPTEXT@ Menu Option
+ .SPA,Spanish prompt goes here
+ .FRE,French prompt goes here
+ 5
+ 1,10,5,UNREGLCL
+ 2,10,5,UNREGNET
+ 3,20,5,REGLCL
+ 4,20,5,REGNET
+ 5,30,5,SYSOP
+ -----------
+ BOT OF FILE
+
+
+ OPTION INFORMATION
+
+     OPT,SEC,TYPE,INFO
+
+     OPT is the string (eight characters max) used to select the option
+     SEC is the required security level for the option
+     TYPE is the type number of the option (listed below)
+     INFO is specific to the type
+
+
+ TYPES
+
+      0 (MENU) - This option loads a new menu for the user to access.
+
+                 INFO - The path and filename of the MNU file to load.
+
+                 @PARAMS@ - Unavailable
+
+      1 (SCR)  - This option selects a script questionnaire from the
+                 SCR.LST file for the conference.
+
+                 INFO - The script number to process.
+
+                 @PARAMS@ - Available
+
+      2 (BLT)  - This option displays a bulletin from the BLT.LST file
+                 for the conference.
+
+                 INFO - The bulletin number to display.
+
+                 @PARAMS@ - Available
+
+      3 (FILE) - This option displays a file.
+
+                 INFO - The path and filename of the file to display.
+
+                 @PARAMS@ - Unavailable
+
+      4 (DOOR) - This option selects a door from the DOORS.LST file for
+                 the conference.
+
+                 INFO - The door name or number.
+
+                 @PARAMS@ - Available
+
+      5 (CONF) - This option joins a conference.
+
+                 INFO - The conference name or number.
+
+                 @PARAMS@ - Available
+
+      6 (DIR)  - This option selects a file directory for the user.
+
+                 INFO - The file directory number.
+
+                 @PARAMS@ - Available
+
+      7 (STFS) - This option stuffs the keyboard buffer with a string.
+
+                 INFO - The string to stuff.
+
+                 @PARAMS@ - Available
+
+      8 (STFF) - This option stuffs the keyboard buffer with the contents
+                 of a file.
+
+                 INFO - The filename to stuff.
+
+                 @PARAMS@ - Unavailable
+
+      9 (XPRT) - This option changes the users expert status.
+
+                 INFO - ON, OFF, or TOGGLE.
+
+                 @PARAMS@ - Available
+
+     10 (GBYE) - This option logs the user off as if the G command was
+                 selected.
+
+                 INFO - NONE
+
+                 @PARAMS@ - Unavailable
+
+     11 (BYE)  - This option logs the user off as if the BYE command was
+                 selected.
+
+                 INFO - NONE
+
+                 @PARAMS@ - Unavailable
+
+     12 (QUIT) - This option exits the current active menu.
+
+                 INFO - NONE
+
+                 @PARAMS@ - Unavailable
+
+     13 (EXIT) - This option exits all active menus.
+
+                 INFO - NONE
+
+                 @PARAMS@ - Unavailable
+
+     14 (PPE)  - This option starts executing a PPE file.
+
+                 INFO - The path and filename of the PPE file to execute.
+
+                 @PARAMS@ - Available
+
+     15 (SSNR) - This option stuffs the keyboard buffer with a string
+                 (same as STFS) without saving the current MNU state.  In
+                 other words, after stuffing the keyboard buffer and
+                 exiting, it will not return to the MNU that it was
+                 selected from.
+
+                 INFO - The string to stuff.
+
+                 @PARAMS@ - Available
+
+     16 (SFNR) - This option stuffs the keyboard buffer with the contents
+                 of a file (same as STFF) without saving the current MNU
+                 state.  In other words, after stuffing the keyboard
+                 buffer and exiting, it will not return to the MNU that
+                 it was selected from.
+
+                 INFO - The filename to stuff.
+
+                 @PARAMS@ - Unavailable
+
+     17 (DIS)  - This option type disables an existing option; used as a
+                 place holder when you want to temporarily remove an
+                 option without deleting it from the MNU file.
+
+                 INFO - Ignored
+
+                 @PARAMS@ - Unavailable
+
+     18 (STFQ) - This option stuffs the keyboard buffer with a string
+                 quietly (without echoing the input to the screen from
+                 the main command prompt).  NOTE:  This option type may
+                 not be used to select CMD.LST entries.
+
+                 INFO - The string to stuff.
+
+                 @PARAMS@ - Available
+
+     19 (SQNR) - This option stuffs the keyboard buffer with a string
+                 quietly (same as STFQ) without saving the current MNU
+                 state.  In other words, after stuffing the keyboard
+                 buffer and exiting, it will not return to the MNU that
+                 it was selected from.
+
+                 INFO - The string to stuff.
+
+                 @PARAMS@ - Available
+
+|    20 (DORX) - This option selects a door from the DOORS.LST file for
+|                the conference but doesn't restore the MNU afterward.
+|
+|                INFO - The door name or number.
+|
+|                @PARAMS@ - Available
+
+|    21 (PPEX) - This option starts executing a PPE file and exits the
+|                MNU afterward.
+|
+|                INFO - The path and filename of the PPE file to
+|                       execute.
+|
+|                @PARAMS@ - Available
+

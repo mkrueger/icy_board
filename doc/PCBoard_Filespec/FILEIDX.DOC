@@ -1,0 +1,120 @@
+The following information describes the download path index files that are
+used by PCBoard.  Lines marked with a vertical bar (|) were added on 7/5/96
+in support of PCBoard v15.3's new style IDX file.
+
+| NOTE:  Beginning with PCBoard v15.3, two IDX formats are supported by
+|        PCBoard.  Both formats are "similar", enough so that you can share
+|        most of the code in handling them.  The new format is mostly
+|        different in that it uses 4-byte long integers instead of the 2-byte
+|        short integers used in the old format. It also includes in the file
+|        record portion of the file a 4-byte long integer representing the
+|        size of the file.
+|
+|        The new style of index is created by running MAKEIDX with a /E
+|        command line parameter.  Most sysops will probably continue to use
+|        the old style index while reserving the new style index primarily
+|        for CD-ROMs.
+
+
+  File Specification
+  ==================
+
+  Old Style IDX Header
+  --------------------
+   2 bytes for an integer indicating the number of files
+  52 bytes for 26 integers indicating starting points for A thru Z
+| 73 bytes reserved space
+|  1 byte as a "ID" value which is 0 to indicate the old style index
+
+  typedef struct {
+    unsigned NumFiles;
+    unsigned RecOffset[26];
+    char     Reserved[73];        // set to all zeroes
+    char     Id;                  // set to 0 - indicates old style index
+  } idxhdrtype;
+
+| New Style IDX Header
+| --------------------
+|   4 bytes for a long integer indicating the number of files
+| 104 bytes for 26 long integers indicating starting points for A thru Z
+|  19 bytes reserved space
+|  1 byte as a "ID" value which is 1 to indicate the NEW style index
+|
+| typedef struct {
+|   unsigned long NumFiles;
+|   unsigned long RecOffset[26];
+|   char          Reserved[19];   // set to all zeroes
+|   char          Id;             // set to 1 - indicates NEW style index
+| } newidxhdrtype;
+
+
+  Old Style File Name Records
+  ---------------------------
+  The filename records include:
+  -  11 bytes for a filename of the form:  nnnnnnnneee
+     any character not used is filled with a space
+  -  the path associated with the file is represented by a path number
+
+  typedef struct {
+    char     Name[8];
+    char     Ext[3];
+    unsigned PathNum;
+  } nametype;
+
+
+| New Style File Name Records
+| ---------------------------
+| The new style record is the same as above with two differences:
+| -  The PathNum variable is a 4-byte long integer
+| -  In the new style index, a 4-byte long integer is included to indicate
+|    the size of the file
+|
+| typedef struct {
+|   char          Name[8];
+|   char          Ext[3];
+|   unsigned long PathNum;
+|   unsigned long FileSize;
+| } newnametype;
+
+
+  Path Records (the same in both IDX styles)
+  ==========================================
+  Paths are stored as fixed length records, each one is 64 bytes which includes
+  a NUL terminator at the end of the path:
+
+  typedef struct {
+    char Path[64];
+  } pathtype;
+
+
+  File Layout and Accessing the File
+  ==================================
+| The first thing you need to do is read the header of the IDX file and look
+| at the byte at offset 127, which is the ID byte.  If it is 0, then use the
+| structure defined as idxhdrtype shown above.  If it is a 1, then use the
+| structure defined as newidxhdrtype.  The remainder of the "logic" for
+| accessing the files remains the same whether using the old or new style IDX
+| file.  Just remember to use the proper integer sizes (short in old style and
+| long in the new style).
+
+  Following the header is the list of filenames which are then followed by
+  paths.
+
+  The header consists of 26 separate values which indicate the record number
+  (offset 0) of the first filename starting with each of the letters A thru Z.
+  This reduces the number of file seeks performed by immediately narrowing down
+  the search records.  It also increases the likelyhood that all file seeks
+  will be performed within the memory buffer that is read in from disk.
+
+  For instance, if the file to be found starts with the letter "B" then looking
+  at offset numbers for "B" and "C" (let's say they are record numbers 100 and
+  200 respectively out of 1000 files) we can narrow down the search to records
+  100-200 immediately without having to read files at the very end of the list.
+
+  Files starting with letters before 'A' will be placed immediately following
+  the header so no offset value is recorded there.  Files that start with
+  letters after 'Z' will follow those filenames starting with 'Z'.
+
+  A binary search is then used to locate the filename.  Note the format of
+  the filenames which makes it easy to use a wildcard matching technique.
+

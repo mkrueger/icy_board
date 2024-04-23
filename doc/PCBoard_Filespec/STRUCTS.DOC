@@ -1,0 +1,171 @@
+Preliminary data structures for PCBFido 15.22
+
+Unless otherwise specified, these *.DAT files contain an unlimited number
+of records in the format described
+
+================================================================================
+
+AREAS.DAT
+---------
+
+Byte offset     type                       datum
+
+0-1             unsigned short int         file version (15.22 = 3)
+2-3             unsigned short int         PCBoard Conference number
+4-64            char                       Area Tag
+65-66           unsigned short int         Aka record index (Record number for AKAS.DAT)
+67-68           unsigned short int         Origin record index (Record number in ORIGINS.DAT)
+69              char                       highAscii setting
+70-71           unsigned short int         Julian date for last activity in echo (import/expo
+72              char                       Allow Private messages (boolean)
+73              char                       Allow File Attach
+74-83           char                       Reserved
+-------------------------------------------------------------------------------
+
+AKAS.DAT
+--------
+
+Byte offset     type                       datum
+
+0-1             unsigned short             file version (15.22 = 3)
+2-3             unsigned short             zone
+4-5             unsigned short             net
+6-7             unsigned short             node
+8-9             unsigned short             point
+10              char                       Primary address
+11              char                       InSeenBy
+12              char                       Present in handshake
+13              char                       Up/Downlink
+14-83           char                       Conference Range
+84-93           char                       Reserved
+
+-------------------------------------------------------------------------------
+
+FIDOQUE.DAT
+-----------
+
+Same as 15.22, but replace 128 byte bit array header with 2 byte unsigned file version
+
+--------------------------------------------------------------------------------
+
+FREQDENY.DAT
+------------
+Same as AKAS.DAT
+
+-------------------------------------------------------------------------------
+
+FREQPATH
+---------
+
+Byte offset     type                       datum
+
+0-1             unsigned short             file version (15.22 = 3)
+2-67            char                       file path
+68-77           char                       password
+78-87           char                       reserved
+
+-------------------------------------------------------------------------------
+
+MAGICNAM.DAT
+-------------
+
+Byte offset     type                       datum
+
+0-1             unsigned short             file version (15.22 = 3)
+2-22            char                       Magic Name
+23-89           char                       path/filename
+90-99           char                       password
+100-109         char                       reserved
+
+------------------------------------------------------------------------------
+
+NODEARC.DAT
+-----------
+
+Byte offset     type                       datum
+
+0-1             unsigned short             file version (15.22 = 3)
+2-3             unsigned short             zone
+4-5             unsigned short             net
+6-7             unsigned short             node
+8-9             unsigned short             point
+10-11           unsigned short             packet type
+12-13           signed   short int         Archiver_index
+14-23           char                       reserved
+
+-----------------------------------------------------------------------------
+
+NODELIST.DAT
+------------
+
+Byte offset     type                       datum
+
+0-1             unsigned short             file version (15.22 = 3)
+2-81            char                       Base Name
+82-90           char                       Diff Name
+91-92           signed int                 Last compile
+93-102          char                       compile
+
+------------------------------------------------------------------------------
+
+ORIGINS.DAT
+-----------
+
+Byte offset     type                       datum
+
+0-1             unsigned short             file version (15.22 = 3)
+2-71            char                       Origin
+72-141          char                       Conference Range
+142-151         char                       reserved
+-----------------------------------------------------------------------------
+
+PHONEX.DAT
+----------
+
+Byte offset     type                       datum
+
+0-1             unsigned short             file version (15.22 = 3)
+2-31            char                       in
+32-63           char                       out
+64-73           char                       reserved
+----------------------------------------------------------------------------
+
+PCBFIDO.CFG
+-----------
+
+three single structures of the following format in the foillowing order.
+Byte offset     type                       datum
+
+0-1             unsigned short             file version (15.22 = 3)
+
+typedef struct
+{
+  char          incoming_packets[66];
+  char          outgoing_packets[66];
+  char          outgoing_msg[66];
+  char          bad_packets[66];
+  char          nodelist_path[66];
+  char          work_directory[66];
+  char          passthrough[66];           // Passthru files
+  char          securemail[66];            // Secure netmail
+  char          messages[66];              // response Messages
+
+} DIRECTORIES;
+
+
+typedef struct
+{
+  char          archivers[4][66];
+  char          archiver_switches[4][80];
+  char          unarchivers[4][66];
+  char          unarchiver_switches[4][80];
+} ARCHIVERS;
+
+typedef struct
+  char  BBS_Name[60];
+  char  City[30];
+  char  Sysop[30];
+  char  Phone[50];
+  char  Baud[10];
+  char  Flags[50];
+} EMSI_DATA;

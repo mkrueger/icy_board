@@ -1,0 +1,28 @@
+The following documents the format of the DIR.LST files that PCBoard uses to
+store the LIST of "DIR Files" that PCBoard uses to determine which DIR fils
+should be displayed.
+
+typedef struct {
+  char DirPath[30];
+  char DskPath[30];
+  char DirDesc[35];
+  char SortType;
+} dirlisttype;
+
+DirPath is the complete path and filename of the DIR file to be displayed.
+
+DskPath is the physical path location where files *associated* with the DIR
+file can be found.
+
+DirDesc is the text description of the DIR file.
+
+SortType is one of the following:  0 - no sort
+                                   1 - Sort by File Name (ascending)
+                                   2 - Sort by File Date (ascending)
+                                   3 - Sort by File Name (descending)
+                                   4 - Sort by File Date (descending)
+
+
+For a format of the actual DIR files (which are just text files) take a look
+at the DIR.DOC file.
+

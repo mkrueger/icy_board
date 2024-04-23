@@ -1,0 +1,347 @@
+  WARNING:  This document is subject to change at any time.  Any changes made
+  will be indicated by a vertical bar (|) in column 1 of the file.
+
+| Last update: 08/13/94
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+  The following information documents the order in which the fields of the
+  PCBOARD.DAT file are layed out.  All fields are written in an ASCII text
+  format with a carriage return/line feed after each field making one field
+  per line in the file.
+
+  On questions of a YES or NO nature in PCBSETUP the values are stored in the
+  PCBOARD.DAT file as a "-1" for YES or a "0" for NO.
+
+| For version 14.0 thru 14.2 lines 1 thru 150 apply.  Lines 151-198 are
+| new for version 14.5.  Lines 199-266 are new for v15.0.  Lines 267-272 are
+| new for v15.1.  Lines xxx-xxx are new for v15.2.
+
+  A program that is written to READ this file should only read those lines
+  which it needs and should check line number 1 (the version identification)
+  to be sure that it is compatible with the software being used.
+
+  A program that is written to WRITE to this file should first read in ALL of
+  the existing lines and copy back out the ones that go unchanged.  Note that
+  the total number of lines may INCREASE without notice.  Therefore you should
+  write the program to continue reading until an EOF (end of file) condition
+  occurs and then write out all of the lines.  This will preserve compatibility
+  with future changes in the PCBOARD.DAT file.
+
+  Line  Contents
+  ----  --------
+     1  PCBOARD.DAT version identification
+     2  Sysop Display Name (if answered NO to "Use Real Name")
+     3  Sysop Password (from call waiting screen)
+     4  Use Real Name
+     5  Use Graphics (when logging in as the sysop)
+     6  Level Needed to Read All Comments
+     7  Level Needed to Read All Mail Except Comments
+     8  Sysop Level (for Sysop Menu and F1-Temp-Sysop Upgrade)
+     9  Level Needed to Copy or Move Messages Between Areas
+    10  Security Req'd for Sysop Function 1  (view log)
+    11  Security Req'd for Sysop Function 2  (view users)
+    12  Security Req'd for Sysop Function 3  (pack msgs)
+    13  Security Req'd for Sysop Function 4  (recover msgs)
+    14  Security Req'd for Sysop Function 5  (lisg msg headers)
+    15  Security Req'd for Sysop Function 6  (view system file)
+    16  Security Req'd for Sysop Function 7  (user maintenance)
+    17  Security Req'd for Sysop Function 8  (pack users file)
+    18  Security Req'd for Sysop Function 9  (remote dos)
+    19  Security Req'd for Sysop Function 10 (shell dos function)
+    20  Security Req'd for Sysop Function 11 (view other nodes)
+    21  Security Req'd for Sysop Function 12 (logoff alt node)
+    22  Security Req'd for Sysop Function 13 (view node log)
+    23  Security Req'd for Sysop Function 14 (drop alt node to dos)
+    24  Location of Help Files
+    25  Location of Security Files
+    26  Location of Node Chat Files
+    27  Location of PCBTEXT Files
+    28  Location of User INDEX Files
+    29  Name/Location of USERS File
+    30  Name/Location of CALLERS Log
+    31  Name/Location of CNAMES File
+    32  Name/Location of PWRD File
+    33  Name/Location of FSEC File
+    34  Name/Location of UPSEC File
+    35  Name/Location of TCAN File
+    36  Name/Location of WELCOME File
+    37  Name/Location of NEWUSER File
+    38  Name/Location of CLOSED File
+    39  Name/Location of WARNING File
+    40  Name/Location of EXPIRED File
+    41  Name/Location of USERNET File
+    42  Name/Location of Conference Menu
+    43  Name/Location of NEWASK File
+    44  Name/Location of NEWREG File
+    45  Name/Location of PCBPROT.DAT File
+    46  Name/Location of DOWNLOAD.TXT File
+    47  Name/Location of LOGOFF Script
+    48  Name/Location of LOGOFF Answers
+    49  Name/Location of PCBML.DAT File
+    50  Name/Location of Group Chat Topic File
+    51  Seconds to wait for carrier
+    52  COMx (or NONE)
+    53  Initial Port Speed
+    54  Lock Port Speed
+    55  Modem Initialization String
+    56  Modem Off-Hook String
+    57  Disable CTS/RTS Checking
+    58  Using a Hayes V-Series
+    59  Using a FASTCOMM
+    60  Reset Modem During Recycle
+    61  Modem Offhook During Recycle
+    62  Using PAD
+    63  Answer on True Ring Detect
+    64  Allow 7,E,1 Callers
+    65  Allow Low Baud Rates
+    66  Start Time for Low Baud
+    67  Stop Time for Low Baud
+    68  Disable Message Scan
+    69  Disable 3-Minute Screen Clear
+    70  Disable Registration Edits
+    71  Disable High-ASCII Filter
+    72  Disable Quick Logon Feature
+    73  Disable Password Check (DOS)
+    74  Multi-Lingual Operation
+    75  Disable Full Record Updating
+    76  Run System as a Closed Board
+    77  Use Non-Graphics Mode Only
+    78  Exit to DOS After Each Call
+    79  Include City Field in NODE Display
+    80  Eliminate Screen Snow in PCB
+    81  Enable Subscription Mode
+    82  Allow ESC Codes in Messages
+    83  Allow Carbon-Copy Messages
+    84  Validate TO: Name in Messages (except in Echo Conferences)
+    85  (no longer used, was:  Update Msg Ptr after Read)
+    86  Enforce Daily Time Limit
+    87  Display NEWS Only if Changed (-1=YES, 0=NO, 1=ALWAYS)
+    88  Disable CTS-Drop During Write
+    89  Keyboard Timeout (0=disable)
+    90  Running a Network / Multitasker System
+    91  Node Number on the Network
+    92  Network Timeout on Errors (20-99 secs)
+    93  Node Chat Frequency (once every 5-99 secs)
+    94  Board Name
+    95  Batch file for viewing compressed files
+    96  Filename EXTENSION for compressed files
+    97  Function Key SHIFT-F1
+    98  Function Key SHIFT-F2
+    99  Function Key SHIFT-F3
+   100  Function Key SHIFT-F4
+   101  Function Key SHIFT-F5
+   102  Function Key SHIFT-F6
+   103  Function Key SHIFT-F7
+   104  Function Key SHIFT-F8
+   105  Function Key SHIFT-F9
+   106  Function Key SHIFT-F10
+   107  (not used)
+   108  Number of Highest Conference Desired
+   109  Maximum Lines in the Message Editor
+   110  Default Color ANSI Code
+   111  Default Color Intensity
+   112  Is a Timed Event Active
+   113  Time to Begin Event (military time)
+   114  Minutes Prior to Suspend All Activity
+   115  Disallow Uploads Prior to an Event
+   116  Slide Event Time if a User is Online
+   117  Upload Buffer Size (4-64)
+   118  Disable Drive Size Check
+   119  Parallel Port Num (1-3,0=None)
+   120  Stop Upload's when Free Space is less than ### K-bytes
+   121  Security Level for A) Abandon Conference
+   122  Security Level for B) Bulletin Listings
+   123  Security Level for C) Comment to Sysop
+   124  Security Level for D) Download a File
+   125  Security Level for E) Enter a Message
+   126  Security Level for F) File Directory
+   127  (no longer used - was security for GOODBYE command)
+   128  Security Level for H) Help Functions
+   129  Security Level for I) Initial Welcome
+   130  Security Level for J) Join a Conference
+   131  Security Level for K) Kill a Message
+   132  Security Level for L) Locate File Name
+   133  Security Level for M) Mode (graphics)
+   134  Security Level for N) New Files Scan
+   135  Security Level for O) Operator Page
+   136  Security Level for P) Page Length
+   137  Security Level for Q) Quick Message Scan
+   138  Security Level for R) Read Messages
+   139  Security Level for S) Script Questionnaire
+   140  Security Level for T) Transfer Protocol
+   141  Security Level for U) Upload a File
+   142  Security Level for V) View Settings
+   143  Security Level for W) Write User Info.
+   144  Security Level for X) Expert Mode Toggle
+   145  Security Level for Y) Your Personal Mail
+   146  Security Level for Z) Zippy DIR Scan
+   147  Security Level for OPEN a DOOR
+   148  Security Level for CHAT Between NODEs
+   149  Level Given to Users Who Agree  to Register
+   150  Level Given to Users Who Refuse to Register
+   151  Security Level needed for USERS command
+   152  Security Level needed for WHO command
+   153  Security Level needed for BATCH file transfers
+   154  Name of color definition file (usually PCBFILER.DEF)
+   155  Lowest allowed baud rate for callers (was /BAUD:xxxx)
+   156  Modem delay during recycle (was /DELAY:xx)
+   157  Number of Rings before answering the phone
+   158  IRQ number of comm port if not COM1 or COM2
+   159  BASE address of comm port if not COM1 or COM2
+   160  Leave DTR up at drop to DOS (some modems hangup if DTR is down
+   161  Maximum lines in scrollback buffer (was /MAX:xxx)
+   162  Pre-load PCBTEXT file for faster access (uses more memory)
+   163  Pre-load CNAMES file for faster access (uses more memory)
+   164  Security Level required for a caller to use @-variables
+   165  Include "Uploaded By" line in uploaded file descriptions
+   166  Show user settings during login (was /INFO)
+   167  Allow local F5 shells to DOS
+   168  Use Slave Card updating (v14.2 did, v14.5 is faster without)
+   169  Default subscription length for new users
+   170  Maximum messages in a capture file
+   171  Maximum messages per conference in a capture file
+   172  Minutes prior to an event to stop uploads
+   173  Security Level needed to EDIT any message
+   174  Security Level needed to EDIT your own message
+   175  Share IRQ's on microchannel buses (for comm ports)
+   176  Default to scan ALL conferences at login
+   177  Level Needed to Use the 'Read Only' Command
+   178  Use NEWASK questionnaire plus standard new user questions
+   179  Location for temporary files
+   180  Name and location of USERS.INF file
+   181  Default to 'Quick Scan' method on personal message scan
+   182  Number of DAYS for warning prior to subscription expiration
+   183  Allow ONE-name users to log onto the system
+   184  Default 'Expired' Security Level
+   185  Security Level to use the TEST command
+   186  Name of the message CAPTURE file (or blank=caller number)
+   187  Perform file verification on uploads
+   188  Stop the clock during Message Capture download
+   189  Start time for sysop pages
+   190  Stop time for sysop pages
+   191  Write Caller Number to callers log
+   192  Write Connect String to callers log
+   193  Write Caller's Security Level to callers log
+   194  Read PWRD file upon joining a conference
+   195  Confirm caller name at logon time
+   196  Allow password failure comment
+   197  Warning before logoff
+   198  Maximum number of lines in upload description
+   199  Name/Location of CHAT.DAT file
+   200  Name/Location of PCBSTATS.DAT file
+   201  Name/Location of CHAT menu
+   202  Name/Location of NOANSI file
+   203  List of slow drive letters
+   204  Name/Location of SWAP FILE (when swapping to disk)
+   205  Swap out
+   206  Disable Batch Uploads
+   207  Force comments-to-sysop ito the Main Board
+   208  Foreign System - use 0Dh instead of E3h for Line Separators in messages
+   209  Monitor modem - record missed connections in callers log
+   210  Force NO 16550 usage
+   211  Force 16550 usage
+   212  Reset modem while idling at the call waiting screen
+   213  Float Node Number via USERNET information
+   214  Promote U and D commands to UB and DB when batch protocol is default
+   215  Automatically register new users into public conferences
+   216  Scan for new bulletins during login sequence
+   217  Create MSGS file if it does not exist when joining a conference
+   218  Verify CD Loss before recycling
+   219  Encrypt USERS file
+   220  Upload Time Credits (default is 1.0)
+   221  Upload Byte Credits (default is 0.0)
+   222  Default Color, range 0-255 (overrides lines 110 and 111 in this file)
+   223  Message Header Line 1 Color, range 0-255
+   224  Message Header Line 2 Color, range 0-255
+   225  Message Header Line 3 Color, range 0-255
+   226  Message Header Line 4 Color, range 0-255
+   227  Message Header Line 5 Color, range 0-255
+   228  Message Header Line 6 Color, range 0-255
+   229  ORIGIN information for netmail routing
+   230  Name/Location of EVENT.DAT file
+   231  Location of EVENT files
+   232  Name/Location of CMD.LST file
+   233  Require password to exit to DOS from Call Waiting screen
+   234  Security Level to use Sysop Function 15
+   235  Security Level to use BROADCAST command
+   236  Security Level to view the Private Upload directory
+   237  Security Level to enter generic messages (@user@, @##@, @##-##@)
+   238  Security Level to edit message headers
+   239  Security Level to protect messages
+   240  Security Level to overwrite files on an upload
+   241  Security Level to copy/move a message to a new location
+   242  Environment Size when shelling/swapping to DOS
+   243  Security Level to override the Low Baud Rate limit
+   244  Name/Location of ALLFILES.LST (used in place of DLPATH.LST on uploads)
+   245  Reserved
+   246  Reserved
+   247  Reserved
+   248  Prompt callers to read new mail
+   249  Name/Location of LOGON Script Questionnaire
+   250  Name/Location of LOGON Script Questionnaire ANSWER File
+   251  Name of QWK Packet (root name of .QWK and .REP files)
+   252  Name/Location of Upload File TRASHCAN (stop uploads of specific files)
+   253  Security Level to set an pack-out date on a message
+   254  Security Level to be able to see Return Receipts not addressed to you
+   255  Swap during $$LOGON/$$LOGOFF batch execution
+   256  Create USERS.SYS file for $$LOGON.BAT execution
+   257  Graphics Mode default
+   258  Name of SLOW DRIVE batch file to execute after copying from slow drive
+   259  Allow Aliases to be changed after first selecting them
+   260  Exclude local logins/downloads/etc from statistics
+   261  Number of days to FORCE password change (requires Password PSA)
+   262  Number of days to WARN before password change (requires Password PSA)
+   263  Record Group Chat Sessions
+   264  Show ALIAS names in USERNET
+   265  Minimum length for passwords when the Password PSA is installed
+|  266  Allow Handles in Group Chat
+|  267  Location of Command Display Files
+|  268  Force INTRO Display on Conference Join
+|  269  Skip Protocol Question when Registering a New User
+|  270  Skip Alias Question when Registering a New User
+|  271  Drop to DOS on Missed Connection
+|  272  Use OS/2 API to Access COMx:
+|  273  Accounting - Enable Accounting
+|  274  Accounting - Show Currency
+|  275  Accounting - Concurrent Tracking
+|  276  Accounting - Peak Usage Start Time
+|  277  Accounting - Peak Usage Stop Time
+|  278  Accounting - Name/Location of Configuration File
+|  279  Accounting - Name/Location of INFO file
+|  280  Accounting - Name/Location of WARN File
+|  281  Accounting - Name/Location of Tracking file
+|  282  Accounting - Name/Location of LOGOFF File
+|  283  UUCP - Base Path
+|  284  UUCP - Spool Directory
+|  285  UUCP - Log File Directory
+|  286  UUCP - Compress Batch File
+|  287  UUCP - Decompress Batch File
+|  288  UUCP - Name
+|  289  UUCP - Domain Name
+|  290  UUCP - Email Host
+|  291  UUCP - News Host
+|  292  UUCP - News Distribution
+|  293  UUCP - Time Zone Offset from GMT
+|  294  UUCP - Name Separator
+|  295  UUCP - Organization
+|  296  UUCP - High Ascii Filter
+|  297  UUCP - Internet Email Conference
+|  298  UUCP - Usenet Junk Conference
+|  299  UUCP - Bang Domain
+|  300  UUCP - Sub Domain
+|  301  Fido - Allow Node to Process Incoming Packets
+|  302  Fido - Allow Node to Process Orphan Packets
+|  303  Fido - Allow Node to Export Mail
+|  304  Fido - Allow Node to Dial Out
+|  305  Fido - Frequency of Scan for Inbound Packets
+|  306  Fido - Frequency of Scan for Mail to Export
+|  307  Fido - Frequency of Scan for Outbound Packets
+|  308  Fido - Allowed Dial Out Start Time
+|  309  Fido - Allowed Dial Out End Time
+|  310  Accounting - Peak Days
+|  311  Accounting - Holidays File
+|  312  UUCP - Moderator File
+|  313  Modem Initialization String #2
+|  314  Modem Answer String
+

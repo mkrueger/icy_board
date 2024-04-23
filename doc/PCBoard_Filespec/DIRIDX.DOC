@@ -1,0 +1,35 @@
+The following information describes the IDX files that are associated with
+DIR files.  These IDX files are NOT related in any way to the IDX files that
+are used inside of DLPATH.LST.  The two index files serve completely different
+purposes and both of them are highly desirable.
+
+  typedef struct {
+    long     FileSize;
+    unsigned FileTime;
+    unsigned FileDate;          <-- file date using DOS's bit-packed date
+    unsigned Latest;            <-- file date of the most recent file in index
+    char     Reserved[6];
+  } idxheadertype;
+
+  typedef struct {
+    char     Name[NAMESIZE];     <-- 8 bytes
+    char     Ext[EXTSIZE];       <-- 3 bytes
+    unsigned Date;               <-- file date using DOS's bit-packed date
+    unsigned LoOffset;           /
+    char     HiOffset;           \ these two fields make a 3-byte-integer
+  } filetype;
+
+The header is used to determine if the IDX file is out of sync and needs to be
+recreated.  The only thing unusual about the IDX records is the use of a
+LoOffset and HiOffset.  This is a 3-Byte Integer (as opposed to a 2 byte short
+integer or a 4 byte long integer).  The 3-Byte Integer pretty well covers the
+maximum expected size of a DIR file (over 17M in size) and saving the extra
+byte keeps the record size at 16 bytes (I hate non-binary sized records and
+cringed at the thought of using 17 bytes per record, besides, reading the
+IDX file in hex mode using a program such as Vern Buerg's LIST is a lot easier
+and prettier with the record kept to 16 bytes).
+
+In the header the "Latest" field is used so that when PCBoard is searching for
+new files, it can completely skip over (without even reading beyond the header)
+those IDX files that have older files listed in them.
+

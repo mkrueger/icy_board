@@ -1,0 +1,35 @@
+The following is the format of the FLIST.### file.
+
+There is one record for each file in the FLIST.### file, with each record
+having the structure outlined below.  Both uploads and downloads go into the
+same file.  The file is erased before starting to add names into the
+upload list.  The file is appended to if download names are already in the
+list and the caller is adding more files to the list.
+
+#define bool char
+typedef enum {FAILED=0,UPOKAY,DNOKAY,REMOVE} trntype;
+typedef enum {NOTCAP,MSGCAP,QWKCAP} captype;
+
+typedef struct {
+  char    FullPath[66];      /* full path and filename   */
+  char    Name[13];          /* just the filename        */
+  long    Size;              /* size of the file         */
+  long    Seconds;           /* seconds to xfer file     */
+  int     CPS;               /* cps rate after xfer      */
+  trntype Success;           /* see above types          */
+  bool    HasDesc;           /* true if u/l has desc     */
+  bool    Checked;           /* true if d/l fsec checked */
+  bool    Found;             /* true if file exists      */
+  bool    FsecOkay;          /* true if d/l fsec passed  */
+  bool    Free;              /* true if free bytes       */
+  bool    NoTime;            /* true if free time        */
+  bool    MovedToWork;       /* true if moved to workdir */
+  bool    Failed;            /* true if failed u/l test  */
+  char    OldName[13];       /* old name before workdir  */
+  bool    Duplicate;         /* true if u/l name is dupe */
+  captype CapType;           /* see above types          */
+  int     Multiplier;        /* acct charge multiplier   */
+  bool    NoCost;            /* true if acct charge=0    */
+  char    Reserved[11];      /* do not use!              */
+} spectype;
+

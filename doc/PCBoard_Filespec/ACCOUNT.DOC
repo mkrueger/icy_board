@@ -1,0 +1,96 @@
+The following information covers the file format used by the account tracking
+file (both .DBF and .TXT formats) which PCBoard uses to track user activities
+and the debits and credits associated with them.
+
+
+   "Account Tracking File" - This file is used to track the user's activities
+   on your system and the charges (and reimbursements) that are made.  When
+   you define the name for this file you are also instructing PCBoard as to
+   how it should create the file.  For instance, if you name it TRACKING.DBF
+   then PCBoard will write to it in DBF format.  Any file extension other than
+   .DBF will be treated as an ASCII text file.
+
+   NOTE:  The Account Tracking File can be SHARED among all of your nodes by
+   pointing to the same physical file in all of your node configurations.
+   PCBoard will properly append each new record to the end of that file.
+   However, due to the frequency of the updates, you may want to have each node
+   post to its own file just to make the updates quicker.  Either way works
+   fine, the latter approach, however, may create a little extra work for you
+   in having to analyze and/or combine the files when billing your customers.
+
+   As a dBase file, the following fields are defined:
+
+      Field Name  Type  Len  Dec  Description
+      ==========  ====  ===  ===  ===========
+      Date        'D'     8       Date when the activity occured
+      Time        'C'     5       Time when the activity occured
+      Name        'C'    25       The name of the user performing the activity
+      NodeNumber  'N'     5   0   The node number on which the activity worked
+      ConfNumber  'N'     5   0   The conference the caller was in at the time
+      Activity    'C'    15       Text abbreviation of the activity
+      SubAct      'C'    25       Filenames, etc.  See below.
+      UnitCost    'N'    14   4   Per-Unit cost (per minute, per byte, etc)
+      Quantity    'N'     9   0   Number of units (minutes, bytes, etc)
+      Value       'N'    14   4   Total cost or payback (UnitCost * Quantity)
+
+   The Activity values, used by PCBoard, are as follows:
+
+      Activity        Sub-Activity          Explanation of Value
+      ==============  ====================  ==================================
+      CMD USAGE       Name of the Command   Cost for this usage of the command
+      CMD USAGE MIN   Name of the Command   Cost for the minutes it was used
+      DOOR USAGE      Name of the DOOR      Cost for this usage of the door
+      DOOR USAGE MIN  Name of the DOOR      Cost for the minutes it was used
+      MSG READ                              Cost to read messages
+      MSG READ CAP                          Cost to download captured messages
+      MSG READ CAP    "CREDIT"              Credits on an aborted capture D/L
+      MSG WRITE       TO: name              Cost to write public message
+      MSG WRITE PRIV  TO: name              Cost to write private message
+      MSG WRITE ECHO  TO: name              Cost to write echoed message
+      DNLD FILE       File name downloaded  Cost to download the file
+      DNLD BYTES      File name downloaded  Cost to download the file
+      UPLD FILE       File name uploaded    Cost/reward to upload the file
+      UPLD BYTES      File name uploaded    Cost/reward to upload the file
+      UPLD FILE FAIL  File name uploaded    Backing out charge/reward for upld
+      UPLD BYTES FAIL File name uploaded    Backing out charge/reward for upld
+      CHAT TIME                             Cost for min spent in Group Chat
+      CONF TIME                             Cost for min spent in conference
+      TIME ONLINE                           Cost for minutes spent online
+      TIME ONLINE     PEAK                  Cost for time spent during peak
+      LOGON           LOCAL or BPS rate     Cost for logging onto the system
+
+   All values are positive if they are to be subtracted from the balance,
+   negative if they are to be added into the balance.  In other words, if you
+   reward your callers for uploads, then they will show up as negative values
+   in the account tracking file.
+
+   NOTE: Additional activities, subactivities, and charges may be posted via
+   programs written in PPL.
+
+   The ASCII text version of the account tracking file is identical to the
+   above as far as content is concerned.  The layout is one record per line,
+   with all fields, except the last one, padded to their full length.  The
+   format, then, looks like this:
+
+     Date       8 characters, left justified
+                1 character - separator
+     Time       5 characters, left justified
+                1 character - separator
+     Name      25 characters, left justified
+                1 character - separator
+     NodeNum    5 characters, right justified, padded on left with spaces
+                1 character - separator
+     ConfNum    5 characters, right justified, padded on left with spaces
+                1 character - separator
+     Activity  15 characters, left justified
+                1 character - separator
+     SubAct    25 characters, left justified
+                1 character - separator
+     UnitCost  14 characters, right justified with 4 decimal places
+                1 character - separator
+     Quantity   9 characters, right justified
+                1 character - separator
+     Value     14 characters, right justified, with 4 decimal places
+                2 characters - CR/LF
+
+
