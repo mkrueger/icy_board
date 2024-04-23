@@ -8,6 +8,7 @@ use std::{
 use crate::Res;
 use icy_board_engine::{
     icy_board::{
+        login_server::Telnet,
         state::{IcyBoardState, NodeState},
         IcyBoard,
     },
@@ -71,8 +72,12 @@ impl BBS {
     }
 }
 
-pub fn await_telnet_connections(board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
-    let addr = "127.0.0.1:1337".to_string();
+pub fn await_telnet_connections(telnet: Telnet, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+    let addr = if telnet.address.is_empty() {
+        format!("127.0.0.1:{}", telnet.port)
+    } else {
+        format!("{}:{}", telnet.address, telnet.port)
+    };
     let listener = match TcpListener::bind(addr) {
         Ok(listener) => listener,
         Err(e) => panic!("could not read start TCP listener: {}", e),

@@ -21,6 +21,7 @@ use icy_board_engine::icy_board::{
     },
     icb_text::IcbTextFile,
     language::SupportedLanguages,
+    login_server::LoginServer,
     menu::Menu,
     message_area::AreaList,
     pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader},
@@ -268,6 +269,7 @@ impl PCBoardImporter {
                 date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
                 num_nodes: 4,
             },
+            login_server: LoginServer::default(),
             func_keys: self.data.func_keys.clone(),
             subscription_info: SubscriptionMode {
                 is_enabled: self.data.subscription_info.is_enabled,

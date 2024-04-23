@@ -138,11 +138,16 @@ pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) -> Res<()> {
             let board = Arc::new(Mutex::new(icy_board));
 
             {
+                let telnet_connection = board.lock().unwrap().config.login_server.telnet.clone();
+
                 let bbs = bbs.clone();
                 let board = board.clone();
-                std::thread::spawn(move || {
-                    let _ = await_telnet_connections(board, bbs);
-                });
+
+                if telnet_connection.is_enabled {
+                    std::thread::spawn(move || {
+                        let _ = await_telnet_connections(telnet_connection, board, bbs);
+                    });
+                }
             }
 
             loop {

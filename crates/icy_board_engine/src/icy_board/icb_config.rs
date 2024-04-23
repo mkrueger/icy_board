@@ -4,7 +4,7 @@ use crate::datetime::IcbTime;
 use icy_engine::Color;
 use serde::{Deserialize, Serialize};
 
-use super::{is_false, is_null_16, is_null_8, is_null_i32, user_base::Password, IcyBoardSerializer};
+use super::{is_false, is_null_16, is_null_8, is_null_i32, login_server::LoginServer, user_base::Password, IcyBoardSerializer};
 
 #[derive(Serialize, Deserialize)]
 pub struct SysopSecurityLevels {
@@ -389,6 +389,8 @@ pub struct IcbConfig {
 
     pub options: BoardOptions,
 
+    pub login_server: LoginServer,
+
     #[serde(rename = "sysop_sec")]
     pub sysop_security_level: SysopSecurityLevels,
 
@@ -431,6 +433,7 @@ impl IcbConfig {
                 sysop_start: IcbTime::default(),
                 sysop_stop: IcbTime::default(),
             },
+            login_server: LoginServer::default(),
             sysop_security_level: SysopSecurityLevels {
                 sysop: 100,
                 read_all_comments: 110,
