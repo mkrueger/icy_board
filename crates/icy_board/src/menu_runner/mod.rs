@@ -55,15 +55,20 @@ impl PcbBoardCommand {
         if command.is_empty() {
             return Ok(());
         }
-        let mut cmds = command.split(' ');
+        let cmds = command.split(' ');
 
-        let command = cmds.next().unwrap_or_default();
         for cmd in cmds {
-            self.state.session.tokens.push_back(cmd.to_string());
+            for cmd in cmd.split(';') {
+                let cmd = cmd.trim();
+                if !cmd.is_empty() {
+                    self.state.session.tokens.push_back(cmd.to_string());
+                }
+            }
         }
+        let command = self.state.session.tokens.pop_front().unwrap();
 
-        if let Some(action) = self.state.try_find_command(command) {
-            return self.dispatch_action(command, &action);
+        if let Some(action) = self.state.try_find_command(&command) {
+            return self.dispatch_action(&command, &action);
         }
 
         self.state
@@ -122,6 +127,10 @@ impl PcbBoardCommand {
             CommandType::Goodbye => {
                 // G
                 self.goodbye_cmd()?;
+            }
+            CommandType::Bye => {
+                // BYE
+                self.bye_cmd()?;
             }
             CommandType::Help => {
                 // H

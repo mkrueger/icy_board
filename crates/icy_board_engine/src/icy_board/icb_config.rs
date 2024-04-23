@@ -298,6 +298,15 @@ pub struct ConfigPaths {
 
     /// log file
     pub log_file: PathBuf,
+
+    pub logon_survey: PathBuf,
+    pub logon_answer: PathBuf,
+
+    pub logoff_survey: PathBuf,
+    pub logoff_answer: PathBuf,
+
+    pub newask_survey: PathBuf,
+    pub newask_answer: PathBuf,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -479,6 +488,15 @@ impl IcbConfig {
                 statistics_file: PathBuf::new(),
                 group_file: PathBuf::new(),
                 log_file: PathBuf::from("output.log"),
+
+                logon_survey: PathBuf::new(),
+                logon_answer: PathBuf::new(),
+
+                logoff_survey: PathBuf::new(),
+                logoff_answer: PathBuf::new(),
+
+                newask_survey: PathBuf::new(),
+                newask_answer: PathBuf::new(),
             },
             new_user_settings: NewUserSettings {
                 sec_level: 10,

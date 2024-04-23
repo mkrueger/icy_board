@@ -29,7 +29,7 @@ pub fn add_default_commands(data: &PcbBoardData, cmd_list: &mut CommandList) {
 
     // doesn't make sense to have a sec for that but it's in the record
     cmd_list.push(convert_cmd("G", CommandType::Goodbye, data.user_levels.cmd_g));
-    cmd_list.push(convert_cmd("BYE", CommandType::Goodbye, data.user_levels.cmd_g));
+    cmd_list.push(convert_cmd("BYE", CommandType::Bye, data.user_levels.cmd_g));
 
     cmd_list.push(convert_cmd("HELP", CommandType::Help, data.user_levels.cmd_h));
     cmd_list.push(convert_cmd("?", CommandType::Help, data.user_levels.cmd_h));
@@ -65,7 +65,7 @@ pub fn add_default_commands(data: &PcbBoardData, cmd_list: &mut CommandList) {
     cmd_list.push(convert_cmd("REPLY", CommandType::ReplyMessage, 0));
     cmd_list.push(convert_cmd("ALIAS", CommandType::EnableAlias, 0));
 
-    cmd_list.push(convert_cmd("BRDCST", CommandType::Broadcast, data.sysop_security.sysop));
+    cmd_list.push(convert_cmd("BR", CommandType::Broadcast, data.sysop_security.sysop));
 
     cmd_list.push(convert_cmd("4", CommandType::RestoreMessage, data.sysop_security.sysop));
 

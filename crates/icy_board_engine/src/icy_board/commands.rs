@@ -113,6 +113,9 @@ pub enum CommandType {
     /// G command
     Goodbye,
 
+    /// BYE commend (same as G;Y) - skips file flag scan
+    Bye,
+
     /// H command
     Help,
 

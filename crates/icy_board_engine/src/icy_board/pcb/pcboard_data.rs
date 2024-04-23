@@ -661,9 +661,9 @@ pub struct FileLocations {
     ///  name/location of CMD.LST to use for defaults (v15.0)
     pub cmd_lst: String,
     ///  name and loc of logon script questionnaire (v15.0)
-    pub log_on_scr: String,
+    pub login_script: String,
     ///  name and loc of logon script answers (v15.0)
-    pub log_on_ans: String,
+    pub login_answer: String,
     ///  name of File Trashcan for stopping uploads (v15.0)
     pub file_tcan: String,
 
@@ -1028,8 +1028,8 @@ impl PcbBoardData {
         ret.fido_config = read_line(&mut reader, encoding)?;
         ret.fido_queue = read_line(&mut reader, encoding)?;
         ret.prompt_to_read_mail = read_bool(&mut reader, encoding)?;
-        ret.path.log_on_scr = read_line(&mut reader, encoding)?;
-        ret.path.log_on_ans = read_line(&mut reader, encoding)?;
+        ret.path.login_script = read_line(&mut reader, encoding)?;
+        ret.path.login_answer = read_line(&mut reader, encoding)?;
         ret.qwk_file = read_line(&mut reader, encoding)?;
         ret.path.file_tcan = read_line(&mut reader, encoding)?;
 
@@ -1415,8 +1415,8 @@ impl PcbBoardData {
         append_line(&mut res, encoding, &self.fido_config);
         append_line(&mut res, encoding, &self.fido_queue);
         append_bool(&mut res, encoding, self.prompt_to_read_mail);
-        append_line(&mut res, encoding, &self.path.log_on_scr);
-        append_line(&mut res, encoding, &self.path.log_on_ans);
+        append_line(&mut res, encoding, &self.path.login_script);
+        append_line(&mut res, encoding, &self.path.login_answer);
         append_line(&mut res, encoding, &self.qwk_file);
         append_line(&mut res, encoding, &self.path.file_tcan);
 

@@ -190,6 +190,15 @@ impl PCBoardImporter {
         let chat_menu = self.convert_display_file(&self.data.path.chat_menu.clone(), "art/chtm")?;
         let no_ansi = self.convert_display_file(&self.data.path.no_ansi.clone(), "art/noansi")?;
 
+        let logon_survey = self.convert_logon_surveys(&self.data.path.login_script.clone(), "art/login_survey")?;
+        let logon_answer = PathBuf::from("art/login_answer");
+
+        let logoff_survey = self.convert_logon_surveys(&self.data.path.logoff_script.clone(), "art/logoff_survey")?;
+        let logoff_answer = PathBuf::from("art/logoff_answer");
+
+        let newask_survey = self.convert_logon_surveys(&self.data.path.newreg_file.clone(), "art/newask_survey")?;
+        let newask_answer = PathBuf::from("art/newask_answer");
+
         self.convert_user_base(&self.data.path.usr_file.clone(), &self.data.path.inf_file.clone(), "home")?;
 
         let protocol_data_file = self.convert_data::<SupportedProtocols>(&self.data.path.protocol_data_file.clone(), "config/protocols.toml")?;
@@ -301,6 +310,13 @@ impl PCBoardImporter {
                 trashcan_email: tcan_email,
                 trashcan_passwords: tcan_passwords,
                 vip_users,
+
+                logon_survey,
+                logon_answer,
+                logoff_survey,
+                logoff_answer,
+                newask_survey,
+                newask_answer,
             },
             new_user_settings: NewUserSettings {
                 sec_level: self.data.user_levels.agree_to_register as u8,
@@ -1019,7 +1035,8 @@ impl PCBoardImporter {
                     // Add a separator line after the first 5 lines of the question file
                     if new_rel_name.extension().unwrap_or_default().to_string_lossy() != "ppe" {
                         let full_path = self.output_directory.join(&new_rel_name);
-                        if let Ok(str) = fs::read_to_string(&full_path) {
+
+                        if let Ok(str) = read_with_encoding_detection(&full_path) {
                             let mut out = String::new();
                             for (i, line) in str.lines().enumerate() {
                                 if i == 5 {
@@ -1131,5 +1148,36 @@ impl PCBoardImporter {
     fn create_file(&self, include_str: &str, new_name: &str) -> Res<PathBuf> {
         fs::write(self.output_directory.join(new_name), include_str)?;
         Ok(PathBuf::from(new_name))
+    }
+
+    fn convert_logon_surveys(&mut self, source: &str, arg: &str) -> Res<PathBuf> {
+        if source.is_empty() {
+            return Ok(PathBuf::new());
+        }
+
+        let new_entry = self.resolve_file(source);
+        self.output.start_action(format!("Trying to import questionaire {}", new_entry.display()));
+
+        if !new_entry.exists() {
+            self.logger
+                .log(&format!("Warning, can't import questionaire  {}, doesn't exist.", new_entry.display()));
+            return Ok(PathBuf::new());
+        }
+        if let Ok(str) = read_with_encoding_detection(&new_entry) {
+            let mut out = String::new();
+            // Add a separator line at beginning
+            // The login/logoff surveys don't seem to have headers in PCBoard but in IcyBoard they do.
+            out.push_str("**************************************************************");
+            out.push('\n');
+            for line in str.lines() {
+                out.push_str(line);
+                out.push('\n');
+            }
+            let new_name = self.output_directory.join(arg);
+            write_with_bom(&new_name, &out)?;
+            self.logger.log(&format!("Wrote logon survey to {}", new_name.display()));
+        }
+
+        Ok(PathBuf::from(arg))
     }
 }

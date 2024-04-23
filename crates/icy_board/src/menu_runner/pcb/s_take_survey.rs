@@ -73,7 +73,7 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    fn start_survey(&mut self, survey: &&icy_board_engine::icy_board::surveys::Survey) -> Res<()> {
+    pub fn start_survey(&mut self, survey: &icy_board_engine::icy_board::surveys::Survey) -> Res<()> {
         let question = self.state.resolve_path(&survey.question_file);
         let answer_file = self.state.resolve_path(&survey.answer_file);
 
@@ -127,15 +127,19 @@ impl PcbBoardCommand {
                     self.state.print(icy_board_engine::vm::TerminalTarget::Both, line)?;
                     self.state.new_line()?;
                 }
-                let txt = self.state.input_field(
-                    IceText::CompleteQuestion,
-                    1,
-                    "",
-                    "",
-                    Some(self.state.session.no_char.to_string()),
-                    display_flags::YESNO | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::UPCASE,
-                )?;
-                if txt.starts_with(self.state.session.yes_char) {
+                let txt = if let Some(text) = self.state.session.tokens.pop_front() {
+                    text
+                } else {
+                    self.state.input_field(
+                        IceText::CompleteQuestion,
+                        1,
+                        "",
+                        "",
+                        Some(self.state.session.no_char.to_string()),
+                        display_flags::YESNO | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::UPCASE,
+                    )?
+                };
+                if txt.eq_ignore_ascii_case(&self.state.session.yes_char.to_string()) {
                     for question in &lines[start_line..] {
                         self.state.set_color(TerminalTarget::Both, IcbColor::Dos(14))?;
                         self.state.print(TerminalTarget::Both, question)?;
