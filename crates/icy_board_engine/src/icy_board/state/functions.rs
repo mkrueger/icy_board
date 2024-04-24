@@ -201,7 +201,7 @@ impl IcyBoardState {
     }
 
     pub fn display_menu<P: AsRef<Path>>(&mut self, file_name: &P) -> Res<bool> {
-        let resolved_name_ppe = self.board.lock().unwrap().resolve_file(&(file_name.as_ref().with_extension("PPE")));
+        let resolved_name_ppe = self.board.lock().unwrap().resolve_file(&(file_name.as_ref().with_extension("ppe")));
         let path = PathBuf::from(resolved_name_ppe);
         if path.exists() {
             self.run_ppe(&path, None)?;

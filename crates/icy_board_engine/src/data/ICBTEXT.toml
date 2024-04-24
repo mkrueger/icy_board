@@ -2936,3 +2936,7 @@ text = "Avatar"
 
 [GfxModeRip]
 text = "Rip"
+
+[DOORNumberCommandExpertmode]
+text = "Enter the DOOR # to Open (Enter)=none"
+style = "Yellow"

@@ -96,7 +96,6 @@ impl Tui {
                         let _ = cmd.state.print(TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err));
                         let _ = cmd.state.reset_color();
                     }
-                    return Ok(());
                 }
                 cmd.state.session.disp_options.reset_printout();
                 if cmd.state.session.request_logoff {

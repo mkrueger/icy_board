@@ -8,7 +8,7 @@ use crate::{
 pub trait UserDataMemberRegistry {
     fn get_member_id(&self, name: &unicase::Ascii<String>) -> Option<usize>;
 
-    fn add_field(&mut self, name: unicase::Ascii<String>, var_type: VariableType);
+    fn add_property(&mut self, name: unicase::Ascii<String>, var_type: VariableType, has_setter: bool);
 
     fn add_procedure(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>);
     fn add_function(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, return_type: VariableType);
@@ -22,8 +22,8 @@ pub trait UserData: Sized + UserDataValue {
 }
 
 pub trait UserDataValue: Sync {
-    fn get_field_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> Res<VariableValue>;
-    fn set_field_value(&mut self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()>;
+    fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> Res<VariableValue>;
+    fn set_property_value(&mut self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()>;
 
     fn call_function(&self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, arguments: &[PPEExpr]) -> crate::Res<VariableValue>;
     fn call_method(&mut self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, arguments: &[PPEExpr]) -> crate::Res<()>;
@@ -31,6 +31,7 @@ pub trait UserDataValue: Sync {
 
 pub enum UserDataEntry {
     Field(unicase::Ascii<String>),
+    Getter(unicase::Ascii<String>),
     Procedure(unicase::Ascii<String>),
     Function(unicase::Ascii<String>),
 }
@@ -50,9 +51,13 @@ impl UserDataMemberRegistry for UserDataRegistry {
         self.member_id_lookup.get(name).copied()
     }
 
-    fn add_field(&mut self, name: unicase::Ascii<String>, var_type: VariableType) {
+    fn add_property(&mut self, name: unicase::Ascii<String>, var_type: VariableType, has_setter: bool) {
         self.member_id_lookup.insert(name.clone(), self.id_table.len());
-        self.id_table.push(UserDataEntry::Field(name.clone()));
+        if has_setter {
+            self.id_table.push(UserDataEntry::Field(name.clone()));
+        } else {
+            self.id_table.push(UserDataEntry::Getter(name.clone()));
+        }
         self.fields.insert(name, var_type);
     }
 

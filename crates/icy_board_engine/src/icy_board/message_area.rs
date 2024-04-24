@@ -64,7 +64,7 @@ impl UserData for MessageArea {
     const TYPE_NAME: &'static str = "Area";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_field(NAME.clone(), VariableType::String);
+        registry.add_property(NAME.clone(), VariableType::String, false);
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
     }
 }
@@ -75,7 +75,7 @@ lazy_static::lazy_static! {
 }
 
 impl UserDataValue for MessageArea {
-    fn get_field_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
+    fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *NAME {
             return Ok(VariableValue::new_string(self.name.clone()));
         }
@@ -83,7 +83,7 @@ impl UserDataValue for MessageArea {
         Ok(VariableValue::new_int(-1))
     }
 
-    fn set_field_value(&mut self, _vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()> {
+    fn set_property_value(&mut self, _vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()> {
         if *name == *NAME {
             self.name = val.as_string();
             return Ok(());

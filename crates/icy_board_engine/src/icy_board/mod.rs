@@ -14,6 +14,7 @@ use crate::vm::errors::IcyError;
 use self::{
     commands::CommandList,
     conferences::ConferenceBase,
+    doors::DoorList,
     file_directory::DirectoryList,
     group_list::GroupList,
     icb_config::IcbConfig,
@@ -31,6 +32,7 @@ use self::{
 pub mod bulletins;
 pub mod commands;
 pub mod conferences;
+pub mod doors;
 pub mod file_directory;
 pub mod group_list;
 pub mod icb_config;
@@ -264,11 +266,27 @@ impl IcyBoard {
             };
             if file_area_file.exists() {
                 match DirectoryList::load(&file_area_file) {
-                    Ok(areas) => {
-                        conf.directories = areas;
+                    Ok(directories) => {
+                        conf.directories = directories;
                     }
                     Err(err) => {
                         log::error!("Error loading file areas {}: {}", file_area_file.display(), err);
+                    }
+                }
+            }
+
+            let doors_file = if conf.doors_file.is_absolute() {
+                conf.doors_file.clone()
+            } else {
+                board.root_path.join(&conf.doors_file)
+            };
+            if doors_file.exists() {
+                match DoorList::load(&doors_file) {
+                    Ok(doors) => {
+                        conf.doors = doors;
+                    }
+                    Err(err) => {
+                        log::error!("Error loading file areas {}: {}", doors_file.display(), err);
                     }
                 }
             }

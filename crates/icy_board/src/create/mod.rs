@@ -7,6 +7,7 @@ use icy_board_engine::{
         bulletins::{Bullettin, BullettinList},
         commands::CommandList,
         conferences::{Conference, ConferenceBase},
+        doors::DoorList,
         file_directory::{DirectoryList, FileDirectory},
         group_list::GroupList,
         icb_config::IcbConfig,
@@ -310,6 +311,17 @@ impl IcyBoardCreator {
         list.push(fd);
 
         list.save(&self.destination.join(&conf.area_file))?;
+
+        // Create Door files
+        self.logger.start_action("Create door file…".to_string());
+        conf.doors_menu = PathBuf::from("conferences/main/door");
+        fs::write(
+            &self.destination.join(&conf.doors_menu).with_extension("ppe"),
+            include_bytes!("../../../../ppe/door.ppe"),
+        )?;
+        conf.doors_file = PathBuf::from("conferences/main/door.toml");
+        let list = DoorList::default();
+        list.save(&self.destination.join(&conf.doors_file))?;
 
         self.logger.start_action("Write conference…".to_string());
         let mut base = ConferenceBase::default();

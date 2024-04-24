@@ -232,6 +232,11 @@ impl PcbBoardCommand {
                 self.who_display_nodes(action)?;
             }
 
+            CommandType::OpenDoor => {
+                // DOOR/OPEN
+                self.open_door(action)?;
+            }
+
             CommandType::RestoreMessage => {
                 // 4
                 self.restore_message(action)?;

@@ -1,0 +1,23 @@
+﻿INTEGER i
+
+BEGIN
+  CLS
+  PRINTLN "@X17╒═════════════════════════════════════════════════════════════════════════════╕"
+  PRINTLN "│  @X1EYou have access to the following doors in this conference:                 @X17│"
+  PRINTLN "╘═════════════════════════════════════════════════════════════════════════════╛"
+  PRINTLN
+  
+  CONFERENCE CONF = CONFINFO(CURCONF())
+  
+  FOR i = 1 to CONF.Doors
+    Door a = CONF.GetDoor(i - 1)
+    
+    IF !a.HasAccess() CONTINUE
+
+    PRINT "@X0E", Left(String(i),2), "- "
+    COLOR @X0F
+    PRINT LEFT(a.Name,15)
+    PRINTLN a.Description
+  NEXT
+  PRINTLN
+END

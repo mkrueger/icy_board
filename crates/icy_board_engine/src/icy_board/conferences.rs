@@ -8,12 +8,13 @@ use serde::{Deserialize, Serialize};
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
     executable::{GenericVariableData, PPEExpr, VariableData, VariableType, VariableValue},
-    icy_board::file_directory::FileDirectory,
-    parser::{FILE_DIRECTORY_ID, MESSAGE_AREA_ID},
+    icy_board::{doors::Door, file_directory::FileDirectory},
+    parser::{DOOR_ID, FILE_DIRECTORY_ID, MESSAGE_AREA_ID},
 };
 
 use super::{
     commands::Command,
+    doors::DoorList,
     file_directory::DirectoryList,
     is_false, is_null_8, is_null_i32,
     message_area::{AreaList, MessageArea},
@@ -122,6 +123,9 @@ pub struct Conference {
 
     #[serde(skip)]
     pub directories: DirectoryList,
+
+    #[serde(skip)]
+    pub doors: DoorList,
 }
 
 impl Conference {}
@@ -205,6 +209,7 @@ impl ConferenceBase {
                 area_file: PathBuf::from("area.toml"),
                 areas: AreaList::default(),
                 directories: DirectoryList::default(),
+                doors: DoorList::default(),
             };
             confs.push(new);
         }
@@ -242,10 +247,11 @@ impl UserData for Conference {
     const TYPE_NAME: &'static str = "Conference";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_field(NAME.clone(), VariableType::String);
-        registry.add_field(ISPUBLIC.clone(), VariableType::Boolean);
-        registry.add_field(FILE_AREAS.clone(), VariableType::Boolean);
-        registry.add_field(MESSAGE_AREAS.clone(), VariableType::Boolean);
+        registry.add_property(NAME.clone(), VariableType::String, false);
+        registry.add_property(ISPUBLIC.clone(), VariableType::Boolean, false);
+        registry.add_property(FILE_AREAS.clone(), VariableType::Boolean, false);
+        registry.add_property(MESSAGE_AREAS.clone(), VariableType::Boolean, false);
+        registry.add_property(DOORS.clone(), VariableType::Boolean, false);
 
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(
@@ -254,6 +260,7 @@ impl UserData for Conference {
             VariableType::UserData(FILE_DIRECTORY_ID as u8),
         );
         registry.add_function(GET_MSG_AREA.clone(), vec![VariableType::Integer], VariableType::UserData(MESSAGE_AREA_ID as u8));
+        registry.add_function(GET_DOOR.clone(), vec![VariableType::Integer], VariableType::UserData(DOOR_ID as u8));
     }
 }
 
@@ -261,16 +268,18 @@ lazy_static::lazy_static! {
     pub static ref NAME: unicase::Ascii<String> = unicase::Ascii::new("Name".to_string());
     pub static ref ISPUBLIC: unicase::Ascii<String> = unicase::Ascii::new("IsPublic".to_string());
     pub static ref FILE_AREAS: unicase::Ascii<String> = unicase::Ascii::new("Directories".to_string());
+    pub static ref DOORS: unicase::Ascii<String> = unicase::Ascii::new("Doors".to_string());
     pub static ref MESSAGE_AREAS: unicase::Ascii<String> = unicase::Ascii::new("Areas".to_string());
 
     pub static ref HAS_ACCESS: unicase::Ascii<String> = unicase::Ascii::new("HasAccess".to_string());
     pub static ref GET_FILE_AREA: unicase::Ascii<String> = unicase::Ascii::new("GetDir".to_string());
     pub static ref GET_MSG_AREA: unicase::Ascii<String> = unicase::Ascii::new("GetArea".to_string());
+    pub static ref GET_DOOR: unicase::Ascii<String> = unicase::Ascii::new("GetDoor".to_string());
 
 }
 
 impl UserDataValue for Conference {
-    fn get_field_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
+    fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *NAME {
             return Ok(VariableValue::new_string(self.name.clone()));
         }
@@ -283,12 +292,15 @@ impl UserDataValue for Conference {
         if *name == *MESSAGE_AREAS {
             return Ok(VariableValue::new_int(self.areas.len() as i32));
         }
+        if *name == *DOORS {
+            return Ok(VariableValue::new_int(self.doors.len() as i32));
+        }
 
         log::error!("Invalid user data call on Conference ({})", name);
         Ok(VariableValue::new_int(-1))
     }
 
-    fn set_field_value(&mut self, _vm: &mut crate::vm::VirtualMachine, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+    fn set_property_value(&mut self, _vm: &mut crate::vm::VirtualMachine, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
         // Currently unsupported !
         Ok(())
     }
@@ -335,7 +347,27 @@ impl UserDataValue for Conference {
             return Ok(VariableValue {
                 data: VariableData::from_int(0),
                 generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
-                vtype: VariableType::UserData(FILE_DIRECTORY_ID as u8),
+                vtype: VariableType::UserData(MESSAGE_AREA_ID as u8),
+            });
+        }
+
+        if *name == *GET_DOOR {
+            let door = vm.eval_expr(&arguments[0])?.as_int();
+            if let Some(res) = self.doors.get(door as usize) {
+                vm.user_data.push(Box::new((*res).clone()));
+                return Ok(VariableValue {
+                    data: VariableData::from_int(0),
+                    generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
+                    vtype: VariableType::UserData(DOOR_ID as u8),
+                });
+            }
+            log::error!("PPL: Door not found ({})", door);
+
+            vm.user_data.push(Box::new(Door::default()));
+            return Ok(VariableValue {
+                data: VariableData::from_int(0),
+                generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
+                vtype: VariableType::UserData(DOOR_ID as u8),
             });
         }
         log::error!("Invalid function call on Conference ({})", name);

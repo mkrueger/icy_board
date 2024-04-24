@@ -357,8 +357,8 @@ impl<'a> VirtualMachine<'a> {
                 };
 
                 match &registry.id_table[*member_id] {
-                    crate::compiler::user_data::UserDataEntry::Field(name) => {
-                        let val = self.user_data[object_id].get_field_value(self, name);
+                    crate::compiler::user_data::UserDataEntry::Field(name) | crate::compiler::user_data::UserDataEntry::Getter(name) => {
+                        let val = self.user_data[object_id].get_property_value(self, name);
                         return val;
                     }
                     crate::compiler::user_data::UserDataEntry::Procedure(_) | crate::compiler::user_data::UserDataEntry::Function(_) => {
@@ -387,7 +387,7 @@ impl<'a> VirtualMachine<'a> {
                 };
 
                 match &registry.id_table[*id] {
-                    crate::compiler::user_data::UserDataEntry::Field(_) => {
+                    crate::compiler::user_data::UserDataEntry::Field(_) | crate::compiler::user_data::UserDataEntry::Getter(_) => {
                         todo!();
                     }
                     crate::compiler::user_data::UserDataEntry::Procedure(_) => todo!(),

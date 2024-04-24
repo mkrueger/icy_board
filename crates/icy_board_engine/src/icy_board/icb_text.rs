@@ -1568,9 +1568,12 @@ pub enum IceText {
 
     /// `Rip`
     GfxModeRip = 767,
+
+    /// `Enter the DOOR # to Open (Enter)=none`
+    DOORNumberCommandExpertmode = 768,
 }
 
-const LAST_ENTRY: usize = 767;
+const LAST_ENTRY: usize = 768;
 
 impl IceText {
     pub fn from(i: usize) -> Self {
