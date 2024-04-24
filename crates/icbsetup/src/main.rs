@@ -28,7 +28,12 @@ struct Cli {
 fn main() -> Result<()> {
     let arguments = Cli::parse();
 
-    let file = arguments.file.with_extension("toml");
+    let mut file = arguments.file.clone();
+    if file.is_dir() {
+        file = file.join("icyboard.toml");
+    }
+
+    let file = file.with_extension("toml");
     if !file.exists() {
         let mut map: HashMap<String, String> = HashMap::new();
         map.insert("name".to_string(), file.display().to_string());

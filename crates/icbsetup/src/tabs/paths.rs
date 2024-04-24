@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::icy_board::IcyBoard;
@@ -18,75 +19,65 @@ use super::TabPage;
 pub struct PathTab {
     pub state: ConfigMenuState,
     config: ConfigMenu,
+    icy_board: Arc<Mutex<IcyBoard>>,
 }
 
 impl PathTab {
-    pub fn new(icy_board: Arc<IcyBoard>) -> Self {
+    pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
+        let a = icy_board.clone();
+        let lock = a.lock().unwrap();
         let system_files = vec![
             ConfigEntry::Item(
                 ListItem::new(
                     "conf_data",
                     "Conference Data".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.conferences.clone()),
+                    ListValue::Path(lock.config.paths.conferences.clone()),
                 )
                 .with_status("Name/Loc of Conference Data"),
             ),
             ConfigEntry::Item(
-                ListItem::new(
-                    "home_dir",
-                    "Home Directory".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.home_dir.clone()),
-                )
-                .with_status("User Home Directory"),
+                ListItem::new("home_dir", "Home Directory".to_string(), ListValue::Path(lock.config.paths.home_dir.clone())).with_status("User Home Directory"),
             ),
             ConfigEntry::Item(
-                ListItem::new("log_file", "Log File".to_string(), ListValue::Path(25, icy_board.config.paths.log_file.clone())).with_status("BBS Logfile"),
+                ListItem::new("log_file", "Log File".to_string(), ListValue::Path(lock.config.paths.log_file.clone())).with_status("BBS Logfile"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
                     "stats_file",
                     "Statistics File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.statistics_file.clone()),
+                    ListValue::Path(lock.config.paths.statistics_file.clone()),
                 )
                 .with_status("Name/Loc of Statistics file"),
             ),
             ConfigEntry::Item(
-                ListItem::new(
-                    "icb_text",
-                    "ICBTEXT File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.icbtext.clone()),
-                )
-                .with_status("Name/Loc of ICBTEXT file"),
+                ListItem::new("icb_text", "ICBTEXT File".to_string(), ListValue::Path(lock.config.paths.icbtext.clone()))
+                    .with_status("Name/Loc of ICBTEXT file"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
                     "temp_files",
                     "Temporary Work Files".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.tmp_work_path.clone()),
+                    ListValue::Path(lock.config.paths.tmp_work_path.clone()),
                 )
                 .with_status("Location of Temporary Work Files"),
             ),
             ConfigEntry::Item(
-                ListItem::new(
-                    "help_files",
-                    "Help Files".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.help_path.clone()),
-                )
-                .with_status("Location of Help Files"),
+                ListItem::new("help_files", "Help Files".to_string(), ListValue::Path(lock.config.paths.help_path.clone()))
+                    .with_status("Location of Help Files"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "login_sec",
+                    "security_file_path",
                     "Login Security Files".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.security_file_path.clone()),
+                    ListValue::Path(lock.config.paths.security_file_path.clone()),
                 )
                 .with_status("Location of Login Security Files"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "login_sec",
+                    "command_display_path",
                     "Command Display Files".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.command_display_path.clone()),
+                    ListValue::Path(lock.config.paths.command_display_path.clone()),
                 )
                 .with_status("Location of Command Display Files"),
             ),
@@ -95,65 +86,61 @@ impl PathTab {
         let configuration_files: Vec<ConfigEntry> = vec![
             ConfigEntry::Item(
                 ListItem::new(
-                    "pwrd_sec",
+                    "pwrd_sec_level_file",
                     "PWRD/Security File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.pwrd_sec_level_file.clone()),
+                    ListValue::Path(lock.config.paths.pwrd_sec_level_file.clone()),
                 )
                 .with_status("Name/Location of PWRD/Security File"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "pwrd_sec",
+                    "trashcan_user",
                     "User Trashcan File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.trashcan_user.clone()),
+                    ListValue::Path(lock.config.paths.trashcan_user.clone()),
                 )
                 .with_status("Name/Location of User Trashcan File"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "pwrd_sec",
+                    "trashcan_passwords",
                     "Password Trashcan File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.trashcan_passwords.clone()),
+                    ListValue::Path(lock.config.paths.trashcan_passwords.clone()),
                 )
                 .with_status("Name/Location of Password Trashcan File"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "pwrd_sec",
+                    "trashcan_email",
                     "EMail Trashcan File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.trashcan_email.clone()),
+                    ListValue::Path(lock.config.paths.trashcan_email.clone()),
                 )
                 .with_status("Name/Location of EMail Trashcan File"),
             ),
             ConfigEntry::Item(
-                ListItem::new(
-                    "pwrd_sec",
-                    "VIP Users File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.vip_users.clone()),
-                )
-                .with_status("Name/Location of VIP Users File"),
+                ListItem::new("vip_users", "VIP Users File".to_string(), ListValue::Path(lock.config.paths.vip_users.clone()))
+                    .with_status("Name/Location of VIP Users File"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "pwrd_sec",
+                    "protocol_data_file",
                     "Protocol Data File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.protocol_data_file.clone()),
+                    ListValue::Path(lock.config.paths.protocol_data_file.clone()),
                 )
                 .with_status("Name/Location of Protocol Data File"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "pwrd_sec",
+                    "language_file",
                     "Multi-Lang. Data File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.language_file.clone()),
+                    ListValue::Path(lock.config.paths.language_file.clone()),
                 )
                 .with_status("Name/Location of Multi-Lang. Data File"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "pwrd_sec",
+                    "language_file",
                     "Default CMD.LST File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.language_file.clone()),
+                    ListValue::Path(lock.config.paths.language_file.clone()),
                 )
                 .with_status("Name/Location of CMD.LST File"),
             ),
@@ -161,109 +148,89 @@ impl PathTab {
 
         let display_files = vec![
             ConfigEntry::Item(
-                ListItem::new(
-                    "pwrd_sec",
-                    "WELCOME File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.welcome.clone()),
-                )
-                .with_status("Name/Location of WELCOME File"),
+                ListItem::new("welcome", "WELCOME File".to_string(), ListValue::Path(lock.config.paths.welcome.clone()))
+                    .with_status("Name/Location of WELCOME File"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new("newuser", "NEWUSER File".to_string(), ListValue::Path(lock.config.paths.newuser.clone()))
+                    .with_status("Name/Location of NEWUSER File"),
+            ),
+            ConfigEntry::Item(
+                ListItem::new("closed", "CLOSED File".to_string(), ListValue::Path(lock.config.paths.closed.clone()))
+                    .with_status("Name/Location of CLOSED File"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "pwrd_sec",
-                    "NEWUSER File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.newuser.clone()),
-                )
-                .with_status("Name/Location of NEWUSER File"),
-            ),
-            ConfigEntry::Item(
-                ListItem::new(
-                    "pwrd_sec",
-                    "CLOSED File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.closed.clone()),
-                )
-                .with_status("Name/Location of CLOSED File"),
-            ),
-            ConfigEntry::Item(
-                ListItem::new(
-                    "pwrd_sec",
+                    "expire_warning",
                     "WARNING File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.expire_warning.clone()),
+                    ListValue::Path(lock.config.paths.expire_warning.clone()),
                 )
                 .with_status("Name/Location of WARNING File"),
             ),
             ConfigEntry::Item(
-                ListItem::new(
-                    "pwrd_sec",
-                    "EXPIRED File".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.expired.clone()),
-                )
-                .with_status("Name/Location of EXPIRED File"),
+                ListItem::new("expired", "EXPIRED File".to_string(), ListValue::Path(lock.config.paths.expired.clone()))
+                    .with_status("Name/Location of EXPIRED File"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "pwrd_sec",
+                    "conf_join_menu",
                     "Conference Join Menu".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.conf_join_menu.clone()),
+                    ListValue::Path(lock.config.paths.conf_join_menu.clone()),
                 )
                 .with_status("Name/Location of Conference Join Menu File"),
             ),
             ConfigEntry::Item(
-                ListItem::new(
-                    "pwrd_sec",
-                    "NOANSI Warning".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.no_ansi.clone()),
-                )
-                .with_status("Name/Location of NOANSI Warning File"),
+                ListItem::new("no_ansi", "NOANSI Warning".to_string(), ListValue::Path(lock.config.paths.no_ansi.clone()))
+                    .with_status("Name/Location of NOANSI Warning File"),
             ),
         ];
 
         let new_user_files = vec![
             ConfigEntry::Item(
                 ListItem::new(
-                    "pwrd_sec",
+                    "newask_survey",
                     "New Reg Survey".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.no_ansi.clone()),
+                    ListValue::Path(lock.config.paths.newask_survey.clone()),
                 )
                 .with_status("Name/Location of NEWASK Survey File"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "pwrd_sec",
+                    "newask_answer",
                     "New Reg Answers".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.no_ansi.clone()),
+                    ListValue::Path(lock.config.paths.newask_answer.clone()),
                 )
                 .with_status("Name/Location of NEWASK Survey Answers"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "pwrd_sec",
+                    "logon_survey",
                     "Logon Survey".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.no_ansi.clone()),
+                    ListValue::Path(lock.config.paths.logon_survey.clone()),
                 )
                 .with_status("Name/Location of Logon Survey File"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "pwrd_sec",
+                    "logon_answer",
                     "Logon Answers".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.no_ansi.clone()),
+                    ListValue::Path(lock.config.paths.logon_answer.clone()),
                 )
                 .with_status("Name/Location of Logon Survey Answers"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "pwrd_sec",
+                    "logoff_survey",
                     "Logoff Survey".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.no_ansi.clone()),
+                    ListValue::Path(lock.config.paths.logoff_survey.clone()),
                 )
                 .with_status("Name/Location of Logoff Survey File"),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "pwrd_sec",
+                    "logoff_answer",
                     "Logoff Answers".to_string(),
-                    ListValue::Path(25, icy_board.config.paths.no_ansi.clone()),
+                    ListValue::Path(lock.config.paths.logoff_answer.clone()),
                 )
                 .with_status("Name/Location of Logoff Survey Answers"),
             ),
@@ -279,6 +246,7 @@ impl PathTab {
                     ConfigEntry::Group("New User/Logon/off Surveys".to_string(), new_user_files),
                 ],
             },
+            icy_board,
         }
     }
 
@@ -308,11 +276,82 @@ impl PathTab {
             }
         }
     }
+
+    fn write_back(&self, icy_board: &mut IcyBoard) {
+        for entry in self.config.items.iter() {
+            self.visit_item(&entry, icy_board);
+        }
+    }
+
+    fn visit_item(&self, entry: &ConfigEntry, icy_board: &mut IcyBoard) {
+        match entry {
+            ConfigEntry::Group(_grp, entries) => {
+                for e in entries {
+                    self.visit_item(&e, icy_board);
+                }
+            }
+            ConfigEntry::Separator => {}
+            ConfigEntry::Item(item) => self.write_item(&item, icy_board),
+            ConfigEntry::Table(_, _) => todo!(),
+        }
+    }
+
+    fn write_item(&self, item: &ListItem, icy_board: &mut IcyBoard) {
+        match &item.value {
+            ListValue::Text(_, _text) => match item.id.as_str() {
+                _ => panic!("Unknown id: {}", item.id),
+            },
+            ListValue::Path(path) => match item.id.as_str() {
+                "conf_data" => icy_board.config.paths.conferences = path.clone(),
+                "home_dir" => icy_board.config.paths.home_dir = path.clone(),
+                "log_file" => icy_board.config.paths.log_file = path.clone(),
+                "stats_file" => icy_board.config.paths.statistics_file = path.clone(),
+                "icb_text" => icy_board.config.paths.icbtext = path.clone(),
+                "temp_files" => icy_board.config.paths.tmp_work_path = path.clone(),
+                "help_files" => icy_board.config.paths.help_path = path.clone(),
+                "security_file_path" => icy_board.config.paths.security_file_path = path.clone(),
+                "command_display_path" => icy_board.config.paths.command_display_path = path.clone(),
+                "pwrd_sec_level_file" => icy_board.config.paths.pwrd_sec_level_file = path.clone(),
+                "trashcan_user" => icy_board.config.paths.trashcan_user = path.clone(),
+                "trashcan_passwords" => icy_board.config.paths.trashcan_passwords = path.clone(),
+                "trashcan_email" => icy_board.config.paths.trashcan_email = path.clone(),
+                "vip_users" => icy_board.config.paths.vip_users = path.clone(),
+                "protocol_data_file" => icy_board.config.paths.protocol_data_file = path.clone(),
+                "language_file" => icy_board.config.paths.language_file = path.clone(),
+                "welcome" => icy_board.config.paths.welcome = path.clone(),
+                "newuser" => icy_board.config.paths.newuser = path.clone(),
+                "closed" => icy_board.config.paths.closed = path.clone(),
+                "expire_warning" => icy_board.config.paths.expire_warning = path.clone(),
+                "expired" => icy_board.config.paths.expired = path.clone(),
+                "conf_join_menu" => icy_board.config.paths.conf_join_menu = path.clone(),
+
+                "no_ansi" => icy_board.config.paths.no_ansi = path.clone(),
+                "newask_survey" => icy_board.config.paths.newask_survey = path.clone(),
+                "newask_answer" => icy_board.config.paths.newask_answer = path.clone(),
+                "logon_survey" => icy_board.config.paths.logon_survey = path.clone(),
+                "logon_answer" => icy_board.config.paths.logon_answer = path.clone(),
+                "logoff_survey" => icy_board.config.paths.logoff_survey = path.clone(),
+                "logoff_answer" => icy_board.config.paths.logoff_answer = path.clone(),
+
+                _ => panic!("Unknown id: {}", item.id),
+            },
+            ListValue::U32(_i, _, _) => match item.id.as_str() {
+                _ => panic!("Unknown id: {}", item.id),
+            },
+            ListValue::Bool(_b) => match item.id.as_str() {
+                _ => panic!("Unknown id: {}", item.id),
+            },
+            ListValue::Color(_c) => match item.id.as_str() {
+                _ => panic!("Unknown id: {}", item.id),
+            },
+            ListValue::ValueList(_, _) => todo!(),
+        }
+    }
 }
 
 impl TabPage for PathTab {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
-        let area = area.inner(&Margin { horizontal: 2, vertical: 2 });
+        let area = area.inner(&Margin { horizontal: 2, vertical: 1 });
 
         Clear.render(area, frame.buffer_mut());
 
@@ -349,6 +388,7 @@ impl TabPage for PathTab {
             };
         } else {
             let res = self.config.handle_key_press(key, &self.state);
+            self.write_back(&mut self.icy_board.lock().unwrap());
             self.state.in_edit = res.in_edit_mode;
             res
         }

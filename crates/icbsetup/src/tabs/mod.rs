@@ -12,6 +12,9 @@ pub use conferences::*;
 pub mod paths;
 pub use paths::*;
 
+pub mod server_tab;
+pub use server_tab::*;
+
 use icy_board_tui::{config_menu::ResultState, TerminalType};
 use ratatui::{layout::Rect, Frame};
 

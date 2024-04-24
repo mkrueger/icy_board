@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{path::PathBuf, sync::Arc, sync::Mutex, time::Duration};
 
 use chrono::{Local, Timelike};
 use color_eyre::{eyre::Context, Result};
@@ -15,7 +15,7 @@ pub struct App {
     mode: Mode,
     tab: TabPageType,
 
-    icy_board: Arc<IcyBoard>,
+    icy_board: Arc<Mutex<IcyBoard>>,
     _file: PathBuf,
 
     status_line: String,
@@ -23,6 +23,8 @@ pub struct App {
 
     general_tab: GeneralTab,
     path_tab: PathTab,
+    server_tab: ServerTab,
+
     conferences_tab: ConferencesTab,
     about_tab: AboutTab,
 }
@@ -48,8 +50,9 @@ enum TabPageType {
 
 impl App {
     pub fn new(icy_board: IcyBoard, file: PathBuf, full_screen: bool) -> Self {
-        let icy_board = Arc::new(icy_board);
+        let icy_board = Arc::new(Mutex::new(icy_board));
         let general_tab = GeneralTab::new(icy_board.clone());
+        let server_tab = ServerTab::new(icy_board.clone());
         let command_tab = ConferencesTab::new(icy_board.clone());
         let path_tab = PathTab::new(icy_board.clone());
         Self {
@@ -57,6 +60,7 @@ impl App {
             icy_board,
             _file: file,
             general_tab,
+            server_tab,
             path_tab,
             mode: Mode::default(),
             tab: TabPageType::System,
@@ -112,7 +116,7 @@ impl App {
             TabPageType::System => &self.general_tab,
             TabPageType::Paths => &self.path_tab,
             TabPageType::Net => &self.general_tab,
-            TabPageType::Server => &self.general_tab,
+            TabPageType::Server => &self.server_tab,
             TabPageType::Conferences => &self.conferences_tab,
             TabPageType::About => &self.about_tab,
         }
@@ -123,7 +127,7 @@ impl App {
             TabPageType::System => &mut self.general_tab,
             TabPageType::Paths => &mut self.path_tab,
             TabPageType::Net => &mut self.general_tab,
-            TabPageType::Server => &mut self.general_tab,
+            TabPageType::Server => &mut self.server_tab,
             TabPageType::Conferences => &mut self.conferences_tab,
             TabPageType::About => &mut self.about_tab,
         }
@@ -223,7 +227,7 @@ impl App {
         let time_status = format!(
             " {} {} |",
             now.time().with_nanosecond(0).unwrap(),
-            now.date_naive().format(&self.icy_board.config.board.date_format)
+            now.date_naive().format(&self.icy_board.lock().unwrap().config.board.date_format)
         );
         let time_len = time_status.len() as u16;
         Line::from(time_status).left_aligned().style(THEME.status_line).render(area, buf);

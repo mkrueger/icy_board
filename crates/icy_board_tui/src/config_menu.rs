@@ -17,7 +17,7 @@ pub struct ResultState {
 
 pub enum ListValue {
     Text(u16, String),
-    Path(u16, PathBuf),
+    Path(PathBuf),
     U32(u32, u32, u32),
     Bool(bool),
     Color(IcbColor),
@@ -25,17 +25,17 @@ pub enum ListValue {
 }
 
 pub struct ListItem {
-    _id: String,
+    pub id: String,
     title: String,
     pub status: String,
     pub text_field_state: TextfieldState,
-    value: ListValue,
+    pub value: ListValue,
 }
 
 impl ListItem {
     pub fn new(id: &str, title: String, value: ListValue) -> Self {
         Self {
-            _id: id.to_string(),
+            id: id.to_string(),
             status: format!("{}", title),
             text_field_state: TextfieldState::default(),
             title,
@@ -50,15 +50,11 @@ impl ListItem {
 
     fn render(&self, area: Rect, frame: &mut Frame) {
         match &self.value {
-            ListValue::Text(edit_len, text) => {
-                let mut area = area;
-                area.width = *edit_len;
+            ListValue::Text(_, text) => {
                 Text::from(text.clone()).style(THEME.value).render(area, frame.buffer_mut());
             }
 
-            ListValue::Path(edit_len, text) => {
-                let mut area = area;
-                area.width = *edit_len;
+            ListValue::Path(text) => {
                 Text::from(format!("{}", text.display())).style(THEME.value).render(area, frame.buffer_mut());
             }
 
@@ -89,7 +85,7 @@ impl ListItem {
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
             }
 
-            ListValue::Path(_edit_len, text) => {
+            ListValue::Path(text) => {
                 let field = TextField::new().with_value(format!("{}", text.display()));
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
             }
@@ -129,7 +125,7 @@ impl ListItem {
             ListValue::Text(_edit_len, text) => {
                 self.text_field_state.handle_input(key, text);
             }
-            ListValue::Path(_edit_len, path) => {
+            ListValue::Path(path) => {
                 let mut text = format!("{}", path.display());
                 self.text_field_state.handle_input(key, &mut text);
                 *path = PathBuf::from(text);
@@ -149,6 +145,16 @@ pub enum ConfigEntry {
     Table(usize, Vec<ConfigEntry>),
     Separator,
 }
+impl ConfigEntry {
+    fn title_len(&self) -> u16 {
+        match self {
+            ConfigEntry::Item(item) => item.title.len() as u16,
+            ConfigEntry::Group(_, items) => items.iter().map(|item| item.title_len()).max().unwrap_or(0),
+            ConfigEntry::Table(_rows, _items) => 0,
+            ConfigEntry::Separator => 0,
+        }
+    }
+}
 
 pub struct ConfigMenu {
     pub items: Vec<ConfigEntry>,
@@ -166,7 +172,7 @@ pub struct ConfigMenuState {
 
 impl ConfigMenu {
     pub fn render(&mut self, area: Rect, frame: &mut Frame, state: &mut ConfigMenuState) {
-        let max = 16; //self.items.iter().map(|item| item.title.len()).max().unwrap_or(0);
+        let max = self.items.iter().map(|item| item.title_len()).max().unwrap_or(0);
 
         let mut y = 0;
         let mut x = 0;

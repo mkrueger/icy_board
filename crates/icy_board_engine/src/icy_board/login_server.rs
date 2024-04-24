@@ -103,9 +103,20 @@ impl Default for SecureWebsocket {
 }
 
 #[derive(Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Modem {
+    pub device: String,
+    pub baud_rate: usize,
+    pub init_string1: String,
+    pub init_string2: String,
+    pub answer_string: String,
+    pub dialout_string: String,
+}
+
+#[derive(Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct LoginServer {
     pub telnet: Telnet,
     pub ssh: SSH,
     pub websocket: Websocket,
     pub secure_websocket: SecureWebsocket,
+    pub modems: Vec<Modem>,
 }

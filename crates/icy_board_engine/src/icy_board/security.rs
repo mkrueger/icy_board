@@ -4,9 +4,9 @@ use super::state::Session;
 
 #[derive(Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RequiredSecurity {
-    level: u8,
-    min_age: u8,
-    groups: Vec<String>,
+    pub level: u8,
+    pub min_age: u8,
+    pub groups: Vec<String>,
 }
 
 impl RequiredSecurity {

@@ -1,8 +1,10 @@
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{config_menu::ResultState, theme::THEME, TerminalType};
+use ratatui::text::Span;
 use ratatui::{
     layout::{Constraint, Margin, Rect},
     text::Text,
@@ -16,15 +18,18 @@ use super::TabPage;
 pub struct ConferencesTab {
     scroll_state: ScrollbarState,
     table_state: TableState,
-    icy_board: Arc<IcyBoard>,
+    icy_board: Arc<Mutex<IcyBoard>>,
+
+    in_edit_mode: bool,
 }
 
 impl ConferencesTab {
-    pub fn new(icy_board: Arc<IcyBoard>) -> Self {
+    pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
         Self {
-            scroll_state: ScrollbarState::default().content_length(icy_board.conferences.len()),
+            scroll_state: ScrollbarState::default().content_length(icy_board.lock().unwrap().conferences.len()),
             table_state: TableState::default(),
             icy_board: icy_board.clone(),
+            in_edit_mode: false,
         }
     }
 
@@ -51,8 +56,8 @@ impl ConferencesTab {
             .style(THEME.table_header)
             .height(1);
 
-        let rows = self
-            .icy_board
+        let l = self.icy_board.lock().unwrap();
+        let rows = l
             .conferences
             .iter()
             .enumerate()
@@ -75,13 +80,13 @@ impl ConferencesTab {
     }
 
     fn prev(&mut self) {
-        if self.icy_board.conferences.is_empty() {
+        if self.icy_board.lock().unwrap().conferences.is_empty() {
             return;
         }
         let i = match self.table_state.selected() {
             Some(i) => {
                 if i == 0 {
-                    self.icy_board.conferences.len() - 1
+                    self.icy_board.lock().unwrap().conferences.len() - 1
                 } else {
                     i - 1
                 }
@@ -93,12 +98,12 @@ impl ConferencesTab {
     }
 
     fn next(&mut self) {
-        if self.icy_board.conferences.is_empty() {
+        if self.icy_board.lock().unwrap().conferences.is_empty() {
             return;
         }
         let i = match self.table_state.selected() {
             Some(i) => {
-                if i + 1 >= self.icy_board.conferences.len() {
+                if i + 1 >= self.icy_board.lock().unwrap().conferences.len() {
                     0
                 } else {
                     i + 1
@@ -112,14 +117,135 @@ impl ConferencesTab {
 
     fn insert(&mut self) {
         //  self.icy_board.conferences.push(icy_board_engine::icy_board::commands::Command::default());
-        self.scroll_state = self.scroll_state.content_length(self.icy_board.conferences.len());
+        self.scroll_state = self.scroll_state.content_length(self.icy_board.lock().unwrap().conferences.len());
+    }
+
+    fn draw_label(&self, label: &str, line: &mut Rect, len: u16, frame: &mut Frame) {
+        Text::from(label).style(THEME.item).render(*line, frame.buffer_mut());
+        line.x += len;
+        line.width -= len;
+        Span::from(":").style(THEME.item).render(*line, frame.buffer_mut());
+        line.x += 2;
+        line.width -= 2;
+    }
+
+    fn render_editor(&self, frame: &mut Frame, mut area: Rect) {
+        let Ok(mut board) = self.icy_board.lock() else {
+            return;
+        };
+        let cur_conf = board.conferences.get_mut(self.table_state.selected().unwrap()).unwrap();
+        let mut line = Rect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: 1,
+        };
+        self.draw_label(&format!("Name (#{})", self.table_state.selected().unwrap() + 1), &mut line, 14, frame);
+        Text::from(cur_conf.name.to_string()).style(THEME.value).render(line, frame.buffer_mut());
+
+        area.y += 1;
+        let mut line = Rect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: 1,
+        };
+
+        let l1 = 28;
+
+        self.draw_label("Public Conference", &mut line, l1, frame);
+        Text::from(if cur_conf.is_public { "Y" } else { "N" })
+            .style(THEME.value)
+            .render(line, frame.buffer_mut());
+        line.x += 15;
+        line.x -= 15;
+        self.draw_label("Req. Security if Public", &mut line, 24, frame);
+        Text::from(cur_conf.required_security.level.to_string())
+            .style(THEME.value)
+            .render(line, frame.buffer_mut());
+        area.y += 1;
+        let mut line = Rect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: 1,
+        };
+        self.draw_label("Password to Join if Private", &mut line, l1, frame);
+        Text::from(cur_conf.password.to_string()).style(THEME.value).render(line, frame.buffer_mut());
+        line.x += 20;
+
+        area.y += 2;
+        let mut line = Rect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: 1,
+        };
+        self.draw_label("Name/Loc of User's Menu", &mut line, l1, frame);
+        Text::from(cur_conf.users_menu.to_string_lossy())
+            .style(THEME.value)
+            .render(line, frame.buffer_mut());
+
+        area.y += 1;
+        let mut line = Rect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: 1,
+        };
+        self.draw_label("Name/Loc of Sysop's Menu", &mut line, l1, frame);
+        Text::from(cur_conf.sysop_menu.to_string_lossy())
+            .style(THEME.value)
+            .render(line, frame.buffer_mut());
+
+        area.y += 1;
+        let mut line = Rect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: 1,
+        };
+        self.draw_label("Name/Loc of NEWS File", &mut line, l1, frame);
+        Text::from(cur_conf.news_file.to_string_lossy())
+            .style(THEME.value)
+            .render(line, frame.buffer_mut());
+
+        area.y += 1;
+        let mut line = Rect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: 1,
+        };
+        self.draw_label("Name/Loc of Conf INTRO File", &mut line, l1, frame);
+        Text::from(cur_conf.intro_file.to_string_lossy())
+            .style(THEME.value)
+            .render(line, frame.buffer_mut());
+
+        area.y += 1;
+        let mut line = Rect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: 1,
+        };
+        self.draw_label("Location for Attachments", &mut line, l1, frame);
+        Text::from(cur_conf.attachment_location.to_string_lossy())
+            .style(THEME.value)
+            .render(line, frame.buffer_mut());
     }
 }
 
 impl TabPage for ConferencesTab {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
-        let area = area.inner(&Margin { vertical: 2, horizontal: 2 });
+        let area = area.inner(&Margin { vertical: 1, horizontal: 2 });
         Clear.render(area, frame.buffer_mut());
+
+        if self.in_edit_mode {
+            self.render_editor(frame, area);
+            return;
+        }
+
         self.render_table(frame, area);
         self.render_scrollbar(frame, area);
     }
@@ -136,10 +262,15 @@ impl TabPage for ConferencesTab {
     }
 
     fn request_edit_mode(&mut self, _terminal: &mut TerminalType, _full_screen: bool) -> ResultState {
-        /* *    if let Some(sel) = self.table_state.selected() {
-            let cmd = &self.commands[sel];
-            EditCommandDialog::new(cmd.clone(), full_screen).run(terminal).unwrap();
-        }*/
-        ResultState::default()
+        if let Some(_state) = self.table_state.selected() {
+            self.in_edit_mode = true;
+            ResultState {
+                in_edit_mode: true,
+                status_line: String::new(),
+            }
+        } else {
+            self.in_edit_mode = false;
+            ResultState::default()
+        }
     }
 }

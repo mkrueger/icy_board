@@ -49,7 +49,7 @@ impl IceText {
 impl TabPage for AboutTab {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         let text = vec![
-            format!("mkicbmnu Configuration Utility v{}", crate::VERSION.to_string()),
+            format!("IcyBoard Setup Utility v{}", crate::VERSION.to_string()),
             "written 2024 by Mike Krüger as part of the icy_board project".to_string(),
             "visit https://github.com/mkrueger/icy_board".to_string(),
             "for the latest version & discussions".to_string(),
