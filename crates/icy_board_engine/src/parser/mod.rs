@@ -170,7 +170,6 @@ pub enum ParserWarningType {
 #[derive(Default)]
 pub struct UserTypeRegistry {
     pub registered_types: HashMap<unicase::Ascii<String>, VariableType>,
-    pub type_lookup: HashMap<unicase::Ascii<String>, usize>,
     pub types: Vec<UserDataRegistry>,
 }
 
@@ -200,10 +199,10 @@ impl UserTypeRegistry {
     pub fn register<T: UserData>(&mut self) {
         let mut registry = UserDataRegistry::default();
         T::register_members(&mut registry);
-        self.type_lookup.insert(unicase::Ascii::new(T::TYPE_NAME.to_string()), self.types.len());
+        let id = self.types.len();
         self.registered_types.insert(
             unicase::Ascii::new(T::TYPE_NAME.to_string()),
-            VariableType::UserData((FIRST_ID + self.types.len()) as u8),
+            VariableType::UserData((FIRST_ID + id) as u8),
         );
         self.types.push(registry);
     }
@@ -211,6 +210,7 @@ impl UserTypeRegistry {
     pub fn get_type_from_id(&self, d: u8) -> Option<&UserDataRegistry> {
         let d = d as usize;
         if d < FIRST_ID || d >= self.types.len() + FIRST_ID {
+            log::error!("Invalid user type id: {}", d);
             return None;
         }
         Some(&self.types[d - FIRST_ID])
