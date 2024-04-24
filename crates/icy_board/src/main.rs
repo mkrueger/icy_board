@@ -28,6 +28,8 @@ use ratatui::{
 use semver::Version;
 use tui::{print_exit_screen, Tui};
 
+use crate::bbs::{await_securewebsocket_connections, await_ssh_connections, await_websocket_connections};
+
 mod bbs;
 mod call_wait_screen;
 mod create;
@@ -139,13 +141,38 @@ pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) -> Res<()> {
 
             {
                 let telnet_connection = board.lock().unwrap().config.login_server.telnet.clone();
-
-                let bbs = bbs.clone();
-                let board = board.clone();
-
                 if telnet_connection.is_enabled {
+                    let bbs = bbs.clone();
+                    let board = board.clone();
                     std::thread::spawn(move || {
                         let _ = await_telnet_connections(telnet_connection, board, bbs);
+                    });
+                }
+
+                let ssh_connection = board.lock().unwrap().config.login_server.ssh.clone();
+                if ssh_connection.is_enabled {
+                    let bbs = bbs.clone();
+                    let board = board.clone();
+                    std::thread::spawn(move || {
+                        let _ = await_ssh_connections(ssh_connection, board, bbs);
+                    });
+                }
+
+                let websocket_connection = board.lock().unwrap().config.login_server.websocket.clone();
+                if websocket_connection.is_enabled {
+                    let bbs = bbs.clone();
+                    let board = board.clone();
+                    std::thread::spawn(move || {
+                        let _ = await_websocket_connections(websocket_connection, board, bbs);
+                    });
+                }
+
+                let secure_websocket_connection = board.lock().unwrap().config.login_server.secure_websocket.clone();
+                if secure_websocket_connection.is_enabled {
+                    let bbs = bbs.clone();
+                    let board = board.clone();
+                    std::thread::spawn(move || {
+                        let _ = await_securewebsocket_connections(secure_websocket_connection, board, bbs);
                     });
                 }
             }

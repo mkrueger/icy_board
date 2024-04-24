@@ -8,13 +8,17 @@ use std::{
 use crate::Res;
 use icy_board_engine::{
     icy_board::{
-        login_server::Telnet,
+        login_server::{SecureWebsocket, Telnet, Websocket, SSH},
         state::{IcyBoardState, NodeState},
         IcyBoard,
     },
     vm::TerminalTarget,
 };
-use icy_net::{telnet::TelnetConnection, Connection, ConnectionType};
+use icy_net::{
+    telnet::TelnetConnection,
+    websocket::{accept_websocket, accept_websocket_secure},
+    Connection, ConnectionType,
+};
 
 use crate::menu_runner::PcbBoardCommand;
 
@@ -97,10 +101,166 @@ pub fn await_telnet_connections(telnet: Telnet, board: Arc<Mutex<IcyBoard>>, bbs
                         orig_hook(panic_info);
                     }));
 
-                    let connection = TelnetConnection::accept(stream).unwrap();
-                    // connection succeeded
-                    if let Err(err) = handle_client(board, node_list, node, Box::new(connection)) {
-                        log::error!("Error running backround client: {}", err);
+                    match TelnetConnection::accept(stream) {
+                        Ok(connection) => {
+                            // connection succeeded
+                            if let Err(err) = handle_client(board, node_list, node, Box::new(connection)) {
+                                log::error!("Error running backround client: {}", err);
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("telnet connection failed {}", e);
+                        }
+                    }
+                    Ok(())
+                });
+                bbs.lock().unwrap().get_open_connections().lock().unwrap()[node].as_mut().unwrap().handle = Some(handle);
+            }
+            Err(e) => {
+                log::error!("connection failed {}", e);
+            }
+        }
+    }
+    drop(listener);
+    Ok(())
+}
+
+pub fn await_ssh_connections(ssh: SSH, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+    let addr = if ssh.address.is_empty() {
+        format!("127.0.0.1:{}", ssh.port)
+    } else {
+        format!("{}:{}", ssh.address, ssh.port)
+    };
+    let listener = match TcpListener::bind(addr) {
+        Ok(listener) => listener,
+        Err(e) => panic!("could not read start TCP listener: {}", e),
+    };
+    for stream in listener.incoming() {
+        match stream {
+            Ok(stream) => {
+                let board = board.clone();
+                let node = bbs.lock().unwrap().create_new_node(ConnectionType::SSH);
+
+                let node_list = bbs.lock().unwrap().get_open_connections().clone();
+                let handle = thread::spawn(move || {
+                    let orig_hook = std::panic::take_hook();
+                    std::panic::set_hook(Box::new(move |panic_info| {
+                        log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
+                        log::error!("full info: {:?}", panic_info);
+                        orig_hook(panic_info);
+                    }));
+
+                    match TelnetConnection::accept(stream) {
+                        Ok(connection) => {
+                            // connection succeeded
+                            if let Err(err) = handle_client(board, node_list, node, Box::new(connection)) {
+                                log::error!("Error running backround client: {}", err);
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("ssh connection failed {}", e);
+                        }
+                    }
+
+                    Ok(())
+                });
+                bbs.lock().unwrap().get_open_connections().lock().unwrap()[node].as_mut().unwrap().handle = Some(handle);
+            }
+            Err(e) => {
+                log::error!("connection failed {}", e);
+            }
+        }
+    }
+    drop(listener);
+    Ok(())
+}
+
+pub fn await_websocket_connections(ssh: Websocket, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+    let addr = if ssh.address.is_empty() {
+        format!("127.0.0.1:{}", ssh.port)
+    } else {
+        format!("{}:{}", ssh.address, ssh.port)
+    };
+    let listener = match TcpListener::bind(addr) {
+        Ok(listener) => listener,
+        Err(e) => panic!("could not read start TCP listener: {}", e),
+    };
+    for stream in listener.incoming() {
+        match stream {
+            Ok(stream) => {
+                let board = board.clone();
+                let node = bbs.lock().unwrap().create_new_node(ConnectionType::Websocket);
+
+                let node_list = bbs.lock().unwrap().get_open_connections().clone();
+                let handle = thread::spawn(move || {
+                    let orig_hook = std::panic::take_hook();
+                    std::panic::set_hook(Box::new(move |panic_info| {
+                        log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
+                        log::error!("full info: {:?}", panic_info);
+                        orig_hook(panic_info);
+                    }));
+
+                    match accept_websocket(stream) {
+                        Ok(connection) => {
+                            // connection succeeded
+                            if let Err(err) = handle_client(board, node_list, node, Box::new(connection)) {
+                                log::error!("Error running backround client: {}", err);
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("webserver connection failed {}", e);
+                        }
+                    }
+                    Ok(())
+                });
+                bbs.lock().unwrap().get_open_connections().lock().unwrap()[node].as_mut().unwrap().handle = Some(handle);
+            }
+            Err(e) => {
+                log::error!("connection failed {}", e);
+            }
+        }
+    }
+    drop(listener);
+    Ok(())
+}
+
+pub fn await_securewebsocket_connections(ssh: SecureWebsocket, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+    let addr = if ssh.address.is_empty() {
+        format!("127.0.0.1:{}", ssh.port)
+    } else {
+        format!("{}:{}", ssh.address, ssh.port)
+    };
+    let listener = match TcpListener::bind(addr) {
+        Ok(listener) => listener,
+        Err(e) => panic!("could not read start TCP listener: {}", e),
+    };
+    for stream in listener.incoming() {
+        match stream {
+            Ok(stream) => {
+                let board = board.clone();
+                let node = bbs.lock().unwrap().create_new_node(ConnectionType::SecureWebsocket);
+
+                let node_list = bbs.lock().unwrap().get_open_connections().clone();
+                let cp = ssh.cert_pem.clone();
+                let kp = ssh.key_pem.clone();
+                let handle = thread::spawn(move || {
+                    let orig_hook = std::panic::take_hook();
+                    std::panic::set_hook(Box::new(move |panic_info| {
+                        log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
+                        log::error!("full info: {:?}", panic_info);
+                        orig_hook(panic_info);
+                    }));
+
+                    match accept_websocket_secure(stream, &cp, &kp) {
+                        Ok(connection) => {
+                            // connection succeeded
+                            if let Err(err) = handle_client(board, node_list, node, Box::new(connection)) {
+                                log::error!("Error running backround client: {}", err);
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("secure webserver connection failed {}", e);
+                        }
                     }
                     Ok(())
                 });

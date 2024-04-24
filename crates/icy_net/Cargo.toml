@@ -29,6 +29,7 @@ rustls = { version = "0.22.0", features = [
     "tls12",
  #   "dangerous_configuration"  # Allow invalid certs/etc.
 ]}
+rustls-pemfile = "2"
 webpki-roots = "0.26.1"
 
 [dev-dependencies]

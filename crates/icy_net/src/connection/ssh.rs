@@ -2,7 +2,7 @@
 use libssh_rs::{Channel, Session, SshOption};
 use std::{
     io::{self, ErrorKind, Read, Write},
-    net::ToSocketAddrs,
+    net::{TcpStream, ToSocketAddrs},
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -55,6 +55,10 @@ impl SSHConnection {
 
     fn default_port() -> u16 {
         22
+    }
+
+    pub fn accept(_tcp_stream: TcpStream) -> crate::Result<Self> {
+        todo!("SSHConnection::accept");
     }
     /*
     fn parse_address(addr: &str) -> TermComResult<(String, u16)> {
