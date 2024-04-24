@@ -349,7 +349,7 @@ pub struct IcyBoardState {
     pub debug_level: i32,
     pub env_vars: HashMap<String, String>,
 
-    user_screen: VirtualScreen,
+    pub user_screen: VirtualScreen,
     sysop_screen: VirtualScreen,
 
     char_buffer: VecDeque<KeyChar>,
@@ -357,8 +357,8 @@ pub struct IcyBoardState {
 
 pub struct VirtualScreen {
     parser: ansi::Parser,
-    caret: Caret,
-    buffer: Buffer,
+    pub caret: Caret,
+    pub buffer: Buffer,
 }
 
 impl VirtualScreen {
@@ -979,7 +979,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    fn translate_variable(&mut self, target: TerminalTarget, input: &str) -> Option<String> {
+    pub fn translate_variable(&mut self, target: TerminalTarget, input: &str) -> Option<String> {
         let mut split = input.split(':');
         let id = split.next().unwrap();
         let param = split.next();

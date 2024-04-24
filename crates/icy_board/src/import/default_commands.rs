@@ -68,6 +68,7 @@ pub fn add_default_commands(data: &PcbBoardData, cmd_list: &mut CommandList) {
     cmd_list.push(convert_cmd("BR", CommandType::Broadcast, data.sysop_security.sysop));
 
     cmd_list.push(convert_cmd("4", CommandType::RestoreMessage, data.sysop_security.sysop));
+    cmd_list.push(convert_cmd("PPE", CommandType::RunPPE, data.sysop_security.sysop));
 
     cmd_list.push(convert_cmd("@", CommandType::ReadEmail, data.sysop_security.sysop));
     cmd_list.push(convert_cmd("@W", CommandType::WriteEmail, data.sysop_security.sysop));

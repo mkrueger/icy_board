@@ -218,6 +218,9 @@ pub enum CommandType {
 
     // '@W'
     WriteEmail,
+
+    // 'PPE'
+    RunPPE,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Default)]

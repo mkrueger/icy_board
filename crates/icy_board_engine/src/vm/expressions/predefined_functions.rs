@@ -11,7 +11,7 @@ use crate::parser::CONFERENCE_ID;
 use crate::vm::VirtualMachine;
 use crate::Res;
 use codepages::tables::CP437_TO_UNICODE;
-use icy_engine::update_crc32;
+use icy_engine::{update_crc32, Position, TextPane};
 use radix_fmt::radix;
 use rand::Rng; // 0.8.5
 use substring::Substring;
@@ -743,8 +743,9 @@ pub fn peekw(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     panic!("TODO")
 }
 pub fn mkaddr(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let seg = vm.eval_expr(&args[0])?.as_int();
+    let off = vm.eval_expr(&args[1])?.as_int();
+    Ok(VariableValue::new_int(seg.wrapping_mul(0x10000) | off))
 }
 pub fn exist(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     let file_name = vm.eval_expr(&args[0])?.as_string();
@@ -942,10 +943,12 @@ pub fn mkdate(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub fn curcolor(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let attr = vm.icy_board_state.user_screen.caret.get_attribute().as_u8(icy_engine::IceMode::Blink);
+    Ok(VariableValue::new_int(attr as i32))
 }
+
 pub fn kinkey(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     inkey(vm, args)
 }
@@ -1021,15 +1024,37 @@ pub fn u_inconf(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue>
     panic!("TODO")
 }
 pub fn peekdw(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    log::error!("not implemented function 'peekdw' !");
+    let mut rng = rand::thread_rng();
+
+    Ok(VariableValue::new_int(rng.gen()))
 }
 pub fn dbglevel(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.icy_board_state.debug_level))
 }
 pub fn scrtext(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let col = vm.eval_expr(&args[0])?.as_int() - 1;
+    let row = vm.eval_expr(&args[1])?.as_int() - 1;
+    let len = vm.eval_expr(&args[2])?.as_int();
+    let code = vm.eval_expr(&args[3])?.as_bool();
+
+    let mut res = String::new();
+
+    let mut cur_color = -1;
+    for i in 0..len {
+        let ch = vm.icy_board_state.user_screen.buffer.get_char(Position::new(col + i, row));
+        if code {
+            let col = ch.attribute.as_u8(icy_engine::IceMode::Blink) as i32;
+            if cur_color != col {
+                res.push_str(&format!("@X{:02X}", col));
+                cur_color = col;
+            }
+        }
+
+        res.push(ch.ch);
+    }
+
+    Ok(VariableValue::new_string(res))
 }
 pub fn showstat(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
@@ -1128,12 +1153,12 @@ pub fn confalias(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue
     panic!("TODO")
 }
 pub fn useralias(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_bool(
+        vm.icy_board_state.session.use_alias && vm.icy_board_state.session.current_conference.allow_aliases,
+    ))
 }
 pub fn curuser(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_int(vm.icy_board_state.session.cur_user as i32))
 }
 pub fn chatstat(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
@@ -1229,8 +1254,13 @@ fn calc_crc32(buffer: &[u8]) -> u32 {
 }
 
 pub fn pcbmac(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let var = vm.eval_expr(&args[0])?.as_string();
+
+    if let Some(expanded) = vm.icy_board_state.translate_variable(crate::vm::TerminalTarget::Sysop, var.trim_matches('@')) {
+        Ok(VariableValue::new_string(expanded))
+    } else {
+        Ok(VariableValue::new_string(String::new()))
+    }
 }
 pub fn actmsgnum(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");

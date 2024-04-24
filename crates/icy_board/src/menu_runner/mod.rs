@@ -246,6 +246,10 @@ impl PcbBoardCommand {
                 // @
                 self.read_email(action)?;
             }
+            CommandType::RunPPE => {
+                // PPE
+                self.ppe_run()?;
+            }
 
             _ => {
                 return Err(Box::new(IcyBoardError::UnknownAction(format!("{:?}", action.command_type))));

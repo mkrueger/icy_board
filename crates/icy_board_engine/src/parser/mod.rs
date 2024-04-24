@@ -200,10 +200,8 @@ impl UserTypeRegistry {
         let mut registry = UserDataRegistry::default();
         T::register_members(&mut registry);
         let id = self.types.len();
-        self.registered_types.insert(
-            unicase::Ascii::new(T::TYPE_NAME.to_string()),
-            VariableType::UserData((FIRST_ID + id) as u8),
-        );
+        self.registered_types
+            .insert(unicase::Ascii::new(T::TYPE_NAME.to_string()), VariableType::UserData((FIRST_ID + id) as u8));
         self.types.push(registry);
     }
 

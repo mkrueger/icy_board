@@ -297,6 +297,8 @@ impl Decompiler {
                 let (identifier, arguments) = match self.decompile_expression(left) {
                     Expression::FunctionCall(f) => (unicase::Ascii::new(f.get_expression().to_string()), f.get_arguments().clone()),
                     Expression::Identifier(id) => (id.get_identifier().clone(), Vec::new()),
+                    Expression::Indexer(f) => (unicase::Ascii::new(f.get_identifier().to_string()), f.get_arguments().clone()),
+
                     x => panic!("Invalid expression {x:?}"),
                 };
                 let id = left.get_id().unwrap();
