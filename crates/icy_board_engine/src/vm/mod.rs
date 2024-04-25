@@ -488,7 +488,6 @@ impl<'a> VirtualMachine<'a> {
             let p = self.cur_ptr;
             self.cur_ptr += 1;
             let c = self.script.statements[p].command.clone();
-            log::warn!("Running command: {:?}", c);
             self.execute_statement(&c)?;
         }
         Ok(())
@@ -695,7 +694,7 @@ pub fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn PCBoard
     let Ok(script) = PPEScript::from_ppe_file(prg) else {
         return Ok(false);
     };
-    let mut label_table = calc_labe_table(&script.statements);
+    let mut label_table = HashMap::new();
     for (i, stmt) in script.statements.iter().enumerate() {
         label_table.insert(stmt.span.start * 2, i);
     }
@@ -722,16 +721,6 @@ pub fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn PCBoard
     };
     vm.run()?;
     Ok(true)
-}
-
-fn calc_labe_table(statements: &[PPEStatement]) -> HashMap<usize, usize> {
-    let mut res = HashMap::new();
-    let mut offset = 0;
-    for (i, stmt) in statements.iter().enumerate() {
-        res.insert(offset, i);
-        offset += stmt.command.get_size();
-    }
-    res
 }
 
 pub const U_EXPERT: usize = 1;

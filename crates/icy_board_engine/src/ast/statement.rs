@@ -36,6 +36,32 @@ pub enum Statement {
 }
 
 impl Statement {
+
+    pub fn get_span(&self) -> core::ops::Range<usize> {
+        match self {
+            Statement::Comment(c) => c.get_comment_token().span.clone(),
+            Statement::Block(b) => b.get_begin_token().span.clone(),
+            Statement::If(i) => i.get_if_token().span.clone(),
+            Statement::IfThen(i) => i.get_if_token().span.clone(),
+            Statement::Select(s) => s.get_select_token().span.clone(),
+            Statement::While(w) => w.get_while_token().span.clone(),
+            Statement::WhileDo(w) => w.get_while_token().span.clone(),
+            Statement::RepeatUntil(r) => r.get_repeat_token().span.start..r.condition.get_span().end,
+            Statement::Loop(l) => l.get_loop_token().span.start..l.get_endloop_token().span.end,
+            Statement::For(f) => f.get_for_token().span.clone(),
+            Statement::Break(b) => b.get_break_token().span.clone(),
+            Statement::Continue(c) => c.get_continue_token().span.clone(),
+            Statement::Gosub(g) => g.get_gosub_token().span.clone(),
+            Statement::Return(r) => r.get_return_token().span.clone(),
+            Statement::Let(l) => l.get_identifier_token().span.clone(),
+            Statement::Goto(g) => g.get_goto_token().span.clone(),
+            Statement::Label(l) => l.get_label_token().span.clone(),
+            Statement::Call(c) => c.get_identifier_token().span.clone(),
+            Statement::PredifinedCall(p) => p.identifier_token.span.clone(),
+            Statement::VariableDeclaration(v) => v.get_type_token().span.clone(),
+        }
+    }
+
     pub fn visit<T: Default, V: AstVisitor<T>>(&self, visitor: &mut V) -> T {
         match self {
             Statement::Comment(s) => visitor.visit_comment(s),
@@ -1832,11 +1858,11 @@ impl LoopStatement {
         }
     }
 
-    pub fn get_repeat_token(&self) -> &Spanned<Token> {
+    pub fn get_loop_token(&self) -> &Spanned<Token> {
         &self.loop_token
     }
 
-    pub fn get_until_token(&self) -> &Spanned<Token> {
+    pub fn get_endloop_token(&self) -> &Spanned<Token> {
         &self.endloop_token
     }
 

@@ -751,6 +751,7 @@ impl<'a> SemanticVisitor<'a> {
         if let Expression::Indexer(_) = expr {
             return;
         }
+
         self.errors
             .lock()
             .unwrap()
@@ -890,6 +891,7 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
         {
             self.require_user_variables = true;
         }
+        walk_predefined_call_statement(self, call_stmt);
 
         match def.sig {
             crate::executable::StatementSignature::Invalid => panic!("Invalid signature"),
@@ -964,7 +966,6 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
             VariableType::Procedure,
             call_stmt.get_identifier_token(),
         );
-        walk_predefined_call_statement(self, call_stmt);
         VariableType::None
     }
 
@@ -1021,7 +1022,7 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
                         // error already reported.
                         return res;
                     }
-                }
+                } 
 
                 let (rt, r) = &mut self.references[*idx];
 

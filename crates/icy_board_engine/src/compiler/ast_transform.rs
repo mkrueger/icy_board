@@ -208,7 +208,7 @@ impl AstVisitorMut for AstTransformationVisitor {
         let continue_label = self.next_label();
         let break_label = self.next_label();
 
-        let id_expr = IdentifierExpression::create_empty_expression(for_stmt.get_identifier().clone());
+        let id_expr = Expression::Identifier(IdentifierExpression::new(for_stmt.get_identifier_token().clone()));
 
         // init variable
         statements.push(LetStatement::create_empty_statement(
@@ -283,49 +283,49 @@ impl AstVisitorMut for AstTransformationVisitor {
             Token::MulAssign => {
                 val_expr = BinaryExpression::create_empty_expression(
                     crate::ast::BinOp::Mul,
-                    IdentifierExpression::create_empty_expression(let_stmt.get_identifier().clone()),
+                    Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone())),
                     val_expr,
                 );
             }
             Token::DivAssign => {
                 val_expr = BinaryExpression::create_empty_expression(
                     crate::ast::BinOp::Div,
-                    IdentifierExpression::create_empty_expression(let_stmt.get_identifier().clone()),
+                    Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone())),
                     val_expr,
                 );
             }
             Token::ModAssign => {
                 val_expr = BinaryExpression::create_empty_expression(
                     crate::ast::BinOp::Mod,
-                    IdentifierExpression::create_empty_expression(let_stmt.get_identifier().clone()),
+                    Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone())),
                     val_expr,
                 );
             }
             Token::AddAssign => {
                 val_expr = BinaryExpression::create_empty_expression(
                     crate::ast::BinOp::Add,
-                    IdentifierExpression::create_empty_expression(let_stmt.get_identifier().clone()),
+                    Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone())),
                     val_expr,
                 );
             }
             Token::SubAssign => {
                 val_expr = BinaryExpression::create_empty_expression(
                     crate::ast::BinOp::Sub,
-                    IdentifierExpression::create_empty_expression(let_stmt.get_identifier().clone()),
+                    Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone())),
                     val_expr,
                 );
             }
             Token::AndAssign => {
                 val_expr = BinaryExpression::create_empty_expression(
                     crate::ast::BinOp::And,
-                    IdentifierExpression::create_empty_expression(let_stmt.get_identifier().clone()),
+                    Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone())),
                     val_expr,
                 );
             }
             Token::OrAssign => {
                 val_expr = BinaryExpression::create_empty_expression(
                     crate::ast::BinOp::Or,
-                    IdentifierExpression::create_empty_expression(let_stmt.get_identifier().clone()),
+                    Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone())),
                     val_expr,
                 );
             }
