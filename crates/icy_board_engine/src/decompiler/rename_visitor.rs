@@ -1,19 +1,17 @@
 use std::collections::HashMap;
 
-use crate::
-    ast::AstVisitor
-;
+use crate::ast::AstVisitor;
 
 #[derive(Default)]
 pub struct RenameScanVistitor {
     pub rename_map: HashMap<unicase::Ascii<String>, unicase::Ascii<String>>,
-    cur_index_var: usize,
-    file_names: usize,
-    x_coords: usize,
-    y_coords: usize,
+    _cur_index_var: usize,
+    _file_names: usize,
+    _x_coords: usize,
+    _y_coords: usize,
 }
 
-const INDEX_VARS: [&str; 4] = ["i", "j", "k", "l"];
+const _INDEX_VARS: [&str; 4] = ["i", "j", "k", "l"];
 
 impl AstVisitor<()> for RenameScanVistitor {
     fn visit_for_statement(&mut self, _for_stmt: &crate::ast::ForStatement) {

@@ -8,7 +8,6 @@ use crate::executable::GenericVariableData;
 use crate::executable::PPECommand;
 use crate::executable::PPEExpr;
 use crate::executable::PPEScript;
-use crate::executable::PPEStatement;
 use crate::executable::VariableTable;
 use crate::executable::VariableType;
 use crate::executable::VariableValue;

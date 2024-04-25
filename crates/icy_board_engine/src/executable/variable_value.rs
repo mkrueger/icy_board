@@ -1128,12 +1128,12 @@ impl VariableValue {
             }
             GenericVariableData::Dim2(data) => {
                 if dim1 < data.len() && dim2 < data[dim1].len() {
-                    data[dim2][dim1] = val.convert_to(self.vtype);
+                    data[dim1][dim2] = val.convert_to(self.vtype);
                 }
             }
             GenericVariableData::Dim3(data) => {
                 if dim1 < data.len() && dim2 < data[dim1].len() && dim3 < data[dim1][dim2].len() {
-                    data[dim3][dim2][dim1] = val.convert_to(self.vtype);
+                    data[dim1][dim2][dim3] = val.convert_to(self.vtype);
                 }
             }
             _ => log::error!("no array variable: {self}"),

@@ -11,7 +11,7 @@ use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 
 use crate::tabs::*;
 
-pub struct App {
+pub struct App<'a> {
     mode: Mode,
     tab: TabPageType,
 
@@ -22,7 +22,7 @@ pub struct App {
     full_screen: bool,
 
     general_tab: GeneralTab,
-    path_tab: PathTab,
+    path_tab: PathTab<'a>,
     server_tab: ServerTab,
 
     conferences_tab: ConferencesTab,
@@ -48,7 +48,7 @@ enum TabPageType {
     About,
 }
 
-impl App {
+impl<'a> App<'a> {
     pub fn new(icy_board: IcyBoard, file: PathBuf, full_screen: bool) -> Self {
         let icy_board = Arc::new(Mutex::new(icy_board));
         let general_tab = GeneralTab::new(icy_board.clone());
@@ -134,7 +134,7 @@ impl App {
     }
 
     fn handle_key_press(&mut self, terminal: &mut TerminalType, key: KeyEvent) {
-        if self.mode == Mode::Edit {
+        if self.get_tab().has_control() {
             let state = self.get_tab_mut().handle_key_press(key);
             self.status_line = state.status_line;
             self.mode = if state.in_edit_mode { Mode::Edit } else { Mode::Command };
@@ -146,16 +146,11 @@ impl App {
             Char('q') | Esc => self.mode = Mode::Quit,
             Char('h') | Left => self.prev_tab(),
             Char('l') | Right => self.next_tab(),
-            Char('d') | Enter => {
-                let full_screen = self.full_screen;
-                let state = self.get_tab_mut().request_edit_mode(terminal, full_screen);
-                self.status_line = state.status_line;
-                self.mode = if state.in_edit_mode { Mode::Edit } else { Mode::Command };
-            }
 
             _ => {
                 let state = self.get_tab_mut().handle_key_press(key);
                 self.status_line = state.status_line;
+                self.mode = if state.in_edit_mode { Mode::Edit } else { Mode::Command };
             }
         };
     }
@@ -187,7 +182,7 @@ impl App {
     }
 }
 
-impl App {
+impl<'a> App<'a> {
     fn render_title_bar(&self, area: Rect, buf: &mut Buffer) {
         let len: u16 = TabPageType::iter().map(|p| TabPageType::title(p).len() as u16).sum();
         let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(len)]);

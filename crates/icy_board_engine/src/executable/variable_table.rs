@@ -516,7 +516,6 @@ impl VariableTable {
                         + first_var
                 };
 
-
                 (first_var..last).for_each(|i| {
                     if self.entries[i].get_type() == EntryType::Parameter {
                         self.entries[i].set_name(format!("PAR{par:03}"));

@@ -63,9 +63,7 @@ impl Decompiler {
 
         for statement in &self.script.statements {
             match statement.command {
-                PPECommand::Goto(label) |
-                PPECommand::Gosub(label) |
-                PPECommand::IfNot(_, label) => {
+                PPECommand::Goto(label) | PPECommand::Gosub(label) | PPECommand::IfNot(_, label) => {
                     labels.insert(label);
                 }
                 _ => {}
@@ -338,7 +336,7 @@ impl Decompiler {
             if self.label_lookup.contains_key(&(byte_offset)) {
                 func_body.push(LabelStatement::create_empty_statement(self.get_label_name(byte_offset)));
             }
-            
+
             if matches!(statement.command, PPECommand::EndFunc) || matches!(statement.command, PPECommand::EndProc) {
                 if entry.header.variable_type == VariableType::Function {
                     let parameters = self.generate_parameter_list(entry);
@@ -363,7 +361,6 @@ impl Decompiler {
                 break;
             }
 
-         
             func_body.push(self.decompile_statement(&statement.command));
             self.cur_ptr += 1;
         }

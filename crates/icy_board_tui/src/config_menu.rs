@@ -2,7 +2,13 @@ use std::{collections::HashMap, path::PathBuf};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::icy_board::icb_config::IcbColor;
-use ratatui::{layout::Rect, style::Stylize, text::Text, widgets::Widget, Frame};
+use ratatui::{
+    layout::Rect,
+    style::Stylize,
+    text::Text,
+    widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState, Widget},
+    Frame,
+};
 
 use crate::{
     text_field::{TextField, TextfieldState},
@@ -48,7 +54,35 @@ impl ListItem {
         self
     }
 
-    fn render(&self, area: Rect, frame: &mut Frame) {
+    fn render_label(&self, left_area: Rect, frame: &mut Frame, selected: bool, in_edit: bool) {
+        match &self.value {
+            ListValue::Bool(value) => {
+                let title = if *value {
+                    format!(" ✓ {}", self.title)
+                } else {
+                    format!(" ☐ {}", self.title)
+                };
+                let area = Rect {
+                    x: left_area.x,
+                    y: left_area.y,
+                    width: title.len() as u16 + 1,
+                    height: left_area.height,
+                };
+                Text::from(title)
+                    .alignment(ratatui::layout::Alignment::Right)
+                    .style(if selected { THEME.selected_item } else { THEME.item })
+                    .render(area, frame.buffer_mut());
+            }
+            _ => {
+                Text::from(format!(" {}:", self.title.clone()))
+                    .alignment(ratatui::layout::Alignment::Right)
+                    .style(if selected && !in_edit { THEME.selected_item } else { THEME.item })
+                    .render(left_area, frame.buffer_mut());
+            }
+        }
+    }
+
+    fn render_value(&self, area: Rect, frame: &mut Frame) {
         match &self.value {
             ListValue::Text(_, text) => {
                 Text::from(text.clone()).style(THEME.value).render(area, frame.buffer_mut());
@@ -67,11 +101,7 @@ impl ListItem {
                 IcbColor::Dos(u8) => Text::from(format!("@X{:02}", *u8)).style(THEME.value).render(area, frame.buffer_mut()),
                 IcbColor::IcyEngine(_) => todo!(),
             },
-            ListValue::Bool(value) => {
-                Text::from(if *value { "Yes" } else { "No" })
-                    .style(THEME.value)
-                    .render(area, frame.buffer_mut());
-            }
+            ListValue::Bool(_) => {}
             ListValue::ValueList(cur_value, _) => {
                 Text::from(cur_value.clone()).style(THEME.value).render(area, frame.buffer_mut());
             }
@@ -90,16 +120,16 @@ impl ListItem {
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
             }
             ListValue::U32(_value, _min, _max) => {
-                self.render(area, frame);
+                self.render_value(area, frame);
             }
             ListValue::Bool(_value) => {
-                self.render(area, frame);
+                self.render_value(area, frame);
             }
             ListValue::Color(_value) => {
-                self.render(area, frame);
+                self.render_value(area, frame);
             }
             ListValue::ValueList(_cur_value, _) => {
-                self.render(area, frame);
+                self.render_value(area, frame);
             }
         }
     }
@@ -130,11 +160,31 @@ impl ListItem {
                 self.text_field_state.handle_input(key, &mut text);
                 *path = PathBuf::from(text);
             }
-            ListValue::Bool(_) | ListValue::Color(_) | ListValue::U32(_, _, _) | ListValue::ValueList(_, _) => {}
+            ListValue::Bool(b) => {
+                *b = !*b;
+                return ResultState::default();
+            }
+            ListValue::Color(_) | ListValue::U32(_, _, _) | ListValue::ValueList(_, _) => {}
         }
         ResultState {
             in_edit_mode: true,
             status_line: self.status.clone(),
+        }
+    }
+
+    fn request_edit_mode(&mut self) -> ResultState {
+        match &mut self.value {
+            ListValue::Bool(b) => {
+                *b = !*b;
+                ResultState {
+                    in_edit_mode: false,
+                    status_line: self.status.clone(),
+                }
+            }
+            _ => ResultState {
+                in_edit_mode: true,
+                status_line: "".to_string(),
+            },
         }
     }
 }
@@ -168,6 +218,8 @@ pub struct ConfigMenuState {
     pub area_height: u16,
 
     pub item_pos: HashMap<usize, u16>,
+
+    pub scroll_state: ScrollbarState,
 }
 
 impl ConfigMenu {
@@ -181,6 +233,25 @@ impl ConfigMenu {
         state.area_height = area.height;
 
         Self::display_list(&mut i, &mut self.items, area, max, &mut y, &mut x, frame, state);
+
+        state.scroll_state = state.scroll_state.position(state.first_row as usize).content_length(state.area_height as usize);
+        Self::render_scrollbar(state, frame, area);
+    }
+
+    fn render_scrollbar(state: &mut ConfigMenuState, frame: &mut Frame, mut area: Rect) {
+        area.x += 1;
+
+        frame.render_stateful_widget(
+            Scrollbar::default()
+                .style(THEME.content_box)
+                .orientation(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(Some("▲"))
+                .thumb_symbol("█")
+                .track_symbol(Some("░"))
+                .end_symbol(Some("▼")),
+            area,
+            &mut state.scroll_state,
+        );
     }
 
     pub fn count(&self) -> usize {
@@ -204,6 +275,12 @@ impl ConfigMenu {
                     *len += 1;
                 }
                 ConfigEntry::Group(_t, items) => {
+                    let res = Self::get_item_internal(items, len, i);
+                    if res.is_some() {
+                        return res;
+                    }
+                }
+                ConfigEntry::Table(_, items) => {
                     let res = Self::get_item_internal(items, len, i);
                     if res.is_some() {
                         return res;
@@ -236,6 +313,12 @@ impl ConfigMenu {
                         return res;
                     }
                 }
+                ConfigEntry::Table(_, items) => {
+                    let res = Self::get_item_internal_mut(items, len, i);
+                    if res.is_some() {
+                        return res;
+                    }
+                }
                 _ => {}
             }
         }
@@ -252,11 +335,69 @@ impl ConfigMenu {
                 ConfigEntry::Group(_t, items) => {
                     self.count_items(items, len);
                 }
+                ConfigEntry::Table(_rows, items) => {
+                    self.count_items(items, len);
+                }
                 _ => {}
             }
         }
     }
 
+    fn display_table(
+        i: &mut usize,
+        items: &mut Vec<ConfigEntry>,
+        area: Rect,
+        max: u16,
+        y: &mut u16,
+        x: &mut u16,
+        frame: &mut Frame,
+        state: &mut ConfigMenuState,
+    ) {
+        let x1 = *x;
+        let x2 = *x + area.width / 2;
+
+        for (j, item) in items.iter_mut().enumerate() {
+            match item {
+                ConfigEntry::Item(item) => {
+                    if *y >= state.first_row && *y < area.height + state.first_row {
+                        let left_area = Rect {
+                            x: area.x + *x,
+                            y: area.y + *y - state.first_row,
+                            width: max as u16 + 2,
+                            height: 1,
+                        };
+
+                        item.render_label(left_area, frame, *i == state.selected, state.in_edit);
+
+                        let right_area = Rect {
+                            x: area.x + *x + max + 3,
+                            y: area.y + *y - state.first_row,
+                            width: area.width - (*x + max + 3) - 2,
+                            height: 1,
+                        };
+                        if state.in_edit && *i == state.selected {
+                            item.render_editor(right_area, frame);
+                        } else {
+                            item.render_value(right_area, frame);
+                        }
+                    }
+
+                    state.item_pos.insert(*i, *y);
+                    if j % 2 == 0 {
+                        *x = x2;
+                    } else {
+                        *x = x1;
+                        *y += 1;
+                    }
+                    *i += 1;
+                }
+                _ => {
+                    todo!()
+                }
+            }
+        }
+        *x = x1;
+    }
     pub fn display_list(
         i: &mut usize,
         items: &mut Vec<ConfigEntry>,
@@ -278,14 +419,7 @@ impl ConfigMenu {
                             height: 1,
                         };
 
-                        Text::from(format!(" {}:", item.title.clone()))
-                            .alignment(ratatui::layout::Alignment::Right)
-                            .style(if *i == state.selected && !state.in_edit {
-                                THEME.selected_item
-                            } else {
-                                THEME.item
-                            })
-                            .render(left_area, frame.buffer_mut());
+                        item.render_label(left_area, frame, *i == state.selected, state.in_edit);
 
                         let right_area = Rect {
                             x: area.x + *x + max + 3,
@@ -296,7 +430,7 @@ impl ConfigMenu {
                         if state.in_edit && *i == state.selected {
                             item.render_editor(right_area, frame);
                         } else {
-                            item.render(right_area, frame);
+                            item.render_value(right_area, frame);
                         }
                     }
 
@@ -320,8 +454,8 @@ impl ConfigMenu {
                     *y += 1;
                     Self::display_list(i, items, area, max, y, x, frame, state);
                 }
-                ConfigEntry::Table(_rows, _items) => {
-                    todo!()
+                ConfigEntry::Table(_cols, items) => {
+                    Self::display_table(i, items, area, max, y, x, frame, state);
                 }
                 ConfigEntry::Separator => {
                     /*
@@ -344,15 +478,83 @@ impl ConfigMenu {
         }
     }
 
-    pub fn handle_key_press(&mut self, key: KeyEvent, state: &ConfigMenuState) -> ResultState {
-        let res = self.get_item_mut(state.selected).unwrap().handle_key_press(key);
-        res
+    pub fn handle_key_press(&mut self, key: KeyEvent, state: &mut ConfigMenuState) -> ResultState {
+        if state.in_edit {
+            return self.get_item_mut(state.selected).unwrap().handle_key_press(key);
+        }
+
+        match key.code {
+            KeyCode::Home => {
+                state.selected = 0;
+                state.first_row = 0;
+            }
+            KeyCode::End => {
+                state.selected = self.count() - 1;
+                state.first_row = state.item_pos.get(&state.selected).unwrap_or(&0) - state.area_height + 1;
+            }
+            KeyCode::PageDown => {
+                state.selected += state.area_height as usize;
+                if state.selected >= self.count() {
+                    state.selected = self.count() - 1;
+                }
+                if let Some(y) = state.item_pos.get(&state.selected) {
+                    if *y >= state.area_height {
+                        state.first_row = *y - state.area_height + 1;
+                    }
+                }
+            }
+            KeyCode::PageUp => {
+                if state.selected >= state.area_height as usize {
+                    state.selected -= state.area_height as usize;
+                } else {
+                    state.selected = 0;
+                }
+                if let Some(y) = state.item_pos.get(&state.selected) {
+                    if *y < state.first_row {
+                        state.first_row = *y;
+                        if state.first_row == 1 {
+                            state.first_row = 0;
+                        }
+                    }
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => Self::prev(state),
+            KeyCode::Char('j') | KeyCode::Down => Self::next(self.count(), state),
+            KeyCode::Char('d') | KeyCode::Enter => {
+                return self.get_item_mut(state.selected).unwrap().request_edit_mode();
+            }
+
+            _ => {}
+        }
+        ResultState {
+            in_edit_mode: false,
+            status_line: self.get_item(state.selected).unwrap().status.clone(),
+        }
     }
 
-    pub fn request_edit_mode(&self, _state: &ConfigMenuState) -> ResultState {
-        ResultState {
-            in_edit_mode: true,
-            status_line: "".to_string(),
+    fn prev(state: &mut ConfigMenuState) {
+        if state.selected > 0 {
+            state.selected -= 1;
+
+            if let Some(y) = state.item_pos.get(&state.selected) {
+                if *y < state.first_row {
+                    state.first_row = *y;
+                    if state.first_row == 1 {
+                        state.first_row = 0;
+                    }
+                }
+            }
+        }
+    }
+
+    fn next(count: usize, state: &mut ConfigMenuState) {
+        if state.selected < count - 1 {
+            state.selected += 1;
+            if let Some(y) = state.item_pos.get(&state.selected) {
+                if *y >= state.area_height {
+                    state.first_row = *y - state.area_height + 1;
+                }
+            }
         }
     }
 }

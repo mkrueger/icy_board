@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
@@ -185,33 +185,6 @@ impl ServerTab {
             ListValue::ValueList(_, _) => todo!(),
         }
     }
-
-    fn prev(&mut self) {
-        if self.state.selected > 0 {
-            self.state.selected -= 1;
-
-            if let Some(y) = self.state.item_pos.get(&self.state.selected) {
-                if *y < self.state.first_row {
-                    self.state.first_row = *y;
-                    if self.state.first_row == 1 {
-                        self.state.first_row = 0;
-                    }
-                }
-            }
-        }
-    }
-
-    fn next(&mut self) {
-        let count = self.config.count();
-        if self.state.selected < count - 1 {
-            self.state.selected += 1;
-            if let Some(y) = self.state.item_pos.get(&self.state.selected) {
-                if *y >= self.state.area_height {
-                    self.state.first_row = *y - self.state.area_height + 1;
-                }
-            }
-        }
-    }
 }
 
 impl TabPage for ServerTab {
@@ -231,9 +204,8 @@ impl TabPage for ServerTab {
         self.config.render(area, frame, &mut self.state);
     }
 
-    fn request_edit_mode(&mut self, _t: &mut TerminalType, _fs: bool) -> ResultState {
-        self.state.in_edit = true;
-        self.config.request_edit_mode(&self.state)
+    fn has_control(&self) -> bool {
+        self.state.in_edit
     }
 
     fn set_cursor_position(&self, frame: &mut Frame) {
@@ -241,22 +213,12 @@ impl TabPage for ServerTab {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
-        if !self.state.in_edit {
-            match key.code {
-                KeyCode::Char('k') | KeyCode::Up => self.prev(),
-                KeyCode::Char('j') | KeyCode::Down => self.next(),
-                _ => {}
-            }
-            return ResultState {
-                in_edit_mode: false,
-                status_line: self.config.get_item(self.state.selected).unwrap().status.clone(),
-            };
-        } else {
-            let res = self.config.handle_key_press(key, &self.state);
+        let res = self.config.handle_key_press(key, &mut self.state);
+        if self.state.in_edit {
             self.write_back(&mut self.icy_board.lock().unwrap());
-            self.state.in_edit = res.in_edit_mode;
-            res
         }
+        self.state.in_edit = res.in_edit_mode;
+        res
     }
 
     fn request_status(&self) -> ResultState {

@@ -18,7 +18,7 @@ clap = { workspace = true }
 crossterm = { workspace = true }
 ratatui = { workspace = true }
 
-tui-input = "0.8.0"
+tui-textarea  = "0.4.0"
 ariadne = "0.4.0"
 unicase = { workspace = true }
 color-eyre = { workspace = true }

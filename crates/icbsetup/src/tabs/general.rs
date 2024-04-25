@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::user_base::Password;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
@@ -19,9 +19,11 @@ use super::TabPage;
 
 pub struct GeneralTab {
     pub state: ConfigMenuState,
+
     config: ConfigMenu,
     icy_board: Arc<Mutex<IcyBoard>>,
 }
+
 impl GeneralTab {
     pub fn new(lock: Arc<Mutex<IcyBoard>>) -> Self {
         let icy_board = lock.lock().unwrap();
@@ -115,81 +117,86 @@ impl GeneralTab {
                 "Groups".to_string(),
                 ListValue::Text(40, icy_board.config.new_user_settings.new_user_groups.clone()),
             )),
-            ConfigEntry::Item(ListItem::new(
-                "ask_city_or_state",
-                "City or State".to_string(),
-                ListValue::Bool(icy_board.config.new_user_settings.ask_city_or_state),
-            )),
-            ConfigEntry::Item(ListItem::new(
-                "ask_address",
-                "Address".to_string(),
-                ListValue::Bool(icy_board.config.new_user_settings.ask_address),
-            )),
-            ConfigEntry::Item(ListItem::new(
-                "ask_verification",
-                "Verification".to_string(),
-                ListValue::Bool(icy_board.config.new_user_settings.ask_verification),
-            )),
-            ConfigEntry::Item(ListItem::new(
-                "ask_bus_data_phone",
-                "Bus Phone".to_string(),
-                ListValue::Bool(icy_board.config.new_user_settings.ask_bus_data_phone),
-            )),
-            ConfigEntry::Item(ListItem::new(
-                "ask_voice_phone",
-                "Home Phone".to_string(),
-                ListValue::Bool(icy_board.config.new_user_settings.ask_voice_phone),
-            )),
-            ConfigEntry::Item(ListItem::new(
-                "ask_comment",
-                "Comment".to_string(),
-                ListValue::Bool(icy_board.config.new_user_settings.ask_comment),
-            )),
-            ConfigEntry::Item(ListItem::new(
-                "ask_clr_msg",
-                "MsgClear".to_string(),
-                ListValue::Bool(icy_board.config.new_user_settings.ask_clr_msg),
-            )),
-            ConfigEntry::Item(ListItem::new(
-                "ask_xfer_protocol",
-                "Protocols".to_string(),
-                ListValue::Bool(icy_board.config.new_user_settings.ask_xfer_protocol),
-            )),
-            ConfigEntry::Item(ListItem::new(
-                "ask_date_format",
-                "Date Format".to_string(),
-                ListValue::Bool(icy_board.config.new_user_settings.ask_date_format),
-            )),
-            ConfigEntry::Item(ListItem::new(
-                "ask_alias",
-                "Alias".to_string(),
-                ListValue::Bool(icy_board.config.new_user_settings.ask_alias),
-            )),
-            ConfigEntry::Item(ListItem::new(
-                "ask_gender",
-                "Gender".to_string(),
-                ListValue::Bool(icy_board.config.new_user_settings.ask_gender),
-            )),
-            ConfigEntry::Item(ListItem::new(
-                "ask_birthdate",
-                "Birthdate".to_string(),
-                ListValue::Bool(icy_board.config.new_user_settings.ask_birthdate),
-            )),
-            ConfigEntry::Item(ListItem::new(
-                "ask_email",
-                "Email".to_string(),
-                ListValue::Bool(icy_board.config.new_user_settings.ask_email),
-            )),
-            ConfigEntry::Item(ListItem::new(
-                "ask_web_address",
-                "Web Address".to_string(),
-                ListValue::Bool(icy_board.config.new_user_settings.ask_web_address),
-            )),
-            ConfigEntry::Item(ListItem::new(
-                "ask_use_short_descr",
-                "Short File Descr".to_string(),
-                ListValue::Bool(icy_board.config.new_user_settings.ask_use_short_descr),
-            )),
+            ConfigEntry::Table(
+                2,
+                vec![
+                    ConfigEntry::Item(ListItem::new(
+                        "ask_city_or_state",
+                        "City or State".to_string(),
+                        ListValue::Bool(icy_board.config.new_user_settings.ask_city_or_state),
+                    )),
+                    ConfigEntry::Item(ListItem::new(
+                        "ask_address",
+                        "Address".to_string(),
+                        ListValue::Bool(icy_board.config.new_user_settings.ask_address),
+                    )),
+                    ConfigEntry::Item(ListItem::new(
+                        "ask_verification",
+                        "Verification".to_string(),
+                        ListValue::Bool(icy_board.config.new_user_settings.ask_verification),
+                    )),
+                    ConfigEntry::Item(ListItem::new(
+                        "ask_bus_data_phone",
+                        "Bus Phone".to_string(),
+                        ListValue::Bool(icy_board.config.new_user_settings.ask_bus_data_phone),
+                    )),
+                    ConfigEntry::Item(ListItem::new(
+                        "ask_voice_phone",
+                        "Home Phone".to_string(),
+                        ListValue::Bool(icy_board.config.new_user_settings.ask_voice_phone),
+                    )),
+                    ConfigEntry::Item(ListItem::new(
+                        "ask_comment",
+                        "Comment".to_string(),
+                        ListValue::Bool(icy_board.config.new_user_settings.ask_comment),
+                    )),
+                    ConfigEntry::Item(ListItem::new(
+                        "ask_clr_msg",
+                        "MsgClear".to_string(),
+                        ListValue::Bool(icy_board.config.new_user_settings.ask_clr_msg),
+                    )),
+                    ConfigEntry::Item(ListItem::new(
+                        "ask_xfer_protocol",
+                        "Protocols".to_string(),
+                        ListValue::Bool(icy_board.config.new_user_settings.ask_xfer_protocol),
+                    )),
+                    ConfigEntry::Item(ListItem::new(
+                        "ask_date_format",
+                        "Date Format".to_string(),
+                        ListValue::Bool(icy_board.config.new_user_settings.ask_date_format),
+                    )),
+                    ConfigEntry::Item(ListItem::new(
+                        "ask_alias",
+                        "Alias".to_string(),
+                        ListValue::Bool(icy_board.config.new_user_settings.ask_alias),
+                    )),
+                    ConfigEntry::Item(ListItem::new(
+                        "ask_gender",
+                        "Gender".to_string(),
+                        ListValue::Bool(icy_board.config.new_user_settings.ask_gender),
+                    )),
+                    ConfigEntry::Item(ListItem::new(
+                        "ask_birthdate",
+                        "Birthdate".to_string(),
+                        ListValue::Bool(icy_board.config.new_user_settings.ask_birthdate),
+                    )),
+                    ConfigEntry::Item(ListItem::new(
+                        "ask_email",
+                        "Email".to_string(),
+                        ListValue::Bool(icy_board.config.new_user_settings.ask_email),
+                    )),
+                    ConfigEntry::Item(ListItem::new(
+                        "ask_web_address",
+                        "Web Address".to_string(),
+                        ListValue::Bool(icy_board.config.new_user_settings.ask_web_address),
+                    )),
+                    ConfigEntry::Item(ListItem::new(
+                        "ask_use_short_descr",
+                        "Short File Descr".to_string(),
+                        ListValue::Bool(icy_board.config.new_user_settings.ask_use_short_descr),
+                    )),
+                ],
+            ),
         ];
 
         let mut function_keys = Vec::new();
@@ -418,7 +425,11 @@ impl GeneralTab {
             }
             ConfigEntry::Separator => {}
             ConfigEntry::Item(item) => self.write_item(&item, icy_board),
-            ConfigEntry::Table(_, _) => todo!(),
+            ConfigEntry::Table(_, item) => {
+                for e in item {
+                    self.visit_item(&e, icy_board);
+                }
+            }
         }
     }
 
@@ -506,33 +517,6 @@ impl GeneralTab {
             ListValue::ValueList(_, _) => todo!(),
         }
     }
-
-    fn prev(&mut self) {
-        if self.state.selected > 0 {
-            self.state.selected -= 1;
-
-            if let Some(y) = self.state.item_pos.get(&self.state.selected) {
-                if *y < self.state.first_row {
-                    self.state.first_row = *y;
-                    if self.state.first_row == 1 {
-                        self.state.first_row = 0;
-                    }
-                }
-            }
-        }
-    }
-
-    fn next(&mut self) {
-        let count = self.config.count();
-        if self.state.selected < count - 1 {
-            self.state.selected += 1;
-            if let Some(y) = self.state.item_pos.get(&self.state.selected) {
-                if *y >= self.state.area_height {
-                    self.state.first_row = *y - self.state.area_height + 1;
-                }
-            }
-        }
-    }
 }
 
 impl TabPage for GeneralTab {
@@ -552,9 +536,8 @@ impl TabPage for GeneralTab {
         self.config.render(area, frame, &mut self.state);
     }
 
-    fn request_edit_mode(&mut self, _t: &mut TerminalType, _fs: bool) -> ResultState {
-        self.state.in_edit = true;
-        self.config.request_edit_mode(&self.state)
+    fn has_control(&self) -> bool {
+        self.state.in_edit
     }
 
     fn set_cursor_position(&self, frame: &mut Frame) {
@@ -562,22 +545,12 @@ impl TabPage for GeneralTab {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
-        if !self.state.in_edit {
-            match key.code {
-                KeyCode::Char('k') | KeyCode::Up => self.prev(),
-                KeyCode::Char('j') | KeyCode::Down => self.next(),
-                _ => {}
-            }
-            return ResultState {
-                in_edit_mode: false,
-                status_line: self.config.get_item(self.state.selected).unwrap().status.clone(),
-            };
-        } else {
-            let res = self.config.handle_key_press(key, &self.state);
+        let res = self.config.handle_key_press(key, &mut self.state);
+        if self.state.in_edit {
             self.write_back(&mut self.icy_board.lock().unwrap());
-            self.state.in_edit = res.in_edit_mode;
-            res
         }
+        self.state.in_edit = res.in_edit_mode;
+        res
     }
 
     fn request_status(&self) -> ResultState {

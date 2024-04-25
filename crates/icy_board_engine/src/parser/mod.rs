@@ -435,9 +435,9 @@ impl<'a> Parser<'a> {
                         return None;
                     }
                     if self.got_funcs && !self.use_funcs {
-                        if matches!(stmt, Statement::Comment(_))  {
+                        if matches!(stmt, Statement::Comment(_)) {
                             return Some(AstNode::TopLevelStatement(stmt));
-                        } 
+                        }
                         self.report_error(stmt.get_span(), ParserErrorType::NoStatementsAfterFunctions);
                         return None;
                     }

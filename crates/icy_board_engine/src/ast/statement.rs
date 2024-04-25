@@ -36,7 +36,6 @@ pub enum Statement {
 }
 
 impl Statement {
-
     pub fn get_span(&self) -> core::ops::Range<usize> {
         match self {
             Statement::Comment(c) => c.get_comment_token().span.clone(),

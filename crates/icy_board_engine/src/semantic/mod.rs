@@ -1022,7 +1022,7 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
                         // error already reported.
                         return res;
                     }
-                } 
+                }
 
                 let (rt, r) = &mut self.references[*idx];
 

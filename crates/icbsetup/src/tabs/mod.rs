@@ -34,4 +34,8 @@ pub trait TabPage {
     }
 
     fn set_cursor_position(&self, _frame: &mut Frame) {}
+
+    fn has_control(&self) -> bool {
+        false
+    }
 }

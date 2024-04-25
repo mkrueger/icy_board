@@ -1,7 +1,14 @@
+use itertools::Itertools;
+use ratatui::backend::CrosstermBackend;
+use ratatui::layout::{Constraint, Direction, Layout};
+use ratatui::Terminal;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
+use tui_textarea::TextArea;
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
@@ -16,13 +23,16 @@ use ratatui::{
 
 use super::TabPage;
 
-pub struct PathTab {
+pub struct PathTab<'a> {
     pub state: ConfigMenuState,
     config: ConfigMenu,
     icy_board: Arc<Mutex<IcyBoard>>,
+
+    edit_text: Option<PathBuf>,
+    textarea: TextArea<'a>,
 }
 
-impl PathTab {
+impl<'a> PathTab<'a> {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
         let a = icy_board.clone();
         let lock = a.lock().unwrap();
@@ -247,33 +257,8 @@ impl PathTab {
                 ],
             },
             icy_board,
-        }
-    }
-
-    fn prev(&mut self) {
-        if self.state.selected > 0 {
-            self.state.selected -= 1;
-
-            if let Some(y) = self.state.item_pos.get(&self.state.selected) {
-                if *y < self.state.first_row {
-                    self.state.first_row = *y;
-                    if self.state.first_row == 1 {
-                        self.state.first_row = 0;
-                    }
-                }
-            }
-        }
-    }
-
-    fn next(&mut self) {
-        let count = self.config.count();
-        if self.state.selected < count - 1 {
-            self.state.selected += 1;
-            if let Some(y) = self.state.item_pos.get(&self.state.selected) {
-                if *y >= self.state.area_height {
-                    self.state.first_row = *y - self.state.area_height + 1;
-                }
-            }
+            edit_text: None,
+            textarea: TextArea::default(),
         }
     }
 
@@ -349,11 +334,22 @@ impl PathTab {
     }
 }
 
-impl TabPage for PathTab {
+impl<'a> TabPage for PathTab<'a> {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         let area = area.inner(&Margin { horizontal: 2, vertical: 1 });
-
         Clear.render(area, frame.buffer_mut());
+
+        if self.edit_text.is_some() {
+            let block = Block::new()
+                .title(format!("[{:?}]", self.edit_text.as_ref().unwrap()))
+                .borders(Borders::ALL)
+                .border_type(BorderType::Double);
+            block.render(area, frame.buffer_mut());
+            let area = area.inner(&Margin { vertical: 1, horizontal: 1 });
+            let widget = self.textarea.widget();
+            frame.render_widget(widget, area);
+            return;
+        }
 
         let block = Block::new()
             .style(THEME.content_box)
@@ -365,10 +361,8 @@ impl TabPage for PathTab {
         let area = area.inner(&Margin { vertical: 1, horizontal: 1 });
         self.config.render(area, frame, &mut self.state);
     }
-
-    fn request_edit_mode(&mut self, _t: &mut TerminalType, _fs: bool) -> ResultState {
-        self.state.in_edit = true;
-        self.config.request_edit_mode(&self.state)
+    fn has_control(&self) -> bool {
+        self.state.in_edit || self.edit_text.is_some()
     }
 
     fn set_cursor_position(&self, frame: &mut Frame) {
@@ -376,22 +370,37 @@ impl TabPage for PathTab {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
+        if self.edit_text.is_some() {
+            if key.code == crossterm::event::KeyCode::Esc {
+                self.edit_text = None;
+                return ResultState::default();
+            }
+            self.textarea.input(key);
+            return ResultState::default();
+        }
         if !self.state.in_edit {
             match key.code {
-                KeyCode::Char('k') | KeyCode::Up => self.prev(),
-                KeyCode::Char('j') | KeyCode::Down => self.next(),
+                crossterm::event::KeyCode::F(2) => {
+                    if let ListValue::Path(path) = &self.config.get_item(self.state.selected).unwrap().value {
+                        let path = self.icy_board.lock().unwrap().resolve_file(path);
+
+                        if path.exists() {
+                            self.edit_text = Some(path.clone());
+                            let text = fs::read_to_string(path).unwrap();
+                            self.textarea = TextArea::new(text.lines().map(str::to_string).collect());
+                        }
+                    }
+                }
                 _ => {}
             }
-            return ResultState {
-                in_edit_mode: false,
-                status_line: self.config.get_item(self.state.selected).unwrap().status.clone(),
-            };
-        } else {
-            let res = self.config.handle_key_press(key, &self.state);
-            self.write_back(&mut self.icy_board.lock().unwrap());
-            self.state.in_edit = res.in_edit_mode;
-            res
         }
+
+        let res = self.config.handle_key_press(key, &mut self.state);
+        if self.state.in_edit {
+            self.write_back(&mut self.icy_board.lock().unwrap());
+        }
+        self.state.in_edit = res.in_edit_mode;
+        res
     }
 
     fn request_status(&self) -> ResultState {
