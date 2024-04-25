@@ -63,7 +63,9 @@ impl Decompiler {
 
         for statement in &self.script.statements {
             match statement.command {
-                PPECommand::Goto(label) | PPECommand::Gosub(label) | PPECommand::IfNot(_, label) => {
+                PPECommand::Goto(label) |
+                PPECommand::Gosub(label) |
+                PPECommand::IfNot(_, label) => {
                     labels.insert(label);
                 }
                 _ => {}
@@ -101,7 +103,9 @@ impl Decompiler {
 
         self.generate_function_declarations(&mut ast);
         self.generate_variable_declarations(&mut ast);
-
+        for k in self.label_lookup.keys() {
+            println!("{:04X} -> {:?}", k, self.get_label_name(*k));
+        }
         let mut statements = Vec::new();
         while self.cur_ptr < self.script.statements.len() {
             let statement = &self.script.statements[self.cur_ptr];
@@ -331,6 +335,10 @@ impl Decompiler {
         while self.cur_ptr < self.script.statements.len() {
             let statement = &self.script.statements[self.cur_ptr];
             let byte_offset = statement.span.start * 2;
+            if self.label_lookup.contains_key(&(byte_offset)) {
+                func_body.push(LabelStatement::create_empty_statement(self.get_label_name(byte_offset)));
+            }
+            
             if matches!(statement.command, PPECommand::EndFunc) || matches!(statement.command, PPECommand::EndProc) {
                 if entry.header.variable_type == VariableType::Function {
                     let parameters = self.generate_parameter_list(entry);
@@ -355,9 +363,7 @@ impl Decompiler {
                 break;
             }
 
-            if self.label_lookup.contains_key(&(byte_offset)) {
-                func_body.push(LabelStatement::create_empty_statement(self.get_label_name(byte_offset)));
-            }
+         
             func_body.push(self.decompile_statement(&statement.command));
             self.cur_ptr += 1;
         }

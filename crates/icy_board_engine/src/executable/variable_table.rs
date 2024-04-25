@@ -498,6 +498,8 @@ impl VariableTable {
 
             res.set_name(name);
         }
+        let mut par = 1;
+        let mut loc = 1;
 
         for i in 0..self.entries.len() {
             let var_type = self.entries[i].header.variable_type;
@@ -514,8 +516,6 @@ impl VariableTable {
                         + first_var
                 };
 
-                let mut par = 1;
-                let mut loc = 1;
 
                 (first_var..last).for_each(|i| {
                     if self.entries[i].get_type() == EntryType::Parameter {

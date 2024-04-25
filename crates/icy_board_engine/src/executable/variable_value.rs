@@ -1210,12 +1210,18 @@ impl VariableValue {
             VariableType::Table => {
                 panic!("Not supported for tables.")
             }
-            VariableType::Function | VariableType::Procedure | VariableType::None => {
-                panic!("Unknown variable type")
+            VariableType::Function => {
+                panic!("Can't convert to function")
+            }
+            VariableType::Procedure => {
+                panic!("Can't convert to procedure")
             }
             VariableType::UserData(x) => {
                 log::error!("can't convert {:?} to user data type {x}", self);
                 data.int_value = -1;
+            }
+            VariableType::None => {
+                panic!("Unknown variable type")
             }
         }
 

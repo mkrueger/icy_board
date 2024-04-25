@@ -18,16 +18,18 @@ const INDEX_VARS: [&str; 4] = ["i", "j", "k", "l"];
 
 impl AstVisitor<()> for RenameScanVistitor {
     fn visit_for_statement(&mut self, for_stmt: &crate::ast::ForStatement) {
+        /*
         let var_name = for_stmt.get_identifier();
         if !self.rename_map.contains_key(var_name) && self.cur_index_var < INDEX_VARS.len() {
             self.rename_map
                 .insert(var_name.clone(), unicase::Ascii::new(INDEX_VARS[self.cur_index_var].to_string()));
             self.cur_index_var += 1;
         }
-        walk_for_stmt(self, for_stmt);
+        walk_for_stmt(self, for_stmt);*/
     }
 
     fn visit_predefined_call_statement(&mut self, call: &crate::ast::PredefinedCallStatement) {
+        /*
         match &call.get_func().opcode {
             OpCode::ANSIPOS => {
                 if let Expression::Identifier(id) = &call.get_arguments()[0] {
@@ -56,6 +58,6 @@ impl AstVisitor<()> for RenameScanVistitor {
                 }
             }
             _ => {}
-        }
+        }*/
     }
 }
