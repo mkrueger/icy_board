@@ -12,7 +12,7 @@ use std::{
 use crate::{executable::Executable, Res};
 use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use codepages::tables::UNICODE_TO_CP437;
-use icy_engine::TextAttribute;
+use icy_engine::{TextAttribute, TextPane};
 use icy_engine::{ansi, Buffer, BufferParser, Caret};
 use icy_engine::{ansi::constants::COLOR_OFFSETS, Position};
 use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
@@ -38,8 +38,11 @@ use super::{
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum GraphicsMode {
+    // No graphics or ansi codes
     Off,
+    // Ansi codes - color codes on/off is extra
     Ansi,
+    // Avatar codes - color codes on/off is extra
     Avatar,
     Rip,
 }
@@ -444,13 +447,20 @@ impl IcyBoardState {
     }
 
     pub fn clear_screen(&mut self) -> Res<()> {
-        self.session.num_lines_printed = 0;
-        if self.use_ansi() {
-            self.print(TerminalTarget::Both, "\x1B[2J\x1B[H")
-        } else {
-            // form feed character
-            self.print(TerminalTarget::Both, "\x0C")
+        match self.session.disp_options.grapics_mode {
+            GraphicsMode::Off |
+            GraphicsMode::Avatar => {
+                // form feed character
+                self.print(TerminalTarget::Both, "\x0C")?;
+            }
+            GraphicsMode::Ansi => {
+                self.print(TerminalTarget::Both, "\x1B[2J\x1B[H")?;
+            }
+            _ => {
+                // ignore
+            }
         }
+        Ok(())
     }
 
     pub fn clear_line(&mut self) -> Res<()> {
@@ -463,10 +473,20 @@ impl IcyBoardState {
     }
 
     pub fn clear_eol(&mut self) -> Res<()> {
-        if self.use_ansi() {
-            self.print(TerminalTarget::Both, "\x1B[K")
-        } else {
-            Ok(())
+        match self.session.disp_options.grapics_mode {
+            GraphicsMode::Off => {
+                let x = self.user_screen.buffer.get_width() - self.user_screen.caret.get_position().x;
+                for i in 0..x {
+                    self.print(TerminalTarget::Both, " ")?;
+                }
+                for i in 0..x {
+                    self.print(TerminalTarget::Both, "\x08")?;
+                }
+                Ok(())
+            },
+            GraphicsMode::Ansi |
+            GraphicsMode::Avatar => self.print(TerminalTarget::Both, "\x1B[K"),
+            GraphicsMode::Rip => self.print(TerminalTarget::Both, "\x1B[K"),
         }
     }
 
@@ -788,11 +808,22 @@ impl IcyBoardState {
 
     /// # Errors
     pub fn gotoxy(&mut self, target: TerminalTarget, x: i32, y: i32) -> Res<()> {
-        if self.use_ansi() {
-            self.write_raw(target, format!("\x1B[{};{}H", y, x).chars().collect::<Vec<char>>().as_slice())
-        } else {
-            Ok(())
+        match self.session.disp_options.grapics_mode {
+            GraphicsMode::Off => {
+                // ignore
+            }
+            GraphicsMode::Ansi => {
+                self.print(target, &format!("\x1B[{};{}H", y, x))?;
+            }
+            GraphicsMode::Avatar => {
+                self.print(target, &format!("\x16\x08{}{}", (x as u8) as char, (y as u8) as char))?;
+            }
+            GraphicsMode::Rip => {
+                self.print(target, &format!("\x1B[{};{}H", y, x))?;
+            }
         }
+
+        Ok(())
     }
 
     pub fn backward(&mut self, chars: i32) -> Res<()> {
@@ -1330,6 +1361,14 @@ impl IcyBoardState {
                 todo!();
             }
         };
+
+        if self.session.disp_options.grapics_mode == GraphicsMode::Avatar {
+            if let IcbColor::Dos(color) = color {
+                let color_change = format!("\x16\x01{}", color as char);
+                return self.write_chars(target, color_change.chars().collect::<Vec<char>>().as_slice());
+            }
+        }
+
 
         let mut color_change = "\x1B[".to_string();
         let was_bold = self.user_screen.caret.get_attribute().is_bold();

@@ -32,7 +32,7 @@ impl ConferencesTab {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
         Self {
             scroll_state: ScrollbarState::default().content_length(icy_board.lock().unwrap().conferences.len()),
-            table_state: TableState::default(),
+            table_state: TableState::default().with_selected(0),
             text_field_state: TextfieldState::default(),
             icy_board: icy_board.clone(),
             in_edit_mode: false,
@@ -463,22 +463,24 @@ impl TabPage for ConferencesTab {
             crossterm::event::KeyCode::Char('k') | crossterm::event::KeyCode::Up => self.prev(),
             crossterm::event::KeyCode::Char('j') | crossterm::event::KeyCode::Down => self.next(),
             crossterm::event::KeyCode::Char('i') | crossterm::event::KeyCode::Insert => self.insert(),
+            crossterm::event::KeyCode::Char('d') | crossterm::event::KeyCode::Enter => {
+                if let Some(_state) = self.table_state.selected() {
+                    self.in_edit_mode = true;
+                    return ResultState {
+                        in_edit_mode: true,
+                        status_line: String::new(),
+                    }
+                } else {
+                    self.in_edit_mode = false;
+                }
+
+            }
+
+
+
             _ => {}
         }
 
         ResultState::default()
-    }
-
-    fn request_edit_mode(&mut self, _terminal: &mut TerminalType, _full_screen: bool) -> ResultState {
-        if let Some(_state) = self.table_state.selected() {
-            self.in_edit_mode = true;
-            ResultState {
-                in_edit_mode: true,
-                status_line: String::new(),
-            }
-        } else {
-            self.in_edit_mode = false;
-            ResultState::default()
-        }
     }
 }

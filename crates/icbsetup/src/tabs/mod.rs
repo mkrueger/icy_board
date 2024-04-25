@@ -25,10 +25,6 @@ pub trait TabPage {
         ResultState::default()
     }
 
-    fn request_edit_mode(&mut self, _terminal: &mut TerminalType, _full_screen: bool) -> ResultState {
-        ResultState::default()
-    }
-
     fn request_status(&self) -> ResultState {
         ResultState::default()
     }
