@@ -19,10 +19,10 @@ crossterm = { workspace = true }
 ratatui = { workspace = true }
 
 tui-textarea  = "0.4.0"
+tui-markdown = "0.2.3"
 ariadne = "0.4.0"
 unicase = { workspace = true }
 color-eyre = { workspace = true }
 itertools = "0.12.1"
 substring = { workspace = true }
 strum = { workspace = true }
-

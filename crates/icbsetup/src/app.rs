@@ -9,7 +9,10 @@ use itertools::Itertools;
 use ratatui::{prelude::*, widgets::*};
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 
-use crate::tabs::*;
+use crate::{
+    help_view::{HelpView, HelpViewState},
+    tabs::*,
+};
 
 pub struct App<'a> {
     mode: Mode,
@@ -27,6 +30,8 @@ pub struct App<'a> {
 
     conferences_tab: ConferencesTab,
     about_tab: AboutTab,
+
+    help_state: HelpViewState<'a>,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -35,6 +40,7 @@ enum Mode {
     Command,
     Edit,
     Quit,
+    ShowHelp,
 }
 
 #[derive(Debug, Clone, Copy, Default, Display, EnumIter, FromRepr, PartialEq, Eq)]
@@ -67,6 +73,7 @@ impl<'a> App<'a> {
             conferences_tab: command_tab,
             about_tab: AboutTab::default(),
             status_line: String::new(),
+            help_state: HelpViewState::new(23),
         }
     }
 
@@ -90,8 +97,12 @@ impl<'a> App<'a> {
                 let screen = get_screen_size(&frame, self.full_screen);
                 self.ui(frame, screen);
 
-                if self.mode == Mode::Edit {
-                    self.get_tab().set_cursor_position(frame);
+                match self.mode {
+                    Mode::ShowHelp => {
+                        self.show_help(frame, screen);
+                    }
+                    Mode::Edit => self.get_tab().set_cursor_position(frame),
+                    _ => {}
                 }
             })
             .wrap_err("terminal.draw")?;
@@ -141,12 +152,24 @@ impl<'a> App<'a> {
             return;
         }
 
-        use KeyCode::*;
-        match key.code {
-            Char('q') | Esc => self.mode = Mode::Quit,
-            Char('h') | Left => self.prev_tab(),
-            Char('l') | Right => self.next_tab(),
+        if self.mode == Mode::ShowHelp {
+            match key.code {
+                KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Command,
+                _ => {
+                    self.help_state.handle_key_press(key);
+                }
+            }
+            return;
+        }
 
+        match key.code {
+            KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Quit,
+            KeyCode::Char('h') | KeyCode::Left => self.prev_tab(),
+            KeyCode::Char('l') | KeyCode::Right => self.next_tab(),
+            KeyCode::F(1) => {
+                self.help_state.text = self.get_tab().get_help();
+                self.mode = Mode::ShowHelp;
+            }
             _ => {
                 let state = self.get_tab_mut().handle_key_press(key);
                 self.status_line = state.status_line;
@@ -179,6 +202,12 @@ impl<'a> App<'a> {
     fn update_state(&mut self) {
         let state = self.get_tab().request_status();
         self.status_line = state.status_line;
+    }
+
+    fn show_help(&mut self, frame: &mut Frame, screen: Rect) {
+        let area = screen.inner(&Margin { horizontal: 2, vertical: 2 });
+        Clear.render(area, frame.buffer_mut());
+        HelpView::default().render(area, frame.buffer_mut(), &mut self.help_state);
     }
 }
 

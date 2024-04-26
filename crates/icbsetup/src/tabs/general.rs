@@ -8,6 +8,7 @@ use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
     theme::THEME,
 };
+use ratatui::text::Text;
 use ratatui::{
     layout::{Margin, Rect},
     widgets::{Block, BorderType, Borders, Clear, Padding, Widget},
@@ -561,5 +562,22 @@ impl TabPage for GeneralTab {
                 "".to_string()
             },
         };
+    }
+
+    fn get_help(&self) -> Text<'static> {
+        if let Some(item) = self.config.get_item(self.state.selected) {
+            let hlp = get_help(&item.id);
+            return tui_markdown::from_str(&hlp);
+        }
+
+        let input = include_str!("../../data/general_help.md");
+        tui_markdown::from_str(input)
+    }
+}
+
+fn get_help(help: &str) -> &'static str {
+    match help {
+        "date_format" => include_str!("../../data/date_format.md"),
+        _ => "TODO - please contribute me.",
     }
 }

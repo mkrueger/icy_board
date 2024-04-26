@@ -16,7 +16,7 @@ pub mod server_tab;
 pub use server_tab::*;
 
 use icy_board_tui::config_menu::ResultState;
-use ratatui::{layout::Rect, Frame};
+use ratatui::{layout::Rect, text::Text, Frame};
 
 pub trait TabPage {
     fn render(&mut self, frame: &mut Frame, area: Rect);
@@ -33,5 +33,10 @@ pub trait TabPage {
 
     fn has_control(&self) -> bool {
         false
+    }
+
+    fn get_help(&self) -> Text<'static> {
+        let input = include_str!("../../data/general_help.md");
+        tui_markdown::from_str(input)
     }
 }
