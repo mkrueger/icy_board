@@ -27,7 +27,7 @@ mod terminal_type {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum Terminal {
+pub enum TerminalEmulation {
     #[default]
     Ansi,
     Avatar,
@@ -42,7 +42,7 @@ pub enum Terminal {
 
 pub struct TermCaps {
     pub window_size: (u16, u16), // width, height
-    pub terminal: Terminal,
+    pub terminal: TerminalEmulation,
 }
 
 pub struct TelnetConnection {
@@ -79,7 +79,7 @@ impl TelnetConnection {
             tcp_stream,
             caps: TermCaps {
                 window_size: (0, 0),
-                terminal: Terminal::Ansi,
+                terminal: TerminalEmulation::Ansi,
             },
             state: ParserState::Data,
         })
@@ -112,15 +112,15 @@ impl TelnetConnection {
 
                                 match self.caps.terminal {
                                     //  :TODO: Let's extend this to allow for some of the semi-standard BBS IDs, e.g. "xterm" (ANSI), "ansi-256-color", etc.
-                                    Terminal::Ansi => buf.extend_from_slice(b"ANSI"),
-                                    Terminal::PETscii => buf.extend_from_slice(b"PETSCII"),
-                                    Terminal::ATAscii => buf.extend_from_slice(b"ATASCII"),
-                                    Terminal::ViewData => buf.extend_from_slice(b"VIEWDATA"),
-                                    Terminal::Ascii => buf.extend_from_slice(b"RAW"),
-                                    Terminal::Avatar => buf.extend_from_slice(b"AVATAR"),
-                                    Terminal::Rip => buf.extend_from_slice(b"RIP"),
-                                    Terminal::IGS => buf.extend_from_slice(b"IGS"),
-                                    Terminal::Mode7 => buf.extend_from_slice(b"MODE7"),
+                                    TerminalEmulation::Ansi => buf.extend_from_slice(b"ANSI"),
+                                    TerminalEmulation::PETscii => buf.extend_from_slice(b"PETSCII"),
+                                    TerminalEmulation::ATAscii => buf.extend_from_slice(b"ATASCII"),
+                                    TerminalEmulation::ViewData => buf.extend_from_slice(b"VIEWDATA"),
+                                    TerminalEmulation::Ascii => buf.extend_from_slice(b"RAW"),
+                                    TerminalEmulation::Avatar => buf.extend_from_slice(b"AVATAR"),
+                                    TerminalEmulation::Rip => buf.extend_from_slice(b"RIP"),
+                                    TerminalEmulation::IGS => buf.extend_from_slice(b"IGS"),
+                                    TerminalEmulation::Mode7 => buf.extend_from_slice(b"MODE7"),
                                 }
                                 data[write_ptr] = telnet_cmd::IAC;
                                 write_ptr += 1;

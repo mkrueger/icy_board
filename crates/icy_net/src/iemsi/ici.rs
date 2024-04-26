@@ -1,5 +1,5 @@
 use crate::{
-    telnet::{TermCaps, Terminal},
+    telnet::{TermCaps, TerminalEmulation},
     NetError,
 };
 
@@ -100,7 +100,7 @@ impl Default for ICITerminalSettings {
         Self {
             term_caps: TermCaps {
                 window_size: (80, 25),
-                terminal: Terminal::Ansi,
+                terminal: TerminalEmulation::Ansi,
             },
             protocols: Default::default(),
             can_chat: true,
@@ -116,8 +116,8 @@ impl Default for ICITerminalSettings {
 impl ICITerminalSettings {
     pub fn get_crtdef_string(&self) -> String {
         let term = match self.term_caps.terminal {
-            Terminal::Ansi => "ANSI",
-            Terminal::Avatar => "AVT0",
+            TerminalEmulation::Ansi => "ANSI",
+            TerminalEmulation::Avatar => "AVT0",
             _ => "TTY",
         };
         // 0 == the number of ASCII NUL (00H) characters the user's software requires to be transmitted between each line of text.

@@ -2,7 +2,7 @@
 
 use icy_net::{
     iemsi::{encode_ici, ICIRequests, ICITerminalSettings, ICIUserSettings},
-    telnet::{TermCaps, Terminal},
+    telnet::{TermCaps, TerminalEmulation},
 };
 use pretty_assertions::assert_eq;
 
@@ -20,7 +20,7 @@ fn test_emsi_ici_encoding() {
     let term = ICITerminalSettings {
         term_caps: TermCaps {
             window_size: (80, 24),
-            terminal: Terminal::Ansi,
+            terminal: TerminalEmulation::Ansi,
         },
         protocols: "ZAP,ZMO,KER".to_string(),
         can_chat: true,
