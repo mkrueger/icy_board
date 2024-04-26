@@ -12,10 +12,10 @@ use std::{
 use crate::{executable::Executable, Res};
 use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use codepages::tables::UNICODE_TO_CP437;
-use icy_engine::{ansi, Buffer, BufferParser, Caret};
+use icy_engine::ansi;
 use icy_engine::{ansi::constants::COLOR_OFFSETS, Position};
 use icy_engine::{TextAttribute, TextPane};
-use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
+use icy_net::{channel::ChannelConnection, terminal::virtual_screen::VirtualScreen, Connection, ConnectionType};
 
 use crate::{
     icy_board::IcyBoardError,
@@ -362,21 +362,6 @@ pub struct IcyBoardState {
     char_buffer: VecDeque<KeyChar>,
 }
 
-pub struct VirtualScreen {
-    parser: ansi::Parser,
-    pub caret: Caret,
-    pub buffer: Buffer,
-}
-
-impl VirtualScreen {
-    pub fn new() -> Self {
-        let buffer = Buffer::new((80, 25));
-        let caret = Caret::default();
-        let mut parser = ansi::Parser::default();
-        parser.bs_is_ctrl_char = true;
-        Self { parser, caret, buffer }
-    }
-}
 
 impl IcyBoardState {
     pub fn new(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<Vec<Option<NodeState>>>>, node: usize, connection: Box<dyn Connection>) -> Self {
@@ -386,6 +371,11 @@ impl IcyBoardState {
         session.date_format = board.lock().unwrap().config.board.date_format.clone();
         let display_text = board.lock().unwrap().default_display_text.clone();
         let root_path = board.lock().unwrap().root_path.clone();
+        let mut p1  = ansi::Parser::default();
+        p1.bs_is_ctrl_char = true;
+        let mut p2  = ansi::Parser::default();
+        p2.bs_is_ctrl_char = true;
+        
         Self {
             root_path,
             board,
@@ -399,8 +389,8 @@ impl IcyBoardState {
             env_vars: HashMap::new(),
             session,
             transfer_statistics: TransferStatistics::default(),
-            user_screen: VirtualScreen::new(),
-            sysop_screen: VirtualScreen::new(),
+            user_screen: VirtualScreen::new(p1),
+            sysop_screen: VirtualScreen::new(p2),
             char_buffer: VecDeque::new(),
         }
     }
@@ -880,8 +870,7 @@ impl IcyBoardState {
             if target != TerminalTarget::Sysop || self.session.is_sysop {
                 let _ = self
                     .user_screen
-                    .parser
-                    .print_char(&mut self.user_screen.buffer, 0, &mut self.user_screen.caret, *c);
+                    .print_char(*c);
                 if *c == '\n' {
                     self.next_line()?;
                 }
@@ -894,8 +883,7 @@ impl IcyBoardState {
             if target != TerminalTarget::User {
                 let _ = self
                     .sysop_screen
-                    .parser
-                    .print_char(&mut self.sysop_screen.buffer, 0, &mut self.sysop_screen.caret, *c);
+                    .print_char( *c);
                 if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
                     sysop_bytes.push(cp437);
                 } else {

@@ -3,6 +3,7 @@ pub use connection::*;
 pub mod crc;
 pub mod iemsi;
 pub mod protocol;
+pub mod terminal;
 
 use thiserror::Error;
 
