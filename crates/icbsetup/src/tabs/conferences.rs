@@ -5,7 +5,7 @@ use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::text_field::TextField;
 use icy_board_tui::text_field::TextfieldState;
-use icy_board_tui::{config_menu::ResultState, theme::THEME, TerminalType};
+use icy_board_tui::{config_menu::ResultState, theme::THEME};
 use ratatui::text::Span;
 use ratatui::{
     layout::{Constraint, Margin, Rect},

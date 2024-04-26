@@ -6,7 +6,6 @@ use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
     theme::THEME,
-    TerminalType,
 };
 use ratatui::{
     layout::{Margin, Rect},

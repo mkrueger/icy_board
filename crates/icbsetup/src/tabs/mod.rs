@@ -15,7 +15,7 @@ pub use paths::*;
 pub mod server_tab;
 pub use server_tab::*;
 
-use icy_board_tui::{config_menu::ResultState, TerminalType};
+use icy_board_tui::config_menu::ResultState;
 use ratatui::{layout::Rect, Frame};
 
 pub trait TabPage {

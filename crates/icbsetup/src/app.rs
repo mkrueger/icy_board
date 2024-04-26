@@ -133,7 +133,7 @@ impl<'a> App<'a> {
         }
     }
 
-    fn handle_key_press(&mut self, terminal: &mut TerminalType, key: KeyEvent) {
+    fn handle_key_press(&mut self, _terminal: &mut TerminalType, key: KeyEvent) {
         if self.get_tab().has_control() {
             let state = self.get_tab_mut().handle_key_press(key);
             self.status_line = state.status_line;

@@ -184,6 +184,9 @@ pub struct Session {
     pub use_fse: bool,
 
     pub flagged_files: HashSet<PathBuf>,
+
+    // Used in @X00 macros to save color, to restore it with @XFF
+    pub saved_color: IcbColor,
 }
 
 impl Session {
@@ -225,6 +228,7 @@ impl Session {
             yes_char: 'Y',
             no_char: 'N',
             yes_no_mask: "YyNn".to_string(),
+            saved_color: IcbColor::Dos(7),
 
             sysop_name: "SYSOP".to_string(),
             flagged_files: HashSet::new(),
@@ -475,10 +479,10 @@ impl IcyBoardState {
         match self.session.disp_options.grapics_mode {
             GraphicsMode::Ctty => {
                 let x = self.user_screen.buffer.get_width() - self.user_screen.caret.get_position().x;
-                for i in 0..x {
+                for _ in 0..x {
                     self.print(TerminalTarget::Both, " ")?;
                 }
-                for i in 0..x {
+                for _ in 0..x {
                     self.print(TerminalTarget::Both, "\x08")?;
                 }
                 Ok(())
@@ -986,7 +990,14 @@ impl IcyBoardState {
                             self.write_chars(target, &['@', ch1, *c])?;
                         } else {
                             let color = (c.to_digit(16).unwrap() | (ch1.to_digit(16).unwrap() << 4)) as u8;
-                            self.set_color(target, color.into())?;
+
+                            if color == 0 {
+                                self.session.saved_color = self.cur_color();
+                            } else if color == 0xFF {
+                                self.set_color(target, self.cur_color())?;
+                            } else {
+                                self.set_color(target, color.into())?;
+                            }
                         }
                     }
                 }
@@ -1341,6 +1352,11 @@ impl IcyBoardState {
 
     pub fn inbytes(&mut self) -> i32 {
         self.char_buffer.len() as i32
+    }
+
+    pub fn cur_color(&self) -> IcbColor {
+        let attr = self.user_screen.caret.get_attribute().as_u8(icy_engine::IceMode::Blink);
+        IcbColor::Dos(attr)
     }
 
     pub fn set_color(&mut self, target: TerminalTarget, color: IcbColor) -> Res<()> {
