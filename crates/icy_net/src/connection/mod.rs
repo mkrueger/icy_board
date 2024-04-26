@@ -1,4 +1,6 @@
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
+
+use crate::NetError;
 pub mod channel;
 pub mod modem;
 pub mod raw;
@@ -11,10 +13,11 @@ pub struct ConnectionData {
     pub address: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum ConnectionType {
     Channel,
     Raw,
+    #[default]
     Telnet,
     SSH,
     Modem,
@@ -45,5 +48,37 @@ pub trait Connection: Read + Write {
         let mut buf = [0; 1];
         self.read_exact(&mut buf)?;
         Ok(buf[0])
+    }
+}
+
+pub struct NullConnection {}
+
+impl Connection for NullConnection {
+    fn get_connection_type(&self) -> ConnectionType {
+        ConnectionType::Raw
+    }
+
+    fn shutdown(&mut self) -> crate::Result<()> {
+        Err(NetError::Unsupported.into())
+    }
+
+    fn read_u8(&mut self) -> crate::Result<u8> {
+        Err(NetError::Unsupported.into())
+    }
+}
+
+impl Read for NullConnection {
+    fn read(&mut self, _buf: &mut [u8]) -> io::Result<usize> {
+        Err(io::Error::new(io::ErrorKind::Other, "Cannot read from NullConnection"))
+    }
+}
+
+impl Write for NullConnection {
+    fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
+        Err(io::Error::new(io::ErrorKind::Other, "Cannot write to NullConnection"))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }

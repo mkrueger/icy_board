@@ -21,4 +21,7 @@ pub enum NetError {
 
     #[error("Invalid Unicode in EMSI")]
     NoUnicodeInEmsi,
+
+    #[error("Operation is unsupported")]
+    Unsupported,
 }
