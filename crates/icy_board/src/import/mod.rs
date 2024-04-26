@@ -359,6 +359,7 @@ impl PCBoardImporter {
                 display_uploader: self.data.upload_by,
                 keyboard_timeout: self.data.kbd_timeout as u16,
                 upload_descr_lines: self.data.num_ul_desc_lines as u8,
+                non_graphics: self.data.non_graphics,
             },
         };
 

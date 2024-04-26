@@ -364,6 +364,9 @@ pub struct BoardOptions {
     pub check_files_uploaded: bool,
     pub upload_descr_lines: u8,
     pub display_uploader: bool,
+
+    // disable colors
+    pub non_graphics: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
@@ -533,6 +536,7 @@ impl IcbConfig {
                 prompt_to_read_mail: true,
                 check_files_uploaded: true,
                 display_uploader: false,
+                non_graphics: false,
                 keyboard_timeout: 5,
                 upload_descr_lines: 20,
             },

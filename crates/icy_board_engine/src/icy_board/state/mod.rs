@@ -12,9 +12,9 @@ use std::{
 use crate::{executable::Executable, Res};
 use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use codepages::tables::UNICODE_TO_CP437;
-use icy_engine::{TextAttribute, TextPane};
 use icy_engine::{ansi, Buffer, BufferParser, Caret};
 use icy_engine::{ansi::constants::COLOR_OFFSETS, Position};
+use icy_engine::{TextAttribute, TextPane};
 use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
 
 use crate::{
@@ -39,7 +39,7 @@ use super::{
 #[derive(Clone, Copy, PartialEq)]
 pub enum GraphicsMode {
     // No graphics or ansi codes
-    Off,
+    Ctty,
     // Ansi codes - color codes on/off is extra
     Ansi,
     // Avatar codes - color codes on/off is extra
@@ -378,7 +378,7 @@ impl IcyBoardState {
     pub fn new(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<Vec<Option<NodeState>>>>, node: usize, connection: Box<dyn Connection>) -> Self {
         let mut session = Session::new();
         session.caller_number = board.lock().unwrap().statistics.cur_caller_number() as usize;
-
+        session.disp_options.disable_color = board.lock().unwrap().config.options.non_graphics;
         session.date_format = board.lock().unwrap().config.board.date_format.clone();
         let display_text = board.lock().unwrap().default_display_text.clone();
         let root_path = board.lock().unwrap().root_path.clone();
@@ -434,7 +434,7 @@ impl IcyBoardState {
     }
 
     fn use_graphics(&self) -> bool {
-        !self.session.disp_options.disable_color && self.session.disp_options.grapics_mode != GraphicsMode::Off
+        !self.session.disp_options.disable_color && self.session.disp_options.grapics_mode != GraphicsMode::Ctty
     }
 
     fn check_time_left(&self) {
@@ -448,8 +448,7 @@ impl IcyBoardState {
 
     pub fn clear_screen(&mut self) -> Res<()> {
         match self.session.disp_options.grapics_mode {
-            GraphicsMode::Off |
-            GraphicsMode::Avatar => {
+            GraphicsMode::Ctty | GraphicsMode::Avatar => {
                 // form feed character
                 self.print(TerminalTarget::Both, "\x0C")?;
             }
@@ -474,7 +473,7 @@ impl IcyBoardState {
 
     pub fn clear_eol(&mut self) -> Res<()> {
         match self.session.disp_options.grapics_mode {
-            GraphicsMode::Off => {
+            GraphicsMode::Ctty => {
                 let x = self.user_screen.buffer.get_width() - self.user_screen.caret.get_position().x;
                 for i in 0..x {
                     self.print(TerminalTarget::Both, " ")?;
@@ -483,9 +482,8 @@ impl IcyBoardState {
                     self.print(TerminalTarget::Both, "\x08")?;
                 }
                 Ok(())
-            },
-            GraphicsMode::Ansi |
-            GraphicsMode::Avatar => self.print(TerminalTarget::Both, "\x1B[K"),
+            }
+            GraphicsMode::Ansi | GraphicsMode::Avatar => self.print(TerminalTarget::Both, "\x1B[K"),
             GraphicsMode::Rip => self.print(TerminalTarget::Both, "\x1B[K"),
         }
     }
@@ -738,7 +736,7 @@ impl IcyBoardState {
                 return Some(result);
             }
         }
-        if self.session.disp_options.grapics_mode != GraphicsMode::Off {
+        if self.session.disp_options.grapics_mode != GraphicsMode::Ctty {
             if let Some(result) = self.find_more_specific_file_with_language(base_name.clone() + "g") {
                 return Some(result);
             }
@@ -809,7 +807,7 @@ impl IcyBoardState {
     /// # Errors
     pub fn gotoxy(&mut self, target: TerminalTarget, x: i32, y: i32) -> Res<()> {
         match self.session.disp_options.grapics_mode {
-            GraphicsMode::Off => {
+            GraphicsMode::Ctty => {
                 // ignore
             }
             GraphicsMode::Ansi => {
@@ -1106,7 +1104,7 @@ impl IcyBoardState {
             "FREESPACE" => {}
             "GFXMODE" => {
                 result = match self.session.disp_options.grapics_mode {
-                    GraphicsMode::Off => self.display_text.get_display_text(IceText::GfxModeOff).unwrap().text,
+                    GraphicsMode::Ctty => self.display_text.get_display_text(IceText::GfxModeOff).unwrap().text,
                     GraphicsMode::Ansi => self.display_text.get_display_text(IceText::GfxModeAnsi).unwrap().text,
                     GraphicsMode::Avatar => self.display_text.get_display_text(IceText::GfxModeAvatar).unwrap().text,
                     GraphicsMode::Rip => self.display_text.get_display_text(IceText::GfxModeRip).unwrap().text,
@@ -1261,7 +1259,9 @@ impl IcyBoardState {
                 return None;
             }
             "XON" => {
-                self.session.disp_options.disable_color = false;
+                if !self.board.lock().unwrap().config.options.non_graphics {
+                    self.session.disp_options.disable_color = false;
+                }
                 return None;
             }
             "YESCHAR" => result = self.session.yes_char.to_string(),
@@ -1368,7 +1368,6 @@ impl IcyBoardState {
                 return self.write_chars(target, color_change.chars().collect::<Vec<char>>().as_slice());
             }
         }
-
 
         let mut color_change = "\x1B[".to_string();
         let was_bold = self.user_screen.caret.get_attribute().is_bold();

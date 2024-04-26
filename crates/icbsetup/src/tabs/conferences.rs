@@ -469,14 +469,11 @@ impl TabPage for ConferencesTab {
                     return ResultState {
                         in_edit_mode: true,
                         status_line: String::new(),
-                    }
+                    };
                 } else {
                     self.in_edit_mode = false;
                 }
-
             }
-
-
 
             _ => {}
         }

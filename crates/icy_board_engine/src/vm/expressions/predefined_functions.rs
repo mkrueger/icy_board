@@ -870,7 +870,7 @@ pub fn abs(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
 
 pub fn grafmode(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
     match vm.icy_board_state.session.disp_options.grapics_mode {
-        crate::icy_board::state::GraphicsMode::Off => Ok(VariableValue::new_string("N".to_string())),
+        crate::icy_board::state::GraphicsMode::Ctty => Ok(VariableValue::new_string("N".to_string())),
         crate::icy_board::state::GraphicsMode::Ansi => {
             // never returned "A" for ANSI
             Ok(VariableValue::new_string("G".to_string()))

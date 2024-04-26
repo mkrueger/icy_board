@@ -8,13 +8,12 @@ impl PcbBoardCommand {
     pub fn toggle_graphics(&mut self) -> Res<()> {
         self.displaycmdfile("m")?;
 
-        /* no_graphics disabled atm
-        if self.state.board.lock().unwrap().config.no_graphis {
+        if self.state.board.lock().unwrap().config.options.non_graphics {
             self.state
                 .display_text(IceText::GraphicsUnavailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
 
-            return;
-        } */
+            return Ok(());
+        }
 
         if !self.state.session.disp_options.disable_color {
             self.state.reset_color()?;
@@ -26,11 +25,11 @@ impl PcbBoardCommand {
             match token.as_str() {
                 "CT" => {
                     self.state.session.disp_options.disable_color = true;
-                    self.state.session.disp_options.grapics_mode = GraphicsMode::Off;
+                    self.state.session.disp_options.grapics_mode = GraphicsMode::Ctty;
                     self.state.display_text(IceText::CTTYOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
                 }
                 "AN" => {
-                    self.state.session.disp_options.disable_color = false;
+                    self.state.session.disp_options.disable_color = true;
                     self.state.session.disp_options.grapics_mode = GraphicsMode::Ansi;
                     self.state.display_text(IceText::AnsiOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
                 }
@@ -39,15 +38,22 @@ impl PcbBoardCommand {
                     self.state.session.disp_options.grapics_mode = GraphicsMode::Avatar;
                     self.state.display_text(IceText::AvatarOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
                 }
-                "GR" => {
+                "GR" | "ON" | "YES" => {
                     self.state.session.disp_options.disable_color = false;
-                    self.state.session.disp_options.grapics_mode = GraphicsMode::Ansi;
+                    if self.state.session.disp_options.grapics_mode == GraphicsMode::Ctty {
+                        self.state.session.disp_options.grapics_mode = GraphicsMode::Ansi;
+                    }
                     self.state.display_text(IceText::GraphicsOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
                 }
                 "RI" => {
                     self.state.session.disp_options.disable_color = false;
                     self.state.session.disp_options.grapics_mode = GraphicsMode::Rip;
                     self.state.display_text(IceText::RIPModeOn, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                }
+                "OFF" | "NO" => {
+                    self.state.session.disp_options.disable_color = true;
+                    self.state
+                        .display_text(IceText::GraphicsOff, display_flags::NEWLINE | display_flags::LFBEFORE)?;
                 }
                 _ => {
                     self.state
