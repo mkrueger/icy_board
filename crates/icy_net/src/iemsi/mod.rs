@@ -1,7 +1,5 @@
 #![allow(dead_code, clippy::wildcard_imports, clippy::needless_range_loop)]
 // IEMSI autologin implementation http://ftsc.org/docs/fsc-0056.001
-use std::io::Write;
-
 pub mod dat;
 pub use dat::*;
 

@@ -40,6 +40,7 @@ pub enum TerminalEmulation {
     IGS,
 }
 
+#[derive(Debug, Clone)]
 pub struct TermCaps {
     pub window_size: (u16, u16), // width, height
     pub terminal: TerminalEmulation,
