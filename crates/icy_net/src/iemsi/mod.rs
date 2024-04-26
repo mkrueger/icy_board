@@ -268,14 +268,19 @@ impl IEmsi {
         Ok(false)
     }
 
-    pub fn try_login<T: Write>(&mut self, con: &mut T, user_name: &str, password: &str, ch: u8) -> crate::Result<bool> {
+    /// Tries to login with IEMSI with a given username & password.
+    /// # Returns
+    /// - `Ok(None)` if the login is still in progress.
+    /// - `Ok(Some(data))` if the login is successful. The data is the IEMSI data to send to the server.
+    pub fn try_login(&mut self, user_name: &str, password: &str, ch: u8) -> crate::Result<Option<Vec<u8>>> {
         if self.aborted {
-            return Ok(false);
+            return Ok(None);
         }
         if let Some(data) = self.advance_char(user_name, password, ch)? {
-            con.write_all(&data)?;
+            Ok(Some(data))
+        } else {
+            Ok(None)
         }
-        Ok(self.logged_in)
     }
 
     pub fn advance_char(&mut self, user_name: &str, password: &str, ch: u8) -> crate::Result<Option<Vec<u8>>> {
