@@ -12,6 +12,7 @@ use icy_board_engine::{
             functions::{display_flags, pwd_flags, MASK_ALNUM, MASK_PHONE, MASK_WEB},
             UserActivity,
         },
+        surveys::Survey,
         user_base::{Password, User},
         IcyBoardError,
     },
@@ -43,25 +44,6 @@ impl PcbBoardCommand {
         let mut tries = 0;
 
         loop {
-            let first_name = self.state.input_field(
-                IceText::YourFirstName,
-                39,
-                &MASK_ALNUM,
-                "",
-                None,
-                display_flags::UPCASE | display_flags::NEWLINE | display_flags::STACKED,
-            )?;
-
-            let last_name = self.state.input_field(
-                IceText::YourLastName,
-                39,
-                &MASK_ALNUM,
-                "",
-                None,
-                display_flags::UPCASE | display_flags::NEWLINE | display_flags::STACKED,
-            )?;
-            self.state.session.user_name = format!("{} {}", first_name, last_name).trim().to_string();
-
             tries += 1;
             if tries > 3 {
                 log::warn!("Login at {} num login tries exceeded.", Local::now().to_rfc2822());
@@ -69,16 +51,63 @@ impl PcbBoardCommand {
                 self.state.hangup()?;
                 return Ok(false);
             }
+
+            let first_name = self
+                .state
+                .input_field(
+                    IceText::YourFirstName,
+                    39,
+                    &MASK_ALNUM,
+                    "",
+                    None,
+                    display_flags::UPCASE | display_flags::NEWLINE | display_flags::STACKED,
+                )?
+                .trim()
+                .to_string();
+
+            if first_name.is_empty() {
+                continue;
+            }
+
             let mut found_user = None;
             if let Ok(board) = self.state.board.lock() {
                 for (i, user) in board.users.iter().enumerate() {
-                    if user.is_valid_loginname(&self.state.session.user_name) {
+                    if user.is_valid_loginname(&first_name) {
                         found_user = Some(i);
                         break;
                     }
                 }
+            }
+            if found_user.is_none() && !first_name.contains(' ') {
+                let last_name = self.state.input_field(
+                    IceText::YourLastName,
+                    39,
+                    &MASK_ALNUM,
+                    "",
+                    None,
+                    display_flags::UPCASE | display_flags::NEWLINE | display_flags::STACKED,
+                )?;
+                if !self.state.board.lock().unwrap().config.new_user_settings.allow_one_name_users && last_name.is_empty() {
+                    self.state.display_text(
+                        IceText::RequireTwoNames,
+                        display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
+                    )?;
+                    continue;
+                }
+                self.state.session.user_name = format!("{} {}", first_name, last_name.trim()).trim().to_string();
+
+                if let Ok(board) = self.state.board.lock() {
+                    for (i, user) in board.users.iter().enumerate() {
+                        if user.is_valid_loginname(&self.state.session.user_name) {
+                            found_user = Some(i);
+                            break;
+                        }
+                    }
+                } else {
+                    return Err(IcyBoardError::ErrorLockingBoard.into());
+                }
             } else {
-                return Err(IcyBoardError::ErrorLockingBoard.into());
+                self.state.session.user_name = first_name.to_string();
             }
             if let Some(user) = found_user {
                 self.state.set_current_user(user)?;
@@ -97,7 +126,7 @@ impl PcbBoardCommand {
                 display_flags::UPCASE | display_flags::NEWLINE | display_flags::FIELDLEN,
             )?;
 
-            if re_enter.is_empty() || re_enter == "C" {
+            if re_enter.trim().is_empty() || re_enter == "C" {
                 let new_file = self.state.board.lock().unwrap().config.paths.newuser.clone();
                 self.state.display_file(&self.state.resolve_path(&new_file))?;
                 self.state.new_line()?;
@@ -110,17 +139,18 @@ impl PcbBoardCommand {
                     Some("Y".to_string()),
                     display_flags::YESNO | display_flags::NEWLINE | display_flags::FIELDLEN,
                 )?;
-
-                if register == "Y" || register.is_empty() {
+                if register == "Y" || register.trim().is_empty() {
                     if !self.new_user()? {
                         self.state.display_text(IceText::RefusedToRegister, display_flags::NEWLINE)?;
                         self.state.hangup()?;
+                        log::info!("'{}' refused to register.", self.state.session.user_name);
                         return Ok(false);
                     }
                     return Ok(true);
                 } else {
                     self.state.display_text(IceText::RefusedToRegister, display_flags::NEWLINE)?;
                     self.state.hangup()?;
+                    log::info!("'{}' refused to register.", self.state.session.user_name);
                     return Ok(false);
                 }
             }
@@ -129,6 +159,14 @@ impl PcbBoardCommand {
 
     fn new_user(&mut self) -> Res<bool> {
         let mut tries = 0;
+
+        if self.state.board.lock().unwrap().config.options.is_closed_board {
+            self.newask_questions()?;
+            log::info!("New user registration for {} attempted on closed board.", self.state.session.user_name);
+            self.state.display_text(IceText::ClosedBoard, display_flags::NEWLINE)?;
+            self.state.hangup()?;
+            return Ok(false);
+        }
 
         let mut new_user = User::default();
         let settings = self.state.board.lock().unwrap().config.new_user_settings.clone();
@@ -159,208 +197,239 @@ impl PcbBoardCommand {
             self.state.display_text(IceText::PasswordsDontMatch, display_flags::NEWLINE)?;
         }
 
-        if settings.ask_city_or_state && self.state.display_text.has_text(IceText::CityState) {
-            let Some(city_or_state) = self.input_required(IceText::CityState, &MASK_ALNUM, 24, 0)? else {
-                return Ok(false);
-            };
-            new_user.city_or_state = city_or_state;
-        }
-
-        if settings.ask_bus_data_phone && self.state.display_text.has_text(IceText::BusDataPhone) {
-            let Some(bus_data_phone) = self.input_required(IceText::BusDataPhone, &MASK_PHONE, 13, 0)? else {
-                return Ok(false);
-            };
-            new_user.bus_data_phone = bus_data_phone;
-        }
-
-        if settings.ask_voice_phone && self.state.display_text.has_text(IceText::HomeVoicePhone) {
-            let Some(home_voice_phone) = self.input_required(IceText::HomeVoicePhone, &MASK_PHONE, 13, 0)? else {
-                return Ok(false);
-            };
-            new_user.home_voice_phone = home_voice_phone;
-        }
-
-        if settings.ask_comment && self.state.display_text.has_text(IceText::CommentFieldPrompt) {
-            new_user.user_comment = self.state.input_field(
-                IceText::CommentFieldPrompt,
-                30,
-                &MASK_ALNUM,
-                "",
-                None,
-                display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
-            )?;
-        }
-
-        if settings.ask_clr_msg && self.state.display_text.has_text(IceText::CLSBetweenMessages) {
-            let msg_cls = self.state.input_field(
-                IceText::CLSBetweenMessages,
-                1,
-                &"",
-                "",
-                Some(self.state.session.yes_char.to_uppercase().to_string()),
-                display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::YESNO,
-            )?;
-            new_user.flags.msg_clear = msg_cls.is_empty() || msg_cls == self.state.session.yes_char.to_uppercase().to_string();
-        }
-
-        if settings.ask_date_format && self.state.display_text.has_text(IceText::DateFormatDesired) {
-            new_user.date_format = DEFAULT_PCBOARD_DATE_FORMAT.to_string();
-            let date_format = self.ask_date_format(&new_user.date_format)?;
-            if !date_format.is_empty() {
-                new_user.date_format = date_format;
+        if !self.newask_exists() || self.state.board.lock().unwrap().config.new_user_settings.use_newask_and_builtin {
+            if settings.ask_city_or_state && self.state.display_text.has_text(IceText::CityState) {
+                let Some(city_or_state) = self.input_required(IceText::CityState, &MASK_ALNUM, 24, 0)? else {
+                    return Ok(false);
+                };
+                new_user.city_or_state = city_or_state;
             }
-        }
-        if settings.ask_xfer_protocol {
-            let protocol = self.ask_protocols("N".to_string())?;
-            if !protocol.is_empty() {
-                new_user.protocol = protocol;
-            } else {
-                new_user.protocol = "N".to_string();
+
+            if settings.ask_bus_data_phone && self.state.display_text.has_text(IceText::BusDataPhone) {
+                let Some(bus_data_phone) = self.input_required(IceText::BusDataPhone, &MASK_PHONE, 13, 0)? else {
+                    return Ok(false);
+                };
+                new_user.bus_data_phone = bus_data_phone;
             }
-        }
 
-        if settings.ask_alias && self.state.display_text.has_text(IceText::GetAliasName) {
-            new_user.alias = self.state.input_field(
-                IceText::GetAliasName,
-                30,
-                &MASK_ALNUM,
-                "",
-                None,
-                display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
-            )?;
-        }
+            if settings.ask_voice_phone && self.state.display_text.has_text(IceText::HomeVoicePhone) {
+                let Some(home_voice_phone) = self.input_required(IceText::HomeVoicePhone, &MASK_PHONE, 13, 0)? else {
+                    return Ok(false);
+                };
+                new_user.home_voice_phone = home_voice_phone;
+            }
 
-        if settings.ask_address && self.state.display_text.has_text(IceText::EnterAddress) {
-            self.state
-                .display_text(IceText::EnterAddress, display_flags::NEWLINE | display_flags::LFBEFORE)?;
-
-            if self.state.display_text.has_text(IceText::Street1) {
-                new_user.street1 = self.state.input_field(
-                    IceText::Street1,
-                    50,
+            if settings.ask_comment && self.state.display_text.has_text(IceText::CommentFieldPrompt) {
+                new_user.user_comment = self.state.input_field(
+                    IceText::CommentFieldPrompt,
+                    30,
                     &MASK_ALNUM,
                     "",
                     None,
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
                 )?;
             }
-            if self.state.display_text.has_text(IceText::Street2) {
-                new_user.street2 = self.state.input_field(
-                    IceText::Street2,
-                    50,
+
+            if settings.ask_clr_msg && self.state.display_text.has_text(IceText::CLSBetweenMessages) {
+                let msg_cls = self.state.input_field(
+                    IceText::CLSBetweenMessages,
+                    1,
+                    &"",
+                    "",
+                    Some(self.state.session.yes_char.to_uppercase().to_string()),
+                    display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::YESNO,
+                )?;
+                new_user.flags.msg_clear = msg_cls.is_empty() || msg_cls == self.state.session.yes_char.to_uppercase().to_string();
+            }
+
+            if settings.ask_date_format && self.state.display_text.has_text(IceText::DateFormatDesired) {
+                new_user.date_format = DEFAULT_PCBOARD_DATE_FORMAT.to_string();
+                let date_format = self.ask_date_format(&new_user.date_format)?;
+                if !date_format.is_empty() {
+                    new_user.date_format = date_format;
+                }
+            }
+            if settings.ask_xfer_protocol {
+                let protocol = self.ask_protocols("N".to_string())?;
+                if !protocol.is_empty() {
+                    new_user.protocol = protocol;
+                } else {
+                    new_user.protocol = "N".to_string();
+                }
+            }
+
+            if settings.ask_alias && self.state.display_text.has_text(IceText::GetAliasName) {
+                new_user.alias = self.state.input_field(
+                    IceText::GetAliasName,
+                    30,
                     &MASK_ALNUM,
                     "",
                     None,
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
                 )?;
             }
-            if self.state.display_text.has_text(IceText::City) {
-                new_user.city = self.state.input_field(
-                    IceText::City,
-                    25,
+
+            if settings.ask_address && self.state.display_text.has_text(IceText::EnterAddress) {
+                self.state
+                    .display_text(IceText::EnterAddress, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+
+                if self.state.display_text.has_text(IceText::Street1) {
+                    new_user.street1 = self.state.input_field(
+                        IceText::Street1,
+                        50,
+                        &MASK_ALNUM,
+                        "",
+                        None,
+                        display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                    )?;
+                }
+                if self.state.display_text.has_text(IceText::Street2) {
+                    new_user.street2 = self.state.input_field(
+                        IceText::Street2,
+                        50,
+                        &MASK_ALNUM,
+                        "",
+                        None,
+                        display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                    )?;
+                }
+                if self.state.display_text.has_text(IceText::City) {
+                    new_user.city = self.state.input_field(
+                        IceText::City,
+                        25,
+                        &MASK_ALNUM,
+                        "",
+                        None,
+                        display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                    )?;
+                }
+                if self.state.display_text.has_text(IceText::State) {
+                    new_user.state = self.state.input_field(
+                        IceText::State,
+                        15,
+                        &MASK_ALNUM,
+                        "",
+                        None,
+                        display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                    )?;
+                }
+                if self.state.display_text.has_text(IceText::Zip) {
+                    new_user.zip = self.state.input_field(
+                        IceText::Zip,
+                        10,
+                        &MASK_ALNUM,
+                        "",
+                        None,
+                        display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                    )?;
+                }
+                if self.state.display_text.has_text(IceText::Country) {
+                    new_user.country = self.state.input_field(
+                        IceText::Country,
+                        15,
+                        &MASK_ALNUM,
+                        "",
+                        None,
+                        display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                    )?;
+                }
+            }
+
+            if settings.ask_verification && self.state.display_text.has_text(IceText::EnterVerifyText) {
+                let Some(verify_answer) = self.input_required(IceText::EnterVerifyText, &MASK_ALNUM, 25, 0)? else {
+                    return Ok(false);
+                };
+                new_user.verify_answer = verify_answer;
+            }
+
+            if settings.ask_gender && self.state.display_text.has_text(IceText::EnterGender) {
+                new_user.gender = self.state.input_field(
+                    IceText::EnterGender,
+                    1,
+                    "MmFf",
+                    "",
+                    None,
+                    display_flags::FIELDLEN | display_flags::UPCASE | display_flags::NEWLINE | display_flags::LFBEFORE,
+                )?;
+            }
+
+            if settings.ask_birthdate && self.state.display_text.has_text(IceText::EnterBirthdate) {
+                let date = self.state.input_field(
+                    IceText::EnterBirthdate,
+                    8,
                     &MASK_ALNUM,
                     "",
                     None,
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
                 )?;
+                new_user.birth_date = IcbDate::parse(&date).to_utc_date_time();
             }
-            if self.state.display_text.has_text(IceText::State) {
-                new_user.state = self.state.input_field(
-                    IceText::State,
-                    15,
-                    &MASK_ALNUM,
+
+            if settings.ask_email && self.state.display_text.has_text(IceText::EnterEmail) {
+                let Some(email) = self.input_required(IceText::EnterEmail, &MASK_WEB, 30, 0)? else {
+                    return Ok(false);
+                };
+                new_user.email = email;
+            }
+
+            if settings.ask_web_address && self.state.display_text.has_text(IceText::EnterWebAddress) {
+                new_user.web = self.state.input_field(
+                    IceText::EnterWebAddress,
+                    30,
+                    &MASK_WEB,
                     "",
                     None,
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
                 )?;
             }
-            if self.state.display_text.has_text(IceText::Zip) {
-                new_user.zip = self.state.input_field(
-                    IceText::Zip,
-                    10,
-                    &MASK_ALNUM,
+
+            if settings.ask_use_short_descr && self.state.display_text.has_text(IceText::UseShortDescription) {
+                let use_short = self.state.input_field(
+                    IceText::UseShortDescription,
+                    1,
                     "",
-                    None,
-                    display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
-                )?;
-            }
-            if self.state.display_text.has_text(IceText::Country) {
-                new_user.country = self.state.input_field(
-                    IceText::Country,
-                    15,
-                    &MASK_ALNUM,
                     "",
-                    None,
-                    display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                    Some("N".to_string()),
+                    display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::YESNO,
                 )?;
+                new_user.flags.use_short_filedescr = use_short == "Y";
             }
         }
-
-        if settings.ask_verification && self.state.display_text.has_text(IceText::EnterVerifyText) {
-            let Some(verify_answer) = self.input_required(IceText::EnterVerifyText, &MASK_ALNUM, 25, 0)? else {
-                return Ok(false);
-            };
-            new_user.verify_answer = verify_answer;
-        }
-
-        if settings.ask_gender && self.state.display_text.has_text(IceText::EnterGender) {
-            new_user.gender = self.state.input_field(
-                IceText::EnterGender,
-                1,
-                "MmFf",
-                "",
-                None,
-                display_flags::FIELDLEN | display_flags::UPCASE | display_flags::NEWLINE | display_flags::LFBEFORE,
-            )?;
-        }
-
-        if settings.ask_birthdate && self.state.display_text.has_text(IceText::EnterBirthdate) {
-            let date = self.state.input_field(
-                IceText::EnterBirthdate,
-                8,
-                &MASK_ALNUM,
-                "",
-                None,
-                display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
-            )?;
-            new_user.birth_date = IcbDate::parse(&date).to_utc_date_time();
-        }
-
-        if settings.ask_email && self.state.display_text.has_text(IceText::EnterEmail) {
-            let Some(email) = self.input_required(IceText::EnterEmail, &MASK_WEB, 30, 0)? else {
-                return Ok(false);
-            };
-            new_user.email = email;
-        }
-
-        if settings.ask_web_address && self.state.display_text.has_text(IceText::EnterWebAddress) {
-            new_user.web = self.state.input_field(
-                IceText::EnterWebAddress,
-                30,
-                &MASK_WEB,
-                "",
-                None,
-                display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
-            )?;
-        }
-
-        if settings.ask_use_short_descr && self.state.display_text.has_text(IceText::UseShortDescription) {
-            let use_short = self.state.input_field(
-                IceText::UseShortDescription,
-                1,
-                "",
-                "",
-                Some("N".to_string()),
-                display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::YESNO,
-            )?;
-            new_user.flags.use_short_filedescr = use_short == "Y";
-        }
+        self.newask_questions()?;
 
         let id = self.state.board.lock().unwrap().users.new_user(new_user);
         self.state.board.lock().unwrap().save_userbase()?;
         self.state.set_current_user(id)?;
+
+        log::info!("NEW USER: '{}'", self.state.session.user_name);
+
         self.display_news()?;
         return Ok(true);
+    }
+
+    fn newask_exists(&self) -> bool {
+        if let Ok(board) = self.state.board.lock() {
+            board.resolve_file(&board.config.paths.newask_survey).exists()
+        } else {
+            false
+        }
+    }
+
+    fn newask_questions(&mut self) -> Res<()> {
+        let survey = if let Ok(board) = self.state.board.lock() {
+            Survey {
+                question_file: board.resolve_file(&board.config.paths.newask_survey),
+                answer_file: board.resolve_file(&board.config.paths.newask_answer),
+                required_security: 0,
+            }
+        } else {
+            Survey::default()
+        };
+        Ok(if !self.state.session.is_sysop && survey.question_file.exists() {
+            // skip the survey question.
+            self.state.session.tokens.push_front(self.state.session.yes_char.to_string());
+            self.start_survey(&survey)?;
+        })
     }
 
     fn login_user(&mut self) -> Res<bool> {

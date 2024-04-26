@@ -9,11 +9,10 @@ use icy_board_engine::{
             functions::{display_flags, MASK_ASCII},
             UserActivity,
         },
-        xfer_protocols::SendRecvCommand,
     },
     vm::TerminalTarget,
 };
-use icy_net::protocol::{Protocol, XYModemVariant, XYmodem, Zmodem};
+use icy_net::protocol::{Protocol, TransferProtocolType, XYModemVariant, XYmodem, Zmodem};
 
 use super::d_download::BlockingConnection;
 
@@ -91,16 +90,16 @@ impl PcbBoardCommand {
 
         if let Some(protocol) = protocol {
             let mut prot: Box<dyn Protocol> = match protocol {
-                SendRecvCommand::ASCII => todo!(),
-                SendRecvCommand::XModem => Box::new(XYmodem::new(XYModemVariant::XModem)),
-                SendRecvCommand::XModemCRC => Box::new(XYmodem::new(XYModemVariant::XModemCRC)),
-                SendRecvCommand::XModem1k => Box::new(XYmodem::new(XYModemVariant::XModem1k)),
-                SendRecvCommand::XModem1kG => Box::new(XYmodem::new(XYModemVariant::XModem1kG)),
-                SendRecvCommand::YModem => Box::new(XYmodem::new(XYModemVariant::YModem)),
-                SendRecvCommand::YModemG => Box::new(XYmodem::new(XYModemVariant::YModemG)),
-                SendRecvCommand::ZModem => Box::new(Zmodem::new(1024)),
-                SendRecvCommand::ZModem8k => Box::new(Zmodem::new(8 * 1024)),
-                SendRecvCommand::External(_) => todo!(),
+                TransferProtocolType::ASCII => todo!(),
+                TransferProtocolType::XModem => Box::new(XYmodem::new(XYModemVariant::XModem)),
+                TransferProtocolType::XModemCRC => Box::new(XYmodem::new(XYModemVariant::XModemCRC)),
+                TransferProtocolType::XModem1k => Box::new(XYmodem::new(XYModemVariant::XModem1k)),
+                TransferProtocolType::XModem1kG => Box::new(XYmodem::new(XYModemVariant::XModem1kG)),
+                TransferProtocolType::YModem => Box::new(XYmodem::new(XYModemVariant::YModem)),
+                TransferProtocolType::YModemG => Box::new(XYmodem::new(XYModemVariant::YModemG)),
+                TransferProtocolType::ZModem => Box::new(Zmodem::new(1024)),
+                TransferProtocolType::ZModem8k => Box::new(Zmodem::new(8 * 1024)),
+                TransferProtocolType::External(_) => todo!(),
             };
 
             match prot.initiate_recv(&mut *self.state.connection) {

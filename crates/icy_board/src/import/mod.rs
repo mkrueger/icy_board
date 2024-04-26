@@ -324,7 +324,7 @@ impl PCBoardImporter {
                 sec_level: self.data.user_levels.agree_to_register as u8,
                 new_user_groups: "new_users".to_string(),
                 allow_one_name_users: self.data.allow_one_name_users,
-                use_newask: self.data.use_new_ask_file,
+                use_newask_and_builtin: self.data.use_new_ask_file,
                 ask_city_or_state: true,
                 ask_address: false,
                 ask_verification: false,
@@ -519,7 +519,7 @@ impl PCBoardImporter {
                 {
                     if let Ok(mut text_file) = IcbTextFile::load(&entry.path()) {
                         for (i, entry) in text_file.iter_mut().enumerate() {
-                            entry.text = self.scan_line_for_commands(&entry.text, &format!("PCBTEXT, entry {}", i))?;
+                            entry.text = self.scan_pcb_text_line_for_commands(&entry.text, i)?;
                         }
                         let destination = PathBuf::from(
                             destination
@@ -544,8 +544,12 @@ impl PCBoardImporter {
         Ok(PathBuf::from(new_rel_name.to_string() + ".toml"))
     }
 
-    pub fn scan_line_for_commands(&mut self, line: &str, _context: &str) -> Res<String> {
+    pub fn scan_pcb_text_line_for_commands(&mut self, line: &str, i: usize) -> Res<String> {
         if let Some(call) = PPECall::try_parse_line(line) {
+            self.logger.log(&format!(
+                "Found {:?} in entry {} : {} arguments :{:?}",
+                call.call_type, i, call.file, call.arguments
+            ));
             let resolved_file = self.resolve_file(&call.file);
             if !resolved_file.exists() {
                 self.output.warning(format!("Can't find file {}", resolved_file.display()));
@@ -564,6 +568,37 @@ impl PCBoardImporter {
                 }
                 new_line.push(ch);
             }
+            self.logger.log(&format!("Convert to line: {}", new_line));
+            return Ok(new_line);
+        }
+        Ok(line.to_string())
+    }
+
+    pub fn scan_line_for_commands(&mut self, line: &str, i: usize) -> Res<String> {
+        if let Some(call) = PPECall::try_parse_line(line) {
+            self.logger.log(&format!(
+                "Found {:?} in line {} : {} arguments :{:?}",
+                call.call_type, i, call.file, call.arguments
+            ));
+            let resolved_file = self.resolve_file(&call.file);
+            if !resolved_file.exists() {
+                self.output.warning(format!("Can't find file {}", resolved_file.display()));
+                self.logger.log(&format!("Can't find file {}", resolved_file.display()));
+                return Ok(line.to_string());
+            }
+            let new_name = self.convert_file(resolved_file)?;
+
+            let mut new_line = String::new();
+            for (i, ch) in line.chars().enumerate() {
+                if i == 1 {
+                    new_line.push_str(&new_name);
+                }
+                if i >= 1 && i <= call.file.len() {
+                    continue;
+                }
+                new_line.push(ch);
+            }
+            self.logger.log(&format!("Convert to line: {}", new_line));
             return Ok(new_line);
         }
         Ok(line.to_string())
@@ -629,9 +664,8 @@ impl PCBoardImporter {
             .start_action(format!("\t convert '{}' to utf8 '{}'…", from.as_ref().display(), to.as_ref().display()));
         let mut import = String::new();
 
-        let ctx = format!("importing file {}", from.as_ref().display());
-        for line in in_string.lines() {
-            import.push_str(&self.scan_line_for_commands(line, &ctx)?);
+        for (i, line) in in_string.lines().enumerate() {
+            import.push_str(&self.scan_line_for_commands(line, i)?);
             import.push('\n');
         }
 

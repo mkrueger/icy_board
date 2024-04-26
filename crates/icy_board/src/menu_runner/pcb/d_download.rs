@@ -7,13 +7,10 @@ use std::{
 
 use crate::{menu_runner::PcbBoardCommand, Res};
 use icy_board_engine::{
-    icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags, xfer_protocols::SendRecvCommand},
+    icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
 };
-use icy_net::{
-    protocol::{Protocol, XYModemVariant, XYmodem, Zmodem},
-    Connection,
-};
+use icy_net::Connection;
 
 impl PcbBoardCommand {
     pub fn download(&mut self, _action: &Command) -> Res<()> {
@@ -52,18 +49,7 @@ impl PcbBoardCommand {
         }
 
         if let Some(protocol) = protocol {
-            let mut prot: Box<dyn Protocol> = match protocol {
-                SendRecvCommand::ASCII => todo!(),
-                SendRecvCommand::XModem => Box::new(XYmodem::new(XYModemVariant::XModem)),
-                SendRecvCommand::XModemCRC => Box::new(XYmodem::new(XYModemVariant::XModemCRC)),
-                SendRecvCommand::XModem1k => Box::new(XYmodem::new(XYModemVariant::XModem1k)),
-                SendRecvCommand::XModem1kG => Box::new(XYmodem::new(XYModemVariant::XModem1kG)),
-                SendRecvCommand::YModem => Box::new(XYmodem::new(XYModemVariant::YModem)),
-                SendRecvCommand::YModemG => Box::new(XYmodem::new(XYModemVariant::YModemG)),
-                SendRecvCommand::ZModem => Box::new(Zmodem::new(1024)),
-                SendRecvCommand::ZModem8k => Box::new(Zmodem::new(8 * 1024)),
-                SendRecvCommand::External(_) => todo!(),
-            };
+            let mut prot = protocol.create();
             let files: Vec<PathBuf> = self.state.session.flagged_files.drain().collect();
             for f in &files {
                 if !f.exists() {

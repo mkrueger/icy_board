@@ -19,11 +19,12 @@ use icy_board_engine::{
         statistics::Statistics,
         surveys::{Survey, SurveyList},
         user_base::{Password, PasswordInfo, User, UserBase},
-        xfer_protocols::{Protocol, SendRecvCommand, SupportedProtocols},
+        xfer_protocols::{Protocol, SupportedProtocols},
         IcyBoardSerializer,
     },
     Res,
 };
+use icy_net::protocol::TransferProtocolType;
 use jamjam::{jam::JamMessageBase, util::echmoail::EchomailAddress};
 
 use crate::import::{console_logger::ConsoleLogger, default_commands::add_default_commands, OutputLogger};
@@ -494,8 +495,8 @@ fn generate_protocol_data(protocol_data_file: &PathBuf) -> Res<()> {
         is_batch: false,
         char_code: "A".to_string(),
         description: "Ascii".to_string(),
-        send_command: SendRecvCommand::ASCII,
-        recv_command: SendRecvCommand::ASCII,
+        send_command: TransferProtocolType::ASCII,
+        recv_command: TransferProtocolType::ASCII,
     });
 
     protocols.protocols.push(Protocol {
@@ -503,8 +504,8 @@ fn generate_protocol_data(protocol_data_file: &PathBuf) -> Res<()> {
         is_batch: false,
         char_code: "X".to_string(),
         description: "Xmodem/Checksum".to_string(),
-        send_command: SendRecvCommand::XModem,
-        recv_command: SendRecvCommand::XModem,
+        send_command: TransferProtocolType::XModem,
+        recv_command: TransferProtocolType::XModem,
     });
 
     protocols.protocols.push(Protocol {
@@ -512,8 +513,8 @@ fn generate_protocol_data(protocol_data_file: &PathBuf) -> Res<()> {
         is_batch: false,
         char_code: "C".to_string(),
         description: "Xmodem/CRC".to_string(),
-        send_command: SendRecvCommand::XModemCRC,
-        recv_command: SendRecvCommand::XModemCRC,
+        send_command: TransferProtocolType::XModemCRC,
+        recv_command: TransferProtocolType::XModemCRC,
     });
 
     protocols.protocols.push(Protocol {
@@ -521,8 +522,8 @@ fn generate_protocol_data(protocol_data_file: &PathBuf) -> Res<()> {
         is_batch: false,
         char_code: "O".to_string(),
         description: "1K-Xmodem       (a.k.a. non-BATCH Ymodem)".to_string(),
-        send_command: SendRecvCommand::XModem1k,
-        recv_command: SendRecvCommand::XModem1k,
+        send_command: TransferProtocolType::XModem1k,
+        recv_command: TransferProtocolType::XModem1k,
     });
 
     protocols.protocols.push(Protocol {
@@ -530,8 +531,8 @@ fn generate_protocol_data(protocol_data_file: &PathBuf) -> Res<()> {
         is_batch: false,
         char_code: "F".to_string(),
         description: "1K-Xmodem/G     (a.k.a. non-BATCH Ymodem/G)".to_string(),
-        send_command: SendRecvCommand::XModem1kG,
-        recv_command: SendRecvCommand::XModem1kG,
+        send_command: TransferProtocolType::XModem1kG,
+        recv_command: TransferProtocolType::XModem1kG,
     });
 
     protocols.protocols.push(Protocol {
@@ -539,8 +540,8 @@ fn generate_protocol_data(protocol_data_file: &PathBuf) -> Res<()> {
         is_batch: true,
         char_code: "Y".to_string(),
         description: "Ymodem BATCH".to_string(),
-        send_command: SendRecvCommand::YModem,
-        recv_command: SendRecvCommand::YModem,
+        send_command: TransferProtocolType::YModem,
+        recv_command: TransferProtocolType::YModem,
     });
 
     protocols.protocols.push(Protocol {
@@ -548,8 +549,8 @@ fn generate_protocol_data(protocol_data_file: &PathBuf) -> Res<()> {
         is_batch: true,
         char_code: "G".to_string(),
         description: "Ymodem/G BATCH".to_string(),
-        send_command: SendRecvCommand::YModemG,
-        recv_command: SendRecvCommand::YModemG,
+        send_command: TransferProtocolType::YModemG,
+        recv_command: TransferProtocolType::YModemG,
     });
 
     protocols.protocols.push(Protocol {
@@ -557,8 +558,8 @@ fn generate_protocol_data(protocol_data_file: &PathBuf) -> Res<()> {
         is_batch: true,
         char_code: "Z".to_string(),
         description: "Zmodem (batch)".to_string(),
-        send_command: SendRecvCommand::ZModem,
-        recv_command: SendRecvCommand::ZModem,
+        send_command: TransferProtocolType::ZModem,
+        recv_command: TransferProtocolType::ZModem,
     });
 
     protocols.protocols.push(Protocol {
@@ -566,8 +567,8 @@ fn generate_protocol_data(protocol_data_file: &PathBuf) -> Res<()> {
         is_batch: true,
         char_code: "Z8".to_string(),
         description: "Zmodem 8k (batch)".to_string(),
-        send_command: SendRecvCommand::ZModem8k,
-        recv_command: SendRecvCommand::ZModem8k,
+        send_command: TransferProtocolType::ZModem8k,
+        recv_command: TransferProtocolType::ZModem8k,
     });
 
     protocols.save(protocol_data_file)?;

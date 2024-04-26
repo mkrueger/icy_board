@@ -315,7 +315,9 @@ pub struct NewUserSettings {
 
     pub new_user_groups: String,
     pub allow_one_name_users: bool,
-    pub use_newask: bool,
+
+    /// if true, then the logon survey will be asked in ADDITION to the built in questions
+    pub use_newask_and_builtin: bool,
 
     pub ask_city_or_state: bool,
 
@@ -508,7 +510,7 @@ impl IcbConfig {
                 sec_level: 10,
                 new_user_groups: "new_users".to_string(),
                 allow_one_name_users: false,
-                use_newask: false,
+                use_newask_and_builtin: false,
                 ask_city_or_state: true,
                 ask_address: true,
                 ask_verification: true,

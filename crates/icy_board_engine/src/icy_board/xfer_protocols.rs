@@ -4,80 +4,8 @@ use std::path::Path;
 use super::IcyBoardSerializer;
 use super::{is_false, is_true, set_true, PCBoardImport, PCBoardTextImport};
 use crate::Res;
+use icy_net::protocol::TransferProtocolType;
 use serde::{Deserialize, Serialize};
-
-#[derive(Default, Debug, Clone)]
-pub enum SendRecvCommand {
-    ASCII,
-    XModem,
-    XModemCRC,
-    XModem1k,
-    XModem1kG,
-    YModem,
-    YModemG,
-    #[default]
-    ZModem,
-    ZModem8k,
-    External(String),
-}
-
-const ASC_STR: &str = "@asc";
-const XMODEM_STR: &str = "@xmodem";
-const XMODEMCRC_STR: &str = "@xmodemcrc";
-const XMODEM1K_STR: &str = "@xmodem1k";
-const XMODEM1KG_STR: &str = "@xmodem1kg";
-const YMODEM_STR: &str = "@ymodem";
-const YMODEMG_STR: &str = "@ymodemg";
-const ZMODEM_STR: &str = "@zmodem";
-const ZMODEM8K_STR: &str = "@zmodem8k";
-
-impl<'de> Deserialize<'de> for SendRecvCommand {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        String::deserialize(deserializer).map(|s| {
-            if s.starts_with('@') {
-                match s.as_str().to_lowercase().as_str() {
-                    ASC_STR => SendRecvCommand::ASCII,
-                    XMODEM_STR => SendRecvCommand::XModem,
-                    XMODEMCRC_STR => SendRecvCommand::XModemCRC,
-                    XMODEM1K_STR => SendRecvCommand::XModem1k,
-                    XMODEM1KG_STR => SendRecvCommand::XModem1kG,
-                    YMODEM_STR => SendRecvCommand::YModem,
-                    YMODEMG_STR => SendRecvCommand::YModemG,
-                    ZMODEM_STR => SendRecvCommand::ZModem,
-                    ZMODEM8K_STR => SendRecvCommand::ZModem8k,
-                    _ => SendRecvCommand::ZModem,
-                }
-            } else {
-                SendRecvCommand::External(s)
-            }
-        })
-    }
-}
-
-impl serde::Serialize for SendRecvCommand {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let s = match self {
-            SendRecvCommand::ASCII => ASC_STR,
-            SendRecvCommand::XModem => XMODEM_STR,
-            SendRecvCommand::XModemCRC => XMODEMCRC_STR,
-            SendRecvCommand::XModem1k => XMODEM1K_STR,
-            SendRecvCommand::XModem1kG => XMODEM1KG_STR,
-            SendRecvCommand::YModem => YMODEM_STR,
-            SendRecvCommand::YModemG => YMODEMG_STR,
-            SendRecvCommand::ZModem => ZMODEM_STR,
-            SendRecvCommand::ZModem8k => ZMODEM8K_STR,
-            SendRecvCommand::External(s) => s,
-        };
-
-        s.serialize(serializer)
-    }
-}
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct Protocol {
@@ -98,8 +26,8 @@ pub struct Protocol {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub description: String,
 
-    pub send_command: SendRecvCommand,
-    pub recv_command: SendRecvCommand,
+    pub send_command: TransferProtocolType,
+    pub recv_command: TransferProtocolType,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -139,15 +67,15 @@ impl PCBoardTextImport for SupportedProtocols {
             let char_code = splitted_line[0].to_string().chars().next().unwrap_or('-');
 
             let (is_enabled, is_batch, command) = match char_code {
-                'A' => (true, false, SendRecvCommand::ASCII),
-                'X' => (true, false, SendRecvCommand::XModem),
-                'C' => (true, false, SendRecvCommand::XModemCRC),
-                'O' => (true, false, SendRecvCommand::XModem1k),
-                'F' => (true, false, SendRecvCommand::XModem1kG),
-                'Y' => (true, false, SendRecvCommand::XModem1kG),
-                'G' => (true, true, SendRecvCommand::YModemG),
-                'Z' => (true, true, SendRecvCommand::ZModem),
-                _ => (false, true, SendRecvCommand::External("todo".to_string())),
+                'A' => (true, false, TransferProtocolType::ASCII),
+                'X' => (true, false, TransferProtocolType::XModem),
+                'C' => (true, false, TransferProtocolType::XModemCRC),
+                'O' => (true, false, TransferProtocolType::XModem1k),
+                'F' => (true, false, TransferProtocolType::XModem1kG),
+                'Y' => (true, false, TransferProtocolType::XModem1kG),
+                'G' => (true, true, TransferProtocolType::YModemG),
+                'Z' => (true, true, TransferProtocolType::ZModem),
+                _ => (false, true, TransferProtocolType::External("todo".to_string())),
             };
 
             res.protocols.push(Protocol {

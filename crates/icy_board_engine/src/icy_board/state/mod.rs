@@ -315,7 +315,7 @@ impl NodeState {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Debug, Copy, PartialEq)]
 pub enum KeySource {
     User,
     StuffedHidden,

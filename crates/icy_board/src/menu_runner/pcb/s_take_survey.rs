@@ -59,6 +59,8 @@ impl PcbBoardCommand {
                 if number > 0 {
                     if let Some(survey) = surveys.get(number - 1) {
                         self.start_survey(&survey)?;
+                        self.state.press_enter()?;
+                        self.display_menu = true;
                         break;
                     } else {
                         self.state.display_text(
@@ -69,7 +71,6 @@ impl PcbBoardCommand {
                 }
             }
         }
-        self.display_menu = true;
         Ok(())
     }
 
@@ -83,9 +84,24 @@ impl PcbBoardCommand {
             output.push(format!(
                 "From: {}, {} Sec {} Exp {}",
                 user.get_name(),
-                Local::now().format("%Y/%m/%d (%H:%M)"),
+                format!(
+                    "{} {}",
+                    Local::now().format(&self.state.board.lock().unwrap().config.board.date_format),
+                    Local::now().format("(%H:%M)")
+                ),
                 self.state.session.cur_security,
                 user.exp_date
+            ));
+        } else {
+            output.push(format!(
+                "From: {}, {} Sec {}",
+                self.state.session.user_name,
+                format!(
+                    "{} {}",
+                    Local::now().format(&self.state.board.lock().unwrap().config.board.date_format),
+                    Local::now().format("(%H:%M)")
+                ),
+                self.state.session.cur_security,
             ));
         }
 
@@ -178,8 +194,6 @@ impl PcbBoardCommand {
                 )?;
             }
         }
-        self.state.press_enter()?;
-        self.display_menu = true;
         Ok(())
     }
 }

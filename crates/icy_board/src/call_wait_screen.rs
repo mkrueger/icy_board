@@ -38,6 +38,7 @@ pub struct CallWaitScreen {
     selected: Option<Instant>,
     buttons: Vec<Button>,
     board_name: String,
+    date_format: String,
     statistics: Statistics,
 }
 
@@ -81,13 +82,14 @@ impl CallWaitScreen {
             },
         ];
         let board_name = board.lock().unwrap().config.board.name.clone();
-
+        let date_format = board.lock().unwrap().config.board.date_format.clone();
         Ok(Self {
             x: 0,
             y: 0,
             selected: None,
             buttons,
             board_name,
+            date_format,
             statistics: Statistics::default(),
         })
     }
@@ -140,10 +142,13 @@ impl CallWaitScreen {
 
     fn ui(&self, frame: &mut Frame) {
         let now = Local::now();
+
+        let dt = now.format(&self.date_format);
+
         let ver = VERSION.to_string();
         let area = frame.size();
         let b = Block::default()
-            .title(Title::from(Line::from(format!(" {} ", now.date_naive())).style(Style::new().white())).alignment(Alignment::Left))
+            .title(Title::from(Line::from(format!(" {} ", dt)).style(Style::new().white())).alignment(Alignment::Left))
             .title_style(Style::new().fg(DOS_YELLOW))
             .title_alignment(Alignment::Center)
             .title(format!("  IcyBoard v{}  ", ver))
