@@ -13,11 +13,12 @@ use crate::{Connection, ConnectionType};
 pub struct WebSocketConnection<S: Read + Write> {
     is_secure: bool,
     socket: WebSocket<S>,
+    data: Vec<u8>,
 }
 
 pub fn accept_websocket(stream: TcpStream) -> crate::Result<WebSocketConnection<TcpStream>> {
     let socket = tungstenite::accept(stream)?;
-    Ok(WebSocketConnection { is_secure: false, socket })
+    Ok(WebSocketConnection { is_secure: false, socket, data: Vec::new() })
 }
 
 pub fn accept_websocket_secure(
@@ -56,7 +57,7 @@ fn accept_secure2(
                 Ok(response)
             },
         )?;
-        Ok(WebSocketConnection { is_secure: true, socket })
+        Ok(WebSocketConnection { is_secure: true, socket, data: Vec::new()})
     } else {
         Err("No private key found".into())
     }
@@ -95,7 +96,7 @@ pub fn connect(address: &String, is_secure: bool) -> crate::Result<WebSocketConn
         _ => (),
     }
 
-    Ok(WebSocketConnection { is_secure, socket })
+    Ok(WebSocketConnection { is_secure, socket, data: Vec::new()})
 }
 
 fn schema_prefix(is_secure: bool) -> &'static str {
@@ -123,12 +124,19 @@ impl<S: Read + Write> Connection for WebSocketConnection<S> {
 
 impl<S: Read + Write> Read for WebSocketConnection<S> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if self.data.len() > 0 {
+            let len = buf.len().min(self.data.len());
+            buf[..len].copy_from_slice(&self.data[..len]);
+            self.data.drain(..len);
+            return Ok(len);
+        }
         match self.socket.read() {
             Ok(msg) => {
-                let data = msg.into_data();
+                let mut data = msg.into_data();
                 let len = buf.len().min(data.len());
                 buf[..len].copy_from_slice(&data[..len]);
-
+                data.drain(..len);
+                self.data = data;
                 Ok(len)
             }
             Err(Error::Io(e)) if e.kind() == std::io::ErrorKind::WouldBlock => Ok(0),

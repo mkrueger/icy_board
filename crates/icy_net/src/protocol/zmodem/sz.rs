@@ -15,13 +15,12 @@ use crate::{
 
 use super::{ZCRCQ, ZCRCW};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum SendState {
     Await,
     SendZRQInit,
     SendZDATA,
     SendDataPackages,
-    Finished,
 }
 
 pub struct Sz {
@@ -43,7 +42,7 @@ pub struct Sz {
 impl Sz {
     pub fn new(block_length: usize) -> Self {
         Self {
-            state: SendState::Finished,
+            state: SendState::Await,
             file_queue: VecDeque::new(),
             transfered_file: false,
             cur_buf: None,
@@ -97,12 +96,7 @@ impl Sz {
             Zmodem::encode_subpacket_crc16(zcrc_byte, data, self.can_esc_control())
         }
     }
-
-    pub fn is_active(&self) -> bool {
-        !matches!(self.state, SendState::Finished)
-    }
-
-    fn next_file(&mut self, transfer_state: &mut TransferState) -> crate::Result<()> {
+    fn next_file(&mut self, transfer_state: &mut TransferState) -> crate::Result<bool> {
         if let Some(next_file) = self.file_queue.pop_front() {
             transfer_state.send_state.file_name = next_file.file_name().unwrap().to_string_lossy().to_string();
             transfer_state.send_state.file_size = next_file.metadata()?.len();
@@ -110,19 +104,19 @@ impl Sz {
             self.cur_file = next_file.clone();
             let reader = BufReader::new(File::open(next_file)?);
             self.cur_buf = Some(reader);
+            Ok(true)
         } else {
-            transfer_state.is_finished = true;
+            Ok(false)
         }
-        Ok(())
     }
 
     pub fn update_transfer(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
-        if let SendState::Finished = self.state {
+        if transfer_state.is_finished {
             return Ok(());
         }
         if self.retries > 5 {
             Zmodem::cancel(com)?;
-            self.state = SendState::Finished;
+            transfer_state.is_finished  = true;
             return Ok(());
         }
         transfer_state.update_time();
@@ -220,20 +214,12 @@ impl Sz {
                             _ => {
                                 log::error!("unexpected header {header:?}");
                                 // cancel
-                                self.state = SendState::Finished;
                                 Zmodem::cancel(com)?;
+                                transfer_state.is_finished = true;
                             }
                         }
                     }
                 }
-            }
-            SendState::Finished => {
-                //                transfer_state.current_state = "Finishing transfer…";
-                // let now = Instant::now();
-                //if now.duration_since(self.last_send).unwrap().as_millis() > 3000 {
-                self.send_zfin(com, 0)?;
-                //}
-                return Ok(());
             }
         }
         Ok(())
@@ -243,14 +229,15 @@ impl Sz {
         let err = Header::read(com, &mut self.can_count);
         if self.can_count >= 5 {
             // transfer_info.write("Received cancel...".to_string());
-            self.state = SendState::Finished;
+            Zmodem::cancel(com)?;
+            transfer_state.is_finished = true;
             return Ok(());
         }
         if let Err(err) = err {
             log::error!("error reading header: {:?}", err);
             if self.errors > 3 {
-                self.state = SendState::Finished;
                 Zmodem::cancel(com)?;
+                transfer_state.is_finished = true;
                 return Err(err);
             }
             self.errors += 1;
@@ -259,16 +246,11 @@ impl Sz {
         self.errors = 0;
         let res = err.unwrap();
         if let Some(res) = res {
-            // println!("got header {}", res);
             match res.frame_type {
                 ZFrameType::RIinit => {
-                    if self.transfered_file {
-                        self.next_file(transfer_state)?;
-                        self.transfered_file = false;
-                    }
-
-                    if transfer_state.is_finished {
+                    if !self.next_file(transfer_state)? {
                         self.send_zfin(com, transfer_state.send_state.cur_bytes_transfered as u32)?;
+                        self.state = SendState::Await;
                         transfer_state.send_state.cur_bytes_transfered = 0;
                         return Ok(());
                     }
@@ -333,7 +315,7 @@ impl Sz {
                 }
 
                 ZFrameType::Fin => {
-                    self.state = SendState::Finished;
+                    transfer_state.is_finished = true;
                     com.write_all(b"OO")?;
                     return Ok(());
                 }
@@ -342,7 +324,7 @@ impl Sz {
                 }
                 ZFrameType::Abort | ZFrameType::FErr | ZFrameType::Can => {
                     Header::empty(ZFrameType::Fin).write(com, self.get_header_type(), self.can_esc_control())?;
-                    self.state = SendState::Finished;
+                    transfer_state.is_finished = true;
                 }
                 unk_frame => {
                     return Err(ZModemError::UnsupportedFrame(unk_frame).into());
@@ -354,7 +336,7 @@ impl Sz {
 
     fn send_zfile(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState, tries: i32) -> crate::Result<()> {
         if self.cur_buf.is_none() {
-            self.state = SendState::Finished;
+            transfer_state.is_finished = true;
             return Ok(());
         }
         let mut b = Vec::new();
@@ -400,17 +382,21 @@ impl Sz {
                 ZFrameType::Nak => {
                     if tries > 5 {
                         log::error!("too many tries for z_file");
-                        self.state = SendState::Finished;
                         Zmodem::cancel(com)?;
+                        transfer_state.is_finished = true;
                         return Ok(());
                     }
                     // self.send_zfile(com, tries + 1); /* resend */
                 }
+                ZFrameType::Fin => {
+                    com.write_all(b"OO")?;
+                    transfer_state.is_finished = true;
+                }
                 _ => {
                     log::error!("unexpected header {header:?}");
                     // cancel
-                    self.state = SendState::Finished;
                     Zmodem::cancel(com)?;
+                    transfer_state.is_finished = true;
                 }
             }
         }

@@ -109,7 +109,7 @@ impl TelnetConnection {
                         terminal_type::SEND => {
                             // Send
                             if cmd == telnet_option::TERMINAL_TYPE as i32 {
-                                let mut buf: Vec<u8> = vec![telnet_cmd::IAC, telnet_cmd::SB, telnet_option::TERMINAL_TYPE, terminal_type::IS];
+                                let mut buf = vec![telnet_cmd::IAC, telnet_cmd::SB, telnet_option::TERMINAL_TYPE, terminal_type::IS];
 
                                 match self.caps.terminal {
                                     //  :TODO: Let's extend this to allow for some of the semi-standard BBS IDs, e.g. "xterm" (ANSI), "ansi-256-color", etc.
@@ -123,11 +123,7 @@ impl TelnetConnection {
                                     TerminalEmulation::IGS => buf.extend_from_slice(b"IGS"),
                                     TerminalEmulation::Mode7 => buf.extend_from_slice(b"MODE7"),
                                 }
-                                data[write_ptr] = telnet_cmd::IAC;
-                                write_ptr += 1;
-                                data[write_ptr] = telnet_cmd::SE;
-                                write_ptr += 1;
-
+                                buf.extend([telnet_cmd::IAC, telnet_cmd::SE]);
                                 self.tcp_stream.write_all(&buf)?;
                             }
                         }
@@ -281,8 +277,9 @@ impl Write for TelnetConnection {
                 data.push(*b);
             }
         }
+        self.tcp_stream.write(&data)?;
 
-        self.tcp_stream.write(buf)
+        Ok(buf.len())
     }
 
     fn flush(&mut self) -> io::Result<()> {

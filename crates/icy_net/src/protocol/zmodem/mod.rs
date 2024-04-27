@@ -143,9 +143,6 @@ impl Protocol for Zmodem {
             }
         } else if let Some(sz) = &mut self.sz {
             sz.update_transfer(com, transfer_state)?;
-            if !sz.is_active() {
-                transfer_state.is_finished = true;
-            }
         }
         Ok(())
     }

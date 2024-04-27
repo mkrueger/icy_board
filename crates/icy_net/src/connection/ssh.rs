@@ -25,8 +25,15 @@ impl SSHConnection {
     pub fn open<A: ToSocketAddrs>(addr: &A, caps: TermCaps, credentials: Credentials) -> crate::Result<Self> {
         for addr in addr.to_socket_addrs()? {
             let session = Session::new()?;
-            session.set_option(SshOption::Hostname(addr.ip().to_string()))?;
-            session.set_option(SshOption::Port(addr.port()))?;
+            let host = addr.ip().to_string();
+            let mut port = addr.port();
+
+            if port == 0 {
+                port = Self::default_port();
+            }
+            println!("Connecting to {}:{}", host, port);
+            session.set_option(SshOption::Hostname(host))?;
+            session.set_option(SshOption::Port(port))?;
             session.set_option(SshOption::KeyExchange(SUPPORTED_KEY_EXCHANGES.to_string()))?;
             session.set_option(SshOption::CiphersCS(SUPPORTED_CIPHERS.to_string()))?;
             session.set_option(SshOption::CiphersSC(SUPPORTED_CIPHERS.to_string()))?;
@@ -35,7 +42,7 @@ impl SSHConnection {
             session.connect()?;
 
             //  :TODO: SECURITY: verify_known_hosts() implemented here -- ie: user must accept & we save somewhere
-
+            println!("User auth password: {} {}", credentials.user_name, credentials.password);
             session.userauth_password(Some(credentials.user_name.as_str()), Some(credentials.password.as_str()))?;
 
             let chan = session.new_channel()?;
@@ -44,7 +51,7 @@ impl SSHConnection {
             chan.request_pty(terminal_type.as_str(), caps.window_size.0 as u32, caps.window_size.1 as u32)?;
             chan.request_shell()?;
             session.set_blocking(false);
-
+            println!("initiating sessin !!!!");
             return Ok(Self {
                 session,
                 channel: Arc::new(Mutex::new(chan)),
@@ -60,20 +67,6 @@ impl SSHConnection {
     pub fn accept(_tcp_stream: TcpStream) -> crate::Result<Self> {
         todo!("SSHConnection::accept");
     }
-    /*
-    fn parse_address(addr: &str) -> TermComResult<(String, u16)> {
-        let components: Vec<&str> = addr.split(':').collect();
-        match components.first() {
-            Some(host) => match components.get(1) {
-                Some(port_str) => {
-                    let port = port_str.parse()?;
-                    Ok(((*host).to_string(), port))
-                }
-                _ => Ok(((*host).to_string(), Self::default_port())),
-            },
-            _ => Err(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid address"))),
-        }
-    }*/
 }
 
 impl Connection for SSHConnection {
@@ -92,7 +85,15 @@ impl Read for SSHConnection {
         match self.channel.lock() {
             Ok(locked) => {
                 let mut stdout = locked.stdout();
-                stdout.read(buf)
+                match stdout.read(buf) {
+                    Ok(size) => Ok(size),
+                    Err(e) => {
+                        if e.kind() == std::io::ErrorKind::WouldBlock {
+                            return Ok(0);
+                        }
+                        Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")))
+                    }
+                }
             }
             Err(err) => Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Can't lock channel: {err}"))),
         }

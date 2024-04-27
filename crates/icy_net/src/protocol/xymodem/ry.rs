@@ -118,7 +118,7 @@ impl Ry {
 
                 let num = str_from_null_terminated_utf8_unchecked(&block[(file_name.len() + 1)..]).to_string();
                 let file_size = if let Ok(file_size) = num.parse::<u64>() { file_size } else { 0 };
-                transfer_state.recieve_state.file_name = file_name.clone();
+                transfer_state.recieve_state.file_name = file_name;
                 transfer_state.recieve_state.file_size = file_size;
                 self.cur_out_file = Some(NamedTempFile::new()?);
 

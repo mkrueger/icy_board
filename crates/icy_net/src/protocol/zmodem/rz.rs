@@ -202,6 +202,8 @@ impl Rz {
                             transfer_state
                                 .recieve_state
                                 .log_info(format!("Start file transfer: {file_name} ({file_size} bytes)"));
+                            transfer_state
+                            .recieve_state.file_name = file_name;
                             // println!("start file transfer: {file_name} ({file_size})");
                             self.cur_out_file = Some(NamedTempFile::new()?);
                             transfer_state.recieve_state.file_size = file_size as u64;

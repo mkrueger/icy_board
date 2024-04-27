@@ -46,7 +46,24 @@ pub trait Connection: Read + Write {
 
     fn read_u8(&mut self) -> crate::Result<u8> {
         let mut buf = [0; 1];
-        self.read_exact(&mut buf)?;
+        loop { 
+            match self.read(&mut buf) {
+                Ok(size) =>  {
+                    if size == 0 {
+                        continue;
+                    }
+                    break;
+                }
+                Err(e) => {
+                    println!("Error: {:?}", e);
+                    if e.kind() != io::ErrorKind::WouldBlock {
+                        return Err(e.into());
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+            
+            }
+        }
         Ok(buf[0])
     }
 }

@@ -233,6 +233,7 @@ impl Header {
         }
         *can_count = 0;
         let mut next = com.read_u8()?;
+
         if next == ZPAD {
             next = com.read_u8()?;
         }
@@ -241,6 +242,7 @@ impl Header {
         }
 
         let header_type = com.read_u8()?;
+
         let header_data_size = match header_type {
             ZBIN => 7,
             ZBIN32 => 9,
@@ -251,6 +253,7 @@ impl Header {
         };
 
         let header_data = read_zdle_bytes(com, header_data_size)?;
+
         match header_type {
             ZBIN => {
                 let crc16 = get_crc16_buggy(&header_data[0..5]);

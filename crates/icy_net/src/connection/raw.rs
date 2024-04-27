@@ -1,12 +1,11 @@
-#![allow(dead_code)]
-
 use std::{
-    io::{self, Read, Write},
+    io::{self, ErrorKind, Read, Write},
     net::{TcpStream, ToSocketAddrs},
     time::Duration,
 };
 
 use crate::{Connection, ConnectionType, NetError};
+
 
 pub struct RawConnection {
     tcp_stream: TcpStream,
@@ -19,7 +18,7 @@ impl RawConnection {
 
             tcp_stream.set_write_timeout(Some(timeout))?;
             tcp_stream.set_read_timeout(Some(timeout))?;
-            tcp_stream.set_nonblocking(false)?;
+            tcp_stream.set_nonblocking(true)?;
 
             return Ok(Self { tcp_stream });
         }
@@ -40,7 +39,17 @@ impl Connection for RawConnection {
 
 impl Read for RawConnection {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.tcp_stream.read(buf)
+        match self.tcp_stream.read(buf) {
+            Ok(size) => {
+                Ok(size)
+            }
+            Err(ref e) => {
+                if e.kind() == ErrorKind::WouldBlock {
+                    return Ok(0);
+                }
+                Err(io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")))
+            }
+        }
     }
 }
 
