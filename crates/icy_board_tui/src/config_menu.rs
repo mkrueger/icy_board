@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, default, os::linux::raw::stat, path::PathBuf};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::icy_board::icb_config::IcbColor;
@@ -16,9 +16,24 @@ use crate::{
 };
 
 #[derive(Default)]
+pub enum EditMode {
+    #[default]
+    None,
+    Open(String, PathBuf),
+}
+
+#[derive(Default)]
 pub struct ResultState {
-    pub in_edit_mode: bool,
+    pub edit_mode: EditMode,
     pub status_line: String,
+}
+impl ResultState {
+    pub fn status_line(status_line: String) -> ResultState {
+        ResultState {
+            edit_mode: EditMode::None,
+            status_line,
+        }
+    }
 }
 
 pub enum ListValue {
@@ -51,6 +66,13 @@ impl ListItem {
 
     pub fn with_status(mut self, status: &str) -> Self {
         self.status = status.to_string();
+        self
+    }
+
+    pub fn with_label_width(mut self, width: u16) -> Self {
+        while self.title.len() < width as usize {
+            self.title.push(' ');
+        }
         self
     }
 
@@ -134,19 +156,15 @@ impl ListItem {
         }
     }
 
-    fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
+    fn handle_key_press(&mut self, key: KeyEvent, state: &mut ConfigMenuState) -> ResultState {
         match key {
             KeyEvent { code: KeyCode::Enter, .. } => {
-                return ResultState {
-                    in_edit_mode: false,
-                    status_line: self.status.clone(),
-                };
+                state.in_edit = false;
+                return ResultState::status_line(self.status.clone());
             }
             KeyEvent { code: KeyCode::Esc, .. } => {
-                return ResultState {
-                    in_edit_mode: false,
-                    status_line: self.status.clone(),
-                };
+                state.in_edit = false;
+                return ResultState::status_line(self.status.clone());
             }
             _ => {}
         }
@@ -166,25 +184,16 @@ impl ListItem {
             }
             ListValue::Color(_) | ListValue::U32(_, _, _) | ListValue::ValueList(_, _) => {}
         }
-        ResultState {
-            in_edit_mode: true,
-            status_line: self.status.clone(),
-        }
+        return ResultState::status_line(self.status.clone());
     }
 
     fn request_edit_mode(&mut self) -> ResultState {
         match &mut self.value {
             ListValue::Bool(b) => {
                 *b = !*b;
-                ResultState {
-                    in_edit_mode: false,
-                    status_line: self.status.clone(),
-                }
+                return ResultState::status_line(self.status.clone());
             }
-            _ => ResultState {
-                in_edit_mode: true,
-                status_line: "".to_string(),
-            },
+            _ => ResultState::status_line(String::new()),
         }
     }
 }
@@ -224,15 +233,13 @@ pub struct ConfigMenuState {
 
 impl ConfigMenu {
     pub fn render(&mut self, area: Rect, frame: &mut Frame, state: &mut ConfigMenuState) {
-        let max = self.items.iter().map(|item| item.title_len()).max().unwrap_or(0);
-
         let mut y = 0;
         let mut x = 0;
         let mut i = 0;
 
         state.area_height = area.height;
 
-        Self::display_list(&mut i, &mut self.items, area, max, &mut y, &mut x, frame, state);
+        Self::display_list(&mut i, &mut self.items, area, &mut y, &mut x, frame, state);
 
         state.scroll_state = state.scroll_state.position(state.first_row as usize).content_length(state.area_height as usize);
         Self::render_scrollbar(state, frame, area);
@@ -343,16 +350,7 @@ impl ConfigMenu {
         }
     }
 
-    fn display_table(
-        i: &mut usize,
-        items: &mut Vec<ConfigEntry>,
-        area: Rect,
-        max: u16,
-        y: &mut u16,
-        x: &mut u16,
-        frame: &mut Frame,
-        state: &mut ConfigMenuState,
-    ) {
+    fn display_table(i: &mut usize, items: &mut Vec<ConfigEntry>, area: Rect, y: &mut u16, x: &mut u16, frame: &mut Frame, state: &mut ConfigMenuState) {
         let x1 = *x;
         let x2 = *x + area.width / 2;
 
@@ -360,6 +358,8 @@ impl ConfigMenu {
             match item {
                 ConfigEntry::Item(item) => {
                     if *y >= state.first_row && *y < area.height + state.first_row {
+                        let max = item.title.len() as u16;
+
                         let left_area = Rect {
                             x: area.x + *x,
                             y: area.y + *y - state.first_row,
@@ -368,11 +368,11 @@ impl ConfigMenu {
                         };
 
                         item.render_label(left_area, frame, *i == state.selected, state.in_edit);
-
+                        let xright = if *x >= x2 { area.right() - 1 } else { area.x + x2 };
                         let right_area = Rect {
-                            x: area.x + *x + max + 3,
+                            x: left_area.right() + 1,
                             y: area.y + *y - state.first_row,
-                            width: area.width - (*x + max + 3) - 2,
+                            width: xright.saturating_sub(left_area.right() + 1),
                             height: 1,
                         };
                         if state.in_edit && *i == state.selected {
@@ -398,24 +398,16 @@ impl ConfigMenu {
         }
         *x = x1;
     }
-    pub fn display_list(
-        i: &mut usize,
-        items: &mut Vec<ConfigEntry>,
-        area: Rect,
-        max: u16,
-        y: &mut u16,
-        x: &mut u16,
-        frame: &mut Frame,
-        state: &mut ConfigMenuState,
-    ) {
+    pub fn display_list(i: &mut usize, items: &mut Vec<ConfigEntry>, area: Rect, y: &mut u16, x: &mut u16, frame: &mut Frame, state: &mut ConfigMenuState) {
         for item in items.iter_mut() {
             match item {
                 ConfigEntry::Item(item) => {
                     if *y >= state.first_row && *y < area.height + state.first_row {
+                        let max = item.title.len() as u16;
                         let left_area = Rect {
                             x: area.x + *x,
                             y: area.y + *y - state.first_row,
-                            width: max as u16 + 2,
+                            width: max + 2,
                             height: 1,
                         };
 
@@ -452,10 +444,10 @@ impl ConfigMenu {
                             .render(left_area, frame.buffer_mut());
                     }
                     *y += 1;
-                    Self::display_list(i, items, area, max, y, x, frame, state);
+                    Self::display_list(i, items, area, y, x, frame, state);
                 }
                 ConfigEntry::Table(_cols, items) => {
-                    Self::display_table(i, items, area, max, y, x, frame, state);
+                    Self::display_table(i, items, area, y, x, frame, state);
                 }
                 ConfigEntry::Separator => {
                     /*
@@ -480,7 +472,7 @@ impl ConfigMenu {
 
     pub fn handle_key_press(&mut self, key: KeyEvent, state: &mut ConfigMenuState) -> ResultState {
         if state.in_edit {
-            return self.get_item_mut(state.selected).unwrap().handle_key_press(key);
+            return self.get_item_mut(state.selected).unwrap().handle_key_press(key, state);
         }
 
         match key.code {
@@ -490,7 +482,7 @@ impl ConfigMenu {
             }
             KeyCode::End => {
                 state.selected = self.count() - 1;
-                state.first_row = state.item_pos.get(&state.selected).unwrap_or(&0) - state.area_height + 1;
+                state.first_row = state.item_pos.get(&state.selected).unwrap_or(&0).saturating_sub(state.area_height) + 1;
             }
             KeyCode::PageDown => {
                 state.selected += state.area_height as usize;
@@ -521,15 +513,14 @@ impl ConfigMenu {
             KeyCode::Char('k') | KeyCode::Up => Self::prev(state),
             KeyCode::Char('j') | KeyCode::Down => Self::next(self.count(), state),
             KeyCode::Char('d') | KeyCode::Enter => {
+                state.in_edit = !state.in_edit;
                 return self.get_item_mut(state.selected).unwrap().request_edit_mode();
             }
 
             _ => {}
         }
-        ResultState {
-            in_edit_mode: false,
-            status_line: self.get_item(state.selected).unwrap().status.clone(),
-        }
+
+        ResultState::status_line(self.get_item(state.selected).unwrap().status.clone())
     }
 
     fn prev(state: &mut ConfigMenuState) {
@@ -555,6 +546,43 @@ impl ConfigMenu {
                     state.first_row = *y - state.area_height + 1;
                 }
             }
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &ListItem> {
+        ConfigMenuIter { iter: vec![self.items.iter()] }
+    }
+}
+
+struct ConfigMenuIter<'a> {
+    iter: Vec<std::slice::Iter<'a, ConfigEntry>>,
+}
+impl<'a> Iterator for ConfigMenuIter<'a> {
+    type Item = &'a ListItem;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Some(mut l) = self.iter.pop() else {
+            return None;
+        };
+        match l.next() {
+            Some(a) => match a {
+                ConfigEntry::Item(item) => {
+                    self.iter.push(l);
+                    Some(item)
+                }
+                ConfigEntry::Group(_, items) => {
+                    self.iter.push(l);
+                    self.iter.push(items.iter());
+                    self.next()
+                }
+                ConfigEntry::Table(_, items) => {
+                    self.iter.push(l);
+                    self.iter.push(items.iter());
+                    self.next()
+                }
+                ConfigEntry::Separator => self.next(),
+            },
+            None => self.next(),
         }
     }
 }

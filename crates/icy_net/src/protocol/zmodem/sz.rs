@@ -116,7 +116,7 @@ impl Sz {
         }
         if self.retries > 5 {
             Zmodem::cancel(com)?;
-            transfer_state.is_finished  = true;
+            transfer_state.is_finished = true;
             return Ok(());
         }
         transfer_state.update_time();

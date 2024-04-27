@@ -71,6 +71,8 @@ impl TextfieldState {
 
     fn insert_key(&mut self, value: &mut String, ch: char) {
         if self.mask.is_empty() || self.mask.contains(ch) {
+            self.cursor_position = self.cursor_position.clamp(0, value.len() as u16);
+
             if self.cursor_position + 1 < self.max_len || self.max_len == 0 {
                 value.insert(self.cursor_position as usize, ch);
                 self.cursor_position += 1;

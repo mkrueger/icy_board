@@ -1,12 +1,18 @@
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::vec;
 
+use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
+use icy_board_engine::icy_board::user_base::Password;
 use icy_board_engine::icy_board::IcyBoard;
-use icy_board_tui::text_field::TextField;
-use icy_board_tui::text_field::TextfieldState;
+use icy_board_tui::config_menu::ConfigEntry;
+use icy_board_tui::config_menu::ConfigMenu;
+use icy_board_tui::config_menu::ConfigMenuState;
+use icy_board_tui::config_menu::EditMode;
+use icy_board_tui::config_menu::ListItem;
+use icy_board_tui::config_menu::ListValue;
 use icy_board_tui::{config_menu::ResultState, theme::THEME};
-use ratatui::text::Span;
 use ratatui::{
     layout::{Constraint, Margin, Rect},
     text::Text,
@@ -16,27 +22,30 @@ use ratatui::{
 
 use super::TabPage;
 
-#[derive(Clone)]
 pub struct ConferencesTab {
     scroll_state: ScrollbarState,
     table_state: TableState,
     icy_board: Arc<Mutex<IcyBoard>>,
-    pub text_field_state: TextfieldState,
-
-    edit_area: usize,
 
     in_edit_mode: bool,
+
+    conference_config: ConfigMenu,
+    state: ConfigMenuState,
+    edit_conference: usize,
 }
 
 impl ConferencesTab {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
+        let items = vec![];
+
         Self {
             scroll_state: ScrollbarState::default().content_length(icy_board.lock().unwrap().conferences.len()),
             table_state: TableState::default().with_selected(0),
-            text_field_state: TextfieldState::default(),
             icy_board: icy_board.clone(),
             in_edit_mode: false,
-            edit_area: 0,
+            conference_config: ConfigMenu { items },
+            state: ConfigMenuState::default(),
+            edit_conference: 0,
         }
     }
 
@@ -55,6 +64,7 @@ impl ConferencesTab {
             &mut self.scroll_state,
         );
     }
+
     fn render_table(&mut self, frame: &mut Frame, area: Rect) {
         let header = ["", "Keyword", "Display"]
             .into_iter()
@@ -123,294 +133,174 @@ impl ConferencesTab {
     }
 
     fn insert(&mut self) {
-        //  self.icy_board.conferences.push(icy_board_engine::icy_board::commands::Command::default());
+        let mut conf = if let Some(i) = self.table_state.selected() {
+            self.icy_board.lock().unwrap().conferences[i].clone()
+        } else {
+            self.icy_board.lock().unwrap().conferences[0].clone()
+        };
+        conf.name = format!("New Conference #{}", self.icy_board.lock().unwrap().conferences.len() + 1);
+        self.icy_board.lock().unwrap().conferences.push(conf);
         self.scroll_state = self.scroll_state.content_length(self.icy_board.lock().unwrap().conferences.len());
     }
 
-    fn draw_label(&self, label: &str, line: &mut Rect, len: u16, frame: &mut Frame) {
-        Text::from(label).style(THEME.item).render(*line, frame.buffer_mut());
-        line.x += len;
-        line.width -= len;
-        Span::from(":").style(THEME.item).render(*line, frame.buffer_mut());
-        line.x += 2;
-        line.width -= 2;
+    fn remove(&mut self) {
+        if let Some(i) = self.table_state.selected() {
+            if i > 0 {
+                self.icy_board.lock().unwrap().conferences.remove(i);
+                let len = self.icy_board.lock().unwrap().conferences.len();
+                self.scroll_state = self.scroll_state.content_length(len);
+
+                if len >= i - 1 {
+                    self.table_state.select(Some(i - 1));
+                } else {
+                    self.table_state.select(Some(0));
+                }
+            }
+        }
     }
 
     fn render_editor(&mut self, frame: &mut Frame, area: Rect) {
-        let mut area = area.inner(&Margin { vertical: 1, horizontal: 2 });
-        let Ok(mut board) = self.icy_board.lock() else {
-            return;
-        };
-        let cur_conf = board.conferences.get_mut(self.table_state.selected().unwrap()).unwrap();
-        let mut line = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        };
-        self.draw_label(&format!("Name (#{})", self.table_state.selected().unwrap() + 1), &mut line, 14, frame);
+        let area = area.inner(&Margin { vertical: 1, horizontal: 1 });
+        self.conference_config.render(area, frame, &mut self.state);
+    }
 
-        if self.edit_area == 0 {
-            let field = TextField::new().with_value(cur_conf.name.to_string());
-            frame.render_stateful_widget(field, line, &mut self.text_field_state);
-        } else {
-            Text::from(cur_conf.name.to_string()).style(THEME.value).render(line, frame.buffer_mut());
+    fn open_editor(&mut self, conference_number: usize) {
+        self.state = ConfigMenuState::default();
+        self.edit_conference = conference_number;
+        let ib = self.icy_board.lock().unwrap();
+        let conf = ib.conferences.get(conference_number).unwrap();
+        let items = vec![
+            ConfigEntry::Item(
+                ListItem::new(
+                    "name",
+                    format!("Name (#{})", self.table_state.selected().unwrap() + 1),
+                    ListValue::Text(25, conf.name.clone()),
+                )
+                .with_label_width(14),
+            ),
+            ConfigEntry::Table(
+                2,
+                vec![
+                    ConfigEntry::Item(ListItem::new("is_public", "Public Conference".to_string(), ListValue::Bool(conf.is_public))),
+                    ConfigEntry::Item(
+                        ListItem::new(
+                            "req_sec",
+                            "Req. Security if Public".to_string(),
+                            ListValue::U32(conf.required_security.level as u32, 0, 255),
+                        )
+                        .with_label_width(28),
+                    ),
+                ],
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "password",
+                    "Password to Join if Private".to_string(),
+                    ListValue::Text(25, conf.password.to_string()),
+                )
+                .with_label_width(28),
+            ),
+            ConfigEntry::Separator,
+            ConfigEntry::Item(
+                ListItem::new("users_menu", "Name/Loc of User's Menu".to_string(), ListValue::Path(conf.users_menu.clone())).with_label_width(28),
+            ),
+            ConfigEntry::Item(
+                ListItem::new("sysop_menu", "Name/Loc of Sysop's Menu".to_string(), ListValue::Path(conf.sysop_menu.clone())).with_label_width(28),
+            ),
+            ConfigEntry::Item(ListItem::new("news_file", "Name/Loc of NEWS File".to_string(), ListValue::Path(conf.news_file.clone())).with_label_width(28)),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "intro_file",
+                    "Name/Loc of Conf INTRO File".to_string(),
+                    ListValue::Path(conf.intro_file.clone()),
+                )
+                .with_label_width(28),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "attachment_location",
+                    "Location for Attachments".to_string(),
+                    ListValue::Path(conf.attachment_location.clone()),
+                )
+                .with_label_width(28),
+            ),
+            ConfigEntry::Item(ListItem::new("command_file", "Conf. CMD.LST File".to_string(), ListValue::Path(conf.command_file.clone())).with_label_width(28)),
+            ConfigEntry::Separator,
+            ConfigEntry::Item(
+                ListItem::new(
+                    "pub_upload_dir_file",
+                    "Public Upld".to_string(),
+                    ListValue::Path(conf.pub_upload_dir_file.clone()),
+                )
+                .with_label_width(12),
+            ),
+            ConfigEntry::Separator,
+            ConfigEntry::Table(
+                2,
+                vec![
+                    ConfigEntry::Item(ListItem::new("doors_menu", "Doors".to_string(), ListValue::Path(conf.doors_menu.clone())).with_label_width(12)),
+                    ConfigEntry::Item(ListItem::new("doors_file", "".to_string(), ListValue::Path(conf.doors_file.clone()))),
+                    ConfigEntry::Item(ListItem::new("blt_menu", "Bulletins".to_string(), ListValue::Path(conf.blt_menu.clone())).with_label_width(12)),
+                    ConfigEntry::Item(ListItem::new("blt_file", "".to_string(), ListValue::Path(conf.blt_file.clone()))),
+                    ConfigEntry::Item(ListItem::new("survey_menu", "Surveys".to_string(), ListValue::Path(conf.survey_menu.clone())).with_label_width(12)),
+                    ConfigEntry::Item(ListItem::new("survey_file", "".to_string(), ListValue::Path(conf.survey_file.clone()))),
+                    ConfigEntry::Item(ListItem::new("dir_menu", "Directories".to_string(), ListValue::Path(conf.dir_menu.clone())).with_label_width(12)),
+                    ConfigEntry::Item(ListItem::new("dir_file", "".to_string(), ListValue::Path(conf.dir_file.clone()))),
+                    ConfigEntry::Item(ListItem::new("area_menu", "Areas".to_string(), ListValue::Path(conf.area_menu.clone())).with_label_width(12)),
+                    ConfigEntry::Item(ListItem::new("area_file", "".to_string(), ListValue::Path(conf.area_file.clone()))),
+                ],
+            ),
+        ];
+        self.conference_config.items = items;
+    }
+
+    fn write_config(&self) {
+        let mut ib = self.icy_board.lock().unwrap();
+        let conf = &mut ib.conferences[self.edit_conference];
+
+        for item in self.conference_config.iter() {
+            self.write_item(item, conf);
         }
+    }
 
-        area.y += 1;
-        let mut line = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        };
-
-        let l1 = 28;
-
-        self.draw_label("Public Conference", &mut line, l1, frame);
-        Text::from(if cur_conf.is_public { "Y" } else { "N" })
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-        line.x += 10;
-        line.width -= 10;
-        self.draw_label("Req. Security if Public", &mut line, 24, frame);
-        Text::from(cur_conf.required_security.level.to_string())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-        area.y += 1;
-        let mut line = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        };
-        self.draw_label("Password to Join if Private", &mut line, l1, frame);
-        Text::from(cur_conf.password.to_string()).style(THEME.value).render(line, frame.buffer_mut());
-        line.x += 20;
-
-        area.y += 2;
-        let mut line = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        };
-        self.draw_label("Name/Loc of User's Menu", &mut line, l1, frame);
-        Text::from(cur_conf.users_menu.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-
-        area.y += 1;
-        let mut line = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        };
-        self.draw_label("Name/Loc of Sysop's Menu", &mut line, l1, frame);
-        Text::from(cur_conf.sysop_menu.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-
-        area.y += 1;
-        let mut line = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        };
-        self.draw_label("Name/Loc of NEWS File", &mut line, l1, frame);
-        Text::from(cur_conf.news_file.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-
-        area.y += 1;
-        let mut line = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        };
-        self.draw_label("Name/Loc of Conf INTRO File", &mut line, l1, frame);
-        Text::from(cur_conf.intro_file.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-
-        area.y += 1;
-        let mut line = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        };
-        self.draw_label("Location for Attachments", &mut line, l1, frame);
-        Text::from(cur_conf.attachment_location.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-
-        area.y += 1;
-        let mut line = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        };
-        self.draw_label("Conf. CMD.LST File", &mut line, l1, frame);
-        Text::from(cur_conf.command_file.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-
-        area.y += 2;
-        let mut line = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        };
-        self.draw_label("Public Upld", &mut line, 12, frame);
-        Text::from(cur_conf.pub_upload_dir_file.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-
-        line.x += 22;
-        line.width -= 22;
-
-        self.draw_label(":", &mut line, 1, frame);
-        Text::from(cur_conf.pub_upload_location.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-
-        let l2 = 12;
-        let l3 = 25;
-
-        area.y += 2;
-
-        let mut line = Rect {
-            x: area.x + 2,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        };
-        line.x += l2;
-        Text::from("Menu Listing").style(THEME.value).render(line, frame.buffer_mut());
-
-        line.x += l3;
-        line.width -= l3;
-        Text::from("Path/Name List File").style(THEME.value).render(line, frame.buffer_mut());
-
-        area.y += 1;
-
-        let mut line = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        };
-        self.draw_label("Doors", &mut line, l2, frame);
-        Text::from(cur_conf.doors_menu.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-        line.x += l3;
-        line.width -= l3;
-
-        Text::from(":").style(THEME.value).render(line, frame.buffer_mut());
-
-        line.x += 2;
-        line.width -= 2;
-
-        Text::from(cur_conf.doors_file.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-
-        area.y += 1;
-        let mut line = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        };
-        self.draw_label("Bulletins", &mut line, l2, frame);
-        Text::from(cur_conf.blt_menu.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-        line.x += l3;
-        line.width -= l3;
-        Text::from(":").style(THEME.value).render(line, frame.buffer_mut());
-
-        line.x += 2;
-        line.width -= 2;
-
-        Text::from(cur_conf.blt_file.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-
-        area.y += 1;
-        let mut line = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        };
-        self.draw_label("Surveys", &mut line, l2, frame);
-        Text::from(cur_conf.survey_menu.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-        line.x += l3;
-        line.width -= l3;
-        Text::from(":").style(THEME.value).render(line, frame.buffer_mut());
-
-        line.x += 2;
-        line.width -= 2;
-
-        Text::from(cur_conf.survey_file.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-
-        area.y += 1;
-        let mut line = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        };
-
-        self.draw_label("Directories", &mut line, l2, frame);
-        Text::from(cur_conf.dir_menu.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-        line.x += l3;
-        line.width -= l3;
-        Text::from(":").style(THEME.value).render(line, frame.buffer_mut());
-
-        line.x += 2;
-        line.width -= 2;
-
-        Text::from(cur_conf.dir_file.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-
-        area.y += 1;
-        let mut line = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        };
-
-        self.draw_label("Areas", &mut line, l2, frame);
-        Text::from(cur_conf.area_menu.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
-        line.x += l3;
-        line.width -= l3;
-        Text::from(":").style(THEME.value).render(line, frame.buffer_mut());
-
-        line.x += 2;
-        line.width -= 2;
-
-        Text::from(cur_conf.area_file.to_string_lossy())
-            .style(THEME.value)
-            .render(line, frame.buffer_mut());
+    fn write_item(&self, item: &ListItem, conf: &mut icy_board_engine::icy_board::conferences::Conference) {
+        match &item.value {
+            ListValue::Text(_, text) => match item.id.as_str() {
+                "name" => conf.name = text.clone(),
+                "password" => conf.password = Password::PlainText(text.clone()),
+                _ => panic!("Unknown id: {}", item.id),
+            },
+            ListValue::Path(path) => match item.id.as_str() {
+                "users_menu" => conf.users_menu = path.clone(),
+                "sysop_menu" => conf.sysop_menu = path.clone(),
+                "news_file" => conf.news_file = path.clone(),
+                "intro_file" => conf.intro_file = path.clone(),
+                "attachment_location" => conf.attachment_location = path.clone(),
+                "command_file" => conf.command_file = path.clone(),
+                "pub_upload_dir_file" => conf.pub_upload_dir_file = path.clone(),
+                "doors_menu" => conf.doors_menu = path.clone(),
+                "doors_file" => conf.doors_file = path.clone(),
+                "blt_menu" => conf.blt_menu = path.clone(),
+                "blt_file" => conf.blt_file = path.clone(),
+                "survey_menu" => conf.survey_menu = path.clone(),
+                "survey_file" => conf.survey_file = path.clone(),
+                "dir_menu" => conf.dir_menu = path.clone(),
+                "dir_file" => conf.dir_file = path.clone(),
+                "area_menu" => conf.area_menu = path.clone(),
+                "area_file" => conf.area_file = path.clone(),
+                _ => panic!("Unknown id: {}", item.id),
+            },
+            ListValue::U32(val, _, _) => match item.id.as_str() {
+                "req_sec" => conf.required_security.level = *val as u8,
+                _ => panic!("Unknown id: {}", item.id),
+            },
+            ListValue::Bool(b) => match item.id.as_str() {
+                "is_public" => conf.is_public = *b,
+                _ => panic!("Unknown id: {}", item.id),
+            },
+            ListValue::Color(_) => todo!(),
+            ListValue::ValueList(_, _) => todo!(),
+        }
     }
 }
 
@@ -421,6 +311,7 @@ impl TabPage for ConferencesTab {
 
         if self.in_edit_mode {
             self.render_editor(frame, area);
+            self.set_cursor_position(frame);
             return;
         }
 
@@ -428,56 +319,59 @@ impl TabPage for ConferencesTab {
         self.render_scrollbar(frame, area);
     }
 
+    fn set_cursor_position(&self, frame: &mut Frame) {
+        self.conference_config
+            .get_item(self.state.selected)
+            .unwrap()
+            .text_field_state
+            .set_cursor_position(frame);
+    }
+    fn has_control(&self) -> bool {
+        self.in_edit_mode
+    }
     fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
         if self.in_edit_mode {
             match key.code {
-                crossterm::event::KeyCode::Esc => {
+                KeyCode::Esc => {
                     self.in_edit_mode = false;
+                    self.write_config();
                     return ResultState::default();
                 }
-                crossterm::event::KeyCode::Up => self.edit_area = self.edit_area.saturating_sub(1),
-                crossterm::event::KeyCode::Down => self.edit_area = (self.edit_area + 1) % 10,
-
-                _ => match self.edit_area {
-                    0 => self.text_field_state.handle_input(
-                        key,
-                        &mut self
-                            .icy_board
-                            .lock()
-                            .unwrap()
-                            .conferences
-                            .get_mut(self.table_state.selected().unwrap())
-                            .unwrap()
-                            .name,
-                    ),
-                    _ => {}
-                },
+                KeyCode::F(2) => {
+                    if let Some(item) = self.conference_config.get_item(self.state.selected) {
+                        if item.id == "doors_file" {
+                            if let ListValue::Path(path) = &item.value {
+                                let path = self.icy_board.lock().unwrap().resolve_file(path);
+                                return ResultState {
+                                    edit_mode: EditMode::Open("doors_file".to_string(), path.clone()),
+                                    status_line: String::new(),
+                                };
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    let res = self.conference_config.handle_key_press(key, &mut self.state);
+                }
             }
-
-            return ResultState {
-                in_edit_mode: true,
-                status_line: String::new(),
-            };
+            return ResultState::status_line(String::new());
         }
         match key.code {
-            crossterm::event::KeyCode::Char('k') | crossterm::event::KeyCode::Up => self.prev(),
-            crossterm::event::KeyCode::Char('j') | crossterm::event::KeyCode::Down => self.next(),
-            crossterm::event::KeyCode::Char('i') | crossterm::event::KeyCode::Insert => self.insert(),
-            crossterm::event::KeyCode::Char('d') | crossterm::event::KeyCode::Enter => {
-                if let Some(_state) = self.table_state.selected() {
+            KeyCode::Char('k') | KeyCode::Up => self.prev(),
+            KeyCode::Char('j') | KeyCode::Down => self.next(),
+            KeyCode::Char('i') | KeyCode::Insert => self.insert(),
+            KeyCode::Char('r') | KeyCode::Delete => self.remove(),
+            KeyCode::Char('d') | KeyCode::Enter => {
+                if let Some(state) = self.table_state.selected() {
                     self.in_edit_mode = true;
-                    return ResultState {
-                        in_edit_mode: true,
-                        status_line: String::new(),
-                    };
+                    self.open_editor(state);
+                    return ResultState::status_line(String::new());
                 } else {
                     self.in_edit_mode = false;
                 }
             }
-
             _ => {}
         }
-
         ResultState::default()
     }
 }

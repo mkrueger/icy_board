@@ -1,3 +1,4 @@
+use icy_board_tui::config_menu::EditMode;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -355,7 +356,11 @@ impl<'a> TabPage for PathTab<'a> {
 
         let area = area.inner(&Margin { vertical: 1, horizontal: 1 });
         self.config.render(area, frame, &mut self.state);
+        if self.state.in_edit {
+            self.set_cursor_position(frame);
+        }
     }
+
     fn has_control(&self) -> bool {
         self.state.in_edit || self.edit_text.is_some()
     }
@@ -394,13 +399,12 @@ impl<'a> TabPage for PathTab<'a> {
         if self.state.in_edit {
             self.write_back(&mut self.icy_board.lock().unwrap());
         }
-        self.state.in_edit = res.in_edit_mode;
         res
     }
 
     fn request_status(&self) -> ResultState {
         return ResultState {
-            in_edit_mode: self.state.in_edit,
+            edit_mode: EditMode::None,
             status_line: if self.state.selected < self.config.items.len() {
                 "".to_string()
             } else {

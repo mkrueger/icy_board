@@ -7,6 +7,7 @@ use semver::Version;
 use std::{collections::HashMap, path::PathBuf, process::exit};
 
 pub mod app;
+pub mod editors;
 pub mod help_view;
 pub mod tabs;
 

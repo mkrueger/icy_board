@@ -18,7 +18,11 @@ pub struct WebSocketConnection<S: Read + Write> {
 
 pub fn accept_websocket(stream: TcpStream) -> crate::Result<WebSocketConnection<TcpStream>> {
     let socket = tungstenite::accept(stream)?;
-    Ok(WebSocketConnection { is_secure: false, socket, data: Vec::new() })
+    Ok(WebSocketConnection {
+        is_secure: false,
+        socket,
+        data: Vec::new(),
+    })
 }
 
 pub fn accept_websocket_secure(
@@ -57,7 +61,11 @@ fn accept_secure2(
                 Ok(response)
             },
         )?;
-        Ok(WebSocketConnection { is_secure: true, socket, data: Vec::new()})
+        Ok(WebSocketConnection {
+            is_secure: true,
+            socket,
+            data: Vec::new(),
+        })
     } else {
         Err("No private key found".into())
     }
@@ -96,7 +104,11 @@ pub fn connect(address: &String, is_secure: bool) -> crate::Result<WebSocketConn
         _ => (),
     }
 
-    Ok(WebSocketConnection { is_secure, socket, data: Vec::new()})
+    Ok(WebSocketConnection {
+        is_secure,
+        socket,
+        data: Vec::new(),
+    })
 }
 
 fn schema_prefix(is_secure: bool) -> &'static str {

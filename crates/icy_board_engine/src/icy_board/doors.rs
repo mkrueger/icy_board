@@ -35,7 +35,7 @@ pub struct Door {
     pub securiy_level: RequiredSecurity,
 
     pub door_type: DoorType,
-    pub door_path: String,
+    pub path: String,
 }
 
 impl UserData for Door {

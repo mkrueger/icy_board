@@ -1,15 +1,17 @@
+use core::panic;
 use std::{path::PathBuf, sync::Arc, sync::Mutex, time::Duration};
 
 use chrono::{Local, Timelike};
 use color_eyre::{eyre::Context, Result};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use icy_board_engine::icy_board::IcyBoard;
-use icy_board_tui::{term::next_event, theme::THEME, TerminalType};
+use icy_board_tui::{config_menu::EditMode, term::next_event, theme::THEME, TerminalType};
 use itertools::Itertools;
 use ratatui::{prelude::*, widgets::*};
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 
 use crate::{
+    editors::{door::DoorEditor, Editor},
     help_view::{HelpView, HelpViewState},
     tabs::*,
 };
@@ -32,13 +34,14 @@ pub struct App<'a> {
     about_tab: AboutTab,
 
     help_state: HelpViewState<'a>,
+
+    cur_file_editor: Option<Box<dyn Editor>>,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 enum Mode {
     #[default]
     Command,
-    Edit,
     Quit,
     ShowHelp,
 }
@@ -74,6 +77,7 @@ impl<'a> App<'a> {
             about_tab: AboutTab::default(),
             status_line: String::new(),
             help_state: HelpViewState::new(23),
+            cur_file_editor: None,
         }
     }
 
@@ -82,6 +86,9 @@ impl<'a> App<'a> {
         while self.is_running() {
             self.draw(terminal)?;
             self.handle_events(terminal)?;
+        }
+        if let Err(err) = self.icy_board.lock().unwrap().save() {
+            eprintln!("Error saving config: {}", err);
         }
         Ok(())
     }
@@ -95,13 +102,18 @@ impl<'a> App<'a> {
         terminal
             .draw(|frame| {
                 let screen = get_screen_size(&frame, self.full_screen);
+
+                if let Some(editor) = &mut self.cur_file_editor {
+                    editor.render(frame, screen);
+                    return;
+                }
+
                 self.ui(frame, screen);
 
                 match self.mode {
                     Mode::ShowHelp => {
                         self.show_help(frame, screen);
                     }
-                    Mode::Edit => self.get_tab().set_cursor_position(frame),
                     _ => {}
                 }
             })
@@ -145,10 +157,27 @@ impl<'a> App<'a> {
     }
 
     fn handle_key_press(&mut self, _terminal: &mut TerminalType, key: KeyEvent) {
+        if let Some(editor) = &mut self.cur_file_editor {
+            if !editor.handle_key_press(key) {
+                self.cur_file_editor = None;
+            }
+            return;
+        }
+
         if self.get_tab().has_control() {
             let state = self.get_tab_mut().handle_key_press(key);
+            if let EditMode::Open(id, path) = &state.edit_mode {
+                match id.as_str() {
+                    "doors_file" => {
+                        self.cur_file_editor = Some(Box::new(DoorEditor::new(path).unwrap()));
+                    }
+                    _ => {
+                        panic!("Unknown id: {}", id);
+                    }
+                }
+            }
+
             self.status_line = state.status_line;
-            self.mode = if state.in_edit_mode { Mode::Edit } else { Mode::Command };
             return;
         }
 
@@ -173,7 +202,6 @@ impl<'a> App<'a> {
             _ => {
                 let state = self.get_tab_mut().handle_key_press(key);
                 self.status_line = state.status_line;
-                self.mode = if state.in_edit_mode { Mode::Edit } else { Mode::Command };
             }
         };
     }

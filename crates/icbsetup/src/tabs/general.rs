@@ -4,6 +4,7 @@ use std::sync::Mutex;
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::user_base::Password;
 use icy_board_engine::icy_board::IcyBoard;
+use icy_board_tui::config_menu::EditMode;
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
     theme::THEME,
@@ -410,29 +411,6 @@ impl GeneralTab {
         }
     }
 
-    fn write_back(&self, icy_board: &mut IcyBoard) {
-        for entry in self.config.items.iter() {
-            self.visit_item(&entry, icy_board);
-        }
-    }
-
-    fn visit_item(&self, entry: &ConfigEntry, icy_board: &mut IcyBoard) {
-        match entry {
-            ConfigEntry::Group(_grp, entries) => {
-                for e in entries {
-                    self.visit_item(&e, icy_board);
-                }
-            }
-            ConfigEntry::Separator => {}
-            ConfigEntry::Item(item) => self.write_item(&item, icy_board),
-            ConfigEntry::Table(_, item) => {
-                for e in item {
-                    self.visit_item(&e, icy_board);
-                }
-            }
-        }
-    }
-
     fn write_item(&self, item: &ListItem, icy_board: &mut IcyBoard) {
         match &item.value {
             ListValue::Text(_, text) => match item.id.as_str() {
@@ -534,6 +512,10 @@ impl TabPage for GeneralTab {
 
         let area = area.inner(&Margin { vertical: 1, horizontal: 1 });
         self.config.render(area, frame, &mut self.state);
+
+        if self.state.in_edit {
+            self.set_cursor_position(frame);
+        }
     }
 
     fn has_control(&self) -> bool {
@@ -546,16 +528,15 @@ impl TabPage for GeneralTab {
 
     fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
         let res = self.config.handle_key_press(key, &mut self.state);
-        if self.state.in_edit {
-            self.write_back(&mut self.icy_board.lock().unwrap());
+        for item in self.config.iter() {
+            self.write_item(item, &mut self.icy_board.lock().unwrap());
         }
-        self.state.in_edit = res.in_edit_mode;
         res
     }
 
     fn request_status(&self) -> ResultState {
         return ResultState {
-            in_edit_mode: self.state.in_edit,
+            edit_mode: EditMode::None,
             status_line: if self.state.selected < self.config.items.len() {
                 "".to_string()
             } else {

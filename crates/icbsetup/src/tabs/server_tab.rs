@@ -3,6 +3,7 @@ use std::sync::Mutex;
 
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
+use icy_board_tui::config_menu::EditMode;
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
     theme::THEME,
@@ -20,6 +21,7 @@ pub struct ServerTab {
     config: ConfigMenu,
     icy_board: Arc<Mutex<IcyBoard>>,
 }
+
 impl ServerTab {
     pub fn new(lock: Arc<Mutex<IcyBoard>>) -> Self {
         let icy_board: std::sync::MutexGuard<'_, IcyBoard> = lock.lock().unwrap();
@@ -201,6 +203,9 @@ impl TabPage for ServerTab {
 
         let area = area.inner(&Margin { vertical: 1, horizontal: 1 });
         self.config.render(area, frame, &mut self.state);
+        if self.state.in_edit {
+            self.set_cursor_position(frame);
+        }
     }
 
     fn has_control(&self) -> bool {
@@ -216,13 +221,12 @@ impl TabPage for ServerTab {
         if self.state.in_edit {
             self.write_back(&mut self.icy_board.lock().unwrap());
         }
-        self.state.in_edit = res.in_edit_mode;
         res
     }
 
     fn request_status(&self) -> ResultState {
         return ResultState {
-            in_edit_mode: self.state.in_edit,
+            edit_mode: EditMode::None,
             status_line: if self.state.selected < self.config.items.len() {
                 "".to_string()
             } else {

@@ -362,7 +362,6 @@ pub struct IcyBoardState {
     char_buffer: VecDeque<KeyChar>,
 }
 
-
 impl IcyBoardState {
     pub fn new(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<Vec<Option<NodeState>>>>, node: usize, connection: Box<dyn Connection>) -> Self {
         let mut session = Session::new();
@@ -371,11 +370,11 @@ impl IcyBoardState {
         session.date_format = board.lock().unwrap().config.board.date_format.clone();
         let display_text = board.lock().unwrap().default_display_text.clone();
         let root_path = board.lock().unwrap().root_path.clone();
-        let mut p1  = ansi::Parser::default();
+        let mut p1 = ansi::Parser::default();
         p1.bs_is_ctrl_char = true;
-        let mut p2  = ansi::Parser::default();
+        let mut p2 = ansi::Parser::default();
         p2.bs_is_ctrl_char = true;
-        
+
         Self {
             root_path,
             board,
@@ -868,9 +867,7 @@ impl IcyBoardState {
 
         for c in data {
             if target != TerminalTarget::Sysop || self.session.is_sysop {
-                let _ = self
-                    .user_screen
-                    .print_char(*c);
+                let _ = self.user_screen.print_char(*c);
                 if *c == '\n' {
                     self.next_line()?;
                 }
@@ -881,9 +878,7 @@ impl IcyBoardState {
                 }
             }
             if target != TerminalTarget::User {
-                let _ = self
-                    .sysop_screen
-                    .print_char( *c);
+                let _ = self.sysop_screen.print_char(*c);
                 if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
                     sysop_bytes.push(cp437);
                 } else {

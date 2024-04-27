@@ -6,7 +6,6 @@ use std::{
 
 use crate::{Connection, ConnectionType, NetError};
 
-
 pub struct RawConnection {
     tcp_stream: TcpStream,
 }
@@ -40,9 +39,7 @@ impl Connection for RawConnection {
 impl Read for RawConnection {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self.tcp_stream.read(buf) {
-            Ok(size) => {
-                Ok(size)
-            }
+            Ok(size) => Ok(size),
             Err(ref e) => {
                 if e.kind() == ErrorKind::WouldBlock {
                     return Ok(0);

@@ -46,9 +46,9 @@ pub trait Connection: Read + Write {
 
     fn read_u8(&mut self) -> crate::Result<u8> {
         let mut buf = [0; 1];
-        loop { 
+        loop {
             match self.read(&mut buf) {
-                Ok(size) =>  {
+                Ok(size) => {
                     if size == 0 {
                         continue;
                     }
@@ -61,7 +61,6 @@ pub trait Connection: Read + Write {
                     }
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
-            
             }
         }
         Ok(buf[0])

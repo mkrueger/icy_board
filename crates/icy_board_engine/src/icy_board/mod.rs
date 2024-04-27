@@ -295,6 +295,12 @@ impl IcyBoard {
         Ok(board)
     }
 
+    pub fn save(&self) -> Res<()> {
+        self.config.save(&self.file_name)?;
+        self.conferences.save(&self.resolve_file(&self.config.paths.conferences))?;
+        Ok(())
+    }
+
     pub fn save_userbase(&mut self) -> Res<()> {
         let home_dir = PathBuf::from(self.resolve_file(&self.config.paths.home_dir));
         if let Err(e) = self.users.save_users(&home_dir) {
