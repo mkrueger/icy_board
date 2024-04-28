@@ -165,9 +165,9 @@ impl<'a> PathTab<'a> {
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "language_file",
+                    "cmd_lst_file",
                     "CMD.LST File".to_string(),
-                    ListValue::Path(lock.config.paths.language_file.clone()),
+                    ListValue::Path(lock.config.paths.command_file.clone()),
                 )
                 .with_status("Name/Location of CMD.LST File")
                 .with_label_width(configuration_files_width),
@@ -336,6 +336,8 @@ impl<'a> PathTab<'a> {
                 "vip_users" => icy_board.config.paths.vip_users = path.clone(),
                 "protocol_data_file" => icy_board.config.paths.protocol_data_file = path.clone(),
                 "language_file" => icy_board.config.paths.language_file = path.clone(),
+                "cmd_lst_file" => icy_board.config.paths.command_file = path.clone(),
+
                 "welcome" => icy_board.config.paths.welcome = path.clone(),
                 "newuser" => icy_board.config.paths.newuser = path.clone(),
                 "closed" => icy_board.config.paths.closed = path.clone(),

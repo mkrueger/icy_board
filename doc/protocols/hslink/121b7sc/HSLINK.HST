@@ -1,0 +1,1348 @@
+
+HS/Link Revision History (in reverse order)
+-------------------------------------------
+
+08-Feb-94
+   Posted as a public beta 1.21B7 (german version)
+
+17-Nov-93
+   Changes in RTS logic may solve problems with INTERNAL modems that
+   require the -HR option to work.
+
+19-Jul-93
+   Posted as public beta 1.21B6 under filename HS121B6.ZIP (english
+   version) and HS121GB6.ZIP (german version).
+
+   Created German language version of HSCONFIG.EXE.
+
+   Special thanks to Martin Thommen of CommNET communications for his
+   assistance in the German translation.
+
+12-Jul-93
+   Posted as public beta 1.21B4 under filename HS121B4.ZIP.
+
+   Created German language versions of HSLINK.EXE and FHSLINK.EXE.  These
+   will be posted as HS121GB4.ZIP.
+
+15-Jun-93
+   Posted as public beta 1.21B2 under filename HS121B2.ZIP.
+
+12-Jun-93
+   Removed the normal 2 second CHAT timeout if the outgoing channel is
+   currently idle, making CHAT much smoother under some circumstances.
+
+18-May-93
+   Added logic to also disable XON/XOFF handshake during transfer abort
+   sequences.
+
+   Corrected logic to prevent occasional failed connections when -MN and
+   -HX options were being used on only one side of the link.
+
+06-May-93
+   Added logic to automatically disable CTS handshake during transfer
+   abort sequences.  This will prevent HSLINK waiting indefinitely for a
+   modem that has a locked up CTS signal to respond to the abort strings.
+
+   Maintenance release of HS/Link 1.21 as HS121.ZIP.  See WHATSNEW.121
+   for a complete list of changes between version 1.20 and version 1.21.
+
+01-Apr-93
+   Changed fixed timeouts from 5 seconds to 11 seconds when waiting for
+   the first character in a packet to arrive.  Once a packet begins to
+   arrive, the next timeout still occurs after 22 seconds of idle time.
+   This change may improve results when delays due to error correcting
+   modems cause unusually long delays.
+
+28-Mar-93
+   Completed the new reference manual, HSLINK.DOC.
+
+15-Feb-93
+   Added -CP option to control the position of the status display.  The
+   default is -CP2, which causes HSLINK to leave the top 2 lines untouched.
+   Use a setting of -CP0 to move HSLINK's display UP so that the bottom two
+   lines will be untouched.  This may solve problems with some BBS softwares
+   that attempt to protect the bottom two lines of the screen.
+
+   Added logic to allow the link to continue in CHAT mode when all file
+   transfers are completed.  The link will terminate when CHAT is manually
+   terminated with ESC or when 30 seconds of idle time elapse.
+
+11-Feb-93
+   Removed logic to redirect IRQ2 to IRQ9 on AT-class machines with dual
+   interrupt controllers.  It appears that some users are able to run a COM
+   port on IRQ2.
+
+   Added -NE option to control the number of repeated errors that will abort
+   a file transfer.  The default is to abort at 20 consequtive errors, but
+   some users may wish to set this to a higher or lower number.
+
+   Added a "page number" display in HSCONFIG so you can tell more easily
+   which page of options you are working on.
+
+23-Dec-92
+   Added logic to automatically disengage "minimal blocks" mode if any data
+   errors are detected.
+
+11-Dec-92
+   Added logic to cause hslink to assume an outgoing file from an unspecified
+   directory will be located in the directory of the previously specified
+   outgoing file.  For example:
+        hslink c:\dir1\file1 file2 file3
+   means the same as
+        hslink c:\dir1\file1 c:\dir1\file2 c:\dir1\file3
+
+20-Nov-92
+   Changed FOSSIL implementation to take advantage of block read/write
+   functions.  This should make quite an improvement in FHSLINK performance
+   running with a FOSSIL driver.
+
+13-Nov-92
+   Added a check for
+        SET HSERR=path\logfile
+   to enable a new error logging facility.  When enabled, most screen
+   information and error messages are logged to the specified logfile.
+
+   Added logic to warn the user when an invalid registration code is entered,
+   rather than triggering the tamper detection logic.
+
+09-Nov-92
+   Changed initial handshake logic to default to new alternate XON/XOFF
+   encoding method, instead of first attempting the old method.  This should
+   speed up the initial handshake process and also prevent some occasional
+   handshake failures.  Added -NA option to disable this logic for
+   compatibility with release 1.12 and earlier.
+
+   Further testing under windows indicates that the best results are obtained
+   (at least in some cases) when the following statements are present in your
+   [386enh] section of WINDOWS.INI:
+        Com#Fifo=0
+        Com#Buffer=0
+   where # is the com port being used, usually 1 or 2.  In this mode, the -N5
+   option is not needed on the HS/Link command line running under Windows,
+   and the -FT# option may be used to fine-tune performance.
+
+   Windows users can benefit greatly from TurboComm enhanced windows COMM
+   drivers, available for $47 from Bio Engineering (503)482-2744.
+
+22-Oct-92
+   Added -I4 option to give up idle time under Windows, OS/2, DOS 5 and other
+   environments that support the "int 2fh/ax=1680h" idle call.
+
+19-Oct-92
+   Added logic to explicitly enable the cascade interrupt when a high IRQ of
+   8 and up is being used.
+
+08-Oct-92
+   Added logic to force a special COMM driver mode when -FT16 and higher are
+   specified.  In this mode attempts will be made to perform multiple
+   character i/o per interrupt service, even when the UART appears to be an
+   8250 or 16540.  This logic may improve the performance with some internal
+   modems, such as the Forval, but may cause the transfer to fail with
+   others.  Use with caution.
+
+04-Oct-92
+   Posted as public beta 1.13C4 under filename HS113C4.ZIP.
+
+   Added logic to prevent internal transmit queue overflows when using
+   large blocks and very high effective speed settings.
+
+   Some earlier betas would not enable file buffering after the first
+   or second file in a batch.
+
+03-Oct-92
+   Internal changes to correct operation with the internal Intel
+   Satisfaxion Modem/400E.
+
+   The -FTn option now controls not only the receive fifo threshold, but
+   also the number of characters pre-queued for transmit per THRE
+   interrupt service.
+
+01-Oct-92
+   Reduced NS16550 transmit preque from 8 bytes to 4 bytes to reduce
+   overhead of queueing transmit bytes (during which no receive bytes
+   can be processed).
+
+   Added new -N! (do not force remote to use local settings) option to
+   override any previous -! option in either the command line or a
+   configuration file.
+
+   Note: When running HS/Link in Windows Enhanced mode and you are
+   getting COM Overrun errors, you may need to add the following
+   statement in the [386Enh] section of your SYSTEM.INI file:
+        COM1BUFFER=8192         ;if you are using COM1, or
+        COM2BUFFER=8192         ;if you are using COM2
+
+30-Sep-92
+   Added new -FTn option to control NS16550 Fifo Threshold.  Possible
+   values are -FT1, -FT4, -FT8, -FT14.  Higher thresholds reduce
+   interrupt overhead but increase the chances of a receiver OVERRUN
+   error under multi-taskers such as Desqview and Windows.
+   The default is now -FT1.  Betas B8 through C2 had a default of -FT8,
+   which caused overruns on some machines.
+
+   Added logic to detect failure of flow control to suspend flow in slow
+   handshake mode prior to disk activity.  When flow continues for 3
+   seconds after flow control is asserted, the message
+        Warning: Flow control failure!  Slow handshake disabled.
+   will be displayed and the -HS option will be disengaged for the rest
+   of the session.
+
+29-Sep-92
+   Added internal logic to cancel a link when the same error is reported
+   ten times in sequence.
+
+   The HS/Link program and installation tips files are now available via
+   FTP at simtel20.army.mil in PD1:<MSDOS.MODEM> !!!
+
+28-Sep-92
+   Posted as public beta 1.13C2 under filename HS113C2.ZIP.
+
+25-Sep-92
+   Recompiled under Borland C++ 3.1 compiler.
+
+23-Sep-92
+   Changed combined thruput calculation to original calculation method.
+
+   Added new -NG option to block Control-G (BEEP) characters in chat
+   mode. This keeps remote callers from beeping your speaker during a
+   file transfer.
+
+19-Sep-92
+   Posted as public beta 1.13C0 under filename HS113C0.ZIP.
+
+18-Sep-92
+   Removed some profiling and/or debugging code which caused strange
+   failures on some machines.
+
+   Added -FL option to usage help messages.
+
+14-Sep-92
+   Posted as public beta 1.13B8 under filename HS113B8.ZIP.
+
+13-Sep-92
+   Internal changes in terminal mode.
+
+   When an outgoing file was aborted, the reason for the abort was often
+   not being printed on the screen.
+
+   Corrected RTS handshake on receive buffer overflow.
+
+   Optimized NS16550A buffering logic to greatly reduce interrupt overhead.
+
+   Changed transfer abort logic to exit more quickly if ^X is typed 6 or
+   more times.  Otherwise HSLINK will wait for remote data flow to stop
+   before releasing control.
+
+   Changes in batch status window calculation to base time estimate on
+   the direction with the most estimated TIME remaining rather than the
+   batch with the most BYTES remaining to transfer.  This should prevent
+   the estimates from jumping around as much.
+
+12-Sep-92
+   Posted as public beta 1.13B6 under filename HS113B6.ZIP.
+
+   Some non-public beta B5's did not check the HSLINK.EXE directory for
+   the HSLINK.CFG file.
+
+11-Sep-92
+   Added a mini terminal feature.  If you include -T in the hslink command
+   line, you will be placed into a simple terminal emulation prior to starting
+   the transfer.
+
+10-Sep-92
+   Internal changes to reduce memory requirements by about 10k compared
+   to earlier versions.  Hslink works best with about 103000 bytes of
+   ram, but will now work successfully with at little as 78000 bytes.
+
+   Added additional logic to insure proper operation under marginal
+   memory conditions.
+
+   Added reporting of additional memory requirements when there is
+   enough ram to load hslink but not enough for it to run properly.
+
+   Changes to prevent spurious word-wraps in CHAT mode.
+
+   The new CHAT mode is now a "registered" feature.  If you are running
+   an unregistered copy of hslink, you will not be able to INITIATE a
+   chat, but you can chat with the remote if the remote is registered
+   and initiates the chat.
+
+   To initiate a CHAT, just start typing... the chat windows will
+   automatically pop up.  If the remote is using 1.13à or newer you will
+   have a two-way chat.  Press ESCAPE to close the chat windows.
+
+   Implemented proper RTS handshake in addition to XON/XOFF when receive
+   buffer nears overflow.
+
+04-Sep-92
+   Posted as a public beta under filename HS113B4.ZIP.
+
+02-Sep-92
+   Added new -NK (do not keep aborted downloads) option to override any
+   previous -K option in either the command line or a configuration
+   file.
+
+31-Aug-92
+   More internal changes to help with systems that do not always respect
+   the high order bit.  This may help XON/XOFF handshake via PC Pursuit.
+
+   Some non-public betas posted today did not work.
+
+   Some non-public betas posted today gave a false 'bad ready crc'
+   during the initial handshake process.
+
+   Added logic to give priority to the lower serial numbered copy when
+   two registered copies attempt to use the -! option.  This may save
+   transfers that would otherwise fail due to conflicting setting
+   overrides.
+
+30-Aug-92
+   More changes to solve PC Pursuit problems.
+
+27-Aug-92
+   Internal changes.  Some versions posted on 27-Aug did not correctly
+   handshake with the remote prior to starting file transmission.
+
+   Posted as a public beta under filename HS113B2.ZIP.
+
+25-Aug-92
+   Posted as a public beta under filename HS113A1.ZIP.
+
+19-Aug-92
+   Internal changes to protect the CR-@-CR sequence used by PC Pursuit to
+   escape to a command mode.  This version identifies itself as 1.13à1.
+
+18-Jul-92
+   Internal changes to guard the codes 0x91 and 0x93 when XON/XOFF
+   handshake is enabled.  This change was required because some common
+   FOSSIL drivers accept these codes as alternates for the normal 0x11
+   and 0x13 XON/XOFF codes.
+
+17-Jul-92
+   The alphas were sometimes using directvideo while loading the
+   config file- this has been correct.
+
+16-Jul-92
+   More changes in batch status calculations.
+
+   The FOSSIL version of HS/Link is now ready for alpha testing.
+   See FHSLINK.EXE and FHSLINK.DOC for details.
+
+13-Jul-92
+   11-jul and 12-jul alphas send HS* <esc> ^B ... instead of HS* ^B ...
+   during the initial handshake, preventing some auto-download detectors
+   from working.
+
+   Added a very simple "chat" function which is automatically activated
+   when you begin typing at the keyboard.  Press ESCAPE to restore the
+   normal settings window display.  (this is an experimental feature
+   which may not make it into the next planned bugfix-release).
+
+11-Jul-92
+   Changes to possibly eliminate all remaining false "exit code 2"
+   conditions following a successful transfer.
+
+10-Jul-92
+   Added logic to automatically reduce 'window' size when flow control
+   appears to be failing.
+
+09-Jul-92
+   The batch status bargraph was not working in 8-jul alphas.
+
+08-Jul-92
+   Additional changes in batch status window to give best estimate of
+   time remaining during bidirectional transfers.  Time estimate is now
+   based on the channel with the most bytes remaining to transfer rather
+   than the most total bytes to transfer.
+
+06-Jul-92
+   Corrected HSCONFIG to set MONO default colors only when a new
+   configuration file is being created.
+
+05-Jul-92
+   Correction in batch status totals when files are skipped in the
+   incoming files window.
+
+   Correction of batch time estimate to reflect only the time remaining
+   in the larger of the send or receive batches.
+
+14-May-92
+   Version 1.11 didn't solve the problem for some slow machines.
+   Additional changes in 1.12 seem to cover all the bases.
+
+   Official release of version 1.12 as HS112.ZIP.
+
+14-May-92
+   Version 1.10 will sometimes return errorlevel 2 after successfully
+   receiving files and when no outgoing files are active.  Version 1.11
+   corrects this.
+
+   Posted version 1.11 as hslk111.zip for testing.
+
+13-May-92
+   Official release of HS/Link 1.10 as HSLINK11.ZIP.
+   See WHATSNEW.110 for a complete list of changes between version 1.0
+   and version 1.1.
+
+   Changes in errorlevel logic (higher errorlevels now have priority and
+   errorlevel 2 during final shutdown is disregarded as normal).
+
+   Corrected batch status total updating in files skipped due to upload
+   blocking or duplication.
+
+10-May-92
+   ERRORLEVEL 10 exits were not always being generated.
+
+09-May-92
+   Batch totals were not correctly deducting the sizes of skipped files
+   due to overwrite restriction or write failure.
+
+   Some bogus copies of HSLK11D1 have been found in circulation - beware
+   as this file did not originate with the author.
+
+02-May-92
+   Tinkered with cps calculations in transmit window and batch status
+   window.
+
+   Some early 5/2/92 daily betas did not brand correctly.
+
+27-Apr-92
+   Major documentation updates.
+
+   Patched Borland's runtime library to prevent loss of interrupts
+   during direct video screen updating.  This may eliminate the need for
+   the -NV option in cases where overrun errors occur during screen
+   updates.
+
+   Posted publicly as HSLK11C9.ZIP.   (PUBLIC BETA VERSION)
+
+15-Apr-92
+   Error messages were not formatted properly in incoming files window!
+
+13-Apr-92
+   Cleaned up error message wraparound in incoming files window.
+
+   Posted publicly as HSLK11C7.ZIP.   (PUBLIC BETA VERSION)
+
+08-Apr-92
+   Added expected incoming and outgoing file counts in -NF display mode.
+
+   Added logic to ignore lines in -NO files that contain x:/.... rather
+   than x:\...., making it possible to use the same BLDLIST outputs in
+   both hslink and prodoor systems.
+
+   Some errors in the outgoing files window were being counted twice.
+
+02-Apr-92
+   Cleaned up cursor positioning in both incoming and outgoing files
+   during bidirectional transfers.
+
+31-Mar-92
+   Added logic to give registered copies of hslink priority over
+   unregistered copies when both sides of the link are using the -!
+   (take priority) option.   Behavior in this situation used to be
+   undefined.
+
+   Exit code 0 was sometimes being returned instead of 4 when no files
+   were sent or received during a session.
+
+30-Mar-92
+   Improvement in batch status 'minutes remaining' calculation.
+
+27-Mar-92
+   Posted publicly as HSLK11C5.ZIP.   (PUBLIC BETA VERSION)
+
+26-Mar-92
+   Added -FC option to force CTS handshake to remain in effect, even if
+   it CTS is not active initially.  This may be required if you are SURE
+   you need CTS handshake, but when CTS is occasionally dropped by the
+   modem just as HS/Link loads.
+
+   Added a new ERRORLEVEL 10 exit to indicate that carrier was lost
+   during the initial handshake with the remote.
+
+   Added a new ERRORLEVEL 11 exit to indicate when the link was aborted
+   due to CTS handshake lockup.  This condition can occur with some
+   error correcting modems when line conditions are too poor for
+   continued data transmission.
+
+   Added -LFlogfile option to allow DSZLOG log file pathname to be
+   specified from a config file when use of the DSZLOG environment
+   variable is not desired.
+
+   Corrections to prevent occasional '... was incomplete!' condition in
+   the last file of a batch.
+
+   Corrections in reporting of batch status during crash recovery.
+
+   Enabled the new BATCH STATUS display, which shows total bytes
+   expected and completed, as well as estimated time remaining for the
+   batch.
+
+   Added -CB option to control color of bargraph displays.
+
+23-Mar-92
+   Added logic to cancel a link after repeated ACK timeout errors.
+
+   Corrected logic to detect receive timeouts even when transmitter
+   is active.
+
+22-Mar-92
+   Corrected final CPS calculation in outgoing files window when
+   crash recovery is in effect.
+
+20-Mar-92
+   HSCONFIG beta B9 was not able to create a new configuration file
+   from scratch, though it correctly edited existing configurations.
+
+   Posted publicly as HSLK11C1.ZIP.   (PUBLIC BETA VERSION)
+
+13-Mar-92
+   Daily betas posted on 12-Mar-92 did not transmit files correctly.
+
+   Corrected CPS calculation in incoming files under certain
+   circumstances.
+
+12-Mar-92
+   Added logic to reset the current transmit file when a file read error
+   occurs.
+
+11-Mar-92
+   Changed HSLINK.EXE and HSCONFIG.EXE to search for HSLINK.CFG the
+   following logic:
+        1) search the current directory,
+        2) search the directory where HSLINK.EXE is located
+        3) search the PATH directories
+
+   Posted publicly as HSLK11B9.ZIP.   (PUBLIC BETA VERSION)
+
+09-Mar-92
+   Changed logic to include bargraphs even in unregistered copies of
+   HS/Link, making unregistered copies fully functional.
+
+   Removed supurflous "Please use -O with -R" message when files are
+   rejected via -NO lists and user has requested -R.
+
+   Changed crash recovery message in transmit window from "Seek to
+   block" to "Crash recovery at block".
+
+05-Mar-92
+   Changed CPS calculation to properly account for skipped data during
+   file transfer crash recovery.
+
+23-Feb-92
+   Posted publicly as HSLK11B7.ZIP.   (PUBLIC BETA VERSION)
+
+22-Feb-92
+   Corrected settings display to say "COMx" rather than "COM1" when non-
+   standard com port settings are being used.
+
+   Correction to prevent endless "ACK timeout" errors under some
+   conditions.
+
+   Switched back to the original TC++ 1.0 compiler.
+
+21-Feb-92
+   See BETA.DOC for an explanation of the new beta numbering system.
+
+   Posted publicly as HSLK11B5.ZIP.   (PUBLIC BETA VERSION)
+
+19-Feb-92
+   Added logic to allow simple filenames as well as directory names in
+   the upload duplication check file.  This allows quicker duplication
+   checking over networks or CD-ROMS.
+
+   Use a program like MKDLIST.ZIP to create file lists.  This logic will
+   check over 40000 files for duplicates in under 5 seconds on a 386/20
+   machine.
+
+14-Feb-92
+   Recompiled with Borland BC++ 3.0 compiler.
+
+   Posted publicly as HSLK11B3.ZIP.   (PUBLIC BETA VERSION)
+
+13-Feb-92
+   Added a prefix to the original "ready" signature, making it less
+   likely that hs/link auto upload or auto download will falsely
+   trigger.  The new signatures are:
+        HS*^BR
+   and
+        HS*^BQ
+   The 'HS*' prefix has been added.
+
+   Corrected new logic to leave NS16550 buffering enabled if it was
+   found to already be enabled on program entry.
+
+12-Feb-92
+   Partial coding of high IRQ support logic.
+
+   Changed HSCONFIG to allow nonstandard base addresses in HEX.
+
+11-Feb-92
+   Added logic to prevent upload duplication prior to bidirectional
+   transfers.  Without this feature, duplicate uploads will be
+   completely received before the duplication is detected by the BBS.
+   To enable this feature, use the option
+        -NOdirlist
+   where 'dirlist' specifies the full pathname of a file containing one
+   directory spec per line.  Each specified directory will then be
+   checked for duplication with incoming files.  For example, PCBoard
+   systems may use the option
+        -NOC:\PCB\GEN\DLPATH.LST
+   to prevent upload duplication.
+
+   Added support for -I, -N5, -NM and -NO options in HSCONFIG.
+
+10-Feb-92
+   Added logic in HSCONFIG to create the default HSLINK.CFG file in the
+   same directory as HSLINK.EXE instead of in the current directory.
+
+   Posted publicly as HSLK11B1.ZIP.   (PUBLIC BETA VERSION)
+
+05-Feb-92
+   Added logic to correctly handle the interrupt controller PIC register
+   on exit when running on some multi-tasking systems.
+
+   Added some logic to check for systems not using SHARE.
+
+30-Jan-92
+   Changed logic to leave NS16550 buffering enabled if it was found to
+   already be enabled on program entry.
+
+28-Jan-92
+   Corrected dropped characters during transmit with some internal
+   modems.  Thanks to Mark Talley and William Elliott for helping to
+   track down this bug.
+
+   Added new DSZLOG codes to distinguish between transmit errors and
+   receive errors. The new DSZLOG codes used are:
+        'H'=file received from remote
+        'h'=file transmitted to remote
+        'E'=file receive was aborted
+        'e'=file transmit was aborted (used to be 'E')
+        'L'=lost carrier during file receive
+        'l'=lost carrier during file transmit (used to be 'L')
+
+22-Jan-92
+   Changed CPS calculations to prevent numeric overflow at around 11megs.
+
+   Changed DSZLOG entries to always include spaces with files over 1meg.
+
+21-Jan-92
+   Added logic to allow hex values to be specified for -PB and most
+   other integer command line options.  Option format is:
+        -PBdecimal
+        -PB$hex
+   for example, -PB1000 means the same thing as -PB$3E8.
+
+   Added -N5 option to disable the NS16550AN buffering logic, which
+   causes problems on some early flawed versions of the 16550 chip.
+
+19-Jan-92
+   Added logic to prevent block character devices (such as CON, NUL,
+   CLOCK$, PRN, etc.) as transfer filenames.
+
+   Added logic to allow ^Z eof marking in FILELIST files.
+
+   Added logic to allow HS/Link operation when DoorWay is active.
+
+14-Jan-92
+   Official release of HS/Link 1.00 as HSLINK10.ZIP.
+
+13-Jan-92
+   Added logic to insert 2 nulls before any message when transmit is
+   currently stalled or inactive.  Based on tests with the 1/11 beta, I
+   suspect this will resolve the 'timeout' on some types of hardware.
+
+11-Jan-92
+   Added 2 nulls before control messages; this may help systems that
+   tend to lose the second character queued for transmit.
+
+08-Jan-92
+   Changed -R logic to better deal with CRC errors in verify packets.
+
+   Corrected some problems in handshake.
+
+   Improved low level handling of NS16550A transmit buffering, resulting
+   in possibly higher thruput in some instances.
+
+   Posted publicly as HSLK10E4.ZIP.
+
+07-Jan-92
+   We are nearing completion of the first release of the HS/Link
+   protocol.  Please make sure you are using the latest posted version,
+   and that you quickly report and bugs you find so they can be
+   corrected before the final release of version 1.0.  Thanks!
+
+   Corrected an error in -HS logic that would cause a lockup on some
+   systems prior to bringing up the status display windows.
+
+   Posted publicly as HSLK10E3.ZIP.
+
+05-Jan-92
+   Changed -R logic to skip files that exactly match instead of
+   resending the final block in the file.
+
+   Added logic in -HS to delay until flow actually stops before
+   beginning IO operations.
+
+   Internal changes to discard pending output characters when a link is
+   cancelled.
+
+   The running cps display in transmit window when 'window' mode is in
+   effect was being overestimated.
+
+   Added DISTRIB.DOC (HS/Link distributor list) and BLT.TXT (sample
+   bulletin describing HS/Link to BBS users).
+
+   Posted publicly as HSLK10E2.ZIP.
+
+02-Jan-92
+   Lots of internal changes to counter recent hacking attempts.
+
+   Added a check for ^C to abort the multi-page usage messages.
+
+   Posted privately as HSLK10E1.ZIP.
+
+30-Dec-91
+   Added logic to detect short/long blocks causing CRC errors and to
+   report them as "Dropped bytes" or "Noise burst" instead of simply
+   "Data CRC error".
+
+   Posted privately as HSLK10G1.ZIP.
+
+28-Dec-91
+   Changed transmit file searching logic to build a linked list of files
+   to be transmitted prior to beginning any transfers.  This makes the
+   total of all transmit file sizes available before the ready
+   handshake, and also makes nested @ files and wildcards within @ files
+   possible.
+
+   Corrected reported transfer time when crossing midnight.
+
+   Posted privately as HSLK10G0.ZIP.
+
+25-Dec-91
+   The beta posted at 12-24-91 11:45am did not BRAND properly.
+
+   The 'Can't open @filelist file' error message was going into the
+   wrong window of the display.
+
+   Added logic to search the PATH list for HSLINK.EXE when running under
+   DOS 2.x, since the argv[0] pointer to path\hslink.exe is valid only
+   under DOS 3.x and later.
+
+   Transfers would fail if -A and -W were both specified in a
+   configuration file.  The -A setting now over-rides any -W setting.
+
+   Posted as HSLK10D8.ZIP.
+
+24-Dec-91
+   Error recovery logic was occasionally looking for an invalid block
+   number to be resent.
+
+   Corrected buffering of @filelist and hslink.cfg files to work when
+   these files are over 255 bytes long.
+
+   Lengthened ACK timeout period when -R verification is in process.
+
+   Internal changes to improve error recovery when ack and nak packets
+   are often corrupted by line noise.
+
+   Internal changes to resist hacking attempts.
+
+21-Dec-91
+   The link would occasionally fail when one side of the connection used
+   -HX and the other did not.
+
+   Some early 21-dec betas did not always display the 'settings' window.
+
+   Note that a bogus HSLK10D6.ZIP has been found -- I did not and will
+   not post a beta under that filename.
+
+   Posted as HSLK10D7.ZIP.
+
+20-Dec-91
+   Added a carrier-detect check in receive-character-waiting loop.
+
+19-Dec-91
+   The HSLINK.EXE file is now compressed with PKLITE/Professional and
+   will not operate correctly if it is patched, decompressed or altered
+   in any way (other than by branding in a serial number/password).
+
+   Added a check for -W0 to cause it to act like -A instead of making
+   transfers fail.
+
+   Posted as HSLK10D5.ZIP.
+
+18-Dec-91
+   Corrected timeout settings to prevent repeated 'receive timeout'
+   messages when connecting at 2400 with large block sizes.
+
+   More optimization in full-streaming-error-recovery logic.
+
+   Changed time reports from seconds to minutes.
+
+   Added graphic file completion graph in both transmitter and receiver
+   status windows. (registered version only)
+
+   Added running estimate of seconds remaining in current transmit and
+   receive file. (registered version only)
+
+   Added combined thruput calculation and report. (registered version
+   only)
+
+   Posted as HSLK10D4.ZIP.
+
+12-Dec-91
+   Warning: do NOT compress or alter HSLINK.EXE in any way.  HSLINK will
+   not operate correctly if compressed with PKLITE, LZEXE or other
+   similar utilities.
+
+   Receive timeout logic was not always working.
+
+   Corrected -R logic to not hang with single block files.
+
+   Changed 'Finished' messages to instead say '# files transmitted' and
+   '# files received'.
+
+   Changed exit logic to return the following ERRORLEVEL values:
+
+      ERRORLEVEL             Reason for link termination
+      ----------   ------------------------------------------------
+         0         One or more files transferred successfully
+         1         ^X typed at local keyboard
+         2         ^X received over COM port
+         3         Incompatible BETA versions
+         4         No files transmitted or received
+         5         Remote did not respond within 2 minutes
+         6         Too many framing errors, possible -B mismatch
+   
+   This beta will not communicate with betas posted before 12/4/91.
+   Posted as HSLK10D3.ZIP.
+
+06-Dec-91
+   Corrected an error in later 10D1 betas that occasionally caused a
+   'restarting file' condition when -R is in effect.
+
+   Posted as HSLK10D2.ZIP.
+
+04-Dec-91
+   Posted as HSLK10D1.ZIP.
+
+03-Dec-91
+   The first HSLK10C9 postings did not correctly write to DSZLOG (my new
+   routines were ending each line with \n instead of \r\n), resulting in
+   strange messages from many BBS programs after file transfers..
+
+   Internal changes in @ and -@ processing to eliminate all calls to the
+   'fopen' library, which I suspect is unstable.
+
+02-Dec-91
+   Changed DSZLOG logic to properly append logfiles containing a ^Z EOF
+   marker (this may fix RBBS systems).
+
+   Posted as HSLK10C9.ZIP.
+
+   Note:  There is a bogus, and possibly dangerous file being posted as
+   HSLK10C8.ZIP.  This file DID NOT originate with me!  I never released
+   a beta with that filename.  Check that the PKUNZIP -T authenticity
+   code is 'XOC363', which is the code I am currently using.
+
+29-Nov-91
+   Added support for DOS version 2.x.
+
+28-Nov-91
+   Changes in documentation.
+
+26-Nov-91
+   We are nearing completion of the first release of the HS/Link
+   protocol.  Please make sure you are using the latest posted version,
+   and that you quickly report and bugs you find so they can be
+   corrected before the final release of version 1.0.  Thanks!
+
+   Posted as HSLK10C7.ZIP.
+
+24-Nov-91
+   HSLK10C6 betas posted 11/23/91 did not always correctly log transfers
+   to DSZLOG.
+
+23-Nov-91
+   More work on the users manual.
+
+   Changed in local keyboard handler to call bios directly to avoid
+   conflicts with some versions of PC Mag's ANSI.COM.
+
+   Posted as HSLK10C6.ZIP.
+
+22-Nov-91
+   Major work on the users manual and registration form.
+
+21-Nov-91
+   Changed online help and usage messages to default to non-direct video
+   mode, correcting help screen displays in multi taskers such as
+   desqview.  The online help "press enter to continue" prompt was
+   reading from DOS standard-input, which sometimes caused problems.
+   BIOS calls are now used to read the keyboard.
+
+   HSCONFIG was not always going into non-direct video mode when the -NV
+   or -NF options were specified.
+
+   Changed logic to return a non-0 ERRORLEVEL on an initial handshake
+   timeout, and also if no files are transferred during a session.
+
+   Added 'remote version' display to settings window.
+
+   Changed version checking logic to display a warning if the remote
+   program is a different version, but the link is not automatically
+   aborted.
+
+   Changed initial full-screen manager to no longer attempt to erase
+   lines 1 and 2 of the display.  The last line in the display is also
+   preserved.
+
+19-Nov-91
+   Corrected a bug that under rare conditions would cause file
+   corruption.  Thanks to Doug Haire for helping to track this one down.
+
+   The receiver's -S setting wasn't always being honored in single
+   direction transfers.
+
+   DSZLOG entries for uploaded files now include the full path name of
+   received files even when the -U option is not used.  This is what was
+   keeping HSLINK from working under ProBoard and possibly other similar
+   BBS programs that read DSZLOG format result files.
+
+   This beta is not compatible with any earlier betas.  Please upgrade!
+   Posted as HSLK10C5.ZIP.
+
+17-Nov-91
+   Changes in -HS to defer starting the I/O operation until after flow
+   has been suspended.
+
+   Changed DSZLOG format to record number of bytes actually transferred
+   on aborted transfer entries.
+
+   Added -NU option to block uploads while sending files.  Used by BBS
+   programs that can't (yet) cope with bidirectional uploads.
+
+   Posted as HSLK10C4.ZIP.
+
+16-Nov-91
+   Changes in logic for NS16550AN buffering, should reduce or eliminate
+   overrun errors when this chip is used.
+
+   Removed code to place the program into debugging mode after receipt
+   of a 'bad ready crc' error.
+
+15-Nov-91
+   Posted as HSLK10C3.ZIP
+
+14-Nov-91
+   Corrected transfer time measurement to NOT include the time taken to
+   initially read the file into memory.  Time measurement now begins
+   when the first byte of the first block begins transmission.
+
+   Many HSLK10C2 betas posted on 11/12 and 11/13 had flawed interrupt
+   handlers and did not work.
+
+13-Nov-91
+   Changes in status display updating to prevent the current filename
+   from scrolling off screen following error recovery.
+
+   More optimization of interrupt handlers.
+
+   Some 13-nov betas did not work at all when used with 16550 chips.
+
+12-Nov-91
+   More changes to correct the "bad ready crc" and "overrun" error
+   conditions.
+
+   A partial block of "garbage" was sometimes being appended to the end
+   of file after valid downloads.  This has been corrected. (This was
+   the reason that ZLABP_14.ZIP was corrupted by earlier betas)
+
+   Posted as HSLK10C2.ZIP
+
+12-Nov-91
+   Added logic to check for framing errors during initial ready
+   handshake.  Initial framing errors generally indicate a baud rate
+   mismatch, caused by an incorrect -B parameter on one end of the link.
+
+11-Nov-91
+   The -PI and -PB command line options were not being decoded properly.
+
+   More optimization of COMM interrupt handlers.
+
+   Changed protocol to require 4 or more sequential ^X characters to
+   abort a transfer.
+
+   Corrected -R operation when recovering a file that is an exact
+   multiple of 100 blocks in length.
+
+   Posted as HSLK10C1.ZIP.
+
+10-Nov-91
+   Major speed-up in COMM interrupt handlers; may reduce or eliminate
+   overrun errors in many cases.
+
+   I just discovered that QEMM adds quite a lot of overhead to COMM
+   interrupt handling, reducing maximum thruput on my 386/SX-16mhz by
+   nearly 50%.  If you are getting a lot of COM Overrun errors and are
+   using QEMM, you might try running without QEMM to see if that is the
+   cause of the overruns.
+
+09-Nov-91
+   Changes in error recovery logic to prevent premature multiple
+   retransmissions of the same block.
+
+   Added -NT option to stamp current time/date on received files instead
+   of retaining the original file's time/date.
+
+   Corrected a bug that would rarely cause the protocol to lock up with
+   a "Bad ready crc" message.
+
+   Strange things were happening in a bidirectional transfer when the
+   incoming and outgoing block sizes were different.
+
+07-Nov-91
+   Changed the "screen settings" page in HSCONFIG to automatically
+   update the screen colors when color values are changed.
+
+   Corrected an error in handling of new configuration files when
+   the configuration filename is specified on the HSCONFIG command line.
+
+   Cosmetic changes in HSCONFIG display and help formats.
+
+   Added logic in HSCONFIG to provide better default colors when the
+   current video mode is BW80 or MONO.
+
+   Posted as HSLK10B9.ZIP.
+
+06-Nov-91
+   Added a display of the current command line to the top window.
+
+   Added a 3 second delay after display of "Exit code = #" when
+   returning a non-zero errorlevel.
+
+   Slight improvement in -R file recovery speed.
+
+   The -CB, -CM, -CT and -CW options were not being recognized.
+
+   Wrote a new HSCONFIG configuration manager utility. This program
+   provides a menu oriented method of selecting command line options,
+   and contains extensive context sensitive popup help.
+
+   Please review the screen layout and help text and report any problems
+   so they can be corrected as the coding is completed.
+
+05-Nov-91
+   Slight changes in "settings" window display.
+
+   Added a running CH/SEC speed display in the receiver status display.
+
+   Added new -PBbase and -PIirq options to allow non-standard com ports
+   to be specified.  -PBbase sets the com port base i/o port to 'base'
+   (in decimal) and -PIirq sets the IRQ level to 'irq'.
+
+04-Nov-91
+   Slight change in interrupt handler.
+
+03-Nov-91
+   Changes in interrupt service for slightly less overhead on systems
+   that occasionally experience overrun errors.
+
+   Changes in detection of 'incomplete' transfers to prevent occasional
+   flagging of valid transfers as incomplete.
+
+   Temporarily made Minimal Blocks OFF the default.  The -NM command now
+   enables the feature.  I suspect that in some cases, when Minimal
+   Blocks is active, a missed block is not detected and corrected as it
+   should be.
+
+   Corrected -p option to allow -p8 as a valid com port.  The supported
+   COM ports are:
+           Option   Channel        I/O Port       Interrupt
+             -p1      COM1           0x3F8            4
+             -p2      COM2           0x2F8            3
+             -p3      COM3           0x3E8            4
+             -p4      COM4           0x2E8            3
+             -p5      COM5           undefined
+             -p6      COM6           undefined
+             -p7      COM7           0x2E8            5
+             -p8      COM8           0x3E8            5
+
+02-Nov-91
+   Found a severe bug in all betas dating back to 25-oct.  In these
+   betas, if you use the -S option on one size of the link, you must use
+   an identical -S option on the other end of the link, or received
+   files will be silently corrupted.  This has been corrected.
+   PLEASE DELETE ALL EARLIER BETAS!
+
+   Posted as HSLK10B8.ZIP.
+
+02-Nov-91
+   Some early 2-nov betas reported "overwrite: YES" even when this
+   feature was not enabled.
+
+   DSZLOG entries for received files were not including the full
+   directory, which confused ProDoor into thinking they were transmitted
+   files and logging them as free downloads.  This has been corrected.
+
+   Changed the -R (recover aborted transfer) option to also require
+   -O (allow overwrites).  This allows the use of -R without the
+   possibility of overwrite security problems under PCB145 in the
+   private directory.
+
+   Made some changes to prevent non-0 errorlevel return on -R type
+   transfers.
+
+   Internal changes in -R logic to speed up the process when the
+   specified file is NOT being recovered.  Because of this change, this
+   beta cannot use -R when communicating with earlier betas.
+
+   Cosmetic changes in -NF static display.
+
+   Changes in full screen display to attempt to preserve a BBS status
+   line on line 25 and remain compatible with systems that place the BBS
+   status on lines 1 and 2.
+
+01-Nov-91
+   Changes in display management.
+
+   Improvement in handling of "bad batch" type error conditions.
+
+   Added logic to automatically enable -HS when excessive overrun errors
+   are detected.
+
+   Added -NV command line option to disable direct video writes.  Use
+   this option if you experience screen "bleed-through" in DesqView,
+   DoubleDOS or other multi-tasking software.
+
+   Added a new "full screen" status display as the default program
+   output.  Use the new -NF option to disable the full screen display
+   and return the original line oriented output.  The -NF option also
+   disables direct video writes.
+
+   NOTE:  Some BBS sysops may now need to include -NF in the command
+          line to prevent screen management conflicts.
+
+   Added -CB option to define the border color in full screen mode.
+   Added -CM option to define the main screen color in full screen mode.
+   Added -CT option to define the window title color in full screen mode.
+   Added -CW option to define the window contents color in full screen mode.
+
+   Posted as HSLK10B7.ZIP.
+
+30-Oct-91
+   Changes in DSZLOG output to expand columns for very large numbers,
+   rather than running the numbers together.  This sometimes happens
+   with resumed downloads since the calculated CPS figures are often
+   extremely large.
+
+   The -K option hasn't been working since 28-oct betas.
+
+   Increased initial handshake timeout from 1 minute to 2 minutes.
+
+   More updates to the documentation.  Addition of REGISTER.FRM
+   registration form.
+
+   Internal changes to insure -! option causes over-ride of -HX and -A
+   settings on the remote system.
+
+   Added logic to initially raise the RTS signal on entry to the
+   program.  This will allow HSLINK to operate in environments that
+   lower RTS before shelling to an external protocol.
+
+   This beta of HSLINK has been tested successfully with PCBOARD 14.5a
+   betas dated 10/30/91.  See HS-145A.ZIP for detailed instructions on
+   installation under PCBOARD 14.5a.
+
+   Corrected a bug that could cause HSLINK to lock up after receiving a
+   "bad message code" condition.
+
+   Implemented "branding" logic to allow a copy of HSLINK.EXE to brand
+   itself with a registered user's Serial Number and Password.
+
+   Some corrections in -R logic.
+
+   Posted as HSLK10B6.ZIP (HSLK10B5 was never publicly posted).
+
+28-Oct-91
+   Changed display outputs to go through DOS to prevent "bleedthrough"
+   in multi-taskers.
+
+   Removed original definition of -R command line option.
+
+   Added -R command line option to resume an aborted file.  May be
+   specified from either side of the link, and applies to all files
+   transferred in that session.  When -R is active, the file being
+   transmitted will be scanned and the CRC values will be transmitted
+   for each block.  The receiver will compare these CRC values to the
+   actual file contents, and thereby instruct the transmitter where to
+   begin retransmission to complete the aborted transfer.  This method
+   guarantees that the resumed file will exactly match the original
+   file, even if the original has changed between download attempts.
+   This will also detect and properly handle the case where the original
+   file shrinks or has data appended.
+
+   Changed decoding of command line parameters.  Earlier betas would
+   "toggle" options if they appeared more than once either on the
+   command line or from a configuration file.  This no longer happens.
+
+26-Oct-91
+   Added a second "ready" packet to distinguish uploads from downloads.
+   The original ready packet ^B "R" is sent when HSLINK expects to
+   transmit files during the session.  If no transmit files are
+   specified, however, HSLINK now sends the new packet ^B "Q".  This
+   change prevents an upload request from triggering auto-download logic
+   in COMM programs.  Betas prior to 26-oct will be able to receive
+   files from today's beta, but will not be able to transmit files.
+
+   Expanded usage/online help messages to include both a summary of
+   basic options and a full list of advanced options.
+
+   Changes in display output to prevent unwanted scrolling when running
+   under PRONS in ProDoor.
+
+   Added logic to prevent loading the default HSLINK.CFG if the first
+   command line parameter is -@...
+
+   Added -NB command line option to disable buffering of receive and
+   transmit files.
+
+25-Oct-91
+   Changes in initial handshake to insure -! priorities always take
+   effect and to prevent the "Handshake:...." line from being printed
+   after a "Receiving file..." message.
+
+   Added buffering on receive and transmit files to reduce frequency of
+   handshake needed when handshake-slow (-HS) is active.
+
+   Recoded CRC-32 calculation in assembly language for greater speed.
+
+   Improved error recovery under some circumstances.
+
+   Some 25-oct betas would not transmit files which are flagged
+   READ/ONLY.  This has been corrected.
+
+   Added an initial timeout if no connection is made with a remote HSLINK
+   within 60 seconds.
+
+24-Oct-91
+   Added logic to transmit Minimal Blocks when current sequence and code
+   substitution information is predictable.  This should further improve
+   thruput.  Unfortunately, this will not communicate with earlier
+   betas.
+
+   Added logic to require two consecutive Control-X codes on local
+   keyboard to cancel a transfer.
+
+   Added logic to ignore Control-C on the local keyboard.
+
+   Improved handling of files that are skipped because the receiver
+   won't allow overwrite of existing files.
+
+   Improved error recovery when a long stream of bad blocks occurs near
+   the last block in a file.
+
+   Added 'carrier lost' and 'transfer aborted' messages on receive end
+   of the link.
+
+   Added -NM command line option to disable the Minimal Blocks logic.
+
+   Added -NC command line option to disable the Dynamic Code
+   Substitution logic.
+
+   NOTICE: This beta is not compatible with any earlier betas, so please
+   make sure you have 10/25 or newer on both sides of the link when
+   testing.
+
+   Posted as HSLK10B4.ZIP.
+
+23-Oct-91
+   Added -HR command line option to disable RTS handshake when -HS slow
+   handshake is in effect.
+
+22-Oct-91
+   Betas posted on 21-Oct often corrupted files in transit, even though
+   no errors were reported (because a bug in the code substitution logic
+   caused some codes to be interchanged)
+
+   Changed DSZLOG format to log transmitted files with protocol code 'h'
+   and received files with protocol code 'H', making the format more
+   compatible with DSZ's own conventions.
+
+   Received files are now logged to DSZLOG by default, rendering the -R
+   command line option obsolete.  Look for a new ProDoor beta that will
+   better handle DSZLOG files with bidirectional transfers.
+
+   Added an initial display of handshake, block size and windowing
+   settings.
+
+   Posted as HSLK10B3.ZIP.
+
+21-Oct-91
+   Implemented new Dynamic Code Substitution system to drasticly reduce
+   number protocol overhead and "escape" codes needed to transmit
+   certain data streams.   Quite a bit of tweaking in protocol to
+   enhance performance.  I'm now consistantly beating DSZ MobyTurbo in
+   my own benchmarks.
+
+   Added -A command to disable transmitting of ACK codes from receiver
+   to transmitter, except at EOF.  This may speed up transfers on
+   asymetrical links, but my own testing shows no improvement in speed
+   when used.
+
+   Added -! command to allow one side of a link to take priority over
+   the other side in the values of -s (block size) and -w (window size).
+
+   NOTICE: This beta is not compatible with any earlier betas, so please
+   make sure you have 10/21 or newer on both sides of the link when
+   testing.
+
+   Posted as HSLK10B2.ZIP.
+
+19-Oct-91
+   Changed default action to display the usage screen instead of going
+   into file receive mode.  To receive files using all default files you
+   must now use the command
+        HSLINK -R
+   to prevent a usage message being displayed.
+
+   Added a check for HSLINK.CFG.  If found, each line in this file may
+   contain a single "command line option".  All PATH directories are
+   searched for this file.
+
+   Added an initial test for CTS status, and if it is not active but CTS
+   handshake is enabled, a warning will be printed and CTS handshake
+   will be turned off.  This will prevent handshake lockups in some
+   instances.
+
+   Added -@fname command line option to specify additional or alternate
+   configuration files to also be loaded.
+
+   Added -K command line option to keep partial files resulting from
+   aborted transfers.
+
+18-Oct-91
+   Added DSZLOG logging of files transmitted.
+
+   Added -E command line option to specify the effective connect speed
+   between modems.
+
+   Added -R command line option to also include received files in
+   DSZLOG.  The default is to log only transmitted files, making the
+   default logfile format compatible with existing systems that are bi-
+   directional protocol capable, such as ProDoor.
+
+   Replaced 16 bit CRC values with 32 bit values.  This update will not
+   communicate with betas posted on 17-oct.
+
+17-Oct-91
+   Initial posting of HS/Link beta as HSLK10B.ZIP.
+
+July-87
+   Initial protocol design and prototype development began but was never
+   made functional enough for public testing.
+

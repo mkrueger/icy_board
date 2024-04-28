@@ -1,0 +1,83 @@
+
+HS/Link Revision History (in reverse order)
+-------------------------------------------
+
+08-Feb-94
+   Posted as a public beta 1.21B7 (german version)
+
+17-Nov-93
+   Changes in RTS logic may solve problems with INTERNAL modems that
+   require the -HR option to work.
+
+19-Jul-93
+   Posted as public beta 1.21B6 under filename HS121B6.ZIP (english
+   version) and HS121GB6.ZIP (german version).
+
+   Created German language version of HSCONFIG.EXE.
+
+   Special thanks to Martin Thommen of CommNET communications for his
+   assistance in the German translation.
+
+12-Jul-93
+   Posted as public beta 1.21B4 under filename HS121B4.ZIP.
+
+   Created German language versions of HSLINK.EXE and FHSLINK.EXE.  These
+   will be posted as HS121GB4.ZIP.
+
+15-Jun-93
+   Posted as public beta 1.21B2 under filename HS121B2.ZIP.
+
+12-Jun-93
+   Removed the normal 2 second CHAT timeout if the outgoing channel is
+   currently idle, making CHAT much smoother under some circumstances.
+
+18-May-93
+   Added logic to also disable XON/XOFF handshake during transfer abort
+   sequences.
+
+   Corrected logic to prevent occasional failed connections when -MN and
+   -HX options were being used on only one side of the link.
+
+06-May-93
+   Added logic to automatically disable CTS handshake during transfer
+   abort sequences.  This will prevent HSLINK waiting indefinitely for a
+   modem that has a locked up CTS signal to respond to the abort strings.
+
+   Maintenance release of HS/Link 1.21 as HS121.ZIP.  See WHATSNEW.121
+   for a complete list of changes between version 1.20 and version 1.21.
+
+11-Apr-93
+   Official release of HS/Link 1.20 as HS120.ZIP. See WHATSNEW.120 for a
+   complete list of changes between version 1.1 and version 1.2.
+
+11-Dec-92
+   Added logic to cause hslink to assume an outgoing file from an unspecified
+   directory will be located in the directory of the previously specified
+   outgoing file.  For example:
+        hslink c:\dir1\file1 file2 file3
+   means the same as
+        hslink c:\dir1\file1 c:\dir1\file2 c:\dir1\file3
+
+13-Nov-92
+   Added a check for
+        SET HSERR=path\logfile
+   to enable a new error logging facility.  When enabled, most screen
+   information and error messages are logged to the specified logfile.
+
+14-May-92
+   Official release of version 1.12 as HS112.ZIP.
+
+13-May-92
+   Official release of HS/Link 1.10 as HSLINK11.ZIP. See WHATSNEW.110 for a
+   complete list of changes between version 1.0 and version 1.1.
+
+14-Jan-92
+   Official release of HS/Link 1.00 as HSLINK10.ZIP.
+
+17-Oct-91
+   Initial posting of HS/Link beta as HSLK10B.ZIP.
+
+July-87
+   Initial protocol design and prototype development began but was never made
+   functional enough for public testing.
+

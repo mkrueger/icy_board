@@ -1,0 +1,1 @@
+{$DEFINE LANG_GERMAN} 

@@ -452,6 +452,42 @@ impl GeneralTab {
                 .with_status("Exclude Local Logins from Statistics")
                 .with_label_width(file_transfer_width),
             ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "disable_full_record_updating",
+                    "Disable Fill Record Updating".to_string(),
+                    ListValue::Bool(icy_board.config.options.disable_full_record_updating),
+                )
+                .with_status("Setting 'Y' will only allow pwd change in 'W' command.")
+                .with_label_width(file_transfer_width),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "is_closed_board",
+                    "Run System as a Closed Board".to_string(),
+                    ListValue::Bool(icy_board.config.options.disable_full_record_updating),
+                )
+                .with_status("Deny new users (NEWASK Survey works).")
+                .with_label_width(file_transfer_width),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "display_userinfo_at_login",
+                    "Display User Info at Login".to_string(),
+                    ListValue::Bool(icy_board.config.options.disable_full_record_updating),
+                )
+                .with_status("Display 'v' command at login.")
+                .with_label_width(file_transfer_width),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "non_graphics",
+                    "Non Graphics BBS".to_string(),
+                    ListValue::Bool(icy_board.config.options.disable_full_record_updating),
+                )
+                .with_status("Disable Colors.")
+                .with_label_width(file_transfer_width),
+            ),
         ];
 
         Self {
@@ -530,7 +566,10 @@ impl GeneralTab {
                 "check_files_uploaded" => icy_board.config.options.check_files_uploaded = *b,
                 "display_uploader" => icy_board.config.options.display_uploader = *b,
                 "exclude_local_calls" => icy_board.config.options.exclude_local_calls = *b,
-
+                "disable_full_record_updating" => icy_board.config.options.disable_full_record_updating = *b,
+                "is_closed_board" => icy_board.config.options.is_closed_board = *b,
+                "display_userinfo_at_login" => icy_board.config.options.display_userinfo_at_login = *b,
+                "non_graphics" => icy_board.config.options.non_graphics = *b,
                 _ => panic!("Unknown id: {}", item.id),
             },
             ListValue::Color(c) => match item.id.as_str() {

@@ -11,7 +11,7 @@ use jamjam::jam::{msg_header::JamMessageHeader, JamMessageBase};
 
 use super::{PcbBoardCommand, MASK_COMMAND};
 
-struct MessageViewer {
+pub struct MessageViewer {
     date_num: TextEntry,
     to_line: TextEntry,
     _reply_line: TextEntry,
@@ -42,7 +42,7 @@ struct MessageViewer {
 }
 
 impl MessageViewer {
-    fn load(dt: &icy_board_engine::icy_board::icb_text::IcbTextFile) -> Res<Self> {
+    pub fn load(dt: &icy_board_engine::icy_board::icb_text::IcbTextFile) -> Res<Self> {
         let date_num = dt.get_display_text(IceText::MessageDateNumber)?;
         let to_line = dt.get_display_text(IceText::MessageToLine)?;
         let reply_line = dt.get_display_text(IceText::MessageReplies)?;
@@ -262,7 +262,7 @@ impl PcbBoardCommand {
             }
 
             if let Ok(number) = text.parse::<u32>() {
-                self.read_message_number(&message_base, &viewer, number)?;
+                self.read_message_number(&message_base, &viewer, number, None)?;
             }
         }
         self.state.press_enter()?;
@@ -270,16 +270,28 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    fn read_message_number(&mut self, message_base: &JamMessageBase, viewer: &MessageViewer, number: u32) -> Res<()> {
+    pub fn read_message_number(&mut self, message_base: &JamMessageBase, viewer: &MessageViewer, number: u32, matches: Option<Vec<(usize, usize)>>) -> Res<()> {
         if number == 0 {
             return Ok(());
         }
         loop {
             match message_base.read_header(number) {
                 Ok(header) => {
-                    let text = message_base.read_msg_text(&header)?.to_string();
+                    let mut text = message_base.read_msg_text(&header)?.to_string();
                     viewer.display_header(&mut self.state, message_base, &header)?;
-
+                    if let Some(matches) = &matches {
+                        let mut new_text = String::new();
+                        let mut last = 0;
+                        for (start, end) in matches {
+                            new_text.push_str(&text[last..*start]);
+                            new_text.push_str("@X70");
+                            new_text.push_str(&text[*start..*end]);
+                            new_text.push_str("@X07");
+                            last = *end;
+                        }
+                        new_text.push_str(&text[last..]);
+                        text = new_text;
+                    }
                     if header.needs_password() {
                         if self
                             .state
@@ -308,13 +320,13 @@ impl PcbBoardCommand {
                 MASK_COMMAND,
                 "hlpendr", // TODO: Hard coded help flag!
                 None,
-                display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
+                display_flags::UPCASE | display_flags::LFBEFORE | display_flags::NEWLINE,
             )?;
             if text.is_empty() {
                 break;
             }
             if let Ok(number) = text.parse::<u32>() {
-                return self.read_message_number(message_base, viewer, number);
+                return self.read_message_number(message_base, viewer, number, None);
             }
         }
 

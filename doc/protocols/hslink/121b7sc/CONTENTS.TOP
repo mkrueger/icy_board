@@ -1,0 +1,41 @@
+
+   This archive should contain the following files:
+
+        FILE_ID.DIZ   - The "Description In Zip" description for this
+                        archive.
+
+        DESC.SDI      - Single line description for this archive.
+
+        WHATSNEW.120  - List of changes since version 1.12.
+
+        REGISTER.FRM  - Fill out this form and mail in to register HSLINK.
+
+        HSLINK.DOC    - The complete documentation for HS/Link, ready to
+                        print.  Formatted 61 lines/page with form feeds.
+
+        HSLINK.EXE    - The main HSLINK program, ALL YOU NEED to run HSLINK.
+
+        HSLINK.NEW    - Recent changes in HSLINK are documented here.
+
+        HSCONFIG.EXE  - The HSLINK Configuration Manager, helps make config
+                        files if you chose to use them.  Has online help,
+                        and is pretty easy to figure out.
+
+        COMMENTS.TXT  - Comments from a few HSLINK users.
+
+        DISTRIB.DOC   - A current list of HS/Link distributors.
+
+        CONTENTS.TXT  - This file.
+
+        FHSLINK.DOC   - Special documentation for FOSSIL version of HS/Link
+
+        FHSLINK.EXE   - The FOSSIL version of HS/Link.
+
+        BLTS.ZIP      - bulletins describing HS/Link.  Sysops can place
+                        these files in their bulletins section.
+
+        PRESS.DOC     - press release announcing HS/Link version 1.20.
+
+    Please verify that this archive contains the original and correct
+    contents as distributed by Samuel H. Smith.  When you run PKUNZIP -V
+    on this archive you should see the following report:

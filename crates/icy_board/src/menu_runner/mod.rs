@@ -244,6 +244,11 @@ impl PcbBoardCommand {
                 self.ppe_run()?;
             }
 
+            CommandType::TextSearch => {
+                // TS
+                self.text_search(action)?;
+            }
+
             _ => {
                 return Err(Box::new(IcyBoardError::UnknownAction(format!("{:?}", action.command_type))));
             }

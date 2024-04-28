@@ -1,0 +1,217 @@
+
+  ==========================================================================
+             SUMMARY OF WHAT'S NEW IN HS/LINK VERSION 1.20
+  ==========================================================================
+
+  HS/Link version 1.20 corrects all known problems in version 1.12 and adds a
+  number of new features and options.  This version can successfully connect
+  and transfer files with prior HS/Link release versions 1.0, 1.1 and 1.12.
+  Earlier "Alpha" (à) or "Beta" (á) version numbers represent unfinished
+  versions and should not be used.
+
+  HS/Link version 1.20 is a direct replacement for version 1.12 and does not
+  require any change in command line options or configuration options. There
+  are a number of NEW options you may want to take a look at.
+
+  The most important new feature is the "CHAT" function, which allows you to
+  CHAT with the remote user during a file transfer. You must have a registered
+  copy of HS/Link to initiate a CHAT. Unregistered copies can still CHAT if a
+  remote registered copy initiates the CHAT.
+
+  The following options have been added or enhanced:
+
+     -CPn    Control the position of the status display.  Use a setting of -CP0
+             to move HSLINK's display UP so that the bottom two lines will be
+             untouched.
+
+     -FTn    Control NS16550AN Fifo Threshold.  Higher thresholds reduce
+             interrupt overhead but increase the chances of a receiver OVERRUN
+             error under multi-taskers such as Desqview and Windows.
+
+     -I4     Give up idle time under Windows, OS/2, DOS 5 and other
+             environments that support the "int 2fh/ax=1680h" idle call.
+
+     -N!     Do not force remote to use local settings.  Will override any
+             previous -! option in either the command line or a configuration
+             file.
+
+     -NA     Disable Alternate XON/XOFF method for compatibility with versions
+             1.0 and 1.12.
+
+     -NEn    Controls the number of repeated errors that will abort a file
+             transfer.
+
+     -NG     Do not allow Control-G (BEEP) characters in CHAT mode. This keeps
+             remote callers from beeping your speaker during a file transfer.
+
+     -NK     Do not keep aborted downloads.  Will override any previous -K
+             option in either the command line or a configuration file.
+
+     -T      If you include -T in the HSLINK command line, you will be placed
+             into a simple mini terminal emulation prior to starting the
+             transfer.
+
+
+  ==========================================================================
+                DETAILED LIST OF CHANGES IN VERSION 1.20
+  ==========================================================================
+
+   Added -CP option to control the position of the status display.  The default
+   is -CP2, which causes HSLINK to leave the top 2 lines untouched. Use a
+   setting of -CP0 to move HSLINK's display UP so that the bottom two lines
+   will be untouched.  This solves problems with some BBS softwares that
+   protect the bottom two lines of the screen.
+
+   Added -FTn option to control NS16550 Fifo Threshold.  Possible values are
+   -FT1, -FT4, -FT8, -FT14.  Higher thresholds reduce interrupt overhead but
+   increase the chances of a receiver OVERRUN error under multi-taskers such as
+   Desqview and Windows. The default is now -FT4.
+
+   Added -I4 option to give up idle time under Windows, OS/2, DOS 5 and other
+   environments that support the "int 2fh/ax=1680h" idle call.
+
+   Added -N! (do not force remote to use local settings) option to override any
+   previous -! option in either the command line or a configuration file.
+
+   Added -NE option to control the number of repeated errors that will abort a
+   file transfer.  The default is to abort at 20 consequtive errors, but some
+   users may wish to set this to a higher or lower number.
+
+   Added -NG option to block Control-G (BEEP) characters in CHAT mode. This
+   keeps remote callers from beeping your speaker during a file transfer.
+
+   Added -NK (do not keep aborted downloads) option to override any previous -K
+   option in either the command line or a configuration file.
+
+   Added a check for
+        SET HSERR=path\logfile
+   to enable a new error logging facility.  When enabled, most screen
+   information and error messages are logged to the specified logfile.
+
+   Added a mini terminal feature.  If you include -T in the HSLINK command
+   line, you will be placed into a simple terminal emulation prior to starting
+   the transfer.
+
+   Added logic to allow the link to continue in CHAT mode when all file
+   transfers are completed.  The link will terminate when CHAT is manually
+   terminated with ESC or when 30 seconds of idle time elapse.
+
+   Added logic to automatically reduce 'window' size when flow control appears
+   to be failing.  This helps to save failing PC Pursuit sessions.
+
+   Added logic to cancel a link when the same error is reported ten times in
+   sequence.
+
+   Added logic to detect failure of flow control to suspend flow in slow
+   handshake mode prior to disk activity.  When flow continues for 3 seconds
+   after flow control is asserted, the message Warning: Flow control failure!
+   Slow handshake disabled. will be displayed and the -HS option will be
+   disengaged for the rest of the session.
+
+   Added logic to force a special COMM driver mode when -FT16 and higher are
+   specified.  In this mode attempts will be made to perform multiple character
+   i/o per interrupt service, even when the UART appears to be an 8250 or
+   16540.  This logic may improve the performance with some internal modems,
+   such as the Forval, but may cause the transfer to fail with others. Use with
+   caution.
+
+   Added logic to give priority to the lower serial numbered copy when two
+   registered copies attempt to use the -! option.  This may save transfers
+   that would otherwise fail due to conflicting setting overrides.
+
+   Added logic to insure proper operation under marginal memory conditions.
+
+   Added logic to prevent internal transmit queue overflows when using large
+   blocks and very high effective speed settings.
+
+   Added logic to warn the user when an invalid registration code is entered,
+   rather than triggering the tamper detection logic.
+
+   Changed initial handshake logic to default to new alternate XON/XOFF
+   encoding method, instead of first attempting the old method.  This should
+   speed up the initial handshake process and also prevent some occasional
+   handshake failures.  Added -NA option to disable this logic for
+   compatibility with release 1.12 and earlier.
+
+   Changed transfer abort logic to exit more quickly if ^X is typed 6 or more
+   times.  Otherwise HSLINK will wait for remote data flow to stop before
+   releasing control.
+
+   Changes in batch status window calculation to base time estimate on the
+   direction with the most estimated TIME remaining rather than the batch with
+   the most BYTES remaining to transfer.  This should prevent the estimates
+   from jumping around as much.
+
+   Changes to eliminate all remaining false "exit code 2" conditions following
+   a successful transfer.
+
+   Corrected HSCONFIG to set MONO default colors only when a new configuration
+   file is being created.
+
+   Correction in batch status totals when files are skipped in the incoming
+   files window.
+
+   Implemented proper RTS handshake in addition to XON/XOFF when receive buffer
+   nears overflow.
+
+   Internal changes to correct operation with the internal Intel Satisfaxion
+   Modem/400E.
+
+   Internal changes to guard the codes 0x91 and 0x93 when XON/XOFF handshake is
+   enabled.  This change was required because some common FOSSIL drivers accept
+   these codes as alternates for the normal 0x11 and 0x13 XON/XOFF codes.  This
+   solves problems with XON/XOFF handshake via PC Pursuit.  The remote must be
+   running version 1.13á or later for this logic to go into effect.
+
+   Internal changes to protect the CR-@-CR sequence used by PC Pursuit to
+   escape to a command mode.
+
+   Internal changes to reduce memory requirements by about 10k compared to
+   earlier versions.  Hslink works best with about 103000 bytes of ram, but
+   will now work successfully with at little as 78000 bytes.
+
+   Note: When running HS/Link in Windows Enhanced mode and you are getting COM
+   Overrun errors, you may need to add the following statement in the [386Enh]
+   section of your SYSTEM.INI file:
+        COM1BUFFER=8192         ;if you are using COM1, or
+        COM2BUFFER=8192         ;if you are using COM2
+
+   The following ERRORLEVEL codes are now possible:
+
+      ERRORLEVEL     Reason for link termination
+      ----------     ----------------------------------------
+         0           One or more files transferred successfully
+         1           ^X typed at local keyboard
+         2           ^X received over COM port
+         3           Incompatible BETA versions
+         4           No files transmitted or received
+         5           Remote did not respond within 2 minutes
+         6           Too many framing errors, possible -B mismatch
+         7           Possible tampering or corruption in HSLINK.EXE
+         8           Possible tampering or corruption in HSLINK.EXE
+         9           COM port not responding, incorrect -P options
+        10           Carrier lost during initial handshake with remote
+        11           Link aborted due to CTS lockup
+        12           Bad command line or config file option
+        13           Repeated identical errors in excess of -NE setting
+
+   The HS/Link program and installation tips files are now available via FTP at
+   simtel20.army.mil in PD1:<MSDOS.MODEM> !!!
+
+   The most reliable operation under Microsoft Windows seems to occur when the
+   -N5 option is used, even if the COM port actually does have the NS16550AN
+   attached.
+
+   The new CHAT mode is now a "registered" feature.  If you are running an
+   unregistered copy of HSLINK, you will not be able to INITIATE a CHAT, but
+   you can CHAT with the remote if the remote is registered and initiates the
+   CHAT.
+
+   The new FOSSIL version of HS/Link was created.  See FHSLINK.EXE and
+   FHSLINK.DOC for details.
+
+   To initiate a CHAT, just hit ENTER ... two CHAT windows will pop up and you
+   will have a two-way CHAT.  Press the ESCAPE key to close the CHAT windows.
+   The remote must be using version 1.13à or newer.
+
+

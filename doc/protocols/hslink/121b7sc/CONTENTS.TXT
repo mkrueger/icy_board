@@ -1,0 +1,131 @@
+
+   This archive should contain the following files:
+
+        FILE_ID.DIZ   - The "Description In Zip" description for this
+                        archive.
+
+        DESC.SDI      - Single line description for this archive.
+
+        WHATSNEW.120  - List of changes since version 1.12.
+
+        REGISTER.FRM  - Fill out this form and mail in to register HSLINK.
+
+        HSLINK.DOC    - The complete documentation for HS/Link, ready to
+                        print.  Formatted 61 lines/page with form feeds.
+
+        HSLINK.EXE    - The main HSLINK program, ALL YOU NEED to run HSLINK.
+
+        HSLINK.NEW    - Recent changes in HSLINK are documented here.
+
+        HSCONFIG.EXE  - The HSLINK Configuration Manager, helps make config
+                        files if you chose to use them.  Has online help,
+                        and is pretty easy to figure out.
+
+        COMMENTS.TXT  - Comments from a few HSLINK users.
+
+        DISTRIB.DOC   - A current list of HS/Link distributors.
+
+        CONTENTS.TXT  - This file.
+
+        FHSLINK.DOC   - Special documentation for FOSSIL version of HS/Link
+
+        FHSLINK.EXE   - The FOSSIL version of HS/Link.
+
+        BLTS.ZIP      - bulletins describing HS/Link.  Sysops can place
+                        these files in their bulletins section.
+
+        PRESS.DOC     - press release announcing HS/Link version 1.20.
+
+    Please verify that this archive contains the original and correct
+    contents as distributed by Samuel H. Smith.  When you run PKUNZIP -V
+    on this archive you should see the following report:
+
+PKUNZIP (R)    FAST!    Extract Utility    Version 1.1    03-15-90
+Copr. 1989-1990 PKWARE Inc. All Rights Reserved. PKUNZIP/h for help
+PKUNZIP Reg. U.S. Pat. and Tm. Off.
+
+Searching ZIP: HSLINK.ZIP - This file was obtained from:
+_____________________________________________________________________________
+
+                                                    T h e   T o o l   S h o p
+Samuel H. Smith                                Specializing in Software Tools
+Sysop
+                                      P.O. Box 4808 þ Panorama City, CA 91412
+                                                       6 Nodes (818) 891-1344
+_____________________________________________________________________________
+
+The Tool Shop specializes in Software Tools and is the home of HS/Link and
+many other utilities.
+
+
+ Length  Method   Size  Ratio   Date    Time   CRC-32  Attr  Name
+ ------  ------   ----- -----   ----    ----   ------  ----  ----
+    399  Implode    375   7%  02-08-94  20:37  5e1e96b8 --w  FILE_ID.DIZ
+     47  Stored      47   0%  06-15-93  17:18  d3b25cff --w  DESC.SDI
+   5075  Implode   1923  63%  07-15-93  00:49  3883c70a --w  REGISTER.FRM
+ 101783  Implode  29526  71%  12-29-93  09:22  f003660f --w  HSLINK.DOC
+  34848  Stored   34848   0%  02-08-94  20:37  d33bb632 --w  HSLINK.EXE
+   2785  Implode   1346  52%  02-08-94  20:37  7aacfc1a --w  HSLINK.NEW
+  26397  Stored   26397   0%  02-08-94  18:05  602ec57f --w  HSCONFIG.EXE
+   6238  Implode   2838  55%  04-11-93  13:02  e3100c5b --w  COMMENTS.TXT
+   2767  Implode   1535  45%  01-29-94  11:19  44ffab22 --w  DISTRIB.DOC
+   5904  Implode   2115  65%  02-08-94  20:37  41684eb1 --w  CONTENTS.TXT
+   1418  Implode    815  43%  04-11-93  13:02  72e4d712 --w  FHSLINK.DOC
+  33367  Stored   33367   0%  02-08-94  18:07  82db1d7f --w  FHSLINK.EXE
+  10658  Implode   3963  63%  04-11-93  13:02  b92c17b7 --w  WHATSNEW.120
+   3051  Implode    769  75%  04-11-93  13:02  f6f23e71 --w  SURVEY.DOC
+   5377  Stored    5377   0%  04-11-93  13:02  67261615 --w  BLTS.ZIP
+   1881  Implode   1147  40%  04-11-93  13:02  663488a6 --w  PRESS.DOC
+    934  Implode    555  41%  05-06-93  09:14  f7d701f6 --w  WHATSNEW.121
+   9253  Implode   3646  61%  01-29-94  11:19  bbc4fa63 --w  VENDOR.DOC
+ ------          ------  ---                                 -------
+ 252182          150589  41%                                      18
+
+    If your copy shows a different CRC or file length, insist on a
+    legitimate copy and report the source of the bogus/pirated copy to
+    Samuel H. Smith on The Tool Shop.
+
+    When you run PKUNZIP -T on this archive you should see the following
+    report:
+
+PKUNZIP (R)    FAST!    Extract Utility    Version 1.1    03-15-90
+Copr. 1989-1990 PKWARE Inc. All Rights Reserved. PKUNZIP/h for help
+PKUNZIP Reg. U.S. Pat. and Tm. Off.
+
+Searching ZIP: HSLINK.ZIP - This file was obtained from:
+_____________________________________________________________________________
+
+                                                    T h e   T o o l   S h o p
+Samuel H. Smith                                Specializing in Software Tools
+Sysop
+                                      P.O. Box 4808 þ Panorama City, CA 91412
+                                                       6 Nodes (818) 891-1344
+_____________________________________________________________________________
+
+The Tool Shop specializes in Software Tools and is the home of HS/Link and
+many other utilities.
+
+Testing: FILE_ID.DIZ   OK -AV
+Testing: DESC.SDI      OK -AV
+Testing: REGISTER.FRM  OK -AV
+Testing: HSLINK.DOC    OK -AV
+Testing: HSLINK.EXE    OK -AV
+Testing: HSLINK.NEW    OK -AV
+Testing: HSCONFIG.EXE  OK -AV
+Testing: COMMENTS.TXT  OK -AV
+Testing: DISTRIB.DOC   OK -AV
+Testing: CONTENTS.TXT  OK -AV
+Testing: FHSLINK.DOC   OK -AV
+Testing: FHSLINK.EXE   OK -AV
+Testing: WHATSNEW.120  OK -AV
+Testing: SURVEY.DOC    OK -AV
+Testing: BLTS.ZIP      OK -AV
+Testing: PRESS.DOC     OK -AV
+Testing: WHATSNEW.121  OK -AV
+Testing: VENDOR.DOC    OK -AV
+
+Authentic files Verified!   # XOC363   Samuel H. Smith - (818) 891-6780
+
+    Do not use a patched or modified version of this program!  I cannot
+    assume liability for the safety or performance of patched code.
+

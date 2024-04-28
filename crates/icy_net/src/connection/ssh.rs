@@ -16,6 +16,7 @@ pub struct SSHConnection {
 pub struct Credentials {
     pub user_name: String,
     pub password: String,
+    pub proxy_command: Option<String>,
 }
 
 const SUPPORTED_CIPHERS: &str = "aes128-ctr,aes192-ctr,aes256-ctr,aes128-gcm,aes128-gcm@openssh.com,aes256-gcm,aes256-gcm@openssh.com,aes256-cbc,aes192-cbc,aes128-cbc,blowfish-cbc,3des-cbc,arcfour256,arcfour128,cast128-cbc,arcfour";
@@ -39,6 +40,7 @@ impl SSHConnection {
             session.set_option(SshOption::CiphersSC(SUPPORTED_CIPHERS.to_string()))?;
             session.set_option(SshOption::Timeout(Duration::from_millis(5000)))?;
             session.set_option(SshOption::LogLevel(libssh_rs::LogLevel::Warning))?;
+            session.set_option(SshOption::ProxyCommand(credentials.proxy_command))?;
             session.connect()?;
 
             //  :TODO: SECURITY: verify_known_hosts() implemented here -- ie: user must accept & we save somewhere

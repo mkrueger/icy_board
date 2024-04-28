@@ -1,0 +1,179 @@
+
+-------------------------------------------------------------------------------
+The following is one of my bulletins.  I thought others might find it helpful
+for their systems so...
+-------------------------------------------------------------------------------
+
+HSLINK, by Sam Smith, is a fast, easy to use protocol capable of uploading
+files during downloads.  This can make uploading all but free-of-cost,
+
+BEST ACCURATE SPEED OBTAINED HERE WITH HSLINK TO DATE: (12/91)
+   BAUD   ERROR COR     SPEED
+   2400      No           236
+   2400     Yes           279
+   9600     Yes         1,128
+   9600      No           ???  no valid ones yet--should be around 930
+  14400     Yes         1,708
+
+OVERVIEW:
+  Simultaneous transfers are often referred to as bi-directional transfers;
+  it is the ability of the protocol to use both the transmit and receive
+  channels (built-in to every modem) at the same time. "Normal" protocols use
+  the one channel for transfer and the other typically goes all but unused--
+  being used for short acknowledgment of the blocks being transferred. HSLINK
+  allows two files to be sent at once--one upload; one download.  The
+  overhead associated with acknowledging a good block of data received are
+  built-in to the protocols other channel along with the data packet that is
+  being transferred to allow taking active advantage of both channels.
+
+WHO CAN TAKE ADVANTAGE OF SIMULTANEOUS TRANSFERS?
+  Any modem that is NOT a HST.  HST modems have a single high-speed channel.
+  Its back channel operates at a much lower speed and the modem WILL switch
+  back-and-forth--giving the fast channel to the direction in greatest need.
+  For typical bbs operation that places the high speed channel in the hands
+  of bbs transmission and the user side which is typically much slower
+  (keyboarding commands) at the user's disposal.  Switching channels is time
+  consuming and any advantage in simultaneous transfers is lost to its user.
+
+  Now that we know who can't; <grin> let's try to answer the question
+  properly.
+    Any 2400 baud modem--both error correcting and non-correcting
+    Any V.32 or  V.32bis modem--with or without MNP or V.42 (EC)
+    Telebit Trailblazers
+  These modems have symmetrical channels--both transmit and receive operate
+  at the same speed.  The protocol works just fine with error correcting
+  modem, although error correction is not a requirement.
+
+WHAT KIND OF SPEEDS SHOULD I SEE?
+  If you don't have an error correcting modem, you should see speeds
+  exceeding 98% of the rated speed.  This means that a 2400 baud modem will
+  be able to get 235 plus cps.  Error correcting modems will add to that
+  maximum speed.  The reason for this is that they don't require the all of
+  the overhead of start and stop bits.  A standard modem has, beside the
+  8-bits of data, 2-bits of overhead.  That is how we got to the 235 above by
+  taking the baud rate and dividing it by the bits per word:
+        2400/10=240 : 240*98%=235.2
+  The error correcting modem doesn't always need the overhead (not when
+  transmitting blocks) and the best speed for a 2400-baud error correcting
+  modem is typically 270 rather than 240.  A rule of thumb is that we should
+  see an efficiency over 110% if our MNP/V.42 modem is downloading using a
+  clean line and has been set to maximize its capability.  Many modems quote
+  a much higher speed; this applies only to the tranfer of text or
+  uncompressed files.  Compressed files like ZIP/ARJ/LZH file found on BBS's
+  aren't capable of further compression. If your modem is MNP, disable
+  compression when calling a bbs.  If it is V.42, it will do intellegent
+  selection of when to allow/use data compression.  That's about the only
+  difference you'll see/need between the two, common correcting methods.
+
+WHY AREN'T I SEEING THOSE SPEEDS?  (Primarily Error Correcting Modems)
+  There can be as many good guesses as good reasons.  The real problem
+  invariably boils down to just one--hardware.  Our CPU may be a bit slow
+  when it comes to handling the data stream to/from the modem. The baud rate
+  you set the uart to may not be the optimum selection. You may not have
+  enabled or selected the use/honoring of the CTS signal. A slow hard disk
+  may not be able to write fast enough to also allow the modem to pass all
+  characters without loss during disk writes.
+
+  Hardware handshaking is a must with EC Modems.  If your handshaking is
+  incorrect you will see errors when you are transferring files; it's most
+  evident when uploading a file.
+
+  If your lost blocks occur at a fairly regularly spaced intervals (every
+  n-kbytes or so) then it's probably the Hard Disk.  You can tell the
+  protocol about this problem by adding -HS to the command line that loads
+  HSLINK.
+
+  If you are running a multi-tasker like DesqView or using EXTENDED memory
+  for a disk cache, the modem can also have more random overrun problems.
+  Often you can solve this problem with an UART (The chip that provides/is
+  the serial port services.) upgrade.  Switching to a 16550 gives you a uart
+  capable of holding more than one byte in its receive buffer.  This prevents
+  the loss of characters that some experience. If you don't experience a loss
+  of characters, having a 16550 will be of NO advantage to you--it won't
+  speed or make better anything to do with your modem connections.
+
+WHAT CAN I DO WHEN IT ABORTS/CRAPS/LOCKS-UP/DIES/ETC?
+  Yeah, well, sooner-or-later it happens to all of us.  Equipment is less
+  than perfect and software even more so.  At some point, the gods will
+  conspire and the transmission goes south.  If you are lucky, you abort the
+  transfer and go at it again.  If you are not, you reboot. However, if you
+  have selected the options that retain partial files and also the one that
+  allows recovery (-K -R) you will be able to pick up from the point that
+  your download aborted.  If it was an upload that died, you're probably
+  out-of-luck as most BBS software will not retain such uploads in the upload
+  directory. (Nobody wants to be the next caller and spend time downloading a
+  bum file.)
+
+OK, I KNOW MORE ABOUT HARDWARE THAN I EVER WANTED TO... JUST HOW DO I
+USE HSLINK, ANYWAY?
+  Sorry, I get carried away sometimes.  HSLINK from the user standpoint is
+  simplicity itself.  On the BBS you just select the files you want to
+  download and then... SELECT UPLOAD FROM/IN YOUR TERMINAL PROGRAM Yes, I
+  said to upload!  You enter the filename(s) that you are uploading and start
+  the terminal program's upload.  HSLINK will handle everything from there
+  and you see files being both sent and received on the HSLINK screen.
+
+  I said it was easy, didn't I?  Well, I meant to...
+
+  NOTE: Because the BBS doesn't know about the upload until it is returned to
+        after its download process...
+
+        And, because the bbs will probably be testing the upload for viruses
+        or whatever..
+
+  BE SURE TO WAIT AND THEN DESCRIBE THE FILE(S) UPLOADED.  IF YOU DON'T WAIT
+  YOU WON'T RECEIVE CREDIT.  IF YOU UPLOADED A NUMBER OF LARGE FILES, THIS
+  TESTING CAN RUN SEVERAL MINUTES. REMEMBER, YOU'VE SAVED A BUNCH OF TIME/$$$
+  ALREADY--SO THE WAIT ISN'T REALLY THAT BAD/COSTLY--JUST ANNOYING.
+
+  A file is also available to assist you in using HSLINK.  HS-INST.ZIP has
+  the necessary files and configuration instructions for installing it in
+  just about every terminal/bbs program out there.  If you are familiar with
+  how your terminal program shells to a protocol, you might not even need it.
+
+
+OK, A WHILE BACK YOU MENTIONED SPEED, MY SPEEDS MOVE AROUND LIKE A CHINESE
+FIREDRILL, THEY ARE ALL OVER THE PLACE.
+  Well, speeds are affected by the overhead involved in finding and opening a
+  file along with then sending info to the other side so that it can
+  create/open a file of that name on its side.  This affects the reported
+  speeds on short files.  As filesize goes up this affect is minimized. I use
+  50k as a rule of thumb--anything smaller will be obviously distorted
+  somewhat downward.  And by the time we reach 80k or so, the speed should
+  hold pretty steady and only move the speed around by a CPS or two.
+
+  Error correcting modems throw another variable into the pot.  They are
+  buffered.  My US Robotics modem has a 4-k transmit buffer.  When it fills
+  it on starting up a file send, the baud rate is alarmingly high. It then
+  creeps down to something more believable.  No modem program is able to read
+  how full the modem buffer is--so there is no way to tell/compute a 100%
+  accurate value on such a modem.
+
+CONCLUSION:
+  HSLINK is as good or better than any other protocol.  If you have a modem
+  that can take advantage of simultaneous transfers, it will save you LOTS
+  and LOTS of MONEY!!!.  If you can't, its is still as efficient as any other
+  protocol and just as easy or easier to use.  All serious modem users--
+  especially when calling Long-distance--should install and use this
+  protocol.
+
+ORDERING:
+  HSLINK may be ordered from Sam Smith using a credit card on his bbs.
+  The bbs numbers are: (818) 891-6780      US Robotics 2400
+                       (818) 891-3772      US Robotics HST 9600
+                       (818) 891-1344      Supra v.32bis/v.42bis
+
+  It can also be mail ordered from:
+                       SAMUEL H. SMITH
+                       P. O. BOX 4808
+                       PANORAMA CITY, CA 91412-4808
+
+  The voice number for credit card orders is (818) 891-4228.
+
+  Current price is $20 making it quite a bargain.
+
+COPYRIGHT 1991 by Ken Prevo, The Toolkit BBS -- ALL RIGHTS RESERVED
+  Permission for reproduction as a bulletin on public bbs systems is granted
+  as is reproduction by any not-for-profit computer club for the use of or
+  presentation to its members. The above copyright notice must be retained in
+  all reproductions. Lines following the above copyright are optional.

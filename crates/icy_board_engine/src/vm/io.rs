@@ -10,8 +10,6 @@ use crate::Res;
 
 use crate::vm::VMError;
 
-use super::expressions::cwd;
-
 const O_RD: i32 = 0;
 const O_RW: i32 = 2;
 const O_WR: i32 = 1;

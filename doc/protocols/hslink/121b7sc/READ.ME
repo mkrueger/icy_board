@@ -1,0 +1,166 @@
+
+COPYRIGHT 1992 SAMUEL H. SMITH
+ALL RIGHTS RESERVED
+
+THIS DOCUMENT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS PROPRIETARY
+TO SAMUEL H. SMITH DBA THE TOOL SHOP.  DO NOT DISTRIBUTE.
+
+
+The HS/Link source distribution has been prepared for compilation under the
+command line version of Borland's Turbo C++ 1.0 in DOS.  Changes will be
+required when porting to other compilers.  Exe files are packed with PKWARE's
+PKLITE/Professional as a way of enshrouding embedded text and of reducing
+casual hacking.  The HSCONFIG program is written in Borland's Turbo Pascal
+6.0.
+
+The HS/Link source distribution consists of the following files:
+
+MAKEFILE          6258 07-18-92   9:00a
+        Makefile suitable for use with borlands MAKE command.  The
+        makefile contains logic to post beta and release codes online as
+        well as to prepare local compilations for testing.  The basic
+        command lines used are
+                make hslink
+                make hsconfig
+
+MAKEF    BAT       207 07-21-92   1:35p
+MAKEI    BAT       222 07-21-92   1:35p
+        These batch files are used in conjunction with the MAKE command
+        to generate either the FOSSIL (MAKEF) or INTERNAL (MAKEI) comm
+        version of hslink.
+
+MISMATCH BAT        39 01-07-92   2:36p
+        Utility batch file used to find patch locations for internal CRC
+        check.
+
+FCOMM    C        3410 08-02-92   9:54p
+        Very simple glass tty comm program using FOSSIL drivers.
+
+DEBUG    H        3060 08-02-92   9:53p
+        Macros used to generate debugging code as needed.
+
+FOSSIL   H        3871 08-02-92   9:53p
+        Definitions of FOSSIL api as used in hslink.
+
+HSBUF    H        2442 08-02-92   9:53p
+HSBUF    C       11566 08-02-92   9:54p
+        File buffering unit.  Provided buffered file read/write functions on
+        both block and text files.  This was written to improve performance
+        and to circumvent some bugs in the standard 'fwrite' type of
+        buffering library provided by the compiler.
+
+HSCOMM   H        1264 08-02-92   9:53p
+HSCOMM   C       29572 08-02-92   9:54p
+        Basic COMM driver unit.  This unit provides the COMM interface for
+        the rest of hslink.  It also provides idle time management and some
+        keyboard polling functions.  This file can be compiled for either
+        internal or fossil drivers.
+
+HSCRC    H         407 08-02-92   9:53p
+HSCRC    C        6486 08-02-92   9:54p
+        This unit provides the standard CRC32 calculation used by hslink.
+
+HSDEF    H        3580 01-29-92   9:39a
+        This header defines the default values for all hslink command line
+        options.  It can be preprocessed by CPP for direct inclusion into the
+        HSCONFIG program.
+
+HSDISP   H        1911 08-02-92   9:53p
+HSDISP   C       24909 08-02-92   9:54p
+        This unit provides all of hslinks display management.  It implements
+        the various display windows, including bargraphs and time estimation.
+
+QUELIB   H        3702 08-02-92   9:55p
+UART     H        5708 08-02-92   9:54p
+HSINTR   H        2547 08-02-92   9:53p
+HSINTR   C       10517 08-02-92   9:54p
+        This unit is the lowest level COMM interrupt service.  Used only when
+        hscomm is compiled for INTERNAL drivers.
+
+HSLINK   C        9670 08-02-92   9:54p
+HSLINK   H       13530 08-02-92   9:53p
+        This is the main unit for hslink,  including initial handshake, file
+        selection, transmission, reception and shutdown.  Hslink.h formally
+        defines the packet structure of the protocol.
+
+HSMISC   H        2071 08-02-92   9:55p
+HSMISC   C       13084 08-02-92   9:54p
+        Various utilities to manipulate time measures, file specifications
+        result logging, etc.
+
+HSOPT    H        6742 08-02-92   9:55p
+HSOPT    C       13483 08-02-92   9:54p
+        This unit defines all command line option variables and the logic to
+        decode the command line.
+
+HSRECV   C       48460 08-02-92   9:54p
+HSRECV   H         644 08-02-92   9:55p
+        This unit defines the "receive side" of the protocol.
+
+HSTRANS  H         474 08-02-92   9:55p
+HSTRANS  C       27492 08-02-92   9:53p
+        This unit defines the "transmit side" of the protocol.
+
+HSUID    H        3113 08-02-92   9:55p
+HSUID2   H         466 08-02-92   9:55p
+HSUID    C        7048 08-02-92   9:53p
+        This unit identifies the user registration number and validates the
+        hslink.exe file to deter hacking.  The values in HSUID2.H should be
+        edited prior to any public posting to ensure the validity check is
+        performed correctly for the current exe file size.
+
+HSTEXT   C        6572 08-02-92   9:58p
+HSTEXT   H         582 08-02-92   9:58p
+HSHELP   STR      4766 07-11-92   7:45p
+HSTEXT   STR      1226 07-13-92   8:00p
+STRPREP  C        3132 08-02-92   9:53p
+STRPREP  DOC      1830 11-01-91   7:22p
+        This unit defines much of the text messages in hslink. HSHELP.STR and
+        HSTEXT.STR are the text definitions, using a simple script format
+        defined in STRPREP.DOC.  Strprep is a small utility program that
+        (driven my MAKEFILE) processes the .STR files to produce HSTEXT.C and
+        HSTEXT.H for the C compiler.
+
+SETCRC   C        3103 08-02-92   9:53p
+        This program is called by MAKEFILE to insert the proper CRC value
+        into a newly compiled HSLINK.EXE so that it will validate itself as
+        not being tampered with.
+
+MKDLIST  DOC      3190 02-19-92   4:36p
+MKDLIST  PAS      1632 08-02-92   9:56p
+        This is a utility program to build a duplicate filename list for use
+        with hslinks -NO option.
+
+HSCONFIG HLP     18760 05-13-92   5:34p
+HSCONFIG HLI     84259 05-13-92   5:36p
+PREPHELP PAS      6847 08-02-92   9:56p
+HELPME   PAS      5402 08-02-92   9:57p
+        The context sensitive pop-up help system in HSCONFIG is driven by the
+        HELPME unit using text and data definitions from HSCONFIG.HLP.  The
+        PREPHELP program reads HSCONFIG.HLP and forms it into HSCONFIG.HLP,
+        which is suitable for direct inclusion into the pascal source of
+        HSCONFIG at compile time.
+
+PRODEF   INC       687 08-02-92   9:56p
+HSOPT    DCL      1615 11-05-91   9:20p
+OPTIONS  DCL      3097 08-02-92   9:56p
+OPTIONS  I        1989 07-18-92  12:44p
+DISPEDIT PAS     28991 08-02-92   9:56p
+HSCONFIG PAS     20482 08-02-92   9:57p
+        These are the remaining files making up the source for HSCONFIG.
+
+MATCHLN  PAS       587 08-02-92   9:56p
+        This is a utility program used by MAKEFILE to verify that the SETCRC
+        operation was successful.
+
+HSLINK   DOC     99749 05-13-92   5:34p
+COVER3   WP      16302 05-18-92   8:56a
+PHSLINK  WP     120392 05-10-92  11:37p
+        These files make up the text and WordPerfect 5.1 reference guide for
+        hslink.  Please note that I retain all copy rights to printed
+        documentation.
+
+HSLINK   HST     35309 05-13-92   5:43p
+HSLINK   NEW      3088 07-18-92  12:13p
+        This contains the revision history for HSLINK.
+

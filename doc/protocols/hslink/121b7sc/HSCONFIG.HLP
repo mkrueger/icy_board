@@ -1,0 +1,586 @@
+;
+; HS/Link Configuration Manager - help file (for prephelp)
+;
+-- Help_Index Contents Introduction Installation Help!
+
+Welcome to HS/Link Configuration Manager's Online Help System.
+
+This program is the "easy way" to manipulate HS/Link's
+configuration files and options.
+
+Use the <SPACE>, <BACKSPACE> and <ENTER> keys to select topics
+for display.
+
+Use the <ESC> key to go back to the previous screen.
+
+-- Welcome!
+Welcome to the HS/Link Configuration Manager.
+The easy way to handle HS/Link configuration files.
+
+Use the   keys to select entries on this page.
+Use the PgUp/PgDn keys to change pages.
+Press ESC to save changes when you are finished.
+
+Use the F1 key to get HELP at any prompt.
+-- Contents Flow_Control COM_Settings Options Screen
+
+Select the desired section.
+
+-- COM_Settings -B -C -E -P -PB -PI -HC -HR -HS -HX
+
+These settings control the use of the COM port
+handshake (flow control).
+
+-- Options File/Directory_Options Feature_Options
+
+Select the desired group of options.
+
+-- File/Directory_Options -NB -K -O -R -S -U -NT -LF
+
+Select the desired File or Directory option.
+
+-- Feature_Options -! -A -NC -NM -W -N5 -FT -I -NO -NE
+
+These settings control various optional
+features of the HS/Link protocol.
+
+-- Screen -NF -NV -CB -CM -CT -CW -CG -CP
+
+The settings control the screen display format
+and color during file transfer.
+
+-- Flow_Control -HX -HC -HR -HS -NA -NC
+
+Flow Control is required when the sending and receiving computers
+or modems operate at different speeds, or when computers are
+unable to simultaneously access disk drives and the COM port.
+Flow Control is a software and/or hardware means of slowing down
+the faster parts of the connection to prevent overloading the
+slower parts of the system.
+
+HS/Link uses both XON/XOFF (software) and RTS/CTS (hardware)
+handshake when communicating with high speed modems or slow
+packet switched networks.  The protocol also uses a window
+algorithm to suspend data transmission if the receiver does not
+eventually respond to transmitted data.
+
+-- Introduction Features Installation Help!
+
+HS/Link is a high speed, full streaming, full-duplex, bi-
+directional, batch file transfer protocol with advanced full-
+streaming-error-correction.  Each side of the link is allowed to
+provide a list of files to be sent. Files will be sent in BOTH
+directions until both sides of the link are satisfied.
+
+HS/Link is not _just_ another bidirectional protocol, it is also a
+very fast protocol for normal downloading and uploading,
+incorporating some new ideas, such as Full-Streaming-Error-
+Correction(tm) and Dynamic-Code-Substitution(tm), to make things
+happen a bit faster and with greater reliability.
+
+-- Features More_Features
+
+*  Speed.  HS/Link operates at or very near peak efficiency, often
+   reaching 98% or more with pre-compressed files and non-buffered
+   modems.  Even higher speeds are possible with buffered or error
+   correcting modems.  A number of features, such as fast 32 bit
+   CRC protection, Full-Streaming-Error-Recovery(tm) and Dynamic-Code-
+   Substitition(tm), combine to give maximum performance and security.
+
+*  Simple interface for beginners.  In many cases, HS/Link requires
+   only the COM port number and the filename to be transmitted.
+   Configuration files are not required.  The program is easily
+   installed in most COMM programs that support external protocols.
+   The HSLINK program has multiple help screens, providing a quick
+   reference to the basic and advanced command line options,
+   including examples of how the program is used.
+
+*  Batch file transfers.  The protocol can handle any size batch of
+   files, and can take file specifications from either the command
+   line or from a listing file.
+
+-- More_Features Still_More_Features
+
+*  Bi-directional options that really work.  The program can
+   simultaneously upload and download with a single host request. What's
+   even better is how easy it is to use...  instead of a complex setup
+   all you do is:
+
+   1) Tell the BBS the names of the files you want to download, and then
+
+   2) Press PGUP (or whatever your COMM program uses to UPLOAD files)
+      and then tell your COMM program which files to upload
+
+   By virtue of the BBS being told that it is sending files and your
+   COMM program telling HS/Link that it too is sending files you then
+   have a bidirectional transfer.  There's nothing else to set up.  You
+   use the familiar BBS interface to request files to download and your
+   COMM program's familiar interface to tell it which files to upload.
+   It couldn't get easier!
+
+-- Still_More_Features
+
+*  Aborted file recovery.  When desired, HS/Link can resume an
+   aborted transfer, verifying all existing data blocks to insure
+   the resumed file completely matches the file being transmitted.
+   This function can also update a file that has only a small
+   number of changed, added, or deleted blocks.
+
+The HS/Link protocol is the result of years of communication experience,
+and uses some very new and solid technology to see to it that you can
+easily move files as quickly as possible, and with the least amount of
+hassle.
+
+-- Installation Command_line System_requirements Copy_protection
+
+The HS/Link protocol can be easily installed in most modern COMM
+programs.  Specific instructions have been prepared for many
+popular COMM programs, and are available in separate files for
+download.  See HS-INST.ZIP for many current install instructions.
+
+-- Copy_protection BOOTLEG_BUSTERS DISCLAIMER
+
+This software is protected by both United States copyright law and
+international treaty provisions.  Therefore, you must treat this
+software JUST LIKE A BOOK with the following single exception: You are
+authorized you to make archival copies of HS/Link for the sole purpose
+of backing up our software and protecting your investment from loss.
+
+By saying, "just like a book," we mean, for example, that this
+software may be used by any number of people and may be freely moved
+from one computer location to another so long as there is NO
+POSSIBILITY of its being used at one location while it's being used at
+another.  Just like a book that can't be read by two different people
+in two different places at the same time, neither can the software be
+used by two different people in two different places at the same time.
+
+It is NOT NICE to give away registered copies of HS/Link, since then
+the hard-working people at The Tool Shop would not receive any money
+for the effort that has gone into this product.
+
+-- BOOTLEG_BUSTERS Shareware
+
+If you happened to get a bootleg copy of HS/Link, please
+write or call:
+
+      Samuel H. Smith
+      P.O.BOX 4808
+      Panorama City, CA 91412-4808
+      (818) 891-4228 (VOICE)
+
+If you see registered HS/Link on any BBS, we would appreciate it
+if you tell the SysOp that registered HS/Link is a copyrighted
+commercial product, neither "Freeware", "Shareware", nor public
+domain.
+
+-- Shareware
+
+The un-registered version can be freely distributed so long as it
+is not modified or sold for profit.  After an evaluation period
+of 30 days, if you find that this program is valuable,  and you
+intend to continue using the program, you must register it for a
+small fee of $20.
+
+-- DISCLAIMER
+
+Samuel H. Smith disclaims all warranties as to this software,
+whether express or implied, including without limitation any
+implied warranties of merchantability, fitness for a particular
+purpose, functionality or data integrity or protection.
+
+-- System_requirements DISCLAIMER
+
+HS/Link works on all IBM PC and Compatible computers,
+including the PC/XT, PC/AT and PS/2 computers.
+
+Works with IBM PC-DOS version 2.1 and later,
+MS-DOS version 2.1 and later.
+
+Your computer should have at least 120K bytes of free RAM.
+
+Monochrome, Color Graphics, Enhanced Graphics and Video
+Graphics Array displays are all supported.
+
+HS/Link runs in color on color monitors.
+
+-- Command_line
+
+HS/Link can be called from batch files for automated operation.
+
+The command line format is:
+    [drive:][path]HSLINK [options] [files to send]
+
+Examples:
+    HSLINK -P1
+    HSLINK -P2 -Uc:\bbsfiles -K
+    HSLINK -Uc:\bbsfiles c:\uploads\*.zip
+    HSLINK file1.zip file2.zip file3.zip
+    HSLINK -b38400 -p2 -c -hs -hc file1.zip file2.zip
+
+-- Help! DISCLAIMER
+
+If you need further assistance in the operation of HS/Link you
+can contact me at:
+
+      The Tool Shop
+      Samuel H. Smith
+      P.O.BOX 4808
+      Panorama City, CA 91412-4808
+      (818) 891-4228 (Voice)
+      (818) 891-1344 (BBS)
+
+Please have the following information handy before you call:
+
+ o  Product name, version and serial number
+ o  Computer make and model number
+ o  Operating system and version number
+ o  Modem make and model number
+
+;
+; Help for the varoius options
+;
+-- -!
+-!  þ Take priority.
+
+Will force the remote system to use the locally
+specified -A, -HX, -S, -NM, and -W settings.
+
+Do not use the -! option on both sides of a link.
+
+-- -A
+-A  þ Disable transmission of ACK codes after each block.
+
+This may improve transfer speeds under some conditions.
+
+Bidirectional transfers will generally perform better
+when ACK codes are disabled.
+
+-- -B
+-Bbaud  þ Open COM port at 300..115200
+
+This option controls the speed at which the COM port will be
+opened.  Normally, the COM port speed can be determined from
+hardware and need not be specified.
+(default=current port speed).
+
+-- -C
+-C  þ Disable carrier detect checking.
+
+-- -CB
+-CB  þ Defines the border color in full screen mode.
+
+-- -CM
+-CM  þ Defines the main screen color in full screen mode.
+
+-- -CT
+-CT  þ Defines the window title color in full screen mode.
+
+-- -CP
+-CP  þ Defines the status display screen position.
+
+This is used to reposition the status display up or down on your screen.
+The default of -CP2 causes the top two lines to be untouched.
+
+A setting of -CP0 will make the status display to start at the TOP of the
+screen, leaving the bottom lines untouched.
+
+-- -CW
+-CW  þ Defines the window contents color in full screen mode.
+
+-- -CG
+-CG  þ Defines the color of transfer progress graphs
+       in full screen mode.
+
+-- -E
+-Ebaud  þ Effective modem-to-modem baud rate.
+
+This is used to estimate transfer times, and is included in the
+DSZLOG output.  (default=current -B setting)
+
+-- -FC -HC Flow_Control
+-FC  þ Force CTS hardware handshake.
+
+This option prevents HSLINK from automatically disabling CTS hardware
+handshake if CTS is not active initially.
+
+-- -FT -N5
+-FTn  þ Set NS16550 FIFO Threshold.
+
+This option controls the number of characters that will be buffered by
+the NS16550AN internal buffer before an interrupt is generated. Higher
+fifo thresholds will produce fewer interrupts and somewhat less CPU
+loading, but with the risk of overrun errors.  Lower thresholds will
+prevent overrun errors under multi-taskers like Windows or Desqview.
+
+When the NS16550AN is not detected (or has been disabled with the -N5
+option) a setting of -FT0 is assumed.   The special settings -FT18
+through -FT128 are used with certain internal modems that have
+buffering but do not emulate the NS16550AN.
+
+-- -HC -FC Flow_Control
+-HC  þ Disables CTS hardware handshake.
+
+CTS transmitter handshake is automatically enabled, but may
+conflict with some unusual modem cables or serial ports.  If the
+CTS signal is not active when HSLINK loads, it will automatically
+disable CTS handshake for you.
+Use the -HC command to manually disable CTS handshake.
+Use the -FC command to force CTS handshake to remain in effect.
+
+-- -HR Flow_Control
+-HR  þ Disables RTS hardware handshake.
+
+RTS receiver handshake is used when the slow-handshake option is
+selected.  This form of handshake causes the RTS line to the
+modem to be lowered whenever the disk is being accessed.  Some
+unusual modem or cable arrangements may not tolerate the RTS line
+being lowered.  In this case, the RTS handshake can be disabled
+with the -HR option.
+
+-- -HS Flow_Control
+-HS  þ Handshake Slow
+
+The slow handshake option is available for systems with slow disk
+access.  Use this if you get frequent CRC errors or COM Overrun
+errors on otherwise clean lines.  The slow handshake option
+causes XOFF to be sent and/or RTS to be lowered during any disk
+activity.  Even when -HS is active, the HS/Link protocol should
+transfer data very nearly as fast as the slowest part of the link
+allows.
+
+-- -HX Flow_Control
+-HX  þ Disables XON/XOFF software handshake.
+
+XON/XOFF handshake is a software handshake scheme that should
+work well on all combinations of modems and networks, and is
+enabled by default. If you prefer not to use XON/XOFF handshake,
+or you find that it is not required for error-free transfer, you
+can disable it with the -HX option.
+
+Note that both the sender and the receiver must simultaneously
+disable XON/XOFF handshake, otherwise it will remain in effect.
+
+-- -I
+-Imethod  þ Idle time method.
+
+This option determines how HS/Link will dispose of idle time.
+        -I0     Do not dispose of idle time (default)
+        -I1     Spend idle time in BIOS keyboard polling
+        -I2     Yield idle time under DesqView
+        -I3     Yield idle time under DoubleDOS
+        -I4     Yield idle time under Windows/OS2/VCPI/DOS5
+
+-- -K
+-K  þ Keep partial files from aborted transfers.
+
+-- -LF
+-LFlogfile  þ Specify status log file.
+
+This option allows you to override the DSZLOG environment
+variable to specify the file to be used for status logging.
+
+Omit this option, or leave blank to control this function
+through the DSZLOG environment variable.
+
+-- -N5 -FT
+-N5  þ Disable NS16550AN buffering logic.
+
+Some versions or clones of the 16550 chip do not function
+properly in buffered mode.  This option forces HS/Link to
+program the chip as a normal 16540 to prevent errors.
+
+When operating under Microsoft Windows or other protected
+environments you may need to use this option.
+
+-- -NA -HX
+-NA  þ Disable Alternate XON/XOFF method during initial handshake.
+
+This option causes HS/Link to use the old XON/XOFF method rather
+than the new alternate method during the initial handshake with
+the remote.  This option is needed only if handshake fails when the
+remote unit is version 1.12 or earlier and should not be needed
+when communicating with newer versions.
+
+-- -NB
+-NB  þ Disable buffering of receive and transmit files.
+
+This option causes HS/Link access disk files for every
+block sent or received.
+
+When buffering is enabled, HS/Link normally buffers
+approximately 20k of send or receive data to reduce the
+frequency of disk I/O during a file transfer.
+
+-- -NC
+-NC  þ Disable Dynamic Code Substitution logic.
+
+Certain byte codes cannot be transmitted directly over the COM
+link. For instance, the codes for Control-X, Control-S and
+Control-Q must be "escaped" to prevent a conflict with flow or
+program control.
+
+The HS/Link protocol uses a new Dynamic Code Substitution system
+to drastically reduce number protocol overhead and "escape" codes
+needed to transmit certain data streams.
+
+Highly compressed data files (such as ZIP and GIF files) benefit
+the most, since they often have many byte codes that cannot be
+transmitted directly over the COM link.
+
+-- -NE
+-NE  þ Maximum Repeated Errors.
+
+This option sets the number of repeated identical errors that must
+occur to abort a file transfer.  This feature is used to limit the
+duration of a file transfer that appears to be failing.
+
+-- -NF
+-NF  þ Disable Full screen mode.
+
+The standard status display takes over the full screen (except
+the top 2 lines, which may contain a BBS status line).  This
+option bypasses the full screen display and causes a line-
+oriented output to be used. Use this option if your environment's
+screen management does not allow a full-screen display.
+
+-- -NM
+-NM  þ Disable Minimal Blocks logic.
+
+The HS/Link protocol includes a Minimal Blocks feature, which
+when activated, causes the protocol to strip away repeated
+information from the protocol frames and transmit only the
+minimal amount of information required for data flow.
+
+This feature results in a savings of over 50% of the normal
+protocol overhead characters in each block of data, while
+retaining full data integrity.  All data and control blocks are
+fully protected by a 32 bit CRC calculation, even when Minimal
+Blocks is in effect.
+
+The final block in a file rarely ends on an exact transfer block
+boundary.  The HS/Link protocol automatically shortens the final
+block, eliminating extraneous data transmission at the end of
+file.
+
+-- -NO
+-NOdirlist  þ Incoming file duplication checklist.
+
+This option allows you to check incoming files for duplication in a list
+of directories.  This feature prevents incoming files from duplicating
+files in directories other than the current -U setting.
+
+The dirlist is a text file which contains one filename or directory
+specification per line.  See MKDLIST.DOC for special instructions to
+speed CD-ROM duplication checking.
+
+-- -NT
+-NT  þ Stamp current file time.
+
+This option stamps the current time/date on received files,
+instead of retaining the original file time/date.
+
+-- -NV
+-NV  þ Disable direct Video for DesqView/DoubleDOS/etc.
+
+If you are running a multi-tasking program, like DesqView or
+DoubleDOS, you may experience "bleed through" from the HSLINK
+status display.  To stop this bleedthrough, you can use the -NV
+option to disable direct video writing.  The result will be a
+slightly slower display, but it will not bleed from one partition
+to another.
+
+-- -O
+-O  þ Allow receive files to overwrite existing files.
+
+-- -P  -PB -PI
+-Pport  þ Use COM port 1..8 (default=1)
+
+Specifies the communication port to be used by HS/Link for data
+transfer.
+
+HS/Link has 8 predefined COM ports:
+       Channel        I/O Port       Interrupt
+         COM1           0x3F8            4
+         COM2           0x2F8            3
+         COM3           0x3E8            4
+         COM4           0x2E8            3
+         COM5           undefined
+         COM6           undefined
+         COM7           0x2E8            5
+         COM8           0x3E8            5
+
+-- -PB -PI -P
+-PBbase  þ Set non-standard COM port base address (in decimal).
+
+Omit this option, or specify a value of 0 to use standard COM ports.
+The base address may be specified in HEX using the format -PB$base,
+for example: -PB$3E8 is the same as -PB1000.
+
+-- -PI -PB -P
+-PIirq  þ Set non-standard COM port IRQ level.
+
+Omit this option, or specify a value of 0 to use standard COM ports.
+
+-- -R
+-R  þ Resume aborted transfer.
+
+The receiver and transmitter will verify the contents of an
+existing file, and will begin transmission at the first block
+that does not match.  This provides a reliable means of
+restarting an aborted transfer, or of updating a modified file.
+You must also use -O to recover aborted downloads.
+
+-- -S
+-Ssize  þ Sets transmit block size 2..4096 (default=1024)
+
+Larger block sizes may result in higher transfer speeds under
+clean line conditions.
+
+-- -U
+-Udir  þ Download directory.
+
+This option controls the destination directory for downloaded
+files.  Without this option, all download files are placed into
+the current directory.
+
+-- -W
+-Wwindow  þ Number of blocks allowed without ACK 0..1000 (default=8)
+
+Use -A to establish an "infinite" window (i.e. no ACK required at all).
+
+;
+; The following topics are used in error reporting
+;
+-- New_Configuration
+
+The specified configuration file cannot be located.
+
+This probably indicates that you are creating a new
+configuration for HS/Link.  All options will be set
+to default values.
+
+Alternate configuration files can be specified on
+the command line to HSCONFIG.  The default configuration
+file is HSLINK.CFG, and it may be located either in the
+current directory, or in any PATH directory.
+
+Press <ENTER> or <ESC> to continue.
+
+-- Open_Error New_Configuration
+
+The specified configuration file could not be opened.
+
+Check that the filename is valid, and that any drive
+or directory specifications are correct.
+
+Press <ENTER> or <ESC> to continue.
+
+-- Create_Error New_Configuration
+
+The specified configuration file could not be created on disk.
+
+Check that the filename is valid, and that any drive
+or directory specifications are correct.
+
+Press <ENTER> or <ESC> to continue.
+

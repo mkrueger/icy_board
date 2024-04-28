@@ -24,6 +24,7 @@ pub mod r_read_messages;
 pub mod redisplay_cmd;
 pub mod s_take_survey;
 pub mod t_set_transfer_protocol;
+pub mod ts_text_search;
 pub mod u_upload_file;
 pub mod user_show_user_list;
 pub mod v_view_settings;

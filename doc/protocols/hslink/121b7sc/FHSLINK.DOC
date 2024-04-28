@@ -1,0 +1,33 @@
+
+                             FOSSIL HS/Link
+                              Version 1.20
+
+                     Copyright 1993 Samuel H. Smith
+                          All Rights Reserved
+
+The file FHSLINK.EXE is the new FOSSIL version of the HS/Link protocol
+driver.  This version of HS/Link is useful if you are using FOSSIL
+drivers to access your COM ports.  You may need FOSSIL drivers with non-
+standard computer equipment or with many multi-port serial cards, such
+as the Digi-board.
+
+FOSSIL HS/Link is identical to the standard HSLINK with the following
+exceptions:
+
+*  You MUST specify the COM port opening speed with the -B option.  I
+   was not able to reliably determine the current COM port speed using
+   X00.  Future versions may remove this requirement.
+
+*  The RTS handshake functions are not available in standard version 5
+   FOSSIL drivers, so the -HS option may not work.  Support has been
+   added for X00 drivers, which extend the standard to allow this type
+   of handshake.
+
+*  I recommend a FOSSIL transmit buffer size of at least 5k.  The
+   receive buffer size is not as important, but should be increased if
+   FHSLINK reports receiver overflow errors.  Consult your FOSSIL driver
+   documentation for details of setting buffer sizes.
+
+*  The -PB, -PI, -N5 and -FT options are ignored since the FOSSIL driver
+   now controls all low-level COM port details.
+

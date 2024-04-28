@@ -1,0 +1,220 @@
+
+#
+# TC/BC++ 3.1 Makefile for "HS/Link" using small/static model HDK libraries
+# Samuel H. Smith, 10/14/91
+#
+
+.AUTODEPEND
+
+# online posting of betas for download
+
+ONLINE=U:\DL1\HS121gB7.ZIP
+SOURCE=R:\BAK\121B7SC.ZIP
+
+# exe directory
+
+EXEDIR=U:\BIN
+HSLZIP=U:\DL1\HSLEXE.ZIP
+
+# hslink developer kit library to link (HDKSS is for small model, static)
+
+!if $d(DWS)
+HDKLIB=\HDK\HDKS.LIB
+!else
+HDKLIB=\HDK\HDKSS.LIB
+!endif
+
+!if $d(DEBUG)
+HDKLIB=\HDK\DEBSS.LIB
+!endif
+
+# exe file compression
+
+PKLITE=rem pklite
+PKLITE=PKLITE -e -n
+
+# memory model
+
+MODEL=s
+CPU=
+
+# determine if fossil driver is to be used
+
+!if $d(FOSSIL)
+USEFOS=-DFOSSIL
+!else
+USEFOS=
+!endif
+
+
+# compiler options
+
+COMPILER=tcc
+
+!if $d(DWS)
+CC=$(COMPILER)
+!else
+CC=$(COMPILER) -DSWS
+!endif
+
+CCOPT=-v -y -f- -k- -d -G -O2 -w
+CCOPT=-v- -y -f- -k- -d -G -O2 -w
+
+
+# default compile rules
+
+COMPC=$(CC) -c @COMP.OPT $(HS286) $(CPU) -m$(MODEL)
+
+.C.OBJ:
+        $(COMPC) {$< }
+
+# allow .ASM files to be generaed if make -DASM is specified
+# (this cannot be the default or make will want to compile
+#  every module via assembly!)
+!if $d(ASM)
+.C.ASM:
+        $(COMPC) -S {$< }
+!else
+!endif
+
+.C.I:
+        CPP -c @COMP.OPT $(HS286) $(CPU) -m$(MODEL) {$< }
+
+# build files
+
+DEFAULT: COMP.OPT HSLINK
+
+ALL: COMP.OPT HSLINK SETCRC HSCONFIG ONLINE SOURCE
+
+ONLINE: $(ONLINE) EXE HSLEXE
+
+SOURCE: COMP.OPT HSLDEV.ZIP
+
+EXE: COMP.OPT $(EXEDIR)\HSLINK.EXE $(EXEDIR)\FHSLINK.EXE
+
+HSLEXE: EXE
+        PKZIP1 -f -! $(HSLZIP)
+        COPY DISTRIB.DOC U:\PCB\GEN\BLT6
+        UFDIR U:\PCB\GEN\DLDIR1 U:\DL1
+
+HSLINK: HSLINK.EXE 
+
+HSTERM: HSTERM.EXE $(EXEDIR)\HSTERM.EXE
+
+COMP.OPT: MAKEFILE
+        ECHO $(CCOPT) >COMP.OPT
+
+!if $d(FOSSIL)
+$(EXEDIR)\FHSLINK.EXE: FHSLINK.EXE
+        CP FHSLINK.EXE EXE -R
+        EXE\FHSLINK REGISTER 00001 1s2b58h
+        CP EXE\FHSLINK.EXE $(EXEDIR) -R
+!endif
+
+$(EXEDIR)\HSLINK.EXE: HSLINK.EXE
+        CP HSLINK.EXE EXE -R
+        EXE\HSLINK REGISTER 00001 1s2b58h
+        CP EXE\HSLINK.EXE $(EXEDIR) -R
+
+$(EXEDIR)\HSTERM.EXE: HSTERM.EXE
+        CP HSTERM.EXE $(EXEDIR) -R
+
+OBJ1=HSLINK.OBJ HSMEM.OBJ HSCLOCK.OBJ HSUID.OBJ HSDISP.OBJ HSIDLE.OBJ $(HDKLIB)
+
+!if $d(FOSSIL)
+OBJ2=FOSSIL.OBJ
+!else
+OBJ2=HSCOMM.OBJ HSINTR.OBJ
+!endif
+
+
+LINK.OPT: MAKEFILE
+        ECHO $(OBJ1) >LINK.OPT
+        ECHO $(OBJ2) >>LINK.OPT
+
+HSLINK.EXE: $(OBJ1) $(OBJ2) SETCRC.EXE HSUID2.H HSLINK.C LINK.OPT
+        $(CC) -m$(MODEL) @COMP.OPT $(HS286) $(CPU) $(USEFOS) @LINK.OPT HSVER.C
+        COPY HSLINK.EXE \TMP\BEFORE.EXE >nul
+        $(PKLITE) HSLINK.EXE
+        SETCRC HSLINK.EXE
+!if $d(FOSSIL)
+        COPY HSLINK.EXE FHSLINK.EXE
+        DEL HSLINK.EXE
+!endif
+
+FILE_ID.DIZ: FILE_ID.TX1 FILE_ID.TX2 HSLINK.EXE
+        type FILE_ID.TX1 >FILE_ID.DIZ
+        ntm /l "As of" >>FILE_ID.DIZ
+        type FILE_ID.TX2 >>FILE_ID.DIZ
+
+$(ONLINE): HSLINK.EXE HSLINK.DOC HSLINK.NEW REGISTER.FRM HSCONFIG.EXE FILE_ID.DIZ
+        TOUCH CONTENTS.TXT >nul
+        PKZIP1 -! -F HSLINK.ZIP
+        TYPE CONTENTS.TOP >CONTENTS.TXT
+        PKUN1 -V HSLINK.ZIP >>CONTENTS.TXT
+        TYPE CONTENTS.MID >>CONTENTS.TXT
+        PKUN1 -T HSLINK.ZIP >>CONTENTS.TXT
+        TYPE CONTENTS.BOT >>CONTENTS.TXT
+        PKZIP1 -! -F HSLINK.ZIP
+        COPY HSLINK.ZIP $(ONLINE)
+        UFDIR U:\PCB\GEN\DLDIR1 U:\DL1
+
+HSLDEV.ZIP: HSLINK.EXE HSLINK.DOC HSLINK.NEW
+        PKZIP -F HSLDEV.ZIP *.* \HDK\HDKSC.ZIP \HDK\HDK.ZIP
+        BAC HSLDEV.ZIP R:\DIST
+        COPY HSLDEV.ZIP $(SOURCE)
+
+
+# compile each source file
+
+HSINTR.OBJ: HSINTR.C UART.H HSINTR.H HSINTR2.H FINDJMP.EXE
+
+HSCOMM.OBJ: HSCOMM.C HSIDLE.H
+
+FOSSIL.OBJ: FOSSIL.C FOSSIL.H HSIDLE.H
+        $(COMPC) $(USEFOS) FOSSIL.C
+
+HSUID.OBJ: HSUID.C HSUID2.H
+        $(COMPC) $(USEFOS) HSUID.C
+
+HSLINK.OBJ: HSLINK.C HSUID2.H
+        $(COMPC) $(USEFOS) HSLINK.C
+
+HSDISP.OBJ: HSDISP.C
+
+HSMEM.OBJ: HSMEM.C
+
+HSCLOCK.OBJ: HSCLOCK.C
+
+HSIDLE.OBJ: HSIDLE.C
+
+
+# compile utility and supporting programs
+
+SETCRC: SETCRC.EXE 
+
+SETCRC.EXE: SETCRC.C HSUID2.H
+        $(CC) -m$(MODEL) @COMP.OPT -M $(HS286) $(USEFOS) SETCRC.c $(HDKLIB)
+
+HSCONFIG: HSCONFIG.EXE
+
+HSCONFIG.EXE: HSCONFIG.PAS OPTIONS.I HSCONFIG.HLI
+        TPC HSCONFIG /M
+        $(PKLITE) HSCONFIG.EXE
+
+$(EXEDIR)\HSCONFIG.EXE: HSCONFIG.EXE
+        CP HSCONFIG.EXE $(EXEDIR) -R
+
+OPTIONS.I: OPTIONS.DCL
+        CPP -P- OPTIONS.DCL
+        GMREP OPTIONS.GM OPTIONS.I
+
+HSCONFIG.HLI: HSCONFIG.HLP PREPHELP.EXE
+        PREPHELP HSCONFIG.HLP HSCONFIG.HLI
+
+PREPHELP.EXE: PREPHELP.PAS
+        TPC PREPHELP/M
+
+FINDJMP.EXE: FINDJMP.PAS
+        TPC FINDJMP
+

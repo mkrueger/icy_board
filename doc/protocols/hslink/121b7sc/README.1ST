@@ -1,0 +1,17 @@
+As many of you know, last year my offices were burglarized and my
+main software development system stolen, complete with latest backup tapes.
+As a result, I have no source code at all for the windows dlp version
+of hs/link, and only a 2/94 edition of the dos version.  This loss
+really took all the steam out of my development plans for this project.
+Please don't send registrations for hs/link- I'm no longer picking up mail
+at my Panorama City PO box.  Consider this program "free" and unsupported.
+Today I am posting what source code I could dig up, in the hopes that others
+may eventually benefit from my past work, and to keep the protocol alive,
+at least in some changed form.
+The source code is contained in the file 121B7SC.ZIP.  You can access it
+from this directory or use the URL http://www.primenet.com/~shsmith/ftp/hslink
+
+August 7, 1996
+Samuel H. Smith
+shsmith@primenet.com
+

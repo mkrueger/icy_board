@@ -1,0 +1,125 @@
+    It appears to be an excellent performer under symetrical high-speed
+    conditions.  From 9600 on up, it works very well.  At 2400, it is very
+    competitive with Zmodem. I think you have a real winner here.
+                                .......Doug Haire
+
+
+    BTW, kudos to you for creating such an easy protocol to add to both comm
+    programs and the BBS.  It took only about 5 minutes to put it into my
+    PCBoard system and Qmodem.  So far, so good!
+                                .......Rod Renner
+
+
+    I have been getting about 95-96% efficiency with Zmodem, but with
+    HS/LINK I get about 98% with one way transfers...haven't tried 2-way
+    yet.
+                                .......Robert Hearn
+
+
+    I've been onto telecommunications for eight years and have run a BBS for
+    six..  I have never used a transfer protocol that any where measures up
+    to your new protocol..  It's amazing that you could develop all the
+    features that you have in only a ver 1 beta..  Keep up the good work..
+    This protocol is going to be one that I will recommend over any other.
+                                ........Michael Chamberlain
+
+
+    It's a fine product, and I'm happy to say in my implementation of it in
+    Qmodem, it's been faster than Y-Modem G, something I didn't think was
+    possible.
+                                ........Todd Henschell
+
+
+    Glad you found the problem, though! People are starting to take to it
+    real heavy. I think it's a true winner and it's been a pleasure to have
+    worked with you on the few problems its had. Your attitude toward
+    producing quality software is a shining example to the rest of the
+    software producers.
+                                .......Doug Haire
+
+
+    I set it up on my BBS in 5 minutes and in my TELIX pgm in 3 minutes...
+    most of that time was consumed by my "hunt and oeck" typing!
+                                .......Al Lawrence
+                                       Sunrise Door Software
+                                       404-256-9525 HST DS 19.2
+
+
+    Several boards in my area have started using HSLINK and really like it.
+    So easy.  As an example, I had just uploaded it to a PC-Board and then
+    entered a message to the sysop urging him to give this protocol
+    consideration.  By the time I had finished with the letter, he broke
+    into chat and said he had unziped it and installed it.  Wanted me to
+    test it right then.  We did a bi-directional transfer without a hitch.
+                                .......Gary Rambo
+
+
+    I see that someone beat me in getting registration in, but literally
+    "the check's in the mail" as of 15 minutes ago.  Please reserve me as
+    low a number as possible.  I'm always pleased to support superb
+    shareware products, such as those you've written.  As the Vice President
+    of the Capital Area SysOps Association (CASA) in the Washington DC area,
+    I will be mentioning your new product at our next meeting this Saturday.
+    If there is anything in particular you'd like my fellow SysOps to know
+    about your product, please let me know and I'll pass it along.
+                                .......Rod Renner
+
+
+    I was worried at first because every time I tried to d/l using HS/Link
+    beta 7 (I removed my -S4096) it aborted, but it works just great with
+    beta 8.  Keep up the great work!  I'm going to save you a call and u/l
+    it to Salt Air now.  Thanks for writing HS/Link.
+                                .......Raymond Clements
+                                       The Pegasus BBS
+                                       (502)684-9871 HST
+                                       (502)684-9855
+
+
+    MOÝPing-Pong....Don't really know about this type of effect...but if it is
+      Ýusing both channels,,,why wouldn't it work. (bidirectional that is)...
+
+    In a manner of speaking, the HST, V-series Hayes and others are
+    full duplex, but they are asymetrical - one channel is at a very
+    high speed and the other is simultaneous, but slow. The priority
+    goes to the channel with the most data. If both are sending equal
+    amounts, the high speed channel switches back and forth - a common
+    term used to describe this is "ping-ponging". In a bi-directional
+    transfer or a fully interactive session, where both sides are
+    transmitting equal amounts of data simultaneously, one side would
+    be sending at top speed and the other side would get the low speed
+    back channel until a lull on the high speed end occurred,
+    switching the high speed channel to the other sender.
+
+    MOÝCorrect me if I am wrong...but I thought that the v.32 mean
+      Ýfull-duplex??? (in the 9600 series)
+
+    Yes, v.32 is full duplex - but it is also symetrical with both
+    channels carrying 9600 bps simultaneously.
+                                .......Ken Sukimoto
+
+
+    Please don't overlook HSLINK's ability to do one-way transfers!
+
+    Of course it's getting attention as a bi-directional protocol, but the
+    great error control, and the ability to set the size of the packet size
+    makes the speed comparable to Zmodem or Ymodem-g.
+
+    HSLINK:  It's not just for bi-directionals anymore!
+                                .......Gary Rambo
+
+
+    HSLink 10C looks very close to a release to these untrained eyes. I sure
+    do hope it will work with other BBSes, because if it does Mr Smith is
+    going to get a LOT of registrations. He's gonna get some from here even
+    as it stands, which for the moment is a one-way protocol. It's VERY nice
+    work.
+                                .......Alan Dawson
+
+
+    Recently Werner Gumpert and I were discussing the growth of use on such
+    a new protocol as being nothing short of phenominal <sp> as in the
+    short time it has been out is now is used on 11.8% of all file
+    transfers on my board, including the QWK mail transfers.  This is
+    second only to Zmodem and has replaced Ymodem and all the others. Great
+    program!  The BBS community owes you a big thanks for producing it.
+                                .......Randy Young
