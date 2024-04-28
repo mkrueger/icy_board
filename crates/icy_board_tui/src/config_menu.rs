@@ -36,13 +36,26 @@ impl ResultState {
     }
 }
 
+pub struct Value {
+    pub display: String,
+    pub value: String,
+}
+impl Value {
+    pub fn new(display: &str, value: &str) -> Self {
+        Self {
+            display: display.to_string(),
+            value: value.to_string(),
+        }
+    }
+}
+
 pub enum ListValue {
     Text(u16, String),
     Path(PathBuf),
     U32(u32, u32, u32),
     Bool(bool),
     Color(IcbColor),
-    ValueList(String, Vec<String>),
+    ValueList(String, Vec<Value>),
 }
 
 pub struct ListItem {
@@ -124,7 +137,13 @@ impl ListItem {
                 IcbColor::IcyEngine(_) => todo!(),
             },
             ListValue::Bool(_) => {}
-            ListValue::ValueList(cur_value, _) => {
+            ListValue::ValueList(cur_value, list) => {
+                for l in list {
+                    if l.value == *cur_value {
+                        Text::from(l.display.clone()).style(THEME.value).render(area, frame.buffer_mut());
+                        return;
+                    }
+                }
                 Text::from(cur_value.clone()).style(THEME.value).render(area, frame.buffer_mut());
             }
         }
@@ -151,8 +170,17 @@ impl ListItem {
             ListValue::Color(_value) => {
                 self.render_value(area, frame);
             }
-            ListValue::ValueList(_cur_value, _) => {
-                self.render_value(area, frame);
+            ListValue::ValueList(cur_value, list) => {
+                let mut area = area;
+                area.width = list.iter().map(|l| l.display.len()).max().unwrap_or(0) as u16;
+
+                for l in list {
+                    if l.value == *cur_value {
+                        Text::from(l.display.clone()).style(THEME.edit_value).render(area, frame.buffer_mut());
+                        return;
+                    }
+                }
+                Text::from(cur_value.clone()).style(THEME.edit_value).render(area, frame.buffer_mut());
             }
         }
     }
@@ -190,15 +218,28 @@ impl ListItem {
                 *b = !*b;
                 return ResultState::default();
             }
-            ListValue::Color(_) | ListValue::ValueList(_, _) => {}
+
+            ListValue::ValueList(cur_value, list) => {
+                for (i, l) in list.iter().enumerate() {
+                    if l.value == *cur_value {
+                        *cur_value = list[(i + 1) % list.len()].value.clone();
+                        return ResultState::default();
+                    }
+                }
+                *cur_value = list[0].value.clone();
+                return ResultState::default();
+            }
+
+            ListValue::Color(_) => {}
         }
         return ResultState::status_line(self.status.clone());
     }
 
-    fn request_edit_mode(&mut self) -> ResultState {
+    fn request_edit_mode(&mut self, state: &mut ConfigMenuState) -> ResultState {
         match &mut self.value {
             ListValue::Bool(b) => {
                 *b = !*b;
+                state.in_edit = false;
                 return ResultState::status_line(self.status.clone());
             }
             _ => ResultState::status_line(String::new()),
@@ -522,7 +563,7 @@ impl ConfigMenu {
             KeyCode::Char('j') | KeyCode::Down => Self::next(self.count(), state),
             KeyCode::Char('d') | KeyCode::Enter => {
                 state.in_edit = !state.in_edit;
-                return self.get_item_mut(state.selected).unwrap().request_edit_mode();
+                return self.get_item_mut(state.selected).unwrap().request_edit_mode(state);
             }
 
             _ => {}

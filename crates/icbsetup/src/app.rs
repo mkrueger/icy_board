@@ -1,5 +1,9 @@
 use core::panic;
-use std::{path::PathBuf, sync::Arc, sync::Mutex, time::Duration};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use chrono::{Local, Timelike};
 use color_eyre::{eyre::Context, Result};

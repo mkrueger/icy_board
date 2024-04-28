@@ -32,6 +32,8 @@ impl<'a> PathTab<'a> {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
         let a = icy_board.clone();
         let lock = a.lock().unwrap();
+        let system_files_width = 16;
+
         let system_files = vec![
             ConfigEntry::Item(
                 ListItem::new(
@@ -39,13 +41,18 @@ impl<'a> PathTab<'a> {
                     "Conference Data".to_string(),
                     ListValue::Path(lock.config.paths.conferences.clone()),
                 )
-                .with_status("Name/Loc of Conference Data"),
+                .with_status("Name/Loc of Conference Data")
+                .with_label_width(system_files_width),
             ),
             ConfigEntry::Item(
-                ListItem::new("home_dir", "Home Directory".to_string(), ListValue::Path(lock.config.paths.home_dir.clone())).with_status("User Home Directory"),
+                ListItem::new("home_dir", "Home Directory".to_string(), ListValue::Path(lock.config.paths.home_dir.clone()))
+                    .with_status("User Home Directory")
+                    .with_label_width(system_files_width),
             ),
             ConfigEntry::Item(
-                ListItem::new("log_file", "Log File".to_string(), ListValue::Path(lock.config.paths.log_file.clone())).with_status("BBS Logfile"),
+                ListItem::new("log_file", "Log File".to_string(), ListValue::Path(lock.config.paths.log_file.clone()))
+                    .with_status("BBS Logfile")
+                    .with_label_width(system_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
@@ -53,42 +60,49 @@ impl<'a> PathTab<'a> {
                     "Statistics File".to_string(),
                     ListValue::Path(lock.config.paths.statistics_file.clone()),
                 )
-                .with_status("Name/Loc of Statistics file"),
+                .with_status("Name/Loc of Statistics file")
+                .with_label_width(system_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new("icb_text", "ICBTEXT File".to_string(), ListValue::Path(lock.config.paths.icbtext.clone()))
-                    .with_status("Name/Loc of ICBTEXT file"),
+                    .with_status("Name/Loc of ICBTEXT file")
+                    .with_label_width(system_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
                     "temp_files",
-                    "Temporary Work Files".to_string(),
+                    "Temp. Work Files".to_string(),
                     ListValue::Path(lock.config.paths.tmp_work_path.clone()),
                 )
-                .with_status("Location of Temporary Work Files"),
+                .with_status("Location of Temporary Work Files")
+                .with_label_width(system_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new("help_files", "Help Files".to_string(), ListValue::Path(lock.config.paths.help_path.clone()))
-                    .with_status("Location of Help Files"),
+                    .with_status("Location of Help Files")
+                    .with_label_width(system_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
                     "security_file_path",
-                    "Login Security Files".to_string(),
+                    "Login Sec. Files".to_string(),
                     ListValue::Path(lock.config.paths.security_file_path.clone()),
                 )
-                .with_status("Location of Login Security Files"),
+                .with_status("Location of Login Security Files")
+                .with_label_width(system_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
                     "command_display_path",
-                    "Command Display Files".to_string(),
+                    "CMD Display Files".to_string(),
                     ListValue::Path(lock.config.paths.command_display_path.clone()),
                 )
-                .with_status("Location of Command Display Files"),
+                .with_status("Location of Command Display Files")
+                .with_label_width(system_files_width),
             ),
         ];
 
+        let configuration_files_width = 19;
         let configuration_files: Vec<ConfigEntry> = vec![
             ConfigEntry::Item(
                 ListItem::new(
@@ -96,7 +110,8 @@ impl<'a> PathTab<'a> {
                     "PWRD/Security File".to_string(),
                     ListValue::Path(lock.config.paths.pwrd_sec_level_file.clone()),
                 )
-                .with_status("Name/Location of PWRD/Security File"),
+                .with_status("Name/Location of PWRD/Security File")
+                .with_label_width(configuration_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
@@ -104,15 +119,17 @@ impl<'a> PathTab<'a> {
                     "User Trashcan File".to_string(),
                     ListValue::Path(lock.config.paths.trashcan_user.clone()),
                 )
-                .with_status("Name/Location of User Trashcan File"),
+                .with_status("Name/Location of User Trashcan File")
+                .with_label_width(configuration_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
                     "trashcan_passwords",
-                    "Password Trashcan File".to_string(),
+                    "PWD Trashcan File".to_string(),
                     ListValue::Path(lock.config.paths.trashcan_passwords.clone()),
                 )
-                .with_status("Name/Location of Password Trashcan File"),
+                .with_status("Name/Location of Password Trashcan File")
+                .with_label_width(configuration_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
@@ -120,50 +137,59 @@ impl<'a> PathTab<'a> {
                     "EMail Trashcan File".to_string(),
                     ListValue::Path(lock.config.paths.trashcan_email.clone()),
                 )
-                .with_status("Name/Location of EMail Trashcan File"),
+                .with_status("Name/Location of EMail Trashcan File")
+                .with_label_width(configuration_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new("vip_users", "VIP Users File".to_string(), ListValue::Path(lock.config.paths.vip_users.clone()))
-                    .with_status("Name/Location of VIP Users File"),
+                    .with_status("Name/Location of VIP Users File")
+                    .with_label_width(configuration_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
                     "protocol_data_file",
-                    "Protocol Data File".to_string(),
+                    "Protocol File".to_string(),
                     ListValue::Path(lock.config.paths.protocol_data_file.clone()),
                 )
-                .with_status("Name/Location of Protocol Data File"),
+                .with_status("Name/Location of Protocol Data File")
+                .with_label_width(configuration_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
                     "language_file",
-                    "Multi-Lang. Data File".to_string(),
+                    "Multi-Lang. File".to_string(),
                     ListValue::Path(lock.config.paths.language_file.clone()),
                 )
-                .with_status("Name/Location of Multi-Lang. Data File"),
+                .with_status("Name/Location of Multi-Lang. Data File")
+                .with_label_width(configuration_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
                     "language_file",
-                    "Default CMD.LST File".to_string(),
+                    "CMD.LST File".to_string(),
                     ListValue::Path(lock.config.paths.language_file.clone()),
                 )
-                .with_status("Name/Location of CMD.LST File"),
+                .with_status("Name/Location of CMD.LST File")
+                .with_label_width(configuration_files_width),
             ),
         ];
 
+        let display_files_width = 16;
         let display_files = vec![
             ConfigEntry::Item(
                 ListItem::new("welcome", "WELCOME File".to_string(), ListValue::Path(lock.config.paths.welcome.clone()))
-                    .with_status("Name/Location of WELCOME File"),
+                    .with_status("Name/Location of WELCOME File")
+                    .with_label_width(display_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new("newuser", "NEWUSER File".to_string(), ListValue::Path(lock.config.paths.newuser.clone()))
-                    .with_status("Name/Location of NEWUSER File"),
+                    .with_status("Name/Location of NEWUSER File")
+                    .with_label_width(display_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new("closed", "CLOSED File".to_string(), ListValue::Path(lock.config.paths.closed.clone()))
-                    .with_status("Name/Location of CLOSED File"),
+                    .with_status("Name/Location of CLOSED File")
+                    .with_label_width(display_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
@@ -171,26 +197,31 @@ impl<'a> PathTab<'a> {
                     "WARNING File".to_string(),
                     ListValue::Path(lock.config.paths.expire_warning.clone()),
                 )
-                .with_status("Name/Location of WARNING File"),
+                .with_status("Name/Location of WARNING File")
+                .with_label_width(display_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new("expired", "EXPIRED File".to_string(), ListValue::Path(lock.config.paths.expired.clone()))
-                    .with_status("Name/Location of EXPIRED File"),
+                    .with_status("Name/Location of EXPIRED File")
+                    .with_label_width(display_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
                     "conf_join_menu",
-                    "Conference Join Menu".to_string(),
+                    "Conf. Join Menu".to_string(),
                     ListValue::Path(lock.config.paths.conf_join_menu.clone()),
                 )
-                .with_status("Name/Location of Conference Join Menu File"),
+                .with_status("Name/Location of Conference Join Menu File")
+                .with_label_width(display_files_width),
             ),
             ConfigEntry::Item(
                 ListItem::new("no_ansi", "NOANSI Warning".to_string(), ListValue::Path(lock.config.paths.no_ansi.clone()))
-                    .with_status("Name/Location of NOANSI Warning File"),
+                    .with_status("Name/Location of NOANSI Warning File")
+                    .with_label_width(display_files_width),
             ),
         ];
 
+        let new_user_width = 16;
         let new_user_files = vec![
             ConfigEntry::Item(
                 ListItem::new(
@@ -198,7 +229,8 @@ impl<'a> PathTab<'a> {
                     "New Reg Survey".to_string(),
                     ListValue::Path(lock.config.paths.newask_survey.clone()),
                 )
-                .with_status("Name/Location of NEWASK Survey File"),
+                .with_status("Name/Location of NEWASK Survey File")
+                .with_label_width(new_user_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
@@ -206,7 +238,8 @@ impl<'a> PathTab<'a> {
                     "New Reg Answers".to_string(),
                     ListValue::Path(lock.config.paths.newask_answer.clone()),
                 )
-                .with_status("Name/Location of NEWASK Survey Answers"),
+                .with_status("Name/Location of NEWASK Survey Answers")
+                .with_label_width(new_user_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
@@ -214,7 +247,8 @@ impl<'a> PathTab<'a> {
                     "Logon Survey".to_string(),
                     ListValue::Path(lock.config.paths.logon_survey.clone()),
                 )
-                .with_status("Name/Location of Logon Survey File"),
+                .with_status("Name/Location of Logon Survey File")
+                .with_label_width(new_user_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
@@ -222,7 +256,8 @@ impl<'a> PathTab<'a> {
                     "Logon Answers".to_string(),
                     ListValue::Path(lock.config.paths.logon_answer.clone()),
                 )
-                .with_status("Name/Location of Logon Survey Answers"),
+                .with_status("Name/Location of Logon Survey Answers")
+                .with_label_width(new_user_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
@@ -230,7 +265,8 @@ impl<'a> PathTab<'a> {
                     "Logoff Survey".to_string(),
                     ListValue::Path(lock.config.paths.logoff_survey.clone()),
                 )
-                .with_status("Name/Location of Logoff Survey File"),
+                .with_status("Name/Location of Logoff Survey File")
+                .with_label_width(new_user_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
@@ -238,7 +274,8 @@ impl<'a> PathTab<'a> {
                     "Logoff Answers".to_string(),
                     ListValue::Path(lock.config.paths.logoff_answer.clone()),
                 )
-                .with_status("Name/Location of Logoff Survey Answers"),
+                .with_status("Name/Location of Logoff Survey Answers")
+                .with_label_width(new_user_width),
             ),
         ];
 
