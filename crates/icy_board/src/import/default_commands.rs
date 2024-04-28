@@ -64,6 +64,7 @@ pub fn add_default_commands(data: &PcbBoardData, cmd_list: &mut CommandList) {
     cmd_list.push(convert_cmd("LANG", CommandType::SetLanguage, 0));
     cmd_list.push(convert_cmd("REPLY", CommandType::ReplyMessage, 0));
     cmd_list.push(convert_cmd("ALIAS", CommandType::EnableAlias, 0));
+    cmd_list.push(convert_cmd("TS", CommandType::TextSearch, 0));
 
     cmd_list.push(convert_cmd("BR", CommandType::Broadcast, data.sysop_security.sysop));
 

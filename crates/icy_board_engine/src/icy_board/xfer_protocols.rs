@@ -1,3 +1,4 @@
+use std::fs;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
@@ -36,6 +37,33 @@ pub struct SupportedProtocols {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(rename = "protocol")]
     pub protocols: Vec<Protocol>,
+}
+
+impl SupportedProtocols {
+    pub fn export_data(&self, output: &Path) -> Res<()> {
+        let mut res = String::new();
+        for protocol in &self.protocols {
+            let char_code = protocol.char_code.chars().next().unwrap_or('-');
+            // I internal
+            // S shelled
+            // D shelled + DSZLOG for batch transfer
+            // B shelled + bidirectional + DSZLOG
+            let prot_type = "I";
+
+            let block_size = 1024;
+            let description = &protocol.description;
+
+            let mnp = "N"; // error corrected session
+            let port_open = "N"; // leave port open during shell
+            let lock_lines = "N"; // lock status lines on screen
+            res.push_str(&format!(
+                "{},{},{},{},{},{},{}\r\n",
+                char_code, prot_type, block_size, description, mnp, port_open, lock_lines
+            ));
+        }
+        fs::write(output, res)?;
+        Ok(())
+    }
 }
 
 impl Deref for SupportedProtocols {

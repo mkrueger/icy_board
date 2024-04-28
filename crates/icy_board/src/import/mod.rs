@@ -132,14 +132,13 @@ impl PCBoardImporter {
                 _ => x,
             })
             .collect();
-
         // hack for "/path" - assume that PCB is on the same drive & top level dir (like C:\PCB)
         if s.starts_with("/") {
             s = format!("{}/..{}", self.resolve_paths.values().next().unwrap(), s);
         }
 
         for (k, v) in &self.resolve_paths {
-            if s.starts_with(k) {
+            if s.to_ascii_uppercase().starts_with(&k.to_ascii_uppercase()) {
                 if v.ends_with('/') || s.chars().skip(k.len()).next().unwrap() == '/' {
                     s = v.clone() + &s[k.len()..];
                 } else {
@@ -791,7 +790,14 @@ impl PCBoardImporter {
         self.output.start_action("Convert user base…".into());
         let usr_file = self.resolve_file(usr_file);
         let inf_file = self.resolve_file(inf_file);
-
+        if !usr_file.exists() {
+            self.logger.log(&format!("Can't find user file {}", usr_file.display()));
+            return Ok(PathBuf::new());
+        }
+        if !inf_file.exists() {
+            self.logger.log(&format!("Can't find user information file {}", inf_file.display()));
+            return Ok(PathBuf::new());
+        }
         let users = PcbUserRecord::read_users(&PathBuf::from(&usr_file))?;
         let user_inf = PcbUserInf::read_users(&PathBuf::from(&inf_file))?;
 

@@ -221,6 +221,9 @@ pub enum CommandType {
 
     // 'PPE'
     RunPPE,
+
+    // 'TS'
+    TextSearch,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Default)]

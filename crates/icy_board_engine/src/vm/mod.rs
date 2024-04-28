@@ -501,7 +501,6 @@ impl<'a> VirtualMachine<'a> {
                 let dim_1 = self.eval_expr(&dims[0])?.as_int() as usize;
                 let dim_2 = if dims.len() >= 2 { self.eval_expr(&dims[1])?.as_int() as usize } else { 0 };
                 let dim_3 = if dims.len() >= 3 { self.eval_expr(&dims[2])?.as_int() as usize } else { 0 };
-
                 self.variable_table.get_var_entry_mut(*id).value.set_array_value(dim_1, dim_2, dim_3, value);
             }
             _ => {
@@ -684,7 +683,8 @@ impl<'a> VirtualMachine<'a> {
     }
 
     pub fn resolve_file<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
-        self.icy_board_state.board.lock().unwrap().resolve_file(file)
+        let file = file.as_ref().to_string_lossy().to_string().replace('\\', "/");
+        self.icy_board_state.board.lock().unwrap().resolve_file(&file)
     }
 }
 /// .
@@ -699,6 +699,7 @@ pub fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn PCBoard
     }
     let file_name = file_name.as_ref().to_path_buf();
     let reg = UserTypeRegistry::icy_board_registry();
+    log::error!("Run PPE {}", file_name.display());
 
     let mut vm = VirtualMachine {
         file_name,
@@ -718,6 +719,7 @@ pub fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn PCBoard
         push_pop_stack: Vec::new(),
         user_data: Vec::new(),
     };
+
     vm.run()?;
     Ok(true)
 }

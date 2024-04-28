@@ -67,7 +67,8 @@ pub fn confunflag(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 pub fn dispfile(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     let file_name = &vm.eval_expr(&args[0])?.as_string();
 
-    vm.icy_board_state.display_file(file_name)?;
+    let file_name = vm.resolve_file(&file_name);
+    vm.icy_board_state.display_file(&file_name)?;
     Ok(())
 }
 
@@ -217,8 +218,9 @@ pub fn deluser(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     panic!("TODO")
 }
 pub fn adjtime(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    let min = vm.eval_expr(&args[0])?.as_int();
+    vm.icy_board_state.session.time_limit += min;
+    Ok(())
 }
 
 pub fn log(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
@@ -561,12 +563,16 @@ pub fn wrunet(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 
     // Todo: Broadcast
 
-    if !stat.is_empty() {
-        vm.icy_board_state.nodes[node as usize].status = stat.as_bytes()[0] as char;
+    if let Some(node) = vm.icy_board_state.nodes.get_mut(node as usize) {
+        if !stat.is_empty() {
+            node.status = stat.as_bytes()[0] as char;
+        }
+        node.name = name;
+        node.city = city;
+        node.operation = operation;
+    } else {
+        log::error!("PPE wrunet - node invalid: {}", node);
     }
-    vm.icy_board_state.nodes[node as usize].name = name;
-    vm.icy_board_state.nodes[node as usize].city = city;
-    vm.icy_board_state.nodes[node as usize].operation = operation;
 
     Ok(())
 }

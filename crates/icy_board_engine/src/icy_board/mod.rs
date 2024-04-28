@@ -6,7 +6,6 @@ use std::{
 use crate::Res;
 use codepages::tables::write_with_bom;
 use qfile::{QFilePath, QTraitSync};
-use relative_path::RelativePath;
 use thiserror::Error;
 
 use crate::vm::errors::IcyError;
@@ -158,7 +157,7 @@ impl IcyBoard {
 
     pub fn load<P: AsRef<Path>>(path: &P) -> Res<Self> {
         let config = IcbConfig::load(path).map_err(|e| {
-            log::error!("Error loading icy board config file: {} from {}", e, path.as_ref().display());
+            eprintln!("Error loading icy board config file: {} from {}", e, path.as_ref().display());
             e
         })?;
 
@@ -180,50 +179,54 @@ impl IcyBoard {
             e
         })?;*/
         let mut users = UserBase::default();
-        let load_path = RelativePath::from_path(&config.paths.home_dir)?.to_path(parent_path);
-        users.load_users(&load_path)?;
 
-        let load_path = RelativePath::from_path(&config.paths.conferences)?.to_path(parent_path);
+        let load_path = get_path(parent_path, &config.paths.home_dir);
+        users.load_users(&load_path).map_err(|e| {
+            eprintln!("Error loading users: {} from {}", e, load_path.display());
+            e
+        })?;
+
+        let load_path = get_path(parent_path, &config.paths.conferences);
         let conferences = ConferenceBase::load(&load_path).map_err(|e| {
-            log::error!("Error loading conference base: {} from {}", e, load_path.display());
+            eprintln!("Error loading conference base: {} from {}", e, load_path.display());
             e
         })?;
 
-        let load_path = RelativePath::from_path(&config.paths.icbtext)?.to_path(parent_path);
+        let load_path = get_path(parent_path, &config.paths.icbtext);
         let default_display_text = IcbTextFile::load(&load_path).map_err(|e| {
-            log::error!("Error loading display text: {} from {}", e, load_path.display());
+            eprintln!("Error loading display text: {} from {}", e, load_path.display());
             e
         })?;
 
-        let load_path = &RelativePath::from_path(&config.paths.language_file)?.to_path(parent_path);
-        let languages = SupportedLanguages::load(load_path).map_err(|e| {
-            log::error!("Error loading languages: {} from {}", e, load_path.display());
+        let load_path = get_path(parent_path, &config.paths.language_file);
+        let languages = SupportedLanguages::load(&load_path).map_err(|e| {
+            eprintln!("Error loading languages: {} from {}", e, load_path.display());
             e
         })?;
 
-        let load_path = RelativePath::from_path(&config.paths.protocol_data_file)?.to_path(parent_path);
+        let load_path = get_path(parent_path, &config.paths.protocol_data_file);
         let protocols = SupportedProtocols::load(&load_path).map_err(|e| {
-            log::error!("Error loading protocols: {} from {}", e, load_path.display());
+            eprintln!("Error loading protocols: {} from {}", e, load_path.display());
             e
         })?;
 
-        let load_path = RelativePath::from_path(&config.paths.pwrd_sec_level_file)?.to_path(parent_path);
+        let load_path = get_path(parent_path, &config.paths.pwrd_sec_level_file);
         let sec_levels = SecurityLevelDefinitions::load(&load_path).map_err(|e| {
-            log::error!("Error loading security levels: {} from {}", e, load_path.display());
+            eprintln!("Error loading security levels: {} from {}", e, load_path.display());
             e
         })?;
 
-        let load_path = &RelativePath::from_path(&config.paths.command_file)?.to_path(parent_path);
-        let commands = CommandList::load(load_path).map_err(|e| {
-            log::error!("Error loading commands: {} from {}", e, load_path.display());
+        let load_path = get_path(parent_path, &config.paths.command_file);
+        let commands = CommandList::load(&load_path).map_err(|e| {
+            eprintln!("Error loading commands: {} from {}", e, load_path.display());
             e
         })?;
 
-        let load_path = RelativePath::from_path(&config.paths.statistics_file)?.to_path(parent_path);
+        let load_path = get_path(parent_path, &config.paths.statistics_file);
         let statistics = match Statistics::load(&load_path) {
             Ok(stat) => stat,
             Err(e) => {
-                log::error!("Error loading statistics: {} from {}, generating default.", e, load_path.display());
+                eprintln!("Error loading statistics: {} from {}, generating default.", e, load_path.display());
                 Statistics::default()
             }
         };
@@ -254,7 +257,7 @@ impl IcyBoard {
                         conf.areas = areas;
                     }
                     Err(err) => {
-                        log::error!("Error loading message areas {}: {}", message_area_file.display(), err);
+                        eprintln!("Error loading message areas {}: {}", message_area_file.display(), err);
                     }
                 }
             }
@@ -270,7 +273,7 @@ impl IcyBoard {
                         conf.directories = directories;
                     }
                     Err(err) => {
-                        log::error!("Error loading file areas {}: {}", file_area_file.display(), err);
+                        eprintln!("Error loading file areas {}: {}", file_area_file.display(), err);
                     }
                 }
             }
@@ -286,7 +289,7 @@ impl IcyBoard {
                         conf.doors = doors;
                     }
                     Err(err) => {
-                        log::error!("Error loading file areas {}: {}", doors_file.display(), err);
+                        eprintln!("Error loading file areas {}: {}", doors_file.display(), err);
                     }
                 }
             }
@@ -329,6 +332,10 @@ impl IcyBoard {
         let cnames = base_loc.join("cnames");
         self.export_conference_files(&base_loc, &cnames)?;
         pcb_dat.path.conference_file = cnames.to_string_lossy().to_string();
+
+        let protocol_data_file = base_loc.join("pcbprot.dat");
+        self.protocols.export_data(&protocol_data_file)?;
+        pcb_dat.path.protocol_data_file = protocol_data_file.to_string_lossy().to_string();
 
         pcb_dat.num_conf = self.conferences.len() as i32 - 1;
         pcb_dat.path.sec_loc = self.resolve_file(&self.config.paths.pwrd_sec_level_file).to_string_lossy().to_string();
@@ -481,6 +488,14 @@ impl IcyBoard {
         fs::write(home_dir.join("user.toml"), user_txt)?;
         self.users[i] = new_user;
         Ok(())
+    }
+}
+
+fn get_path(parent_path: &Path, home_dir: &PathBuf) -> PathBuf {
+    if home_dir.is_absolute() {
+        home_dir.clone()
+    } else {
+        parent_path.join(home_dir)
     }
 }
 

@@ -10,6 +10,8 @@ use crate::Res;
 
 use crate::vm::VMError;
 
+use super::expressions::cwd;
+
 const O_RD: i32 = 0;
 const O_RW: i32 = 2;
 const O_WR: i32 = 1;
@@ -196,6 +198,8 @@ impl PCBoardIO for DiskIO {
     }
 
     fn fopen(&mut self, channel: usize, file_name: &str, mode: i32, _sm: i32) -> Res<()> {
+        log::info!("FOPEN: {}, {}, mode : {}", channel, file_name, mode);
+
         let file = match mode {
             O_RD => File::open(file_name),
             O_WR => File::create(file_name),
@@ -250,12 +254,16 @@ impl PCBoardIO for DiskIO {
         }
         if let Some(reader) = &mut chan.reader {
             let mut line = String::new();
-            if reader.read_line(&mut line).is_err() {
-                chan.err = true;
-                Ok(String::new())
-            } else {
-                chan.err = false;
-                Ok(line.trim_end_matches(|c| c == '\r' || c == '\n').to_string())
+            match reader.read_line(&mut line) {
+                Ok(size) => {
+                    chan.err = size == 0;
+                    Ok(line.trim_end_matches(|c| c == '\r' || c == '\n').to_string())
+                }
+                Err(err) => {
+                    log::error!("error reading line: {}", err);
+                    chan.err = true;
+                    Ok(String::new())
+                }
             }
         } else {
             log::error!("no file!");
@@ -426,6 +434,7 @@ impl Default for MemoryIO {
 impl PCBoardIO for MemoryIO {
     fn fappend(&mut self, channel: usize, file: &str, _am: i32, _sm: i32) {
         let f = file.to_string();
+
         let mut filepos = 0;
 
         if let Some(v) = self.files.get(&f) {

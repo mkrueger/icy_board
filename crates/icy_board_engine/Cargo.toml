@@ -30,7 +30,6 @@ byteorder = "1.5.0"
 strum = { workspace = true }
 strum_macros = "0.26.2"
 toml = { workspace = true }
-relative-path = "1.9.2"
 async-trait = "0.1.80"
 # interpreter deps
 [dev-dependencies]

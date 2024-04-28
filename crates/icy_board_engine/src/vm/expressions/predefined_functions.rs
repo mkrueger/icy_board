@@ -311,13 +311,16 @@ pub fn stripatx(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue>
 }
 
 pub fn replacestr(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let input = vm.eval_expr(&args[0])?.as_string();
+    let search = vm.eval_expr(&args[1])?.as_string();
+    let replace = vm.eval_expr(&args[2])?.as_string();
+    Ok(VariableValue::new_string(input.replace(&search, &replace)))
 }
 
 pub fn stripstr(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let input = vm.eval_expr(&args[0])?.as_string();
+    let search = vm.eval_expr(&args[1])?.as_string();
+    Ok(VariableValue::new_string(input.replace(&search, "")))
 }
 
 /// Trim specified characters from the end of a string

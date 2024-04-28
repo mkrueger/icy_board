@@ -1136,7 +1136,22 @@ impl VariableValue {
                     data[dim1][dim2][dim3] = val.convert_to(self.vtype);
                 }
             }
-            _ => log::error!("no array variable: {self}"),
+            _ => {
+                if self.vtype == VariableType::String {
+                    if let Some(ch) = val.as_string().chars().next() {
+                        if let GenericVariableData::String(s) = &mut self.generic_data {
+                            let mut v: Vec<char> = s.chars().collect();
+                            v.resize(dim1 + 1, ' ');
+                            v[dim1] = ch;
+                            *s = v.iter().collect();
+                        } else {
+                            log::error!("no string variable: {}", self.vtype);
+                        }
+                    }
+                    return;
+                }
+                log::error!("no array variable: {}", self.vtype);
+            }
         }
     }
 
