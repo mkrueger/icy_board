@@ -55,16 +55,8 @@ impl PcbBoardCommand {
         if command.is_empty() {
             return Ok(());
         }
-        let cmds = command.split(' ');
 
-        for cmd in cmds {
-            for cmd in cmd.split(';') {
-                let cmd = cmd.trim();
-                if !cmd.is_empty() {
-                    self.state.session.tokens.push_back(cmd.to_string());
-                }
-            }
-        }
+        self.state.session.push_tokens(&command);
         let command = self.state.session.tokens.pop_front().unwrap();
 
         if let Some(action) = self.state.try_find_command(&command) {
@@ -172,7 +164,6 @@ impl PcbBoardCommand {
                 // R
                 self.read_messages(action)?;
             }
-
             CommandType::Survey => {
                 // S
                 self.take_survey(action)?;
@@ -181,12 +172,10 @@ impl PcbBoardCommand {
                 // T
                 self.set_transfer_protocol(action)?;
             }
-
             CommandType::UploadFile => {
                 // U
                 self.upload_file(action)?;
             }
-
             CommandType::ViewSettings => {
                 // V
                 self.view_settings(action)?;
@@ -199,6 +188,10 @@ impl PcbBoardCommand {
             CommandType::ExpertMode => {
                 // X
                 self.set_expert_mode()?;
+            }
+            CommandType::PersonalMail => {
+                // Y
+                self.personal_mail(action)?;
             }
             CommandType::ZippyDirectoryScan => {
                 // Z

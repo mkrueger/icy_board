@@ -292,11 +292,9 @@ impl IcyBoardState {
             self.set_color(TerminalTarget::Both, color.clone())?;
         }
         self.display_line(&prompt)?;
-        log::info!("prompt: {}", prompt);
         // we've data from a PPE here, so take that input and return it.
         // ignoring all other settings.
         if let Some(front) = self.char_buffer.front() {
-            log::info!("Got stuffed key from : {:?}", front.source);
             if front.source == KeySource::StuffedHidden {
                 let mut result = String::new();
                 while let Some(key) = self.char_buffer.pop_front() {

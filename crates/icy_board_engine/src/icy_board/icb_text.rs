@@ -329,7 +329,7 @@ pub enum IceText {
     /// `(@OPTEXT@) already exists on the system.`
     DuplicateFile = 154,
     /// `Msg Scan: (A)ll, (C)urrent, (S)ince, (Q)uick, (L)ong, (Enter)=abort`
-    MessagesCanPrompt = 155,
+    MessageScanPrompt = 155,
     /// `Join Group CHAT Session (Enter)=no`
     JoinGroupChat = 156,
     /// `Awaiting Event Timer - All activity suspended ...`

@@ -351,7 +351,7 @@ impl TabPage for ConferencesTab {
                     }
                 }
                 _ => {
-                    let res = self.conference_config.handle_key_press(key, &mut self.state);
+                    self.conference_config.handle_key_press(key, &mut self.state);
                 }
             }
             return ResultState::status_line(String::new());

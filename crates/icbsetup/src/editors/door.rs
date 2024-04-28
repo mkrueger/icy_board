@@ -51,7 +51,7 @@ impl DoorEditor {
             )),
         ];
 
-        let mut menu = ConfigMenu { items };
+        let menu = ConfigMenu { items };
 
         Ok(Self {
             path: path.clone(),

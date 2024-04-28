@@ -235,6 +235,18 @@ impl Session {
         }
     }
 
+    pub fn push_tokens(&mut self, command: &str) {
+        let cmds = command.split(' ');
+        for cmd in cmds {
+            for cmd in cmd.split(';') {
+                let cmd = cmd.trim();
+                if !cmd.is_empty() {
+                    self.tokens.push_back(cmd.to_string());
+                }
+            }
+        }
+    }
+
     pub fn get_username_or_alias(&self) -> String {
         if self.use_alias && self.current_conference.allow_aliases {
             self.alias_name.clone()

@@ -608,7 +608,7 @@ style = "White"
 text = "(@OPTEXT@) already exists on the system."
 style = "Red"
 
-[MessagesCanPrompt]
+[MessageScanPrompt]
 text = "Msg Scan: (A)ll, (C)urrent, (S)ince, (Q)uick, (L)ong, (Enter)=abort"
 style = "Green"
 

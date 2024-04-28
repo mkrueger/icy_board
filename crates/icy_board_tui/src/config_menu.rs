@@ -1,4 +1,4 @@
-use std::{collections::HashMap, default, os::linux::raw::stat, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::icy_board::icb_config::IcbColor;
@@ -141,8 +141,9 @@ impl ListItem {
                 let field = TextField::new().with_value(format!("{}", text.display()));
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
             }
-            ListValue::U32(_value, _min, _max) => {
-                self.render_value(area, frame);
+            ListValue::U32(value, _min, _max) => {
+                let field = TextField::new().with_value(format!("{}", value));
+                frame.render_stateful_widget(field, area, &mut self.text_field_state);
             }
             ListValue::Bool(_value) => {
                 self.render_value(area, frame);
@@ -178,11 +179,18 @@ impl ListItem {
                 self.text_field_state.handle_input(key, &mut text);
                 *path = PathBuf::from(text);
             }
+            ListValue::U32(cur, min, max) => {
+                let mut text = format!("{}", *cur);
+                self.text_field_state.handle_input(key, &mut text);
+                if let Ok(u) = text.parse::<u32>() {
+                    *cur = u.clamp(*min, *max);
+                }
+            }
             ListValue::Bool(b) => {
                 *b = !*b;
                 return ResultState::default();
             }
-            ListValue::Color(_) | ListValue::U32(_, _, _) | ListValue::ValueList(_, _) => {}
+            ListValue::Color(_) | ListValue::ValueList(_, _) => {}
         }
         return ResultState::status_line(self.status.clone());
     }
@@ -205,10 +213,10 @@ pub enum ConfigEntry {
     Separator,
 }
 impl ConfigEntry {
-    fn title_len(&self) -> u16 {
+    fn _title_len(&self) -> u16 {
         match self {
             ConfigEntry::Item(item) => item.title.len() as u16,
-            ConfigEntry::Group(_, items) => items.iter().map(|item| item.title_len()).max().unwrap_or(0),
+            ConfigEntry::Group(_, items) => items.iter().map(|item| item._title_len()).max().unwrap_or(0),
             ConfigEntry::Table(_rows, _items) => 0,
             ConfigEntry::Separator => 0,
         }
