@@ -4,7 +4,7 @@ use crate::{
 };
 use icy_board_engine::{
     icy_board::{commands::Command, icb_config::IcbColor, icb_text::IceText, state::functions::display_flags, IcyBoardError},
-    vm::{lang, TerminalTarget},
+    vm::TerminalTarget,
 };
 
 impl PcbBoardCommand {

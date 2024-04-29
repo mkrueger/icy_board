@@ -1,10 +1,10 @@
 use std::io::stdout;
 
-use crate::Res;
 use crossterm::{
     execute,
     style::{Attribute, Color, Print, SetAttribute, SetForegroundColor},
 };
+use icy_board_engine::Res;
 
 use super::OutputLogger;
 

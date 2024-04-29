@@ -10,7 +10,6 @@ authors.workspace = true
 lazy_static = { workspace = true }
 thiserror = { workspace = true }
 crossterm = { workspace = true }
-clap = { workspace = true }
 ratatui = { workspace = true }
 semver = { workspace = true }
 log = { workspace = true }

@@ -1,5 +1,6 @@
+use argh::FromArgs;
 use ariadne::{Label, Report, ReportKind, Source};
-use clap::Parser;
+
 use icy_board_engine::{
     compiler::PPECompiler,
     parser::{load_with_encoding, parse_ast, Encoding, UserTypeRegistry},
@@ -17,39 +18,39 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[derive(FromArgs)]
 /// PCBoard Programming Language Compiler  
-#[derive(clap::Parser)]
-#[command(version="", about="PCBoard Programming Language Compiler", long_about = None)]
 struct Cli {
     /// output the disassembly instead of compiling
-    #[arg(long, short)]
+    #[argh(switch, short = 'd')]
     disassemble: bool,
 
     /// force no user variables
-    #[arg(long)]
+    #[argh(switch)]
     nouvar: bool,
 
     /// force user variables
-    #[arg(long)]
+    #[argh(switch)]
     forceuvar: bool,
 
     /// don't report any warnings
-    #[arg(long)]
+    #[argh(switch)]
     nowarnings: bool,
 
     /// version number for the compiler, valid: 100, 200, 300, 310, 330 (default), 340
-    #[arg(long)]
+    #[argh(option)]
     ppl_version: Option<u16>,
 
     /// version number for the runtime, valid: 100, 200, 300, 310, 330 (default), 340
-    #[arg(long)]
+    #[argh(option)]
     runtime_version: Option<u16>,
 
-    /// input file is CP437
-    #[arg(long)]
-    dos: bool,
+    /// specify the encoding of the file, defaults to autodetection
+    #[argh(option)]
+    cp437: Option<bool>,
 
     /// file[.pps] to compile (extension defaults to .pps if not specified)
+    #[argh(positional)]
     file: PathBuf,
 }
 
@@ -58,7 +59,8 @@ lazy_static::lazy_static! {
 }
 
 fn main() {
-    let arguments = Cli::parse();
+    let arguments: Cli = argh::from_env();
+
     let ppl_version = if let Some(v) = arguments.ppl_version { v } else { 400 };
     let runtime_version = if let Some(v) = arguments.runtime_version { v } else { 400 };
     let valid_versions: Vec<u16> = vec![100, 200, 300, 310, 330, 340, 400];
@@ -80,7 +82,15 @@ fn main() {
         arguments.file.clone()
     };
 
-    let encoding = if arguments.dos { Encoding::CP437 } else { Encoding::Utf8 };
+    let encoding = if let Some(cp437) = arguments.cp437 {
+        if cp437 {
+            Encoding::CP437
+        } else {
+            Encoding::Utf8
+        }
+    } else {
+        Encoding::Detect
+    };
 
     match load_with_encoding(&PathBuf::from(&file_name), encoding) {
         Ok(src) => {

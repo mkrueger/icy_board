@@ -1,25 +1,23 @@
 use std::{
-    fs,
+    fmt::Display,
     io::stdout,
     path::{Path, PathBuf},
     process,
     sync::{Arc, Mutex},
 };
 
+use argh::FromArgs;
 use bbs::{await_telnet_connections, BBS};
 use call_wait_screen::{CallWaitMessage, CallWaitScreen};
 use chrono::Local;
-use clap::{Parser, Subcommand};
-use create::IcyBoardCreator;
 use crossterm::{
+    execute,
+    style::{Attribute, Print, SetAttribute, SetForegroundColor},
     terminal::{disable_raw_mode, enable_raw_mode, Clear, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 use icy_board_engine::{icy_board::IcyBoard, Res};
-use import::{
-    console_logger::{print_error, ConsoleLogger},
-    PCBoardImporter,
-};
+
 use node_monitoring_screen::NodeMonitoringScreenMessage;
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -32,85 +30,48 @@ use crate::bbs::{await_securewebsocket_connections, await_ssh_connections, await
 
 mod bbs;
 mod call_wait_screen;
-mod create;
 mod icy_engine_output;
-mod import;
 pub mod menu_runner;
 pub mod mods;
 mod node_monitoring_screen;
 mod tui;
 
-#[derive(clap::Parser)]
-#[command(version="", about="PcbBoard BBS", long_about = None)]
+#[derive(FromArgs)]
+/// IcyBoard BBS
 struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-}
+    #[argh(option)]
+    /// path/file name of the icyboard.toml configuration file
+    file: Option<PathBuf>,
 
-#[derive(Subcommand)]
-enum Commands {
-    /// Import PCBDAT.DAT file to IcyBoard
-    Import {
-        /// PCBOARD.DAT file to import
-        name: PathBuf,
-        /// Output directory
-        out: PathBuf,
-    },
-    /// Creates a new IcyBoard configuration
-    Create { destination: PathBuf },
-    Run {
-        /// PCBOARD.DAT file to run
-        file: String,
-    },
-}
+    #[argh(switch)]
+    /// login locally to icy board
+    localon: bool,
 
+    #[argh(option)]
+    /// execute PPE file
+    ppe: Option<PathBuf>,
+    /*
+
+    */
+}
+/*
+
+*/
 lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
 /// evlevlelvelvelv`
 
 fn main() -> Res<()> {
-    let arguments = Cli::parse();
+    let arguments: Cli = argh::from_env();
+    let file = arguments.file.clone().unwrap_or(PathBuf::from("."));
 
-    match &arguments.command {
-        Commands::Import { name, out } => {
-            let output = Box::<ConsoleLogger>::default();
-            match PCBoardImporter::new(name, output, PathBuf::from(out)) {
-                Ok(mut importer) => match importer.start_import() {
-                    Ok(_) => {
-                        println!("Imported successfully");
-                    }
-                    Err(e) => {
-                        print_error(e.to_string());
-                        let destination = importer.output_directory.join("importlog.txt");
-                        fs::write(destination, &importer.logger.output)?;
-                    }
-                },
-                Err(e) => {
-                    print_error(e.to_string());
-                }
-            }
-        }
-        Commands::Create { destination } => {
-            if destination.exists() {
-                print_error("Destination already exists".to_string());
-                process::exit(1);
-            }
-            let mut creator = IcyBoardCreator::new(destination);
+    start_icy_board(&arguments, &file)?;
 
-            if let Err(err) = creator.create() {
-                print_error(err.to_string());
-                process::exit(1);
-            }
-        }
-        Commands::Run { file } => {
-            start_icy_board(file)?;
-        }
-    }
     Ok(())
 }
 
-pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) -> Res<()> {
+fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Res<()> {
     let mut file = config_file.as_ref().to_path_buf();
     if file.is_dir() {
         file = file.join("icyboard.toml");
@@ -143,7 +104,17 @@ pub fn start_icy_board<P: AsRef<Path>>(config_file: &P) -> Res<()> {
 
             let mut bbs = Arc::new(Mutex::new(BBS::new(icy_board.config.board.num_nodes as usize)));
             let board = Arc::new(Mutex::new(icy_board));
-
+            if arguments.localon || arguments.ppe.is_some() {
+                let mut terminal = init_terminal()?;
+                let cmd = if let Some(ppe) = &arguments.ppe {
+                    CallWaitMessage::RunPPE(ppe.clone())
+                } else {
+                    CallWaitMessage::User(false)
+                };
+                run_message(cmd, &mut terminal, &board, &mut bbs)?;
+                restore_terminal()?;
+                return Ok(());
+            }
             {
                 let telnet_connection = board.lock().unwrap().config.login_server.telnet.clone();
                 if telnet_connection.is_enabled {
@@ -213,7 +184,17 @@ fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, boar
     match msg {
         CallWaitMessage::User(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
-            let mut tui = Tui::local_mode(board, bbs, false);
+            let mut tui = Tui::local_mode(board, bbs, false, None);
+            if let Err(err) = tui.run(&board) {
+                restore_terminal()?;
+                log::error!("while running board in local mode: {}", err.to_string());
+                println!("Error: {}", err);
+                process::exit(1);
+            }
+        }
+        CallWaitMessage::RunPPE(ppe) => {
+            stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
+            let mut tui = Tui::local_mode(board, bbs, true, Some(ppe));
             if let Err(err) = tui.run(&board) {
                 restore_terminal()?;
                 log::error!("while running board in local mode: {}", err.to_string());
@@ -223,7 +204,7 @@ fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, boar
         }
         CallWaitMessage::Sysop(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
-            let mut tui = Tui::local_mode(board, bbs, true);
+            let mut tui = Tui::local_mode(board, bbs, true, None);
             if let Err(err) = tui.run(&board) {
                 restore_terminal()?;
                 log::error!("while running board in local mode: {}", err.to_string());
@@ -289,4 +270,21 @@ pub fn restore_terminal() -> Res<()> {
     disable_raw_mode()?;
     stdout().execute(LeaveAlternateScreen)?;
     Ok(())
+}
+
+pub fn print_error<A: Display>(error: A) {
+    execute!(
+        stdout(),
+        SetAttribute(Attribute::Bold),
+        SetForegroundColor(crossterm::style::Color::Red),
+        //Print(gettext("error_cmd_line_label")),
+        Print("error:"),
+        Print(" "),
+        SetAttribute(Attribute::Reset),
+        SetAttribute(Attribute::Bold),
+        Print(error),
+        Print("\n"),
+        SetAttribute(Attribute::Reset)
+    )
+    .unwrap();
 }

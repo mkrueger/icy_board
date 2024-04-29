@@ -1,4 +1,5 @@
 use std::{
+    path::PathBuf,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
@@ -18,11 +19,12 @@ use ratatui::{
 
 use crate::VERSION;
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum CallWaitMessage {
     User(bool),
     Sysop(bool),
     Exit(bool),
+    RunPPE(PathBuf),
     Monitor,
 }
 
@@ -129,7 +131,7 @@ impl CallWaitScreen {
 
             if let Some(selected) = self.selected {
                 if selected.elapsed() >= Duration::from_millis(300) {
-                    return Ok(self.buttons[(self.y * 3 + self.x) as usize].message);
+                    return Ok(self.buttons[(self.y * 3 + self.x) as usize].message.clone());
                 }
             }
 

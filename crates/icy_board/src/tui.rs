@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     io::{self, stdout, Read, Stdout, Write},
+    path::PathBuf,
     sync::{Arc, Mutex},
     thread,
     time::{Duration, Instant},
@@ -45,7 +46,7 @@ pub struct Tui {
 }
 
 impl Tui {
-    pub fn local_mode(board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>, sysop_mode: bool) -> Self {
+    pub fn local_mode(board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>, sysop_mode: bool, ppe: Option<PathBuf>) -> Self {
         let mut session = Session::new();
         session.is_local = true;
         let ui_session = Arc::new(Mutex::new(session));
@@ -82,6 +83,12 @@ impl Tui {
                         return Ok(());
                     }
                 }
+            }
+            if let Some(ppe) = ppe {
+                let _ = cmd.state.run_ppe(&ppe, None);
+                let _ = cmd.state.press_enter();
+                let _ = cmd.state.hangup();
+                return Ok(());
             }
 
             loop {

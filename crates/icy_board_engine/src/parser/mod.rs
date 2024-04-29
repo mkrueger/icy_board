@@ -978,6 +978,7 @@ impl ErrorRepoter {
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Encoding {
+    Detect,
     CP437,
     Utf8,
 }
@@ -988,6 +989,11 @@ pub enum Encoding {
 ///
 /// This function will return an error if .
 pub fn load_with_encoding(file_name: &Path, encoding: Encoding) -> std::io::Result<String> {
+    if encoding == Encoding::Detect {
+        let src_data = fs::read(file_name)?;
+        let src = codepages::tables::get_utf8(&src_data);
+        return Ok(src);
+    }
     let src_data = fs::read(file_name)?;
     let src = if encoding == Encoding::CP437 {
         let mut res = String::new();

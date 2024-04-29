@@ -9,15 +9,24 @@ version.workspace = true
 [dependencies]
 icy_board_engine = { workspace = true }
 icy_board_tui = { workspace = true }
+icy_net = { workspace = true }
+dizbase = { workspace = true }
+codepages = { workspace = true }
 
 lazy_static = { workspace = true }
 thiserror = { workspace = true }
 semver = { workspace = true }
 chrono = { workspace = true }
-clap = { workspace = true }
+argh = { workspace = true }
 crossterm = { workspace = true }
 ratatui = { workspace = true }
-
+bstr = { workspace = true }
+jamjam = { workspace = true}
+regex = { workspace = true}
+walkdir = { workspace = true }
+qfile = "3.0.1"
+relative-path = "1.9.2"
+ 
 tui-textarea  = "0.4.0"
 tui-markdown = "0.2.3"
 ariadne = "0.4.0"

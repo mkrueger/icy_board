@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::Res;
+use icy_board_engine::Res;
 
 #[derive(Default)]
 pub struct ImportLog {

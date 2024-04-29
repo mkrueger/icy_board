@@ -8,7 +8,6 @@ members = [
 	"crates/codepages",
 	"crates/pplc",
 	"crates/ppld",
-	"crates/pplx",
 	"crates/ppl-lsp",
 	"crates/scandb",
 	"crates/codepages", 
@@ -32,11 +31,11 @@ icy_board_tui = { path = "crates/icy_board_tui" }
 icy_net = { path = "crates/icy_net" }
 icy_board_engine = { path = "crates/icy_board_engine" }
 icy_engine = { git ="https://github.com/mkrueger/icy_tools" }
-
+ 
 lazy_static = "1.4.0"
 semver = "1.0.20"
 thiserror = "1.0.57"
-clap = { version = "4.5.4", features = ["derive"] }
+argh = "0.1.12"
 crossterm = "0.27.0"
 ratatui = "0.26.1"
 log = "0.4.14"

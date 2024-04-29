@@ -1,5 +1,5 @@
 use app::App;
-use clap::Parser;
+use argh::FromArgs;
 use color_eyre::Result;
 use icy_board_tui::{get_text_args, print_error, term};
 use semver::Version;
@@ -13,28 +13,28 @@ lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
 
-/// PCBText File Generator/Editor
-#[derive(clap::Parser)]
-#[command(version="", about="IcyBoard menu utility", long_about = None)]
+#[derive(FromArgs)]
+/// ICBTEXT File Generator/Editor
 struct Cli {
-    /// create menu file
-    #[arg(long, short)]
+    /// create new ICBTEXT file
+    #[argh(switch, short = 'c')]
     create: bool,
 
-    /// create menu file
-    #[arg(long, short)]
+    /// import PCBTEXT file
+    #[argh(switch, short = 'i')]
     import: bool,
 
-    /// Default is 80x25
-    #[arg(long, short)]
+    /// default is 80x25
+    #[argh(switch, short = 'f')]
     full_screen: bool,
 
     /// file to edit/create
+    #[argh(positional)]
     file: PathBuf,
 }
 
 fn main() -> Result<()> {
-    let arguments = Cli::parse();
+    let arguments: Cli = argh::from_env();
 
     let file = arguments.file;
     if !file.exists() && !arguments.create {

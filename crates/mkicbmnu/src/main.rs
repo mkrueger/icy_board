@@ -1,5 +1,5 @@
 use app::App;
-use clap::Parser;
+use argh::FromArgs;
 use color_eyre::Result;
 use icy_board_engine::icy_board::{menu::Menu, IcyBoardSerializer};
 use icy_board_tui::{get_text_args, print_error, term};
@@ -17,24 +17,24 @@ lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
 
-/// Make IcyBord Menus
-#[derive(clap::Parser)]
-#[command(version="", about="IcyBoard menu utility", long_about = None)]
+/// IcyBoard menu utility
+#[derive(FromArgs)]
 struct Cli {
     /// create menu file
-    #[arg(long, short)]
+    #[argh(switch, short = 'c')]
     create: bool,
 
-    /// Default is 80x25
-    #[arg(long, short)]
+    /// default is 80x25
+    #[argh(switch, short = 'f')]
     full_screen: bool,
 
     /// file[.mnu] to edit/create (extension will always be .mnu)
+    #[argh(positional)]
     file: PathBuf,
 }
 
 fn main() -> Result<()> {
-    let arguments = Cli::parse();
+    let arguments: Cli = argh::from_env();
 
     let file = arguments.file.with_extension("mnu");
     if !file.exists() && !arguments.create {

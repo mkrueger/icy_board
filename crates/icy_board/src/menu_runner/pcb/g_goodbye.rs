@@ -54,7 +54,8 @@ impl PcbBoardCommand {
             self.state.session.tokens.push_front(self.state.session.yes_char.to_string());
             self.start_survey(&survey)?;
         }
-        self.state.display_text(IceText::ThanksForCalling, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+        self.state
+            .display_text(IceText::ThanksForCalling, display_flags::NEWLINE | display_flags::LFBEFORE)?;
         self.state.reset_color()?;
 
         self.state.hangup()?;

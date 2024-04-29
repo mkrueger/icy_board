@@ -9,5 +9,5 @@ icy_board_engine = { workspace = true }
 lazy_static = { workspace = true }
 semver = { workspace = true }
 thiserror = { workspace = true }
-clap = { workspace = true }
+argh = { workspace = true }
 crossterm = { workspace = true }

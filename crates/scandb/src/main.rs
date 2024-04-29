@@ -1,6 +1,6 @@
 use std::{path::PathBuf, time::SystemTime};
 
-use clap::{Parser, Subcommand};
+use argh::FromArgs;
 use dizbase::{
     file_base::{metadata::MetadaType, FileBase},
     file_base_scanner::{bbstro_fingerprint::FingerprintData, repack::repack_files, scan_file_directory},
@@ -16,69 +16,100 @@ pub enum MyError {
     Utf8Error,
 }
 
-#[derive(clap::Parser)]
-#[command(version="", about="IcyBoard file base maintainance utility", long_about = None)]
+#[derive(FromArgs)]
+/// IcyBoard file base maintainance utility
 struct Cli {
-    #[command(subcommand)]
-    command: Option<Commands>,
+    #[argh(subcommand)]
+    command: Commands,
 }
 
-#[derive(Subcommand)]
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand)]
 enum Commands {
-    /// Adds files to myapp
-    ScanFileDirectory {
-        /// input directory to scan
-        input: PathBuf,
-        /// file database
-        file: PathBuf,
-    },
-    /// Gets bbstro data and saves them as 'bbstros.dat'
-    GetBBStros {
-        /// input directory to scan
-        input: PathBuf,
-    },
-    /// Repack files
-    Repack {
-        /// input directory to scan
-        input: PathBuf,
-        /// bbstro data
-        bbstros: PathBuf,
-    },
-    List {
-        /// file database
-        file: PathBuf,
-    },
-    Search {
-        /// file database
-        file: PathBuf,
-        pattern: String,
-    },
+    ScanFileDirectory(ScanFileDirectory),
+    GetBBStros(GetBBStros),
+    Repack(Repack),
+    List(List),
+    Search(Search),
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Adds files to myapp
+#[argh(subcommand, name = "scan")]
+struct ScanFileDirectory {
+    /// input directory to scan
+    #[argh(positional)]
+    input: PathBuf,
+    /// file database
+    #[argh(positional)]
+    file: PathBuf,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Gets bbstro data and saves them as 'bbstros.dat'
+#[argh(subcommand, name = "getbbstro")]
+struct GetBBStros {
+    /// input directory to scan
+    #[argh(positional)]
+    input: PathBuf,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Repack files
+#[argh(subcommand, name = "repack")]
+struct Repack {
+    /// input directory to scan
+    #[argh(positional)]
+    input: PathBuf,
+    /// bbstro data
+    #[argh(positional)]
+    bbstros: PathBuf,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Lists files
+#[argh(subcommand, name = "list")]
+struct List {
+    /// file database
+    #[argh(positional)]
+    file: PathBuf,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Searches pattern
+#[argh(subcommand, name = "search")]
+struct Search {
+    /// file database
+    #[argh(positional)]
+    file: PathBuf,
+
+    #[argh(positional)]
+    pattern: String,
 }
 
 pub fn main() {
-    let arguments = Cli::parse();
+    let arguments: Cli = argh::from_env();
     match &arguments.command {
-        Some(Commands::GetBBStros { input }) => {
+        Commands::GetBBStros(GetBBStros { input }) => {
             println!("Scanning {} for bbstro fingerprints...", input.display());
             let fingerprints = FingerprintData::scan_fingerprint_dir(input).unwrap();
             fingerprints.save(&"bbstros.dat").unwrap();
             println!("Fingerprints saved to 'bbstros.dat'");
         }
-        Some(Commands::ScanFileDirectory { input, file }) => {
+        Commands::ScanFileDirectory(ScanFileDirectory { input, file }) => {
             scan_file_directory(input, file).unwrap();
         }
 
-        Some(Commands::Repack { input, bbstros }) => {
+        Commands::Repack(Repack { input, bbstros }) => {
             let fingerprints = FingerprintData::load(bbstros).unwrap();
             repack_files(input, fingerprints).unwrap();
         }
-        Some(Commands::List { file }) => {
+        Commands::List(List { file }) => {
             list_file_base(file);
         }
-        Some(Commands::Search { file, pattern }) => {
+        Commands::Search(Search { file, pattern }) => {
             search_file_base(file, pattern);
         }
-        None => {}
     }
 }
 

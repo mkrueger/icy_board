@@ -1,4 +1,4 @@
-use clap::Parser;
+use argh::FromArgs;
 use crossterm::execute;
 use crossterm::style::Attribute;
 use crossterm::style::Color;
@@ -21,26 +21,27 @@ use std::path::Path;
 #[cfg(test)]
 pub mod tests;
 
-#[derive(clap::Parser)]
-#[command(version="", about="PCBoard Programming Language Decompiler", long_about = None)]
+#[derive(FromArgs)]
+/// PCBoard Programming Language Decompiler
 struct Cli {
     /// raw ppe without reconstruction control structures
-    #[arg(long)]
+    #[argh(switch)]
     raw: bool,
 
     /// output the disassembly instead of ppl
-    #[arg(long, short)]
+    #[argh(switch, short = 'd')]
     disassemble: bool,
 
     /// output to console instead of writing to file
-    #[arg(long)]
+    #[argh(switch)]
     output: bool,
 
-    #[arg(long)]
+    #[argh(option)]
     /// keyword casing style, valid values are u=upper (default), l=lower, c=camel
     style: Option<char>,
 
     /// file[.ppe] to decompile
+    #[argh(positional)]
     file: String,
 }
 
@@ -49,7 +50,7 @@ lazy_static::lazy_static! {
 }
 
 fn main() {
-    let arguments = Cli::parse();
+    let arguments: Cli = argh::from_env();
     let mut output_func = OutputFunc::Upper;
     match arguments.style {
         Some('u') => output_func = OutputFunc::Upper,
