@@ -175,6 +175,15 @@ pub struct UserStats {
     #[serde(skip_serializing_if = "is_null_64")]
     pub daily_downloaded_bytes: u64,
 }
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+pub enum FSEMode {
+    #[default]
+    Yes,
+    No,
+    Ask,
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct UserFlags {
     #[serde(default)]
@@ -194,12 +203,7 @@ pub struct UserFlags {
     pub has_mail: bool,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "is_false")]
-    pub dont_ask_fse: bool,
-
-    #[serde(default)]
-    #[serde(skip_serializing_if = "is_false")]
-    pub use_fsedefault: bool,
+    pub fse_mode: FSEMode,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
@@ -507,8 +511,15 @@ impl User {
                 is_dirty: u.user.is_dirty,
                 msg_clear: u.user.msg_clear,
                 has_mail: u.user.has_mail,
-                dont_ask_fse: u.user.dont_ask_fse,
-                use_fsedefault: u.user.use_fsedefault,
+                fse_mode: if u.user.use_fsedefault {
+                    FSEMode::Yes
+                } else {
+                    if u.user.dont_ask_fse {
+                        FSEMode::No
+                    } else {
+                        FSEMode::Ask
+                    }
+                },
                 scroll_msg_body: u.user.scroll_msg_body,
                 use_short_filedescr: u.user.short_header,
                 wide_editor: u.user.wide_editor,

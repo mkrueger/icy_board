@@ -406,6 +406,11 @@ impl EditState {
                             self.cur_line().replace_range(o..o + 1, ch.to_string().as_str());
                         }
 
+                        if self.cur_line().len() > self.max_line_length {
+                            let update = self.break_line(self.cursor.y);
+                            self.update_screen(state, update)?;
+                        }
+
                         self.cursor.x += 1;
                         state.print(TerminalTarget::Both, &ch.to_string())?;
                     }
@@ -839,6 +844,25 @@ impl EditState {
         }
 
         EditUpdate::UpdateLinesFrom(paragraph_start)
+    }
+
+    fn break_line(&mut self, y: i32) -> EditUpdate {
+        let y = y as usize;
+        let mut cur_line: Vec<char> = self.msg[y].chars().collect();
+
+        let mut pos = cur_line.len().saturating_sub(2);
+        while pos > 0 && !cur_line[pos].is_whitespace() {
+            pos -= 1;
+        }
+        if pos == 0 {
+            pos = cur_line.len() / 2;
+        }
+        let next_line = cur_line.drain(pos..).collect::<String>().trim_start().to_string();
+        self.msg.insert(y + 1, next_line);
+        self.msg[y] = cur_line.iter().collect();
+        self.cursor.y += 1;
+        self.cursor.x = self.msg[y + 1].len() as i32;
+        EditUpdate::UpdateLinesFrom(y)
     }
 }
 

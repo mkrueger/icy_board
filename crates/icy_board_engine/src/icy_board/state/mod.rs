@@ -33,7 +33,7 @@ use super::{
     icb_text::{IcbTextFile, IcbTextStyle, IceText},
     pcboard_data::Node,
     surveys::SurveyList,
-    user_base::User,
+    user_base::{FSEMode, User},
     IcyBoard, IcyBoardSerializer,
 };
 
@@ -182,7 +182,7 @@ pub struct Session {
     pub no_char: char,
     pub yes_no_mask: String,
 
-    pub use_fse: bool,
+    pub fse_mode: FSEMode,
 
     pub flagged_files: HashSet<PathBuf>,
 
@@ -220,7 +220,7 @@ impl Session {
             disable_auto_more: false,
             more_requested: false,
             cancel_batch: false,
-            use_fse: true,
+            fse_mode: FSEMode::Yes,
             user_name: String::new(),
             alias_name: String::new(),
             date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
@@ -675,7 +675,7 @@ impl IcyBoardState {
             self.session.page_len = user.page_len;
             self.session.user_name = user.get_name().clone();
             self.session.alias_name = user.alias.clone();
-            self.session.use_fse = user.flags.use_fsedefault;
+            self.session.fse_mode = user.flags.fse_mode.clone();
 
             self.current_user = Some(user);
             conf
@@ -693,7 +693,7 @@ impl IcyBoardState {
         let old_language = self.session.language.clone();
         self.session.date_format = if let Some(user) = &self.current_user {
             self.session.language = user.language.clone();
-            self.session.use_fse = user.flags.use_fsedefault;
+            self.session.fse_mode = user.flags.fse_mode.clone();
             if !user.date_format.is_empty() {
                 user.date_format.clone()
             } else {

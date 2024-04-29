@@ -11,6 +11,7 @@ use crate::executable::PPEScript;
 use crate::executable::VariableTable;
 use crate::executable::VariableType;
 use crate::executable::VariableValue;
+use crate::icy_board::user_base::FSEMode;
 use crate::parser::UserTypeRegistry;
 use crate::Res;
 use std::collections::HashMap;
@@ -158,8 +159,20 @@ pub struct VirtualMachine<'a> {
 impl<'a> VirtualMachine<'a> {
     fn set_user_variables(&mut self, cur_user: &User) {
         self.variable_table.set_value(U_EXPERT, VariableValue::new_bool(cur_user.flags.expert_mode));
-        self.variable_table.set_value(U_FSE, VariableValue::new_bool(cur_user.flags.use_fsedefault));
-        self.variable_table.set_value(U_FSEP, VariableValue::new_bool(!cur_user.flags.dont_ask_fse));
+        match cur_user.flags.fse_mode {
+            FSEMode::Yes => {
+                self.variable_table.set_value(U_FSE, VariableValue::new_bool(true));
+                self.variable_table.set_value(U_FSEP, VariableValue::new_bool(true));
+            }
+            FSEMode::Ask => {
+                self.variable_table.set_value(U_FSE, VariableValue::new_bool(false));
+                self.variable_table.set_value(U_FSEP, VariableValue::new_bool(true));
+            }
+            FSEMode::No => {
+                self.variable_table.set_value(U_FSE, VariableValue::new_bool(false));
+                self.variable_table.set_value(U_FSEP, VariableValue::new_bool(false));
+            }
+        }
         self.variable_table.set_value(U_CLS, VariableValue::new_bool(cur_user.flags.msg_clear));
 
         self.variable_table
@@ -278,8 +291,13 @@ impl<'a> VirtualMachine<'a> {
 
     pub fn put_user_variables(&self, cur_user: &mut User) {
         cur_user.flags.expert_mode = self.variable_table.get_value(U_EXPERT).as_bool();
-        cur_user.flags.use_fsedefault = self.variable_table.get_value(U_FSE).as_bool();
-        cur_user.flags.dont_ask_fse = self.variable_table.get_value(U_FSEP).as_bool();
+        if self.variable_table.get_value(U_FSE).as_bool() {
+            cur_user.flags.fse_mode = FSEMode::Yes;
+        } else if self.variable_table.get_value(U_FSEP).as_bool() {
+            cur_user.flags.fse_mode = FSEMode::Ask;
+        } else {
+            cur_user.flags.fse_mode = FSEMode::No;
+        }
         cur_user.flags.msg_clear = self.variable_table.get_value(U_CLS).as_bool();
 
         cur_user.exp_date = IcbDate::from_pcboard(self.variable_table.get_value(U_EXPDATE).as_int() as u32).to_utc_date_time();

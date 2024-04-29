@@ -4,6 +4,7 @@ use crate::{menu_runner::PcbBoardCommand, Res};
 
 use bstr::BString;
 use chrono::Utc;
+use icy_board_engine::icy_board::user_base::FSEMode;
 use icy_board_engine::{
     datetime::IcbTime,
     icy_board::{
@@ -69,8 +70,8 @@ impl PcbBoardCommand {
             subj: subj.to_string(),
             msg: Vec::new(),
             cursor: Position::new(0, 0),
-            use_fse: self.state.session.use_fse,
-            insert_mode: self.state.session.use_fse,
+            use_fse: self.state.session.fse_mode == FSEMode::Yes,
+            insert_mode: self.state.session.fse_mode == FSEMode::Yes,
             top_line: 0,
             max_line_length: 79,
         };

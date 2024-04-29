@@ -5,6 +5,7 @@ use icy_board_engine::{
         commands::Command,
         icb_text::IceText,
         state::functions::{display_flags, MASK_ALNUM, MASK_PHONE, MASK_WEB},
+        user_base::FSEMode,
     },
 };
 
@@ -79,6 +80,34 @@ impl PcbBoardCommand {
                 display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::YESNO,
             )?;
             new_user.flags.msg_clear = msg_cls.is_empty() || msg_cls == self.state.session.yes_char.to_uppercase().to_string();
+        }
+
+        if settings.ask_fse {
+            let str = match new_user.flags.fse_mode {
+                FSEMode::Yes => "Y",
+                FSEMode::No => "N",
+                FSEMode::Ask => "A",
+            };
+            let fse_default = self.state.input_field(
+                IceText::SetFSEDefault,
+                1,
+                &"YNA",
+                "",
+                Some(str.to_string()),
+                display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
+            )?;
+            match fse_default.as_str() {
+                "Y" => {
+                    new_user.flags.fse_mode = FSEMode::Yes;
+                }
+                "N" => {
+                    new_user.flags.fse_mode = FSEMode::No;
+                }
+                "A" => {
+                    new_user.flags.fse_mode = FSEMode::Ask;
+                }
+                _ => {}
+            }
         }
 
         if settings.ask_date_format {

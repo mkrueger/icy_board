@@ -341,6 +341,7 @@ impl PCBoardImporter {
                 ask_email: true,
                 ask_web_address: true,
                 ask_use_short_descr: true,
+                ask_fse: true,
             },
 
             options: BoardOptions {

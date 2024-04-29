@@ -189,6 +189,11 @@ impl GeneralTab {
                         ListValue::Bool(icy_board.config.new_user_settings.ask_clr_msg),
                     )),
                     ConfigEntry::Item(ListItem::new(
+                        "ask_fse",
+                        "Full Screen Editor".to_string(),
+                        ListValue::Bool(icy_board.config.new_user_settings.ask_fse),
+                    )),
+                    ConfigEntry::Item(ListItem::new(
                         "ask_xfer_protocol",
                         "Protocols".to_string(),
                         ListValue::Bool(icy_board.config.new_user_settings.ask_xfer_protocol),
@@ -553,6 +558,7 @@ impl GeneralTab {
                 "ask_voice_phone" => icy_board.config.new_user_settings.ask_voice_phone = *b,
                 "ask_comment" => icy_board.config.new_user_settings.ask_comment = *b,
                 "ask_clr_msg" => icy_board.config.new_user_settings.ask_clr_msg = *b,
+                "ask_fse" => icy_board.config.new_user_settings.ask_fse = *b,
                 "ask_xfer_protocol" => icy_board.config.new_user_settings.ask_xfer_protocol = *b,
                 "ask_date_format" => icy_board.config.new_user_settings.ask_date_format = *b,
                 "ask_alias" => icy_board.config.new_user_settings.ask_alias = *b,

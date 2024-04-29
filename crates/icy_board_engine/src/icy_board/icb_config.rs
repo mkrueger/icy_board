@@ -331,6 +331,7 @@ pub struct NewUserSettings {
 
     pub ask_xfer_protocol: bool,
     pub ask_date_format: bool,
+    pub ask_fse: bool,
 
     pub ask_alias: bool,
     pub ask_gender: bool,
@@ -526,6 +527,7 @@ impl IcbConfig {
                 ask_email: true,
                 ask_web_address: true,
                 ask_use_short_descr: true,
+                ask_fse: true,
             },
             options: BoardOptions {
                 disable_full_record_updating: false,
