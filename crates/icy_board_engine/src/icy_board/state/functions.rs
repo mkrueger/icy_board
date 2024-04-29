@@ -211,14 +211,20 @@ impl IcyBoardState {
     }
 
     pub fn display_file<P: AsRef<Path>>(&mut self, file_name: &P) -> Res<bool> {
+        self.display_file_with_error(file_name, true)
+    }
+
+    pub fn display_file_with_error<P: AsRef<Path>>(&mut self, file_name: &P, display_error: bool) -> Res<bool> {
         let resolved_name = self.board.lock().unwrap().resolve_file(file_name);
         // lookup language/security/graphics mode
         let resolved_name = self.find_more_specific_file(resolved_name.to_string_lossy().to_string());
 
         let Ok(content) = fs::read(resolved_name) else {
-            self.bell()?;
-            self.set_color(TerminalTarget::Both, pcb_colors::RED)?;
-            self.print(TerminalTarget::Both, &format!("\r\n({}) is missing!\r\n\r\n", file_name.as_ref().display()))?;
+            if display_error {
+                self.bell()?;
+                self.set_color(TerminalTarget::Both, pcb_colors::RED)?;
+                self.print(TerminalTarget::Both, &format!("\r\n({}) is missing!\r\n\r\n", file_name.as_ref().display()))?;
+            }
             return Ok(true);
         };
         let converted_content = if content.starts_with(&UTF8_BOM) {

@@ -291,7 +291,6 @@ impl PcbBoardCommand {
             return Ok(false);
         }
         let file = path.join(command_file);
-
         if file.with_extension("ppe").is_file() {
             self.state.run_ppe(&path, None)?;
             return Ok(true);
@@ -304,7 +303,7 @@ impl PcbBoardCommand {
         }
         */
 
-        self.state.display_file(&file)
+        self.state.display_file_with_error(&file, false)
     }
 
     fn send_message(&mut self, conf: i32, area: i32, msg: JamMessage, text: IceText) -> Res<()> {

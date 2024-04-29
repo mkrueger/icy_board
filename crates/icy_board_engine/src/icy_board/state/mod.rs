@@ -1,4 +1,5 @@
 use std::{
+    backtrace::Backtrace,
     collections::{HashMap, HashSet, VecDeque},
     fmt::Alignment,
     fs,
@@ -1448,6 +1449,7 @@ impl IcyBoardState {
     }
 
     pub fn bell(&mut self) -> Res<()> {
+        log::warn!("beeep {}", Backtrace::force_capture());
         self.write_raw(TerminalTarget::Both, &['\x07'])
     }
 
