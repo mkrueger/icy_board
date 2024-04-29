@@ -127,6 +127,9 @@ impl IcyBoard {
     }
 
     pub fn resolve_file<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
+        if file.as_ref().as_os_str().is_empty() {
+            return PathBuf::new();
+        }
         let mut s = PathBuf::from(file.as_ref());
         if !s.is_absolute() {
             s = self.root_path.join(s);
@@ -181,6 +184,12 @@ impl IcyBoard {
         let mut users = UserBase::default();
 
         let load_path = get_path(parent_path, &config.paths.home_dir);
+        if !load_path.exists() {
+            fs::create_dir_all(&load_path).map_err(|e| {
+                eprintln!("Error creating home directory: {} from {}", e, load_path.display());
+                e
+            })?;
+        }
         users.load_users(&load_path).map_err(|e| {
             eprintln!("Error loading users: {} from {}", e, load_path.display());
             e

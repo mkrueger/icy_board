@@ -433,6 +433,7 @@ impl IcyBoardState {
         if let Some(user) = &mut self.current_user {
             user.stats.num_password_failures += 1;
         }
+        self.session.op_text = self.session.get_username_or_alias();
         self.display_text(IceText::PasswordFailure, display_flags::NEWLINE | display_flags::LFAFTER)?;
         Ok(false)
     }

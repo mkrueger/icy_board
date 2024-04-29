@@ -4,7 +4,7 @@ use crate::{
 };
 use icy_board_engine::{
     icy_board::{commands::Command, icb_config::IcbColor, icb_text::IceText, state::functions::display_flags, IcyBoardError},
-    vm::TerminalTarget,
+    vm::{lang, TerminalTarget},
 };
 
 impl PcbBoardCommand {
@@ -19,10 +19,12 @@ impl PcbBoardCommand {
         };
 
         let lang = self.ask_languages(cur_lang)?;
-        if let Some(user) = &mut self.state.current_user {
-            user.language = lang;
+        if !lang.is_empty() {
+            if let Some(user) = &mut self.state.current_user {
+                user.language = lang;
+            }
+            self.state.save_current_user()?;
         }
-        self.state.save_current_user()?;
         self.state.press_enter()?;
         self.display_menu = true;
         Ok(())
@@ -62,7 +64,9 @@ impl PcbBoardCommand {
                 Some(cur_lang_str.clone()),
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE | display_flags::FIELDLEN,
             )?;
-
+            if language.is_empty() {
+                return Ok(language);
+            }
             if let Ok(number) = language.parse::<usize>() {
                 if number > 0 && number <= l.languages.len() {
                     if number == 1 {

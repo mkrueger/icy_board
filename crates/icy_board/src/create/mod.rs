@@ -565,7 +565,7 @@ fn generate_protocol_data(protocol_data_file: &PathBuf) -> Res<()> {
     protocols.protocols.push(Protocol {
         is_enabled: true,
         is_batch: true,
-        char_code: "Z8".to_string(),
+        char_code: "8".to_string(),
         description: "Zmodem 8k (batch)".to_string(),
         send_command: TransferProtocolType::ZModem8k,
         recv_command: TransferProtocolType::ZModem8k,
