@@ -16,6 +16,10 @@ use icy_engine::Position;
 
 use crate::menu_runner::MASK_COMMAND;
 
+#[cfg(test)]
+mod tests;
+
+#[derive(Default)]
 pub struct EditState {
     pub from: String,
     pub to: String,
@@ -29,6 +33,8 @@ pub struct EditState {
     pub use_fse: bool,
 
     pub top_line: usize,
+
+    pub max_line_length: usize,
 }
 
 pub enum EditResult {
@@ -236,11 +242,16 @@ impl EditState {
                     self.print_line_number(state)?;
                 }
                 control_codes::CTRL_B => {
-                    // reformat paragraph
+                    let update = self.reformat();
+                    self.update_screen(state, update)?;
                 }
-
+                control_codes::CTRL_I => {
+                    let update = self.center();
+                    self.update_screen(state, update)?;
+                }
                 control_codes::CTRL_J => {
-                    // join line
+                    let update = self.left_justify();
+                    self.update_screen(state, update)?;
                 }
                 control_codes::CTRL_K => {
                     let o = self.cursor.x as usize;
@@ -255,16 +266,23 @@ impl EditState {
                 }
 
                 control_codes::CTRL_T => {
-                    // delete word
+                    let update = self.delete_word();
+                    self.update_screen(state, update)?;
+                }
+
+                control_codes::CTRL_U => {
+                    let update = self.delete_to_eol();
+                    self.update_screen(state, update)?;
                 }
                 control_codes::CTRL_L => {
                     self.redraw_fse(state)?;
                 }
 
                 control_codes::CTRL_Y => {
-                    if (self.cursor.y as usize) < self.msg.len() {
-                        self.msg.remove(self.cursor.y as usize);
-                        self.redraw_fse(state)?;
+                    let y = self.cursor.y as usize;
+                    if y < self.msg.len() {
+                        self.msg.remove(y);
+                        self.redraw_fse_from(state, y)?;
                     }
                 }
                 control_codes::CTRL_Z => {
@@ -275,6 +293,7 @@ impl EditState {
                     state.press_enter()?;
                     self.redraw_fse(state)?;
                 }
+
                 control_codes::CTRL_LEFT => {
                     for i in (self.cursor.x..0).rev() {
                         if i == 0 || self.cur_line().chars().nth(i as usize).unwrap() == ' ' {
@@ -301,6 +320,7 @@ impl EditState {
                         state.backward(1)?;
                     }
                 }
+
                 control_codes::RIGHT => {
                     if self.cursor.x < self.cur_line().len() as i32 {
                         self.cursor.x += 1;
@@ -319,6 +339,7 @@ impl EditState {
                         self.redraw_fse(state)?;
                     }
                 }
+
                 control_codes::DOWN => {
                     if (self.cursor.y + self.top_line as i32) < 999 {
                         if (self.cursor.y - self.top_line as i32) < state.session.page_len as i32 - Self::HEADER_SIZE - 1 {
@@ -339,10 +360,12 @@ impl EditState {
                         self.cursor.x = 0;
                     }
                 }
+
                 control_codes::INS => {
                     self.insert_mode = !self.insert_mode;
                     self.display_insert_mode(state)?;
                 }
+
                 control_codes::END => {
                     if self.cursor.x < self.cur_line().len() as i32 {
                         state.forward(self.cur_line().len() as i32 - self.cursor.x as i32)?;
@@ -351,41 +374,21 @@ impl EditState {
                 }
 
                 control_codes::BS => {
-                    if self.cursor.x > 0 {
-                        self.cursor.x -= 1;
-                        let o = self.cursor.x as usize;
-                        self.cur_line().remove(o);
-                        state.backward(1)?;
-                        state.print(TerminalTarget::Both, &self.cur_line()[o..])?;
-                        state.clear_eol()?;
-                        let len = self.cur_line().len() as i32 - self.cursor.x as i32;
-                        if len > 0 {
-                            state.backward(len)?;
-                        }
-                    }
+                    let update = self.backspace();
+                    self.update_screen(state, update)?;
                 }
 
                 control_codes::DEL => {
-                    if self.cursor.x < self.cur_line().len() as i32 {
-                        let o = self.cursor.x as usize;
-                        self.cur_line().remove(o);
-                        state.print(TerminalTarget::Both, &self.cur_line()[o..])?;
-                        let len = self.cur_line().len() as i32 - self.cursor.x as i32;
-                        if len > 0 {
-                            state.backward(len)?;
-                        }
-                    }
+                    let update = self.delete_char();
+                    self.update_screen(state, update)?;
                 }
+
                 '\r' => {
-                    if (self.cursor.y as usize) < self.msg.len() {
-                        self.msg.insert(self.cursor.y as usize, String::new());
-                        self.redraw_fse(state)?;
-                    }
-                    self.cursor.y += 1;
-                    self.cursor.x = 0;
-                    state.new_line()?;
+                    let update = self.press_enter();
+                    self.update_screen(state, update)?;
                     self.print_line_number(state)?;
                 }
+
                 ch => {
                     if ch >= ' ' && ch <= '~' {
                         let o = self.cursor.x as usize;
@@ -411,12 +414,26 @@ impl EditState {
         }
     }
 
+    fn redraw_fse_from(&mut self, state: &mut IcyBoardState, y: usize) -> Res<()> {
+        state.reset_color()?;
+        state.gotoxy(TerminalTarget::Both, 1, y as i32 - self.top_line as i32 + Self::HEADER_SIZE)?;
+        for i in y..(state.session.page_len as usize).saturating_sub(Self::HEADER_SIZE as usize) {
+            let cur_line = i + self.top_line;
+            if cur_line < self.msg.len() {
+                state.print(TerminalTarget::Both, &self.msg[cur_line])?;
+            }
+            state.clear_eol()?;
+            state.new_line()?;
+        }
+        Ok(())
+    }
+
     fn redraw_fse(&mut self, state: &mut IcyBoardState) -> Res<()> {
         state.clear_screen()?;
         self.msg_header(state)?;
+        state.reset_color()?;
         state.gotoxy(TerminalTarget::Both, 1, Self::HEADER_SIZE)?;
-
-        for i in 0..(state.session.page_len as usize) - Self::HEADER_SIZE as usize {
+        for i in 0..(state.session.page_len as usize).saturating_sub(Self::HEADER_SIZE as usize) {
             let cur_line = i + self.top_line;
             if cur_line < self.msg.len() {
                 state.print(TerminalTarget::Both, &self.msg[cur_line])?;
@@ -437,8 +454,13 @@ impl EditState {
         } else {
             state.display_text(IceText::INSForInsert, 0)?;
         }
+        state.reset_color()?;
         state.clear_eol()?;
-        state.gotoxy(TerminalTarget::Both, self.cursor.x, Self::HEADER_SIZE + self.cursor.y - self.top_line as i32)?;
+        state.gotoxy(
+            TerminalTarget::Both,
+            self.cursor.x + 1,
+            Self::HEADER_SIZE + self.cursor.y - self.top_line as i32,
+        )?;
         Ok(())
     }
 
@@ -508,21 +530,18 @@ impl EditState {
                         state.forward(1)?;
                     }
                 }
-
                 control_codes::HOME => {
                     if caret_x > 0 {
                         state.backward(caret_x as i32)?;
                         caret_x = 0;
                     }
                 }
-
                 control_codes::END => {
                     if caret_x < edit_line.len() {
                         state.forward(edit_line.len() as i32 - caret_x as i32)?;
                         caret_x = edit_line.len();
                     }
                 }
-
                 control_codes::BS => {
                     if caret_x > 0 {
                         caret_x -= 1;
@@ -530,14 +549,13 @@ impl EditState {
                         state.print(TerminalTarget::Both, &format!("\x08 \x08{}", &edit_line[caret_x..]))?;
                     }
                 }
-
                 control_codes::DEL => {
                     if caret_x < edit_line.len() {
                         edit_line.remove(caret_x);
-                        state.clear_line()?;
-                        state.print(TerminalTarget::Both, &edit_line)?;
-                        let len = edit_line.len() as i32 - caret_x as i32;
-                        if len > 0 {
+                        if caret_x < edit_line.len() {
+                            state.print(TerminalTarget::Both, &edit_line[caret_x..])?;
+                            state.print(TerminalTarget::Both, " ")?;
+                            let len = edit_line.len() as i32 - caret_x as i32 + 1;
                             state.backward(len)?;
                         }
                     }
@@ -634,8 +652,199 @@ impl EditState {
         state.gotoxy(TerminalTarget::Both, 79 - 2, 1)?;
         state.print(TerminalTarget::Both, &format!("{:>3}", self.top_line + self.cursor.y as usize + 1))?;
         state.clear_eol()?;
-        state.gotoxy(TerminalTarget::Both, self.cursor.x, Self::HEADER_SIZE + self.cursor.y - self.top_line as i32)?;
+        state.gotoxy(
+            TerminalTarget::Both,
+            self.cursor.x + 1,
+            Self::HEADER_SIZE + self.cursor.y - self.top_line as i32,
+        )?;
 
         Ok(())
     }
+
+    fn merge_line(&mut self, y: i32) {
+        let y = y as usize;
+        if y + 1 < self.msg.len() {
+            let mut cur_line: Vec<char> = self.msg[y].chars().collect();
+            let mut next_line: Vec<char> = self.msg[y + 1].chars().collect();
+
+            while cur_line.len() < self.max_line_length && !next_line.is_empty() {
+                let pos = next_line.iter().position(|c| *c == ' ').unwrap_or(next_line.len() - 1);
+                if pos + cur_line.len() <= self.max_line_length {
+                    let word = next_line.drain(0..pos + 1).collect::<String>();
+                    cur_line.extend(word.chars());
+                } else {
+                    break;
+                }
+            }
+            while cur_line.ends_with(&[' ']) {
+                cur_line.pop();
+            }
+            self.msg[y] = cur_line.iter().collect();
+            if next_line.is_empty() {
+                self.msg.remove(y + 1);
+            } else {
+                self.msg[y + 1] = next_line.iter().collect();
+            }
+        }
+    }
+
+    fn set_cursor_position(&self, state: &mut IcyBoardState) -> Res<()> {
+        state.gotoxy(
+            TerminalTarget::Both,
+            self.cursor.x + 1,
+            Self::HEADER_SIZE + self.cursor.y - self.top_line as i32,
+        )?;
+        Ok(())
+    }
+
+    pub fn backspace(&mut self) -> EditUpdate {
+        if self.cursor.x > 0 {
+            let o = self.cursor.x as usize;
+            self.cur_line().remove(o - 1);
+            self.cursor.x -= 1;
+            return EditUpdate::UpdateCurrentLineFrom(o - 1);
+        } else if self.cursor.y > 0 {
+            self.cursor.y -= 1;
+            self.cursor.x = self.cur_line().len() as i32;
+            self.merge_line(self.cursor.y);
+            return EditUpdate::UpdateLinesFrom(self.cursor.y as usize);
+        }
+        EditUpdate::None
+    }
+
+    pub fn delete_char(&mut self) -> EditUpdate {
+        let x = self.cursor.x as usize;
+        while self.cur_line().len() < x {
+            self.cur_line().push(' ');
+        }
+        if x < self.cur_line().len() {
+            let o = self.cursor.x as usize;
+            self.cur_line().remove(o);
+            return EditUpdate::UpdateCurrentLineFrom(o);
+        } else {
+            self.merge_line(self.cursor.y);
+            return EditUpdate::UpdateLinesFrom(self.cursor.y as usize);
+        }
+    }
+
+    fn update_screen(&mut self, state: &mut IcyBoardState, update: EditUpdate) -> Res<()> {
+        match update {
+            EditUpdate::None => {}
+            EditUpdate::UpdateCurrentLineFrom(pos) => {
+                state.print(TerminalTarget::Both, &self.cur_line()[pos..])?;
+                state.clear_eol()?;
+                let len = self.cur_line().len() as i32 - self.cursor.x as i32 + 1;
+                if len > 0 {
+                    state.backward(len)?;
+                }
+            }
+            EditUpdate::UpdateLinesFrom(pos) => {
+                self.redraw_fse_from(state, pos)?;
+                self.set_cursor_position(state)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn press_enter(&mut self) -> EditUpdate {
+        let mut y = self.cursor.y as usize;
+        if y < self.msg.len() {
+            let x = self.cursor.x as usize;
+            if x < self.cur_line().len() {
+                let new_line = self.cur_line().drain(x..).collect();
+                self.msg.insert(self.cursor.y as usize + 1, new_line);
+            } else {
+                y += 1; // at eol, don't need to update current line.
+                self.msg.insert(self.cursor.y as usize + 1, String::new());
+            }
+        }
+        self.cursor.y += 1;
+        self.cursor.x = 0;
+        return EditUpdate::UpdateLinesFrom(y);
+    }
+
+    pub fn left_justify(&mut self) -> EditUpdate {
+        if self.cur_line().len() > 0 && self.cur_line().chars().next().unwrap().is_whitespace() {
+            *self.cur_line() = self.cur_line().trim_start().to_string();
+            self.cursor.x = self.cur_line().len() as i32;
+            return EditUpdate::UpdateCurrentLineFrom(0);
+        }
+        EditUpdate::None
+    }
+
+    pub fn center(&mut self) -> EditUpdate {
+        if self.cur_line().len() > 0 {
+            let len = self.cur_line().len();
+            let mut line = self.cur_line().clone();
+            let spaces = self.max_line_length - len;
+            let left = spaces / 2;
+            line.insert_str(0, &str::repeat(" ", left));
+            *self.cur_line() = line.to_string();
+            self.cursor.x = self.cur_line().len() as i32;
+            return EditUpdate::UpdateCurrentLineFrom(0);
+        }
+        EditUpdate::None
+    }
+
+    pub fn delete_word(&mut self) -> EditUpdate {
+        let x = self.cursor.x as usize;
+        let mut line = self.cur_line().clone();
+        if x < line.len() {
+            let mut pos = x;
+            while pos < line.len() && line.chars().nth(pos).unwrap().is_whitespace() {
+                pos += 1;
+            }
+            while pos < line.len() && !line.chars().nth(pos).unwrap().is_whitespace() {
+                pos += 1;
+            }
+            line.drain(x..pos);
+            *self.cur_line() = line;
+            return EditUpdate::UpdateCurrentLineFrom(x);
+        }
+        EditUpdate::None
+    }
+
+    pub fn delete_to_eol(&mut self) -> EditUpdate {
+        let x = self.cursor.x as usize;
+        if x < self.cur_line().len() {
+            self.cur_line().drain(x..);
+            return EditUpdate::UpdateCurrentLineFrom(x);
+        }
+        EditUpdate::None
+    }
+
+    pub fn reformat(&mut self) -> EditUpdate {
+        let mut y = (self.cursor.y as usize).min(self.msg.len());
+        let mut paragraph_start = 0;
+        for i in (0..y).rev() {
+            self.msg[i] = self.msg[i].trim_end().to_string();
+            if self.msg[i].is_empty() {
+                paragraph_start = i;
+                break;
+            }
+        }
+        for i in paragraph_start..y {
+            if i >= self.msg.len() {
+                break;
+            }
+            while self.msg[i].contains("  ") {
+                self.msg[i] = self.msg[i].replace("  ", " ");
+            }
+            let line_counft = self.msg.len();
+            self.msg[i].push(' ');
+            self.merge_line(i as i32);
+            if line_counft < self.msg.len() {
+                y -= 1;
+            }
+        }
+
+        EditUpdate::UpdateLinesFrom(paragraph_start)
+    }
+}
+
+#[derive(PartialEq, Debug)]
+pub enum EditUpdate {
+    None,
+    UpdateCurrentLineFrom(usize),
+    UpdateLinesFrom(usize),
 }

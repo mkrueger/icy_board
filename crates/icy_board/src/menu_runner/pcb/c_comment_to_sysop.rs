@@ -72,6 +72,7 @@ impl PcbBoardCommand {
             use_fse: self.state.session.use_fse,
             insert_mode: self.state.session.use_fse,
             top_line: 0,
+            max_line_length: 79,
         };
 
         match editor.edit_message(&mut self.state)? {
