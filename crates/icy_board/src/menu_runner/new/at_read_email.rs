@@ -6,14 +6,14 @@ use jamjam::jam::JamMessageBase;
 use crate::{menu_runner::PcbBoardCommand, Res};
 
 impl PcbBoardCommand {
-    pub fn read_email(&mut self, action: &Command) -> Res<()> {
+    pub async fn read_email(&mut self, action: &Command) -> Res<()> {
         let name = self.state.session.user_name.to_string();
-        let msg_base = self.get_email_msgbase(&name)?;
-        self.read_msgs_from_base(msg_base, action)?;
+        let msg_base = self.get_email_msgbase(&name).await?;
+        self.read_msgs_from_base(msg_base, action).await?;
         Ok(())
     }
 
-    pub fn get_email_msgbase(&mut self, user_name: &str) -> Res<JamMessageBase> {
+    pub async fn get_email_msgbase(&mut self, user_name: &str) -> Res<JamMessageBase> {
         let home_dir = if let Ok(board) = self.state.board.lock() {
             let name = if user_name == self.state.session.sysop_name {
                 &board.users[0].get_name()
@@ -28,7 +28,7 @@ impl PcbBoardCommand {
 
         if !home_dir.exists() {
             log::error!("Homedir for user {} does not exist", user_name);
-            self.state.display_text(IceText::MessageBaseError, display_flags::NEWLINE)?;
+            self.state.display_text(IceText::MessageBaseError, display_flags::NEWLINE).await?;
             return Err(IcyBoardError::HomeDirMissing(user_name.to_string()).into());
         }
 

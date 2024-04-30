@@ -16,27 +16,30 @@ use icy_board_engine::{
 use super::l_find_files::FileList;
 
 impl PcbBoardCommand {
-    pub fn zippy_directory_scan(&mut self, action: &Command) -> Res<()> {
+    pub async fn zippy_directory_scan(&mut self, action: &Command) -> Res<()> {
         if self.state.session.current_conference.directories.is_empty() {
             self.state
-                .display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
-            self.state.press_enter()?;
+                .display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            self.state.press_enter().await?;
             return Ok(());
         }
         let search_pattern = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
-            self.state.input_field(
-                IceText::TextToScanFor,
-                40,
-                &MASK_ASCII,
-                &action.help,
-                None,
-                display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
-            )?
+            self.state
+                .input_field(
+                    IceText::TextToScanFor,
+                    40,
+                    &MASK_ASCII,
+                    &action.help,
+                    None,
+                    display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
+                )
+                .await?
         };
         if search_pattern.is_empty() {
-            self.state.press_enter()?;
+            self.state.press_enter().await?;
             self.display_menu = true;
             return Ok(());
         }
@@ -44,21 +47,23 @@ impl PcbBoardCommand {
         let search_area = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
-            self.state.input_field(
-                if self.state.session.expert_mode {
-                    IceText::FileNumberExpertmode
-                } else {
-                    IceText::FileNumberNovice
-                },
-                40,
-                MASK_COMMAND,
-                &action.help,
-                None,
-                display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
-            )?
+            self.state
+                .input_field(
+                    if self.state.session.expert_mode {
+                        IceText::FileNumberExpertmode
+                    } else {
+                        IceText::FileNumberNovice
+                    },
+                    40,
+                    MASK_COMMAND,
+                    &action.help,
+                    None,
+                    display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
+                )
+                .await?
         };
         if search_area.is_empty() {
-            self.state.press_enter()?;
+            self.state.press_enter().await?;
             self.display_menu = true;
             return Ok(());
         }
@@ -71,7 +76,7 @@ impl PcbBoardCommand {
                     .list_security
                     .user_can_access(&self.state.session)
                 {
-                    self.pattern_search_file_area(action, area, search_pattern.clone())?;
+                    self.pattern_search_file_area(action, area, search_pattern.clone()).await?;
                 }
                 if self.state.session.cancel_batch {
                     break;
@@ -83,7 +88,7 @@ impl PcbBoardCommand {
                 let area = &self.state.session.current_conference.directories[number as usize - 1];
 
                 if area.list_security.user_can_access(&self.state.session) {
-                    self.pattern_search_file_area(action, number as usize - 1, search_pattern)?;
+                    self.pattern_search_file_area(action, number as usize - 1, search_pattern).await?;
                 }
 
                 joined = true;
@@ -93,33 +98,37 @@ impl PcbBoardCommand {
         if !joined {
             self.state.session.op_text = search_area;
             self.state
-                .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::NOTBLANK)?;
+                .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::NOTBLANK)
+                .await?;
         }
 
-        self.state.new_line()?;
-        self.state.press_enter()?;
+        self.state.new_line().await?;
+        self.state.press_enter().await?;
         self.display_menu = true;
         Ok(())
     }
 
-    fn pattern_search_file_area(&mut self, action: &Command, area: usize, search_pattern: String) -> Res<()> {
+    async fn pattern_search_file_area(&mut self, action: &Command, area: usize, search_pattern: String) -> Res<()> {
         let file_base_path = self.state.resolve_path(&self.state.session.current_conference.directories[area].file_base);
         let Ok(mut base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());
             self.state.session.op_text = self.state.session.current_conference.directories[area].file_base.to_str().unwrap().to_string();
             self.state
-                .display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                .display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
             return Ok(());
         };
 
-        self.state.display_text(IceText::ScanningDirectory, display_flags::DEFAULT)?;
-        self.state.print(TerminalTarget::Both, &format!(" {} ", area + 1))?;
-        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(10))?;
-        self.state.print(
-            TerminalTarget::Both,
-            &format!("({})", self.state.session.current_conference.directories[area].name),
-        )?;
-        self.state.new_line()?;
+        self.state.display_text(IceText::ScanningDirectory, display_flags::DEFAULT).await?;
+        self.state.print(TerminalTarget::Both, &format!(" {} ", area + 1)).await?;
+        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(10)).await?;
+        self.state
+            .print(
+                TerminalTarget::Both,
+                &format!("({})", self.state.session.current_conference.directories[area].name),
+            )
+            .await?;
+        self.state.new_line().await?;
         base.load_headers()?;
         let files = base.find_files_with_pattern(search_pattern.as_str())?;
 
@@ -128,7 +137,7 @@ impl PcbBoardCommand {
             files,
             help: &action.help,
         };
-        list.display_file_list(self)?;
+        list.display_file_list(self).await?;
 
         self.state.session.disable_auto_more = false;
         self.state.session.more_requested = false;

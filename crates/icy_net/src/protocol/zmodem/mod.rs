@@ -5,6 +5,7 @@ pub mod constants;
 
 use std::path::PathBuf;
 
+use async_trait::async_trait;
 pub use constants::*;
 mod headers;
 pub use headers::*;
@@ -48,8 +49,8 @@ impl Zmodem {
         }
     }
 
-    pub fn cancel(com: &mut dyn Connection) -> crate::Result<()> {
-        com.write_all(&ABORT_SEQ)?;
+    pub async fn cancel(com: &mut dyn Connection) -> crate::Result<()> {
+        com.send(&ABORT_SEQ).await?;
         Ok(())
     }
 
@@ -102,10 +103,10 @@ pub fn append_zdle_encoded(v: &mut Vec<u8>, data: &[u8], escape_ctl_chars: bool)
     }
 }
 
-pub fn read_zdle_bytes(com: &mut dyn Connection, length: usize) -> crate::Result<Vec<u8>> {
+pub async fn read_zdle_bytes(com: &mut dyn Connection, length: usize) -> crate::Result<Vec<u8>> {
     let mut data = Vec::new();
     for _ in 0..length {
-        let c = read_zdle_byte(com, false)?;
+        let c = read_zdle_byte(com, false).await?;
         if let rz::ZModemResult::Ok(b) = c {
             data.push(b);
         }
@@ -134,35 +135,36 @@ fn from_hex(n: u8) -> crate::Result<u8> {
     Err(ZModemError::HexNumberExpected.into())
 }
 
+#[async_trait]
 impl Protocol for Zmodem {
-    fn update_transfer(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
+    async fn update_transfer(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
         if let Some(rz) = &mut self.rz {
-            rz.update_transfer(com, transfer_state)?;
+            rz.update_transfer(com, transfer_state).await?;
             if !rz.is_active() {
                 transfer_state.is_finished = true;
             }
         } else if let Some(sz) = &mut self.sz {
-            sz.update_transfer(com, transfer_state)?;
+            sz.update_transfer(com, transfer_state).await?;
         }
         Ok(())
     }
 
-    fn initiate_send(&mut self, _com: &mut dyn Connection, files: &[PathBuf]) -> crate::Result<TransferState> {
+    async fn initiate_send(&mut self, _com: &mut dyn Connection, files: &[PathBuf]) -> crate::Result<TransferState> {
         let mut sz = Sz::new(self.block_length);
         sz.send(files);
         self.sz = Some(sz);
         Ok(TransferState::new(self.get_name().to_string()))
     }
 
-    fn initiate_recv(&mut self, com: &mut dyn Connection) -> crate::Result<TransferState> {
+    async fn initiate_recv(&mut self, com: &mut dyn Connection) -> crate::Result<TransferState> {
         let mut rz = Rz::new(self.block_length);
-        rz.recv(com)?;
+        rz.recv(com).await?;
         self.rz = Some(rz);
         Ok(TransferState::new(self.get_name().to_string()))
     }
 
-    fn cancel_transfer(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
-        com.write_all(&ABORT_SEQ)?;
+    async fn cancel_transfer(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
+        com.send(&ABORT_SEQ).await?;
         Ok(())
     }
 }

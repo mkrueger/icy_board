@@ -1,10 +1,14 @@
-use std::{
-    io::{self, ErrorKind, Read, Write},
+#![allow(dead_code)]
+
+use std::{io, time::Duration};
+
+use async_trait::async_trait;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpStream, ToSocketAddrs},
-    time::Duration,
 };
 
-use crate::{Connection, ConnectionType, NetError};
+use super::{Connection, ConnectionType};
 
 mod telnet_cmd;
 mod telnet_option;
@@ -53,29 +57,22 @@ pub struct TelnetConnection {
 }
 
 impl TelnetConnection {
-    pub fn open<A: ToSocketAddrs>(addr: &A, caps: TermCaps, timeout: Duration) -> crate::Result<Self> {
-        for mut addr in addr.to_socket_addrs()? {
-            if addr.port() == 0 {
-                addr.set_port(23);
-            }
-            let tcp_stream = TcpStream::connect_timeout(&addr, timeout)?;
-            tcp_stream.set_nonblocking(true)?;
-
-            tcp_stream.set_write_timeout(Some(timeout))?;
-            tcp_stream.set_read_timeout(Some(timeout))?;
-
-            return Ok(Self {
-                tcp_stream,
-                caps,
-                state: ParserState::Data,
-            });
+    pub async fn open<A: ToSocketAddrs>(addr: &A, caps: TermCaps, timeout: Duration) -> crate::Result<Self> {
+        let result = tokio::time::timeout(timeout, TcpStream::connect(addr)).await;
+        match result {
+            Ok(tcp_stream) => match tcp_stream {
+                Ok(tcp_stream) => Ok(Self {
+                    tcp_stream,
+                    caps,
+                    state: ParserState::Data,
+                }),
+                Err(err) => Err(Box::new(err)),
+            },
+            Err(err) => Err(Box::new(err)),
         }
-        Err(NetError::CouldNotConnect.into())
     }
 
     pub fn accept(tcp_stream: TcpStream) -> crate::Result<Self> {
-        tcp_stream.set_nonblocking(true)?;
-
         Ok(Self {
             tcp_stream,
             caps: TermCaps {
@@ -86,7 +83,7 @@ impl TelnetConnection {
         })
     }
 
-    fn parse(&mut self, data: &mut [u8]) -> io::Result<usize> {
+    async fn parse(&mut self, data: &mut [u8]) -> io::Result<usize> {
         let mut write_ptr = 0;
         for i in 0..data.len() {
             let b = data[i];
@@ -124,7 +121,7 @@ impl TelnetConnection {
                                     TerminalEmulation::Mode7 => buf.extend_from_slice(b"MODE7"),
                                 }
                                 buf.extend([telnet_cmd::IAC, telnet_cmd::SE]);
-                                self.tcp_stream.write_all(&buf)?;
+                                self.tcp_stream.write_all(&buf).await?;
                             }
                         }
                         24 => {
@@ -137,7 +134,7 @@ impl TelnetConnection {
                 ParserState::Iac => match telnet_cmd::check(b) {
                     Ok(telnet_cmd::AYT) => {
                         self.state = ParserState::Data;
-                        self.tcp_stream.write_all(&telnet_cmd::make_cmd(telnet_cmd::NOP))?;
+                        self.tcp_stream.write_all(&telnet_cmd::make_cmd(telnet_cmd::NOP)).await?;
                     }
                     Ok(telnet_cmd::SE | telnet_cmd::NOP | telnet_cmd::GA) => {
                         self.state = ParserState::Data;
@@ -176,19 +173,22 @@ impl TelnetConnection {
                     match telnet_option::check(b)? {
                         telnet_option::TRANSMIT_BINARY => {
                             self.tcp_stream
-                                .write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::DO, telnet_option::TRANSMIT_BINARY))?;
+                                .write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::DO, telnet_option::TRANSMIT_BINARY))
+                                .await?;
                         }
                         telnet_option::ECHO => {
                             self.tcp_stream
-                                .write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::DO, telnet_option::ECHO))?;
+                                .write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::DO, telnet_option::ECHO))
+                                .await?;
                         }
                         telnet_option::SUPPRESS_GO_AHEAD => {
                             self.tcp_stream
-                                .write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::DO, telnet_option::SUPPRESS_GO_AHEAD))?;
+                                .write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::DO, telnet_option::SUPPRESS_GO_AHEAD))
+                                .await?;
                         }
                         opt => {
                             log::warn!("unsupported will option {}", telnet_option::to_string(opt));
-                            self.tcp_stream.write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::DONT, opt))?;
+                            self.tcp_stream.write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::DONT, opt)).await?;
                         }
                     }
                 }
@@ -203,11 +203,13 @@ impl TelnetConnection {
                     match opt {
                         telnet_option::TRANSMIT_BINARY => {
                             self.tcp_stream
-                                .write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::WILL, telnet_option::TRANSMIT_BINARY))?;
+                                .write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::WILL, telnet_option::TRANSMIT_BINARY))
+                                .await?;
                         }
                         telnet_option::TERMINAL_TYPE => {
                             self.tcp_stream
-                                .write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::WILL, telnet_option::TERMINAL_TYPE))?;
+                                .write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::WILL, telnet_option::TERMINAL_TYPE))
+                                .await?;
                         }
                         telnet_option::NEGOTIATE_ABOUT_WINDOW_SIZE => {
                             // NAWS: send our current window size
@@ -217,11 +219,11 @@ impl TelnetConnection {
                             buf.extend(self.caps.window_size.1.to_be_bytes());
                             buf.push(telnet_cmd::IAC);
                             buf.push(telnet_cmd::SE);
-                            self.tcp_stream.write_all(&buf)?;
+                            self.tcp_stream.write_all(&buf).await?;
                         }
                         _ => {
                             log::warn!("unsupported do option {}", telnet_option::to_string(opt));
-                            self.tcp_stream.write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::WONT, opt))?;
+                            self.tcp_stream.write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::WONT, opt)).await?;
                         }
                     }
                 }
@@ -236,53 +238,55 @@ impl TelnetConnection {
     }
 }
 
+#[async_trait]
 impl Connection for TelnetConnection {
     fn get_connection_type(&self) -> ConnectionType {
         ConnectionType::Telnet
     }
 
-    fn shutdown(&mut self) -> crate::Result<()> {
-        self.tcp_stream.shutdown(std::net::Shutdown::Both)?;
-        Ok(())
-    }
-}
-
-impl Read for TelnetConnection {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self.tcp_stream.read(buf) {
+    async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        match self.tcp_stream.read(buf).await {
             Ok(size) => {
-                if size == 0 {
-                    return Ok(0);
+                for b in &buf[0..size] {
+                    if *b == 0 {
+                        println!("INPUT CONTAINS 0");
+                        break;
+                    }
                 }
-                let size = self.parse(&mut buf[..size])?;
-                Ok(size)
+                let result = self.parse(&mut buf[0..size]).await?;
+                for b in &buf[0..result] {
+                    if *b == 0 {
+                        println!("OUTPUT CONTAINS 0");
+                        break;
+                    }
+                }
+                println!("Received: {}/{}", size, result);
+                Ok(result)
             }
-            Err(ref e) => {
-                if e.kind() == ErrorKind::WouldBlock {
+            Err(err) => {
+                if err.kind() == io::ErrorKind::WouldBlock {
                     return Ok(0);
                 }
-                Err(io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")))
+                return Err(err.into());
             }
         }
     }
-}
 
-impl Write for TelnetConnection {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let mut data = Vec::with_capacity(buf.len());
+    async fn send(&mut self, buf: &[u8]) -> crate::Result<()> {
+        let mut dst = Vec::new();
         for b in buf {
             if *b == telnet_cmd::IAC {
-                data.extend_from_slice(&[telnet_cmd::IAC, telnet_cmd::IAC]);
+                dst.extend_from_slice(&[telnet_cmd::IAC, telnet_cmd::IAC]);
             } else {
-                data.push(*b);
+                dst.push(*b);
             }
         }
-        self.tcp_stream.write(&data)?;
 
-        Ok(buf.len())
+        self.tcp_stream.write_all(&dst).await?;
+        Ok(())
     }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.tcp_stream.flush()
+    async fn shutdown(&mut self) -> crate::Result<()> {
+        self.tcp_stream.shutdown().await?;
+        Ok(())
     }
 }

@@ -3,6 +3,7 @@ use crate::{
     Res,
 };
 
+use async_recursion::async_recursion;
 use bstr::{BString, ByteSlice};
 use icy_board_engine::{
     icy_board::{
@@ -16,47 +17,50 @@ use icy_board_engine::{
 use jamjam::jam::JamMessageBase;
 
 impl PcbBoardCommand {
-    pub fn quick_message_scan(&mut self, action: &Command) -> Res<()> {
+    pub async fn quick_message_scan(&mut self, action: &Command) -> Res<()> {
         self.state.set_activity(UserActivity::ReadMessages);
 
-        let Ok(Some(area)) = self.show_message_areas(action) else {
-            self.state.press_enter()?;
+        let Ok(Some(area)) = self.show_message_areas(action).await else {
+            self.state.press_enter().await?;
             self.display_menu = true;
             return Ok(());
         };
-        self.quick_message_scan_in_area(area, action)
+        self.quick_message_scan_in_area(area, action).await
     }
 
-    fn quick_message_scan_in_area(&mut self, area: usize, action: &Command) -> Res<()> {
+    #[async_recursion(?Send)]
+    async fn quick_message_scan_in_area(&mut self, area: usize, action: &Command) -> Res<()> {
         let message_base_file = &self.state.session.current_conference.areas[area].filename;
         let msgbase_file_resolved = self.state.board.lock().unwrap().resolve_file(message_base_file);
         match JamMessageBase::open(&msgbase_file_resolved) {
             Ok(message_base) => {
-                self.show_quick_scans(area, message_base, action)?;
+                self.show_quick_scans(area, message_base, action).await?;
                 Ok(())
             }
             Err(err) => {
                 log::error!("Message index load error {}", err);
                 log::error!("Creating new message index at {}", msgbase_file_resolved.display());
                 self.state
-                    .display_text(IceText::CreatingNewMessageIndex, display_flags::NEWLINE | display_flags::LFAFTER)?;
+                    .display_text(IceText::CreatingNewMessageIndex, display_flags::NEWLINE | display_flags::LFAFTER)
+                    .await?;
                 if JamMessageBase::create(msgbase_file_resolved).is_ok() {
                     log::error!("successfully created new message index.");
-                    return self.quick_message_scan_in_area(area, action);
+                    return self.quick_message_scan_in_area(area, action).await;
                 }
                 log::error!("failed to create message index.");
 
                 self.state
-                    .display_text(IceText::PathErrorInSystemConfiguration, display_flags::NEWLINE | display_flags::LFAFTER)?;
+                    .display_text(IceText::PathErrorInSystemConfiguration, display_flags::NEWLINE | display_flags::LFAFTER)
+                    .await?;
 
-                self.state.press_enter()?;
+                self.state.press_enter().await?;
                 self.display_menu = true;
                 Ok(())
             }
         }
     }
 
-    fn show_quick_scans(&mut self, area: usize, message_base: JamMessageBase, action: &Command) -> Res<()> {
+    async fn show_quick_scans(&mut self, area: usize, message_base: JamMessageBase, action: &Command) -> Res<()> {
         let prompt = if self.state.session.expert_mode {
             IceText::MessageScanCommandExpertmode
         } else {
@@ -64,14 +68,17 @@ impl PcbBoardCommand {
         };
         self.state.session.op_text = format!("{}-{}", message_base.base_messagenumber(), message_base.active_messages());
 
-        let text = self.state.input_field(
-            prompt,
-            40,
-            MASK_COMMAND,
-            &action.help,
-            None,
-            display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
-        )?;
+        let text = self
+            .state
+            .input_field(
+                prompt,
+                40,
+                MASK_COMMAND,
+                &action.help,
+                None,
+                display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
+            )
+            .await?;
         if text.is_empty() {
             return Ok(());
         }
@@ -79,24 +86,24 @@ impl PcbBoardCommand {
         let number = if let Ok(n) = text.parse::<u32>() {
             n
         } else {
-            self.state.display_text(IceText::InvalidEntry, display_flags::NEWLINE)?;
+            self.state.display_text(IceText::InvalidEntry, display_flags::NEWLINE).await?;
             return Ok(());
         };
 
         if number < 1 || number > message_base.active_messages() {
-            self.state.display_text(IceText::NoMailFound, display_flags::NEWLINE)?;
+            self.state.display_text(IceText::NoMailFound, display_flags::NEWLINE).await?;
             return Ok(());
         }
-        self.state.display_text(IceText::Scanning, display_flags::DEFAULT)?;
+        self.state.display_text(IceText::Scanning, display_flags::DEFAULT).await?;
         let conf = format!(
             "{}/{}",
             self.state.session.current_conference.name, self.state.session.current_conference.areas[area as usize].name
         );
-        self.state.println(TerminalTarget::Both, &conf)?;
+        self.state.println(TerminalTarget::Both, &conf).await?;
 
-        self.state.display_text(IceText::QuickScanHeader, display_flags::NEWLINE)?;
+        self.state.display_text(IceText::QuickScanHeader, display_flags::NEWLINE).await?;
 
-        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11))?;
+        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11)).await?;
         for i in number..message_base.active_messages() {
             match message_base.read_header(i) {
                 Ok(header) => {
@@ -126,24 +133,26 @@ impl PcbBoardCommand {
                         '-'
                     };
 
-                    self.state.println(
-                        TerminalTarget::Both,
-                        &format!(
-                            "{}{:<7} {:<7} {:<15} {:<15} {:<25}",
-                            status,
-                            header.message_number,
-                            if header.reply_to > 0 { header.reply_to.to_string() } else { "-".to_string() },
-                            get_str(header.get_to(), 15),
-                            get_str(header.get_from(), 15),
-                            get_str(header.get_subject(), 25)
-                        ),
-                    )?;
+                    self.state
+                        .println(
+                            TerminalTarget::Both,
+                            &format!(
+                                "{}{:<7} {:<7} {:<15} {:<15} {:<25}",
+                                status,
+                                header.message_number,
+                                if header.reply_to > 0 { header.reply_to.to_string() } else { "-".to_string() },
+                                get_str(header.get_to(), 15),
+                                get_str(header.get_from(), 15),
+                                get_str(header.get_subject(), 25)
+                            ),
+                        )
+                        .await?;
                 }
                 _ => continue,
             }
         }
 
-        self.read_msgs_from_base(message_base, action)
+        self.read_msgs_from_base(message_base, action).await
     }
 }
 

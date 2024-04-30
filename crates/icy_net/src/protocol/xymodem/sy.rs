@@ -65,7 +65,7 @@ impl Sy {
         matches!(self.send_state, SendState::None)
     }
 
-    pub fn update_transfer(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
+    pub async fn update_transfer(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
         transfer_state.update_time();
         let transfer_info = &mut transfer_state.send_state;
         transfer_info.check_size = self.configuration.get_check_and_size();
@@ -75,7 +75,7 @@ impl Sy {
             SendState::None => {}
             SendState::InitiateSend => {
                 transfer_state.current_state = "Initiate send…";
-                self.get_mode(com)?;
+                self.get_mode(com).await?;
                 if self.configuration.is_ymodem() {
                     self.send_state = SendState::SendYModemHeader(0);
                 } else {
@@ -95,18 +95,18 @@ impl Sy {
             SendState::SendYModemHeader(retries) => {
                 if retries > 3 {
                     transfer_state.current_state = "Too many retries...aborting";
-                    self.cancel(com)?;
+                    self.cancel(com).await?;
                     return Ok(());
                 }
                 self.block_number = 0;
                 //transfer_info.write("Send header...".to_string());
-                self.send_ymodem_header(com, transfer_state)?;
+                self.send_ymodem_header(com, transfer_state).await?;
                 self.send_state = SendState::AckSendYmodemHeader(retries);
             }
 
             SendState::AckSendYmodemHeader(retries) => {
                 // let now = Instant::now();
-                let ack = self.read_command(com)?;
+                let ack = self.read_command(com).await?;
                 if ack == NAK {
                     transfer_state.current_state = "Encountered error";
                     transfer_state.send_state.errors += 1;
@@ -123,7 +123,7 @@ impl Sy {
                         return Ok(());
                     }
                     transfer_state.current_state = "Header accepted.";
-                    let _ = self.read_command(com)?;
+                    let _ = self.read_command(com).await?;
                     // SKIP - not needed to check that
                     self.send_state = SendState::SendData(0);
                 }
@@ -139,10 +139,10 @@ impl Sy {
             }
             SendState::SendData(retries) => {
                 transfer_state.current_state = "Send data...";
-                if self.send_data_block(com, transfer_state)? {
+                if self.send_data_block(com, transfer_state).await? {
                     if self.configuration.is_streaming() {
                         self.send_state = SendState::SendData(0);
-                        self.check_eof(com, transfer_state)?;
+                        self.check_eof(com, transfer_state).await?;
                     } else {
                         self.send_state = SendState::AckSendData(retries);
                     }
@@ -151,10 +151,10 @@ impl Sy {
                 };
             }
             SendState::AckSendData(retries) => {
-                let ack = self.read_command(com)?;
+                let ack = self.read_command(com).await?;
                 if ack == CAN {
                     // need 2 CAN
-                    let can2 = self.read_command(com)?;
+                    let can2 = self.read_command(com).await?;
                     if can2 == CAN {
                         self.send_state = SendState::None;
                         //transfer_info.write("Got cancel ...".to_string());
@@ -173,20 +173,20 @@ impl Sy {
                     }
 
                     if retries > 5 {
-                        self.eot(com)?;
+                        self.eot(com).await?;
                         return Err(XYModemError::TooManyRetriesSendingHeader.into());
                     }
                     self.send_state = SendState::SendData(retries + 1);
                     return Ok(());
                 }
                 self.send_state = SendState::SendData(0);
-                self.check_eof(com, transfer_state)?;
+                self.check_eof(com, transfer_state).await?;
             }
             SendState::YModemEndHeader(step) => match step {
                 0 => {
-                    let read_command = self.read_command(com)?;
+                    let read_command = self.read_command(com).await?;
                     if read_command == NAK {
-                        com.write_all(&[EOT])?;
+                        com.send(&[EOT]).await?;
                         self.send_state = SendState::YModemEndHeader(1);
                         return Ok(());
                     }
@@ -194,21 +194,21 @@ impl Sy {
                         self.send_state = SendState::None;
                         return Ok(());
                     }
-                    self.cancel(com)?;
+                    self.cancel(com).await?;
                 }
                 1 => {
-                    if self.read_command(com)? == ACK {
+                    if self.read_command(com).await? == ACK {
                         self.send_state = SendState::YModemEndHeader(2);
                         return Ok(());
                     }
-                    self.cancel(com)?;
+                    self.cancel(com).await?;
                 }
                 2 => {
-                    if self.read_command(com)? == b'C' {
+                    if self.read_command(com).await? == b'C' {
                         self.send_state = SendState::SendYModemHeader(0);
                         return Ok(());
                     }
-                    self.cancel(com)?;
+                    self.cancel(com).await?;
                 }
                 _ => {
                     self.send_state = SendState::None;
@@ -218,11 +218,11 @@ impl Sy {
         Ok(())
     }
 
-    fn check_eof(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
+    async fn check_eof(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
         if transfer_state.send_state.cur_bytes_transfered >= transfer_state.send_state.file_size {
             transfer_state.send_state.finish_file(self.cur_file.clone());
 
-            self.eot(com)?;
+            self.eot(com).await?;
             if self.configuration.is_ymodem() {
                 self.send_state = SendState::YModemEndHeader(0);
             } else {
@@ -233,8 +233,8 @@ impl Sy {
     }
 
     #[allow(clippy::unused_self)]
-    fn read_command(&self, com: &mut dyn Connection) -> crate::Result<u8> {
-        let ch = com.read_u8()?;
+    async fn read_command(&self, com: &mut dyn Connection) -> crate::Result<u8> {
+        let ch = com.read_u8().await?;
         /*
          let cmd = match ch {
             b'C' => "[C]",
@@ -250,16 +250,16 @@ impl Sy {
     }
 
     #[allow(clippy::unused_self)]
-    fn eot(&self, com: &mut dyn Connection) -> crate::Result<usize> {
+    async fn eot(&self, com: &mut dyn Connection) -> crate::Result<usize> {
         // println!("[EOT]");
-        com.write_all(&[EOT])?;
-        self.read_command(com)?; // read ACK
+        com.send(&[EOT]).await?;
+        self.read_command(com).await?; // read ACK
 
         Ok(1)
     }
 
-    pub fn get_mode(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
-        let ch = self.read_command(com)?;
+    pub async fn get_mode(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
+        let ch = self.read_command(com).await?;
         match ch {
             NAK => {
                 self.configuration.checksum_mode = Checksum::Default;
@@ -282,7 +282,7 @@ impl Sy {
         }
     }
 
-    fn send_block(&mut self, com: &mut dyn Connection, data: &[u8], pad_byte: u8) -> crate::Result<()> {
+    async fn send_block(&mut self, com: &mut dyn Connection, data: &[u8], pad_byte: u8) -> crate::Result<()> {
         let block_len = if data.len() <= DEFAULT_BLOCK_LENGTH { SOH } else { STX };
         let mut block = Vec::new();
         block.push(block_len);
@@ -302,12 +302,12 @@ impl Sy {
             }
         }
         // println!("Send block {:X?}", block);
-        com.write_all(&block)?;
+        com.send(&block).await?;
         self.block_number = self.block_number.wrapping_add(1);
         Ok(())
     }
 
-    fn send_ymodem_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
+    async fn send_ymodem_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
         if let Some(next_file) = self.file_queue.pop_front() {
             // restart from 0
             let mut block = Vec::new();
@@ -322,19 +322,19 @@ impl Sy {
             self.cur_file = next_file.clone();
             let reader = BufReader::new(File::open(next_file)?);
             self.cur_buf = Some(reader);
-            self.send_block(com, &block, 0)?;
+            self.send_block(com, &block, 0).await?;
             Ok(())
         } else {
-            self.end_ymodem(com)?;
+            self.end_ymodem(com).await?;
             Ok(())
         }
     }
 
-    fn send_data_block(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<bool> {
+    async fn send_data_block(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<bool> {
         if let Some(cur) = &mut self.cur_buf {
             let mut block = vec![CPMEOF; self.configuration.block_length];
             let bytes = cur.read(&mut block)?;
-            self.send_block(com, &block[0..bytes], CPMEOF)?;
+            self.send_block(com, &block[0..bytes], CPMEOF).await?;
             transfer_state.send_state.total_bytes_transfered += bytes as u64;
             transfer_state.send_state.cur_bytes_transfered += bytes as u64;
 
@@ -344,9 +344,10 @@ impl Sy {
         }
     }
 
-    pub fn cancel(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
+    pub async fn cancel(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
         self.send_state = SendState::None;
-        super::cancel(com)
+        com.send(&[CAN, CAN, CAN, CAN, CAN, CAN]).await?;
+        Ok(())
     }
 
     pub fn send(&mut self, files: &[PathBuf]) {
@@ -356,8 +357,8 @@ impl Sy {
         }
     }
 
-    pub fn end_ymodem(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
-        self.send_block(com, &[0], 0)?;
+    pub async fn end_ymodem(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
+        self.send_block(com, &[0], 0).await?;
         self.transfer_stopped = true;
         Ok(())
     }

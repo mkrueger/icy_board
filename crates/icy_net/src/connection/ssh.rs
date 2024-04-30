@@ -32,7 +32,6 @@ impl SSHConnection {
             if port == 0 {
                 port = Self::default_port();
             }
-            println!("Connecting to {}:{}", host, port);
             session.set_option(SshOption::Hostname(host))?;
             session.set_option(SshOption::Port(port))?;
             session.set_option(SshOption::KeyExchange(SUPPORTED_KEY_EXCHANGES.to_string()))?;
@@ -44,7 +43,6 @@ impl SSHConnection {
             session.connect()?;
 
             //  :TODO: SECURITY: verify_known_hosts() implemented here -- ie: user must accept & we save somewhere
-            println!("User auth password: {} {}", credentials.user_name, credentials.password);
             session.userauth_password(Some(credentials.user_name.as_str()), Some(credentials.password.as_str()))?;
 
             let chan = session.new_channel()?;
@@ -53,7 +51,6 @@ impl SSHConnection {
             chan.request_pty(terminal_type.as_str(), caps.window_size.0 as u32, caps.window_size.1 as u32)?;
             chan.request_shell()?;
             session.set_blocking(false);
-            println!("initiating sessin !!!!");
             return Ok(Self {
                 session,
                 channel: Arc::new(Mutex::new(chan)),

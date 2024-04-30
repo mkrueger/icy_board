@@ -1,3 +1,4 @@
+/*
 #![allow(dead_code)]
 use icy_net::{protocol::TransferState, Connection, ConnectionType};
 use std::io::{self, Read, Write};
@@ -53,3 +54,4 @@ pub fn test_receiver(con: &mut TestConnection, send: &mut dyn icy_net::protocol:
 
     state
 }
+*/

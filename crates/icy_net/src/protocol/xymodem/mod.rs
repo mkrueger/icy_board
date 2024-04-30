@@ -9,6 +9,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use async_trait::async_trait;
+
 use crate::Connection;
 
 use self::{
@@ -85,19 +87,20 @@ impl XYmodem {
     }
 }
 
+#[async_trait]
 impl super::Protocol for XYmodem {
-    fn update_transfer(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
+    async fn update_transfer(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
         if let Some(ry) = &mut self.ry {
-            ry.update_transfer(com, transfer_state)?;
+            ry.update_transfer(com, transfer_state).await?;
             transfer_state.is_finished = ry.is_finished();
         } else if let Some(sy) = &mut self.sy {
-            sy.update_transfer(com, transfer_state)?;
+            sy.update_transfer(com, transfer_state).await?;
             transfer_state.is_finished = sy.is_finished();
         }
         Ok(())
     }
 
-    fn initiate_send(&mut self, _com: &mut dyn Connection, files: &[PathBuf]) -> crate::Result<TransferState> {
+    async fn initiate_send(&mut self, _com: &mut dyn Connection, files: &[PathBuf]) -> crate::Result<TransferState> {
         if !self.config.is_ymodem() && files.len() != 1 {
             return Err(XYModemError::XModem1File.into());
         }
@@ -108,22 +111,18 @@ impl super::Protocol for XYmodem {
         Ok(TransferState::new(self.config.get_protocol_name().to_string()))
     }
 
-    fn initiate_recv(&mut self, com: &mut dyn Connection) -> crate::Result<TransferState> {
+    async fn initiate_recv(&mut self, com: &mut dyn Connection) -> crate::Result<TransferState> {
         let mut ry = ry::Ry::new(self.config);
-        ry.recv(com)?;
+        ry.recv(com).await?;
         self.ry = Some(ry);
 
         Ok(TransferState::new(self.config.get_protocol_name().to_string()))
     }
 
-    fn cancel_transfer(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
-        cancel(com)
+    async fn cancel_transfer(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
+        com.send(&[CAN, CAN, CAN, CAN, CAN, CAN]).await?;
+        Ok(())
     }
-}
-
-fn cancel(com: &mut dyn Connection) -> crate::Result<()> {
-    com.write_all(&[CAN, CAN, CAN, CAN, CAN, CAN])?;
-    Ok(())
 }
 
 fn get_checksum(block: &[u8]) -> u8 {

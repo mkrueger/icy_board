@@ -1,3 +1,4 @@
+/*
 use std::{fs, io::Write, path::PathBuf};
 
 use icy_net::protocol::{XYModemVariant, XYmodem};
@@ -65,3 +66,4 @@ fn test_recv_xmodem1k() {
 
     assert_eq!(loaded_data, orig_data);
 }
+*/

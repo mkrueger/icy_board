@@ -2,11 +2,12 @@ use crate::{menu_runner::PcbBoardCommand, Res};
 use icy_board_engine::icy_board::{icb_text::IceText, state::functions::display_flags};
 
 impl PcbBoardCommand {
-    pub fn abandon_conference(&mut self) -> Res<()> {
+    pub async fn abandon_conference(&mut self) -> Res<()> {
         if self.state.board.lock().unwrap().conferences.is_empty() {
             self.state
-                .display_text(IceText::NoConferenceAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
-            self.state.press_enter()?;
+                .display_text(IceText::NoConferenceAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            self.state.press_enter().await?;
             return Ok(());
         }
         if self.state.session.current_conference_number > 0 {
@@ -16,9 +17,10 @@ impl PcbBoardCommand {
             );
             self.state.join_conference(0);
             self.state
-                .display_text(IceText::ConferenceAbandoned, display_flags::NEWLINE | display_flags::NOTBLANK)?;
-            self.state.new_line()?;
-            self.state.press_enter()?;
+                .display_text(IceText::ConferenceAbandoned, display_flags::NEWLINE | display_flags::NOTBLANK)
+                .await?;
+            self.state.new_line().await?;
+            self.state.press_enter().await?;
         }
         self.display_menu = true;
         Ok(())

@@ -3,7 +3,6 @@ use std::{
     collections::{HashMap, HashSet, VecDeque},
     fmt::Alignment,
     fs,
-    io::{Read, Write},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     thread,
@@ -11,6 +10,7 @@ use std::{
 };
 
 use crate::{executable::Executable, Res};
+use async_recursion::async_recursion;
 use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use codepages::tables::UNICODE_TO_CP437;
 use icy_engine::ansi;
@@ -311,7 +311,7 @@ pub struct NodeState {
     pub enabled_chat: bool,
     pub node_number: usize,
     pub connection_type: ConnectionType,
-    pub handle: Option<thread::JoinHandle<Result<(), String>>>,
+    pub handle: Option<thread::JoinHandle<()>>,
 }
 
 impl NodeState {
@@ -447,19 +447,19 @@ impl IcyBoardState {
         // TODO: Check time left.
     }
 
-    pub fn reset_color(&mut self) -> Res<()> {
+    pub async fn reset_color(&mut self) -> Res<()> {
         let color = self.board.lock().unwrap().config.color_configuration.default.clone();
-        self.set_color(TerminalTarget::Both, color)
+        self.set_color(TerminalTarget::Both, color).await
     }
 
-    pub fn clear_screen(&mut self) -> Res<()> {
+    pub async fn clear_screen(&mut self) -> Res<()> {
         match self.session.disp_options.grapics_mode {
             GraphicsMode::Ctty | GraphicsMode::Avatar => {
                 // form feed character
-                self.print(TerminalTarget::Both, "\x0C")?;
+                self.print(TerminalTarget::Both, "\x0C").await?;
             }
             GraphicsMode::Ansi => {
-                self.print(TerminalTarget::Both, "\x1B[2J\x1B[H")?;
+                self.print(TerminalTarget::Both, "\x1B[2J\x1B[H").await?;
             }
             _ => {
                 // ignore
@@ -468,29 +468,29 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub fn clear_line(&mut self) -> Res<()> {
+    pub async fn clear_line(&mut self) -> Res<()> {
         if self.use_ansi() {
-            self.print(TerminalTarget::Both, "\r\x1B[K")
+            self.print(TerminalTarget::Both, "\r\x1B[K").await
         } else {
             // TODO
             Ok(())
         }
     }
 
-    pub fn clear_eol(&mut self) -> Res<()> {
+    pub async fn clear_eol(&mut self) -> Res<()> {
         match self.session.disp_options.grapics_mode {
             GraphicsMode::Ctty => {
                 let x = self.user_screen.buffer.get_width() - self.user_screen.caret.get_position().x;
                 for _ in 0..x {
-                    self.print(TerminalTarget::Both, " ")?;
+                    self.print(TerminalTarget::Both, " ").await?;
                 }
                 for _ in 0..x {
-                    self.print(TerminalTarget::Both, "\x08")?;
+                    self.print(TerminalTarget::Both, "\x08").await?;
                 }
                 Ok(())
             }
-            GraphicsMode::Ansi | GraphicsMode::Avatar => self.print(TerminalTarget::Both, "\x1B[K"),
-            GraphicsMode::Rip => self.print(TerminalTarget::Both, "\x1B[K"),
+            GraphicsMode::Ansi | GraphicsMode::Avatar => self.print(TerminalTarget::Both, "\x1B[K").await,
+            GraphicsMode::Rip => self.print(TerminalTarget::Both, "\x1B[K").await,
         }
     }
 
@@ -503,7 +503,8 @@ impl IcyBoardState {
         }
     }
 
-    fn next_line(&mut self) -> Res<bool> {
+    #[async_recursion(?Send)]
+    async fn next_line(&mut self) -> Res<bool> {
         if self.session.disp_options.non_stop {
             return Ok(true);
         }
@@ -516,29 +517,31 @@ impl IcyBoardState {
         self.session.last_new_line_y = cur_y;
 
         if self.session.page_len > 0 && self.session.num_lines_printed >= self.session.page_len as usize {
-            self.more_promt()
+            self.more_promt().await
         } else {
             Ok(true)
         }
     }
 
-    pub fn run_ppe<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>) -> Res<()> {
+    pub async fn run_ppe<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>) -> Res<()> {
         match Executable::read_file(&file_name, false) {
             Ok(executable) => {
                 let path = PathBuf::from(file_name.as_ref());
                 let parent = path.parent().unwrap().to_str().unwrap().to_string();
 
                 let mut io = DiskIO::new(&parent, answer_file);
-                if let Err(err) = run(file_name, &executable, &mut io, self) {
+                if let Err(err) = run(file_name, &executable, &mut io, self).await {
                     log::error!("Error executing PPE {}: {}", file_name.as_ref().display(), err);
                     self.session.op_text = format!("{}", err);
-                    self.display_text(IceText::ErrorExecPPE, display_flags::LFBEFORE | display_flags::LFAFTER)?;
+                    self.display_text(IceText::ErrorExecPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
+                        .await?;
                 }
             }
             Err(err) => {
                 log::error!("Error loading PPE {}: {}", file_name.as_ref().display(), err);
                 self.session.op_text = format!("{}", err);
-                self.display_text(IceText::ErrorLoadingPPE, display_flags::LFBEFORE | display_flags::LFAFTER)?;
+                self.display_text(IceText::ErrorLoadingPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
+                    .await?;
             }
         }
 
@@ -811,70 +814,74 @@ impl IcyBoardState {
     }
 
     /// # Errors
-    pub fn gotoxy(&mut self, target: TerminalTarget, x: i32, y: i32) -> Res<()> {
+    pub async fn gotoxy(&mut self, target: TerminalTarget, x: i32, y: i32) -> Res<()> {
         match self.session.disp_options.grapics_mode {
             GraphicsMode::Ctty => {
                 // ignore
             }
             GraphicsMode::Ansi => {
-                self.print(target, &format!("\x1B[{};{}H", y, x))?;
+                self.print(target, &format!("\x1B[{};{}H", y, x)).await?;
             }
             GraphicsMode::Avatar => {
-                self.print(target, &format!("\x16\x08{}{}", (x as u8) as char, (y as u8) as char))?;
+                self.print(target, &format!("\x16\x08{}{}", (x as u8) as char, (y as u8) as char)).await?;
             }
             GraphicsMode::Rip => {
-                self.print(target, &format!("\x1B[{};{}H", y, x))?;
+                self.print(target, &format!("\x1B[{};{}H", y, x)).await?;
             }
         }
 
         Ok(())
     }
 
-    pub fn backward(&mut self, chars: i32) -> Res<()> {
+    pub async fn backward(&mut self, chars: i32) -> Res<()> {
         if self.use_ansi() {
             self.write_raw(TerminalTarget::Both, format!("\x1B[{}D", chars).chars().collect::<Vec<char>>().as_slice())
+                .await
         } else {
             Ok(())
         }
     }
 
-    pub fn forward(&mut self, chars: i32) -> Res<()> {
+    pub async fn forward(&mut self, chars: i32) -> Res<()> {
         if self.use_ansi() {
             self.write_raw(TerminalTarget::Both, format!("\x1B[{}C", chars).chars().collect::<Vec<char>>().as_slice())
+                .await
         } else {
             Ok(())
         }
     }
 
-    pub fn up(&mut self, chars: i32) -> Res<()> {
+    pub async fn up(&mut self, chars: i32) -> Res<()> {
         if self.use_ansi() {
             self.write_raw(TerminalTarget::Both, format!("\x1B[{}A", chars).chars().collect::<Vec<char>>().as_slice())
+                .await
         } else {
             Ok(())
         }
     }
 
-    pub fn down(&mut self, chars: i32) -> Res<()> {
+    pub async fn down(&mut self, chars: i32) -> Res<()> {
         if self.use_ansi() {
             self.write_raw(TerminalTarget::Both, format!("\x1B[{}B", chars).chars().collect::<Vec<char>>().as_slice())
+                .await
         } else {
             Ok(())
         }
     }
 
     /// # Errors
-    pub fn print(&mut self, target: TerminalTarget, str: &str) -> Res<()> {
-        self.write_raw(target, str.chars().collect::<Vec<char>>().as_slice())
+    pub async fn print(&mut self, target: TerminalTarget, str: &str) -> Res<()> {
+        self.write_raw(target, str.chars().collect::<Vec<char>>().as_slice()).await
     }
 
-    pub fn println(&mut self, target: TerminalTarget, str: &str) -> Res<()> {
+    pub async fn println(&mut self, target: TerminalTarget, str: &str) -> Res<()> {
         let mut line = str.chars().collect::<Vec<char>>();
         line.push('\r');
         line.push('\n');
-        self.write_raw(target, line.as_slice())
+        self.write_raw(target, line.as_slice()).await
     }
 
-    fn write_chars(&mut self, target: TerminalTarget, data: &[char]) -> Res<()> {
+    async fn write_chars(&mut self, target: TerminalTarget, data: &[char]) -> Res<()> {
         let mut user_bytes = Vec::new();
         let mut sysop_bytes = Vec::new();
 
@@ -882,7 +889,7 @@ impl IcyBoardState {
             if target != TerminalTarget::Sysop || self.session.is_sysop {
                 let _ = self.user_screen.print_char(*c);
                 if *c == '\n' {
-                    self.next_line()?;
+                    self.next_line().await?;
                 }
                 if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
                     user_bytes.push(cp437);
@@ -901,7 +908,7 @@ impl IcyBoardState {
         }
 
         if target != TerminalTarget::Sysop || self.session.is_sysop {
-            self.connection.write_all(&user_bytes)?;
+            self.connection.send(&user_bytes).await?;
         }
 
         if target != TerminalTarget::User {
@@ -909,7 +916,7 @@ impl IcyBoardState {
             if let Ok(node_state) = self.node_state.lock() {
                 if let Ok(connections) = &mut node_state[self.node].as_ref().unwrap().connections.lock() {
                     for conn in connections.iter_mut() {
-                        let _ = conn.write_all(&sysop_bytes);
+                        let _ = conn.send(&sysop_bytes).await;
                     }
                 }
             }
@@ -926,7 +933,7 @@ impl IcyBoardState {
     }
 
     /// # Errors
-    pub fn write_raw(&mut self, target: TerminalTarget, data: &[char]) -> Res<()> {
+    pub async fn write_raw(&mut self, target: TerminalTarget, data: &[char]) -> Res<()> {
         if self.session.disp_options.display_text {
             let mut state = PcbState::Default;
 
@@ -939,14 +946,14 @@ impl IcyBoardState {
                         if *c == '@' {
                             state = PcbState::GotAt;
                         } else {
-                            self.write_chars(target, &[*c])?;
+                            self.write_chars(target, &[*c]).await?;
                         }
                     }
                     PcbState::GotAt => {
                         if *c == 'X' || *c == 'x' {
                             state = PcbState::ReadColor1;
                         } else if *c == '@' {
-                            self.write_chars(target, &[*c])?;
+                            self.write_chars(target, &[*c]).await?;
                             state = PcbState::GotAt;
                         } else {
                             state = PcbState::ReadAtSequence(c.to_string());
@@ -954,18 +961,18 @@ impl IcyBoardState {
                     }
                     PcbState::ReadAtSequence(s) => {
                         if c.is_whitespace() {
-                            self.write_chars(target, &['@'])?;
-                            self.write_chars(target, s.chars().collect::<Vec<char>>().as_slice())?;
+                            self.write_chars(target, &['@']).await?;
+                            self.write_chars(target, s.chars().collect::<Vec<char>>().as_slice()).await?;
                             state = PcbState::Default;
                         } else if *c == '@' {
                             state = PcbState::Default;
                             if let Some(output) = self.translate_variable(target, &s) {
                                 if output.len() == 0 {
-                                    self.write_chars(target, &['@'])?;
-                                    self.write_chars(target, s.chars().collect::<Vec<char>>().as_slice())?;
+                                    self.write_chars(target, &['@']).await?;
+                                    self.write_chars(target, s.chars().collect::<Vec<char>>().as_slice()).await?;
                                     state = PcbState::GotAt;
                                 } else {
-                                    self.write_chars(target, output.chars().collect::<Vec<char>>().as_slice())?;
+                                    self.write_chars(target, output.chars().collect::<Vec<char>>().as_slice()).await?;
                                 }
                             }
                         } else {
@@ -976,23 +983,23 @@ impl IcyBoardState {
                         if c.is_ascii_hexdigit() {
                             state = PcbState::ReadColor2(*c);
                         } else {
-                            self.write_chars(target, &['@', *c])?;
+                            self.write_chars(target, &['@', *c]).await?;
                             state = PcbState::Default;
                         }
                     }
                     PcbState::ReadColor2(ch1) => {
                         state = PcbState::Default;
                         if !c.is_ascii_hexdigit() {
-                            self.write_chars(target, &['@', ch1, *c])?;
+                            self.write_chars(target, &['@', ch1, *c]).await?;
                         } else {
                             let color = (c.to_digit(16).unwrap() | (ch1.to_digit(16).unwrap() << 4)) as u8;
 
                             if color == 0 {
                                 self.session.saved_color = self.cur_color();
                             } else if color == 0xFF {
-                                self.set_color(target, self.cur_color())?;
+                                self.set_color(target, self.cur_color()).await?;
                             } else {
-                                self.set_color(target, color.into())?;
+                                self.set_color(target, color.into()).await?;
                             }
                         }
                     }
@@ -1002,12 +1009,12 @@ impl IcyBoardState {
             if state != PcbState::Default {
                 match state {
                     PcbState::Default => {}
-                    PcbState::GotAt => self.write_chars(target, &['@'])?,
-                    PcbState::ReadColor1 => self.write_chars(target, &['@', *data.last().unwrap()])?,
-                    PcbState::ReadColor2(ch1) => self.write_chars(target, &['@', ch1, *data.last().unwrap()])?,
+                    PcbState::GotAt => self.write_chars(target, &['@']).await?,
+                    PcbState::ReadColor1 => self.write_chars(target, &['@', *data.last().unwrap()]).await?,
+                    PcbState::ReadColor2(ch1) => self.write_chars(target, &['@', ch1, *data.last().unwrap()]).await?,
                     PcbState::ReadAtSequence(s) => {
-                        self.write_chars(target, &['@'])?;
-                        self.write_chars(target, s.chars().collect::<Vec<char>>().as_slice())?;
+                        self.write_chars(target, &['@']).await?;
+                        self.write_chars(target, s.chars().collect::<Vec<char>>().as_slice()).await?;
                     }
                 }
             }
@@ -1322,19 +1329,19 @@ impl IcyBoardState {
     }
 
     /// # Errors
-    pub fn get_char(&mut self) -> Res<Option<KeyChar>> {
+    pub async fn get_char(&mut self) -> Res<Option<KeyChar>> {
         if let Some(ch) = self.char_buffer.pop_front() {
             return Ok(Some(ch));
         }
         let mut key_data = [0; 1];
-        let size = self.connection.read(&mut key_data)?;
+        let size = self.connection.read(&mut key_data).await?;
         if size == 1 {
             return Ok(Some(KeyChar::new(KeySource::User, key_data[0] as char)));
         }
         if let Ok(node_state) = &self.node_state.lock() {
             if let Ok(connections) = &mut node_state[self.node].as_ref().unwrap().connections.lock() {
                 for conn in connections.iter_mut() {
-                    let size = conn.read(&mut key_data)?;
+                    let size = conn.read(&mut key_data).await?;
                     if size == 1 {
                         return Ok(Some(KeyChar::new(KeySource::Sysop, key_data[0] as char)));
                     }
@@ -1355,7 +1362,7 @@ impl IcyBoardState {
         IcbColor::Dos(attr)
     }
 
-    pub fn set_color(&mut self, target: TerminalTarget, color: IcbColor) -> Res<()> {
+    pub async fn set_color(&mut self, target: TerminalTarget, color: IcbColor) -> Res<()> {
         if !self.use_graphics() {
             return Ok(());
         }
@@ -1377,7 +1384,7 @@ impl IcyBoardState {
         if self.session.disp_options.grapics_mode == GraphicsMode::Avatar {
             if let IcbColor::Dos(color) = color {
                 let color_change = format!("\x16\x01{}", color as char);
-                return self.write_chars(target, color_change.chars().collect::<Vec<char>>().as_slice());
+                return self.write_chars(target, color_change.chars().collect::<Vec<char>>().as_slice()).await;
             }
         }
 
@@ -1410,7 +1417,7 @@ impl IcyBoardState {
 
         color_change.pop();
         color_change += "m";
-        self.write_chars(target, color_change.chars().collect::<Vec<char>>().as_slice())
+        self.write_chars(target, color_change.chars().collect::<Vec<char>>().as_slice()).await
     }
 
     pub fn get_caret_position(&mut self) -> (i32, i32) {
@@ -1418,7 +1425,7 @@ impl IcyBoardState {
     }
 
     /// # Errors
-    pub fn goodbye(&mut self) -> Res<()> {
+    pub async fn goodbye(&mut self) -> Res<()> {
         /*   if HangupType::Hangup != hangup_type {
 
             if HangupType::Goodbye == hangup_type {
@@ -1436,8 +1443,9 @@ impl IcyBoardState {
 
 
         } */
-        self.display_text(IceText::ThanksForCalling, display_flags::LFBEFORE | display_flags::NEWLINE)?;
-        self.reset_color()?;
+        self.display_text(IceText::ThanksForCalling, display_flags::LFBEFORE | display_flags::NEWLINE)
+            .await?;
+        self.reset_color().await?;
 
         self.hangup()
     }
@@ -1448,36 +1456,38 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub fn bell(&mut self) -> Res<()> {
+    pub async fn bell(&mut self) -> Res<()> {
         log::warn!("beeep {}", Backtrace::force_capture());
-        self.write_raw(TerminalTarget::Both, &['\x07'])
+        self.write_raw(TerminalTarget::Both, &['\x07']).await
     }
 
-    pub fn more_promt(&mut self) -> Res<bool> {
+    pub async fn more_promt(&mut self) -> Res<bool> {
         if self.session.disable_auto_more {
             self.session.more_requested = true;
             return Ok(true);
         }
-        let result = self.input_field(
-            IceText::MorePrompt,
-            12,
-            "",
-            "HLPMORE",
-            None,
-            display_flags::YESNO | display_flags::UPCASE | display_flags::STACKED | display_flags::ERASELINE,
-        )?;
+        let result = self
+            .input_field(
+                IceText::MorePrompt,
+                12,
+                "",
+                "HLPMORE",
+                None,
+                display_flags::YESNO | display_flags::UPCASE | display_flags::STACKED | display_flags::ERASELINE,
+            )
+            .await?;
         Ok(result != "N")
     }
 
-    pub fn press_enter(&mut self) -> Res<()> {
+    pub async fn press_enter(&mut self) -> Res<()> {
         self.session.disable_auto_more = true;
         self.session.more_requested = false;
-        self.input_field(IceText::PressEnter, 0, "", "", None, display_flags::ERASELINE)?;
+        self.input_field(IceText::PressEnter, 0, "", "", None, display_flags::ERASELINE).await?;
         Ok(())
     }
 
-    pub fn new_line(&mut self) -> Res<()> {
-        self.write_raw(TerminalTarget::Both, &['\r', '\n'])
+    pub async fn new_line(&mut self) -> Res<()> {
+        self.write_raw(TerminalTarget::Both, &['\r', '\n']).await
     }
 
     pub fn format_date(&self, date_time: DateTime<Utc>) -> String {

@@ -15,7 +15,7 @@ const O_RW: i32 = 2;
 const O_WR: i32 = 1;
 const O_APPEND: i32 = 4;
 
-pub trait PCBoardIO {
+pub trait PCBoardIO: Send {
     /// Open a file for append access
     /// channel - integer expression with the channel to use for the file
     /// file - file name to open

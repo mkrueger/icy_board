@@ -124,11 +124,11 @@ impl MessageViewer {
         result
     }
 
-    pub fn display_header(&self, state: &mut IcyBoardState, msg_base: &JamMessageBase, header: &JamMessageHeader) -> Res<()> {
-        state.clear_screen()?;
+    pub async fn display_header(&self, state: &mut IcyBoardState, msg_base: &JamMessageBase, header: &JamMessageHeader) -> Res<()> {
+        state.clear_screen().await?;
 
         let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_date.clone();
-        state.set_color(TerminalTarget::Both, c1)?;
+        state.set_color(TerminalTarget::Both, c1).await?;
         let time = if let Some(dt) = chrono::DateTime::from_timestamp(header.date_written as i64, 0) {
             dt.to_string()
         } else {
@@ -147,25 +147,25 @@ impl MessageViewer {
             }
         );
         let txt = self.format_hdr_text(&self.date_num.text, &time, &msg_counter);
-        state.print(TerminalTarget::Both, &txt)?;
+        state.print(TerminalTarget::Both, &txt).await?;
 
         let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_to.clone();
-        state.set_color(TerminalTarget::Both, c1)?;
+        state.set_color(TerminalTarget::Both, c1).await?;
         let txt = self.format_hdr_text(&self.to_line.text, &header.get_to().unwrap().to_string(), "");
-        state.print(TerminalTarget::Both, &txt)?;
+        state.print(TerminalTarget::Both, &txt).await?;
 
         let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_from.clone();
-        state.set_color(TerminalTarget::Both, c1)?;
+        state.set_color(TerminalTarget::Both, c1).await?;
         let txt = self.format_hdr_text(&self.from_line.text, &header.get_from().unwrap().to_string(), "");
-        state.print(TerminalTarget::Both, &txt)?;
+        state.print(TerminalTarget::Both, &txt).await?;
 
         let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_subj.clone();
-        state.set_color(TerminalTarget::Both, c1)?;
+        state.set_color(TerminalTarget::Both, c1).await?;
         let txt = self.format_hdr_text(&self.subj_line.text, &header.get_subject().unwrap().to_string(), "");
-        state.print(TerminalTarget::Both, &txt)?;
+        state.print(TerminalTarget::Both, &txt).await?;
 
         let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_read.clone();
-        state.set_color(TerminalTarget::Both, c1)?;
+        state.set_color(TerminalTarget::Both, c1).await?;
         /*        let txt = self.format_hdr_text(&self.read.text, "", "");
                 state.print(TerminalTarget::Both, &txt)?;
         */
@@ -176,27 +176,28 @@ impl MessageViewer {
             &state.session.current_conference.name,
             &state.session.current_conference.areas[area].name,
         );
-        state.print(TerminalTarget::Both, &txt)?;
-        state.reset_color()?;
+        state.print(TerminalTarget::Both, &txt).await?;
+        state.reset_color().await?;
 
         Ok(())
     }
 
-    fn display_body(&self, state: &mut IcyBoardState, text: &str) -> Res<()> {
-        state.print(TerminalTarget::Both, text)
+    async fn display_body(&self, state: &mut IcyBoardState, text: &str) -> Res<()> {
+        state.print(TerminalTarget::Both, text).await
     }
 }
 
 impl PcbBoardCommand {
-    pub fn show_message_areas(&mut self, action: &Command) -> Res<Option<usize>> {
+    pub async fn show_message_areas(&mut self, action: &Command) -> Res<Option<usize>> {
         self.state.set_activity(UserActivity::BrowseFiles);
         self.state.session.disable_auto_more = false;
         self.state.session.more_requested = false;
 
         if self.state.session.current_conference.areas.is_empty() {
             self.state
-                .display_text(IceText::NoAreasAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
-            self.state.press_enter()?;
+                .display_text(IceText::NoAreasAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            self.state.press_enter().await?;
             return Ok(None);
         }
         let area_number = if let Some(token) = self.state.session.tokens.pop_front() {
@@ -204,21 +205,23 @@ impl PcbBoardCommand {
         } else {
             let mnu = self.state.session.current_conference.area_menu.clone();
             let mnu = self.state.resolve_path(&mnu);
-            self.state.display_menu(&mnu)?;
-            self.state.new_line()?;
+            self.state.display_menu(&mnu).await?;
+            self.state.new_line().await?;
 
-            self.state.input_field(
-                if self.state.session.expert_mode {
-                    IceText::AreaListCommandExpert
-                } else {
-                    IceText::AreaListCommand
-                },
-                40,
-                MASK_COMMAND,
-                &action.help,
-                None,
-                display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
-            )?
+            self.state
+                .input_field(
+                    if self.state.session.expert_mode {
+                        IceText::AreaListCommandExpert
+                    } else {
+                        IceText::AreaListCommand
+                    },
+                    40,
+                    MASK_COMMAND,
+                    &action.help,
+                    None,
+                    display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
+                )
+                .await?
         };
 
         if !area_number.is_empty() {
@@ -233,12 +236,13 @@ impl PcbBoardCommand {
 
             self.state.session.op_text = area_number;
             self.state
-                .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::NOTBLANK)?;
+                .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::NOTBLANK)
+                .await?;
         }
         Ok(None)
     }
 
-    pub fn read_msgs_from_base(&mut self, message_base: JamMessageBase, action: &Command) -> Res<()> {
+    pub async fn read_msgs_from_base(&mut self, message_base: JamMessageBase, action: &Command) -> Res<()> {
         let viewer = MessageViewer::load(&self.state.display_text)?;
 
         while !self.state.session.disp_options.abort_printout {
@@ -249,28 +253,37 @@ impl PcbBoardCommand {
             };
             self.state.session.op_text = format!("{}-{}", message_base.base_messagenumber(), message_base.active_messages());
 
-            let text = self.state.input_field(
-                prompt,
-                40,
-                MASK_COMMAND,
-                &action.help,
-                None,
-                display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
-            )?;
+            let text = self
+                .state
+                .input_field(
+                    prompt,
+                    40,
+                    MASK_COMMAND,
+                    &action.help,
+                    None,
+                    display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
+                )
+                .await?;
             if text.is_empty() {
                 break;
             }
 
             if let Ok(number) = text.parse::<u32>() {
-                self.read_message_number(&message_base, &viewer, number, None)?;
+                self.read_message_number(&message_base, &viewer, number, None).await?;
             }
         }
-        self.state.press_enter()?;
+        self.state.press_enter().await?;
         self.display_menu = true;
         Ok(())
     }
 
-    pub fn read_message_number(&mut self, message_base: &JamMessageBase, viewer: &MessageViewer, number: u32, matches: Option<Vec<(usize, usize)>>) -> Res<()> {
+    pub async fn read_message_number(
+        &mut self,
+        message_base: &JamMessageBase,
+        viewer: &MessageViewer,
+        mut number: u32,
+        matches: Option<Vec<(usize, usize)>>,
+    ) -> Res<()> {
         if number == 0 {
             return Ok(());
         }
@@ -278,7 +291,7 @@ impl PcbBoardCommand {
             match message_base.read_header(number) {
                 Ok(header) => {
                     let mut text = message_base.read_msg_text(&header)?.to_string();
-                    viewer.display_header(&mut self.state, message_base, &header)?;
+                    viewer.display_header(&mut self.state, message_base, &header).await?;
                     if let Some(matches) = &matches {
                         let mut new_text = String::new();
                         let mut last = 0;
@@ -295,18 +308,21 @@ impl PcbBoardCommand {
                     if header.needs_password() {
                         if self
                             .state
-                            .check_password(IceText::PasswordToReadMessage, 0, |pwd| header.is_password_valid(pwd))?
+                            .check_password(IceText::PasswordToReadMessage, 0, |pwd| header.is_password_valid(pwd))
+                            .await?
                         {
-                            viewer.display_body(&mut self.state, &text)?;
+                            viewer.display_body(&mut self.state, &text).await?;
                         }
                     } else {
-                        viewer.display_body(&mut self.state, &text)?;
+                        viewer.display_body(&mut self.state, &text).await?;
                     }
-                    self.state.new_line()?;
+                    self.state.new_line().await?;
                 }
                 Err(err) => {
                     log::error!("Error reading message header: {}", err);
-                    self.state.display_text(IceText::NoMailFound, display_flags::NEWLINE | display_flags::LFAFTER)?;
+                    self.state
+                        .display_text(IceText::NoMailFound, display_flags::NEWLINE | display_flags::LFAFTER)
+                        .await?;
                 }
             }
             let prompt = if self.state.session.expert_mode {
@@ -314,19 +330,23 @@ impl PcbBoardCommand {
             } else {
                 IceText::EndOfMessage
             };
-            let text = self.state.input_field(
-                prompt,
-                40,
-                MASK_COMMAND,
-                "hlpendr", // TODO: Hard coded help flag!
-                None,
-                display_flags::UPCASE | display_flags::LFBEFORE | display_flags::NEWLINE,
-            )?;
+            let text = self
+                .state
+                .input_field(
+                    prompt,
+                    40,
+                    MASK_COMMAND,
+                    "hlpendr", // TODO: Hard coded help flag!
+                    None,
+                    display_flags::UPCASE | display_flags::LFBEFORE | display_flags::NEWLINE,
+                )
+                .await?;
             if text.is_empty() {
                 break;
             }
-            if let Ok(number) = text.parse::<u32>() {
-                return self.read_message_number(message_base, viewer, number, None);
+            if let Ok(new_number) = text.parse::<u32>() {
+                number = new_number;
+                continue;
             }
         }
 

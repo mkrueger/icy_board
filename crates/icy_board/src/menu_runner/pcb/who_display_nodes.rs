@@ -11,13 +11,13 @@ use icy_board_engine::{
 use crate::{menu_runner::PcbBoardCommand, Res};
 
 impl PcbBoardCommand {
-    pub fn who_display_nodes(&mut self, _action: &Command) -> Res<()> {
-        if self.displaycmdfile("who")? {
+    pub async fn who_display_nodes(&mut self, _action: &Command) -> Res<()> {
+        if self.displaycmdfile("who").await? {
             return Ok(());
         }
 
-        self.state.display_text(IceText::UserNetHeader, display_flags::NEWLINE)?;
-        self.state.display_text(IceText::UsernetUnderline, display_flags::NEWLINE)?;
+        self.state.display_text(IceText::UserNetHeader, display_flags::NEWLINE).await?;
+        self.state.display_text(IceText::UsernetUnderline, display_flags::NEWLINE).await?;
         let mut lines = Vec::new();
         for (i, connection) in self.state.node_state.lock().unwrap().iter().enumerate() {
             if let Some(connection) = connection {
@@ -57,9 +57,9 @@ impl PcbBoardCommand {
                 }
             }
         }
-        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11))?;
-        self.state.println(TerminalTarget::Both, &lines.join("\r\n"))?;
-        self.state.new_line()?;
+        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11)).await?;
+        self.state.println(TerminalTarget::Both, &lines.join("\r\n")).await?;
+        self.state.new_line().await?;
         Ok(())
     }
 }

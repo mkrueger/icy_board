@@ -2,8 +2,8 @@ use crate::{menu_runner::PcbBoardCommand, Res};
 use icy_board_engine::icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags};
 
 impl PcbBoardCommand {
-    pub fn toggle_alias(&mut self, _action: &Command) -> Res<()> {
-        self.displaycmdfile("alias")?;
+    pub async fn toggle_alias(&mut self, _action: &Command) -> Res<()> {
+        self.displaycmdfile("alias").await?;
 
         self.state.session.use_alias = !self.state.session.use_alias;
         if let Some(token) = self.state.session.tokens.pop_front() {
@@ -24,9 +24,8 @@ impl PcbBoardCommand {
         }
 
         let msg = if self.state.session.use_alias { IceText::AliasOn } else { IceText::AliasOff };
-        self.state.display_text(msg, display_flags::NEWLINE | display_flags::LFAFTER)?;
-
-        self.state.press_enter()?;
+        self.state.display_text(msg, display_flags::NEWLINE | display_flags::LFAFTER).await?;
+        self.state.press_enter().await?;
         self.display_menu = true;
         Ok(())
     }

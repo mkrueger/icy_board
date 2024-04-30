@@ -5,11 +5,12 @@ use crate::{
 use icy_board_engine::icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags};
 
 impl PcbBoardCommand {
-    pub fn join_conference(&mut self, action: &Command) -> Res<()> {
+    pub async fn join_conference(&mut self, action: &Command) -> Res<()> {
         if self.state.board.lock().unwrap().conferences.is_empty() {
             self.state
-                .display_text(IceText::NoConferenceAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
-            self.state.press_enter()?;
+                .display_text(IceText::NoConferenceAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            self.state.press_enter().await?;
             return Ok(());
         }
         let conf_number = if let Some(token) = self.state.session.tokens.pop_front() {
@@ -18,17 +19,19 @@ impl PcbBoardCommand {
             let mnu = self.state.board.lock().unwrap().config.paths.conf_join_menu.clone();
             let mnu = self.state.resolve_path(&mnu);
 
-            self.state.display_menu(&mnu)?;
-            self.state.new_line()?;
+            self.state.display_menu(&mnu).await?;
+            self.state.new_line().await?;
 
-            self.state.input_field(
-                IceText::JoinConferenceNumber,
-                40,
-                MASK_COMMAND,
-                &action.help,
-                None,
-                display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
-            )?
+            self.state
+                .input_field(
+                    IceText::JoinConferenceNumber,
+                    40,
+                    MASK_COMMAND,
+                    &action.help,
+                    None,
+                    display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
+                )
+                .await?
         };
         if !conf_number.is_empty() {
             let mut joined = false;
@@ -40,7 +43,8 @@ impl PcbBoardCommand {
                         self.state.session.current_conference.name, self.state.session.current_conference_number
                     );
                     self.state
-                        .display_text(IceText::ConferenceJoined, display_flags::NEWLINE | display_flags::NOTBLANK)?;
+                        .display_text(IceText::ConferenceJoined, display_flags::NEWLINE | display_flags::NOTBLANK)
+                        .await?;
 
                     joined = true;
                 }
@@ -49,12 +53,13 @@ impl PcbBoardCommand {
             if !joined {
                 self.state.session.op_text = conf_number;
                 self.state
-                    .display_text(IceText::InvalidConferenceNumber, display_flags::NEWLINE | display_flags::NOTBLANK)?;
+                    .display_text(IceText::InvalidConferenceNumber, display_flags::NEWLINE | display_flags::NOTBLANK)
+                    .await?;
             }
         }
 
-        self.state.new_line()?;
-        self.state.press_enter()?;
+        self.state.new_line().await?;
+        self.state.press_enter().await?;
         self.display_menu = true;
         Ok(())
     }

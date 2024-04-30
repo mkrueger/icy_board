@@ -8,20 +8,22 @@ use icy_board_engine::{
 };
 
 impl PcbBoardCommand {
-    pub fn set_page_len(&mut self, action: &Command) -> Res<()> {
+    pub async fn set_page_len(&mut self, action: &Command) -> Res<()> {
         let page_len = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
-            self.state.display_text(IceText::CurrentPageLength, display_flags::LFBEFORE)?;
-            self.state.print(TerminalTarget::Both, &format!(" {}\r\n", self.state.session.page_len))?;
-            self.state.input_field(
-                IceText::EnterPageLength,
-                2,
-                MASK_NUMBER,
-                &action.help,
-                Some(self.state.session.page_len.to_string()),
-                display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
-            )?
+            self.state.display_text(IceText::CurrentPageLength, display_flags::LFBEFORE).await?;
+            self.state.print(TerminalTarget::Both, &format!(" {}\r\n", self.state.session.page_len)).await?;
+            self.state
+                .input_field(
+                    IceText::EnterPageLength,
+                    2,
+                    MASK_NUMBER,
+                    &action.help,
+                    Some(self.state.session.page_len.to_string()),
+                    display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
+                )
+                .await?
         };
 
         if !page_len.is_empty() {
@@ -31,7 +33,7 @@ impl PcbBoardCommand {
                 user.page_len = page_len;
             }
         }
-        self.state.press_enter()?;
+        self.state.press_enter().await?;
         self.display_menu = true;
         Ok(())
     }

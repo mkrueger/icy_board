@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use async_trait::async_trait;
+
 use crate::{
     executable::{PPEExpr, VariableType, VariableValue},
     Res,
@@ -21,12 +23,13 @@ pub trait UserData: Sized + UserDataValue {
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F);
 }
 
-pub trait UserDataValue: Sync {
+#[async_trait]
+pub trait UserDataValue: Send + Sync {
     fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> Res<VariableValue>;
     fn set_property_value(&mut self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()>;
 
-    fn call_function(&self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, arguments: &[PPEExpr]) -> crate::Res<VariableValue>;
-    fn call_method(&mut self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, arguments: &[PPEExpr]) -> crate::Res<()>;
+    async fn call_function(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, arguments: &[PPEExpr]) -> crate::Res<VariableValue>;
+    async fn call_method(&mut self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, arguments: &[PPEExpr]) -> crate::Res<()>;
 }
 
 pub enum UserDataEntry {

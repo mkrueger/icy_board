@@ -25,4 +25,7 @@ pub enum NetError {
 
     #[error("Operation is unsupported")]
     Unsupported,
+
+    #[error("Connection closed")]
+    ConnectionClosed,
 }

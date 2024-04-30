@@ -1,61 +1,53 @@
-use std::{
-    io::{self, ErrorKind, Read, Write},
+#![allow(dead_code)]
+
+use std::time::Duration;
+
+use async_trait::async_trait;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpStream, ToSocketAddrs},
-    time::Duration,
 };
 
-use crate::{Connection, ConnectionType, NetError};
+use super::{Connection, ConnectionType};
 
 pub struct RawConnection {
     tcp_stream: TcpStream,
 }
 
 impl RawConnection {
-    pub fn open<A: ToSocketAddrs>(addr: &A, timeout: Duration) -> crate::Result<Self> {
-        for addr in addr.to_socket_addrs()? {
-            let tcp_stream = TcpStream::connect_timeout(&addr, timeout)?;
-
-            tcp_stream.set_write_timeout(Some(timeout))?;
-            tcp_stream.set_read_timeout(Some(timeout))?;
-            tcp_stream.set_nonblocking(true)?;
-
-            return Ok(Self { tcp_stream });
+    pub async fn open<A: ToSocketAddrs>(addr: &A, timeout: Duration) -> crate::Result<Self> {
+        let result = tokio::time::timeout(timeout, TcpStream::connect(addr)).await;
+        match result {
+            Ok(tcp_stream) => match tcp_stream {
+                Ok(stream) => Ok(Self { tcp_stream: stream }),
+                Err(err) => Err(Box::new(err)),
+            },
+            Err(err) => Err(Box::new(err)),
         }
-        Err(NetError::CouldNotConnect.into())
+    }
+
+    pub async fn accept(tcp_stream: TcpStream) -> crate::Result<Self> {
+        Ok(Self { tcp_stream })
     }
 }
 
+#[async_trait]
 impl Connection for RawConnection {
     fn get_connection_type(&self) -> ConnectionType {
         ConnectionType::Raw
     }
 
-    fn shutdown(&mut self) -> crate::Result<()> {
-        self.tcp_stream.shutdown(std::net::Shutdown::Both)?;
+    async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        Ok(self.tcp_stream.read(buf).await?)
+    }
+
+    async fn send(&mut self, buf: &[u8]) -> crate::Result<()> {
+        self.tcp_stream.write_all(buf).await?;
         Ok(())
     }
-}
 
-impl Read for RawConnection {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self.tcp_stream.read(buf) {
-            Ok(size) => Ok(size),
-            Err(ref e) => {
-                if e.kind() == ErrorKind::WouldBlock {
-                    return Ok(0);
-                }
-                Err(io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")))
-            }
-        }
-    }
-}
-
-impl Write for RawConnection {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.tcp_stream.write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.tcp_stream.flush()
+    async fn shutdown(&mut self) -> crate::Result<()> {
+        self.tcp_stream.shutdown().await?;
+        Ok(())
     }
 }

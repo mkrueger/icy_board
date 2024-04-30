@@ -14,52 +14,58 @@ use icy_board_engine::{
 };
 use icy_net::protocol::{Protocol, TransferProtocolType, XYModemVariant, XYmodem, Zmodem};
 
-use super::d_download::BlockingConnection;
-
 impl PcbBoardCommand {
-    pub fn upload_file(&mut self, action: &Command) -> Res<()> {
+    pub async fn upload_file(&mut self, action: &Command) -> Res<()> {
         self.state.set_activity(UserActivity::UploadFiles);
         let upload_location = self.state.resolve_path(&self.state.session.current_conference.pub_upload_location);
         if !upload_location.exists() {
-            self.state.display_text(
-                IceText::NoDirectoriesAvailable,
-                display_flags::NEWLINE | display_flags::BELL | display_flags::LFBEFORE,
-            )?;
-            self.state.new_line()?;
-            self.state.press_enter()?;
+            self.state
+                .display_text(
+                    IceText::NoDirectoriesAvailable,
+                    display_flags::NEWLINE | display_flags::BELL | display_flags::LFBEFORE,
+                )
+                .await?;
+            self.state.new_line().await?;
+            self.state.press_enter().await?;
             return Ok(());
         }
 
-        let file_name = self.state.input_field(
-            IceText::FileNameToUpload,
-            60,
-            &MASK_ASCII,
-            &action.help,
-            None,
-            display_flags::NEWLINE | display_flags::LFBEFORE,
-        )?;
+        let file_name = self
+            .state
+            .input_field(
+                IceText::FileNameToUpload,
+                60,
+                &MASK_ASCII,
+                &action.help,
+                None,
+                display_flags::NEWLINE | display_flags::LFBEFORE,
+            )
+            .await?;
 
         if file_name.is_empty() {
-            self.state.new_line()?;
-            self.state.press_enter()?;
+            self.state.new_line().await?;
+            self.state.press_enter().await?;
             return Ok(());
         }
         let mut goodbye_after_upload = false;
 
         loop {
-            let input = self.state.input_field(
-                IceText::GoodbyeAfterUpload,
-                1,
-                &"AGP",
-                &action.help,
-                None,
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE | display_flags::FIELDLEN,
-            )?;
+            let input = self
+                .state
+                .input_field(
+                    IceText::GoodbyeAfterUpload,
+                    1,
+                    &"AGP",
+                    &action.help,
+                    None,
+                    display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE | display_flags::FIELDLEN,
+                )
+                .await?;
 
             match input.as_str() {
                 "A" => {
-                    self.state.new_line()?;
-                    self.state.press_enter()?;
+                    self.state.new_line().await?;
+                    self.state.press_enter().await?;
                     return Ok(());
                 }
                 "G" => {
@@ -67,7 +73,7 @@ impl PcbBoardCommand {
                     break;
                 }
                 "P" => {
-                    self.set_transfer_protocol(action)?;
+                    self.set_transfer_protocol(action).await?;
                     continue;
                 }
                 "" => {
@@ -102,22 +108,21 @@ impl PcbBoardCommand {
                 TransferProtocolType::External(_) => todo!(),
             };
 
-            match prot.initiate_recv(&mut *self.state.connection) {
+            match prot.initiate_recv(&mut *self.state.connection).await {
                 Ok(mut state) => {
-                    let mut c = BlockingConnection {
-                        conn: &mut self.state.connection,
-                    };
                     while !state.is_finished {
-                        if let Err(e) = prot.update_transfer(&mut c, &mut state) {
+                        if let Err(e) = prot.update_transfer(&mut *self.state.connection, &mut state).await {
                             log::error!("Error while updating file transfer with {:?} : {}", protocol, e);
-                            self.state.display_text(IceText::TransferAborted, display_flags::NEWLINE)?;
+                            self.state.display_text(IceText::TransferAborted, display_flags::NEWLINE).await?;
                             break;
                         }
                     }
                     self.state
-                        .display_text(IceText::TransferSuccessful, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                        .display_text(IceText::TransferSuccessful, display_flags::NEWLINE | display_flags::LFBEFORE)
+                        .await?;
                     self.state
-                        .display_text(IceText::ThanksForTheFiles, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                        .display_text(IceText::ThanksForTheFiles, display_flags::NEWLINE | display_flags::LFBEFORE)
+                        .await?;
 
                     let mut file_base = match FileBase::open(&self.state.session.current_conference.pub_upload_dir_file) {
                         Ok(file_base) => file_base,
@@ -144,15 +149,15 @@ impl PcbBoardCommand {
                 }
                 Err(e) => {
                     log::error!("Error while initiating file transfer with {:?} : {}", protocol, e);
-                    self.state.println(TerminalTarget::Both, &format!("Error: {}", e))?;
+                    self.state.println(TerminalTarget::Both, &format!("Error: {}", e)).await?;
                 }
             }
         }
         if goodbye_after_upload {
-            self.state.goodbye()?;
+            self.state.goodbye().await?;
         }
-        self.state.new_line()?;
-        self.state.press_enter()?;
+        self.state.new_line().await?;
+        self.state.press_enter().await?;
         Ok(())
     }
 }

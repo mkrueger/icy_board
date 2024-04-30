@@ -190,9 +190,8 @@ impl Header {
         res
     }
 
-    pub fn write(&self, com: &mut dyn Connection, header_type: HeaderType, escape_ctrl_chars: bool) -> crate::Result<usize> {
-        //println!("send header:{:?}  - {:?}", header_type, self);
-        com.write_all(&self.build(header_type, escape_ctrl_chars))?;
+    pub async fn write(&self, com: &mut dyn Connection, header_type: HeaderType, escape_ctrl_chars: bool) -> crate::Result<usize> {
+        com.send(&self.build(header_type, escape_ctrl_chars)).await?;
         Ok(12)
     }
 
@@ -222,8 +221,9 @@ impl Header {
         }
     }
 
-    pub fn read(com: &mut dyn Connection, can_count: &mut usize) -> crate::Result<Option<Header>> {
-        let zpad = com.read_u8()?;
+    pub async fn read(com: &mut dyn Connection, can_count: &mut usize) -> crate::Result<Option<Header>> {
+        println!("read header");
+        let zpad = com.read_u8().await?;
         if zpad == 0x18 {
             // CAN
             *can_count += 1;
@@ -232,16 +232,16 @@ impl Header {
             return Err(ZModemError::ZPADExected(zpad).into());
         }
         *can_count = 0;
-        let mut next = com.read_u8()?;
+        let mut next = com.read_u8().await?;
 
         if next == ZPAD {
-            next = com.read_u8()?;
+            next = com.read_u8().await?;
         }
         if next != ZDLE {
             return Err(ZModemError::ZLDEExected(next).into());
         }
 
-        let header_type = com.read_u8()?;
+        let header_type = com.read_u8().await?;
 
         let header_data_size = match header_type {
             ZBIN => 7,
@@ -252,7 +252,7 @@ impl Header {
             }
         };
 
-        let header_data = read_zdle_bytes(com, header_data_size)?;
+        let header_data = read_zdle_bytes(com, header_data_size).await?;
 
         match header_type {
             ZBIN => {
@@ -297,14 +297,15 @@ impl Header {
                     return Err(ZModemError::CRC16Mismatch(crc16, check_crc16).into());
                 }
                 // read rest;
-                let eol = com.read_u8()?;
+                let eol = com.read_u8().await?;
                 // don't check the next bytes. Errors there don't impact much
                 if eol == b'\r' {
-                    com.read_u8()?; // \n windows eol
+                    com.read_u8().await?; // \n windows eol
                 }
                 if data[0] != ZACK && data[0] != frame_types::ZFIN {
-                    com.read_u8()?; // read XON
+                    com.read_u8().await?; // read XON
                 }
+                println!("read header done!");
 
                 Ok(Some(Header {
                     frame_type: Header::get_frame_type(data[0])?,

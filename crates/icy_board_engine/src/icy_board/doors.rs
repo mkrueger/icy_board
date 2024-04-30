@@ -6,6 +6,7 @@ use crate::{
 };
 
 use super::{security::RequiredSecurity, IcyBoardSerializer};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize, Default)]
@@ -49,6 +50,7 @@ impl UserData for Door {
     }
 }
 
+#[async_trait]
 impl UserDataValue for Door {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *NAME {
@@ -69,7 +71,7 @@ impl UserDataValue for Door {
         Ok(())
     }
 
-    fn call_function(&self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
+    async fn call_function(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
             let res = self.securiy_level.user_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
@@ -78,7 +80,7 @@ impl UserDataValue for Door {
         Err("Function not found".into())
     }
 
-    fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<()> {
+    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<()> {
         log::error!("Invalid method call on Door ({})", name);
         Err("Function not found".into())
     }

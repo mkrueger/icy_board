@@ -16,8 +16,9 @@ use icy_board_engine::{
 };
 use icy_net::{
     telnet::TelnetConnection,
-    websocket::{accept_websocket, accept_websocket_secure},
-    Connection, ConnectionType,
+    //    websocket::{accept_websocket, accept_websocket_secure},
+    Connection,
+    ConnectionType,
 };
 
 use crate::menu_runner::PcbBoardCommand;
@@ -77,7 +78,7 @@ impl BBS {
 }
 
 pub fn await_telnet_connections(telnet: Telnet, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
-    let addr = if telnet.address.is_empty() {
+ /*   let addr = if telnet.address.is_empty() {
         format!("127.0.0.1:{}", telnet.port)
     } else {
         format!("{}:{}", telnet.address, telnet.port)
@@ -104,7 +105,7 @@ pub fn await_telnet_connections(telnet: Telnet, board: Arc<Mutex<IcyBoard>>, bbs
                     match TelnetConnection::accept(stream) {
                         Ok(connection) => {
                             // connection succeeded
-                            if let Err(err) = handle_client(board, node_list, node, Box::new(connection)) {
+                            if let Err(err) = handle_client(board, node_list, node, Box::new(connection)).await {
                                 log::error!("Error running backround client: {}", err);
                             }
                         }
@@ -121,11 +122,12 @@ pub fn await_telnet_connections(telnet: Telnet, board: Arc<Mutex<IcyBoard>>, bbs
             }
         }
     }
-    drop(listener);
+    drop(listener);*/
     Ok(())
 }
 
 pub fn await_ssh_connections(ssh: SSH, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+    /*
     let addr = if ssh.address.is_empty() {
         format!("127.0.0.1:{}", ssh.port)
     } else {
@@ -171,11 +173,12 @@ pub fn await_ssh_connections(ssh: SSH, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mut
             }
         }
     }
-    drop(listener);
+    drop(listener); */
     Ok(())
 }
 
 pub fn await_websocket_connections(ssh: Websocket, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+    /*
     let addr = if ssh.address.is_empty() {
         format!("127.0.0.1:{}", ssh.port)
     } else {
@@ -220,11 +223,12 @@ pub fn await_websocket_connections(ssh: Websocket, board: Arc<Mutex<IcyBoard>>, 
             }
         }
     }
-    drop(listener);
+    drop(listener); */
     Ok(())
 }
 
 pub fn await_securewebsocket_connections(ssh: SecureWebsocket, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+    /*
     let addr = if ssh.address.is_empty() {
         format!("127.0.0.1:{}", ssh.port)
     } else {
@@ -271,15 +275,15 @@ pub fn await_securewebsocket_connections(ssh: SecureWebsocket, board: Arc<Mutex<
             }
         }
     }
-    drop(listener);
+    drop(listener);*/
     Ok(())
 }
 
-fn handle_client(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<Vec<Option<NodeState>>>>, node: usize, connection: Box<dyn Connection>) -> Res<()> {
+async fn handle_client(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<Vec<Option<NodeState>>>>, node: usize, connection: Box<dyn Connection>) -> Res<()> {
     let state = IcyBoardState::new(board, node_state, node, connection);
     let mut cmd = PcbBoardCommand::new(state);
 
-    match cmd.login() {
+    match cmd.login().await {
         Ok(true) => {}
         Ok(false) => {
             return Ok(());
@@ -291,19 +295,20 @@ fn handle_client(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<Vec<Option<N
     }
 
     loop {
-        if let Err(err) = cmd.do_command() {
+        if let Err(err) = cmd.do_command().await {
             cmd.state.session.disp_options.reset_printout();
 
             // print error message to user, if possible
-            if cmd.state.set_color(TerminalTarget::Both, 4.into()).is_ok() {
+            if cmd.state.set_color(TerminalTarget::Both, 4.into()).await.is_ok() {
                 cmd.state
-                    .print(icy_board_engine::vm::TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err))?;
-                cmd.state.reset_color()?;
+                    .print(icy_board_engine::vm::TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err))
+                    .await?;
+                cmd.state.reset_color().await?;
             }
         }
         cmd.state.session.disp_options.reset_printout();
         if cmd.state.session.request_logoff {
-            cmd.state.connection.shutdown()?;
+            cmd.state.connection.shutdown().await?;
             return Ok(());
         }
         thread::sleep(Duration::from_millis(20));

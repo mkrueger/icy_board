@@ -10,6 +10,7 @@ use crate::{
     tables::export_cp437_string,
     Res,
 };
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use super::{is_false, security::RequiredSecurity, user_base::Password, IcyBoardError, IcyBoardSerializer, PCBoardRecordImporter};
@@ -182,6 +183,7 @@ lazy_static::lazy_static! {
     pub static ref HAS_ACCESS: unicase::Ascii<String> = unicase::Ascii::new("HasAccess".to_string());
 }
 
+#[async_trait]
 impl UserDataValue for FileDirectory {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *NAME {
@@ -196,7 +198,7 @@ impl UserDataValue for FileDirectory {
         Ok(())
     }
 
-    fn call_function(&self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
+    async fn call_function(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
             let res = self.list_security.user_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
@@ -204,7 +206,8 @@ impl UserDataValue for FileDirectory {
         log::error!("Invalid function call on FileDirectory ({})", name);
         Err("Function not found".into())
     }
-    fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<()> {
+
+    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<()> {
         log::error!("Invalid method call on FileDirectory ({})", name);
         Err("Function not found".into())
     }

@@ -8,8 +8,8 @@ use icy_board_engine::{
 };
 
 impl PcbBoardCommand {
-    pub fn set_language(&mut self, _action: &Command) -> Res<()> {
-        if self.displaycmdfile("lang")? {
+    pub async fn set_language(&mut self, _action: &Command) -> Res<()> {
+        if self.displaycmdfile("lang").await? {
             return Ok(());
         }
         let cur_lang = if let Some(user) = &mut self.state.current_user {
@@ -18,21 +18,21 @@ impl PcbBoardCommand {
             String::new()
         };
 
-        let lang = self.ask_languages(cur_lang)?;
+        let lang = self.ask_languages(cur_lang).await?;
         if !lang.is_empty() {
             if let Some(user) = &mut self.state.current_user {
                 user.language = lang;
             }
             self.state.save_current_user()?;
         }
-        self.state.press_enter()?;
+        self.state.press_enter().await?;
         self.display_menu = true;
         Ok(())
     }
 
-    pub fn ask_languages(&mut self, cur_language: String) -> Res<String> {
+    pub async fn ask_languages(&mut self, cur_language: String) -> Res<String> {
         let mut languages = Vec::new();
-        self.state.new_line()?;
+        self.state.new_line().await?;
         let l = if let Ok(board) = self.state.board.lock() {
             board.languages.clone()
         } else {
@@ -48,34 +48,38 @@ impl PcbBoardCommand {
             }
         }
         self.state
-            .display_text(IceText::LanguageAvailable, display_flags::NEWLINE | display_flags::LFAFTER)?;
+            .display_text(IceText::LanguageAvailable, display_flags::NEWLINE | display_flags::LFAFTER)
+            .await?;
 
-        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11))?;
+        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11)).await?;
         for line in languages {
-            self.state.print(TerminalTarget::Both, &line)?;
-            self.state.new_line()?;
+            self.state.print(TerminalTarget::Both, &line).await?;
+            self.state.new_line().await?;
         }
         loop {
-            let language = self.state.input_field(
-                IceText::LanguageEnterNumber,
-                3,
-                &MASK_NUMBER,
-                "",
-                Some(cur_lang_str.clone()),
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE | display_flags::FIELDLEN,
-            )?;
+            let language = self
+                .state
+                .input_field(
+                    IceText::LanguageEnterNumber,
+                    3,
+                    &MASK_NUMBER,
+                    "",
+                    Some(cur_lang_str.clone()),
+                    display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE | display_flags::FIELDLEN,
+                )
+                .await?;
             if language.is_empty() {
                 return Ok(language);
             }
             if let Ok(number) = language.parse::<usize>() {
                 if number > 0 && number <= l.languages.len() {
                     if number == 1 {
-                        self.state.display_text(IceText::LanguageActive, display_flags::NEWLINE)?;
+                        self.state.display_text(IceText::LanguageActive, display_flags::NEWLINE).await?;
                     }
                     return Ok(l.languages[number - 1].extension.clone());
                 }
             }
-            self.state.display_text(IceText::LanguageNotAvailable, display_flags::NEWLINE)?;
+            self.state.display_text(IceText::LanguageNotAvailable, display_flags::NEWLINE).await;
         }
     }
 }

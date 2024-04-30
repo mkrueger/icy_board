@@ -3,6 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -243,7 +244,7 @@ impl IcyBoardSerializer for ConferenceBase {
     const FILE_TYPE: &'static str = "conferences";
 }
 
-impl UserData for Conference {
+impl<'a> UserData for Conference {
     const TYPE_NAME: &'static str = "Conference";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
@@ -277,6 +278,7 @@ lazy_static::lazy_static! {
     pub static ref GET_DOOR: unicase::Ascii<String> = unicase::Ascii::new("GetDoor".to_string());
 }
 
+#[async_trait]
 impl UserDataValue for Conference {
     fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *NAME {
@@ -299,19 +301,19 @@ impl UserDataValue for Conference {
         Ok(VariableValue::new_int(-1))
     }
 
-    fn set_property_value(&mut self, _vm: &mut crate::vm::VirtualMachine, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+    fn set_property_value(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
         // Currently unsupported !
         Ok(())
     }
 
-    fn call_function(&self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
+    async fn call_function(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
             let res = self.required_security.user_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
-
+        /*
         if *name == *GET_FILE_AREA {
-            let area = vm.eval_expr(&arguments[0])?.as_int();
+            let area = vm.eval_expr(&arguments[0]).await?.as_int();
             if let Some(res) = self.directories.get(area as usize) {
                 vm.user_data.push(Box::new((*res).clone()));
                 return Ok(VariableValue {
@@ -331,7 +333,7 @@ impl UserDataValue for Conference {
         }
 
         if *name == *GET_MSG_AREA {
-            let area = vm.eval_expr(&arguments[0])?.as_int();
+            let area = vm.eval_expr(&arguments[0]).await?.as_int();
             if let Some(res) = self.areas.get(area as usize) {
                 vm.user_data.push(Box::new((*res).clone()));
                 return Ok(VariableValue {
@@ -351,7 +353,7 @@ impl UserDataValue for Conference {
         }
 
         if *name == *GET_DOOR {
-            let door = vm.eval_expr(&arguments[0])?.as_int();
+            let door = vm.eval_expr(&arguments[0]).await?.as_int();
             if let Some(res) = self.doors.get(door as usize) {
                 vm.user_data.push(Box::new((*res).clone()));
                 return Ok(VariableValue {
@@ -368,12 +370,12 @@ impl UserDataValue for Conference {
                 generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
                 vtype: VariableType::UserData(DOOR_ID as u8),
             });
-        }
+        }*/
         log::error!("Invalid function call on Conference ({})", name);
         Err("Function not found".into())
     }
 
-    fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<()> {
+    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<()> {
         log::error!("Invalid method call on Conference ({})", name);
         Err("Function not found".into())
     }

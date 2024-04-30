@@ -15,7 +15,7 @@ use icy_board_engine::{
 use super::l_find_files::FileList;
 
 impl PcbBoardCommand {
-    pub fn show_file_directories(&mut self, action: &Command) -> Res<()> {
+    pub async fn show_file_directories(&mut self, action: &Command) -> Res<()> {
         self.state.set_activity(UserActivity::BrowseFiles);
 
         self.state.session.disable_auto_more = false;
@@ -23,8 +23,9 @@ impl PcbBoardCommand {
 
         if self.state.session.current_conference.directories.is_empty() {
             self.state
-                .display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)?;
-            self.state.press_enter()?;
+                .display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            self.state.press_enter().await?;
             return Ok(());
         }
         let directory_number = if let Some(token) = self.state.session.tokens.pop_front() {
@@ -32,21 +33,23 @@ impl PcbBoardCommand {
         } else {
             let mnu = self.state.session.current_conference.dir_menu.clone();
             let mnu = self.state.resolve_path(&mnu);
-            self.state.display_menu(&mnu)?;
-            self.state.new_line()?;
+            self.state.display_menu(&mnu).await?;
+            self.state.new_line().await?;
 
-            self.state.input_field(
-                if self.state.session.expert_mode {
-                    IceText::FileListCommandExpert
-                } else {
-                    IceText::FileListCommand
-                },
-                40,
-                MASK_COMMAND,
-                &action.help,
-                None,
-                display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
-            )?
+            self.state
+                .input_field(
+                    if self.state.session.expert_mode {
+                        IceText::FileListCommandExpert
+                    } else {
+                        IceText::FileListCommand
+                    },
+                    40,
+                    MASK_COMMAND,
+                    &action.help,
+                    None,
+                    display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
+                )
+                .await?
         };
 
         if !directory_number.is_empty() {
@@ -55,7 +58,7 @@ impl PcbBoardCommand {
                 if 1 <= number && (number as usize) <= self.state.session.current_conference.directories.len() {
                     let area = &self.state.session.current_conference.directories[number as usize - 1];
                     if area.list_security.user_can_access(&self.state.session) {
-                        self.display_file_area(action, number as usize - 1)?;
+                        self.display_file_area(action, number as usize - 1).await?;
                     }
                     joined = true;
                 }
@@ -64,16 +67,17 @@ impl PcbBoardCommand {
             if !joined {
                 self.state.session.op_text = directory_number;
                 self.state
-                    .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::NOTBLANK)?;
+                    .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::NOTBLANK)
+                    .await?;
             }
         }
-        self.state.new_line()?;
-        self.state.press_enter()?;
+        self.state.new_line().await?;
+        self.state.press_enter().await?;
         self.display_menu = true;
         Ok(())
     }
 
-    fn display_file_area(&mut self, action: &Command, area: usize) -> Res<()> {
+    async fn display_file_area(&mut self, action: &Command, area: usize) -> Res<()> {
         let area = &self.state.session.current_conference.directories[area];
 
         let colors = self.state.board.lock().unwrap().config.color_configuration.clone();
@@ -82,21 +86,25 @@ impl PcbBoardCommand {
             log::error!("Could not open file base: {}", file_base_path.display());
             self.state.session.op_text = area.file_base.to_str().unwrap().to_string();
             self.state
-                .display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)?;
+                .display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
             return Ok(());
         };
 
-        self.state.clear_screen()?;
+        self.state.clear_screen().await?;
 
-        self.state.set_color(TerminalTarget::Both, colors.file_head)?;
+        self.state.set_color(TerminalTarget::Both, colors.file_head).await?;
         self.state
-            .print(TerminalTarget::Both, "Filename       Size      Date    Description of File Contents")?;
-        self.state.new_line()?;
-        self.state.print(
-            TerminalTarget::Both,
-            "============ ========  ========  ============================================",
-        )?;
-        self.state.new_line()?;
+            .print(TerminalTarget::Both, "Filename       Size      Date    Description of File Contents")
+            .await?;
+        self.state.new_line().await?;
+        self.state
+            .print(
+                TerminalTarget::Both,
+                "============ ========  ========  ============================================",
+            )
+            .await?;
+        self.state.new_line().await?;
 
         let files: Vec<FileHeader> = base.iter().flatten().collect();
         let files: Vec<&FileHeader> = files.iter().collect();
@@ -106,10 +114,10 @@ impl PcbBoardCommand {
             files,
             help: &action.help,
         };
-        list.display_file_list(self)?;
+        list.display_file_list(self).await?;
 
         if self.state.session.num_lines_printed > 0 {
-            list.filebase_more(self)?;
+            list.filebase_more(self).await?;
         }
         self.state.session.disable_auto_more = false;
         self.state.session.more_requested = false;

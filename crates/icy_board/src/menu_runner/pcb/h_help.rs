@@ -6,19 +6,21 @@ use crate::{
 };
 
 impl PcbBoardCommand {
-    pub fn show_help(&mut self) -> Res<()> {
+    pub async fn show_help(&mut self) -> Res<()> {
         self.display_menu = true;
         let help_cmd = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
-            self.state.input_field(
-                IceText::HelpPrompt,
-                8,
-                MASK_COMMAND,
-                "",
-                None,
-                display_flags::UPCASE | display_flags::NEWLINE | display_flags::HIGHASCII,
-            )?
+            self.state
+                .input_field(
+                    IceText::HelpPrompt,
+                    8,
+                    MASK_COMMAND,
+                    "",
+                    None,
+                    display_flags::UPCASE | display_flags::NEWLINE | display_flags::HIGHASCII,
+                )
+                .await?
         };
         if !help_cmd.is_empty() {
             let mut help_loc = self.state.board.lock().unwrap().config.paths.help_path.clone();
@@ -36,11 +38,11 @@ impl PcbBoardCommand {
             let am = self.state.session.disable_auto_more;
             self.state.session.disable_auto_more = false;
             self.state.session.disp_options.non_stop = false;
-            let res = self.state.display_file(&help_loc)?;
+            let res = self.state.display_file(&help_loc).await?;
             self.state.session.disable_auto_more = am;
 
             if res {
-                self.state.press_enter()?;
+                self.state.press_enter().await?;
             }
         }
         Ok(())

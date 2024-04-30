@@ -34,21 +34,24 @@ impl PcbBoardCommand {
         }
     }
 
-    pub fn do_command(&mut self) -> Res<()> {
+    pub async fn do_command(&mut self) -> Res<()> {
         self.state.set_activity(UserActivity::BrowseMenu);
         if self.display_menu && !self.state.session.expert_mode {
-            self.display_menu()?;
+            self.display_menu().await?;
             self.display_menu = false;
         }
 
-        let command = self.state.input_field(
-            IceText::CommandPrompt,
-            40,
-            MASK_COMMAND,
-            "",
-            None,
-            display_flags::UPCASE | display_flags::NEWLINE,
-        )?;
+        let command = self
+            .state
+            .input_field(
+                IceText::CommandPrompt,
+                40,
+                MASK_COMMAND,
+                "",
+                None,
+                display_flags::UPCASE | display_flags::NEWLINE,
+            )
+            .await?;
         if command.len() > 5 {
             self.saved_cmd = command.clone();
         }
@@ -60,27 +63,28 @@ impl PcbBoardCommand {
         let command = self.state.session.tokens.pop_front().unwrap();
 
         if let Some(action) = self.state.try_find_command(&command) {
-            return self.dispatch_action(&command, &action);
+            return self.dispatch_action(&command, &action).await;
         }
 
         self.state
-            .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFAFTER | display_flags::LFBEFORE)?;
+            .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFAFTER | display_flags::LFBEFORE)
+            .await?;
         Ok(())
     }
 
-    fn display_menu(&mut self) -> Res<()> {
-        self.displaycmdfile("menu")?;
+    async fn display_menu(&mut self) -> Res<()> {
+        self.displaycmdfile("menu").await?;
         let menu_file = if self.state.session.is_sysop {
             self.state.session.current_conference.sysop_menu.clone()
         } else {
             self.state.session.current_conference.users_menu.clone()
         };
-        self.state.display_file(&menu_file)?;
+        self.state.display_file(&menu_file).await?;
         Ok(())
     }
 
-    fn dispatch_action(&mut self, command: &str, action: &Command) -> Res<()> {
-        if !self.check_sec(command, &action.security)? {
+    async fn dispatch_action(&mut self, command: &str, action: &Command) -> Res<()> {
+        if !self.check_sec(command, &action.security).await? {
             return Ok(());
         }
 
@@ -91,162 +95,162 @@ impl PcbBoardCommand {
             }
             CommandType::AbandonConference => {
                 // A
-                self.abandon_conference()?;
+                self.abandon_conference().await?;
             }
             CommandType::BulletinList => {
                 // B
-                self.show_bulletins(action)?;
+                self.show_bulletins(action).await?;
             }
             CommandType::CommentToSysop => {
                 // C
-                self.comment_to_sysop(action)?;
+                self.comment_to_sysop(action).await?;
             }
 
             CommandType::Download => {
                 // D
-                self.download(action)?;
+                self.download(action).await?;
             }
             CommandType::EnterMessage => {
                 // E
-                self.enter_message(action)?;
+                self.enter_message(action).await?;
             }
 
             CommandType::FileDirectory => {
                 // F
-                self.show_file_directories(action)?;
+                self.show_file_directories(action).await?;
             }
 
             CommandType::Goodbye => {
                 // G
-                self.goodbye_cmd()?;
+                self.goodbye_cmd().await?;
             }
             CommandType::Bye => {
                 // BYE
-                self.bye_cmd()?;
+                self.bye_cmd().await?;
             }
             CommandType::Help => {
                 // H
-                self.show_help()?;
+                self.show_help().await?;
             }
             CommandType::InitialWelcome => {
                 // I
-                self.initial_welcome()?;
+                self.initial_welcome().await?;
             }
             CommandType::JoinConference => {
                 // J
-                self.join_conference(action)?;
+                self.join_conference(action).await?;
             }
             CommandType::DeleteMessage => {
                 // K
-                self.delete_message(action)?;
+                self.delete_message(action).await?;
             }
             CommandType::LocateFile => {
                 // L
-                self.find_files(action)?;
+                self.find_files(action).await?;
             }
             CommandType::ToggleGraphics => {
                 // M
-                self.toggle_graphics()?;
+                self.toggle_graphics().await?;
             }
             CommandType::NewFileScan => {
                 // N
-                self.find_new_files(action, 60000)?;
+                self.find_new_files(action, 60000).await?;
             }
             CommandType::SetPageLength => {
                 // P
-                self.set_page_len(action)?;
+                self.set_page_len(action).await?;
             }
             CommandType::QuickMessageScan => {
                 // Q
-                self.quick_message_scan(action)?;
+                self.quick_message_scan(action).await?;
             }
             CommandType::ReadMessages => {
                 // R
-                self.read_messages(action)?;
+                self.read_messages(action).await?;
             }
             CommandType::Survey => {
                 // S
-                self.take_survey(action)?;
+                self.take_survey(action).await?;
             }
             CommandType::SetTransferProtocol => {
                 // T
-                self.set_transfer_protocol(action)?;
+                self.set_transfer_protocol(action).await?;
             }
             CommandType::UploadFile => {
                 // U
-                self.upload_file(action)?;
+                self.upload_file(action).await?;
             }
             CommandType::ViewSettings => {
                 // V
-                self.view_settings(action)?;
+                self.view_settings(action).await?;
             }
 
             CommandType::WriteSettings => {
                 // W
-                self.write_settings(action)?;
+                self.write_settings(action).await?;
             }
             CommandType::ExpertMode => {
                 // X
-                self.set_expert_mode()?;
+                self.set_expert_mode().await?;
             }
             CommandType::PersonalMail => {
                 // Y
-                self.personal_mail(action)?;
+                self.personal_mail(action).await?;
             }
             CommandType::ZippyDirectoryScan => {
                 // Z
-                self.zippy_directory_scan(action)?;
+                self.zippy_directory_scan(action).await?;
             }
 
             CommandType::ShowMenu => {
                 // MENU
-                self.display_menu()?;
+                self.display_menu().await?;
                 self.display_menu = false;
             }
 
             CommandType::DisplayNews => {
                 // NEWS
-                self.display_news()?;
+                self.display_news().await?;
             }
             CommandType::UserList => {
                 // USER
-                self.show_user_list(action)?;
+                self.show_user_list(action).await?;
             }
             CommandType::SetLanguage => {
                 // LANG
-                self.set_language(action)?;
+                self.set_language(action).await?;
             }
             CommandType::EnableAlias => {
                 // ALIAS
-                self.toggle_alias(action)?;
+                self.toggle_alias(action).await?;
             }
             CommandType::WhoIsOnline => {
                 // WHO
-                self.who_display_nodes(action)?;
+                self.who_display_nodes(action).await?;
             }
 
             CommandType::OpenDoor => {
                 // DOOR/OPEN
-                self.open_door(action)?;
+                self.open_door(action).await?;
             }
 
             CommandType::RestoreMessage => {
                 // 4
-                self.restore_message(action)?;
+                self.restore_message(action).await?;
             }
 
             CommandType::ReadEmail => {
                 // @
-                self.read_email(action)?;
+                self.read_email(action).await?;
             }
             CommandType::RunPPE => {
                 // PPE
-                self.ppe_run()?;
+                self.ppe_run().await?;
             }
 
             CommandType::TextSearch => {
                 // TS
-                self.text_search(action)?;
+                self.text_search(action).await?;
             }
 
             _ => {
@@ -256,43 +260,48 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    fn check_sec(&mut self, command: &str, required_sec: &RequiredSecurity) -> Res<bool> {
+    async fn check_sec(&mut self, command: &str, required_sec: &RequiredSecurity) -> Res<bool> {
         if required_sec.user_can_access(&self.state.session) {
             return Ok(true);
         }
 
-        self.state.bell()?;
+        self.state.bell().await?;
         self.state.session.op_text = command.to_string();
-        self.state.display_text(
-            IceText::MenuSelectionUnavailable,
-            display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
-        )?;
+        self.state
+            .display_text(
+                IceText::MenuSelectionUnavailable,
+                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
+            )
+            .await?;
 
         self.state.session.security_violations += 1;
         if let Some(user) = &mut self.state.current_user {
             user.stats.num_sec_viol += 1;
         }
         if self.state.session.security_violations > 10 {
-            self.state.display_text(
-                IceText::SecurityViolation,
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LOGIT,
-            )?;
             self.state
-                .display_text(IceText::AutoDisconnectNow, display_flags::NEWLINE | display_flags::LFBEFORE)?;
-            self.state.goodbye()?;
+                .display_text(
+                    IceText::SecurityViolation,
+                    display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LOGIT,
+                )
+                .await?;
+            self.state
+                .display_text(IceText::AutoDisconnectNow, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            self.state.goodbye().await?;
         }
 
         Ok(false)
     }
 
-    fn displaycmdfile(&mut self, command_file: &str) -> Res<bool> {
+    async fn displaycmdfile(&mut self, command_file: &str) -> Res<bool> {
         let path = self.state.board.lock().unwrap().config.paths.command_display_path.clone();
         if !path.is_dir() {
             return Ok(false);
         }
         let file = path.join(command_file);
         if file.with_extension("ppe").is_file() {
-            self.state.run_ppe(&path, None)?;
+            self.state.run_ppe(&path, None).await?;
             return Ok(true);
         }
 
@@ -303,13 +312,13 @@ impl PcbBoardCommand {
         }
         */
 
-        self.state.display_file_with_error(&file, false)
+        self.state.display_file_with_error(&file, false).await
     }
 
-    fn send_message(&mut self, conf: i32, area: i32, msg: JamMessage, text: IceText) -> Res<()> {
+    async fn send_message(&mut self, conf: i32, area: i32, msg: JamMessage, text: IceText) -> Res<()> {
         let msg_base = if conf < 0 {
             let user_name = msg.get_to().unwrap().to_string();
-            self.get_email_msgbase(&user_name)
+            self.get_email_msgbase(&user_name).await
         } else {
             let msg_base = self.state.board.lock().unwrap().conferences[conf as usize].areas[area as usize]
                 .filename
@@ -327,13 +336,13 @@ impl PcbBoardCommand {
                 let number = msg_base.write_message(&msg)?;
                 msg_base.write_jhr_header()?;
 
-                self.state.display_text(text, display_flags::DEFAULT)?;
-                self.state.println(TerminalTarget::Both, &number.to_string())?;
-                self.state.new_line()?;
+                self.state.display_text(text, display_flags::DEFAULT).await?;
+                self.state.println(TerminalTarget::Both, &number.to_string()).await?;
+                self.state.new_line().await?;
             }
             Err(err) => {
                 log::error!("while opening message base: {}", err.to_string());
-                self.state.display_text(IceText::MessageBaseError, display_flags::NEWLINE)?;
+                self.state.display_text(IceText::MessageBaseError, display_flags::NEWLINE).await?;
             }
         }
 

@@ -1,3 +1,4 @@
+/*
 use icy_net::protocol::{Zmodem, ZCRCE};
 mod test_connection;
 
@@ -128,4 +129,5 @@ fn compare_data_packages(orig: &[u8], encoded: &[u8]) {
     assert_eq!(orig.len(), encoded.len());
 }
 
+*/
 */

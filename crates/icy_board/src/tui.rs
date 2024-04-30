@@ -14,6 +14,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, Clear, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
+use tokio::sync::mpsc;
 
 use crate::Res;
 use icy_board_engine::{
@@ -28,7 +29,7 @@ use icy_board_tui::{
     theme::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GRAY, DOS_LIGHT_GREEN, DOS_WHITE},
 };
 use icy_engine::{ansi, TextPane};
-use icy_net::{channel::ChannelConnection, ConnectionType};
+use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
 use ratatui::{
     prelude::*,
     widgets::{canvas::Canvas, Paragraph},
@@ -37,9 +38,9 @@ use ratatui::{
 use crate::{bbs::BBS, icy_engine_output::Screen, menu_runner::PcbBoardCommand};
 
 pub struct Tui {
-    screen: Screen,
+    screen: Arc<Mutex<Screen>>,
     session: Arc<Mutex<Session>>,
-    connection: ChannelConnection,
+    tx: mpsc::Sender<Vec<u8>>,
     status_bar: usize,
     handle: Arc<Mutex<Vec<Option<NodeState>>>>,
     node: usize,
@@ -51,66 +52,83 @@ impl Tui {
         session.is_local = true;
         let ui_session = Arc::new(Mutex::new(session));
         let session = ui_session.clone();
-        let (ui_connection, connection) = ChannelConnection::create_pair();
         let board = board.clone();
         let ui_node = bbs.lock().unwrap().create_new_node(ConnectionType::Channel);
         let node_state = bbs.lock().unwrap().open_connections.clone();
         let node = ui_node.clone();
+
+        let (tx, rx) = mpsc::channel(32);
+
+        let screen = Arc::new(Mutex::new(Screen::new()));
+        let screen2 = screen.clone();
         let handle = thread::spawn(move || {
-            let mut state = IcyBoardState::new(board, node_state, node, Box::new(connection));
-            if sysop_mode {
-                state.session.is_sysop = true;
-                state.set_current_user(0).unwrap();
-            }
-            let mut cmd = PcbBoardCommand::new(state);
+            tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(4)
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(async { /*
+                let mut parser = ansi::Parser::default();
+                parser.bs_is_ctrl_char = true;
+                    
+        
+                let mut screen_buf = [0; 1024 * 16];
 
-            let orig_hook = std::panic::take_hook();
-            std::panic::set_hook(Box::new(move |panic_info| {
-                log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
-                log::error!("full info: {:?}", panic_info);
+                let mut state = IcyBoardState::new(board, node_state, node, Box::new(connection));
+                if sysop_mode {
+                    state.session.is_sysop = true;
+                    state.set_current_user(0).unwrap();
+                }
+                let mut cmd = PcbBoardCommand::new(state);
 
-                orig_hook(panic_info);
-            }));
+                let orig_hook = std::panic::take_hook();
+                std::panic::set_hook(Box::new(move |panic_info| {
+                    log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
+                    log::error!("full info: {:?}", panic_info);
 
-            if !sysop_mode {
-                match cmd.login() {
-                    Ok(true) => {}
-                    Ok(false) => {
-                        return Ok(());
-                    }
-                    Err(err) => {
-                        log::error!("error during login process {}", err);
-                        return Ok(());
+                    orig_hook(panic_info);
+                }));
+
+                if !sysop_mode {
+                    match cmd.login().await {
+                        Ok(true) => {}
+                        Ok(false) => {
+                            return Ok(());
+                        }
+                        Err(err) => {
+                            log::error!("error during login process {}", err);
+                            return Ok(());
+                        }
                     }
                 }
-            }
-            if let Some(ppe) = ppe {
-                let _ = cmd.state.run_ppe(&ppe, None);
-                let _ = cmd.state.press_enter();
-                let _ = cmd.state.hangup();
-                return Ok(());
-            }
-
-            loop {
-                session.lock().unwrap().cur_user = cmd.state.session.cur_user;
-                session.lock().unwrap().current_conference = cmd.state.session.current_conference.clone();
-                session.lock().unwrap().disp_options = cmd.state.session.disp_options.clone();
-
-                if let Err(err) = cmd.do_command() {
-                    cmd.state.session.disp_options.reset_printout();
-                    log::error!("session thread 'do_command': {}", err);
-                    if cmd.state.set_color(TerminalTarget::Both, 4.into()).is_ok() {
-                        let _ = cmd.state.print(TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err));
-                        let _ = cmd.state.reset_color();
-                    }
-                }
-                cmd.state.session.disp_options.reset_printout();
-                if cmd.state.session.request_logoff {
-                    let _ = cmd.state.connection.shutdown();
+                if let Some(ppe) = ppe {
+                    let _ = cmd.state.run_ppe(&ppe, None);
+                    let _ = cmd.state.press_enter();
+                    let _ = cmd.state.hangup();
                     return Ok(());
                 }
-                thread::sleep(Duration::from_millis(20));
-            }
+
+                loop {
+                    session.lock().unwrap().cur_user = cmd.state.session.cur_user;
+                    session.lock().unwrap().current_conference = cmd.state.session.current_conference.clone();
+                    session.lock().unwrap().disp_options = cmd.state.session.disp_options.clone();
+
+                    if let Err(err) = cmd.do_command() {
+                        cmd.state.session.disp_options.reset_printout();
+                        log::error!("session thread 'do_command': {}", err);
+                        if cmd.state.set_color(TerminalTarget::Both, 4.into()).is_ok() {
+                            let _ = cmd.state.print(TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err));
+                            let _ = cmd.state.reset_color();
+                        }
+                    }
+                    cmd.state.session.disp_options.reset_printout();
+                    if cmd.state.session.request_logoff {
+                        let _ = cmd.state.connection.shutdown();
+                        return Ok(());
+                    }
+                    thread::sleep(Duration::from_millis(20));
+                } */
+            });
         });
         bbs.lock().unwrap().get_open_connections().as_ref().lock().unwrap()[node]
             .as_mut()
@@ -118,9 +136,9 @@ impl Tui {
             .handle = Some(handle);
 
         Self {
-            screen: Screen::new(),
+            screen: screen2,
             session: ui_session,
-            connection: ui_connection,
+            tx,
             status_bar: 0,
             node,
             handle: bbs.lock().unwrap().get_open_connections().clone(),
@@ -161,26 +179,6 @@ impl Tui {
         let tick_rate = Duration::from_millis(20);
         let mut redraw = true;
         loop {
-            let mut screen_buf = [0; 1024 * 16];
-            let mut parser = ansi::Parser::default();
-            parser.bs_is_ctrl_char = true;
-            loop {
-                match self.connection.read(&mut screen_buf) {
-                    Ok(size) => {
-                        if size == 0 {
-                            break;
-                        }
-                        redraw = true;
-                        for &b in screen_buf[0..size].iter() {
-                            self.screen.print(&mut parser, codepages::tables::CP437_TO_UNICODE[b as usize]);
-                        }
-                    }
-                    Err(_) => {
-                        // channel closed
-                        return Ok(());
-                    }
-                }
-            }
             if self.handle.lock().unwrap()[self.node].as_ref().unwrap().handle.as_ref().unwrap().is_finished() {
                 restore_terminal()?;
                 let handle = self.handle.lock().unwrap()[self.node].as_mut().unwrap().handle.take().unwrap();
@@ -388,7 +386,7 @@ impl Tui {
             s.push(c);
         }
 
-        if let Err(_) = self.connection.write_all(s.as_bytes()) {
+        if let Err(_) = self.connection.send(s.as_bytes()).await {
             return Ok(());
         }
         Ok(())

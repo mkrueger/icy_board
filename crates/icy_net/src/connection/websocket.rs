@@ -1,16 +1,18 @@
+use async_trait::async_trait;
 use http::Uri;
 use rustls::{RootCertStore, ServerConnection, StreamOwned};
+use tokio_tungstenite::tungstenite::{self, WebSocket};
+use tokio_tungstenite::MaybeTlsStream;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::io::{BufReader, ErrorKind};
-use std::net::TcpStream;
+use tokio::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::sync::Arc;
-use tungstenite::{client::IntoClientRequest, stream::MaybeTlsStream, Error, Message, WebSocket};
 
 use crate::{Connection, ConnectionType};
 
-pub struct WebSocketConnection<S: Read + Write> {
+pub struct WebSocketConnection<S: Unpin + Send> {
     is_secure: bool,
     socket: WebSocket<S>,
     data: Vec<u8>,
@@ -24,7 +26,7 @@ pub fn accept_websocket(stream: TcpStream) -> crate::Result<WebSocketConnection<
         data: Vec::new(),
     })
 }
-
+/*
 pub fn accept_websocket_secure(
     stream: TcpStream,
     cert_file: &Path,
@@ -51,7 +53,7 @@ fn accept_secure2(
 
         let tls_session = ServerConnection::new(Arc::new(config))?;
         let stream: StreamOwned<ServerConnection, TcpStream> = rustls::StreamOwned::new(tls_session, stream);
-        let socket = tungstenite::accept_hdr(
+        let socket: WebSocket<StreamOwned<ServerConnection, TcpStream>> = tungstenite::accept_hdr(
             stream,
             |req: &tungstenite::handshake::server::Request, mut response: tungstenite::handshake::server::Response| {
                 for (ref header, _value) in req.headers() {
@@ -71,6 +73,7 @@ fn accept_secure2(
     }
 }
 
+*/
 pub fn connect(address: &String, is_secure: bool) -> crate::Result<WebSocketConnection<MaybeTlsStream<TcpStream>>> {
     // build an ws:// or wss:// address
     //  :TODO: default port if not supplied in address
@@ -119,7 +122,8 @@ fn schema_prefix(is_secure: bool) -> &'static str {
     }
 }
 
-impl<S: Read + Write> Connection for WebSocketConnection<S> {
+#[async_trait]
+impl<S: Unpin + Send> Connection for WebSocketConnection<S> {
     fn get_connection_type(&self) -> ConnectionType {
         if self.is_secure {
             ConnectionType::SecureWebsocket
@@ -128,12 +132,22 @@ impl<S: Read + Write> Connection for WebSocketConnection<S> {
         }
     }
 
-    fn shutdown(&mut self) -> crate::Result<()> {
+    async fn receive(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        Ok(self.tcp_stream.read(buf).await?)
+    }
+
+    async fn send(&mut self, buf: &[u8]) -> crate::Result<()> {
+        self.tcp_stream.write_all(buf).await?;
+        Ok(())
+    }
+
+    async fn shutdown(&mut self) -> crate::Result<()> {
         self.socket.close(None)?;
         Ok(())
     }
 }
 
+/* 
 impl<S: Read + Write> Read for WebSocketConnection<S> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if self.data.len() > 0 {
@@ -174,3 +188,4 @@ impl<S: Read + Write> Write for WebSocketConnection<S> {
         Ok(())
     }
 }
+*/

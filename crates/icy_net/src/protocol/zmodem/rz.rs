@@ -1,6 +1,5 @@
 #![allow(clippy::unused_self, clippy::wildcard_imports)]
 use std::{cmp::Ordering, io::Write, time::Instant};
-
 use tempfile::NamedTempFile;
 
 use crate::{
@@ -66,17 +65,17 @@ impl Rz {
         !matches!(self.state, RecvState::Idle)
     }
 
-    fn cancel(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
+    async fn cancel(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
         self.state = RecvState::Idle;
-        Zmodem::cancel(com)
+        Zmodem::cancel(com).await
     }
 
-    pub fn update_transfer(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
+    pub async fn update_transfer(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
         if let RecvState::Idle = self.state {
             return Ok(());
         }
         if self.retries > 5 {
-            self.cancel(com)?;
+            self.cancel(com).await?;
             return Ok(());
         }
         transfer_state.update_time();
@@ -86,7 +85,7 @@ impl Rz {
         // println!("rz state {:?}", self.state);
         match self.state {
             RecvState::SendZRINIT => {
-                if self.read_header(com, transfer_state)? {
+                if self.read_header(com, transfer_state).await? {
                     return Ok(());
                 }
                 /*  let now = Instant::now();
@@ -100,11 +99,13 @@ impl Rz {
                 self.read_header(com, storage_handler, transfer_state)?;
             }*/
             RecvState::AwaitFileData => {
-                let pck = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control);
+                let pck = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control).await;
                 match pck {
                     Ok((block, is_last, expect_ack)) => {
                         if expect_ack {
-                            Header::from_number(ZFrameType::Ack, block.len() as u32).write(com, HeaderType::Hex, self.can_esc_control)?;
+                            Header::from_number(ZFrameType::Ack, block.len() as u32)
+                                .write(com, HeaderType::Hex, self.can_esc_control)
+                                .await?;
                         }
                         if let Some(named_file) = &mut self.cur_out_file {
                             named_file.as_file_mut().write_all(&block)?;
@@ -123,35 +124,35 @@ impl Rz {
                         log::error!("{err}");
                         transfer_state.recieve_state.log_error(format!("sub package error: {err}"));
 
-                        Header::from_number(ZFrameType::RPos, transfer_state.recieve_state.cur_bytes_transfered as u32).write(
-                            com,
-                            HeaderType::Hex,
-                            self.can_esc_control,
-                        )?;
+                        Header::from_number(ZFrameType::RPos, transfer_state.recieve_state.cur_bytes_transfered as u32)
+                            .write(com, HeaderType::Hex, self.can_esc_control)
+                            .await?;
                         self.state = RecvState::AwaitZDATA;
                         return Ok(());
                     }
                 }
             }
             _ => {
-                self.read_header(com, transfer_state)?;
+                self.read_header(com, transfer_state).await?;
             }
         }
         Ok(())
     }
 
-    fn request_zpos(&mut self, com: &mut dyn Connection, pos: u32) -> crate::Result<usize> {
-        Header::from_number(ZFrameType::RPos, pos).write(com, HeaderType::Hex, self.can_esc_control)
+    async fn request_zpos(&mut self, com: &mut dyn Connection, pos: u32) -> crate::Result<usize> {
+        Header::from_number(ZFrameType::RPos, pos)
+            .write(com, HeaderType::Hex, self.can_esc_control)
+            .await
     }
 
-    fn read_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<bool> {
-        let result = Header::read(com, &mut self.can_count);
+    async fn read_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<bool> {
+        let result = Header::read(com, &mut self.can_count).await;
         if result.is_err() {
             if self.can_count >= 5 {
                 //transfer_state.write("Received cancel...".to_string());
-                self.cancel(com)?;
-                self.cancel(com)?;
-                self.cancel(com)?;
+                self.cancel(com).await?;
+                self.cancel(com).await?;
+                self.cancel(com).await?;
                 self.state = RecvState::Idle;
                 return Ok(false);
             }
@@ -165,18 +166,18 @@ impl Rz {
             // println!("got header: {header}");
             match header.frame_type {
                 ZFrameType::Sinit => {
-                    let pck = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control);
+                    let pck = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control).await;
                     match pck {
                         Ok(attn_seq) => {
                             self.attn_seq = attn_seq.0;
                             self.sender_flags = header.f0();
-                            Header::empty(ZFrameType::Ack).write(com, HeaderType::Hex, self.can_esc_control)?;
+                            Header::empty(ZFrameType::Ack).write(com, HeaderType::Hex, self.can_esc_control).await?;
                             return Ok(true);
                         }
                         Err(err) => {
                             //transfer_state.write(format!("{}", err));
                             log::error!("{err}");
-                            Header::empty(ZFrameType::Nak).write(com, HeaderType::Hex, self.can_esc_control)?;
+                            Header::empty(ZFrameType::Nak).write(com, HeaderType::Hex, self.can_esc_control).await?;
                             return Ok(false);
                         }
                     }
@@ -187,7 +188,7 @@ impl Rz {
                     return Ok(true);
                 }
                 ZFrameType::File => {
-                    let pck = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control);
+                    let pck = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control).await;
 
                     match pck {
                         Ok((block, _, _)) => {
@@ -209,19 +210,17 @@ impl Rz {
                             transfer_state.recieve_state.cur_bytes_transfered = 0;
 
                             self.state = RecvState::AwaitZDATA;
-                            self.request_zpos(com, transfer_state.recieve_state.cur_bytes_transfered as u32)?;
+                            self.request_zpos(com, transfer_state.recieve_state.cur_bytes_transfered as u32).await?;
 
                             return Ok(true);
                         }
                         Err(err) => {
                             log::error!("{err}");
                             transfer_state.recieve_state.errors += 1;
-                            com.write_all(&self.attn_seq)?;
-                            Header::from_number(ZFrameType::RPos, transfer_state.recieve_state.cur_bytes_transfered as u32).write(
-                                com,
-                                HeaderType::Hex,
-                                self.can_esc_control,
-                            )?;
+                            com.send(&self.attn_seq).await?;
+                            Header::from_number(ZFrameType::RPos, transfer_state.recieve_state.cur_bytes_transfered as u32)
+                                .write(com, HeaderType::Hex, self.can_esc_control)
+                                .await?;
                             //transfer_state.write(format!("{}", err));
                             return Ok(false);
                         }
@@ -230,7 +229,7 @@ impl Rz {
                 ZFrameType::Data => {
                     let offset = header.number();
                     if self.cur_out_file.is_none() {
-                        self.cancel(com)?;
+                        self.cancel(com).await?;
                         return Err(ZModemError::ZDataBeforeZFILE.into());
                     }
                     let len = transfer_state.recieve_state.cur_bytes_transfered as usize;
@@ -244,7 +243,9 @@ impl Rz {
                         }
 
                         Ordering::Less => {
-                            Header::from_number(ZFrameType::RPos, len as u32).write(com, HeaderType::Hex, self.can_esc_control)?;
+                            Header::from_number(ZFrameType::RPos, len as u32)
+                                .write(com, HeaderType::Hex, self.can_esc_control)
+                                .await?;
                             return Ok(false);
                         }
                         Ordering::Equal => {}
@@ -253,7 +254,7 @@ impl Rz {
                     return Ok(true);
                 }
                 ZFrameType::Eof => {
-                    self.send_zrinit(com)?;
+                    self.send_zrinit(com).await?;
                     transfer_state.recieve_state.log_info("File transferred.");
                     if let Some(named_file) = self.cur_out_file.take() {
                         let path = &named_file.keep()?.1;
@@ -265,22 +266,26 @@ impl Rz {
                     return Ok(true);
                 }
                 ZFrameType::Fin => {
-                    Header::empty(ZFrameType::Fin).write(com, HeaderType::Hex, self.can_esc_control)?;
+                    Header::empty(ZFrameType::Fin).write(com, HeaderType::Hex, self.can_esc_control).await?;
                     //transfer_state.write("Transfer finished.".to_string());
                     self.state = RecvState::Idle;
                     return Ok(true);
                 }
                 ZFrameType::Challenge => {
                     // isn't specfied for receiver side.
-                    Header::from_number(ZFrameType::Ack, header.number()).write(com, HeaderType::Hex, self.can_esc_control)?;
+                    Header::from_number(ZFrameType::Ack, header.number())
+                        .write(com, HeaderType::Hex, self.can_esc_control)
+                        .await?;
                 }
                 ZFrameType::FreeCnt => {
                     // 0 means unlimited space but sending free hd space to an unknown source is a security issue
-                    Header::from_number(ZFrameType::Ack, 0).write(com, HeaderType::Hex, self.can_esc_control)?;
+                    Header::from_number(ZFrameType::Ack, 0)
+                        .write(com, HeaderType::Hex, self.can_esc_control)
+                        .await?;
                 }
                 ZFrameType::Command => {
                     // just protocol it.
-                    let package = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control);
+                    let package = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control).await;
                     match &package {
                         Ok((block, _, _)) => {
                             let cmd = str_from_null_terminated_utf8_unchecked(block);
@@ -290,10 +295,12 @@ impl Rz {
                             log::error!("{err}");
                         }
                     }
-                    Header::from_number(ZFrameType::Compl, 0).write(com, HeaderType::Hex, self.can_esc_control)?;
+                    Header::from_number(ZFrameType::Compl, 0)
+                        .write(com, HeaderType::Hex, self.can_esc_control)
+                        .await?;
                 }
                 ZFrameType::Abort | ZFrameType::FErr | ZFrameType::Can => {
-                    Header::empty(ZFrameType::Fin).write(com, HeaderType::Hex, self.can_esc_control)?;
+                    Header::empty(ZFrameType::Fin).write(com, HeaderType::Hex, self.can_esc_control).await?;
                     self.state = RecvState::Idle;
                 }
                 unk_frame => {
@@ -304,14 +311,14 @@ impl Rz {
         Ok(false)
     }
 
-    pub fn recv(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
+    pub async fn recv(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
         self.state = RecvState::Await;
         self.retries = 0;
-        self.send_zrinit(com)?;
+        self.send_zrinit(com).await?;
         Ok(())
     }
 
-    pub fn send_zrinit(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
+    pub async fn send_zrinit(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
         let mut flags = 0;
         if self.can_fullduplex {
             flags |= CANFDX;
@@ -331,17 +338,19 @@ impl Rz {
         if self.escape_8th_bit {
             flags |= zrinit_flag::ESC8;
         }
-        Header::from_flags(ZFrameType::RIinit, 0, 0, 0, flags).write(com, HeaderType::Hex, self.can_esc_control)?;
+        Header::from_flags(ZFrameType::RIinit, 0, 0, 0, flags)
+            .write(com, HeaderType::Hex, self.can_esc_control)
+            .await?;
         Ok(())
     }
 }
 
-pub fn read_subpacket(com: &mut dyn Connection, block_length: usize, use_crc32: bool, escape_ctrl_chars: bool) -> crate::Result<(Vec<u8>, bool, bool)> {
+pub async fn read_subpacket(com: &mut dyn Connection, block_length: usize, use_crc32: bool, escape_ctrl_chars: bool) -> crate::Result<(Vec<u8>, bool, bool)> {
     let mut data = Vec::with_capacity(block_length);
     loop {
-        match read_zdle_byte(com, escape_ctrl_chars)? {
+        match read_zdle_byte(com, escape_ctrl_chars).await? {
             ZModemResult::Ok(b) => data.push(b),
-            ZModemResult::CrcCheckRequested(first_byte, frame_ends, zack_requested) => match check_crc(com, use_crc32, &data, first_byte) {
+            ZModemResult::CrcCheckRequested(first_byte, frame_ends, zack_requested) => match check_crc(com, use_crc32, &data, first_byte).await {
                 Ok(_) => {
                     return Ok((data, frame_ends, zack_requested));
                 }
@@ -362,13 +371,13 @@ pub enum ZModemResult {
     CrcCheckRequested(u8, bool, bool),
 }
 
-pub fn read_zdle_byte(com: &mut dyn Connection, escape_ctrl_chars: bool) -> crate::Result<ZModemResult> {
+pub async fn read_zdle_byte(com: &mut dyn Connection, escape_ctrl_chars: bool) -> crate::Result<ZModemResult> {
     loop {
-        let c = com.read_u8()?;
+        let c = com.read_u8().await?;
         match c {
             ZDLE => {
                 loop {
-                    let c = com.read_u8()?;
+                    let c = com.read_u8().await?;
                     match c {
                         XON | XON_0X80 | XOFF | XOFF_0X80 | ZDLE => {
                             continue;
@@ -420,11 +429,11 @@ pub fn read_zdle_byte(com: &mut dyn Connection, escape_ctrl_chars: bool) -> crat
     }
 }
 
-fn check_crc(com: &mut dyn Connection, use_crc32: bool, data: &[u8], zcrc_byte: u8) -> crate::Result<bool> {
+async fn check_crc(com: &mut dyn Connection, use_crc32: bool, data: &[u8], zcrc_byte: u8) -> crate::Result<bool> {
     if use_crc32 {
         let mut crc = get_crc32(data);
         crc = !update_crc32(!crc, zcrc_byte);
-        let crc_bytes = read_zdle_bytes(com, 4)?;
+        let crc_bytes = read_zdle_bytes(com, 4).await?;
         let check_crc = u32::from_le_bytes(crc_bytes.try_into().unwrap());
         if crc == check_crc {
             Ok(true)
@@ -434,7 +443,7 @@ fn check_crc(com: &mut dyn Connection, use_crc32: bool, data: &[u8], zcrc_byte: 
     } else {
         let crc = get_crc16_buggy_zlde(data, zcrc_byte);
 
-        let crc_bytes = read_zdle_bytes(com, 2)?;
+        let crc_bytes = read_zdle_bytes(com, 2).await?;
         let check_crc = u16::from_le_bytes(crc_bytes.try_into().unwrap());
         if crc == check_crc {
             Ok(true)

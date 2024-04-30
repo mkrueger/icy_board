@@ -10,9 +10,9 @@ use icy_board_engine::{
 };
 
 impl PcbBoardCommand {
-    pub fn set_transfer_protocol(&mut self, _action: &Command) -> Res<()> {
-        self.displaycmdfile("preprot")?;
-        if self.displaycmdfile("prot")? {
+    pub async fn set_transfer_protocol(&mut self, _action: &Command) -> Res<()> {
+        self.displaycmdfile("preprot").await?;
+        if self.displaycmdfile("prot").await? {
             return Ok(());
         }
         let cur_protocol = if let Some(user) = &mut self.state.current_user {
@@ -21,11 +21,11 @@ impl PcbBoardCommand {
             String::new()
         };
 
-        let protocol = self.ask_protocols(cur_protocol)?;
+        let protocol = self.ask_protocols(cur_protocol).await?;
         if !protocol.is_empty() {
             let selected_protocol = protocol.to_ascii_uppercase();
 
-            self.state.display_text(IceText::DefaultProtocol, display_flags::DEFAULT)?;
+            self.state.display_text(IceText::DefaultProtocol, display_flags::DEFAULT).await?;
             let txt = if let Ok(board) = self.state.board.lock() {
                 let mut res = String::new();
                 for protocol in board.protocols.iter() {
@@ -41,19 +41,19 @@ impl PcbBoardCommand {
             if let Some(user) = &mut self.state.current_user {
                 user.protocol = selected_protocol;
             }
-            self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11))?;
-            self.state.print(TerminalTarget::Both, &txt)?;
-            self.state.new_line()?;
-            self.state.new_line()?;
+            self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11)).await?;
+            self.state.print(TerminalTarget::Both, &txt).await?;
+            self.state.new_line().await?;
+            self.state.new_line().await?;
         }
-        self.state.press_enter()?;
+        self.state.press_enter().await?;
         self.display_menu = true;
         Ok(())
     }
 
-    pub fn ask_protocols(&mut self, cur_protocol: String) -> Res<String> {
+    pub async fn ask_protocols(&mut self, cur_protocol: String) -> Res<String> {
         let mut protocols = Vec::new();
-        self.state.new_line()?;
+        self.state.new_line().await?;
         if let Ok(board) = self.state.board.lock() {
             for protocol in board.protocols.iter() {
                 if !protocol.is_enabled {
@@ -73,19 +73,22 @@ impl PcbBoardCommand {
             }
         }
 
-        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11))?;
+        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11)).await?;
         for line in protocols {
-            self.state.print(TerminalTarget::Both, &line)?;
-            self.state.new_line()?;
+            self.state.print(TerminalTarget::Both, &line).await?;
+            self.state.new_line().await?;
         }
-        let protocol = self.state.input_field(
-            IceText::DesiredProtocol,
-            1,
-            &MASK_ALNUM,
-            "",
-            Some(cur_protocol.to_string()),
-            display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER | display_flags::UPCASE | display_flags::FIELDLEN,
-        )?;
+        let protocol = self
+            .state
+            .input_field(
+                IceText::DesiredProtocol,
+                1,
+                &MASK_ALNUM,
+                "",
+                Some(cur_protocol.to_string()),
+                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER | display_flags::UPCASE | display_flags::FIELDLEN,
+            )
+            .await?;
         Ok(protocol)
     }
 }

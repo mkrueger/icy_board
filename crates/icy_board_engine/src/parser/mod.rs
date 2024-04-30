@@ -196,7 +196,7 @@ impl UserTypeRegistry {
         None
     }
 
-    pub fn register<T: UserData>(&mut self) {
+    pub fn register<'a, T: UserData>(&mut self) {
         let mut registry = UserDataRegistry::default();
         T::register_members(&mut registry);
         let id = self.types.len();

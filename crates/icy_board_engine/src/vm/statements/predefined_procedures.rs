@@ -19,96 +19,96 @@ use super::super::errors::IcyError;
 /// # Panics
 ///
 /// Always
-pub fn invalid(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn invalid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("Invalid statement");
 }
 
-pub fn end(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn end(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     vm.is_running = false;
     Ok(())
 }
 
-pub fn cls(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.print(TerminalTarget::Both, "\x1B[2J")
+pub async fn cls(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.print(TerminalTarget::Both, "\x1B[2J").await
 }
 
-pub fn clreol(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.print(TerminalTarget::Both, "\x1B[K")
+pub async fn clreol(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.print(TerminalTarget::Both, "\x1B[K").await
 }
 
-pub fn more(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.more_promt()?;
+pub async fn more(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.more_promt().await?;
     Ok(())
 }
 
-pub fn wait(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.press_enter()?;
+pub async fn wait(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.press_enter().await?;
     Ok(())
 }
 
-pub fn color(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let color = vm.eval_expr(&args[0])?.as_int() as u8;
-    vm.icy_board_state.set_color(TerminalTarget::Both, color.into())?;
+pub async fn color(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let color = vm.eval_expr(&args[0]).await?.as_int() as u8;
+    vm.icy_board_state.set_color(TerminalTarget::Both, color.into()).await?;
     Ok(())
 }
 
-pub fn confflag(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn confflag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn confunflag(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn confunflag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
 /// # Errors
 /// Errors if
-pub fn dispfile(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let file_name = &vm.eval_expr(&args[0])?.as_string();
+pub async fn dispfile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let file_name = &vm.eval_expr(&args[0]).await?.as_string();
 
     let file_name = vm.resolve_file(&file_name);
-    vm.icy_board_state.display_file(&file_name)?;
+    vm.icy_board_state.display_file(&file_name).await?;
     Ok(())
 }
 
-pub fn input(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn input(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
-pub fn fcreate(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0])?.as_int() as usize;
-    let file = vm.eval_expr(&args[1])?.as_string();
-    let am = vm.eval_expr(&args[2])?.as_int();
-    let sm = vm.eval_expr(&args[3])?.as_int();
+pub async fn fcreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let file = vm.eval_expr(&args[1]).await?.as_string();
+    let am = vm.eval_expr(&args[2]).await?.as_int();
+    let sm = vm.eval_expr(&args[3]).await?.as_int();
     let file = vm.resolve_file(&file).to_string_lossy().to_string();
     vm.io.fcreate(channel, &file, am, sm);
     Ok(())
 }
 
-pub fn fopen(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0])?.as_int() as usize;
-    let file = vm.eval_expr(&args[1])?.as_string();
-    let am = vm.eval_expr(&args[2])?.as_int();
-    let sm = vm.eval_expr(&args[3])?.as_int();
+pub async fn fopen(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let file = vm.eval_expr(&args[1]).await?.as_string();
+    let am = vm.eval_expr(&args[2]).await?.as_int();
+    let sm = vm.eval_expr(&args[3]).await?.as_int();
     let file = vm.resolve_file(&file).to_string_lossy().to_string();
     vm.io.fopen(channel, &file, am, sm)?;
     Ok(())
 }
 
-pub fn fappend(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0])?.as_int() as usize;
-    let file = vm.eval_expr(&args[1])?.as_string();
-    let am = vm.eval_expr(&args[2])?.as_int();
-    let sm = vm.eval_expr(&args[3])?.as_int();
+pub async fn fappend(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let file = vm.eval_expr(&args[1]).await?.as_string();
+    let am = vm.eval_expr(&args[2]).await?.as_int();
+    let sm = vm.eval_expr(&args[3]).await?.as_int();
     let file = vm.resolve_file(&file).to_string_lossy().to_string();
     vm.io.fappend(channel, &file, am, sm);
     Ok(())
 }
 
-pub fn fclose(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0])?.as_int();
+pub async fn fclose(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let channel = vm.eval_expr(&args[0]).await?.as_int();
     if channel == -1 {
         // READLINE uses -1 as a special value
         return Ok(());
@@ -120,28 +120,28 @@ pub fn fclose(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 
-pub fn fget(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0])?.as_int() as usize;
+pub async fn fget(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
     let value = VariableValue::new_string(vm.io.fget(channel)?);
-    vm.set_variable(&args[1], value)?;
+    vm.set_variable(&args[1], value).await?;
     Ok(())
 }
 
-pub fn fput(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0])?.as_int() as usize;
+pub async fn fput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
 
     for value in &args[1..] {
-        let text = vm.eval_expr(value)?.as_string();
+        let text = vm.eval_expr(value).await?.as_string();
         vm.io.fput(channel, text)?;
     }
     Ok(())
 }
 
-pub fn fputln(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0])?.as_int() as usize;
+pub async fn fputln(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
 
     for value in &args[1..] {
-        let text = vm.eval_expr(value)?.as_string();
+        let text = vm.eval_expr(value).await?.as_string();
         vm.io.fput(channel, text)?;
     }
     vm.io.fput(channel, "\n".to_string())?;
@@ -150,36 +150,36 @@ pub fn fputln(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 
 /// # Errors
 /// Errors if the variable is not found.
-pub fn resetdisp(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn resetdisp(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     // TODO?: unused
     Ok(())
 }
 
 /// # Errors
 /// Errors if the variable is not found.
-pub fn startdisp(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn startdisp(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     // TODO?: unused
     Ok(())
 }
 
 /// # Errors
 /// Errors if the variable is not found.
-pub fn fputpad(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fputpad(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
 /// # Errors
 /// Errors if the variable is not found.
-pub fn hangup(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.goodbye()?;
+pub async fn hangup(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.goodbye().await?;
     vm.is_running = false;
     Ok(())
 }
 
 /// # Errors
 /// Errors if the variable is not found.
-pub fn getuser(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
+pub async fn getuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
     let user = if let Some(user) = &mut vm.icy_board_state.current_user {
         user.clone()
     } else {
@@ -192,7 +192,7 @@ pub fn getuser(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
 
 /// # Errors
 /// Errors if the variable is not found.
-pub fn putuser(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
+pub async fn putuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
     if let Some(mut user) = vm.icy_board_state.current_user.take() {
         vm.put_user_variables(&mut user);
         vm.icy_board_state.current_user = Some(user);
@@ -200,12 +200,12 @@ pub fn putuser(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 
-pub fn defcolor(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.reset_color()
+pub async fn defcolor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.reset_color().await
 }
 
-pub fn delete(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let file = &vm.eval_expr(&args[0])?.as_string();
+pub async fn delete(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let file = &vm.eval_expr(&args[0]).await?.as_string();
     let file = vm.resolve_file(&file).to_string_lossy().to_string();
     if let Err(err) = vm.io.delete(&file) {
         log::error!("Error deleting file: {}", err);
@@ -213,235 +213,235 @@ pub fn delete(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 
-pub fn deluser(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn deluser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn adjtime(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let min = vm.eval_expr(&args[0])?.as_int();
+pub async fn adjtime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let min = vm.eval_expr(&args[0]).await?.as_int();
     vm.icy_board_state.session.time_limit += min;
     Ok(())
 }
 
-pub fn log(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let msg = vm.eval_expr(&args[0])?.as_string();
-    // let left = &vm.eval_expr(&args[0])?;
+pub async fn log(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let msg = vm.eval_expr(&args[0]).await?.as_string();
+    // let left = &vm.eval_expr(&args[0]).await?;
     log::info!("{}", msg);
     Ok(())
 }
 
 const TXT_STOPCHAR: char = '_';
 
-pub fn inputstr(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let prompt = vm.eval_expr(&args[0])?.as_string();
+pub async fn inputstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let prompt = vm.eval_expr(&args[0]).await?.as_string();
     // 1 Output Variable
-    let color = vm.eval_expr(&args[2])?.as_int() as u8;
-    let len = vm.eval_expr(&args[3])?.as_int();
-    let valid = vm.eval_expr(&args[4])?.as_string();
-    let flags = vm.eval_expr(&args[5])?.as_int();
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, &valid, "", None, flags)?;
-    vm.set_variable(&args[1], VariableValue::new_string(output))?;
+    let color = vm.eval_expr(&args[2]).await?.as_int() as u8;
+    let len = vm.eval_expr(&args[3]).await?.as_int();
+    let valid = vm.eval_expr(&args[4]).await?.as_string();
+    let flags = vm.eval_expr(&args[5]).await?.as_int();
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, &valid, "", None, flags).await?;
+    vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
     Ok(())
 }
 
-pub fn inputyn(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let mut prompt = vm.eval_expr(&args[0])?.as_string();
+pub async fn inputyn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let mut prompt = vm.eval_expr(&args[0]).await?.as_string();
     if prompt.ends_with(TXT_STOPCHAR) {
         prompt.pop();
     }
 
-    let color = vm.eval_expr(&args[2])?.as_int() as u8;
+    let color = vm.eval_expr(&args[2]).await?.as_int() as u8;
     let len = 1;
     let valid = "YyNn";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0).await?;
 
-    vm.set_variable(&args[1], VariableValue::new_string(output.to_ascii_uppercase()))?;
+    vm.set_variable(&args[1], VariableValue::new_string(output.to_ascii_uppercase())).await?;
     Ok(())
 }
 
-pub fn inputmoney(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let mut prompt = vm.eval_expr(&args[0])?.as_string();
+pub async fn inputmoney(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let mut prompt = vm.eval_expr(&args[0]).await?.as_string();
     if prompt.ends_with(TXT_STOPCHAR) {
         prompt.pop();
     }
 
-    let color = vm.eval_expr(&args[2])?.as_int() as u8;
+    let color = vm.eval_expr(&args[2]).await?.as_int() as u8;
     let len = 13;
     let valid = "01234567890+-$.";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0).await?;
     // TODO: Money conversion.
-    vm.set_variable(&args[1], VariableValue::new_string(output))?;
+    vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
     Ok(())
 }
 
-pub fn inputint(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let mut prompt = vm.eval_expr(&args[0])?.as_string();
+pub async fn inputint(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let mut prompt = vm.eval_expr(&args[0]).await?.as_string();
     if prompt.ends_with(TXT_STOPCHAR) {
         prompt.pop();
     }
 
-    let color = vm.eval_expr(&args[2])?.as_int() as u8;
+    let color = vm.eval_expr(&args[2]).await?.as_int() as u8;
     let len = 11;
     let valid = "01234567890+-";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0)?;
-    vm.set_variable(&args[1], VariableValue::new_int(output.parse::<i32>()?))?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0).await?;
+    vm.set_variable(&args[1], VariableValue::new_int(output.parse::<i32>()?)).await?;
     Ok(())
 }
-pub fn inputcc(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let mut prompt = vm.eval_expr(&args[0])?.as_string();
+pub async fn inputcc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let mut prompt = vm.eval_expr(&args[0]).await?.as_string();
     if prompt.ends_with(TXT_STOPCHAR) {
         prompt.pop();
     }
 
-    let color = vm.eval_expr(&args[2])?.as_int() as u8;
+    let color = vm.eval_expr(&args[2]).await?.as_int() as u8;
     let len = 16;
     let valid = "01234567890";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0)?;
-    vm.set_variable(&args[1], VariableValue::new_string(output))?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0).await?;
+    vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
     Ok(())
 }
-pub fn inputdate(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let mut prompt = vm.eval_expr(&args[0])?.as_string();
+pub async fn inputdate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let mut prompt = vm.eval_expr(&args[0]).await?.as_string();
     if prompt.ends_with(TXT_STOPCHAR) {
         prompt.pop();
     }
 
-    let color = vm.eval_expr(&args[2])?.as_int() as u8;
+    let color = vm.eval_expr(&args[2]).await?.as_int() as u8;
     let len = 8;
     let valid = "01234567890-/";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0).await?;
     // TODO: Date conversion
-    vm.set_variable(&args[1], VariableValue::new_string(output))?;
+    vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
     Ok(())
 }
 
-pub fn inputtime(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let mut prompt = vm.eval_expr(&args[0])?.as_string();
+pub async fn inputtime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let mut prompt = vm.eval_expr(&args[0]).await?.as_string();
     if prompt.ends_with(TXT_STOPCHAR) {
         prompt.pop();
     }
 
-    let color = vm.eval_expr(&args[2])?.as_int() as u8;
+    let color = vm.eval_expr(&args[2]).await?.as_int() as u8;
     let len = 8;
     let valid = "01234567890:";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0)?;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0).await?;
     // TODO: Time conversion
-    vm.set_variable(&args[1], VariableValue::new_string(output))?;
+    vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
     Ok(())
 }
-pub fn promptstr(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn promptstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dtron(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dtron(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     // IGNORE
     Ok(())
 }
 
-pub fn dtroff(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.goodbye()?;
+pub async fn dtroff(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.goodbye().await?;
     Ok(())
 }
 
-pub fn cdchkon(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn cdchkon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn cdchkoff(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn cdchkoff(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
-pub fn delay(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn delay(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     // 1 tick is ~1/18.2s
-    let ticks = vm.eval_expr(&args[0])?.as_int();
+    let ticks = vm.eval_expr(&args[0]).await?.as_int();
     if ticks > 0 {
         thread::sleep(Duration::from_millis((ticks as f32 * 1000.0 / 18.2) as u64));
     }
     Ok(())
 }
 
-pub fn sendmodem(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn sendmodem(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
-pub fn inc(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let new_value = vm.eval_expr(&args[0])? + VariableValue::new_int(1);
-    vm.set_variable(&args[0], new_value)?;
+pub async fn inc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let new_value = vm.eval_expr(&args[0]).await? + VariableValue::new_int(1);
+    vm.set_variable(&args[0], new_value).await?;
     Ok(())
 }
 
-pub fn dec(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let new_value = vm.eval_expr(&args[0])?.clone() - VariableValue::new_int(1);
-    vm.set_variable(&args[0], new_value)?;
+pub async fn dec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let new_value = vm.eval_expr(&args[0]).await?.clone() - VariableValue::new_int(1);
+    vm.set_variable(&args[0], new_value).await?;
     Ok(())
 }
 
-pub fn newline(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.write_raw(TerminalTarget::Both, &['\n'])
+pub async fn newline(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.write_raw(TerminalTarget::Both, &['\n']).await
 }
 
-pub fn newlines(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let count = vm.eval_expr(&args[0])?.as_int();
+pub async fn newlines(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let count = vm.eval_expr(&args[0]).await?.as_int();
     for _ in 0..count {
-        newline(vm, args)?;
+        newline(vm, args).await?;
     }
     Ok(())
 }
 
 /// # Errors
 /// Errors if the variable is not found.
-pub fn tokenize(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let str = vm.eval_expr(&args[0])?.to_string();
+pub async fn tokenize(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let str = vm.eval_expr(&args[0]).await?.to_string();
     let split = str.split(&[' ', ';'][..]).map(std::string::ToString::to_string);
     vm.icy_board_state.session.tokens.extend(split);
     Ok(())
 }
 
-pub fn gettoken(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn gettoken(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
-pub fn shell(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn shell(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
-pub fn disptext(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let rec = vm.eval_expr(&args[0])?.as_int();
-    let flags = vm.eval_expr(&args[1])?.as_int();
+pub async fn disptext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let rec = vm.eval_expr(&args[0]).await?.as_int();
+    let flags = vm.eval_expr(&args[1]).await?.as_int();
 
-    vm.icy_board_state.display_text(IceText::from(rec as usize), flags)
+    vm.icy_board_state.display_text(IceText::from(rec as usize), flags).await
 }
 
-pub fn stop(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn stop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     vm.is_running = false;
     Ok(())
 }
 
-pub fn inputtext(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn inputtext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
-pub fn beep(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.bell()
+pub async fn beep(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.bell().await
 }
 
-pub fn push(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn push(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     for p in args {
-        let value = vm.eval_expr(p)?;
+        let value = vm.eval_expr(p).await?;
         vm.push_pop_stack.push(value);
     }
     Ok(())
 }
 
-pub fn pop(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn pop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     for arg in args {
         if let Some(val) = vm.push_pop_stack.pop() {
-            vm.set_variable(arg, val)?;
+            vm.set_variable(arg, val).await?;
         } else {
             return Err(Box::new(VMError::PushPopStackEmpty));
         }
@@ -449,40 +449,40 @@ pub fn pop(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 
-pub fn call(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn call(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn join(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn join(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn quest(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn quest(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn blt(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn blt(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dir(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
-pub fn kbdstuff(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let value = vm.eval_expr(&args[0])?.as_string();
+pub async fn kbdstuff(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let value = vm.eval_expr(&args[0]).await?.as_string();
     vm.icy_board_state.put_keyboard_buffer(&value, false)?;
     Ok(())
 }
-pub fn kbdstring(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let value = vm.eval_expr(&args[0])?.as_string();
-    vm.icy_board_state.print(TerminalTarget::Both, &value)?;
+pub async fn kbdstring(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let value = vm.eval_expr(&args[0]).await?.as_string();
+    vm.icy_board_state.print(TerminalTarget::Both, &value).await?;
     vm.icy_board_state.put_keyboard_buffer(&value, false)?;
     Ok(())
 }
-pub fn kbdfile(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let file_name = vm.eval_expr(&args[0])?.as_string();
+pub async fn kbdfile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let file_name = vm.eval_expr(&args[0]).await?.as_string();
     let fil_name = vm.resolve_file(&file_name);
     let contents = fs::read_to_string(file_name)?;
     vm.icy_board_state.put_keyboard_buffer(&contents, false)?;
@@ -490,14 +490,14 @@ pub fn kbdfile(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 
-pub fn bye(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.goodbye()?;
+pub async fn bye(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.goodbye().await?;
     vm.is_running = false;
     Ok(())
 }
 
-pub fn goodbye(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.goodbye()?;
+pub async fn goodbye(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.goodbye().await?;
     vm.is_running = false;
     Ok(())
 }
@@ -511,41 +511,41 @@ pub fn goodbye(vm: &mut VirtualMachine, _args: &[PPEExpr]) -> Res<()> {
 /// This statement allows you to programatically broadcast a message to a range of nodes
 /// without giving users the ability to manually broadcast
 /// at any time they choose.
-pub fn broadcast(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let lonode = vm.eval_expr(&args[0])?.as_int();
-    let hinode = vm.eval_expr(&args[1])?.as_int();
-    let message = vm.eval_expr(&args[2])?.as_string();
+pub async fn broadcast(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let lonode = vm.eval_expr(&args[0]).await?.as_int();
+    let hinode = vm.eval_expr(&args[1]).await?.as_int();
+    let message = vm.eval_expr(&args[2]).await?.as_string();
     // TODO: Broadcast
     log::error!("Broadcasting message from {lonode} to {hinode}: {message}");
     Ok(())
 }
 
-pub fn waitfor(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn waitfor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
-pub fn kbdchkon(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn kbdchkon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     vm.icy_board_state.reset_keyboard_check_timer();
     Ok(())
 }
 
-pub fn kbdchkoff(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn kbdchkoff(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     vm.icy_board_state.session.keyboard_timer_check = false;
     Ok(())
 }
 
-pub fn optext(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.session.op_text = vm.eval_expr(&args[0])?.as_string();
+pub async fn optext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.session.op_text = vm.eval_expr(&args[0]).await?.as_string();
     Ok(())
 }
-pub fn dispstr(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let value = vm.eval_expr(&args[0])?.as_string();
-    vm.icy_board_state.print(TerminalTarget::Both, &value)
+pub async fn dispstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let value = vm.eval_expr(&args[0]).await?.as_string();
+    vm.icy_board_state.print(TerminalTarget::Both, &value).await
 }
 
-pub fn rdunet(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let value = vm.eval_expr(&args[0])?.as_int();
+pub async fn rdunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let value = vm.eval_expr(&args[0]).await?.as_int();
 
     if let Some(node) = vm.icy_board_state.nodes.get(value as usize) {
         vm.pcb_node = Some(node.clone());
@@ -553,13 +553,13 @@ pub fn rdunet(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 
-pub fn wrunet(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let node = vm.eval_expr(&args[0])?.as_int();
-    let stat = vm.eval_expr(&args[1])?.as_string();
-    let name = vm.eval_expr(&args[2])?.as_string();
-    let city = vm.eval_expr(&args[3])?.as_string();
-    let operation = vm.eval_expr(&args[4])?.as_string();
-    let broadcast = vm.eval_expr(&args[5])?.as_string();
+pub async fn wrunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let node = vm.eval_expr(&args[0]).await?.as_int();
+    let stat = vm.eval_expr(&args[1]).await?.as_string();
+    let name = vm.eval_expr(&args[2]).await?.as_string();
+    let city = vm.eval_expr(&args[3]).await?.as_string();
+    let operation = vm.eval_expr(&args[4]).await?.as_string();
+    let broadcast = vm.eval_expr(&args[5]).await?.as_string();
 
     // Todo: Broadcast
 
@@ -577,154 +577,154 @@ pub fn wrunet(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 
-pub fn dointr(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dointr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("System interrupts are not (yet) supported")
 }
-pub fn varseg(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn varseg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("System interrupts are not (yet) supported")
 }
-pub fn varoff(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn varoff(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("System interrupts are not (yet) supported")
 }
-pub fn pokeb(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn pokeb(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("DOS memory access is not (yet) supported")
 }
-pub fn pokew(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn pokew(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("DOS memory access is not (yet) supported")
 }
-pub fn varaddr(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn varaddr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("System interrupts are not (yet) supported")
 }
 
-pub fn ansipos(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let x = vm.eval_expr(&args[0])?.as_int();
-    let y = vm.eval_expr(&args[1])?.as_int();
-    vm.icy_board_state.gotoxy(TerminalTarget::Both, x, y)
+pub async fn ansipos(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let x = vm.eval_expr(&args[0]).await?.as_int();
+    let y = vm.eval_expr(&args[1]).await?.as_int();
+    vm.icy_board_state.gotoxy(TerminalTarget::Both, x, y).await
 }
 
-pub fn backup(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let numcols = vm.eval_expr(&args[0])?.as_int();
+pub async fn backup(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let numcols = vm.eval_expr(&args[0]).await?.as_int();
     if vm.icy_board_state.use_ansi() {
-        vm.icy_board_state.print(TerminalTarget::Both, &format!("\x1B[{numcols}D"))
+        vm.icy_board_state.print(TerminalTarget::Both, &format!("\x1B[{numcols}D")).await
     } else {
-        vm.icy_board_state.print(TerminalTarget::Both, &"\x08".repeat(numcols as usize))
+        vm.icy_board_state.print(TerminalTarget::Both, &"\x08".repeat(numcols as usize)).await
     }
 }
 
-pub fn forward(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let numcols = vm.eval_expr(&args[0])?.as_int();
+pub async fn forward(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let numcols = vm.eval_expr(&args[0]).await?.as_int();
     if vm.icy_board_state.use_ansi() {
-        vm.icy_board_state.print(TerminalTarget::Both, &format!("\x1B[{numcols}C"))?;
+        vm.icy_board_state.print(TerminalTarget::Both, &format!("\x1B[{numcols}C")).await?;
     } else {
-        vm.icy_board_state.print(TerminalTarget::Both, &" ".repeat(numcols as usize))?;
+        vm.icy_board_state.print(TerminalTarget::Both, &" ".repeat(numcols as usize)).await?;
     }
     Ok(())
 }
-pub fn freshline(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.print(TerminalTarget::Both, "\r\n")?;
+pub async fn freshline(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.print(TerminalTarget::Both, "\r\n").await?;
     Ok(())
 }
-pub fn wrusys(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn wrusys(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("USER.SYS is not supported")
 }
-pub fn rdusys(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn rdusys(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("USER.SYS is not supported")
 }
-pub fn newpwd(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn newpwd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn opencap(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn opencap(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn closecap(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn closecap(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn message(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn savescrn(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn savescrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn restscrn(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn restscrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn sound(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn sound(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn chat(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn chat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
-pub fn sprint(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn sprint(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     for value in args {
-        let txt = &vm.eval_expr(value)?.as_string();
-        vm.icy_board_state.print(TerminalTarget::Sysop, txt)?;
+        let txt = &vm.eval_expr(value).await?.as_string();
+        vm.icy_board_state.print(TerminalTarget::Sysop, txt).await?;
     }
     Ok(())
 }
 
-pub fn sprintln(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn sprintln(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     for value in args {
-        let txt = &vm.eval_expr(value)?.as_string();
-        vm.icy_board_state.print(TerminalTarget::Sysop, txt)?;
+        let txt = &vm.eval_expr(value).await?.as_string();
+        vm.icy_board_state.print(TerminalTarget::Sysop, txt).await?;
     }
-    vm.icy_board_state.print(TerminalTarget::Sysop, "\n")?;
+    vm.icy_board_state.print(TerminalTarget::Sysop, "\n").await?;
     Ok(())
 }
 
-pub fn print(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn print(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     for value in args {
-        let txt = &vm.eval_expr(value)?.as_string();
-        vm.icy_board_state.print(TerminalTarget::Both, txt)?;
-    }
-    Ok(())
-}
-
-pub fn println(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    for value in args {
-        let txt = &vm.eval_expr(value)?.as_string();
-        vm.icy_board_state.print(TerminalTarget::Both, txt)?;
-    }
-    vm.icy_board_state.print(TerminalTarget::User, "\n")?;
-    Ok(())
-}
-
-pub fn mprint(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    for value in args {
-        let txt = &vm.eval_expr(value)?.as_string();
-        vm.icy_board_state.print(TerminalTarget::User, txt)?;
+        let txt = &vm.eval_expr(value).await?.as_string();
+        vm.icy_board_state.print(TerminalTarget::Both, txt).await?;
     }
     Ok(())
 }
 
-pub fn mprintln(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn println(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     for value in args {
-        let txt = &vm.eval_expr(value)?.as_string();
-        vm.icy_board_state.print(TerminalTarget::User, txt)?;
+        let txt = &vm.eval_expr(value).await?.as_string();
+        vm.icy_board_state.print(TerminalTarget::Both, txt).await?;
     }
-    vm.icy_board_state.print(TerminalTarget::User, "\n")?;
+    vm.icy_board_state.print(TerminalTarget::User, "\n").await?;
     Ok(())
 }
 
-pub fn rename(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let old = &vm.eval_expr(&args[0])?.as_string();
-    let new = &vm.eval_expr(&args[1])?.as_string();
+pub async fn mprint(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    for value in args {
+        let txt = &vm.eval_expr(value).await?.as_string();
+        vm.icy_board_state.print(TerminalTarget::User, txt).await?;
+    }
+    Ok(())
+}
+
+pub async fn mprintln(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    for value in args {
+        let txt = &vm.eval_expr(value).await?.as_string();
+        vm.icy_board_state.print(TerminalTarget::User, txt).await?;
+    }
+    vm.icy_board_state.print(TerminalTarget::User, "\n").await?;
+    Ok(())
+}
+
+pub async fn rename(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let old = &vm.eval_expr(&args[0]).await?.as_string();
+    let new = &vm.eval_expr(&args[1]).await?.as_string();
     let old = vm.resolve_file(&old).to_string_lossy().to_string();
     let new = vm.resolve_file(&new).to_string_lossy().to_string();
 
@@ -733,54 +733,54 @@ pub fn rename(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     }
     Ok(())
 }
-pub fn frewind(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn frewind(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn pokedw(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn pokedw(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dbglevel(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.debug_level = vm.eval_expr(&args[0])?.as_int();
+pub async fn dbglevel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.debug_level = vm.eval_expr(&args[0]).await?.as_int();
     Ok(())
 }
-pub fn showon(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn showon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     vm.icy_board_state.session.disp_options.display_text = true;
     Ok(())
 }
-pub fn showoff(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn showoff(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     vm.icy_board_state.session.disp_options.display_text = false;
     Ok(())
 }
 
-pub fn pageon(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn pageon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
-pub fn pageoff(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn pageoff(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
-pub fn fseek(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0])?.as_int() as usize;
-    let pos = vm.eval_expr(&args[1])?.as_int();
-    let position = vm.eval_expr(&args[2])?.as_int();
+pub async fn fseek(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let pos = vm.eval_expr(&args[1]).await?.as_int();
+    let position = vm.eval_expr(&args[2]).await?.as_int();
     vm.io.fseek(channel, pos, position)?;
 
     Ok(())
 }
 
-pub fn fflush(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fflush(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn fread(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0])?.as_int() as usize;
-    let val = vm.eval_expr(&args[1])?;
-    let size = vm.eval_expr(&args[2])?.as_int() as usize;
+pub async fn fread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let val = vm.eval_expr(&args[1]).await?;
+    let size = vm.eval_expr(&args[2]).await?.as_int() as usize;
 
     let result = vm.io.fread(channel, size)?;
 
@@ -793,21 +793,21 @@ pub fn fread(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
             }
             vs.push(CP437_TO_UNICODE[c as usize]);
         }
-        vm.set_variable(&args[1], VariableValue::new_string(vs))?;
+        vm.set_variable(&args[1], VariableValue::new_string(vs)).await?;
         return Ok(());
     }
 
     match result.len() {
         1 => {
-            vm.set_variable(&args[1], VariableValue::new_byte(result[0]))?;
+            vm.set_variable(&args[1], VariableValue::new_byte(result[0])).await?;
         }
         2 => {
             let i = u16::from_le_bytes([result[0], result[1]]);
-            vm.set_variable(&args[1], VariableValue::new_word(i))?;
+            vm.set_variable(&args[1], VariableValue::new_word(i)).await?;
         }
         4 => {
             let i = i32::from_le_bytes([result[0], result[1], result[2], result[3]]);
-            vm.set_variable(&args[1], VariableValue::new_int(i))?;
+            vm.set_variable(&args[1], VariableValue::new_int(i)).await?;
         }
         _ => {
             return Err(Box::new(VMError::FReadError(val.get_type(), result.len(), size)));
@@ -816,62 +816,62 @@ pub fn fread(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 
     Ok(())
 }
-pub fn fwrite(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fwrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn fdefin(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fdefin(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn fdefout(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fdefout(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn fdget(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fdget(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn fdput(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fdput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn fdputln(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fdputln(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn fdputpad(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fdputpad(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn fdread(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fdread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn fdwrite(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fdwrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn adjbytes(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn adjbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
-pub fn alias(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.session.use_alias = vm.eval_expr(&args[0])?.as_bool();
+pub async fn alias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.session.use_alias = vm.eval_expr(&args[0]).await?.as_bool();
     Ok(())
 }
-pub fn redim(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn redim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn append(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn append(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn copy(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let old = &vm.eval_expr(&args[0])?.as_string();
-    let new = &vm.eval_expr(&args[1])?.as_string();
+pub async fn copy(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let old = &vm.eval_expr(&args[0]).await?.as_string();
+    let new = &vm.eval_expr(&args[1]).await?.as_string();
     if let Err(err) = vm.io.copy(old, new) {
         log::error!("Error renaming file: {}", err);
     }
@@ -880,43 +880,43 @@ pub fn copy(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
 
 /// # Errors
 /// Errors if the variable is not found.
-pub fn kbdflush(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn kbdflush(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     // TODO?
     Ok(())
 }
 
 /// # Errors
 /// Errors if the variable is not found.
-pub fn mdmflush(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn mdmflush(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     // TODO?
     Ok(())
 }
 
 /// # Errors
 /// Errors if the variable is not found.
-pub fn keyflush(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn keyflush(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     // TODO?
     Ok(())
 }
-pub fn lastin(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn lastin(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn flag(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn flag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn download(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn download(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn wrusysdoor(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn wrusysdoor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
-pub fn getaltuser(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let user_record = vm.eval_expr(&args[0])?.as_int() as usize;
+pub async fn getaltuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let user_record = vm.eval_expr(&args[0]).await?.as_int() as usize;
     let user = if let Ok(board) = vm.icy_board_state.board.lock() {
         if user_record >= board.users.len() {
             return Err(Box::new(VMError::UserRecordOutOfBounds(user_record)));
@@ -929,24 +929,24 @@ pub fn getaltuser(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 
-pub fn adjdbytes(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn adjdbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn adjtbytes(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn adjtbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn ayjtfiles(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn ayjtfiles(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn lang(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn lang(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
-pub fn sort(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn sort(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let PPEExpr::Value(array_idx) = args[0] else {
         return Err(Box::new(VMError::InternalVMError));
     };
@@ -982,89 +982,89 @@ pub fn sort(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 
-pub fn mousereg(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn mousereg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn scrfile(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn scrfile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn searchinit(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn searchinit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn searchfind(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn searchfind(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn searchstop(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn searchstop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn prfound(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn prfound(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn prfoundln(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn prfoundln(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn tpaget(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn tpaget(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn tpaput(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn tpaput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn tpacgea(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn tpacgea(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn tpacput(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn tpacput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn tparead(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn tparead(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn tpawrite(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn tpawrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn tpacread(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn tpacread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn tpacwrite(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn tpacwrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn bitset(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn bitset(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn bitclear(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn bitclear(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn brag(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn brag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn frealtuser(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn frealtuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn setlmr(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn setlmr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
-pub fn setenv(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
-    let env = vm.eval_expr(&args[0])?.as_string();
+pub async fn setenv(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let env = vm.eval_expr(&args[0]).await?.as_string();
     let v: Vec<&str> = env.split('=').collect();
     if v.len() == 2 {
         vm.icy_board_state.set_env(v[0], v[1]);
@@ -1074,224 +1074,224 @@ pub fn setenv(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 
-pub fn fcloseall(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fcloseall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn stackabort(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn stackabort(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dcreate(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dcreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dopen(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dopen(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dclose(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dclose(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dsetalias(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dsetalias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dpack(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dpack(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dcloseall(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dcloseall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dlock(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dlock(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dlockr(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dlockr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dlockg(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dlockg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dunlock(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dunlock(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dncreate(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dncreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dnopen(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dnopen(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dnclose(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dnclose(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dncloseall(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dncloseall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dnew(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dnew(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dadd(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dadd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dappend(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dappend(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dtop(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dtop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dgo(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dgo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dbottom(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dbottom(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dskip(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dskip(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dblank(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dblank(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn ddelete(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn ddelete(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn drecall(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn drecall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dtag(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dtag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dseek(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dseek(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dfblank(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dfblank(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dget(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dget(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dput(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn dfcopy(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn dfcopy(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
 
-pub fn eval(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn eval(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     // nothing, that just avaluates the parameters (for using function calls as statement)
     Ok(())
 }
-pub fn account(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn account(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn recordusage(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn recordusage(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn msgtofile(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn qwklimits(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn qwklimits(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn command(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn command(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn uselmrs(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn uselmrs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn confinfo(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn adjtubytes(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn adjtubytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn grafmode(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn grafmode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn adduser(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn adduser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn killmsg(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn killmsg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn chdir(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn chdir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn mkdir(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn mkdir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn redir(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn redir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn fdowraka(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fdowraka(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn fdoaddaka(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fdoaddaka(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn fdowrorg(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fdowrorg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn fdoaddorg(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fdoaddorg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn fdoqmod(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fdoqmod(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn fdoqadd(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fdoqadd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn fdoqdel(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn fdoqdel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }
-pub fn sounddelay(vm: &mut VirtualMachine, args: &[PPEExpr]) -> Res<()> {
+pub async fn sounddelay(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
 }

@@ -9,18 +9,20 @@ pub mod zmodem;
 pub use zmodem::*;
 
 pub mod transfer_state;
+use async_trait::async_trait;
 pub use transfer_state::*;
 
 use crate::Connection;
 
+#[async_trait]
 pub trait Protocol {
-    fn update_transfer(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()>;
+    async fn update_transfer(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()>;
 
-    fn initiate_send(&mut self, com: &mut dyn Connection, files: &[PathBuf]) -> crate::Result<TransferState>;
+    async fn initiate_send(&mut self, com: &mut dyn Connection, files: &[PathBuf]) -> crate::Result<TransferState>;
 
-    fn initiate_recv(&mut self, com: &mut dyn Connection) -> crate::Result<TransferState>;
+    async fn initiate_recv(&mut self, com: &mut dyn Connection) -> crate::Result<TransferState>;
 
-    fn cancel_transfer(&mut self, com: &mut dyn Connection) -> crate::Result<()>;
+    async fn cancel_transfer(&mut self, com: &mut dyn Connection) -> crate::Result<()>;
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
