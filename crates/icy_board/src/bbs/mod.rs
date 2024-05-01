@@ -78,7 +78,7 @@ impl BBS {
 }
 
 pub fn await_telnet_connections(telnet: Telnet, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
- /*   let addr = if telnet.address.is_empty() {
+    /*   let addr = if telnet.address.is_empty() {
         format!("127.0.0.1:{}", telnet.port)
     } else {
         format!("{}:{}", telnet.address, telnet.port)

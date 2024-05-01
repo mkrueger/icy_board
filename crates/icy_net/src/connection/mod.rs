@@ -3,9 +3,9 @@ pub mod channel;
 // pub mod modem;
 pub mod raw;
 // pub mod serial;
-// pub mod ssh;
+//pub mod ssh;
 pub mod telnet;
-// pub mod websocket;
+pub mod websocket;
 use async_trait::async_trait;
 
 pub struct ConnectionData {

@@ -247,20 +247,7 @@ impl Connection for TelnetConnection {
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
         match self.tcp_stream.read(buf).await {
             Ok(size) => {
-                for b in &buf[0..size] {
-                    if *b == 0 {
-                        println!("INPUT CONTAINS 0");
-                        break;
-                    }
-                }
                 let result = self.parse(&mut buf[0..size]).await?;
-                for b in &buf[0..result] {
-                    if *b == 0 {
-                        println!("OUTPUT CONTAINS 0");
-                        break;
-                    }
-                }
-                println!("Received: {}/{}", size, result);
                 Ok(result)
             }
             Err(err) => {
@@ -281,7 +268,6 @@ impl Connection for TelnetConnection {
                 dst.push(*b);
             }
         }
-
         self.tcp_stream.write_all(&dst).await?;
         Ok(())
     }

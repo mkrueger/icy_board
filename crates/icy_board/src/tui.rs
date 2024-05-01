@@ -68,67 +68,67 @@ impl Tui {
                 .build()
                 .unwrap()
                 .block_on(async { /*
-                let mut parser = ansi::Parser::default();
-                parser.bs_is_ctrl_char = true;
-                    
-        
-                let mut screen_buf = [0; 1024 * 16];
+                     let mut parser = ansi::Parser::default();
+                     parser.bs_is_ctrl_char = true;
 
-                let mut state = IcyBoardState::new(board, node_state, node, Box::new(connection));
-                if sysop_mode {
-                    state.session.is_sysop = true;
-                    state.set_current_user(0).unwrap();
-                }
-                let mut cmd = PcbBoardCommand::new(state);
 
-                let orig_hook = std::panic::take_hook();
-                std::panic::set_hook(Box::new(move |panic_info| {
-                    log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
-                    log::error!("full info: {:?}", panic_info);
+                     let mut screen_buf = [0; 1024 * 16];
 
-                    orig_hook(panic_info);
-                }));
+                     let mut state = IcyBoardState::new(board, node_state, node, Box::new(connection));
+                     if sysop_mode {
+                         state.session.is_sysop = true;
+                         state.set_current_user(0).unwrap();
+                     }
+                     let mut cmd = PcbBoardCommand::new(state);
 
-                if !sysop_mode {
-                    match cmd.login().await {
-                        Ok(true) => {}
-                        Ok(false) => {
-                            return Ok(());
-                        }
-                        Err(err) => {
-                            log::error!("error during login process {}", err);
-                            return Ok(());
-                        }
-                    }
-                }
-                if let Some(ppe) = ppe {
-                    let _ = cmd.state.run_ppe(&ppe, None);
-                    let _ = cmd.state.press_enter();
-                    let _ = cmd.state.hangup();
-                    return Ok(());
-                }
+                     let orig_hook = std::panic::take_hook();
+                     std::panic::set_hook(Box::new(move |panic_info| {
+                         log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
+                         log::error!("full info: {:?}", panic_info);
 
-                loop {
-                    session.lock().unwrap().cur_user = cmd.state.session.cur_user;
-                    session.lock().unwrap().current_conference = cmd.state.session.current_conference.clone();
-                    session.lock().unwrap().disp_options = cmd.state.session.disp_options.clone();
+                         orig_hook(panic_info);
+                     }));
 
-                    if let Err(err) = cmd.do_command() {
-                        cmd.state.session.disp_options.reset_printout();
-                        log::error!("session thread 'do_command': {}", err);
-                        if cmd.state.set_color(TerminalTarget::Both, 4.into()).is_ok() {
-                            let _ = cmd.state.print(TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err));
-                            let _ = cmd.state.reset_color();
-                        }
-                    }
-                    cmd.state.session.disp_options.reset_printout();
-                    if cmd.state.session.request_logoff {
-                        let _ = cmd.state.connection.shutdown();
-                        return Ok(());
-                    }
-                    thread::sleep(Duration::from_millis(20));
-                } */
-            });
+                     if !sysop_mode {
+                         match cmd.login().await {
+                             Ok(true) => {}
+                             Ok(false) => {
+                                 return Ok(());
+                             }
+                             Err(err) => {
+                                 log::error!("error during login process {}", err);
+                                 return Ok(());
+                             }
+                         }
+                     }
+                     if let Some(ppe) = ppe {
+                         let _ = cmd.state.run_ppe(&ppe, None);
+                         let _ = cmd.state.press_enter();
+                         let _ = cmd.state.hangup();
+                         return Ok(());
+                     }
+
+                     loop {
+                         session.lock().unwrap().cur_user = cmd.state.session.cur_user;
+                         session.lock().unwrap().current_conference = cmd.state.session.current_conference.clone();
+                         session.lock().unwrap().disp_options = cmd.state.session.disp_options.clone();
+
+                         if let Err(err) = cmd.do_command() {
+                             cmd.state.session.disp_options.reset_printout();
+                             log::error!("session thread 'do_command': {}", err);
+                             if cmd.state.set_color(TerminalTarget::Both, 4.into()).is_ok() {
+                                 let _ = cmd.state.print(TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err));
+                                 let _ = cmd.state.reset_color();
+                             }
+                         }
+                         cmd.state.session.disp_options.reset_printout();
+                         if cmd.state.session.request_logoff {
+                             let _ = cmd.state.connection.shutdown();
+                             return Ok(());
+                         }
+                         thread::sleep(Duration::from_millis(20));
+                     } */
+                });
         });
         bbs.lock().unwrap().get_open_connections().as_ref().lock().unwrap()[node]
             .as_mut()

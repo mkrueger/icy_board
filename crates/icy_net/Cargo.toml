@@ -20,7 +20,7 @@ bytes = "1"
 serial = "0.4.0"
 
 # SSH
-libssh-rs =  { version = "0.2.2", features = ["vendored", "vendored-openssl"] }
+thrussh = "0.35.1"
 
 # WEBSOCKETS
 tokio-tungstenite = { version = "0.21.0", features = [
@@ -36,6 +36,7 @@ rustls = { version = "0.22.0", features = [
 ]}
 rustls-pemfile = "2"
 webpki-roots = "0.26.1"
+futures-util = { version = "0.3.30", default-features = false, features = ["sink", "std"] }
 
 [dev-dependencies]
 pretty_assertions = "1"

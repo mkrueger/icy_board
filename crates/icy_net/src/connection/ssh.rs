@@ -24,6 +24,30 @@ const SUPPORTED_KEY_EXCHANGES: &str = "ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecd
 
 impl SSHConnection {
     pub fn open<A: ToSocketAddrs>(addr: &A, caps: TermCaps, credentials: Credentials) -> crate::Result<Self> {
+
+        let config = thrussh::client::Config::default();
+        let config = Arc::new(config);
+        let sh = Client {};
+    
+        let mut agent = thrussh_keys::agent::client::AgentClient::connect_env()
+            .await
+            .unwrap();
+        let mut identities = agent.request_identities().await.unwrap();
+        let mut session = thrussh::client::connect(config, "127.0.0.1:2200", sh)
+            .await
+            .unwrap();
+        let (_, auth_res) = session
+            .authenticate_future("pe", identities.pop().unwrap(), agent)
+            .await;
+        let auth_res = auth_res.unwrap();
+        println!("=== auth: {}", auth_res);
+        let mut channel = session
+            .channel_open_direct_tcpip("localhost", 8000, "localhost", 3333)
+            .await
+            .unwrap();
+
+        /* 
+
         for addr in addr.to_socket_addrs()? {
             let session = Session::new()?;
             let host = addr.ip().to_string();
@@ -57,6 +81,7 @@ impl SSHConnection {
             });
         }
         Err(NetError::CouldNotConnect.into())
+        */
     }
 
     fn default_port() -> u16 {
@@ -72,6 +97,17 @@ impl Connection for SSHConnection {
     fn get_connection_type(&self) -> ConnectionType {
         ConnectionType::SSH
     }
+
+    async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize>
+    {
+
+    }
+
+    async fn send(&mut self, buf: &[u8]) -> crate::Result<()>
+    {
+
+    }
+
 
     fn shutdown(&mut self) -> crate::Result<()> {
         self.session.disconnect();
