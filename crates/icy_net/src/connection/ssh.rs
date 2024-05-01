@@ -1,13 +1,14 @@
 #![allow(dead_code)]
-use std::{
-    io::ErrorKind, net::TcpStream, sync::Arc, time::Duration
-};
 use async_trait::async_trait;
 use russh::{client::Msg, *};
 use russh_keys::*;
+use std::{io::ErrorKind, net::TcpStream, sync::Arc, time::Duration};
 
-use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::ToSocketAddrs};
 use crate::{telnet::TermCaps, Connection, ConnectionType};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::ToSocketAddrs,
+};
 pub struct SSHConnection {
     client: SshClient,
     channel: Channel<Msg>,
@@ -24,23 +25,18 @@ const SUPPORTED_KEY_EXCHANGES: &str = "ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecd
 
 impl SSHConnection {
     pub async fn open<A: ToSocketAddrs>(addr: &A, caps: TermCaps, credentials: Credentials) -> crate::Result<Self> {
-        let ssh = SshClient::connect(
-            addr,
-            &credentials.user_name,
-            credentials.password,
-        ).await?;
+        let ssh = SshClient::connect(addr, &credentials.user_name, credentials.password).await?;
 
         let channel = ssh.session.channel_open_session().await?;
         let terminal_type: String = format!("{:?}", caps.terminal).to_lowercase();
-        channel.request_pty(false, &terminal_type, caps.window_size.0 as u32, caps.window_size.1 as u32, 1, 1,&[]).await?;
+        channel
+            .request_pty(false, &terminal_type, caps.window_size.0 as u32, caps.window_size.1 as u32, 1, 1, &[])
+            .await?;
         channel.request_shell(false).await?;
 
-        return Ok(Self {
-            client: ssh,
-            channel: channel,
-        });
-    
-    /* 
+        return Ok(Self { client: ssh, channel });
+
+        /*
 
         for addr in addr.to_socket_addrs()? {
             let session = Session::new()?;
@@ -83,7 +79,7 @@ impl SSHConnection {
     }
 }
 
-#[async_trait] 
+#[async_trait]
 impl Connection for SSHConnection {
     fn get_connection_type(&self) -> ConnectionType {
         ConnectionType::SSH
@@ -101,8 +97,7 @@ impl Connection for SSHConnection {
         }
     }
 
-    async fn send(&mut self, buf: &[u8]) -> crate::Result<()>
-    {
+    async fn send(&mut self, buf: &[u8]) -> crate::Result<()> {
         self.channel.make_writer().write_all(buf).await?;
         Ok(())
     }
@@ -113,7 +108,6 @@ impl Connection for SSHConnection {
     }
 }
 
-
 struct Client {}
 
 // More SSH event handlers
@@ -123,10 +117,7 @@ struct Client {}
 impl client::Handler for Client {
     type Error = russh::Error;
 
-    async fn check_server_key(
-        &mut self,
-        _server_public_key: &key::PublicKey,
-    ) -> Result<bool, Self::Error> {
+    async fn check_server_key(&mut self, _server_public_key: &key::PublicKey) -> Result<bool, Self::Error> {
         Ok(true)
     }
 }
@@ -135,12 +126,8 @@ pub struct SshClient {
 }
 
 impl SshClient {
-    async fn connect<A: ToSocketAddrs>(
-        addrs: A,
-        user: impl Into<String>,
-        password: impl Into<String>,
-    ) -> crate::Result<Self> {
-       // let key_pair = load_secret_key(key_path, None)?;
+    async fn connect<A: ToSocketAddrs>(addrs: A, user: impl Into<String>, password: impl Into<String>) -> crate::Result<Self> {
+        // let key_pair = load_secret_key(key_path, None)?;
         let config = client::Config {
             inactivity_timeout: Some(Duration::from_secs(5)),
             ..<_>::default()
@@ -150,9 +137,7 @@ impl SshClient {
         let sh = Client {};
 
         let mut session = client::connect(config, addrs, sh).await?;
-        let auth_res = session
-            .authenticate_password(user, password)
-            .await?;
+        let auth_res = session.authenticate_password(user, password).await?;
 
         if !auth_res {
             return Err("Authentication failed".into());
@@ -191,9 +176,7 @@ impl SshClient {
     }
 
     async fn close(&mut self) -> crate::Result<()> {
-        self.session
-            .disconnect(Disconnect::ByApplication, "", "English")
-            .await?;
+        self.session.disconnect(Disconnect::ByApplication, "", "English").await?;
         Ok(())
     }
 }

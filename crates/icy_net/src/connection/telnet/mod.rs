@@ -269,7 +269,6 @@ impl Connection for TelnetConnection {
                 dst.push(*b);
             }
         }
-        println!("send {}", dst.len());
         self.tcp_stream.write_all(&dst).await?;
         Ok(())
     }

@@ -24,10 +24,7 @@ impl ModemConnection {
         port.write_all(modem.dial_string.as_bytes()).await?;
         port.write_all(call_number.as_bytes()).await?;
         port.write_all(b"\n").await?;
-        Ok(Self {
-            modem,
-            port: Box::new(port),
-        })
+        Ok(Self { modem, port: Box::new(port) })
     }
 }
 
@@ -36,10 +33,10 @@ impl Connection for ModemConnection {
     fn get_connection_type(&self) -> ConnectionType {
         ConnectionType::Modem
     }
-    
+
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
         let res = self.port.read(buf).await?;
-      //  println!("Read {:?} bytes", &buf[..res]);
+        //  println!("Read {:?} bytes", &buf[..res]);
         Ok(res)
     }
 

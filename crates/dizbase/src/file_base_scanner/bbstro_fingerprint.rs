@@ -99,7 +99,7 @@ impl FingerprintData {
             if entry.path().is_dir() {
                 continue;
             }
-            println!("scan {}…" entry.path().display());
+            println!("scan {}…", entry.path().display());
             let data = fs::read(entry.path())?;
             let Some(file_name) = entry.path().file_name().unwrap().to_str() else {
                 println!("no utf8 file name.");
