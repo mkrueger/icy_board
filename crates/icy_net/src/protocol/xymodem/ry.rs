@@ -3,16 +3,14 @@ use std::io::Write;
 use tempfile::NamedTempFile;
 
 use super::{
-    constants::{CAN, DEFAULT_BLOCK_LENGTH},
+    constants::DEFAULT_BLOCK_LENGTH,
     err::XYModemError,
     get_checksum, remove_cpm_eof, Checksum, XYModemConfiguration,
 };
 use crate::{
     crc::get_crc16,
     protocol::{
-        str_from_null_terminated_utf8_unchecked,
-        xymodem::constants::{ACK, EOT, EXT_BLOCK_LENGTH, NAK, SOH, STX},
-        TransferState,
+        str_from_null_terminated_utf8_unchecked, xymodem::constants::{ACK, EOT, EXT_BLOCK_LENGTH, NAK, SOH, STX}, TransferState
     },
     Connection,
 };
@@ -237,8 +235,7 @@ impl Ry {
 
     pub async fn cancel(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
         self.recv_state = RecvState::None;
-        com.send(&[CAN, CAN, CAN, CAN, CAN, CAN]).await?;
-        Ok(())
+        super::cancel_xymodem_transfer(com).await
     }
 
     pub async fn recv(&mut self, com: &mut dyn Connection) -> crate::Result<()> {

@@ -120,9 +120,13 @@ impl super::Protocol for XYmodem {
     }
 
     async fn cancel_transfer(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
-        com.send(&[CAN, CAN, CAN, CAN, CAN, CAN]).await?;
-        Ok(())
+        cancel_xymodem_transfer(com).await
     }
+}
+
+async fn cancel_xymodem_transfer(com: &mut dyn Connection) -> crate::Result<()> {
+    com.send(&[CAN, CAN, CAN, CAN, CAN, CAN]).await?;
+    Ok(())
 }
 
 fn get_checksum(block: &[u8]) -> u8 {

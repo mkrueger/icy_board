@@ -222,7 +222,6 @@ impl Header {
     }
 
     pub async fn read(com: &mut dyn Connection, can_count: &mut usize) -> crate::Result<Option<Header>> {
-        println!("read header");
         let zpad = com.read_u8().await?;
         if zpad == 0x18 {
             // CAN
@@ -305,7 +304,6 @@ impl Header {
                 if data[0] != ZACK && data[0] != frame_types::ZFIN {
                     com.read_u8().await?; // read XON
                 }
-                println!("read header done!");
 
                 Ok(Some(Header {
                     frame_type: Header::get_frame_type(data[0])?,

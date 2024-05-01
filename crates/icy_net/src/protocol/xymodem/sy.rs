@@ -346,8 +346,7 @@ impl Sy {
 
     pub async fn cancel(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
         self.send_state = SendState::None;
-        com.send(&[CAN, CAN, CAN, CAN, CAN, CAN]).await?;
-        Ok(())
+        super::cancel_xymodem_transfer(com).await
     }
 
     pub fn send(&mut self, files: &[PathBuf]) {

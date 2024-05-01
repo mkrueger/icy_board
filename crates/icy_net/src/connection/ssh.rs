@@ -1,15 +1,15 @@
 #![allow(dead_code)]
 use std::{
-    io::ErrorKind,
-    net::{TcpStream, ToSocketAddrs},
+    io::ErrorKind, net::TcpStream, sync::Arc, time::Duration
 };
-use async_ssh2_tokio::client::{Client, AuthMethod, ServerCheckMethod};
 use async_trait::async_trait;
-use russh::{client::Msg, Channel};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use crate::{telnet::TermCaps, Connection, ConnectionType, NetError};
+use russh::{client::Msg, *};
+use russh_keys::*;
+
+use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::ToSocketAddrs};
+use crate::{telnet::TermCaps, Connection, ConnectionType};
 pub struct SSHConnection {
-    client: Client,
+    client: SshClient,
     channel: Channel<Msg>,
 }
 
@@ -24,26 +24,23 @@ const SUPPORTED_KEY_EXCHANGES: &str = "ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecd
 
 impl SSHConnection {
     pub async fn open<A: ToSocketAddrs>(addr: &A, caps: TermCaps, credentials: Credentials) -> crate::Result<Self> {
-        for addr in addr.to_socket_addrs()? {
-            let auth_method = AuthMethod::with_password(&credentials.password);
-            let client = Client::connect(
-                addr,
-                &credentials.user_name,
-                auth_method,
-                ServerCheckMethod::NoCheck,
-            ).await?;
-            let channel = client.get_channel().await?;
-            let terminal_type: String = format!("{:?}", caps.terminal).to_lowercase();
-            channel.request_pty(false, &terminal_type, caps.window_size.0 as u32, caps.window_size.1 as u32, 1, 1,&[]).await?;
-            channel.request_shell(false).await?;
+        let ssh = SshClient::connect(
+            addr,
+            &credentials.user_name,
+            credentials.password,
+        ).await?;
 
-            return Ok(Self {
-                client,
-                channel: channel,
-            });
-        }
+        let channel = ssh.session.channel_open_session().await?;
+        let terminal_type: String = format!("{:?}", caps.terminal).to_lowercase();
+        channel.request_pty(false, &terminal_type, caps.window_size.0 as u32, caps.window_size.1 as u32, 1, 1,&[]).await?;
+        channel.request_shell(false).await?;
 
-        /* 
+        return Ok(Self {
+            client: ssh,
+            channel: channel,
+        });
+    
+    /* 
 
         for addr in addr.to_socket_addrs()? {
             let session = Session::new()?;
@@ -73,10 +70,8 @@ impl SSHConnection {
             chan.request_shell()?;
             session.set_blocking(false);
         }
-        */
-
         Err(NetError::CouldNotConnect.into())
-
+        */
     }
 
     fn default_port() -> u16 {
@@ -88,7 +83,7 @@ impl SSHConnection {
     }
 }
 
-#[async_trait]
+#[async_trait] 
 impl Connection for SSHConnection {
     fn get_connection_type(&self) -> ConnectionType {
         ConnectionType::SSH
@@ -113,7 +108,92 @@ impl Connection for SSHConnection {
     }
 
     async fn shutdown(&mut self) -> crate::Result<()> {
-        self.client.disconnect().await?;
+        self.client.session.disconnect(Disconnect::ByApplication, "bye", "en").await?;
+        Ok(())
+    }
+}
+
+
+struct Client {}
+
+// More SSH event handlers
+// can be defined in this trait
+// In this example, we're only using Channel, so these aren't needed.
+#[async_trait]
+impl client::Handler for Client {
+    type Error = russh::Error;
+
+    async fn check_server_key(
+        &mut self,
+        _server_public_key: &key::PublicKey,
+    ) -> Result<bool, Self::Error> {
+        Ok(true)
+    }
+}
+pub struct SshClient {
+    session: client::Handle<Client>,
+}
+
+impl SshClient {
+    async fn connect<A: ToSocketAddrs>(
+        addrs: A,
+        user: impl Into<String>,
+        password: impl Into<String>,
+    ) -> crate::Result<Self> {
+       // let key_pair = load_secret_key(key_path, None)?;
+        let config = client::Config {
+            inactivity_timeout: Some(Duration::from_secs(5)),
+            ..<_>::default()
+        };
+
+        let config = Arc::new(config);
+        let sh = Client {};
+
+        let mut session = client::connect(config, addrs, sh).await?;
+        let auth_res = session
+            .authenticate_password(user, password)
+            .await?;
+
+        if !auth_res {
+            return Err("Authentication failed".into());
+        }
+
+        Ok(Self { session })
+    }
+
+    async fn call(&mut self, command: &str) -> crate::Result<u32> {
+        let mut channel = self.session.channel_open_session().await?;
+        channel.exec(true, command).await?;
+
+        let mut code = None;
+        let mut stdout = tokio::io::stdout();
+
+        loop {
+            // There's an event available on the session channel
+            let Some(msg) = channel.wait().await else {
+                break;
+            };
+            match msg {
+                // Write data to the terminal
+                ChannelMsg::Data { ref data } => {
+                    stdout.write_all(data).await?;
+                    stdout.flush().await?;
+                }
+                // The command has returned an exit code
+                ChannelMsg::ExitStatus { exit_status } => {
+                    code = Some(exit_status);
+                    // cannot leave the loop immediately, there might still be more data to receive
+                }
+                _ => {}
+            }
+        }
+        Ok(code.expect("program did not exit cleanly"))
+    }
+
+    async fn close(&mut self) -> crate::Result<()> {
+        self.session
+            .disconnect(Disconnect::ByApplication, "", "English")
+            .await?;
         Ok(())
     }
 }

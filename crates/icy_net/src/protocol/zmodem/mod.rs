@@ -165,6 +165,8 @@ impl Protocol for Zmodem {
 
     async fn cancel_transfer(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
         com.send(&ABORT_SEQ).await?;
+        com.send(&ABORT_SEQ).await?;
+        com.send(&ABORT_SEQ).await?;
         Ok(())
     }
 }

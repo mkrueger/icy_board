@@ -20,8 +20,8 @@ bytes = "1"
 serial2-tokio = "0.1.10"
 
 # SSH
-async-ssh2-tokio = "0.8.8"
-russh = "0.40.2"
+russh = "0.43.0"
+russh-keys = "0.43.0"
 
 # WEBSOCKETS
 tokio-tungstenite = { version = "0.21.0", features = [
