@@ -166,14 +166,17 @@ pub struct UserStats {
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_64")]
-    pub ul_tot_dnld_bytes: u64,
+    pub total_dnld_bytes: u64,
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_64")]
-    pub ul_tot_upld_bytes: u64,
+    pub total_upld_bytes: u64,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_64")]
-    pub daily_downloaded_bytes: u64,
+    pub today_dnld_bytes: u64,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_null_64")]
+    pub today_upld_bytes: u64,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -551,9 +554,10 @@ impl User {
                 num_verify_errors: num_verify_errors as u64,
                 num_uploads: u.user.num_uploads as u64,
                 num_downloads: u.user.num_downloads as u64,
-                ul_tot_dnld_bytes: u.user.ul_tot_dnld_bytes,
-                ul_tot_upld_bytes: u.user.ul_tot_upld_bytes,
-                daily_downloaded_bytes: u.user.daily_downloaded_bytes as u64,
+                total_dnld_bytes: u.user.ul_tot_dnld_bytes,
+                total_upld_bytes: u.user.ul_tot_upld_bytes,
+                today_dnld_bytes: u.user.daily_downloaded_bytes as u64,
+                today_upld_bytes: 0,
             },
         }
     }

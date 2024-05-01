@@ -2931,6 +2931,9 @@ text = "Off"
 [GfxModeAnsi]
 text = "Ansi"
 
+[GfxModeGraphics]
+text = "Graphics"
+
 [GfxModeAvatar]
 text = "Avatar"
 

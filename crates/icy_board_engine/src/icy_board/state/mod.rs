@@ -41,9 +41,11 @@ use super::{
 pub enum GraphicsMode {
     // No graphics or ansi codes
     Ctty,
-    // Ansi codes - color codes on/off is extra
+    // Ansi codes - without colors
     Ansi,
-    // Avatar codes - color codes on/off is extra
+    // Ansi codes + color codes
+    Graphics,
+    // Avatar codes + color codes
     Avatar,
     Rip,
 }
@@ -57,8 +59,6 @@ pub struct DisplayOptions {
     pub non_stop: bool,
 
     pub grapics_mode: GraphicsMode,
-
-    pub disable_color: bool,
 
     ///  flag indicating whether or not the user aborted the display of data via ^K / ^X or answering no to a MORE? prompt
     pub abort_printout: bool,
@@ -78,8 +78,7 @@ impl Default for DisplayOptions {
         Self {
             auto_more: false,
             abort_printout: false,
-            grapics_mode: GraphicsMode::Ansi,
-            disable_color: false,
+            grapics_mode: GraphicsMode::Graphics,
             non_stop: false,
             display_text: true,
         }
@@ -307,10 +306,13 @@ pub enum UserActivity {
 pub struct NodeState {
     pub connections: Arc<Mutex<Vec<Box<ChannelConnection>>>>,
     pub cur_user: i32,
+    pub cur_conference: i32,
+    pub graphics_mode: GraphicsMode,
     pub user_activity: UserActivity,
     pub enabled_chat: bool,
     pub node_number: usize,
     pub connection_type: ConnectionType,
+    pub logon_time: DateTime<Utc>,
     pub handle: Option<thread::JoinHandle<()>>,
 }
 
@@ -322,11 +324,14 @@ impl NodeState {
         Self {
             connections: Arc::new(Mutex::new(Vec::new())),
             user_activity: UserActivity::LoggingIn,
+            graphics_mode: GraphicsMode::Ansi,
             cur_user: -1,
+            cur_conference: 0,
             enabled_chat: true,
             node_number,
             connection_type,
             handle: None,
+            logon_time: Utc::now(),
         }
     }
 }
@@ -382,7 +387,6 @@ impl IcyBoardState {
     pub fn new(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<Vec<Option<NodeState>>>>, node: usize, connection: Box<dyn Connection>) -> Self {
         let mut session = Session::new();
         session.caller_number = board.lock().unwrap().statistics.cur_caller_number() as usize;
-        session.disp_options.disable_color = board.lock().unwrap().config.options.non_graphics;
         session.date_format = board.lock().unwrap().config.board.date_format.clone();
         let display_text = board.lock().unwrap().default_display_text.clone();
         let root_path = board.lock().unwrap().root_path.clone();
@@ -443,7 +447,7 @@ impl IcyBoardState {
     }
 
     fn use_graphics(&self) -> bool {
-        !self.session.disp_options.disable_color && self.session.disp_options.grapics_mode != GraphicsMode::Ctty
+        self.session.disp_options.grapics_mode != GraphicsMode::Ansi && self.session.disp_options.grapics_mode != GraphicsMode::Ctty
     }
 
     fn check_time_left(&self) {
@@ -492,7 +496,7 @@ impl IcyBoardState {
                 }
                 Ok(())
             }
-            GraphicsMode::Ansi | GraphicsMode::Avatar => self.print(TerminalTarget::Both, "\x1B[K").await,
+            GraphicsMode::Ansi | GraphicsMode::Graphics | GraphicsMode::Avatar => self.print(TerminalTarget::Both, "\x1B[K").await,
             GraphicsMode::Rip => self.print(TerminalTarget::Both, "\x1B[K").await,
         }
     }
@@ -503,6 +507,7 @@ impl IcyBoardState {
             if let Ok(board) = self.board.lock() {
                 self.session.current_conference = board.conferences[conference as usize].clone();
             }
+            self.node_state.lock().unwrap()[self.node].as_mut().unwrap().cur_conference = self.session.current_conference_number;
         }
     }
 
@@ -663,6 +668,7 @@ impl IcyBoardState {
 
         self.session.cur_user = user_number as i32;
         self.node_state.lock().unwrap()[self.node].as_mut().unwrap().cur_user = user_number as i32;
+        self.node_state.lock().unwrap()[self.node].as_mut().unwrap().graphics_mode = self.session.disp_options.grapics_mode;
         let last_conference = if let Ok(mut board) = self.board.lock() {
             if user_number >= board.users.len() {
                 log::error!("User number {} is out of range", user_number);
@@ -792,6 +798,11 @@ impl IcyBoardState {
     pub fn set_activity(&self, activity: UserActivity) {
         self.node_state.lock().unwrap()[self.node].as_mut().unwrap().user_activity = activity;
     }
+
+    pub fn set_grapics_mode(&mut self, mode: GraphicsMode) {
+        self.node_state.lock().unwrap()[self.node].as_mut().unwrap().graphics_mode = mode;
+        self.session.disp_options.grapics_mode = mode;
+    }
 }
 
 #[derive(PartialEq)]
@@ -822,7 +833,7 @@ impl IcyBoardState {
             GraphicsMode::Ctty => {
                 // ignore
             }
-            GraphicsMode::Ansi => {
+            GraphicsMode::Ansi | GraphicsMode::Graphics => {
                 self.print(target, &format!("\x1B[{};{}H", y, x)).await?;
             }
             GraphicsMode::Avatar => {
@@ -1124,6 +1135,7 @@ impl IcyBoardState {
                 result = match self.session.disp_options.grapics_mode {
                     GraphicsMode::Ctty => self.display_text.get_display_text(IceText::GfxModeOff).unwrap().text,
                     GraphicsMode::Ansi => self.display_text.get_display_text(IceText::GfxModeAnsi).unwrap().text,
+                    GraphicsMode::Graphics => self.display_text.get_display_text(IceText::GfxModeGraphics).unwrap().text,
                     GraphicsMode::Avatar => self.display_text.get_display_text(IceText::GfxModeAvatar).unwrap().text,
                     GraphicsMode::Rip => self.display_text.get_display_text(IceText::GfxModeRip).unwrap().text,
                 };
@@ -1247,7 +1259,7 @@ impl IcyBoardState {
             "TOTALTIME" => {}
             "UPBYTES" => {
                 if let Some(user) = &self.current_user {
-                    result = user.stats.ul_tot_upld_bytes.to_string();
+                    result = user.stats.total_upld_bytes.to_string();
                 }
             }
             "UPFILES" => {
@@ -1273,12 +1285,12 @@ impl IcyBoardState {
             "WAIT" => {}
             "WHO" => {}
             "XOFF" => {
-                self.session.disp_options.disable_color = true;
+                self.session.disp_options.grapics_mode = GraphicsMode::Ansi;
                 return None;
             }
             "XON" => {
                 if !self.board.lock().unwrap().config.options.non_graphics {
-                    self.session.disp_options.disable_color = false;
+                    self.session.disp_options.grapics_mode = GraphicsMode::Graphics;
                 }
                 return None;
             }

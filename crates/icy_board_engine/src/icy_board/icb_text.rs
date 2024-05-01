@@ -1563,17 +1563,20 @@ pub enum IceText {
     /// `Ansi`
     GfxModeAnsi = 765,
 
+    /// `Graphics`
+    GfxModeGraphics = 766,
+
     /// `Avatar`
-    GfxModeAvatar = 766,
+    GfxModeAvatar = 767,
 
     /// `Rip`
-    GfxModeRip = 767,
+    GfxModeRip = 768,
 
     /// `Enter the DOOR # to Open (Enter)=none`
-    DOORNumberCommandExpertmode = 768,
+    DOORNumberCommandExpertmode = 769,
 }
 
-const LAST_ENTRY: usize = 768;
+const LAST_ENTRY: usize = 769;
 
 impl IceText {
     pub fn from(i: usize) -> Self {

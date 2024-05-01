@@ -7,6 +7,7 @@ use crate::ast::constant::STACK_LIMIT;
 use crate::datetime::{IcbDate, IcbTime};
 use crate::executable::{GenericVariableData, PPEExpr, VariableData, VariableType, VariableValue};
 use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_NUM, MASK_PATH, MASK_PWD};
+use crate::icy_board::state::GraphicsMode;
 use crate::parser::CONFERENCE_ID;
 use crate::vm::VirtualMachine;
 use crate::Res;
@@ -795,7 +796,9 @@ pub async fn langext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     Ok(VariableValue::new_string(vm.icy_board_state.session.language.clone()))
 }
 pub async fn ansion(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_bool(!vm.icy_board_state.session.disp_options.disable_color))
+    Ok(VariableValue::new_bool(
+        vm.icy_board_state.session.disp_options.grapics_mode != GraphicsMode::Ctty,
+    ))
 }
 pub async fn valcc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
@@ -874,10 +877,8 @@ pub async fn abs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
 pub async fn grafmode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     match vm.icy_board_state.session.disp_options.grapics_mode {
         crate::icy_board::state::GraphicsMode::Ctty => Ok(VariableValue::new_string("N".to_string())),
-        crate::icy_board::state::GraphicsMode::Ansi => {
-            // never returned "A" for ANSI
-            Ok(VariableValue::new_string("G".to_string()))
-        }
+        crate::icy_board::state::GraphicsMode::Ansi => Ok(VariableValue::new_string("A".to_string())),
+        crate::icy_board::state::GraphicsMode::Graphics => Ok(VariableValue::new_string("G".to_string())),
         crate::icy_board::state::GraphicsMode::Avatar => {
             // Avatar is new!
             Ok(VariableValue::new_string("V".to_string()))

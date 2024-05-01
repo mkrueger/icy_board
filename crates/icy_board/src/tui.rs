@@ -7,8 +7,12 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::Res;
-use chrono::{Datelike, Local, Timelike};
+use crate::{
+    bbs::{handle_client, LoginOptions},
+    terminal_thread::SendData,
+    Res,
+};
+use chrono::{Datelike, Local, Timelike, Utc};
 use crossterm::{
     cursor::MoveTo,
     event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
@@ -16,129 +20,71 @@ use crossterm::{
     ExecutableCommand,
 };
 use icy_board_engine::icy_board::{
-    state::{NodeState, Session},
+    state::{GraphicsMode, NodeState, Session},
     IcyBoard, IcyBoardError,
 };
 use icy_board_tui::{
     get_text_args,
-    theme::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GRAY, DOS_LIGHT_GREEN, DOS_WHITE},
+    theme::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GRAY, DOS_LIGHT_GREEN, DOS_RED, DOS_WHITE, DOS_YELLOW},
 };
+use icy_engine::TextPane;
 use icy_net::{channel::ChannelConnection, ConnectionType};
 use ratatui::{
     prelude::*,
     widgets::{canvas::Canvas, Paragraph},
 };
+use tokio::{runtime::Runtime, sync::mpsc};
 
 use crate::{bbs::BBS, icy_engine_output::Screen};
 
 pub struct Tui {
-    //  screen: Arc<Mutex<Screen>>,
-    session: Arc<Mutex<Session>>,
-    //  tx: mpsc::Sender<Vec<u8>>,
+    screen: Arc<Mutex<Screen>>,
+    tx: mpsc::Sender<SendData>,
     status_bar: usize,
     handle: Arc<Mutex<Vec<Option<NodeState>>>>,
     node: usize,
+    node_state: Arc<Mutex<Vec<Option<NodeState>>>>,
 }
 
 impl Tui {
-    pub fn local_mode(board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>, _sysop_mode: bool, _ppe: Option<PathBuf>) -> Self {
-        let mut session = Session::new();
-        session.is_local = true;
-        let ui_session = Arc::new(Mutex::new(session));
-        let _session = ui_session.clone();
-        let _board = board.clone();
+    pub fn local_mode(board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>, login_sysop: bool, ppe: Option<PathBuf>) -> Self {
+        let board = board.clone();
         let ui_node = bbs.lock().unwrap().create_new_node(ConnectionType::Channel);
-        let _node_state = bbs.lock().unwrap().open_connections.clone();
+        let node_state = bbs.lock().unwrap().open_connections.clone();
         let node = ui_node.clone();
-
-        //   let (tx, rx) = mpsc::channel(32);
-
         let screen = Arc::new(Mutex::new(Screen::new()));
-        let _screen2 = screen.clone();
-        let _handle = thread::spawn(move || {
+        let (ui_connection, connection) = ChannelConnection::create_pair();
+        let node_state2 = node_state.clone();
+
+        let options = LoginOptions { login_sysop, ppe };
+        let handle = thread::spawn(move || {
             tokio::runtime::Builder::new_multi_thread()
                 .worker_threads(4)
                 .enable_all()
                 .build()
                 .unwrap()
-                .block_on(async { /*
-                     let mut parser = ansi::Parser::default();
-                     parser.bs_is_ctrl_char = true;
-
-
-                     let mut screen_buf = [0; 1024 * 16];
-
-                     let mut state = IcyBoardState::new(board, node_state, node, Box::new(connection));
-                     if sysop_mode {
-                         state.session.is_sysop = true;
-                         state.set_current_user(0).unwrap();
-                     }
-                     let mut cmd = PcbBoardCommand::new(state);
-
-                     let orig_hook = std::panic::take_hook();
-                     std::panic::set_hook(Box::new(move |panic_info| {
-                         log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
-                         log::error!("full info: {:?}", panic_info);
-
-                         orig_hook(panic_info);
-                     }));
-
-                     if !sysop_mode {
-                         match cmd.login().await {
-                             Ok(true) => {}
-                             Ok(false) => {
-                                 return Ok(());
-                             }
-                             Err(err) => {
-                                 log::error!("error during login process {}", err);
-                                 return Ok(());
-                             }
-                         }
-                     }
-                     if let Some(ppe) = ppe {
-                         let _ = cmd.state.run_ppe(&ppe, None);
-                         let _ = cmd.state.press_enter();
-                         let _ = cmd.state.hangup();
-                         return Ok(());
-                     }
-
-                     loop {
-                         session.lock().unwrap().cur_user = cmd.state.session.cur_user;
-                         session.lock().unwrap().current_conference = cmd.state.session.current_conference.clone();
-                         session.lock().unwrap().disp_options = cmd.state.session.disp_options.clone();
-
-                         if let Err(err) = cmd.do_command() {
-                             cmd.state.session.disp_options.reset_printout();
-                             log::error!("session thread 'do_command': {}", err);
-                             if cmd.state.set_color(TerminalTarget::Both, 4.into()).is_ok() {
-                                 let _ = cmd.state.print(TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err));
-                                 let _ = cmd.state.reset_color();
-                             }
-                         }
-                         cmd.state.session.disp_options.reset_printout();
-                         if cmd.state.session.request_logoff {
-                             let _ = cmd.state.connection.shutdown();
-                             return Ok(());
-                         }
-                         thread::sleep(Duration::from_millis(20));
-                     } */
+                .block_on(async {
+                    if let Err(err) = handle_client(board, node_state2, node, Box::new(connection), Some(options)).await {
+                        log::error!("Error running backround client: {}", err);
+                    }
                 });
-        }); /*
-            bbs.lock().unwrap().get_open_connections().as_ref().lock().unwrap()[node]
-                .as_mut()
-                .unwrap()
-                .handle = Some(handle);*/
+        });
+        bbs.lock().unwrap().get_open_connections().as_ref().lock().unwrap()[node]
+            .as_mut()
+            .unwrap()
+            .handle = Some(handle);
+        let (handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone());
 
         Self {
-            //      screen: screen2,
-            session: ui_session,
-            //     tx,
+            screen,
+            tx,
             status_bar: 0,
             node,
+            node_state,
             handle: bbs.lock().unwrap().get_open_connections().clone(),
         }
     }
-
+    /*
     pub fn sysop_mode(bbs: &Arc<Mutex<BBS>>, node: usize) -> Res<Self> {
         let ui_session = Arc::new(Mutex::new(Session::new()));
         let (_ui_connection, connection) = ChannelConnection::create_pair();
@@ -155,7 +101,7 @@ impl Tui {
                 .push(Box::new(connection));
 
             Ok(Self {
-                //  screen: Screen::new(),
+                screen: Arc::new(Mutex::new(Screen::new())),
                 session: ui_session,
                 //   connection: ui_connection,
                 status_bar: 0,
@@ -165,7 +111,7 @@ impl Tui {
         } else {
             return Err(Box::new(IcyBoardError::Error("Node not found".to_string())));
         }
-    }
+    }*/
 
     pub fn run(&mut self, board: &Arc<Mutex<IcyBoard>>) -> Res<()> {
         let mut terminal = init_terminal()?;
@@ -182,7 +128,8 @@ impl Tui {
                 return Ok(());
             }
 
-            if redraw {
+            //if redraw
+            {
                 redraw = false;
                 let board = board.clone();
                 let _ = terminal.draw(|frame| {
@@ -198,7 +145,7 @@ impl Tui {
                         if key.modifiers.contains(KeyModifiers::ALT) {
                             match key.code {
                                 KeyCode::Char('h') => {
-                                    self.status_bar = (self.status_bar + 1) % 2;
+                                    self.status_bar = (self.status_bar + 1) % 4;
                                     redraw = true;
                                 }
                                 KeyCode::Char('x') => {
@@ -257,17 +204,41 @@ impl Tui {
     }
 
     fn ui(&self, frame: &mut Frame, board: &IcyBoard) {
-        let area = Rect::new(0, 0, frame.size().width.min(80), frame.size().height.min(24));
-        frame.render_widget(self.main_canvas(area), area);
+        let width = frame.size().width.min(80);
+        let height = frame.size().height.min(24);
 
-        let area = Rect::new(0, (frame.size().height - 1).min(24), frame.size().width.min(80), 1);
-        frame.render_widget(self.status_bar(board), area);
-        //     let p = self.screen.caret.get_position();
-        //       frame.set_cursor(p.x.clamp(0, 80) as u16, (p.y - self.screen.buffer.get_first_visible_line()).clamp(0, 25) as u16);
+        let mut area = Rect::new((frame.size().width - width) / 2, (frame.size().height - height) / 2, width, height);
+
+        let buffer = &self.screen.lock().unwrap().buffer;
+        for y in 0..area.height as i32 {
+            for x in 0..area.width as i32 {
+                let c = buffer.get_char((x, y + buffer.get_first_visible_line()));
+                let mut fg = c.attribute.get_foreground();
+                if c.attribute.is_bold() {
+                    fg += 8;
+                }
+                let fg = buffer.palette.get_color(fg).get_rgb();
+                let bg = buffer.palette.get_color(c.attribute.get_background()).get_rgb();
+                let mut s = Style::new().bg(Color::Rgb(bg.0, bg.1, bg.2)).fg(Color::Rgb(fg.0, fg.1, fg.2));
+                if c.attribute.is_blinking() {
+                    s = s.slow_blink();
+                }
+                let span = Span::from(c.ch.to_string()).style(s);
+                frame.buffer_mut().set_span(area.x + x as u16, area.y + y as u16, &span, 1);
+            }
+        }
+        area.y += area.height;
+        area.height = 2;
+
+        self.draw_statusbar(frame, board, area);
+
+        // let area = Rect::new(0, (frame.size().height - 1).min(24), frame.size().width.min(80), 1);
+        // frame.render_widget(self.status_bar(board), area);
     }
 
-    fn status_bar(&self, board: &IcyBoard) -> impl Widget + '_ {
+    fn draw_statusbar(&self, frame: &mut Frame, board: &IcyBoard, area: Rect) {
         let user_name;
+        let city;
         let current_conf;
         let cur_security;
         let times_on;
@@ -275,26 +246,65 @@ impl Tui {
         let upbytes;
         let dn;
         let dnbytes;
-        if let Ok(user) = self.session.lock() {
-            current_conf = user.current_conference_number;
-            cur_security = user.cur_security;
-            if user.cur_user >= 0 {
-                user_name = board.users[user.cur_user as usize].get_name().clone();
-                times_on = board.users[user.cur_user as usize].stats.num_times_on;
-                upbytes = board.users[user.cur_user as usize].stats.ul_tot_upld_bytes;
-                up = board.users[user.cur_user as usize].stats.num_uploads;
-                dnbytes = board.users[user.cur_user as usize].stats.ul_tot_dnld_bytes;
-                dn = board.users[user.cur_user as usize].stats.num_downloads;
+        let graphics_mode;
+        let last_on;
+        let logon_time;
+        let msg_left;
+        let msg_read;
+        let today_dn;
+        let today_ul;
+        let bus_phone;
+        let home_phone;
+        let email;
+        let cmt1;
+        let cmt2;
+
+        if let Some(node_state) = &self.node_state.lock().unwrap()[self.node as usize] {
+            current_conf = node_state.cur_conference;
+            graphics_mode = node_state.graphics_mode;
+            logon_time = node_state.logon_time;
+            if node_state.cur_user >= 0 {
+                cur_security = board.users[node_state.cur_user as usize].security_level;
+                user_name = board.users[node_state.cur_user as usize].get_name().clone();
+                city = board.users[node_state.cur_user as usize].city_or_state.clone();
+                times_on = board.users[node_state.cur_user as usize].stats.num_times_on;
+                upbytes = board.users[node_state.cur_user as usize].stats.total_upld_bytes;
+                up = board.users[node_state.cur_user as usize].stats.num_uploads;
+                dnbytes = board.users[node_state.cur_user as usize].stats.total_dnld_bytes;
+                dn = board.users[node_state.cur_user as usize].stats.num_downloads;
+                today_dn = board.users[node_state.cur_user as usize].stats.today_dnld_bytes;
+                today_ul = board.users[node_state.cur_user as usize].stats.total_dnld_bytes;
+                last_on = board.users[node_state.cur_user as usize].stats.last_on;
+                msg_left = board.users[node_state.cur_user as usize].stats.messages_left;
+                msg_read = board.users[node_state.cur_user as usize].stats.messages_read;
+                bus_phone = board.users[node_state.cur_user as usize].bus_data_phone.clone();
+                home_phone = board.users[node_state.cur_user as usize].home_voice_phone.clone();
+                email = board.users[node_state.cur_user as usize].email.clone();
+                cmt1 = board.users[node_state.cur_user as usize].user_comment.clone();
+                cmt2 = board.users[node_state.cur_user as usize].sysop_comment.clone();
             } else {
                 user_name = String::new();
+                city = String::new();
                 times_on = 0;
                 up = 0;
                 dn = 0;
                 upbytes = 0;
                 dnbytes = 0;
+                cur_security = 0;
+                last_on = Utc::now();
+                msg_left = 0;
+                msg_read = 0;
+                today_ul = 0;
+                today_dn = 0;
+                bus_phone = String::new();
+                home_phone = String::new();
+                email = String::new();
+                cmt1 = String::new();
+                cmt2 = String::new();
             }
         } else {
             user_name = String::new();
+            city = String::new();
             current_conf = 0;
             cur_security = 0;
             times_on = 0;
@@ -302,8 +312,119 @@ impl Tui {
             dn = 0;
             upbytes = 0;
             dnbytes = 0;
+            graphics_mode = GraphicsMode::Ansi;
+            last_on = Utc::now();
+            logon_time = Utc::now();
+            msg_left = 0;
+            msg_read = 0;
+            today_ul = 0;
+            today_dn = 0;
+            bus_phone = String::new();
+            home_phone = String::new();
+            email = String::new();
+            cmt1 = String::new();
+            cmt2 = String::new();
         }
 
+        frame.buffer_mut().set_style(area, Style::new().bg(DOS_LIGHT_GRAY));
+
+        match self.status_bar {
+            0 => {
+                let connection = "Local";
+
+                let line = Line::from(vec![
+                    Span::from(format!("{}", self.node)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
+                    Span::from(format!("({}) {} - {}", connection, user_name, city,)).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
+                ]);
+                frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
+
+                let graphics = match graphics_mode {
+                    GraphicsMode::Ctty => "N",
+                    GraphicsMode::Ansi => "A",
+                    GraphicsMode::Graphics => "G",
+                    GraphicsMode::Avatar => "V",
+                    GraphicsMode::Rip => "R",
+                };
+
+                let line = Line::from(vec![Span::from(format!(
+                    "{} ({})  Sec({})={}  Times On={}  Up:Dn={}:{}",
+                    graphics,
+                    last_on.format(&board.config.board.date_format),
+                    current_conf,
+                    cur_security,
+                    times_on,
+                    up,
+                    dn
+                ))
+                .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY))]);
+                frame.buffer_mut().set_line(area.x, area.y + 1, &line, area.width);
+                let hlp = "ALT-H=Help".to_string();
+                let len = hlp.len() as u16;
+                frame
+                    .buffer_mut()
+                    .set_span(area.x + 56, area.y, &Span::from(hlp).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)), len);
+
+                let min_on = (Utc::now() - logon_time).num_minutes();
+
+                let time = format!("{:<3} {}", min_on, logon_time.format("%H:%M"));
+                let len = time.len() as u16;
+                frame.buffer_mut().set_span(
+                    area.x + area.width - len - 2,
+                    area.y,
+                    &Span::from(time).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
+                    len,
+                );
+
+                let time = format!("{}", Utc::now().format("%H:%M"));
+                let len = time.len() as u16;
+                frame.buffer_mut().set_span(
+                    area.x + area.width - len - 2,
+                    area.y + 1,
+                    &Span::from(time).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
+                    len,
+                );
+            }
+            1 => {
+                let line = Line::from(vec![
+                    Span::from(format!("{}", self.node)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
+                    Span::from(format!(" Alt-> X=OS")).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
+                ]);
+                frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
+            }
+            2 => {
+                let line = Line::from(vec![
+                    Span::from(format!("{}", self.node)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
+                    Span::from(format!("{} / {} mail: {}", bus_phone, home_phone, email)).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
+                ]);
+                frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
+
+                let line = Line::from(vec![
+                    Span::from(format!("  C1: {:40} C2: {:40}", cmt1, cmt2)).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY))
+                ]);
+                frame.buffer_mut().set_line(area.x, area.y + 1, &line, area.width);
+            }
+            3 => {
+                let line = Line::from(vec![
+                    Span::from(format!("{}", self.node)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
+                    Span::from(format!(" Msgs Left: {:7}  Files U/L: {:7}  Bytes U/L: {:7}", msg_left, up, upbytes,))
+                        .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
+                ]);
+                frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
+
+                let line = Line::from(vec![Span::from(format!(
+                    "  Msgs Read: {:7}  Files D/L: {:7}  Bytes D/L: {:7}  Today: {:7}",
+                    msg_read,
+                    dn,
+                    dnbytes,
+                    today_dn as i64 + today_ul as i64,
+                ))
+                .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY))]);
+                frame.buffer_mut().set_line(area.x, area.y + 1, &line, area.width);
+            }
+            _ => {}
+        }
+
+        /*
         Canvas::default()
             .paint(move |ctx| match self.status_bar {
                 0 => {
@@ -343,46 +464,18 @@ impl Tui {
                 _ => {}
             })
             .background_color(DOS_LIGHT_GRAY)
-            .x_bounds([0.0, 80.0])
-    }
-
-    fn main_canvas(&self, area: Rect) -> impl Widget + '_ {
-        Canvas::default()
-            .paint(move |_ctx| { /*
-                 let buffer = &self.screen.buffer;
-                 for y in 0..area.height as i32 {
-                     for x in 0..area.width as i32 {
-                         let c = buffer.get_char((x, y + buffer.get_first_visible_line()));
-                         let mut fg = c.attribute.get_foreground();
-                         if c.attribute.is_bold() {
-                             fg += 8;
-                         }
-                         let fg = buffer.palette.get_color(fg).get_rgb();
-                         let bg = buffer.palette.get_color(c.attribute.get_background()).get_rgb();
-                         let mut s = Style::new().bg(Color::Rgb(bg.0, bg.1, bg.2)).fg(Color::Rgb(fg.0, fg.1, fg.2));
-                         if c.attribute.is_blinking() {
-                             s = s.slow_blink();
-                         }
-                         let out_char = Line::from(c.ch.to_string()).style(s);
-
-                         ctx.print(x as f64 + 1.0, (area.height as i32 - 1 - y) as f64, out_char);
-                     }
-                 } */
-            })
-            .background_color(Color::Black)
-            .x_bounds([0.0, area.width as f64])
-            .y_bounds([0.0, area.height as f64])
+            .x_bounds([0.0, 80.0])*/
     }
 
     fn add_input(&mut self, c_seq: std::str::Chars<'_>) -> Res<()> {
-        let mut s = String::new();
+        let mut s = Vec::new();
         for c in c_seq {
-            s.push(c);
+            s.push(c as u8);
         }
-        /*
-        if let Err(_) = self.connection.send(s.as_bytes()).await {
-            return Ok(());
-        }*/
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async move {
+            let _res = self.tx.send(SendData::Data(s)).await;
+        });
         Ok(())
     }
 }

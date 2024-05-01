@@ -34,6 +34,7 @@ mod icy_engine_output;
 pub mod menu_runner;
 pub mod mods;
 mod node_monitoring_screen;
+mod terminal_thread;
 mod tui;
 
 #[derive(FromArgs)]
@@ -228,7 +229,7 @@ fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, boar
             let mut app = node_monitoring_screen::NodeMonitoringScreen::new(&board);
             match app.run(terminal, &board, bbs) {
                 Ok(msg) => {
-                    if let NodeMonitoringScreenMessage::EnterNode(node) = msg {
+                    /*  if let NodeMonitoringScreenMessage::EnterNode(node) = msg {
                         let mut tui = Tui::sysop_mode(bbs, node)?;
                         if let Err(err) = tui.run(&board) {
                             restore_terminal()?;
@@ -236,7 +237,7 @@ fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, boar
                             println!("Error: {}", err);
                             process::exit(1);
                         }
-                    }
+                    } */
                 }
                 Err(err) => {
                     restore_terminal()?;

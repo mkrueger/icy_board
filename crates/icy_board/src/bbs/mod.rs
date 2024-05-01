@@ -1,4 +1,5 @@
 use std::{
+    path::PathBuf,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
@@ -107,8 +108,7 @@ pub async fn await_telnet_connections(telnet: Telnet, board: Arc<Mutex<IcyBoard>
                     match TelnetConnection::accept(stream) {
                         Ok(connection) => {
                             // connection succeeded
-
-                            if let Err(err) = handle_client(board, node_list, node, Box::new(connection)).await {
+                            if let Err(err) = handle_client(board, node_list, node, Box::new(connection), None).await {
                                 log::error!("Error running backround client: {}", err);
                             }
                         }
@@ -276,18 +276,42 @@ pub fn await_securewebsocket_connections(_ssh: SecureWebsocket, _board: Arc<Mute
 }
 
 #[async_recursion(?Send)]
-async fn handle_client(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<Vec<Option<NodeState>>>>, node: usize, connection: Box<dyn Connection>) -> Res<()> {
-    let state = IcyBoardState::new(board, node_state, node, connection);
+pub async fn handle_client(
+    board: Arc<Mutex<IcyBoard>>,
+    node_state: Arc<Mutex<Vec<Option<NodeState>>>>,
+    node: usize,
+    connection: Box<dyn Connection>,
+    login_options: Option<LoginOptions>,
+) -> Res<()> {
+    let mut state = IcyBoardState::new(board, node_state, node, connection);
+    let mut logged_in = false;
+    if let Some(login_options) = &login_options {
+        if login_options.login_sysop {
+            logged_in = true;
+            state.session.is_sysop = true;
+            state.set_current_user(0).unwrap();
+        }
+    }
     let mut cmd = PcbBoardCommand::new(state);
 
-    match cmd.login().await {
-        Ok(true) => {}
-        Ok(false) => {
+    if let Some(login_options) = &login_options {
+        if let Some(ppe) = &login_options.ppe {
+            let _ = cmd.state.run_ppe(&ppe, None);
+            let _ = cmd.state.press_enter();
+            let _ = cmd.state.hangup();
             return Ok(());
         }
-        Err(err) => {
-            log::error!("error during login process {}", err);
-            return Ok(());
+    }
+    if !logged_in {
+        match cmd.login().await {
+            Ok(true) => {}
+            Ok(false) => {
+                return Ok(());
+            }
+            Err(err) => {
+                log::error!("error during login process {}", err);
+                return Ok(());
+            }
         }
     }
 
@@ -310,4 +334,9 @@ async fn handle_client(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<Vec<Op
         }
         thread::sleep(Duration::from_millis(20));
     }
+}
+
+pub struct LoginOptions {
+    pub login_sysop: bool,
+    pub ppe: Option<PathBuf>,
 }
