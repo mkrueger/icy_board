@@ -225,7 +225,7 @@ fn test_delete_to_eol() {
 fn test_break_line() {
     let mut state: EditState = create_state("Foo Bar");
     state.max_line_length = 5;
-    let update = state.break_line(0);
+    let _update = state.break_line(0);
 
     assert_eq!(2, state.msg.len());
     assert_eq!("Foo", state.msg[0]);
@@ -236,7 +236,7 @@ fn test_break_line() {
 fn test_break_full_line() {
     let mut state: EditState = create_state("FooBar");
     state.max_line_length = 5;
-    let update = state.break_line(0);
+    let _update = state.break_line(0);
 
     assert_eq!(2, state.msg.len());
     assert_eq!("Foo", state.msg[0]);

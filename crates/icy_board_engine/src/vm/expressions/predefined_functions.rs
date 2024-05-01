@@ -1259,7 +1259,11 @@ fn calc_crc32(buffer: &[u8]) -> u32 {
 pub async fn pcbmac(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let var = vm.eval_expr(&args[0]).await?.as_string();
 
-    if let Some(expanded) = vm.icy_board_state.translate_variable(crate::vm::TerminalTarget::Sysop, var.trim_matches('@')) {
+    if let Some(expanded) = vm
+        .icy_board_state
+        .translate_variable(crate::vm::TerminalTarget::Sysop, var.trim_matches('@'))
+        .await
+    {
         Ok(VariableValue::new_string(expanded))
     } else {
         Ok(VariableValue::new_string(String::new()))

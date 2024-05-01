@@ -10,6 +10,8 @@ pub struct ChannelConnection {
     rx: UnboundedReceiver<Vec<u8>>,
     tx: UnboundedSender<Vec<u8>>,
 }
+unsafe impl Send for ChannelConnection {}
+unsafe impl Sync for ChannelConnection {}
 
 impl ChannelConnection {
     pub fn new(rx: UnboundedReceiver<Vec<u8>>, tx: UnboundedSender<Vec<u8>>) -> Self {

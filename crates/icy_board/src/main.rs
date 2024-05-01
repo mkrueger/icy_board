@@ -121,7 +121,14 @@ fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Res<()> 
                     let bbs = bbs.clone();
                     let board = board.clone();
                     std::thread::spawn(move || {
-                        let _ = await_telnet_connections(telnet_connection, board, bbs);
+                        tokio::runtime::Builder::new_multi_thread()
+                            .worker_threads(4)
+                            .enable_all()
+                            .build()
+                            .unwrap()
+                            .block_on(async {
+                                await_telnet_connections(telnet_connection, board, bbs).await;
+                            });
                     });
                 }
 

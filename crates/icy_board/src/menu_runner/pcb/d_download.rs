@@ -5,7 +5,6 @@ use icy_board_engine::{
     icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
 };
-use icy_net::Connection;
 
 impl PcbBoardCommand {
     pub async fn download(&mut self, _action: &Command) -> Res<()> {

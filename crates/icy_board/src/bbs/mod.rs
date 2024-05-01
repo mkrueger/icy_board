@@ -1,11 +1,11 @@
 use std::{
-    net::TcpListener,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
 };
 
 use crate::Res;
+use async_recursion::async_recursion;
 use icy_board_engine::{
     icy_board::{
         login_server::{SecureWebsocket, Telnet, Websocket, SSH},
@@ -20,6 +20,7 @@ use icy_net::{
     Connection,
     ConnectionType,
 };
+use tokio::net::TcpListener;
 
 use crate::menu_runner::PcbBoardCommand;
 
@@ -77,24 +78,25 @@ impl BBS {
     }
 }
 
-pub fn await_telnet_connections(telnet: Telnet, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
-    /*   let addr = if telnet.address.is_empty() {
-        format!("127.0.0.1:{}", telnet.port)
+pub async fn await_telnet_connections(telnet: Telnet, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+    let addr = if telnet.address.is_empty() {
+        format!("0.0.0.0:{}", telnet.port)
     } else {
         format!("{}:{}", telnet.address, telnet.port)
     };
-    let listener = match TcpListener::bind(addr) {
-        Ok(listener) => listener,
-        Err(e) => panic!("could not read start TCP listener: {}", e),
-    };
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                let board = board.clone();
-                let node = bbs.lock().unwrap().create_new_node(ConnectionType::Telnet);
-
-                let node_list = bbs.lock().unwrap().get_open_connections().clone();
-                let handle = thread::spawn(move || {
+    let listener = TcpListener::bind(addr).await?;
+    loop {
+        let (stream, _addr) = listener.accept().await?;
+        let node = bbs.lock().unwrap().create_new_node(ConnectionType::Telnet);
+        let node_list = bbs.lock().unwrap().get_open_connections().clone();
+        let board = board.clone();
+        let handle = std::thread::spawn(move || {
+            tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(4)
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(async {
                     let orig_hook = std::panic::take_hook();
                     std::panic::set_hook(Box::new(move |panic_info| {
                         log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
@@ -105,6 +107,7 @@ pub fn await_telnet_connections(telnet: Telnet, board: Arc<Mutex<IcyBoard>>, bbs
                     match TelnetConnection::accept(stream) {
                         Ok(connection) => {
                             // connection succeeded
+
                             if let Err(err) = handle_client(board, node_list, node, Box::new(connection)).await {
                                 log::error!("Error running backround client: {}", err);
                             }
@@ -113,20 +116,13 @@ pub fn await_telnet_connections(telnet: Telnet, board: Arc<Mutex<IcyBoard>>, bbs
                             log::error!("telnet connection failed {}", e);
                         }
                     }
-                    Ok(())
                 });
-                bbs.lock().unwrap().get_open_connections().lock().unwrap()[node].as_mut().unwrap().handle = Some(handle);
-            }
-            Err(e) => {
-                log::error!("connection failed {}", e);
-            }
-        }
+        });
+        bbs.lock().unwrap().get_open_connections().lock().unwrap()[node].as_mut().unwrap().handle = Some(handle);
     }
-    drop(listener);*/
-    Ok(())
 }
 
-pub fn await_ssh_connections(ssh: SSH, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+pub fn await_ssh_connections(_ssh: SSH, _board: Arc<Mutex<IcyBoard>>, _bbs: Arc<Mutex<BBS>>) -> Res<()> {
     /*
     let addr = if ssh.address.is_empty() {
         format!("127.0.0.1:{}", ssh.port)
@@ -177,7 +173,7 @@ pub fn await_ssh_connections(ssh: SSH, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mut
     Ok(())
 }
 
-pub fn await_websocket_connections(ssh: Websocket, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+pub fn await_websocket_connections(_ssh: Websocket, _board: Arc<Mutex<IcyBoard>>, _bbs: Arc<Mutex<BBS>>) -> Res<()> {
     /*
     let addr = if ssh.address.is_empty() {
         format!("127.0.0.1:{}", ssh.port)
@@ -227,7 +223,7 @@ pub fn await_websocket_connections(ssh: Websocket, board: Arc<Mutex<IcyBoard>>, 
     Ok(())
 }
 
-pub fn await_securewebsocket_connections(ssh: SecureWebsocket, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+pub fn await_securewebsocket_connections(_ssh: SecureWebsocket, _board: Arc<Mutex<IcyBoard>>, _bbs: Arc<Mutex<BBS>>) -> Res<()> {
     /*
     let addr = if ssh.address.is_empty() {
         format!("127.0.0.1:{}", ssh.port)
@@ -279,6 +275,7 @@ pub fn await_securewebsocket_connections(ssh: SecureWebsocket, board: Arc<Mutex<
     Ok(())
 }
 
+#[async_recursion(?Send)]
 async fn handle_client(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<Vec<Option<NodeState>>>>, node: usize, connection: Box<dyn Connection>) -> Res<()> {
     let state = IcyBoardState::new(board, node_state, node, connection);
     let mut cmd = PcbBoardCommand::new(state);

@@ -1,12 +1,13 @@
 use std::{
     collections::HashMap,
-    io::{self, stdout, Read, Stdout, Write},
+    io::{self, stdout, Stdout},
     path::PathBuf,
     sync::{Arc, Mutex},
     thread,
     time::{Duration, Instant},
 };
 
+use crate::Res;
 use chrono::{Datelike, Local, Timelike};
 use crossterm::{
     cursor::MoveTo,
@@ -14,54 +15,47 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, Clear, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use tokio::sync::mpsc;
-
-use crate::Res;
-use icy_board_engine::{
-    icy_board::{
-        state::{IcyBoardState, NodeState, Session},
-        IcyBoard, IcyBoardError,
-    },
-    vm::TerminalTarget,
+use icy_board_engine::icy_board::{
+    state::{NodeState, Session},
+    IcyBoard, IcyBoardError,
 };
 use icy_board_tui::{
     get_text_args,
     theme::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GRAY, DOS_LIGHT_GREEN, DOS_WHITE},
 };
-use icy_engine::{ansi, TextPane};
-use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
+use icy_net::{channel::ChannelConnection, ConnectionType};
 use ratatui::{
     prelude::*,
     widgets::{canvas::Canvas, Paragraph},
 };
 
-use crate::{bbs::BBS, icy_engine_output::Screen, menu_runner::PcbBoardCommand};
+use crate::{bbs::BBS, icy_engine_output::Screen};
 
 pub struct Tui {
-    screen: Arc<Mutex<Screen>>,
+    //  screen: Arc<Mutex<Screen>>,
     session: Arc<Mutex<Session>>,
-    tx: mpsc::Sender<Vec<u8>>,
+    //  tx: mpsc::Sender<Vec<u8>>,
     status_bar: usize,
     handle: Arc<Mutex<Vec<Option<NodeState>>>>,
     node: usize,
 }
 
 impl Tui {
-    pub fn local_mode(board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>, sysop_mode: bool, ppe: Option<PathBuf>) -> Self {
+    pub fn local_mode(board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>, _sysop_mode: bool, _ppe: Option<PathBuf>) -> Self {
         let mut session = Session::new();
         session.is_local = true;
         let ui_session = Arc::new(Mutex::new(session));
-        let session = ui_session.clone();
-        let board = board.clone();
+        let _session = ui_session.clone();
+        let _board = board.clone();
         let ui_node = bbs.lock().unwrap().create_new_node(ConnectionType::Channel);
-        let node_state = bbs.lock().unwrap().open_connections.clone();
+        let _node_state = bbs.lock().unwrap().open_connections.clone();
         let node = ui_node.clone();
 
-        let (tx, rx) = mpsc::channel(32);
+        //   let (tx, rx) = mpsc::channel(32);
 
         let screen = Arc::new(Mutex::new(Screen::new()));
-        let screen2 = screen.clone();
-        let handle = thread::spawn(move || {
+        let _screen2 = screen.clone();
+        let _handle = thread::spawn(move || {
             tokio::runtime::Builder::new_multi_thread()
                 .worker_threads(4)
                 .enable_all()
@@ -129,16 +123,16 @@ impl Tui {
                          thread::sleep(Duration::from_millis(20));
                      } */
                 });
-        });
-        bbs.lock().unwrap().get_open_connections().as_ref().lock().unwrap()[node]
-            .as_mut()
-            .unwrap()
-            .handle = Some(handle);
+        }); /*
+            bbs.lock().unwrap().get_open_connections().as_ref().lock().unwrap()[node]
+                .as_mut()
+                .unwrap()
+                .handle = Some(handle);*/
 
         Self {
-            screen: screen2,
+            //      screen: screen2,
             session: ui_session,
-            tx,
+            //     tx,
             status_bar: 0,
             node,
             handle: bbs.lock().unwrap().get_open_connections().clone(),
@@ -147,7 +141,7 @@ impl Tui {
 
     pub fn sysop_mode(bbs: &Arc<Mutex<BBS>>, node: usize) -> Res<Self> {
         let ui_session = Arc::new(Mutex::new(Session::new()));
-        let (ui_connection, connection) = ChannelConnection::create_pair();
+        let (_ui_connection, connection) = ChannelConnection::create_pair();
         if let Ok(bbs) = &mut bbs.lock() {
             /* let Some(node) = bbs.get_node(node) else {
                 return Err(Box::new(IcyBoardError::Error("Node not found".to_string())));
@@ -161,9 +155,9 @@ impl Tui {
                 .push(Box::new(connection));
 
             Ok(Self {
-                screen: Screen::new(),
+                //  screen: Screen::new(),
                 session: ui_session,
-                connection: ui_connection,
+                //   connection: ui_connection,
                 status_bar: 0,
                 node,
                 handle: bbs.get_open_connections().clone(),
@@ -268,8 +262,8 @@ impl Tui {
 
         let area = Rect::new(0, (frame.size().height - 1).min(24), frame.size().width.min(80), 1);
         frame.render_widget(self.status_bar(board), area);
-        let p = self.screen.caret.get_position();
-        frame.set_cursor(p.x.clamp(0, 80) as u16, (p.y - self.screen.buffer.get_first_visible_line()).clamp(0, 25) as u16);
+        //     let p = self.screen.caret.get_position();
+        //       frame.set_cursor(p.x.clamp(0, 80) as u16, (p.y - self.screen.buffer.get_first_visible_line()).clamp(0, 25) as u16);
     }
 
     fn status_bar(&self, board: &IcyBoard) -> impl Widget + '_ {
@@ -354,26 +348,26 @@ impl Tui {
 
     fn main_canvas(&self, area: Rect) -> impl Widget + '_ {
         Canvas::default()
-            .paint(move |ctx| {
-                let buffer = &self.screen.buffer;
-                for y in 0..area.height as i32 {
-                    for x in 0..area.width as i32 {
-                        let c = buffer.get_char((x, y + buffer.get_first_visible_line()));
-                        let mut fg = c.attribute.get_foreground();
-                        if c.attribute.is_bold() {
-                            fg += 8;
-                        }
-                        let fg = buffer.palette.get_color(fg).get_rgb();
-                        let bg = buffer.palette.get_color(c.attribute.get_background()).get_rgb();
-                        let mut s = Style::new().bg(Color::Rgb(bg.0, bg.1, bg.2)).fg(Color::Rgb(fg.0, fg.1, fg.2));
-                        if c.attribute.is_blinking() {
-                            s = s.slow_blink();
-                        }
-                        let out_char = Line::from(c.ch.to_string()).style(s);
+            .paint(move |_ctx| { /*
+                 let buffer = &self.screen.buffer;
+                 for y in 0..area.height as i32 {
+                     for x in 0..area.width as i32 {
+                         let c = buffer.get_char((x, y + buffer.get_first_visible_line()));
+                         let mut fg = c.attribute.get_foreground();
+                         if c.attribute.is_bold() {
+                             fg += 8;
+                         }
+                         let fg = buffer.palette.get_color(fg).get_rgb();
+                         let bg = buffer.palette.get_color(c.attribute.get_background()).get_rgb();
+                         let mut s = Style::new().bg(Color::Rgb(bg.0, bg.1, bg.2)).fg(Color::Rgb(fg.0, fg.1, fg.2));
+                         if c.attribute.is_blinking() {
+                             s = s.slow_blink();
+                         }
+                         let out_char = Line::from(c.ch.to_string()).style(s);
 
-                        ctx.print(x as f64 + 1.0, (area.height as i32 - 1 - y) as f64, out_char);
-                    }
-                }
+                         ctx.print(x as f64 + 1.0, (area.height as i32 - 1 - y) as f64, out_char);
+                     }
+                 } */
             })
             .background_color(Color::Black)
             .x_bounds([0.0, area.width as f64])
@@ -385,10 +379,10 @@ impl Tui {
         for c in c_seq {
             s.push(c);
         }
-
+        /*
         if let Err(_) = self.connection.send(s.as_bytes()).await {
             return Ok(());
-        }
+        }*/
         Ok(())
     }
 }

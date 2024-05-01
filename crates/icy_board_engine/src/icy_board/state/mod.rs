@@ -314,6 +314,9 @@ pub struct NodeState {
     pub handle: Option<thread::JoinHandle<()>>,
 }
 
+unsafe impl Send for NodeState {}
+unsafe impl Sync for NodeState {}
+
 impl NodeState {
     pub fn new(node_number: usize, connection_type: ConnectionType) -> Self {
         Self {
@@ -933,6 +936,7 @@ impl IcyBoardState {
     }
 
     /// # Errors
+    #[async_recursion(?Send)]
     pub async fn write_raw(&mut self, target: TerminalTarget, data: &[char]) -> Res<()> {
         if self.session.disp_options.display_text {
             let mut state = PcbState::Default;
@@ -966,7 +970,7 @@ impl IcyBoardState {
                             state = PcbState::Default;
                         } else if *c == '@' {
                             state = PcbState::Default;
-                            if let Some(output) = self.translate_variable(target, &s) {
+                            if let Some(output) = self.translate_variable(target, &s).await {
                                 if output.len() == 0 {
                                     self.write_chars(target, &['@']).await?;
                                     self.write_chars(target, s.chars().collect::<Vec<char>>().as_slice()).await?;
@@ -1022,7 +1026,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub fn translate_variable(&mut self, target: TerminalTarget, input: &str) -> Option<String> {
+    pub async fn translate_variable(&mut self, target: TerminalTarget, input: &str) -> Option<String> {
         let mut split = input.split(':');
         let id = split.next().unwrap();
         let param = split.next();
@@ -1041,7 +1045,7 @@ impl IcyBoardState {
                 return None;
             }
             "BEEP" => {
-                let _ = self.bell();
+                let _ = self.bell().await;
                 return None;
             }
             "BICPS" => result = self.transfer_statistics.get_cps_both().to_string(),
@@ -1059,11 +1063,11 @@ impl IcyBoardState {
                 }
             }
             "CLREOL" => {
-                let _ = self.clear_eol();
+                let _ = self.clear_eol().await;
                 return None;
             }
             "CLS" => {
-                let _ = self.clear_screen();
+                let _ = self.clear_screen().await;
                 return None;
             }
             "CONFNAME" => result = self.session.current_conference.name.to_string(),
@@ -1136,7 +1140,7 @@ impl IcyBoardState {
             | "MAXBYTES" | "MAXFILES" => {}
             "MINLEFT" => result = "1000".to_string(),
             "MORE" => {
-                let _ = self.more_promt();
+                let _ = self.more_promt().await;
                 return None;
             }
             "MSGLEFT" => {
@@ -1186,7 +1190,7 @@ impl IcyBoardState {
             "OPTEXT" => result = self.session.op_text.to_string(),
             "PAUSE" => {
                 self.session.disp_options.auto_more = true;
-                let _ = self.press_enter();
+                let _ = self.press_enter().await;
                 self.session.disp_options.auto_more = false;
                 return None;
             }

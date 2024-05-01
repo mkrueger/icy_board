@@ -8,8 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
-    executable::{GenericVariableData, PPEExpr, VariableData, VariableType, VariableValue},
-    icy_board::{doors::Door, file_directory::FileDirectory},
+    executable::{PPEExpr, VariableType, VariableValue},
     parser::{DOOR_ID, FILE_DIRECTORY_ID, MESSAGE_AREA_ID},
 };
 
@@ -306,7 +305,7 @@ impl UserDataValue for Conference {
         Ok(())
     }
 
-    async fn call_function(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
+    async fn call_function(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
             let res = self.required_security.user_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
