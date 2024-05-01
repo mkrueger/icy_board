@@ -251,6 +251,7 @@ impl Connection for TelnetConnection {
                 Ok(result)
             }
             Err(err) => {
+                log::error!("telnet error reading from TCP stream: {}", err);
                 if err.kind() == io::ErrorKind::WouldBlock {
                     return Ok(0);
                 }

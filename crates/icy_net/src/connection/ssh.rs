@@ -1,16 +1,16 @@
 #![allow(dead_code)]
-use libssh_rs::{Channel, Session, SshOption};
 use std::{
-    io::{self, ErrorKind, Read, Write},
+    io::ErrorKind,
     net::{TcpStream, ToSocketAddrs},
-    sync::{Arc, Mutex},
-    time::Duration,
 };
-
+use async_ssh2_tokio::client::{Client, AuthMethod, ServerCheckMethod};
+use async_trait::async_trait;
+use russh::{client::Msg, Channel};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use crate::{telnet::TermCaps, Connection, ConnectionType, NetError};
 pub struct SSHConnection {
-    session: Session,
-    channel: Arc<Mutex<Channel>>,
+    client: Client,
+    channel: Channel<Msg>,
 }
 
 pub struct Credentials {
@@ -23,28 +23,25 @@ const SUPPORTED_CIPHERS: &str = "aes128-ctr,aes192-ctr,aes256-ctr,aes128-gcm,aes
 const SUPPORTED_KEY_EXCHANGES: &str = "ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group14-sha1,diffie-hellman-group1-sha1";
 
 impl SSHConnection {
-    pub fn open<A: ToSocketAddrs>(addr: &A, caps: TermCaps, credentials: Credentials) -> crate::Result<Self> {
+    pub async fn open<A: ToSocketAddrs>(addr: &A, caps: TermCaps, credentials: Credentials) -> crate::Result<Self> {
+        for addr in addr.to_socket_addrs()? {
+            let auth_method = AuthMethod::with_password(&credentials.password);
+            let client = Client::connect(
+                addr,
+                &credentials.user_name,
+                auth_method,
+                ServerCheckMethod::NoCheck,
+            ).await?;
+            let channel = client.get_channel().await?;
+            let terminal_type: String = format!("{:?}", caps.terminal).to_lowercase();
+            channel.request_pty(false, &terminal_type, caps.window_size.0 as u32, caps.window_size.1 as u32, 1, 1,&[]).await?;
+            channel.request_shell(false).await?;
 
-        let config = thrussh::client::Config::default();
-        let config = Arc::new(config);
-        let sh = Client {};
-    
-        let mut agent = thrussh_keys::agent::client::AgentClient::connect_env()
-            .await
-            .unwrap();
-        let mut identities = agent.request_identities().await.unwrap();
-        let mut session = thrussh::client::connect(config, "127.0.0.1:2200", sh)
-            .await
-            .unwrap();
-        let (_, auth_res) = session
-            .authenticate_future("pe", identities.pop().unwrap(), agent)
-            .await;
-        let auth_res = auth_res.unwrap();
-        println!("=== auth: {}", auth_res);
-        let mut channel = session
-            .channel_open_direct_tcpip("localhost", 8000, "localhost", 3333)
-            .await
-            .unwrap();
+            return Ok(Self {
+                client,
+                channel: channel,
+            });
+        }
 
         /* 
 
@@ -75,13 +72,11 @@ impl SSHConnection {
             chan.request_pty(terminal_type.as_str(), caps.window_size.0 as u32, caps.window_size.1 as u32)?;
             chan.request_shell()?;
             session.set_blocking(false);
-            return Ok(Self {
-                session,
-                channel: Arc::new(Mutex::new(chan)),
-            });
         }
-        Err(NetError::CouldNotConnect.into())
         */
+
+        Err(NetError::CouldNotConnect.into())
+
     }
 
     fn default_port() -> u16 {
@@ -93,63 +88,32 @@ impl SSHConnection {
     }
 }
 
+#[async_trait]
 impl Connection for SSHConnection {
     fn get_connection_type(&self) -> ConnectionType {
         ConnectionType::SSH
     }
 
-    async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize>
-    {
-
+    async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        match self.channel.make_reader().read(buf).await {
+            Ok(size) => Ok(size),
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::WouldBlock {
+                    return Ok(0);
+                }
+                Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into())
+            }
+        }
     }
 
     async fn send(&mut self, buf: &[u8]) -> crate::Result<()>
     {
-
-    }
-
-
-    fn shutdown(&mut self) -> crate::Result<()> {
-        self.session.disconnect();
+        self.channel.make_writer().write_all(buf).await?;
         Ok(())
     }
-}
 
-impl Read for SSHConnection {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self.channel.lock() {
-            Ok(locked) => {
-                let mut stdout = locked.stdout();
-                match stdout.read(buf) {
-                    Ok(size) => Ok(size),
-                    Err(e) => {
-                        if e.kind() == std::io::ErrorKind::WouldBlock {
-                            return Ok(0);
-                        }
-                        Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")))
-                    }
-                }
-            }
-            Err(err) => Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Can't lock channel: {err}"))),
-        }
-    }
-}
-
-impl Write for SSHConnection {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self.channel.lock() {
-            Ok(locked) => {
-                locked.stdin().write_all(buf)?;
-                Ok(buf.len())
-            }
-            Err(err) => Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Can't lock channel: {err}"))),
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        match self.channel.lock() {
-            Ok(locked) => locked.stdin().flush(),
-            Err(err) => Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Can't lock channel: {err}"))),
-        }
+    async fn shutdown(&mut self) -> crate::Result<()> {
+        self.client.disconnect().await?;
+        Ok(())
     }
 }

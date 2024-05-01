@@ -1,21 +1,9 @@
 #![allow(dead_code)]
 
-use serial::{prelude::*, CharSize, FlowControl, StopBits};
-use std::io::{self, Read, Write};
+use async_trait::async_trait;
+use serial2_tokio::SerialPort;
 
-use crate::{Connection, ConnectionType};
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Serial {
-    pub device: String,
-    pub baud_rate: usize,
-
-    pub char_size: CharSize,
-    pub stop_bits: StopBits,
-    pub parity: serial::Parity,
-
-    pub flow_control: FlowControl,
-}
+use crate::{serial::Serial, Connection, ConnectionType};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModemConfiguration {
@@ -25,58 +13,43 @@ pub struct ModemConfiguration {
 
 pub struct ModemConnection {
     modem: ModemConfiguration,
-    serial: Serial,
-    port: Box<dyn serial::SerialPort>,
+    port: Box<SerialPort>,
 }
 
 impl ModemConnection {
-    pub fn open(serial: Serial, modem: ModemConfiguration, call_number: String) -> crate::Result<Self> {
-        let mut port = serial::open(&serial.device)?;
-        port.reconfigure(&|settings| {
-            settings.set_baud_rate(serial::BaudRate::from_speed(serial.baud_rate))?;
-            settings.set_char_size(serial.char_size);
-            settings.set_parity(serial.parity);
-            settings.set_stop_bits(serial.stop_bits);
-            settings.set_flow_control(serial.flow_control);
-            Ok(())
-        })?;
-        port.write_all(modem.init_string.as_bytes())?;
-        port.write_all(b"\n")?;
-        port.write_all(modem.dial_string.as_bytes())?;
-        port.write_all(call_number.as_bytes())?;
-        port.write_all(b"\n")?;
+    pub async fn open(serial: Serial, modem: ModemConfiguration, call_number: String) -> crate::Result<Self> {
+        let port = serial.open()?;
+        port.write_all(modem.init_string.as_bytes()).await?;
+        port.write_all(b"\n").await?;
+        port.write_all(modem.dial_string.as_bytes()).await?;
+        port.write_all(call_number.as_bytes()).await?;
+        port.write_all(b"\n").await?;
         Ok(Self {
-            serial,
             modem,
             port: Box::new(port),
         })
     }
 }
 
+#[async_trait]
 impl Connection for ModemConnection {
     fn get_connection_type(&self) -> ConnectionType {
         ConnectionType::Modem
     }
+    
+    async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        let res = self.port.read(buf).await?;
+      //  println!("Read {:?} bytes", &buf[..res]);
+        Ok(res)
+    }
 
-    fn shutdown(&mut self) -> crate::Result<()> {
-        self.port.set_dtr(false)?;
-        self.port.set_dtr(true)?;
+    async fn send(&mut self, buf: &[u8]) -> crate::Result<()> {
+        self.port.write_all(buf).await?;
         Ok(())
     }
-}
 
-impl Read for ModemConnection {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.port.read(buf)
-    }
-}
-
-impl Write for ModemConnection {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.port.write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.port.flush()
+    async fn shutdown(&mut self) -> crate::Result<()> {
+        self.port.set_dtr(false)?;
+        Ok(())
     }
 }

@@ -1,9 +1,9 @@
 use crate::NetError;
 pub mod channel;
-// pub mod modem;
+pub mod modem;
 pub mod raw;
-// pub mod serial;
-//pub mod ssh;
+pub mod serial;
+pub mod ssh;
 pub mod telnet;
 pub mod websocket;
 use async_trait::async_trait;
@@ -79,7 +79,7 @@ impl Connection for NullConnection {
         ConnectionType::Raw
     }
     async fn read(&mut self, _buf: &mut [u8]) -> crate::Result<usize> {
-        Err(NetError::Unsupported.into())
+        Ok(0)
     }
 
     async fn send(&mut self, _buf: &[u8]) -> crate::Result<()> {

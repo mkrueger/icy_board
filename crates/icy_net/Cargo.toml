@@ -17,10 +17,11 @@ tokio-util = { version = "0.7.10", features = ["codec"] }
 async-trait = "0.1.80"
 bytes = "1"
 # MODEM
-serial = "0.4.0"
+serial2-tokio = "0.1.10"
 
 # SSH
-thrussh = "0.35.1"
+async-ssh2-tokio = "0.8.8"
+russh = "0.40.2"
 
 # WEBSOCKETS
 tokio-tungstenite = { version = "0.21.0", features = [
