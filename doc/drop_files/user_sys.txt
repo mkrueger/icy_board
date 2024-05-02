@@ -1,0 +1,362 @@
+                              USERS.SYS FILE LAYOUT
+                              ---------------------
+
+  The structure of the USERS.SYS file is as follows:
+
+  1) A header record describing what is contained in the file
+  2) A fixed-size user record with PCBoard specific data fields
+  3) Last Message Read pointers for conferences
+  4) Bit Map fields for conferences (registered, expired, scanned, etc)
+  5) The Third Party Application fixed record
+  6) The Third Party Application conference records
+
+
+  The following C structures are used to implement the above layout:
+
+  USERS.SYS HEADER STRUCTURE
+  --------------------------
+  NOTE:  type "bool" is a character field (i.e. 1 byte in size) with a non-zero
+  value meaning TRUE and zero meaning FALSE.
+
+  typedef struct {
+    unsigned Version;           PCBoard version number (i.e. 1500)
+    long     RecNo;             Record number from USER's file
+    unsigned SizeOfRec;         Size of "fixed" user record (current size)
+    unsigned NumOfAreas;        Number of conference areas (Main=1 thru 65535)
+    unsigned NumOfBitFields;    Number of Bit Map fields for conferences
+    unsigned SizeOfBitFields;   Size of each Bit Map field
+    char     AppName[15];       Name of the Third Party Application (if any)
+    unsigned AppVersion;        Version number for the application (if any)
+    unsigned AppSizeOfRec;      Size of a "fixed length" record (if any)
+    unsigned AppSizeOfConfRec;  Size of each conference record (if any)
+    long     AppRecOffset;      Offset of AppRec into USERS.INF record (if any)
+    bool     Updated;           TRUE if the USERS.SYS file has been updated
+  } syshdrtype;
+
+
+  USERS.SYS FIXED USER RECORD STRUCTURES
+  --------------------------------------
+  typedef struct {               Bit packed flags in the users file
+    int Dirty        :1;         Dirty Flag (meaning file has been updated)
+    int MsgClear     :1;         User's choice for screen clear after messages
+    int HasMail      :1;         Indicates if NEW mail has been left for user
+    int DontAskFSE   :1;         Don't ask for if FSE should be used
+    int FSEDefault   :1;         Default to FSE
+    int ScrollMsgBody:1;         Scroll message body when display messages
+    int ShortHeader  :1;         Display short message headers
+    int WideEditor   :1;         Use wide (79-column) message editor
+  } packedbyte;
+
+  typedef struct {               Bit packed flags in the users file
+    int UnAvailable:1;           Chat Status (Unavailable if bit is set)
+    int Reserved:7;              RESERVED!  DO NO USE THESE BITS
+  } packedbyte2;
+
+  typedef struct {               DOS format for bit packed date fields
+    int Day   :5;                5 bit integer representing the Day
+    int Month :4;                4 bit integer representing the Month
+    int Year  :7;                7 bit integer representing the Year MINUS 80
+  } datetype;
+
+  typedef struct {
+    char  Street[2][51];         2 NULL-terminated strings for street address
+    char  City[26];              A NULL-terminated string for city
+    char  State[11];             A NULL-terminated string for state
+    char  Zip[11];               A NULL-terminated string for zip
+    char  Country[16];           A NULL-terminated string for country
+  } addresstypez;
+
+  typedef struct {
+    char     Previous[3][13];    3 NULL-terminated strings for last 3 passwords
+    unsigned LastChange;         Date of last password change
+    unsigned TimesChanged;       Number of times password has been changed
+    unsigned ExpireDate;         Expiration date of current password
+  } passwordtypez;
+
+  typedef struct {
+    unsigned FirstDateOn;        First date on, in julian date format
+    unsigned NumSysopPages;      Number of times caller paged the sysop
+    unsigned NumGroupChats;      Number of times caller entered group chat
+    unsigned NumComments;        Number of times caller left comment to sysop
+    unsigned Num300;             Number of times caller was on a 300 bps
+    unsigned Num1200;            Number of times caller was on a 1200 bps
+    unsigned Num2400;            Number of times caller was on a 2400 bps
+    unsigned Num9600;            Number of times caller was on a 9600 bps
+    unsigned Num14400;           Number of times caller was on a 14400+ bps
+    unsigned NumSecViol;         Number of security violations committed
+    unsigned NumNotReg;          Number of attempts to join un-reg conference
+    unsigned NumReachDnldLim;    Number of times download limit was reached
+    unsigned NumFileNotFound;    Number of times download file was not found
+    unsigned NumPwrdErrors;      Number of times entered password incorrectly
+    unsigned NumVerifyErrors;    Number of times upload verification failed
+  } callerstattype;
+
+  typedef struct {
+    char  Line[5][61];           5 NULL-terminated strings for notes on caller
+  } notestypez;
+
+| typedef struct {
+|   double StartingBalance;      Starting Balance
+|   double StartThisSession;     Balance at login of current session
+|   double DebitCall;            Charges for calls made to the system
+|   double DebitTime;            Charges for time spent online
+|   double DebitMsgRead;         Charges for messages read
+|   double DebitMsgReadCapture;  Charges for messages captured
+|   double DebitMsgWrite;        Charges for messages written
+|   double DebitMsgWriteEchoed;  Charges for messages written (echoed)
+|   double DebitMsgWritePrivate; Charges for messages written (private)
+|   double DebitDownloadFile;    Charges for files downloaded
+|   double DebitDownloadBytes;   Charges for bytes downloaded
+|   double DebitGroupChat;       Charges for time spent in group chat
+|   double DebitTPU;             Charges for third party utility usage
+|   double DebitSpecial;         Charges made via PPEs
+|   double CreditUploadFile;     Payback for files uploaded
+|   double CreditUploadBytes;    Payback for bytes uploaded
+|   double CreditSpecial;        Packback made via PPEs
+|   char DropSecLevel;           Security level on empty/negative balance
+| } accounttype;
+|
+| typedef struct {
+|   unsigned MaxMsgs;              Maximum messages desired in QWK packet
+|   unsigned MaxMsgsPerConf;       Maximum messages per conference
+|   long     PersonalAttachLimit;  Attach limit on personal messages
+|   long     PublicAttachLimit;    Attach limit on public (non-personal) msgs
+|   char     Reserved[18];
+| } qwkconfigtype;
+
+  typedef struct {
+    char     Name[26];           Name (NULL terminated)
+    char     City[25];           City (NULL terminated)
+    char     Password[13];       Password (NULL terminated)
+    char     BusDataPhone[14];   Business or Data Phone (NULL terminated)
+    char     HomeVoicePhone[14]; Home or Voice Phone (NULL terminated)
+    unsigned LastDateOn;         Julian date for the Last Date On
+    char     LastTimeOn[6];      Last Time On (NULL Terminated)
+    bool     ExpertMode;         1=Expert, 0=Novice
+    char     Protocol;           Protocol (A thru Z)
+    packedbyte PackedFlags;      Bit packed flags
+    datetype DateLastDirRead;    Date for Last DIR Scan (most recent file)
+    int      SecurityLevel;      Security Level
+    unsigned NumTimesOn;         Number of times the caller has connected
+    char     PageLen;            Page Length when display data on the screen
+    unsigned NumUploads;         Total number of FILES uploaded
+    unsigned NumDownloads;       Total number of FILES downloaded
+    long     DailyDnldBytes;     Number of BYTES downloaded so far today
+    char     UserComment[31];    Comment field #1 (NULL terminated)
+    char     SysopComment[31];   Comment field #1 (NULL terminated)
+    int      ElapsedTimeOn;      Number of minutes online
+    unsigned RegExpDate;         Julian date for Registration Expiration Date
+    int      ExpSecurityLevel;   Expired Security Level
+    unsigned LastConference;     Number of the conference the caller was in
+    long     TotDnldBytes;       Total number of BYTES downloaded
+    long     TotUpldBytes;       Total number of BYTES uploaded
+    bool     DeleteFlag;         1=delete this record, 0=keep
+    long     RecNum;             Record Number in USERS.INF file
+    packedbyte2  Flags;          More bit packed flags
+    char     Reserved[8];        Bytes 390-397 from the USERS file
+    long     MsgsRead;           Number of messages the user has read in PCB
+    long     MsgsLeft;           Number of messages the user has left in PCB
+    bool     AliasSupport;       TRUE if Alias PSA installed
+    char     Alias[26];          Chosen Alias, if AliasSupport is TRUE
+    bool     AddressSupport;     TRUE if Address PSA installed
+    addresstypez Address;        Address information, if AddressSupport is TRUE
+    bool     PasswordSupport;    TRUE if Password PSA installed
+    passwordtypez PwrdHistory;   Password History, if PasswordSupport is TRUE
+    bool     VerifySupport;      TRUE if Verify PSA installed
+    char     Verify[26];         Verification Info, if VerifySupport is TRUE
+    bool     StatsSupport;       TRUE if Caller Stats PSA installed
+    callerstattype Stats;        Caller Stats, if StatsSupport is TRUE
+    bool     NotesSupport;       TRUE if Notes PSA installed
+    notestypez Notes;            Notes about caller, if NotesSupport is TRUE
+|   bool      AccountSupport;    TRUE if Accounting PSA installed
+|   accounttype Account;         Accounting values, if AccountSupport is TRUE
+|   bool      QwkSupport;        TRUE if QWK/Net PSA installed
+|   qwkconfigtype QwkConfig;     QWK/Net values, if QwkSupport is TRUE
+  } userrectype;
+
+  CHANGES FOR V15.0
+  -----------------
+  The fields near the end of the userrectype, from AliasSupport to Notes,
+  are new for v15.0.  This means that the record size has GROWN.  Those
+  applications which did not read the record size out of the header and jump
+  over any growth in the record size will fail.
+
+  However, version 15.0 allows you to set the USERS.SYS setting in DOORS.LST
+  to either Y or O.  Setting it to Y tells PCBoard to create a native users.sys
+| file.  Setting it to 1 tells PCBoard to create the 'old' format .. that which
+  was used by PCBoard v14.5a.  This means that the additional information at
+  the end of the record will not be included.
+
+  We recommend that you update your applications to properly deal with the
+  variable sized records so that they can be used with both v14.5a and v15.0
+  users.sys files.
+
+| CHANGES FOR V15.2
+| -----------------
+| Once again, the USERS.SYS structure has GROWN.  The four new fields for
+| version 15.2 are AccountSupport, Account, QwkSupport and QwkConfig.
+|
+| To obtain a v15.0 format USERS.SYS file, use the number 2 inside DOORS.LST
+| under the USERS.SYS header.  A Y means create a default format (v15.2),
+| 1 means to create a v14.5a format, and 2 means to create a v15.0 format.
+|
+| To ensure compatibility with all versions of PCBoard, you should ensure that
+| your software reads the header at the top of the USERS.INF file to determine
+| how big the structure is, then only read as much as your program knows
+| about, and also to determine how many bit fields there are since v15.2 has
+| one more bit field than v14.5 and v15.0 had.
+
+
+  LAST MESSAGE READ POINTERS
+  --------------------------
+  A LONG integer is used for each conference.  Therefore you must know the
+  number of conference areas (syshdrtype.NumOfAreas) to determine how many
+  long integers there are in the file (remember that the MAIN BOARD counts
+  as one conference area).
+
+
+  BIT MAPPED FIELDS
+  -----------------
+  A bit mapped field is nothing more than a string of bytes which when held
+  together can be searched to see if a specific BIT is turned on or off.
+
+  You should read the header record syshdrtype.NumOfBitFields to determine
+  exactly how many bit fields there are in case a new release includes any
+  new fields (which you may skip over if you don't need them).
+
+| There are currently 8 of these fields and they are in the following order:
+
+  1) Registered in Conference
+  2) Expired Registered in Conference (same as above but used when expired)
+  3) User Scan in Conference (user preference for scanning conferences)
+  4) Conference Sysop (user gets Sysop Privileges while in conference)
+  5) Conference Mail (user has mail waiting in conference)
+  6) Conference Joined (user has already joined this conference today)
+  7) Conference Scanned (user has already scanned this conference today)
+| 8) Conferences in which Net Status is available to th caller
+
+  The actual size of each of these fields is given to you in the header
+  record syshdrtype.SizeOfBitFields.  You don't need to know this - but the
+  actual calculation of the size by PCBoard is made using the following
+  formula:
+
+    ConfByteLen = (NumAreas / 8) + ((NumAreas % 8) != 0 ? 1 : 0);
+    if (ConfByteLen < 5)
+      ConfByteLen = 5;
+
+  Basically, it allocates only the number of BYTES necessary to hold the
+  number of bits required for all of the conferences defined.  A minimum of
+  FIVE bytes are used due to PCBoard v14.0's conference definition of 40
+  conference areas.
+
+  In other words, if you have only one conference there will be FIVE bytes
+  used due to v14.0's file layout requirements.  If you have 100 conferences
+  then there will be 13 bytes used (with 4 bits going unused).
+
+  As you can see - bit mapped fields become almost a necessity with the fact
+  that there are currently 7 fields and a system may have as many as 65536
+  conferences (which if it weren't for bit mapped fields could prove to be a
+  very BIG file!).  With all 7 fields a system with 1024 conferences uses up
+  only 896 bytes - which if one byte per flag were used could have taken up
+  as much as 7168 bytes.
+
+
+  CALCULATING THE JULIAN DATE VALUES
+  ----------------------------------
+  The following calculations are used to calculate the LAST DATE ON and the
+  EXPIRATION DATE fields ..  it is a julian date calculation which is used so
+  that arithmetic performed on the date value itself will result in another
+  valid date.  In other words, "date + 365" equals a 365 days in the future.
+
+    int Days[12] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
+
+    date = 36525L * Year;
+    if ((date % 100) == 0 && Month < 3)
+      date--;
+
+    date = (date - (1900 * 36525)) / 100;
+    date += Day + Days[Month-1];
+
+
+  Converting the julian date back into month, day and year values is a bit
+  trickier but is typically only done when displaying the date to the user or
+  storing it in the USERS file in "mmddyy" format.  The following calculations
+  can be used to convert the date back into the month, day and year components:
+
+    int Days[2][12] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334,
+                       0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335};
+
+    Year  = (100 * Date) / 36525;
+    Temp  = Year * 36525L
+    Date -= Temp / 100;
+
+    if (Temp % 100 == 0) {
+      Date++;
+      Leap = 1;
+    } else Leap = 0;
+
+    for (Month = Counter = 0; Counter < 12; Counter++)
+      if (Days[Leap][Counter] < Date)
+        Month = Counter;
+
+    Day = JD - Days[Leap][Month];
+
+
+  THIRD PARTY APPLICATION RECORD
+  ------------------------------
+  The Third Party Application record is used to hold information about the
+  USER which is specific to the application.  PCBoard copies this information
+  out of the USERS.INF file into the USERS.SYS file and then copies it back
+  upon reloading the software.  The advantage to letting PCBoard handle the
+  application needs is that as new users are added to the USERS file the
+  Third Party application records are created inside the USERS.INF file at
+  the same time.  And when a user is removed from the USERS file they are
+  also removed from the USERS.INF file at the same time (while third party
+  records are also being removed).
+
+  The Third Party Application record is written in the USERS.SYS file
+  directly after the PCBoard Bit Map Fields.
+
+  If a there are no installed Third Party Applications (or none which
+  required a user record) then the USERS.SYS file will end with the Bit
+  Mapped Fields described above.
+
+  The way that PCBoard knows which Third Party Application record should be
+  appended to the USERS.SYS file is by the KEYWORD used by the caller to
+  invoke the application.
+
+
+  HANDLING THE USERS.SYS FILE
+  ---------------------------
+  The following information is in reference to how PCBoard expects the
+  USERS.SYS file to be handled by Third Party Applications.
+
+  The USERS.SYS file is created as PCBoard is dropping to DOS and contains
+  what is basically a 'memory dump' of the values that PCBoard had in memory
+  at the time the caller dropped to DOS.
+
+  On returning from DOS PCBoard will check to see if a USERS.SYS file is in the
+  \PCB directory REGARDLESS of whether or not a PCBOARD.SYS file existed or
+  indicated that a caller was online.
+
+  If the Updated flag is set to TRUE (in this case the value must be a byte
+  value of 1 - no other value will be used to indicate TRUE so as to avoid
+  accidently specifying a TRUE response) then PCBoard will read in the rest
+  of the USERS.SYS file and update the USERS and USERS.INF files based on the
+  contents of the USERS.SYS file overwriting whatever previous values may have
+  been there.
+
+  If the Updated flag is set to FALSE (the default) then it is assumed that
+  the TPA may have updated the USERS file directly (in the case of existing
+  v14.0 compatible programs) or that no modification was required.
+
+  If the TPA allows the caller to hang up then it should clear the PCBOARD.SYS
+  file so that PCBoard will recycle.  PCBoard will still read the USERS.SYS
+  file which will indicate that a caller was, in fact, online and if the
+  Updated flag was set then it will still update the USERS and USERS.INF files.
+
+  If the TPA updates the number of uploads, number of downloads or number of
+  messages left fields in USERS.SYS then PCBoard will properly determine that
+  such activity occured outside of the PCBoard environment and it will
+  properly update these statistics on the CALLWAITING screen without the use
+  of the PCBSTATS.EXE program.

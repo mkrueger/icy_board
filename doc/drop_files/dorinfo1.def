@@ -1,0 +1,41 @@
+Filename:	DORINFO1.DEF
+Description:  A standard exit file created in the current
+            (node) directory.  This is a standard ASCII
+            text file and has the following format:
+
+Line 1:  System name
+Line 2:  Sysop first name
+Line 3:  Sysop last name
+Line 4:  Communications port in use (COM0 if local)
+Line 5:  Communications port settings:
+            BPS rate,parity,data bits,stop bits
+        The BPS rate is specified as 0 during local sessions
+        and is followed by the word BAUD.  During error-
+        free connects, the word BAUD is followed by -R.
+        The parity setting is always set to N for no parity.
+        The data bits are always set to 8 and the stop bits
+        are always set to 1.
+Line 6:  Reserved (always zero)
+Line 7:  User first name
+Line 8:  User last name
+Line 9:  User location
+Line 10: User emulation (0=ASCII, 1=ANSI, 2=AVATAR)
+Line 11: User security level
+Line 12: User time remaining (in minutes)
+Line 13: -1 EOF
+
+Example DORINFO1.DEF:
+
+REMOTEACCESS CENTRAL
+ANDREW
+MILNER
+COM1
+19200 BAUD-R,N,8,1
+0
+JOHN
+PARLIN
+BROOKLYN CENTER, MN, USA
+1
+100
+60
+-1

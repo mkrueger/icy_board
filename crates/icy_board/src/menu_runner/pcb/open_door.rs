@@ -1,12 +1,7 @@
-use std::{
-    os::fd::{AsFd, AsRawFd},
-    process::Stdio,
-    time::Duration,
-};
+use std::{process::Stdio, time::Duration};
 
 use crate::{menu_runner::PcbBoardCommand, Res, VERSION};
 
-use http::header;
 use icy_board_engine::icy_board::{
     commands::Command,
     doors::{BBSLink, Door, DoorList, DoorServerAccount, DoorType},
@@ -24,8 +19,7 @@ use icy_net::{
 use rand::distributions::{Alphanumeric, DistString};
 use regex::Regex;
 use thiserror::Error;
-use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
-use tokio_fd::AsyncFd;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 impl PcbBoardCommand {
     pub async fn open_door(&mut self, action: &Command) -> Res<()> {
@@ -75,15 +69,15 @@ impl PcbBoardCommand {
         if let Ok(number) = text.parse::<usize>() {
             if number > 0 {
                 if let Some(b) = doors.get(number - 1) {
-                    self.run_door(&doors, b).await?;
+                    self.run_door(&doors, b, number).await?;
                     //                    self.display_menu = true;
                     return Ok(());
                 }
             }
         } else {
-            for d in &doors.doors {
+            for (i, d) in doors.doors.iter().enumerate() {
                 if d.name.to_uppercase().starts_with(&text.to_uppercase()) {
-                    self.run_door(&doors, d).await?;
+                    self.run_door(&doors, d, i).await?;
                     //                    self.display_menu = true;
                     return Ok(());
                 }
@@ -99,7 +93,7 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    pub async fn run_door(&mut self, door_list: &DoorList, door: &Door) -> Res<()> {
+    pub async fn run_door(&mut self, door_list: &DoorList, door: &Door, door_number: usize) -> Res<()> {
         if !door.securiy_level.user_can_access(&self.state.session) {
             self.state
                 .display_text(
@@ -116,20 +110,20 @@ impl PcbBoardCommand {
                 self.run_bbslink_door(bbslink, door).await?;
             }
             DoorType::Local => {
-                self.run_local_door(door).await?;
+                self.run_local_door(door, door_number).await?;
             }
         }
         Ok(())
     }
 
-    async fn run_local_door(&mut self, door: &icy_board_engine::icy_board::doors::Door) -> Res<()> {
+    async fn run_local_door(&mut self, door: &icy_board_engine::icy_board::doors::Door, door_number: usize) -> Res<()> {
         let file_name = self.state.resolve_path(&door.path);
         if door.path.ends_with("ppe") {
             self.state.run_ppe(&file_name, None).await?;
             return Ok(());
         }
         let working_directory = file_name.parent().unwrap();
-        door.create_drop_file(&self.state, &working_directory)?;
+        door.create_drop_file(&self.state, &working_directory, door_number)?;
         let mut cmd = if door.use_shell_execute {
             tokio::process::Command::new("sh")
                 .arg("-c")

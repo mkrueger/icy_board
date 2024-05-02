@@ -12,7 +12,7 @@ use crate::{
 
 use super::{security::RequiredSecurity, IcyBoardSerializer};
 use async_trait::async_trait;
-use chrono::Timelike;
+use chrono::{Local, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize, Default)]
@@ -42,17 +42,18 @@ pub enum DropFile {
     DoorSys,
     Door32Sys,
     DorInfo,
-
-    // currently unsupported (on request)
     CallInfo,
-    Chain,
-    Curruser,
-    SFDoors,
-    TriBBS,
-    UserInfo,
-    Jumper,
-    SXDoor,
-    Info,
+    // currently unsupported (on request)
+
+    // EXITINFO.BBS  QuickBBS (write/read)
+    // CHAIN.TXT     WWIV (write-only)
+    // SFDOORS.DAT SpitFire (write-only)
+    // TRIBBS.SYS TriBBS (write-only)
+    // DOORFILE.SR 		Solar Realms (write-only)
+    // CURRUSER.BBS RyBBS
+    // USERINFO.DAT WildCat!
+    // JUMPER.DAT WildCat! 2AM BBS
+    // INFO.BBS  Phoenix BBS
 }
 
 #[derive(Clone, Serialize, Deserialize, Default)]
@@ -71,13 +72,14 @@ pub struct Door {
     pub drop_file: DropFile,
 }
 impl Door {
-    pub fn create_drop_file(&self, state: &super::state::IcyBoardState, path: &std::path::Path) -> Res<()> {
+    pub fn create_drop_file(&self, state: &super::state::IcyBoardState, path: &std::path::Path, door_number: usize) -> Res<()> {
         match self.drop_file {
             DropFile::None => Ok(()),
             DropFile::PCBoard => create_pcboard_sys(state, path),
             DropFile::DoorSys => create_door_sys(state, path),
             DropFile::Door32Sys => create_door32_sys(state, path),
             DropFile::DorInfo => create_dorinfo(state, path, 1),
+            DropFile::CallInfo => create_callinfo_bbs(state, path, door_number),
             _ => {
                 log::error!("drop file type currently {:?} unsupported", self.drop_file);
                 Err("drop file unsupported".into())
@@ -259,7 +261,7 @@ fn create_door32_sys(state: &super::state::IcyBoardState, path: &std::path::Path
 
     contents.push_str(&format!("{}\r\n", state.node + 1)); // Line 11: Current node number
 
-    let path = path.join("DOOR32.SYS");
+    let path = path.join("door32.sys");
     log::info!("create door32.sys: {}", path.display());
     fs::write(path, contents)?;
     Ok(())
@@ -291,6 +293,60 @@ fn create_dorinfo(state: &super::state::IcyBoardState, path: &std::path::Path, n
 
         let path = path.join("DORINFO1.DEF");
         log::info!("create dorinfo1.def: {}", path.display());
+        fs::write(path, contents)?;
+    } else {
+        return Err("Board not found".into());
+    }
+    Ok(())
+}
+
+fn create_callinfo_bbs(state: &super::state::IcyBoardState, path: &std::path::Path, door_number: usize) -> Res<()> {
+    let mut contents = String::new();
+    if let Ok(board) = state.board.lock() {
+        contents.push_str(&format!("{}\r\n", state.session.user_name)); // User Name
+        contents.push_str("5\r\n"); // Baud 300=1, 1200=2, 2400=0, 9600=3, 19200=4, Local=5
+        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().city_or_state)); // Calling From
+        contents.push_str(&format!("{}\r\n", state.session.cur_security)); // User security level
+        contents.push_str("999\r\n"); // User Time Left
+        let emulation = match state.session.disp_options.grapics_mode {
+            super::state::GraphicsMode::Ctty => "MONO",
+            _ => "COLOR",
+        };
+        contents.push_str(&format!("{}\r\n", emulation)); // Color or Mono
+        contents.push_str("SECRET\r\n"); // Password
+        contents.push_str(&format!("{}\r\n", state.session.cur_user + 1)); // User Reference Number
+        contents.push_str("0\r\n"); // User Time On
+        contents.push_str(&format!("{}\r\n", state.session.login_date.format("%H:%M"))); // Time Str
+        contents.push_str(&format!("{}\r\n", state.session.login_date.format("%H:%M %m/%d%/%C"))); // Time-Date
+        contents.push_str("\r\n"); // Conference Joined
+        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.today_num_downloads)); // Daily Downloads
+        contents.push_str(&format!("{}\r\n", 999)); // Max Downloads
+        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.today_dnld_bytes / 1024)); // Daily Download K
+        contents.push_str(&format!("{}\r\n", 999 * 1024)); // Max Downloads KB
+        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().home_voice_phone)); // Phone Number
+        contents.push_str(&format!("{}\r\n", Local::now().format("%m/%d%/%C %H:%M"))); // Date-Time
+        let emulation = if state.session.expert_mode { "EXPERT" } else { "NOVICE" };
+        contents.push_str(&format!("{}\r\n", emulation)); // Novice or Expert
+        contents.push_str("All\r\n"); // Transfer Method  All, Ymodem, Ymodem/G, Xmodem, Xmodem/CRC, Xmodem-1K, Xmodem-1K/G, Ascii
+        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.last_on.format("%m/%d%/%C"))); // Last New Date
+        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.num_times_on)); // Times on
+        contents.push_str(&format!("{}\r\n", state.session.page_len)); // Lines per Page
+        contents.push_str("42\r\n"); // Highest Message Read
+        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.num_uploads)); // Uploads
+        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.num_downloads)); // Downloads
+        contents.push_str("8\r\n"); // Databits (7 or 8)
+        contents.push_str("LOCAL\r\n"); // LOCAL or REMOTE
+        contents.push_str("COM0\r\n"); // COM Port
+        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().birth_date.format("%m/%d%/%C"))); // Birth Date
+        contents.push_str("38400\r\n"); // Com Port Speed
+        contents.push_str("TRUE\r\n"); // Already Connected
+        contents.push_str("Normal Connection \r\n"); // MNP/ARQ or Normal Connection
+        contents.push_str(&format!("{}\r\n", Utc::now().format("%m/%d%/%C %H:%M"))); // Date Time (Global)
+        contents.push_str(&format!("{}\r\n", state.node + 1)); // Node ID
+        contents.push_str(&format!("{}\r\n", door_number)); // Door Number
+
+        let path = path.join("CALLINFO.BBS");
+        log::info!("create callinfo.bbs: {}", path.display());
         fs::write(path, contents)?;
     } else {
         return Err("Board not found".into());
