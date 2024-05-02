@@ -12,7 +12,7 @@ use crate::{
     terminal_thread::SendData,
     Res,
 };
-use chrono::{Datelike, Local, Timelike, Utc};
+use chrono::Utc;
 use crossterm::{
     cursor::MoveTo,
     event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
@@ -20,7 +20,7 @@ use crossterm::{
     ExecutableCommand,
 };
 use icy_board_engine::icy_board::{
-    state::{GraphicsMode, NodeState, Session},
+    state::{GraphicsMode, NodeState},
     IcyBoard, IcyBoardError,
 };
 use icy_board_tui::{
@@ -29,10 +29,7 @@ use icy_board_tui::{
 };
 use icy_engine::TextPane;
 use icy_net::{channel::ChannelConnection, ConnectionType};
-use ratatui::{
-    prelude::*,
-    widgets::{canvas::Canvas, Paragraph},
-};
+use ratatui::{prelude::*, widgets::Paragraph};
 use tokio::{runtime::Runtime, sync::mpsc};
 
 use crate::{bbs::BBS, icy_engine_output::Screen};
@@ -117,7 +114,7 @@ impl Tui {
         let mut terminal = init_terminal()?;
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(20);
-        let mut redraw = true;
+        //   let mut redraw = true;
         loop {
             if self.handle.lock().unwrap()[self.node].as_ref().unwrap().handle.as_ref().unwrap().is_finished() {
                 restore_terminal()?;
@@ -130,7 +127,7 @@ impl Tui {
 
             //if redraw
             {
-                redraw = false;
+                //  redraw = false;
                 let board = board.clone();
                 let _ = terminal.draw(|frame| {
                     if let Ok(board) = &board.lock() {
@@ -146,7 +143,7 @@ impl Tui {
                             match key.code {
                                 KeyCode::Char('h') => {
                                     self.status_bar = (self.status_bar + 1) % 4;
-                                    redraw = true;
+                                    //redraw = true;
                                 }
                                 KeyCode::Char('x') => {
                                     let _ = restore_terminal();

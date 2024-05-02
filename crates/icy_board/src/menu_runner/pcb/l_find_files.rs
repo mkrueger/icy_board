@@ -213,7 +213,7 @@ impl<'a> FileList<'a> {
                             cmd.state.print(TerminalTarget::Both, &format!("{:33}", " ")).await?;
                         }
                         cmd.state.print(TerminalTarget::Both, line).await?;
-                        cmd.state.new_line().await;
+                        cmd.state.new_line().await?;
                         printed_lines = true;
                         if cmd.state.session.more_requested && !self.filebase_more(cmd).await? {
                             cmd.state.session.cancel_batch = true;

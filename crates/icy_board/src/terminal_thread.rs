@@ -55,6 +55,8 @@ pub fn start_update_thread(com: Box<dyn Connection>, screen: Arc<Mutex<Screen>>)
                                                 let _ = buffer_parser.print_char( &mut s.buffer, 0, &mut caret, CP437_TO_UNICODE[*ch as usize]);
                                             }
                                             mem::swap(&mut s.caret, &mut caret);
+                                        } else {
+                                            std::thread::sleep(std::time::Duration::from_millis(20));
                                         }
                                     }
                                 }
@@ -79,8 +81,6 @@ async fn handle_receive(c: &mut ConnectionThreadData, data: SendData) -> Res<()>
         SendData::Disconnect => {
             c.com.shutdown().await?;
         }
-
-        _ => {}
     }
     Ok(())
 }

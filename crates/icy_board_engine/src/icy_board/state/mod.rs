@@ -465,10 +465,10 @@ impl IcyBoardState {
                 // form feed character
                 self.print(TerminalTarget::Both, "\x0C").await?;
             }
-            GraphicsMode::Ansi => {
+            GraphicsMode::Ansi | GraphicsMode::Graphics => {
                 self.print(TerminalTarget::Both, "\x1B[2J\x1B[H").await?;
             }
-            _ => {
+            GraphicsMode::Rip => {
                 // ignore
             }
         }
@@ -1218,7 +1218,17 @@ impl IcyBoardState {
                 }
             }
 
-            "POFF" | "PON" | "PROLTR" | "PRODESC" | "PWXDATE" | "PWXDAYS" | "QOFF" | "QON" | "RATIOBYTES" | "RATIOFILES" => {}
+            "POFF" => {
+                self.session.num_lines_printed = 0;
+                self.session.disp_options.non_stop = true;
+                return None;
+            }
+            "PON" => {
+                self.session.num_lines_printed = 0;
+                self.session.disp_options.non_stop = false;
+                return None;
+            }
+            "PROLTR" | "PRODESC" | "PWXDATE" | "PWXDAYS" | "QOFF" | "QON" | "RATIOBYTES" | "RATIOFILES" => {}
             "RCPS" => result = self.transfer_statistics.get_cps_upload().to_string(),
             "RBYTES" => result = self.transfer_statistics.uploaded_bytes.to_string(),
             "RFILES" => result = self.transfer_statistics.uploaded_files.to_string(),

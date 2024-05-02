@@ -18,7 +18,6 @@ use crossterm::{
 };
 use icy_board_engine::{icy_board::IcyBoard, Res};
 
-use node_monitoring_screen::NodeMonitoringScreenMessage;
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     Terminal,
@@ -228,7 +227,7 @@ fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, boar
         CallWaitMessage::Monitor => {
             let mut app = node_monitoring_screen::NodeMonitoringScreen::new(&board);
             match app.run(terminal, &board, bbs) {
-                Ok(msg) => {
+                Ok(_msg) => {
                     /*  if let NodeMonitoringScreenMessage::EnterNode(node) = msg {
                         let mut tui = Tui::sysop_mode(bbs, node)?;
                         if let Err(err) = tui.run(&board) {

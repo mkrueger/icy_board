@@ -79,7 +79,7 @@ impl PcbBoardCommand {
                     return Ok(l.languages[number - 1].extension.clone());
                 }
             }
-            self.state.display_text(IceText::LanguageNotAvailable, display_flags::NEWLINE).await;
+            self.state.display_text(IceText::LanguageNotAvailable, display_flags::NEWLINE).await?;
         }
     }
 }
