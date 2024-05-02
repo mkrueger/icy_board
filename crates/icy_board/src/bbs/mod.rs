@@ -91,13 +91,10 @@ pub async fn await_telnet_connections(telnet: Telnet, board: Arc<Mutex<IcyBoard>
         let node = bbs.lock().unwrap().create_new_node(ConnectionType::Telnet);
         let node_list = bbs.lock().unwrap().get_open_connections().clone();
         let board = board.clone();
-        let handle = std::thread::spawn(move || {
-            tokio::runtime::Builder::new_multi_thread()
-                .worker_threads(4)
-                .enable_all()
-                .build()
-                .unwrap()
-                .block_on(async {
+        let handle = std::thread::Builder::new()
+            .name("Telnet handle".to_string())
+            .spawn(move || {
+                tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
                     let orig_hook = std::panic::take_hook();
                     std::panic::set_hook(Box::new(move |panic_info| {
                         log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
@@ -117,7 +114,8 @@ pub async fn await_telnet_connections(telnet: Telnet, board: Arc<Mutex<IcyBoard>
                         }
                     }
                 });
-        });
+            })
+            .unwrap();
         bbs.lock().unwrap().get_open_connections().lock().unwrap()[node].as_mut().unwrap().handle = Some(handle);
     }
 }
@@ -318,7 +316,6 @@ pub async fn handle_client(
     loop {
         if let Err(err) = cmd.do_command().await {
             cmd.state.session.disp_options.reset_printout();
-
             // print error message to user, if possible
             if cmd.state.set_color(TerminalTarget::Both, 4.into()).await.is_ok() {
                 cmd.state

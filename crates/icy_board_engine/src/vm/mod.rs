@@ -413,7 +413,11 @@ impl<'a> VirtualMachine<'a> {
                     crate::compiler::user_data::UserDataEntry::Function(name) => {
                         let mut moved_data: Vec<Box<dyn UserDataValue>> = Vec::new();
                         mem::swap(&mut moved_data, &mut self.user_data);
-                        match moved_data[object_id].call_function(self, name, arguments).await {
+                        let mut args = Vec::new();
+                        for arg in arguments {
+                            args.push(self.eval_expr(arg).await?);
+                        }
+                        match moved_data[object_id].call_function(self, name, &args).await {
                             Ok(mut result) => {
                                 mem::swap(&mut moved_data, &mut self.user_data);
                                 if !moved_data.is_empty() {
@@ -735,7 +739,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
     }
     let file_name = file_name.as_ref().to_path_buf();
     let reg = UserTypeRegistry::icy_board_registry();
-    log::error!("Run PPE {}", file_name.display());
+    log::info!("Run PPE {}", file_name.display());
 
     let mut vm = VirtualMachine {
         file_name,

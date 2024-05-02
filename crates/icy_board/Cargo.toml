@@ -33,13 +33,11 @@ qfile = "3.0.1"
 easy_reader = "0.5.2"
 toml = { workspace = true }
 md-to-tui = "0.1.2"
-subprocess = "0.2.9"
-
 relative-path = "1.9.2"
 regex = { workspace = true }
 rand = { workspace = true }
 tokio = { workspace = true }
-
+tokio-fd = "0.3.0"
 temp-file = "0.1.8"
 http = "1.1.0"
 md5 = "0.7.0"

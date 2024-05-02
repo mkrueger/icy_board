@@ -1,7 +1,12 @@
-use std::{thread, time::Duration};
+use std::{
+    os::fd::{AsFd, AsRawFd},
+    process::Stdio,
+    time::Duration,
+};
 
-use crate::{menu_runner::PcbBoardCommand, Res};
+use crate::{menu_runner::PcbBoardCommand, Res, VERSION};
 
+use http::header;
 use icy_board_engine::icy_board::{
     commands::Command,
     doors::{BBSLink, Door, DoorList, DoorServerAccount, DoorType},
@@ -18,8 +23,9 @@ use icy_net::{
 };
 use rand::distributions::{Alphanumeric, DistString};
 use regex::Regex;
-use subprocess::{Exec, Redirection};
 use thiserror::Error;
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio_fd::AsyncFd;
 
 impl PcbBoardCommand {
     pub async fn open_door(&mut self, action: &Command) -> Res<()> {
@@ -34,6 +40,7 @@ impl PcbBoardCommand {
                 .await?;
             return Ok(());
         }
+
         let display_menu = self.state.session.tokens.is_empty();
         if display_menu {
             let file = self.state.session.current_conference.doors_menu.clone();
@@ -121,49 +128,74 @@ impl PcbBoardCommand {
             self.state.run_ppe(&file_name, None).await?;
             return Ok(());
         }
-        log::info!("run {}", file_name.display());
+        let working_directory = file_name.parent().unwrap();
+        door.create_drop_file(&self.state, &working_directory)?;
+        let mut cmd = if door.use_shell_execute {
+            tokio::process::Command::new("sh")
+                .arg("-c")
+                .arg(format!("{}", file_name.display()))
+                .current_dir(working_directory)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .spawn()?
+        } else {
+            tokio::process::Command::new(&file_name)
+                .current_dir(working_directory)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .spawn()?
+        };
 
-        let mut cmd = Exec::cmd("sh")
-            .arg("-C")
-            .arg(format!("{}", file_name.display()))
-            .stdin(Redirection::Pipe)
-            .stdout(Redirection::Pipe)
-            .popen()?;
+        let mut write_buf = vec![0; 32 * 1024];
+        let mut read_buf = vec![0; 128 * 1024];
+        let mut stidn = cmd.stdin.take().unwrap();
+        let mut stdout = cmd.stdout.take().unwrap();
 
-        let buf = &mut [0; 128 * 1024];
         loop {
-            let o = cmd.poll();
-            if o.is_some() {
-                break;
-            }
-            let (data_opt, _) = cmd.communicate_bytes(Some(&Vec::new()))?;
-            if let Some(data) = data_opt {
-                self.state.connection.send(&data).await?;
-                if let Ok(node_state) = self.state.node_state.lock() {
-                    if let Ok(connections) = &mut node_state[self.state.node].as_ref().unwrap().connections.lock() {
-                        for conn in connections.iter_mut() {
-                            let _ = conn.send(&data).await;
+            tokio::select! {
+                write_data = stdout.read(&mut read_buf)=> {
+                    match write_data {
+                        Ok(size) => {
+                            if size > 0 {
+                                log::info!("{}", String::from_utf8_lossy(&read_buf[0..size]));
+                                if let Err(_) = self.state.connection.send(&read_buf[0..size]).await {
+                                    break;
+                                }
+                                if let Ok(node_state) = self.state.node_state.lock() {
+                                    if let Ok(connections) = &mut node_state[self.state.node].as_ref().unwrap().connections.lock() {
+                                        for conn in connections.iter_mut() {
+                                            if let Err(_) = conn.send(&read_buf[0..size]).await {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Error reading from door: {}", e);
+                            break;
                         }
                     }
                 }
-            }
+                read_data = self.state.connection.read(&mut write_buf) => {
+                    match read_data {
+                        Ok(size) => {
+                            if let Err(_) = stidn.write_all(&write_buf[0..size]).await {
+                                break;
+                            }
+                        }
+                        Err(_) => {
+                            break;
+                        }
+                    }
+                }
+            };
 
-            let size = self.state.connection.read(buf).await?;
-            if size > 0 {
-                log::info!("read {:?} bytes", &buf[0..size]);
-                cmd.communicate_bytes(Some(&buf[0..size]))?;
+            if cmd.try_wait()?.is_some() {
+                break;
             } else {
-                thread::sleep(Duration::from_millis(10));
-            }
-            if let Ok(node_state) = self.state.node_state.lock() {
-                if let Ok(connections) = &mut node_state[self.state.node].as_ref().unwrap().connections.lock() {
-                    for conn in connections.iter_mut() {
-                        let size = conn.read(buf).await?;
-                        if size > 0 {
-                            cmd.communicate_bytes(Some(&buf[0..size]))?;
-                        }
-                    }
-                }
+                std::thread::sleep(Duration::from_millis(25));
             }
         }
         log::info!("door exited.");
@@ -174,26 +206,28 @@ impl PcbBoardCommand {
     pub async fn run_bbslink_door(&mut self, bbslink: &BBSLink, door: &Door) -> Res<()> {
         log::info!("Running door: {}, requesting token", door.path);
         let x_key = Alphanumeric.sample_string(&mut rand::thread_rng(), 12);
-        let token = reqwest::blocking::get(format!("https://games.bbslink.net/token.php?{x_key}"))?.text()?;
+        let token = reqwest::get(format!("https://games.bbslink.net/token.php?{x_key}")).await?.text().await?;
         log::info!("got token {}, sending credentials", token);
-        /*
-            let mut map = header::HeaderMap::new();
-            map.insert("X-User", self.state.session.cur_user.into());
-            map.insert("X-System", bbslink.system_code.parse()?);
-            map.insert("X-Auth", format!("{:x}", md5::compute(bbslink.auth_code.clone() + token.as_str())).parse()?);
-            map.insert("X-Code", format!("{:x}", md5::compute(bbslink.sheme_code.clone() + token.as_str())).parse()?);
-            map.insert("X-Rows", self.state.user_screen.buffer.get_height().into());
-            map.insert("X-Key", x_key.parse()?);
-            map.insert("X-Door", b.path.parse()?);
-            map.insert("X-Token", token.parse()?);
-            map.insert("X-Type", "icy_board".parse()?);
-            map.insert("X-Version", crate::VERSION.to_string().parse()?);
+        /* Not sure why this doesn't work:
+        let mut map = http::header::HeaderMap::new();
+        map.insert("X-User", self.state.session.cur_user.into());
+        map.insert("X-System", bbslink.system_code.parse()?);
+        map.insert("X-Auth", format!("{:x}", md5::compute(bbslink.auth_code.clone() + token.as_str())).parse()?);
+        map.insert("X-Code", format!("{:x}", md5::compute(bbslink.sheme_code.clone() + token.as_str())).parse()?);
+        map.insert("X-Rows", self.state.user_screen.buffer.get_height().into());
+        map.insert("X-Key", x_key.parse()?);
+        map.insert("X-Door", door.path.parse()?);
+        map.insert("X-Token", token.parse()?);
+        map.insert("X-Type", header::HeaderValue::from_static("icy_board"));
+        map.insert("X-Version", crate::VERSION.to_string().parse()?);
 
-            let response = Client::builder()
-            .user_agent("icy_board")
+
+
+        let response = reqwest::Client::builder()
+          //  .user_agent(format!("icy_board/{}", VERSION.to_string()))
             .default_headers(map)
             .build()?
-            .get(format!("https://games.bbslink.net/auth.php?key={x_key}")).send()?;
+            .get(format!("https://games.bbslink.net/auth.php?key={x_key}")).send().await?.text().await;
         */
 
         let url = format!(
@@ -209,8 +243,7 @@ impl PcbBoardCommand {
             "icy_board",
             crate::VERSION.to_string()
         );
-
-        let response = reqwest::blocking::get(url)?.text();
+        let response = reqwest::get(url).await?.text().await;
 
         match response {
             Ok(str) => {
@@ -224,7 +257,7 @@ impl PcbBoardCommand {
                         Duration::from_millis(500),
                     )
                     .await?;
-
+                    log::info!("Connected to door server");
                     let _ = execute_door(&mut connection, &mut self.state).await?;
                     return Ok(());
                 }
@@ -250,38 +283,57 @@ impl PcbBoardCommand {
 }
 
 async fn execute_door(door_connection: &mut dyn Connection, state: &mut icy_board_engine::icy_board::state::IcyBoardState) -> Res<()> {
-    let buf = &mut [0; 128 * 1024];
+    let mut read_buf = vec![0; 64 * 1024];
+    let mut write_buf = vec![0; 8 * 1024];
     loop {
-        let size = door_connection.read(buf).await?;
+        tokio::select! {
+            read = door_connection.read(&mut read_buf) => {
+               match read {
+                     Ok(size) => {
+                          if size > 0 {
+                            state.connection.send(&read_buf[0..size]).await?;
+                            if let Ok(node_state) = state.node_state.lock() {
+                                if let Ok(connections) = &mut node_state[state.node].as_ref().unwrap().connections.lock() {
+                                    for conn in connections.iter_mut() {
+                                        let _ = conn.send(&read_buf[0..size]).await;
+                                    }
+                                }
+                            }
+                          } else {
+                            return Ok(());
+                          }
+                     }
+                     Err(e) => {
+                        log::error!("Error reading from connection: {}", e);
+                        return Err(e.into());
+                    }
+               }
+            }
+            write = state.connection.read(&mut write_buf) => {
+                match write {
+                    Ok(size) => {
+                        if size > 0 {
+                            door_connection.send(&write_buf[0..size]).await?;
 
-        if size > 0 {
-            state.connection.send(&buf[0..size]).await?;
-            if let Ok(node_state) = state.node_state.lock() {
-                if let Ok(connections) = &mut node_state[state.node].as_ref().unwrap().connections.lock() {
-                    for conn in connections.iter_mut() {
-                        let _ = conn.send(&buf[0..size]).await;
+                            if let Ok(node_state) = state.node_state.lock() {
+                                if let Ok(connections) = &mut node_state[state.node].as_ref().unwrap().connections.lock() {
+                                    for conn in connections.iter_mut() {
+                                        let size = conn.read(&mut read_buf).await?;
+                                        if size > 0 {
+                                            door_connection.send(&read_buf[0..size]).await?;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("Error reading from connection: {}", e);
+                        return Err(e.into());
                     }
                 }
             }
-        } else {
-            std::thread::sleep(Duration::from_millis(10));
         }
-
-        let size = state.connection.read(buf).await?;
-        if size > 0 {
-            door_connection.send(&buf[0..size]).await?;
-        }
-        if let Ok(node_state) = state.node_state.lock() {
-            if let Ok(connections) = &mut node_state[state.node].as_ref().unwrap().connections.lock() {
-                for conn in connections.iter_mut() {
-                    let size = conn.read(buf).await?;
-                    if size > 0 {
-                        door_connection.send(&buf[0..size]).await?;
-                    }
-                }
-            }
-        }
-        // door_connection.flush().await?;
     }
 }
 

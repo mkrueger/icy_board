@@ -160,7 +160,7 @@ impl IcyBoard {
 
     pub fn load<P: AsRef<Path>>(path: &P) -> Res<Self> {
         let config = IcbConfig::load(path).map_err(|e| {
-            eprintln!("Error loading icy board config file: {} from {}", e, path.as_ref().display());
+            log::error!("Error loading icy board config file: {} from {}", e, path.as_ref().display());
             e
         })?;
 
@@ -186,48 +186,48 @@ impl IcyBoard {
         let load_path = get_path(parent_path, &config.paths.home_dir);
         if !load_path.exists() {
             fs::create_dir_all(&load_path).map_err(|e| {
-                eprintln!("Error creating home directory: {} from {}", e, load_path.display());
+                log::error!("Error creating home directory: {} from {}", e, load_path.display());
                 e
             })?;
         }
         users.load_users(&load_path).map_err(|e| {
-            eprintln!("Error loading users: {} from {}", e, load_path.display());
+            log::error!("Error loading users: {} from {}", e, load_path.display());
             e
         })?;
 
         let load_path = get_path(parent_path, &config.paths.conferences);
         let conferences = ConferenceBase::load(&load_path).map_err(|e| {
-            eprintln!("Error loading conference base: {} from {}", e, load_path.display());
+            log::error!("Error loading conference base: {} from {}", e, load_path.display());
             e
         })?;
 
         let load_path = get_path(parent_path, &config.paths.icbtext);
         let default_display_text = IcbTextFile::load(&load_path).map_err(|e| {
-            eprintln!("Error loading display text: {} from {}", e, load_path.display());
+            log::error!("Error loading display text: {} from {}", e, load_path.display());
             e
         })?;
 
         let load_path = get_path(parent_path, &config.paths.language_file);
         let languages = SupportedLanguages::load(&load_path).map_err(|e| {
-            eprintln!("Error loading languages: {} from {}", e, load_path.display());
+            log::error!("Error loading languages: {} from {}", e, load_path.display());
             e
         })?;
 
         let load_path = get_path(parent_path, &config.paths.protocol_data_file);
         let protocols = SupportedProtocols::load(&load_path).map_err(|e| {
-            eprintln!("Error loading protocols: {} from {}", e, load_path.display());
+            log::error!("Error loading protocols: {} from {}", e, load_path.display());
             e
         })?;
 
         let load_path = get_path(parent_path, &config.paths.pwrd_sec_level_file);
         let sec_levels = SecurityLevelDefinitions::load(&load_path).map_err(|e| {
-            eprintln!("Error loading security levels: {} from {}", e, load_path.display());
+            log::error!("Error loading security levels: {} from {}", e, load_path.display());
             e
         })?;
 
         let load_path = get_path(parent_path, &config.paths.command_file);
         let commands = CommandList::load(&load_path).map_err(|e| {
-            eprintln!("Error loading commands: {} from {}", e, load_path.display());
+            log::error!("Error loading commands: {} from {}", e, load_path.display());
             e
         })?;
 
@@ -235,7 +235,7 @@ impl IcyBoard {
         let statistics = match Statistics::load(&load_path) {
             Ok(stat) => stat,
             Err(e) => {
-                eprintln!("Error loading statistics: {} from {}, generating default.", e, load_path.display());
+                log::error!("Error loading statistics: {} from {}, generating default.", e, load_path.display());
                 Statistics::default()
             }
         };
@@ -266,7 +266,7 @@ impl IcyBoard {
                         conf.areas = areas;
                     }
                     Err(err) => {
-                        eprintln!("Error loading message areas {}: {}", message_area_file.display(), err);
+                        log::error!("Error loading message areas {}: {}", message_area_file.display(), err);
                     }
                 }
             }
@@ -282,7 +282,7 @@ impl IcyBoard {
                         conf.directories = directories;
                     }
                     Err(err) => {
-                        eprintln!("Error loading file areas {}: {}", file_area_file.display(), err);
+                        log::error!("Error loading file areas {}: {}", file_area_file.display(), err);
                     }
                 }
             }
@@ -298,7 +298,7 @@ impl IcyBoard {
                         conf.doors = doors;
                     }
                     Err(err) => {
-                        eprintln!("Error loading file areas {}: {}", doors_file.display(), err);
+                        log::error!("loading door files {}: {}", doors_file.display(), err);
                     }
                 }
             }

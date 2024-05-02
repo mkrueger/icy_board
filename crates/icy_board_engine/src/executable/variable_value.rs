@@ -191,6 +191,8 @@ pub union VariableData {
 
     pub std_struct: StdStruct,
 }
+unsafe impl Send for VariableData {}
+unsafe impl Sync for VariableData {}
 
 impl VariableData {
     pub fn from_int(r: i32) -> VariableData {
@@ -232,6 +234,8 @@ pub enum GenericVariableData {
 
     UserData(usize),
 }
+unsafe impl Send for GenericVariableData {}
+unsafe impl Sync for GenericVariableData {}
 
 impl GenericVariableData {
     pub(crate) fn create_array(base_value: VariableValue, dim: u8, vector_size: usize, matrix_size: usize, cube_size: usize) -> GenericVariableData {
@@ -261,6 +265,9 @@ pub struct VariableValue {
     pub data: VariableData,
     pub generic_data: GenericVariableData,
 }
+
+unsafe impl Send for VariableValue {}
+unsafe impl Sync for VariableValue {}
 
 impl fmt::Display for VariableValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

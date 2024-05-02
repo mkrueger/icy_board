@@ -3,7 +3,6 @@ use std::{
     io::{self, stdout, Stdout},
     path::PathBuf,
     sync::{Arc, Mutex},
-    thread,
     time::{Duration, Instant},
 };
 
@@ -54,23 +53,21 @@ impl Tui {
         let node_state2 = node_state.clone();
 
         let options = LoginOptions { login_sysop, ppe };
-        let handle = thread::spawn(move || {
-            tokio::runtime::Builder::new_multi_thread()
-                .worker_threads(4)
-                .enable_all()
-                .build()
-                .unwrap()
-                .block_on(async {
+        let handle = std::thread::Builder::new()
+            .name("Local mode handle".to_string())
+            .spawn(move || {
+                tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
                     if let Err(err) = handle_client(board, node_state2, node, Box::new(connection), Some(options)).await {
                         log::error!("Error running backround client: {}", err);
                     }
                 });
-        });
+            })
+            .unwrap();
         bbs.lock().unwrap().get_open_connections().as_ref().lock().unwrap()[node]
             .as_mut()
             .unwrap()
             .handle = Some(handle);
-        let (handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone());
+        let (_handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone());
 
         Self {
             screen,
@@ -206,7 +203,8 @@ impl Tui {
 
         let mut area = Rect::new((frame.size().width - width) / 2, (frame.size().height - height) / 2, width, height);
 
-        let buffer = &self.screen.lock().unwrap().buffer;
+        let screen = &self.screen.lock().unwrap();
+        let buffer = &screen.buffer;
         for y in 0..area.height as i32 {
             for x in 0..area.width as i32 {
                 let c = buffer.get_char((x, y + buffer.get_first_visible_line()));
@@ -216,7 +214,7 @@ impl Tui {
                 }
                 let fg = buffer.palette.get_color(fg).get_rgb();
                 let bg = buffer.palette.get_color(c.attribute.get_background()).get_rgb();
-                let mut s = Style::new().bg(Color::Rgb(bg.0, bg.1, bg.2)).fg(Color::Rgb(fg.0, fg.1, fg.2));
+                let mut s: Style = Style::new().bg(Color::Rgb(bg.0, bg.1, bg.2)).fg(Color::Rgb(fg.0, fg.1, fg.2));
                 if c.attribute.is_blinking() {
                     s = s.slow_blink();
                 }
@@ -224,13 +222,13 @@ impl Tui {
                 frame.buffer_mut().set_span(area.x + x as u16, area.y + y as u16, &span, 1);
             }
         }
+        let y = area.y as u16;
         area.y += area.height;
         area.height = 2;
 
         self.draw_statusbar(frame, board, area);
-
-        // let area = Rect::new(0, (frame.size().height - 1).min(24), frame.size().width.min(80), 1);
-        // frame.render_widget(self.status_bar(board), area);
+        let pos: icy_engine::Position = screen.caret.get_position();
+        frame.set_cursor(area.x + pos.x as u16, y + pos.y as u16 - buffer.get_first_visible_line() as u16);
     }
 
     fn draw_statusbar(&self, frame: &mut Frame, board: &IcyBoard, area: Rect) {
@@ -330,7 +328,7 @@ impl Tui {
                 let connection = "Local";
 
                 let line = Line::from(vec![
-                    Span::from(format!("{}", self.node)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
+                    Span::from(format!("{}", self.node + 1)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
                     Span::from(format!("({}) {} - {}", connection, user_name, city,)).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);
                 frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
@@ -383,14 +381,14 @@ impl Tui {
             }
             1 => {
                 let line = Line::from(vec![
-                    Span::from(format!("{}", self.node)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
+                    Span::from(format!("{}", self.node + 1)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
                     Span::from(format!(" Alt-> X=OS")).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);
                 frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
             }
             2 => {
                 let line = Line::from(vec![
-                    Span::from(format!("{}", self.node)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
+                    Span::from(format!("{}", self.node + 1)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
                     Span::from(format!("{} / {} mail: {}", bus_phone, home_phone, email)).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);
                 frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
@@ -402,7 +400,7 @@ impl Tui {
             }
             3 => {
                 let line = Line::from(vec![
-                    Span::from(format!("{}", self.node)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
+                    Span::from(format!("{}", self.node + 1)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
                     Span::from(format!(" Msgs Left: {:7}  Files U/L: {:7}  Bytes U/L: {:7}", msg_left, up, upbytes,))
                         .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);

@@ -1546,7 +1546,7 @@ pub async fn confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
             7 => Ok(VariableValue::new_bool(false)), // conference.echo_mail
             8 => Ok(VariableValue::new_int(conference.required_security.level() as i32)),
             9 => Ok(VariableValue::new_int(conference.add_conference_security)),
-            10 => Ok(VariableValue::new_int(conference.add_conference_time)),
+            10 => Ok(VariableValue::new_int(conference.add_conference_time as i32)),
             11 => Ok(VariableValue::new_int(0)),                // message blocks
             12 => Ok(VariableValue::new_string(String::new())), // message file
             13 => Ok(VariableValue::new_string(conference.users_menu.to_string_lossy().to_string())),

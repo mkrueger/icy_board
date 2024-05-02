@@ -50,11 +50,6 @@ impl<'a> PathTab<'a> {
                     .with_label_width(system_files_width),
             ),
             ConfigEntry::Item(
-                ListItem::new("log_file", "Log File".to_string(), ListValue::Path(lock.config.paths.log_file.clone()))
-                    .with_status("BBS Logfile")
-                    .with_label_width(system_files_width),
-            ),
-            ConfigEntry::Item(
                 ListItem::new(
                     "stats_file",
                     "Statistics File".to_string(),
@@ -322,7 +317,6 @@ impl<'a> PathTab<'a> {
             ListValue::Path(path) => match item.id.as_str() {
                 "conf_data" => icy_board.config.paths.conferences = path.clone(),
                 "home_dir" => icy_board.config.paths.home_dir = path.clone(),
-                "log_file" => icy_board.config.paths.log_file = path.clone(),
                 "stats_file" => icy_board.config.paths.statistics_file = path.clone(),
                 "icb_text" => icy_board.config.paths.icbtext = path.clone(),
                 "temp_files" => icy_board.config.paths.tmp_work_path = path.clone(),

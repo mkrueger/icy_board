@@ -173,10 +173,22 @@ pub struct UserStats {
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_64")]
+    pub today_num_downloads: u64,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_null_64")]
+    pub today_num_uploads: u64,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_null_64")]
     pub today_dnld_bytes: u64,
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_64")]
     pub today_upld_bytes: u64,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_null_64")]
+    pub total_doors_executed: u64,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -370,6 +382,22 @@ impl User {
         &self.name
     }
 
+    pub fn get_first_name(&self) -> String {
+        if let Some(idx) = self.name.find(' ') {
+            self.name[..idx].to_string()
+        } else {
+            self.name.clone()
+        }
+    }
+
+    pub fn get_last_name(&self) -> String {
+        if let Some(idx) = self.name.find(' ') {
+            self.name[idx + 1..].to_string()
+        } else {
+            String::new()
+        }
+    }
+
     fn import_pcb(u: &PcbUser) -> Self {
         let alias = if let Some(alias) = &u.inf.alias { alias.alias.clone() } else { String::new() };
         let verify = if let Some(verify) = &u.inf.verify {
@@ -558,6 +586,9 @@ impl User {
                 total_upld_bytes: u.user.ul_tot_upld_bytes,
                 today_dnld_bytes: u.user.daily_downloaded_bytes as u64,
                 today_upld_bytes: 0,
+                today_num_downloads: 0,
+                today_num_uploads: 0,
+                total_doors_executed: 0,
             },
         }
     }

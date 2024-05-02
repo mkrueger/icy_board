@@ -40,7 +40,6 @@ impl PcbBoardCommand {
             self.display_menu().await?;
             self.display_menu = false;
         }
-
         let command = self
             .state
             .input_field(
@@ -69,6 +68,7 @@ impl PcbBoardCommand {
         self.state
             .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFAFTER | display_flags::LFBEFORE)
             .await?;
+        self.state.session.tokens.clear();
         Ok(())
     }
 
@@ -87,7 +87,6 @@ impl PcbBoardCommand {
         if !self.check_sec(command, &action.security).await? {
             return Ok(());
         }
-
         match action.command_type {
             CommandType::RedisplayCommand => {
                 // !
@@ -257,6 +256,8 @@ impl PcbBoardCommand {
                 return Err(Box::new(IcyBoardError::UnknownAction(format!("{:?}", action.command_type))));
             }
         }
+        self.state.session.tokens.clear();
+
         Ok(())
     }
 

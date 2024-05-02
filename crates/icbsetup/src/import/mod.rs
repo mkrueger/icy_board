@@ -307,7 +307,6 @@ impl PCBoardImporter {
                 command_file,
                 statistics_file,
                 group_file,
-                log_file: PathBuf::from("output.log"),
 
                 trashcan_user: bad_users,
                 trashcan_email: tcan_email,

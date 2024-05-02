@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
-    executable::{PPEExpr, VariableType, VariableValue},
+    executable::{VariableType, VariableValue},
     tables::export_cp437_string,
     Res,
 };
@@ -198,7 +198,12 @@ impl UserDataValue for FileDirectory {
         Ok(())
     }
 
-    async fn call_function(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
+    async fn call_function(
+        &self,
+        vm: &mut crate::vm::VirtualMachine<'_>,
+        name: &unicase::Ascii<String>,
+        _arguments: &[VariableValue],
+    ) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
             let res = self.list_security.user_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
@@ -207,7 +212,7 @@ impl UserDataValue for FileDirectory {
         Err("Function not found".into())
     }
 
-    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<()> {
+    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
         log::error!("Invalid method call on FileDirectory ({})", name);
         Err("Function not found".into())
     }

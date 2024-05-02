@@ -21,9 +21,10 @@ pub struct ConnectionThreadData {
 pub fn start_update_thread(com: Box<dyn Connection>, screen: Arc<Mutex<Screen>>) -> (thread::JoinHandle<()>, mpsc::Sender<SendData>) {
     let (tx, rx) = mpsc::channel(32);
     (
-        thread::spawn(move || {
-            tokio::runtime::Builder::new_multi_thread()
-                .worker_threads(4)
+        std::thread::Builder::new()
+            .name("Terminal update".to_string())
+            .spawn(move || {
+                tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
                 .unwrap()
@@ -67,7 +68,8 @@ pub fn start_update_thread(com: Box<dyn Connection>, screen: Arc<Mutex<Screen>>)
                         };
                     }
                 });
-        }),
+            })
+            .unwrap(),
         tx,
     )
 }

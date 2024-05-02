@@ -98,8 +98,10 @@ impl Editor for DoorEditor {
                     description: "".to_string(),
                     password: "".to_string(),
                     securiy_level: RequiredSecurity::new(0),
+                    use_shell_execute: false,
                     door_type: DoorType::BBSlink,
                     path: "".to_string(),
+                    drop_file: Default::default(),
                 });
             }
             _ => {

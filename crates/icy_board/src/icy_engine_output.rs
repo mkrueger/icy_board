@@ -13,7 +13,7 @@ impl Screen {
         Screen { caret, buffer }
     }
 
-    pub fn print(&mut self, parser: &mut ansi::Parser, c: char) {
+    pub fn _print(&mut self, parser: &mut ansi::Parser, c: char) {
         let _ = parser.print_char(&mut self.buffer, 0, &mut self.caret, c);
     }
 }

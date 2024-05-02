@@ -78,30 +78,31 @@ fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Res<()> 
     }
 
     let config_file = file.with_extension("toml");
+
+    let log_file = config_file.with_extension("log");
+    fern::Dispatch::new()
+        // Perform allocation-free log formatting
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{} {} {}] {}",
+                Local::now().format("%Y-%m-%d %H:%M:%S"),
+                record.level(),
+                record.target(),
+                message
+            ))
+        })
+        // Add blanket level filter -
+        .level(log::LevelFilter::Info)
+        // - and per-module overrides
+        .level_for("hyper", log::LevelFilter::Info)
+        // Output to stdout, files, and other Dispatch configurations
+        .chain(fern::log_file(&log_file).unwrap())
+        // Apply globally
+        .apply()
+        .unwrap();
+
     match IcyBoard::load(&config_file) {
         Ok(icy_board) => {
-            let log_file = icy_board.resolve_file(&icy_board.config.paths.log_file);
-            fern::Dispatch::new()
-                // Perform allocation-free log formatting
-                .format(|out, message, record| {
-                    out.finish(format_args!(
-                        "[{} {} {}] {}",
-                        Local::now().format("%Y-%m-%d %H:%M:%S"),
-                        record.level(),
-                        record.target(),
-                        message
-                    ))
-                })
-                // Add blanket level filter -
-                .level(log::LevelFilter::Info)
-                // - and per-module overrides
-                .level_for("hyper", log::LevelFilter::Info)
-                // Output to stdout, files, and other Dispatch configurations
-                .chain(fern::log_file(&log_file).unwrap())
-                // Apply globally
-                .apply()
-                .unwrap();
-
             let mut bbs = Arc::new(Mutex::new(BBS::new(icy_board.config.board.num_nodes as usize)));
             let board = Arc::new(Mutex::new(icy_board));
             if arguments.localon || arguments.ppe.is_some() {
@@ -120,43 +121,50 @@ fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Res<()> 
                 if telnet_connection.is_enabled {
                     let bbs = bbs.clone();
                     let board = board.clone();
-                    std::thread::spawn(move || {
-                        tokio::runtime::Builder::new_multi_thread()
-                            .worker_threads(4)
-                            .enable_all()
-                            .build()
-                            .unwrap()
-                            .block_on(async {
-                                await_telnet_connections(telnet_connection, board, bbs).await;
+                    std::thread::Builder::new()
+                        .name("Telnet connect".to_string())
+                        .spawn(move || {
+                            tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+                                let _ = await_telnet_connections(telnet_connection, board, bbs).await;
                             });
-                    });
+                        })
+                        .unwrap();
                 }
 
                 let ssh_connection = board.lock().unwrap().config.login_server.ssh.clone();
                 if ssh_connection.is_enabled {
                     let bbs = bbs.clone();
                     let board = board.clone();
-                    std::thread::spawn(move || {
-                        let _ = await_ssh_connections(ssh_connection, board, bbs);
-                    });
+                    std::thread::Builder::new()
+                        .name("SSH connect".to_string())
+                        .spawn(move || {
+                            let _ = await_ssh_connections(ssh_connection, board, bbs);
+                        })
+                        .unwrap();
                 }
 
                 let websocket_connection = board.lock().unwrap().config.login_server.websocket.clone();
                 if websocket_connection.is_enabled {
                     let bbs = bbs.clone();
                     let board = board.clone();
-                    std::thread::spawn(move || {
-                        let _ = await_websocket_connections(websocket_connection, board, bbs);
-                    });
+                    std::thread::Builder::new()
+                        .name("Websocket connect".to_string())
+                        .spawn(move || {
+                            let _ = await_websocket_connections(websocket_connection, board, bbs);
+                        })
+                        .unwrap();
                 }
 
                 let secure_websocket_connection = board.lock().unwrap().config.login_server.secure_websocket.clone();
                 if secure_websocket_connection.is_enabled {
                     let bbs = bbs.clone();
                     let board = board.clone();
-                    std::thread::spawn(move || {
-                        let _ = await_securewebsocket_connections(secure_websocket_connection, board, bbs);
-                    });
+                    std::thread::Builder::new()
+                        .name("Secure Websocket connect".to_string())
+                        .spawn(move || {
+                            let _ = await_securewebsocket_connections(secure_websocket_connection, board, bbs);
+                        })
+                        .unwrap();
                 }
             }
 

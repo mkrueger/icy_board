@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
-    executable::{PPEExpr, VariableType, VariableValue},
+    executable::{GenericVariableData, VariableData, VariableType, VariableValue},
+    icy_board::{doors::Door, file_directory::FileDirectory},
     parser::{DOOR_ID, FILE_DIRECTORY_ID, MESSAGE_AREA_ID},
 };
 
@@ -16,7 +17,7 @@ use super::{
     commands::Command,
     doors::DoorList,
     file_directory::DirectoryList,
-    is_false, is_null_8, is_null_i32,
+    is_false, is_null_16, is_null_8, is_null_i32,
     message_area::{AreaList, MessageArea},
     pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader},
     security::RequiredSecurity,
@@ -73,8 +74,8 @@ pub struct Conference {
     pub add_conference_security: i32,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "is_null_i32")]
-    pub add_conference_time: i32,
+    #[serde(skip_serializing_if = "is_null_16")]
+    pub add_conference_time: u16,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
@@ -184,7 +185,7 @@ impl ConferenceBase {
                 private_msgs: c.private_msgs,
                 allow_aliases: d.allow_aliases,
                 add_conference_security: c.add_conference_security,
-                add_conference_time: c.add_conference_time,
+                add_conference_time: c.add_conference_time as u16,
                 users_menu: PathBuf::from(&c.users_menu),
                 sysop_menu: PathBuf::from(&c.sysop_menu),
                 news_file: PathBuf::from(&c.news_file),
@@ -305,14 +306,18 @@ impl UserDataValue for Conference {
         Ok(())
     }
 
-    async fn call_function(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
+    async fn call_function(
+        &self,
+        vm: &mut crate::vm::VirtualMachine<'_>,
+        name: &unicase::Ascii<String>,
+        arguments: &[VariableValue],
+    ) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
             let res = self.required_security.user_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
-        /*
         if *name == *GET_FILE_AREA {
-            let area = vm.eval_expr(&arguments[0]).await?.as_int();
+            let area = arguments[0].as_int();
             if let Some(res) = self.directories.get(area as usize) {
                 vm.user_data.push(Box::new((*res).clone()));
                 return Ok(VariableValue {
@@ -330,9 +335,8 @@ impl UserDataValue for Conference {
                 vtype: VariableType::UserData(FILE_DIRECTORY_ID as u8),
             });
         }
-
         if *name == *GET_MSG_AREA {
-            let area = vm.eval_expr(&arguments[0]).await?.as_int();
+            let area = arguments[0].as_int();
             if let Some(res) = self.areas.get(area as usize) {
                 vm.user_data.push(Box::new((*res).clone()));
                 return Ok(VariableValue {
@@ -352,7 +356,7 @@ impl UserDataValue for Conference {
         }
 
         if *name == *GET_DOOR {
-            let door = vm.eval_expr(&arguments[0]).await?.as_int();
+            let door = arguments[0].as_int();
             if let Some(res) = self.doors.get(door as usize) {
                 vm.user_data.push(Box::new((*res).clone()));
                 return Ok(VariableValue {
@@ -369,12 +373,12 @@ impl UserDataValue for Conference {
                 generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
                 vtype: VariableType::UserData(DOOR_ID as u8),
             });
-        }*/
+        }
         log::error!("Invalid function call on Conference ({})", name);
         Err("Function not found".into())
     }
 
-    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<()> {
+    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
         log::error!("Invalid method call on Conference ({})", name);
         Err("Function not found".into())
     }

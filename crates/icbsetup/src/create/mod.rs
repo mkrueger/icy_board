@@ -156,7 +156,6 @@ impl IcyBoardCreator {
         list.add_group("sysop", "System sysops", &vec!["SYSOP".to_string()]);
         list.add_group("user", "Users", &vec![]);
         list.save(&self.destination.join(&config.paths.group_file))?;
-        config.paths.log_file = PathBuf::from("output.log");
 
         self.logger.start_action("Create default user (SYSOP)".to_string());
 

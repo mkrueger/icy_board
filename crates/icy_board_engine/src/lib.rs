@@ -13,6 +13,8 @@
 
 use std::error::Error;
 
+use semver::Version;
+
 pub mod icy_board;
 pub mod vm;
 
@@ -31,3 +33,7 @@ pub mod tables;
 pub mod tests;
 */
 pub type Res<T> = Result<T, Box<dyn Error + Send + Sync>>;
+
+lazy_static::lazy_static! {
+    static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
+}

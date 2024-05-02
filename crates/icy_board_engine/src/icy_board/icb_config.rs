@@ -296,9 +296,6 @@ pub struct ConfigPaths {
     /// home directory for user files
     pub home_dir: PathBuf,
 
-    /// log file
-    pub log_file: PathBuf,
-
     pub logon_survey: PathBuf,
     pub logon_answer: PathBuf,
 
@@ -496,7 +493,6 @@ impl IcbConfig {
                 command_file: PathBuf::new(),
                 statistics_file: PathBuf::new(),
                 group_file: PathBuf::new(),
-                log_file: PathBuf::from("output.log"),
 
                 logon_survey: PathBuf::new(),
                 logon_answer: PathBuf::new(),

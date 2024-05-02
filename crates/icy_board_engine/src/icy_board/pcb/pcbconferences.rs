@@ -270,7 +270,7 @@ pub struct PcbConferenceHeader {
     pub private_msgs: bool,
     pub echo_mail: bool,
     pub add_conference_security: i32,
-    pub add_conference_time: i32,
+    pub add_conference_time: u16,
     pub message_blocks: i32,
     pub message_file: String,
     pub users_menu: String,
@@ -317,7 +317,7 @@ impl PcbConferenceHeader {
         ret.echo_mail = read_bool(reader, encoding)?;
 
         ret.add_conference_security = read_int(reader, encoding)?;
-        ret.add_conference_time = read_int(reader, encoding)?;
+        ret.add_conference_time = read_int(reader, encoding)? as u16;
         ret.message_blocks = read_int(reader, encoding)?;
 
         ret.message_file = read_line(reader, encoding)?;
@@ -368,7 +368,7 @@ impl PcbConferenceHeader {
         append_bool(&mut res, encoding, self.echo_mail);
 
         append_int(&mut res, encoding, self.add_conference_security);
-        append_int(&mut res, encoding, self.add_conference_time);
+        append_int(&mut res, encoding, self.add_conference_time as i32);
         append_int(&mut res, encoding, self.message_blocks);
 
         append_line(&mut res, encoding, &self.message_file);

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
-    executable::{PPEExpr, VariableType, VariableValue},
+    executable::{VariableType, VariableValue},
 };
 
 use super::{security::RequiredSecurity, IcyBoardSerializer};
@@ -93,7 +93,12 @@ impl UserDataValue for MessageArea {
         Ok(())
     }
 
-    async fn call_function(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<VariableValue> {
+    async fn call_function(
+        &self,
+        vm: &mut crate::vm::VirtualMachine<'_>,
+        name: &unicase::Ascii<String>,
+        _arguments: &[VariableValue],
+    ) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
             let res = self.req_level_to_list.user_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
@@ -101,7 +106,7 @@ impl UserDataValue for MessageArea {
         log::error!("Invalid function call on MessageArea ({})", name);
         Err("Function not found".into())
     }
-    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[PPEExpr]) -> crate::Res<()> {
+    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
         log::error!("Invalid method call on MessageArea ({})", name);
         Err("Function not found".into())
     }

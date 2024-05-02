@@ -186,6 +186,7 @@ impl UserTypeRegistry {
         reg.register::<MessageArea>();
         reg.register::<FileDirectory>();
         reg.register::<Door>();
+
         reg
     }
 

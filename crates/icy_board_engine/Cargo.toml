@@ -18,6 +18,7 @@ crossterm = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
+semver = { workspace = true }
 
 unicase = { workspace = true }
 rand = { workspace = true }
