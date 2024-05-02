@@ -43,14 +43,14 @@ pub enum DropFile {
     Door32Sys,
     DorInfo,
     CallInfo,
+    DoorFileSR,
+    CurruserBBS,
     // currently unsupported (on request)
 
     // EXITINFO.BBS  QuickBBS (write/read)
     // CHAIN.TXT     WWIV (write-only)
     // SFDOORS.DAT SpitFire (write-only)
     // TRIBBS.SYS TriBBS (write-only)
-    // DOORFILE.SR 		Solar Realms (write-only)
-    // CURRUSER.BBS RyBBS
     // USERINFO.DAT WildCat!
     // JUMPER.DAT WildCat! 2AM BBS
     // INFO.BBS  Phoenix BBS
@@ -80,6 +80,9 @@ impl Door {
             DropFile::Door32Sys => create_door32_sys(state, path),
             DropFile::DorInfo => create_dorinfo(state, path, 1),
             DropFile::CallInfo => create_callinfo_bbs(state, path, door_number),
+            DropFile::DoorFileSR => create_doorfile_sr(state, path, door_number),
+            DropFile::CurruserBBS => create_curruser_bbs(state, path, door_number),
+
             _ => {
                 log::error!("drop file type currently {:?} unsupported", self.drop_file);
                 Err("drop file unsupported".into())
@@ -227,8 +230,8 @@ fn create_door_sys(state: &super::state::IcyBoardState, path: &std::path::Path) 
     contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.total_doors_executed)); // Number of files downloaded today
     contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.messages_left)); // Total number of messages posted
 
-    let path = path.join("DOOR32.SYS");
-    log::info!("create door32.sys: {}", path.display());
+    let path = path.join("DOOR.SYS");
+    log::info!("create DOOR.SYS: {}", path.display());
     fs::write(path, contents)?;
     Ok(())
 }
@@ -347,6 +350,66 @@ fn create_callinfo_bbs(state: &super::state::IcyBoardState, path: &std::path::Pa
 
         let path = path.join("CALLINFO.BBS");
         log::info!("create callinfo.bbs: {}", path.display());
+        fs::write(path, contents)?;
+    } else {
+        return Err("Board not found".into());
+    }
+    Ok(())
+}
+
+fn create_doorfile_sr(state: &super::state::IcyBoardState, path: &std::path::Path, door_number: usize) -> Res<()> {
+    let mut contents = String::new();
+    if let Ok(board) = state.board.lock() {
+        contents.push_str(&format!("{}\r\n", state.session.get_username_or_alias())); // Complete name or handle of user
+
+        let emulation = match state.session.disp_options.grapics_mode {
+            super::state::GraphicsMode::Ctty => "0",
+            _ => "1",
+        };
+        contents.push_str(&format!("{}\r\n", emulation)); // ANSI status:  1 = yes, 0 = no, -1 = don't know
+        contents.push_str("1\r\n"); // IBM Graphic characters:  1 = yes, 0 = no, -1 = unknown
+        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().city_or_state)); // Calling From
+        contents.push_str(&format!("{}\r\n", state.session.page_len)); // Page length of screen, in lines.  Assume 25 if unknown
+        contents.push_str("38400\r\n"); // Baud Rate
+        contents.push_str("0\r\n"); // Com Port:  1, 2, 3, or 4; 0 if local.
+        contents.push_str("-1\r\n"); // Time Limit:  (in minutes); -1 if unknown.
+        contents.push_str(&format!("{}\r\n", state.session.user_name)); // Real name (the same as line 1 if not known)
+
+        let path = path.join("DOORFILE.SR");
+        log::info!("create DOORFILE.SR: {}", path.display());
+        fs::write(path, contents)?;
+    } else {
+        return Err("Board not found".into());
+    }
+    Ok(())
+}
+
+fn create_curruser_bbs(state: &super::state::IcyBoardState, path: &std::path::Path, door_number: usize) -> Res<()> {
+    let mut contents = String::new();
+    if let Ok(board) = state.board.lock() {
+        contents.push_str(&format!("{}\r\n", state.session.user_name));
+        contents.push_str(&format!("{}\r\n", state.session.cur_security));
+        contents.push_str(&format!("{}\r\n", state.session.cur_user));
+        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().home_voice_phone));
+        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().city_or_state));
+        contents.push_str("1\r\n");
+        contents.push_str("38400\r\n"); // Baud Rate
+        contents.push_str("N\r\n");
+        contents.push_str("8\r\n");
+        contents.push_str("1\r\n");
+        contents.push_str("\r\n");
+        contents.push_str("DOORM.MNU\r\n");
+        contents.push_str("999\r\n");
+
+        let emulation = match state.session.disp_options.grapics_mode {
+            super::state::GraphicsMode::Ctty => "NONE",
+            super::state::GraphicsMode::Ansi => "IBM",
+            _ => "ANSI",
+        };
+        contents.push_str(&format!("{}\r\n", emulation));
+
+        let path = path.join("CURRUSER.BBS");
+        log::info!("create CURRUSER.BBS: {}", path.display());
         fs::write(path, contents)?;
     } else {
         return Err("Board not found".into());

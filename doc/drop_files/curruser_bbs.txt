@@ -1,0 +1,14 @@
+JOHN DOE     User Name
+20           User Security
+1            User Record number (begins with 0)
+555-444-333  Telephone Number
+City         Location
+1            COM PORT
+19200        BPS
+N            Parity
+8            Data Bits
+1            Stop Bits
+             empty 
+SYSOPM.MNU   Current Menu
+44           TIME LEFT in mins
+ANSI         GFX MODE "ANSI", "IBM" (for ascii) or "NONE"
