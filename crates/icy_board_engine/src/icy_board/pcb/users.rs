@@ -68,9 +68,10 @@ pub struct PcbUserRecord {
 }
 
 impl PcbUserRecord {
+    pub const RECORD_SIZE: u64 = 0x190;
+
     /// # Errors
     pub fn read_users(path: &Path) -> Res<Vec<PcbUserRecord>> {
-        const _RECORD_SIZE: u64 = 0x190;
         let mut users = Vec::new();
 
         let data = fs::read(path)?;
@@ -101,7 +102,7 @@ impl PcbUserRecord {
 
             let packet_flags = data[2];
 
-            let is_dirty = (packet_flags & (1 << 0)) != 0;
+            let is_dirty: bool = (packet_flags & (1 << 0)) != 0;
             let msg_clear = (packet_flags & (1 << 1)) != 0;
             let has_mail = (packet_flags & (1 << 2)) != 0;
             let dont_ask_fse = (packet_flags & (1 << 3)) != 0;

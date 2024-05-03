@@ -29,15 +29,15 @@ impl Default for SupportedLanguages {
         Self {
             // see https://docs.rs/chrono/latest/chrono/format/strftime
             date_formats: vec![
-                ("MM/DD/YY".to_string(), "%m/%d/%C".to_string()),
-                ("DD/MM/YY".to_string(), "%d/%m/%C".to_string()),
-                ("YY/MM/DD".to_string(), "%C/%m/%d".to_string()),
-                ("MM.DD.YY".to_string(), "%m.%d.%C".to_string()),
-                ("DD.MM.YY".to_string(), "%d.%m.%C".to_string()),
-                ("YY.MM.DD".to_string(), "%C.%m.%d".to_string()),
-                ("MM-DD-YY".to_string(), "%m-%d-%C".to_string()),
-                ("DD-MM-YY".to_string(), "%d-%m-%C".to_string()),
-                ("YY-MM-DD".to_string(), "%C-%m-%d".to_string()),
+                ("MM/DD/YY".to_string(), "%m/%d/%y".to_string()),
+                ("DD/MM/YY".to_string(), "%d/%m/%y".to_string()),
+                ("YY/MM/DD".to_string(), "%y/%m/%d".to_string()),
+                ("MM.DD.YY".to_string(), "%m.%d.%y".to_string()),
+                ("DD.MM.YY".to_string(), "%d.%m.%y".to_string()),
+                ("YY.MM.DD".to_string(), "%y.%m.%d".to_string()),
+                ("MM-DD-YY".to_string(), "%m-%d-%y".to_string()),
+                ("DD-MM-YY".to_string(), "%d-%m-%y".to_string()),
+                ("YY-MM-DD".to_string(), "%y-%m-%d".to_string()),
             ],
             languages: Default::default(),
         }

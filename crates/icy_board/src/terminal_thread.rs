@@ -80,7 +80,7 @@ async fn handle_receive(c: &mut ConnectionThreadData, data: SendData) -> Res<()>
             c.com.send(&buf).await?;
         }
 
-        SendData::Disconnect => {
+        SendData::_Disconnect => {
             c.com.shutdown().await?;
         }
     }
@@ -91,5 +91,5 @@ async fn handle_receive(c: &mut ConnectionThreadData, data: SendData) -> Res<()>
 #[derive(Debug)]
 pub enum SendData {
     Data(Vec<u8>),
-    Disconnect,
+    _Disconnect,
 }

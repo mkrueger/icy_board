@@ -193,7 +193,7 @@ impl<'a> FileList<'a> {
             }
 
             cmd.state.set_color(TerminalTarget::Both, colors.file_date.clone()).await?;
-            cmd.state.print(TerminalTarget::Both, &format!("{}", date.format("%m/%d/%C"))).await?;
+            cmd.state.print(TerminalTarget::Both, &format!("{}", date.format("%m/%d/%y"))).await?;
             if false {
                 cmd.state.set_color(TerminalTarget::Both, colors.file_new_file.clone()).await?;
                 cmd.state.print(TerminalTarget::Both, "*").await?;

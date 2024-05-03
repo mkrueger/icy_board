@@ -367,6 +367,8 @@ pub struct BoardOptions {
 
     // disable colors
     pub non_graphics: bool,
+
+    pub give_user_password_to_doors: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
@@ -413,7 +415,7 @@ pub struct IcbConfig {
     pub user_password_policy: UserPasswordPolicy,
 }
 
-pub const DEFAULT_PCBOARD_DATE_FORMAT: &str = "%m/%d/%C";
+pub const DEFAULT_PCBOARD_DATE_FORMAT: &str = "%m/%d/%y";
 
 impl IcbConfig {
     pub fn new() -> Self {
@@ -539,6 +541,7 @@ impl IcbConfig {
                 non_graphics: false,
                 keyboard_timeout: 5,
                 upload_descr_lines: 20,
+                give_user_password_to_doors: false,
             },
         }
     }

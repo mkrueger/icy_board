@@ -1,6 +1,6 @@
 use std::{process::Stdio, time::Duration};
 
-use crate::{menu_runner::PcbBoardCommand, Res, VERSION};
+use crate::{menu_runner::PcbBoardCommand, Res};
 
 use icy_board_engine::icy_board::{
     commands::Command,

@@ -1,3 +1,50 @@
+use std::fs;
+
+use crate::{
+    icy_board::{
+        doors::DOOR_BPS_RATE,
+        state::{GraphicsMode, IcyBoardState},
+    },
+    Res,
+};
+
+/// Mystic BBS door32.sys format
+pub fn create_door32_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
+    let mut contents = String::new();
+    contents.push_str("0\r\n"); // Line 1 : Comm type (0=local, 1=serial, 2=telnet)
+    contents.push_str("0\r\n"); // Line 2 : Comm or socket handle
+    contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE)); // Line 3 : Baud rate
+
+    contents.push_str(&format!("Icy Board {}\r\n", crate::VERSION.to_string())); // Line 4 : BBSID (software name and version)
+    contents.push_str(&format!("{}\r\n", state.session.cur_user + 1)); // Line 5 : User record position (1-based)
+    contents.push_str(&format!("{}\r\n", state.session.user_name)); // Line 6 : User's real name
+    contents.push_str(&format!("{}\r\n", state.session.alias_name)); // Line 7 : User's handle/alias
+    contents.push_str(&format!("{}\r\n", state.session.cur_security)); // Line 8 : User's security level
+    contents.push_str(&format!("{}\r\n", state.session.minutes_left())); // Line 9 : User's time left (in minutes)
+
+    let emulation = match state.session.disp_options.grapics_mode {
+        GraphicsMode::Ctty => 0,
+        GraphicsMode::Ansi => 1,
+        GraphicsMode::Graphics => 4,
+        GraphicsMode::Avatar => 2,
+        GraphicsMode::Rip => 3,
+    };
+    contents.push_str(&format!("{}\r\n", emulation)); // Line 10: Emulation *See Below
+                                                      // 0 = Ascii
+                                                      // 1 = Ansi
+                                                      // 2 = Avatar
+                                                      // 3 = RIP
+                                                      // 4 = Max Graphics
+
+    contents.push_str(&format!("{}\r\n", state.node + 1)); // Line 11: Current node number
+
+    // Lower case - seee notes below
+    let path = path.join("door32.sys");
+    log::info!("create door32.sys: {}", path.display());
+    fs::write(path, contents)?;
+    Ok(())
+}
+/*
 .--------------------------------------------------------------------------.
  | DOOR32 Revision 1 Specifications                 Updated: Feb 23rd, 2001 |
  `--------------------------------------------------------------------------'
@@ -81,7 +128,7 @@
   with case sensitive file systems:
 
 [cut here]-------------------------------------------------------------------
-                                     
+
 0                            Line 1 : Comm type (0=local, 1=serial, 2=telnet)
 0                            Line 2 : Comm or socket handle
 38400                        Line 3 : Baud rate
@@ -118,4 +165,6 @@ g00r00                       Line 7 : User's handle/alias
 
  You can e-mail mysticbbs@geocities.com for any questions or suggestions
  relating to Door32 or post a message in the FidoNet DOORGAMES echo
-                                     
+
+
+*/

@@ -35,8 +35,8 @@ impl PcbBoardCommand {
         };
         if !conf_number.is_empty() {
             let mut joined = false;
-            if let Ok(number) = conf_number.parse::<i32>() {
-                if 0 <= number && (number as usize) <= self.state.board.lock().unwrap().conferences.len() {
+            if let Ok(number) = conf_number.parse::<u16>() {
+                if (number as usize) <= self.state.board.lock().unwrap().conferences.len() {
                     self.state.join_conference(number);
                     self.state.session.op_text = format!(
                         "{} ({})",

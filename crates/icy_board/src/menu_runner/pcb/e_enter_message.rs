@@ -64,7 +64,7 @@ impl PcbBoardCommand {
         };
 
         self.write_message(
-            self.state.session.current_conference_number,
+            self.state.session.current_conference_number as i32,
             area as i32,
             &to,
             &subject,

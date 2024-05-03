@@ -548,7 +548,7 @@ pub async fn mask_ascii(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<
     Ok(VariableValue::new_string(MASK_ASCII.to_string()))
 }
 pub async fn curconf(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.session.current_conference_number))
+    Ok(VariableValue::new_int(vm.icy_board_state.session.current_conference_number as i32))
 }
 pub async fn pcbdat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_string(vm.icy_board_state.get_pcbdat()?))

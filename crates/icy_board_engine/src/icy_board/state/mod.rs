@@ -123,7 +123,7 @@ impl TransferStatistics {
 #[derive(Clone)]
 pub struct Session {
     pub disp_options: DisplayOptions,
-    pub current_conference_number: i32,
+    pub current_conference_number: u16,
     pub current_message_area: usize,
     pub current_file_directory: usize,
     pub current_conference: Conference,
@@ -186,6 +186,18 @@ pub struct Session {
 
     // Used in @X00 macros to save color, to restore it with @XFF
     pub saved_color: IcbColor,
+
+    pub is_emsi_session: bool,
+    pub emsi: EmsiData,
+}
+
+#[derive(Clone, Default)]
+pub struct EmsiData {
+    pub crtdef: String,
+    pub capabilities: String,
+    pub protocols: String,
+    pub requests: String,
+    pub software: String,
 }
 
 impl Session {
@@ -231,6 +243,8 @@ impl Session {
 
             sysop_name: "SYSOP".to_string(),
             flagged_files: HashSet::new(),
+            is_emsi_session: false,
+            emsi: EmsiData::default(),
         }
     }
 
@@ -273,6 +287,13 @@ impl Session {
     pub fn flag_for_download(&mut self, file: PathBuf) {
         self.flagged_files.insert(file);
     }
+
+    pub fn minutes_left(&self) -> i32 {
+        self.time_limit
+    }
+    pub fn seconds_left(&self) -> i32 {
+        self.time_limit * 60
+    }
 }
 
 impl Default for Session {
@@ -305,7 +326,7 @@ pub enum UserActivity {
 pub struct NodeState {
     pub connections: Arc<Mutex<Vec<Box<ChannelConnection>>>>,
     pub cur_user: i32,
-    pub cur_conference: i32,
+    pub cur_conference: u16,
     pub graphics_mode: GraphicsMode,
     pub user_activity: UserActivity,
     pub enabled_chat: bool,
@@ -500,8 +521,8 @@ impl IcyBoardState {
         }
     }
 
-    pub fn join_conference(&mut self, conference: i32) {
-        if conference >= 0 && conference < self.board.lock().unwrap().conferences.len() as i32 {
+    pub fn join_conference(&mut self, conference: u16) {
+        if (conference as usize) < self.board.lock().unwrap().conferences.len() {
             self.session.current_conference_number = conference;
             if let Ok(board) = self.board.lock() {
                 self.session.current_conference = board.conferences[conference as usize].clone();
@@ -676,7 +697,7 @@ impl IcyBoardState {
             let mut user = board.users[user_number].clone();
             user.stats.last_on = Utc::now();
             user.stats.num_times_on += 1;
-            let conf = user.last_conference as i32;
+            let conf = user.last_conference;
             board.statistics.add_caller(user.get_name().clone());
             if !user.date_format.is_empty() {
                 self.session.date_format = user.date_format.clone();
@@ -801,6 +822,17 @@ impl IcyBoardState {
     pub fn set_grapics_mode(&mut self, mode: GraphicsMode) {
         self.node_state.lock().unwrap()[self.node].as_mut().unwrap().graphics_mode = mode;
         self.session.disp_options.grapics_mode = mode;
+    }
+
+    /// Gives back the user password, or 'SECRET' if the user password should not be given to doors.
+    pub fn door_user_password(&self) -> String {
+        if self.board.lock().unwrap().config.options.give_user_password_to_doors {
+            if let Some(user) = &self.current_user {
+                return user.password.password.to_string();
+            }
+        }
+
+        "SECRET".to_string()
     }
 }
 

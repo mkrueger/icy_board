@@ -106,15 +106,15 @@ impl GeneralTab {
                     ListValue::ValueList(
                         icy_board.config.board.date_format.clone(),
                         vec![
-                            Value::new("MM/DD/YY", "%m/%d/%C"),
-                            Value::new("DD/MM/YY", "%d/%m/%C"),
-                            Value::new("YY/MM/DD", "%C/%m/%d"),
-                            Value::new("MM.DD.YY", "%m.%d.%C"),
-                            Value::new("DD.MM.YY", "%d.%m.%C"),
-                            Value::new("YY.MM.DD", "%C.%m.%d"),
-                            Value::new("MM-DD-YY", "%m-%d-%C"),
-                            Value::new("DD-MM-YY", "%d-%m-%C"),
-                            Value::new("YY-MM-DD", "%C-%m-%d"),
+                            Value::new("MM/DD/YY", "%m/%d/%y"),
+                            Value::new("DD/MM/YY", "%d/%m/%y"),
+                            Value::new("YY/MM/DD", "%y/%m/%d"),
+                            Value::new("MM.DD.YY", "%m.%d.%y"),
+                            Value::new("DD.MM.YY", "%d.%m.%y"),
+                            Value::new("YY.MM.DD", "%y.%m.%d"),
+                            Value::new("MM-DD-YY", "%m-%d-%y"),
+                            Value::new("DD-MM-YY", "%d-%m-%y"),
+                            Value::new("YY-MM-DD", "%y-%m-%d"),
                         ],
                     ),
                 )
@@ -493,6 +493,11 @@ impl GeneralTab {
                 .with_status("Disable Colors.")
                 .with_label_width(file_transfer_width),
             ),
+            ConfigEntry::Item(ListItem::new(
+                "give_user_password_to_doors",
+                "Doors get Plaintext Passwords".to_string(),
+                ListValue::Bool(icy_board.config.options.give_user_password_to_doors),
+            )),
         ];
 
         Self {
@@ -576,6 +581,7 @@ impl GeneralTab {
                 "is_closed_board" => icy_board.config.options.is_closed_board = *b,
                 "display_userinfo_at_login" => icy_board.config.options.display_userinfo_at_login = *b,
                 "non_graphics" => icy_board.config.options.non_graphics = *b,
+                "give_user_password_to_doors" => icy_board.config.options.give_user_password_to_doors = *b,
                 _ => panic!("Unknown id: {}", item.id),
             },
             ListValue::Color(c) => match item.id.as_str() {
