@@ -106,6 +106,11 @@ impl IcbDate {
         self.year
     }
 
+    /// Number of days from sunday
+    pub fn get_day_of_week(&self) -> u8 {
+        self.to_utc_date_time().weekday().num_days_from_sunday() as u8
+    }
+
     pub fn is_empty(&self) -> bool {
         self.month == 1 && self.day == 1 && self.year == 0
     }

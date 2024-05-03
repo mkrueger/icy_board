@@ -2,6 +2,10 @@ use std::{fs, thread, time::Duration};
 
 use crate::{
     executable::{PPEExpr, VariableType, VariableValue},
+    icy_board::{
+        icb_config::IcbColor,
+        state::functions::{display_flags, MASK_ALNUM},
+    },
     Res,
 };
 use codepages::tables::CP437_TO_UNICODE;
@@ -70,11 +74,6 @@ pub async fn dispfile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     let file_name = vm.resolve_file(&file_name);
     vm.icy_board_state.display_file(&file_name).await?;
     Ok(())
-}
-
-pub async fn input(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
 }
 
 pub async fn fcreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -231,6 +230,25 @@ pub async fn log(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 const TXT_STOPCHAR: char = '_';
+
+pub async fn input(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let prompt = vm.eval_expr(&args[0]).await?.as_string();
+    let color = IcbColor::Dos(14);
+    let output = vm
+        .icy_board_state
+        .input_string(
+            color,
+            prompt,
+            60,
+            &MASK_ALNUM,
+            "",
+            None,
+            display_flags::FIELDLEN | display_flags::GUIDE | display_flags::HIGHASCII,
+        )
+        .await?;
+    vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
+    Ok(())
+}
 
 pub async fn inputstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let prompt = vm.eval_expr(&args[0]).await?.as_string();
@@ -663,8 +681,10 @@ pub async fn restscrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     panic!("TODO")
 }
 pub async fn sound(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    // log::error!("not implemented statement!");
+    // panic!("TODO")
+    log::warn!("Sound is not supported");
+    Ok(())
 }
 pub async fn chat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");

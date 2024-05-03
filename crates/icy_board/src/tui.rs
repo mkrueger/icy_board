@@ -78,14 +78,12 @@ impl Tui {
             handle: bbs.lock().unwrap().get_open_connections().clone(),
         }
     }
-    /*
     pub fn sysop_mode(bbs: &Arc<Mutex<BBS>>, node: usize) -> Res<Self> {
-        let ui_session = Arc::new(Mutex::new(Session::new()));
-        let (_ui_connection, connection) = ChannelConnection::create_pair();
+        let (ui_connection, connection) = ChannelConnection::create_pair();
         if let Ok(bbs) = &mut bbs.lock() {
-            /* let Some(node) = bbs.get_node(node) else {
-                return Err(Box::new(IcyBoardError::Error("Node not found".to_string())));
-            };*/
+            log::info!("Creating sysop mode");
+            let node_state = bbs.open_connections.clone();
+
             bbs.get_open_connections().lock().unwrap()[node]
                 .as_mut()
                 .unwrap()
@@ -94,23 +92,28 @@ impl Tui {
                 .unwrap()
                 .push(Box::new(connection));
 
+            let screen = Arc::new(Mutex::new(Screen::new()));
+            log::info!("Run terminal thread");
+            let (_handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone());
+
             Ok(Self {
-                screen: Arc::new(Mutex::new(Screen::new())),
-                session: ui_session,
-                //   connection: ui_connection,
+                screen,
+                tx,
                 status_bar: 0,
                 node,
+                node_state,
                 handle: bbs.get_open_connections().clone(),
             })
         } else {
             return Err(Box::new(IcyBoardError::Error("Node not found".to_string())));
         }
-    }*/
+    }
 
     pub fn run(&mut self, board: &Arc<Mutex<IcyBoard>>) -> Res<()> {
         let mut terminal = init_terminal()?;
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(20);
+        terminal.clear()?;
         //   let mut redraw = true;
         loop {
             if self.handle.lock().unwrap()[self.node].as_ref().unwrap().handle.as_ref().unwrap().is_finished() {

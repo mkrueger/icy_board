@@ -458,8 +458,8 @@ pub async fn day(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     Ok(VariableValue::new_int(IcbDate::from_pcboard(var as u32).get_day() as i32))
 }
 pub async fn dow(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let var = vm.eval_expr(&args[0]).await?.as_int();
+    Ok(VariableValue::new_int(IcbDate::from_pcboard(var as u32).get_day_of_week() as i32))
 }
 pub async fn hour(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let var = vm.eval_expr(&args[0]).await?.as_int();
