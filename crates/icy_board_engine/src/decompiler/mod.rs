@@ -101,9 +101,7 @@ impl Decompiler {
 
         self.generate_function_declarations(&mut ast);
         self.generate_variable_declarations(&mut ast);
-        for k in self.label_lookup.keys() {
-            println!("{:04X} -> {:?}", k, self.get_label_name(*k));
-        }
+
         let mut statements = Vec::new();
         while self.cur_ptr < self.script.statements.len() {
             let statement = &self.script.statements[self.cur_ptr];

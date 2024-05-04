@@ -122,9 +122,9 @@ impl Tui {
             //if redraw
             {
                 //  redraw = false;
-                let board = board.clone();
+                let status_bar_info = StatusBarInfo::get_info(board, &self.node_state, self.node).await;
                 let _ = terminal.draw(|frame| {
-                    self.ui(frame, board);
+                    self.ui(frame, status_bar_info);
                 });
             }
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
@@ -191,7 +191,7 @@ impl Tui {
         }
     }
 
-    fn ui(&self, frame: &mut Frame, board: Arc<tokio::sync::Mutex<IcyBoard>>) {
+    fn ui(&self, frame: &mut Frame, status_bar_info: StatusBarInfo) {
         let width = frame.size().width.min(80);
         let height = frame.size().height.min(24);
 
@@ -220,69 +220,12 @@ impl Tui {
         area.y += area.height;
         area.height = 2;
 
-        self.draw_statusbar(frame, board, area);
+        self.draw_statusbar(frame, area, status_bar_info);
         let pos: icy_engine::Position = screen.caret.get_position();
         frame.set_cursor(area.x + pos.x as u16, y + pos.y as u16 - buffer.get_first_visible_line() as u16);
     }
 
-    fn draw_statusbar(&self, frame: &mut Frame, board: Arc<tokio::sync::Mutex<IcyBoard>>, area: Rect) {
-        let mut user_name = String::new();
-        let mut city = String::new();
-        let mut current_conf = 0;
-        let mut cur_security = 0;
-        let mut times_on = 0;
-        let mut up = 0;
-        let mut dn = 0;
-        let mut upbytes = 0;
-        let mut dnbytes = 0;
-        let mut graphics_mode = GraphicsMode::Ansi;
-        let mut last_on = Utc::now();
-        let mut logon_time = Utc::now();
-        let mut msg_left = 0;
-        let mut msg_read = 0;
-        let mut today_ul = 0;
-        let mut today_dn = 0;
-        let mut bus_phone = String::new();
-        let mut home_phone = String::new();
-        let mut email = String::new();
-        let mut cmt1 = String::new();
-        let mut cmt2 = String::new();
-        let mut date_format = String::new();
-
-        if let Some(node_state) = &self.node_state.lock().unwrap()[self.node as usize] {
-            current_conf = node_state.cur_conference;
-            graphics_mode = node_state.graphics_mode;
-            logon_time = node_state.logon_time;
-            if node_state.cur_user >= 0 { /*
-                 tokio::runtime::Builder::new_multi_thread()
-                 .enable_all()
-                 .build()
-                 .unwrap()
-                 .block_on(async {
-                     let board = board.lock().await;
-                     cur_security = board.users[node_state.cur_user as usize].security_level;
-                     user_name = board.users[node_state.cur_user as usize].get_name().clone();
-                     city = board.users[node_state.cur_user as usize].city_or_state.clone();
-                     times_on = board.users[node_state.cur_user as usize].stats.num_times_on;
-                     upbytes = board.users[node_state.cur_user as usize].stats.total_upld_bytes;
-                     up = board.users[node_state.cur_user as usize].stats.num_uploads;
-                     dnbytes = board.users[node_state.cur_user as usize].stats.total_dnld_bytes;
-                     dn = board.users[node_state.cur_user as usize].stats.num_downloads;
-                     today_dn = board.users[node_state.cur_user as usize].stats.today_dnld_bytes;
-                     today_ul = board.users[node_state.cur_user as usize].stats.total_dnld_bytes;
-                     last_on = board.users[node_state.cur_user as usize].stats.last_on;
-                     msg_left = board.users[node_state.cur_user as usize].stats.messages_left;
-                     msg_read = board.users[node_state.cur_user as usize].stats.messages_read;
-                     bus_phone = board.users[node_state.cur_user as usize].bus_data_phone.clone();
-                     home_phone = board.users[node_state.cur_user as usize].home_voice_phone.clone();
-                     email = board.users[node_state.cur_user as usize].email.clone();
-                     cmt1 = board.users[node_state.cur_user as usize].user_comment.clone();
-                     cmt2 = board.users[node_state.cur_user as usize].sysop_comment.clone();
-                     date_format = board.config.board.date_format.clone();
-                 });*/
-            }
-        }
-
+    fn draw_statusbar(&self, frame: &mut Frame, area: Rect, status_bar_info: StatusBarInfo) {
         frame.buffer_mut().set_style(area, Style::new().bg(DOS_LIGHT_GRAY));
 
         match self.status_bar {
@@ -291,11 +234,12 @@ impl Tui {
 
                 let line = Line::from(vec![
                     Span::from(format!("{}", self.node + 1)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
-                    Span::from(format!("({}) {} - {}", connection, user_name, city,)).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
+                    Span::from(format!("({}) {} - {}", connection, status_bar_info.user_name, status_bar_info.city,))
+                        .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);
                 frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
 
-                let graphics = match graphics_mode {
+                let graphics = match status_bar_info.graphics_mode {
                     GraphicsMode::Ctty => "N",
                     GraphicsMode::Ansi => "A",
                     GraphicsMode::Graphics => "G",
@@ -306,12 +250,12 @@ impl Tui {
                 let line = Line::from(vec![Span::from(format!(
                     "{} ({})  Sec({})={}  Times On={}  Up:Dn={}:{}",
                     graphics,
-                    last_on.format(&date_format),
-                    current_conf,
-                    cur_security,
-                    times_on,
-                    up,
-                    dn
+                    status_bar_info.last_on.format(&status_bar_info.date_format),
+                    status_bar_info.current_conf,
+                    status_bar_info.cur_security,
+                    status_bar_info.times_on,
+                    status_bar_info.up,
+                    status_bar_info.dn
                 ))
                 .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY))]);
                 frame.buffer_mut().set_line(area.x, area.y + 1, &line, area.width);
@@ -321,9 +265,9 @@ impl Tui {
                     .buffer_mut()
                     .set_span(area.x + 56, area.y, &Span::from(hlp).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)), len);
 
-                let min_on = (Utc::now() - logon_time).num_minutes();
+                let min_on = (Utc::now() - status_bar_info.logon_time).num_minutes();
 
-                let time = format!("{:<3} {}", min_on, logon_time.format("%H:%M"));
+                let time = format!("{:<3} {}", min_on, status_bar_info.logon_time.format("%H:%M"));
                 let len = time.len() as u16;
                 frame.buffer_mut().set_span(
                     area.x + area.width - len - 2,
@@ -351,29 +295,35 @@ impl Tui {
             2 => {
                 let line = Line::from(vec![
                     Span::from(format!("{}", self.node + 1)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
-                    Span::from(format!("{} / {} mail: {}", bus_phone, home_phone, email)).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
+                    Span::from(format!(
+                        "{} / {} mail: {}",
+                        status_bar_info.bus_phone, status_bar_info.home_phone, status_bar_info.email
+                    ))
+                    .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);
                 frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
 
-                let line = Line::from(vec![
-                    Span::from(format!("  C1: {:40} C2: {:40}", cmt1, cmt2)).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY))
-                ]);
+                let line = Line::from(vec![Span::from(format!("  C1: {:40} C2: {:40}", status_bar_info.cmt1, status_bar_info.cmt2))
+                    .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY))]);
                 frame.buffer_mut().set_line(area.x, area.y + 1, &line, area.width);
             }
             3 => {
                 let line = Line::from(vec![
                     Span::from(format!("{}", self.node + 1)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
-                    Span::from(format!(" Msgs Left: {:7}  Files U/L: {:7}  Bytes U/L: {:7}", msg_left, up, upbytes,))
-                        .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
+                    Span::from(format!(
+                        " Msgs Left: {:7}  Files U/L: {:7}  Bytes U/L: {:7}",
+                        status_bar_info.msg_left, status_bar_info.up, status_bar_info.upbytes,
+                    ))
+                    .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);
                 frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
 
                 let line = Line::from(vec![Span::from(format!(
                     "  Msgs Read: {:7}  Files D/L: {:7}  Bytes D/L: {:7}  Today: {:7}",
-                    msg_read,
-                    dn,
-                    dnbytes,
-                    today_dn as i64 + today_ul as i64,
+                    status_bar_info.msg_read,
+                    status_bar_info.dn,
+                    status_bar_info.dnbytes,
+                    status_bar_info.today_dn as i64 + status_bar_info.today_ul as i64,
                 ))
                 .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY))]);
                 frame.buffer_mut().set_line(area.x, area.y + 1, &line, area.width);
@@ -465,4 +415,89 @@ pub fn print_exit_screen() {
         })
         .unwrap();
     stdout().execute(MoveTo(0, 1)).unwrap();
+}
+
+#[derive(Default)]
+pub struct StatusBarInfo {
+    pub user_name: String,
+    pub city: String,
+    pub current_conf: u16,
+    pub cur_security: u8,
+    pub times_on: u64,
+    pub up: u64,
+    pub dn: u64,
+    pub upbytes: u64,
+    pub dnbytes: u64,
+    pub graphics_mode: GraphicsMode,
+    pub last_on: chrono::DateTime<Utc>,
+    pub logon_time: chrono::DateTime<Utc>,
+    pub msg_left: u64,
+    pub msg_read: u64,
+    pub today_ul: u64,
+    pub today_dn: u64,
+    pub bus_phone: String,
+    pub home_phone: String,
+    pub email: String,
+    pub cmt1: String,
+    pub cmt2: String,
+    pub date_format: String,
+}
+
+impl StatusBarInfo {
+    pub async fn get_info(board: &Arc<tokio::sync::Mutex<IcyBoard>>, node_state: &Arc<Mutex<Vec<Option<NodeState>>>>, node: usize) -> Self {
+        let l = node_state.lock().unwrap();
+        let node_state = l[node].as_ref().unwrap();
+        let current_conf = node_state.cur_conference;
+        let graphics_mode = node_state.graphics_mode;
+        let logon_time = node_state.logon_time;
+        let cur_user = node_state.cur_user as usize;
+        let board = board.lock().await;
+        if cur_user >= board.users.len() {
+            return Default::default();
+        }
+
+        let cur_security = board.users[cur_user].security_level;
+        let user_name = board.users[cur_user].get_name().clone();
+        let city = board.users[cur_user].city_or_state.clone();
+        let times_on = board.users[cur_user].stats.num_times_on;
+        let upbytes = board.users[cur_user].stats.total_upld_bytes;
+        let up = board.users[cur_user].stats.num_uploads;
+        let dnbytes = board.users[cur_user].stats.total_dnld_bytes;
+        let dn = board.users[cur_user].stats.num_downloads;
+        let today_dn = board.users[cur_user].stats.today_dnld_bytes;
+        let today_ul = board.users[cur_user].stats.total_dnld_bytes;
+        let last_on = board.users[cur_user].stats.last_on;
+        let msg_left = board.users[cur_user].stats.messages_left;
+        let msg_read = board.users[cur_user].stats.messages_read;
+        let bus_phone = board.users[cur_user].bus_data_phone.clone();
+        let home_phone = board.users[cur_user].home_voice_phone.clone();
+        let email = board.users[cur_user].email.clone();
+        let cmt1 = board.users[cur_user].user_comment.clone();
+        let cmt2 = board.users[cur_user].sysop_comment.clone();
+        let date_format = board.config.board.date_format.clone();
+        Self {
+            user_name,
+            city,
+            current_conf,
+            cur_security,
+            times_on,
+            up,
+            dn,
+            upbytes,
+            dnbytes,
+            graphics_mode,
+            last_on,
+            logon_time,
+            msg_left,
+            msg_read,
+            today_ul,
+            today_dn,
+            bus_phone,
+            home_phone,
+            email,
+            cmt1,
+            cmt2,
+            date_format,
+        }
+    }
 }

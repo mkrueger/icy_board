@@ -38,11 +38,13 @@ pub async fn end(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn cls(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.print(TerminalTarget::Both, "\x1B[2J").await
+    vm.icy_board_state.clear_screen().await;
+    Ok(())
 }
 
 pub async fn clreol(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.print(TerminalTarget::Both, "\x1B[K").await
+    vm.icy_board_state.clear_eol().await;
+    Ok(())
 }
 
 pub async fn more(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {

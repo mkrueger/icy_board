@@ -36,13 +36,14 @@ use super::{
     IcyBoard, IcyBoardSerializer,
 };
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Default)]
 pub enum GraphicsMode {
     // No graphics or ansi codes
     Ctty,
     // Ansi codes - without colors
     Ansi,
     // Ansi codes + color codes
+    #[default]
     Graphics,
     // Avatar codes + color codes
     Avatar,
@@ -410,6 +411,9 @@ impl IcyBoardState {
         node: usize,
         connection: Box<dyn Connection>,
     ) -> Self {
+        if node > node_state.lock().unwrap().len() {
+            panic!("Node number {node} out of range");
+        }
         let mut session = Session::new();
         session.caller_number = board.lock().await.statistics.cur_caller_number() as usize;
         session.date_format = board.lock().await.config.board.date_format.clone();

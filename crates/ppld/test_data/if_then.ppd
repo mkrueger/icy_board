@@ -1,8 +1,10 @@
 BOOLEAN BOOL001
-    BOOL001 = RANDOM(100) = 10
-    IF (!BOOL001) THEN
-        PRINT "Hello World!"
-    ENDIF
+    BOOL001 = Random(100) = 10
+    IF (BOOL001) GOTO LABEL002
 
+    GOTO LABEL001
+:LABEL002
+    PRINT "Hello World!"
+:LABEL001
 
 

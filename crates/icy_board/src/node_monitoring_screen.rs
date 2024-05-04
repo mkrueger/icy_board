@@ -160,15 +160,17 @@ impl NodeMonitoringScreen {
             if let Ok(con) = bbs.get_open_connections().lock() {
                 let rows = con.iter().enumerate().map(|(i, node_state)| {
                     if let Some(state) = node_state {
-                        let user_name = if state.cur_user < 0 {
+                        let user_name = //if state.cur_user < 0 {
                             get_text("icbmoni_log_in")
-                        } else {
+                      /*  } else {
+                            println!("user !!!");
+                            /*
                             tokio::runtime::Builder::new_current_thread()
                                 .enable_all()
                                 .build()
                                 .unwrap()
-                                .block_on(async { board.lock().await.users[state.cur_user as usize].get_name().clone() })
-                        };
+                                .block_on(async { board.lock().await.users[state.cur_user as usize].get_name().clone() })*/
+                        }*/;
 
                         let activity = match state.user_activity {
                             icy_board_engine::icy_board::state::UserActivity::LoggingIn => get_text("icbmoni_user_log_in"),
