@@ -10,7 +10,7 @@ use crate::{
 };
 
 ///  GAP, 52-line format
-pub fn create_door_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
+pub async fn create_door_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = String::new();
     contents.push_str(&format!("COM{}:\r\n", DOOR_COM_PORT)); // COM Port
     contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE)); // Com Port Speed
@@ -24,7 +24,7 @@ pub fn create_door_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()>
     contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().city_or_state)); // User location
     contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().home_voice_phone)); // Home/voice telephone number
     contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().bus_data_phone)); // Work/data telephone number
-    contents.push_str(&format!("{}\r\n", state.door_user_password()));
+    contents.push_str(&format!("{}\r\n", state.door_user_password().await));
     contents.push_str(&format!("{}\r\n", state.session.cur_security)); // Security level
     contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.num_times_on)); // User's total number of calls to the system
     contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.last_on.format("%m/%d/%y"))); // User's last call date
@@ -51,13 +51,13 @@ pub fn create_door_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()>
     contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().birth_date.format("%m/%d/%y"))); // User's date of birth
     contents.push_str("C:\\HOME\r\n"); // Path to the user database files
     contents.push_str("C:\\MSGS\r\n"); // Path to the message database files
-    contents.push_str(&format!("{}\r\n", state.board.lock().unwrap().config.sysop.name)); // Sysop name
+    contents.push_str(&format!("{}\r\n", state.get_board().await.config.sysop.name)); // Sysop name
     contents.push_str(&format!("{}\r\n", state.session.alias_name)); // User's handle (alias)
     contents.push_str("00:00\r\n"); // Next event starting time
     contents.push_str("Y\r\n"); // Error-free connection (Y=Yes N=No)
     contents.push_str("N\r\n"); // Always set to N
     contents.push_str("Y\r\n"); // Always set to Y
-    let default_color = match state.board.lock().unwrap().config.color_configuration.default {
+    let default_color = match state.get_board().await.config.color_configuration.default {
         IcbColor::None => 7,
         IcbColor::Dos(col) => col % 15,
         IcbColor::IcyEngine(_) => 7,

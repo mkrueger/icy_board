@@ -11,11 +11,11 @@ use crate::{
 };
 
 /// SpitFire BBS
-pub fn create_sfdoors_dat(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
+pub async fn create_sfdoors_dat(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = String::new();
     contents.push_str(&format!("{}\r\n", state.session.cur_user));
     contents.push_str(&format!("{}\r\n", state.session.user_name));
-    contents.push_str(&format!("{}\r\n", state.door_user_password()));
+    contents.push_str(&format!("{}\r\n", state.door_user_password().await));
     contents.push_str(&format!("{}\r\n", state.session.get_first_name()));
     contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE));
     contents.push_str(&format!("{}\r\n", DOOR_COM_PORT));

@@ -22,6 +22,8 @@ semver = { workspace = true }
 
 unicase = { workspace = true }
 rand = { workspace = true }
+jamjam = { workspace = true }
+bstr = { workspace = true }
 
 async-recursion = "1.1.0"
 radix_fmt = "1"

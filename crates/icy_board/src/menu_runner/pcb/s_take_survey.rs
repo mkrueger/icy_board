@@ -25,7 +25,7 @@ impl PcbBoardCommand {
     pub async fn take_survey(&mut self, action: &Command) -> Res<()> {
         self.state.set_activity(UserActivity::TakeSurvey);
 
-        let surveys = self.state.load_surveys()?;
+        let surveys = self.state.load_surveys().await?;
         if surveys.is_empty() {
             self.state
                 .display_text(
@@ -92,7 +92,7 @@ impl PcbBoardCommand {
                 user.get_name(),
                 format!(
                     "{} {}",
-                    Local::now().format(&self.state.board.lock().unwrap().config.board.date_format),
+                    Local::now().format(&self.state.get_board().await.config.board.date_format),
                     Local::now().format("(%H:%M)")
                 ),
                 self.state.session.cur_security,
@@ -104,7 +104,7 @@ impl PcbBoardCommand {
                 self.state.session.user_name,
                 format!(
                     "{} {}",
-                    Local::now().format(&self.state.board.lock().unwrap().config.board.date_format),
+                    Local::now().format(&self.state.get_board().await.config.board.date_format),
                     Local::now().format("(%H:%M)")
                 ),
                 self.state.session.cur_security,

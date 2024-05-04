@@ -1548,10 +1548,10 @@ pub enum IceText {
     /// `Sorry, @FIRST@, no Areas are presently available.`
     NoAreasAvailable = 760,
 
-    /// `(H)elp, (1-@NUMDIR@), File List Command`
+    /// `(H)elp, (1-@NUMDIR@), Area List Command`
     AreaListCommand = 761,
 
-    /// `(H)elp, (1-@NUMDIR@), File List Command`
+    /// `(H)elp, (1-@NUMDIR@), Area List Command`
     AreaListCommandExpert = 762,
 
     /// `AVATAR mode is now on, @FIRST@ ...`

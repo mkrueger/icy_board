@@ -9,13 +9,12 @@ use crate::{
 };
 
 /// 2AM BBS
-pub fn create_jumper_dat(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
+pub async fn create_jumper_dat(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = String::new();
 
-    if let Ok(board) = state.board.lock() {
-        contents.push_str(&format!("{}\r\n", board.config.board.name));
-        contents.push_str(&format!("{}\r\n", board.config.sysop.name));
-    }
+    let board = state.get_board().await;
+    contents.push_str(&format!("{}\r\n", board.config.board.name));
+    contents.push_str(&format!("{}\r\n", board.config.sysop.name));
     contents.push_str(&format!("{}\r\n", state.session.user_name));
     contents.push_str(&format!("{}\r\n", state.session.cur_user));
     contents.push_str(&format!("{}\r\n", state.session.get_first_name()));

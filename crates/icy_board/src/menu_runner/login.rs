@@ -14,7 +14,6 @@ use icy_board_engine::{
         },
         surveys::Survey,
         user_base::{Password, User},
-        IcyBoardError,
     },
     vm::TerminalTarget,
 };
@@ -28,7 +27,7 @@ impl PcbBoardCommand {
         self.state.session.login_date = chrono::Local::now();
 
         // intial_welcome
-        let board_name = self.state.board.lock().unwrap().config.board.name.clone();
+        let board_name = self.state.get_board().await.config.board.name.clone();
         self.state
             .println(TerminalTarget::Both, &format!("CONNECT {} ({})", IcbDate::today(), IcbTime::now()))
             .await?;
@@ -39,7 +38,7 @@ impl PcbBoardCommand {
             .println(TerminalTarget::Both, &format!("IcyBoard v{} - Node {}", VERSION.to_string(), node_number))
             .await?;
 
-        let welcome_screen = self.state.board.lock().unwrap().config.paths.welcome.clone();
+        let welcome_screen = self.state.get_board().await.config.paths.welcome.clone();
         let welcome_screen = self.state.resolve_path(&welcome_screen);
         self.state.display_file(&welcome_screen).await?;
 
@@ -73,14 +72,13 @@ impl PcbBoardCommand {
             }
 
             let mut found_user = None;
-            if let Ok(board) = self.state.board.lock() {
-                for (i, user) in board.users.iter().enumerate() {
-                    if user.is_valid_loginname(&first_name) {
-                        found_user = Some(i);
-                        break;
-                    }
+            for (i, user) in self.state.get_board().await.users.iter().enumerate() {
+                if user.is_valid_loginname(&first_name) {
+                    found_user = Some(i);
+                    break;
                 }
             }
+
             if found_user.is_none() && !first_name.contains(' ') {
                 let last_name = self
                     .state
@@ -93,7 +91,7 @@ impl PcbBoardCommand {
                         display_flags::UPCASE | display_flags::NEWLINE | display_flags::STACKED,
                     )
                     .await?;
-                if !self.state.board.lock().unwrap().config.new_user_settings.allow_one_name_users && last_name.is_empty() {
+                if !self.state.get_board().await.config.new_user_settings.allow_one_name_users && last_name.is_empty() {
                     self.state
                         .display_text(
                             IceText::RequireTwoNames,
@@ -104,21 +102,17 @@ impl PcbBoardCommand {
                 }
                 self.state.session.user_name = format!("{} {}", first_name, last_name.trim()).trim().to_string();
 
-                if let Ok(board) = self.state.board.lock() {
-                    for (i, user) in board.users.iter().enumerate() {
-                        if user.is_valid_loginname(&self.state.session.user_name) {
-                            found_user = Some(i);
-                            break;
-                        }
+                for (i, user) in self.state.get_board().await.users.iter().enumerate() {
+                    if user.is_valid_loginname(&self.state.session.user_name) {
+                        found_user = Some(i);
+                        break;
                     }
-                } else {
-                    return Err(IcyBoardError::ErrorLockingBoard.into());
                 }
             } else {
                 self.state.session.user_name = first_name.to_string();
             }
             if let Some(user) = found_user {
-                self.state.set_current_user(user)?;
+                self.state.set_current_user(user).await?;
                 return self.login_user().await;
             } else {
                 self.state.session.op_text = self.state.session.user_name.clone();
@@ -138,7 +132,7 @@ impl PcbBoardCommand {
                 .await?;
 
             if re_enter.trim().is_empty() || re_enter == "C" {
-                let new_file = self.state.board.lock().unwrap().config.paths.newuser.clone();
+                let new_file = self.state.get_board().await.config.paths.newuser.clone();
                 self.state.display_file(&self.state.resolve_path(&new_file)).await?;
                 self.state.new_line().await?;
 
@@ -174,7 +168,7 @@ impl PcbBoardCommand {
     async fn new_user(&mut self) -> Res<bool> {
         let mut tries = 0;
 
-        if self.state.board.lock().unwrap().config.options.is_closed_board {
+        if self.state.get_board().await.config.options.is_closed_board {
             self.newask_questions().await?;
             log::info!("New user registration for {} attempted on closed board.", self.state.session.user_name);
             self.state.display_text(IceText::ClosedBoard, display_flags::NEWLINE).await?;
@@ -183,7 +177,7 @@ impl PcbBoardCommand {
         }
 
         let mut new_user = User::default();
-        let settings = self.state.board.lock().unwrap().config.new_user_settings.clone();
+        let settings = self.state.get_board().await.config.new_user_settings.clone();
         new_user.security_level = settings.sec_level;
         new_user.stats.first_date_on = Utc::now();
         new_user.set_name(self.state.session.user_name.clone());
@@ -203,15 +197,14 @@ impl PcbBoardCommand {
                 new_user.password.password = Password::PlainText(pw1);
                 break;
             }
-            if let Ok(board) = self.state.board.lock() {
-                if board.config.user_password_policy.password_expire_days > 0 {
-                    new_user.password.expire_date = Utc::now() + chrono::Duration::days(board.config.user_password_policy.password_expire_days as i64);
-                }
+            let exp_days = self.state.get_board().await.config.user_password_policy.password_expire_days;
+            if exp_days > 0 {
+                new_user.password.expire_date = Utc::now() + chrono::Duration::days(exp_days as i64);
             }
             self.state.display_text(IceText::PasswordsDontMatch, display_flags::NEWLINE).await?;
         }
 
-        if !self.newask_exists() || self.state.board.lock().unwrap().config.new_user_settings.use_newask_and_builtin {
+        if !self.newask_exists().await || self.state.get_board().await.config.new_user_settings.use_newask_and_builtin {
             if settings.ask_city_or_state && self.state.display_text.has_text(IceText::CityState) {
                 let Some(city_or_state) = self.input_required(IceText::CityState, &MASK_ALNUM, 24, 0).await? else {
                     return Ok(false);
@@ -451,9 +444,9 @@ impl PcbBoardCommand {
         }
         self.newask_questions().await?;
 
-        let id = self.state.board.lock().unwrap().users.new_user(new_user);
-        self.state.board.lock().unwrap().save_userbase()?;
-        self.state.set_current_user(id)?;
+        let id = self.state.get_board().await.users.new_user(new_user);
+        self.state.get_board().await.save_userbase()?;
+        self.state.set_current_user(id).await?;
 
         log::info!("NEW USER: '{}'", self.state.session.user_name);
 
@@ -461,23 +454,19 @@ impl PcbBoardCommand {
         return Ok(true);
     }
 
-    fn newask_exists(&self) -> bool {
-        if let Ok(board) = self.state.board.lock() {
-            board.resolve_file(&board.config.paths.newask_survey).exists()
-        } else {
-            false
-        }
+    async fn newask_exists(&self) -> bool {
+        let board = self.state.get_board().await;
+        board.resolve_file(&board.config.paths.newask_survey).exists()
     }
 
     async fn newask_questions(&mut self) -> Res<()> {
-        let survey = if let Ok(board) = self.state.board.lock() {
+        let survey = {
+            let board = self.state.get_board().await;
             Survey {
                 question_file: board.resolve_file(&board.config.paths.newask_survey),
                 answer_file: board.resolve_file(&board.config.paths.newask_answer),
                 required_security: 0,
             }
-        } else {
-            Survey::default()
         };
         Ok(if !self.state.session.is_sysop && survey.question_file.exists() {
             // skip the survey question.
@@ -510,18 +499,18 @@ impl PcbBoardCommand {
             return Ok(false);
         }
 
-        if self.state.board.lock().unwrap().config.subscription_info.is_enabled {
+        if self.state.get_board().await.config.subscription_info.is_enabled {
             if let Some(user) = &self.state.current_user {
                 if user.exp_date < Utc::now() {
                     log::warn!("Login from expired user {} at {}", self.state.session.user_name, Local::now().to_rfc2822());
-                    let exp_file = self.state.board.lock().unwrap().config.paths.expired.clone();
+                    let exp_file = self.state.get_board().await.config.paths.expired.clone();
                     self.state.display_file(&self.state.resolve_path(&exp_file)).await?;
                     self.state.hangup()?;
                     return Ok(false);
                 }
-                let warn_days = self.state.board.lock().unwrap().config.subscription_info.warning_days as i64;
+                let warn_days = self.state.get_board().await.config.subscription_info.warning_days as i64;
                 if user.exp_date + chrono::Duration::days(warn_days) < Utc::now() {
-                    let exp_file = self.state.board.lock().unwrap().config.paths.expire_warning.clone();
+                    let exp_file = self.state.get_board().await.config.paths.expire_warning.clone();
                     self.state.display_file(&self.state.resolve_path(&exp_file)).await?;
                     self.state.press_enter().await?;
                 }
@@ -539,7 +528,7 @@ impl PcbBoardCommand {
                     return Ok(false);
                 }
 
-                let days = self.state.board.lock().unwrap().config.user_password_policy.password_expire_warn_days as i64;
+                let days = self.state.get_board().await.config.user_password_policy.password_expire_warn_days as i64;
 
                 if user.password.expire_date + chrono::Duration::days(days) > today {
                     self.state.session.op_text = (user.password.expire_date + chrono::Duration::days(days) - today).num_days().to_string();
@@ -594,15 +583,14 @@ impl PcbBoardCommand {
             };
 
             if pw1 == pw2 {
+                let exp_days = self.state.get_board().await.config.user_password_policy.password_expire_days;
                 if let Some(cur_user) = &mut self.state.current_user {
                     cur_user.password.password = Password::PlainText(pw1);
-                    if let Ok(board) = self.state.board.lock() {
-                        if board.config.user_password_policy.password_expire_days > 0 {
-                            cur_user.password.expire_date = Utc::now() + chrono::Duration::days(board.config.user_password_policy.password_expire_days as i64);
-                        }
+                    if exp_days > 0 {
+                        cur_user.password.expire_date = Utc::now() + chrono::Duration::days(exp_days as i64);
                     }
                 }
-                self.state.board.lock().unwrap().save_userbase()?;
+                self.state.get_board().await.save_userbase()?;
                 return Ok(());
             }
             self.state.display_text(IceText::PasswordsDontMatch, display_flags::NEWLINE).await?;
@@ -611,12 +599,7 @@ impl PcbBoardCommand {
 
     pub async fn ask_date_format(&mut self, cur_format: &str) -> Res<String> {
         self.state.new_line().await?;
-        let date_formats = if let Ok(board) = self.state.board.lock() {
-            board.languages.date_formats.clone()
-        } else {
-            log::error!("ask_date_format: Error locking board");
-            return Ok(cur_format.to_string());
-        };
+        let date_formats = self.state.get_board().await.languages.date_formats.clone();
 
         self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11)).await?;
         let mut preview = String::new();

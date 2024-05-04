@@ -21,8 +21,8 @@ impl PcbBoardCommand {
             return Ok(());
         }
         self.state.set_activity(UserActivity::EnterMessage);
-
-        let Ok(Some(area)) = self.show_message_areas(action).await else {
+        let conf = self.state.session.current_conference_number;
+        let Ok(Some(area)) = self.state.show_message_areas(conf, &action.help).await else {
             self.state.press_enter().await?;
             self.display_menu = true;
             return Ok(());

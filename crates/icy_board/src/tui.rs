@@ -29,7 +29,7 @@ use icy_board_tui::{
 use icy_engine::TextPane;
 use icy_net::{channel::ChannelConnection, ConnectionType};
 use ratatui::{prelude::*, widgets::Paragraph};
-use tokio::{runtime::Runtime, sync::mpsc};
+use tokio::sync::mpsc;
 
 use crate::{bbs::BBS, icy_engine_output::Screen};
 
@@ -43,7 +43,7 @@ pub struct Tui {
 }
 
 impl Tui {
-    pub fn local_mode(board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>, login_sysop: bool, ppe: Option<PathBuf>) -> Self {
+    pub fn local_mode(board: &Arc<tokio::sync::Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>, login_sysop: bool, ppe: Option<PathBuf>) -> Self {
         let board = board.clone();
         let ui_node = bbs.lock().unwrap().create_new_node(ConnectionType::Channel);
         let node_state = bbs.lock().unwrap().open_connections.clone();
@@ -103,7 +103,7 @@ impl Tui {
         }
     }
 
-    pub fn run(&mut self, board: &Arc<Mutex<IcyBoard>>) -> Res<()> {
+    pub async fn run(&mut self, board: &Arc<tokio::sync::Mutex<IcyBoard>>) -> Res<()> {
         let mut terminal = init_terminal()?;
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(20);
@@ -124,9 +124,7 @@ impl Tui {
                 //  redraw = false;
                 let board = board.clone();
                 let _ = terminal.draw(|frame| {
-                    if let Ok(board) = &board.lock() {
-                        self.ui(frame, board);
-                    }
+                    self.ui(frame, board);
                 });
             }
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
@@ -154,33 +152,32 @@ impl Tui {
                                         return Ok(());
                                     }
                                     if ('a'..='z').contains(&c) {
-                                        self.add_input(((c as u8 - b'a' + 1) as char).to_string().chars())?;
+                                        self.add_input(((c as u8 - b'a' + 1) as char).to_string().chars()).await?;
                                     }
                                 }
 
-                                KeyCode::Left => self.add_input("\x01".chars())?,
-                                KeyCode::Right => self.add_input("\x06".chars())?,
-                                KeyCode::End => self.add_input("\x0B".chars())?,
+                                KeyCode::Left => self.add_input("\x01".chars()).await?,
+                                KeyCode::Right => self.add_input("\x06".chars()).await?,
+                                KeyCode::End => self.add_input("\x0B".chars()).await?,
                                 _ => {}
                             }
                         } else {
                             match key.code {
-                                KeyCode::Char(c) => self.add_input(c.to_string().chars())?,
-                                KeyCode::Enter => self.add_input("\r".chars())?,
-                                KeyCode::Backspace => self.add_input("\x08".chars())?,
-                                KeyCode::Esc => self.add_input("\x1B".chars())?,
-                                KeyCode::Tab => self.add_input("\x09".chars())?,
-                                KeyCode::Delete => self.add_input("\x7F".chars())?,
-
-                                KeyCode::Insert => self.add_input("\x1B[2~".chars())?,
-                                KeyCode::Home => self.add_input("\x1B[H".chars())?,
-                                KeyCode::End => self.add_input("\x1B[F".chars())?,
-                                KeyCode::Up => self.add_input("\x1B[A".chars())?,
-                                KeyCode::Down => self.add_input("\x1B[B".chars())?,
-                                KeyCode::Right => self.add_input("\x1B[C".chars())?,
-                                KeyCode::Left => self.add_input("\x1B[D".chars())?,
-                                KeyCode::PageUp => self.add_input("\x1B[5~".chars())?,
-                                KeyCode::PageDown => self.add_input("\x1B[6~".chars())?,
+                                KeyCode::Char(c) => self.add_input(c.to_string().chars()).await?,
+                                KeyCode::Enter => self.add_input("\r".chars()).await?,
+                                KeyCode::Backspace => self.add_input("\x08".chars()).await?,
+                                KeyCode::Esc => self.add_input("\x1B".chars()).await?,
+                                KeyCode::Tab => self.add_input("\x09".chars()).await?,
+                                KeyCode::Delete => self.add_input("\x7F".chars()).await?,
+                                KeyCode::Insert => self.add_input("\x1B[2~".chars()).await?,
+                                KeyCode::Home => self.add_input("\x1B[H".chars()).await?,
+                                KeyCode::End => self.add_input("\x1B[F".chars()).await?,
+                                KeyCode::Up => self.add_input("\x1B[A".chars()).await?,
+                                KeyCode::Down => self.add_input("\x1B[B".chars()).await?,
+                                KeyCode::Right => self.add_input("\x1B[C".chars()).await?,
+                                KeyCode::Left => self.add_input("\x1B[D".chars()).await?,
+                                KeyCode::PageUp => self.add_input("\x1B[5~".chars()).await?,
+                                KeyCode::PageDown => self.add_input("\x1B[6~".chars()).await?,
                                 _ => {}
                             }
                         }
@@ -194,7 +191,7 @@ impl Tui {
         }
     }
 
-    fn ui(&self, frame: &mut Frame, board: &IcyBoard) {
+    fn ui(&self, frame: &mut Frame, board: Arc<tokio::sync::Mutex<IcyBoard>>) {
         let width = frame.size().width.min(80);
         let height = frame.size().height.min(24);
 
@@ -228,94 +225,62 @@ impl Tui {
         frame.set_cursor(area.x + pos.x as u16, y + pos.y as u16 - buffer.get_first_visible_line() as u16);
     }
 
-    fn draw_statusbar(&self, frame: &mut Frame, board: &IcyBoard, area: Rect) {
-        let user_name;
-        let city;
-        let current_conf;
-        let cur_security;
-        let times_on;
-        let up;
-        let upbytes;
-        let dn;
-        let dnbytes;
-        let graphics_mode;
-        let last_on;
-        let logon_time;
-        let msg_left;
-        let msg_read;
-        let today_dn;
-        let today_ul;
-        let bus_phone;
-        let home_phone;
-        let email;
-        let cmt1;
-        let cmt2;
+    fn draw_statusbar(&self, frame: &mut Frame, board: Arc<tokio::sync::Mutex<IcyBoard>>, area: Rect) {
+        let mut user_name = String::new();
+        let mut city = String::new();
+        let mut current_conf = 0;
+        let mut cur_security = 0;
+        let mut times_on = 0;
+        let mut up = 0;
+        let mut dn = 0;
+        let mut upbytes = 0;
+        let mut dnbytes = 0;
+        let mut graphics_mode = GraphicsMode::Ansi;
+        let mut last_on = Utc::now();
+        let mut logon_time = Utc::now();
+        let mut msg_left = 0;
+        let mut msg_read = 0;
+        let mut today_ul = 0;
+        let mut today_dn = 0;
+        let mut bus_phone = String::new();
+        let mut home_phone = String::new();
+        let mut email = String::new();
+        let mut cmt1 = String::new();
+        let mut cmt2 = String::new();
+        let mut date_format = String::new();
 
         if let Some(node_state) = &self.node_state.lock().unwrap()[self.node as usize] {
             current_conf = node_state.cur_conference;
             graphics_mode = node_state.graphics_mode;
             logon_time = node_state.logon_time;
-            if node_state.cur_user >= 0 {
-                cur_security = board.users[node_state.cur_user as usize].security_level;
-                user_name = board.users[node_state.cur_user as usize].get_name().clone();
-                city = board.users[node_state.cur_user as usize].city_or_state.clone();
-                times_on = board.users[node_state.cur_user as usize].stats.num_times_on;
-                upbytes = board.users[node_state.cur_user as usize].stats.total_upld_bytes;
-                up = board.users[node_state.cur_user as usize].stats.num_uploads;
-                dnbytes = board.users[node_state.cur_user as usize].stats.total_dnld_bytes;
-                dn = board.users[node_state.cur_user as usize].stats.num_downloads;
-                today_dn = board.users[node_state.cur_user as usize].stats.today_dnld_bytes;
-                today_ul = board.users[node_state.cur_user as usize].stats.total_dnld_bytes;
-                last_on = board.users[node_state.cur_user as usize].stats.last_on;
-                msg_left = board.users[node_state.cur_user as usize].stats.messages_left;
-                msg_read = board.users[node_state.cur_user as usize].stats.messages_read;
-                bus_phone = board.users[node_state.cur_user as usize].bus_data_phone.clone();
-                home_phone = board.users[node_state.cur_user as usize].home_voice_phone.clone();
-                email = board.users[node_state.cur_user as usize].email.clone();
-                cmt1 = board.users[node_state.cur_user as usize].user_comment.clone();
-                cmt2 = board.users[node_state.cur_user as usize].sysop_comment.clone();
-            } else {
-                user_name = String::new();
-                city = String::new();
-                times_on = 0;
-                up = 0;
-                dn = 0;
-                upbytes = 0;
-                dnbytes = 0;
-                cur_security = 0;
-                last_on = Utc::now();
-                msg_left = 0;
-                msg_read = 0;
-                today_ul = 0;
-                today_dn = 0;
-                bus_phone = String::new();
-                home_phone = String::new();
-                email = String::new();
-                cmt1 = String::new();
-                cmt2 = String::new();
+            if node_state.cur_user >= 0 { /*
+                 tokio::runtime::Builder::new_multi_thread()
+                 .enable_all()
+                 .build()
+                 .unwrap()
+                 .block_on(async {
+                     let board = board.lock().await;
+                     cur_security = board.users[node_state.cur_user as usize].security_level;
+                     user_name = board.users[node_state.cur_user as usize].get_name().clone();
+                     city = board.users[node_state.cur_user as usize].city_or_state.clone();
+                     times_on = board.users[node_state.cur_user as usize].stats.num_times_on;
+                     upbytes = board.users[node_state.cur_user as usize].stats.total_upld_bytes;
+                     up = board.users[node_state.cur_user as usize].stats.num_uploads;
+                     dnbytes = board.users[node_state.cur_user as usize].stats.total_dnld_bytes;
+                     dn = board.users[node_state.cur_user as usize].stats.num_downloads;
+                     today_dn = board.users[node_state.cur_user as usize].stats.today_dnld_bytes;
+                     today_ul = board.users[node_state.cur_user as usize].stats.total_dnld_bytes;
+                     last_on = board.users[node_state.cur_user as usize].stats.last_on;
+                     msg_left = board.users[node_state.cur_user as usize].stats.messages_left;
+                     msg_read = board.users[node_state.cur_user as usize].stats.messages_read;
+                     bus_phone = board.users[node_state.cur_user as usize].bus_data_phone.clone();
+                     home_phone = board.users[node_state.cur_user as usize].home_voice_phone.clone();
+                     email = board.users[node_state.cur_user as usize].email.clone();
+                     cmt1 = board.users[node_state.cur_user as usize].user_comment.clone();
+                     cmt2 = board.users[node_state.cur_user as usize].sysop_comment.clone();
+                     date_format = board.config.board.date_format.clone();
+                 });*/
             }
-        } else {
-            user_name = String::new();
-            city = String::new();
-            current_conf = 0;
-            cur_security = 0;
-            times_on = 0;
-            up = 0;
-            dn = 0;
-            upbytes = 0;
-            dnbytes = 0;
-            graphics_mode = GraphicsMode::Ansi;
-            last_on = Utc::now();
-            logon_time = Utc::now();
-            msg_left = 0;
-            msg_read = 0;
-            today_ul = 0;
-            today_dn = 0;
-            bus_phone = String::new();
-            home_phone = String::new();
-            email = String::new();
-            cmt1 = String::new();
-            cmt2 = String::new();
         }
 
         frame.buffer_mut().set_style(area, Style::new().bg(DOS_LIGHT_GRAY));
@@ -341,7 +306,7 @@ impl Tui {
                 let line = Line::from(vec![Span::from(format!(
                     "{} ({})  Sec({})={}  Times On={}  Up:Dn={}:{}",
                     graphics,
-                    last_on.format(&board.config.board.date_format),
+                    last_on.format(&date_format),
                     current_conf,
                     cur_security,
                     times_on,
@@ -459,15 +424,12 @@ impl Tui {
             .x_bounds([0.0, 80.0])*/
     }
 
-    fn add_input(&mut self, c_seq: std::str::Chars<'_>) -> Res<()> {
+    async fn add_input(&mut self, c_seq: std::str::Chars<'_>) -> Res<()> {
         let mut s = Vec::new();
         for c in c_seq {
             s.push(c as u8);
         }
-        let rt = Runtime::new().unwrap();
-        rt.block_on(async move {
-            let _res = self.tx.send(SendData::Data(s)).await;
-        });
+        let _res = self.tx.send(SendData::Data(s)).await;
         Ok(())
     }
 }

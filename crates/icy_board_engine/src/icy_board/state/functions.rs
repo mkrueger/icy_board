@@ -3,10 +3,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::Res;
+use crate::{
+    icy_board::{user_base::UserBase, IcyBoardError},
+    Res,
+};
 use async_recursion::async_recursion;
 use codepages::tables::CP437_TO_UNICODE;
 use icy_engine::IceMode;
+use jamjam::jam::{JamMessage, JamMessageBase};
 
 use crate::{
     icy_board::{
@@ -18,7 +22,7 @@ use crate::{
     vm::TerminalTarget,
 };
 
-use super::{IcyBoardState, KeySource};
+use super::{IcyBoardState, KeySource, UserActivity};
 
 pub mod display_flags {
     pub const DEFAULT: i32 = 0x00000;
@@ -183,14 +187,14 @@ impl IcyBoardState {
                 }
                 match call.call_type {
                     PPECallType::PPE => {
-                        let file = self.board.lock().unwrap().resolve_file(&call.file);
+                        let file = self.get_board().await.resolve_file(&call.file);
                         self.run_ppe(&file, None).await?;
                     }
                     PPECallType::Menu => {
                         self.display_menu(&call.file).await?;
                     }
                     PPECallType::File => {
-                        let file = self.board.lock().unwrap().resolve_file(&call.file);
+                        let file = self.get_board().await.resolve_file(&call.file);
                         self.display_file(&file).await?;
                     }
                 }
@@ -204,7 +208,7 @@ impl IcyBoardState {
     }
 
     pub async fn display_menu<P: AsRef<Path>>(&mut self, file_name: &P) -> Res<bool> {
-        let resolved_name_ppe = self.board.lock().unwrap().resolve_file(&(file_name.as_ref().with_extension("ppe")));
+        let resolved_name_ppe = self.get_board().await.resolve_file(&(file_name.as_ref().with_extension("ppe")));
         let path = PathBuf::from(resolved_name_ppe);
         if path.exists() {
             self.run_ppe(&path, None).await?;
@@ -218,7 +222,7 @@ impl IcyBoardState {
     }
 
     pub async fn display_file_with_error<P: AsRef<Path>>(&mut self, file_name: &P, display_error: bool) -> Res<bool> {
-        let resolved_name = self.board.lock().unwrap().resolve_file(file_name);
+        let resolved_name = self.get_board().await.resolve_file(file_name);
         // lookup language/security/graphics mode
         let resolved_name = self.find_more_specific_file(resolved_name.to_string_lossy().to_string());
 
@@ -346,7 +350,7 @@ impl IcyBoardState {
             }
             if key_char.ch == '\n' || key_char.ch == '\r' {
                 if !help.is_empty() {
-                    if let Some(cmd) = self.try_find_command(&output) {
+                    if let Some(cmd) = self.try_find_command(&output).await {
                         if cmd.command_type == CommandType::Help {
                             self.show_help(help).await?;
                             return self.input_string(color, prompt, len, valid_mask, help, default_string, display_flags).await;
@@ -404,7 +408,7 @@ impl IcyBoardState {
     }
 
     pub async fn show_help(&mut self, help: &str) -> Res<()> {
-        let help_loc = self.board.lock().unwrap().config.paths.help_path.clone();
+        let help_loc = self.get_board().await.config.paths.help_path.clone();
         let help_loc = help_loc.join(help);
         let am = self.session.disable_auto_more;
         self.session.disable_auto_more = false;
@@ -451,6 +455,117 @@ impl IcyBoardState {
         self.display_text(IceText::PasswordFailure, display_flags::NEWLINE | display_flags::LFAFTER)
             .await?;
         Ok(false)
+    }
+
+    #[async_recursion(?Send)]
+    pub async fn show_message_areas(&mut self, conference: u16, help: &str) -> Res<Option<usize>> {
+        let menu = self.get_board().await.conferences[conference as usize].area_menu.clone();
+        let areas = self.get_board().await.conferences[conference as usize].areas.clone();
+
+        self.set_activity(UserActivity::EnterMessage);
+        self.session.disable_auto_more = false;
+        self.session.more_requested = false;
+
+        if areas.is_empty() {
+            self.display_text(IceText::NoAreasAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            self.press_enter().await?;
+            return Ok(None);
+        }
+        let area_number = if let Some(token) = self.session.tokens.pop_front() {
+            token
+        } else {
+            let mnu = self.resolve_path(&menu);
+            self.display_menu(&mnu).await?;
+            self.new_line().await?;
+
+            self.input_field(
+                if self.session.expert_mode {
+                    IceText::AreaListCommandExpert
+                } else {
+                    IceText::AreaListCommand
+                },
+                40,
+                &MASK_NUM,
+                &help,
+                None,
+                display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
+            )
+            .await?
+        };
+
+        if !area_number.is_empty() {
+            if let Ok(number) = area_number.parse::<i32>() {
+                if 1 <= number && (number as usize) <= areas.len() {
+                    let area = &areas[number as usize - 1];
+                    if area.req_level_to_list.user_can_access(&self.session) {
+                        return Ok(Some(number as usize - 1));
+                    }
+                }
+            }
+
+            self.session.op_text = area_number;
+            self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::NOTBLANK)
+                .await?;
+        }
+        Ok(None)
+    }
+
+    pub async fn send_message(&mut self, conf: i32, area: i32, msg: JamMessage, text: IceText) -> Res<()> {
+        let msg_base = if conf < 0 {
+            let user_name = msg.get_to().unwrap().to_string();
+            self.get_email_msgbase(&user_name).await
+        } else {
+            let msg_base = self.get_board().await.conferences[conf as usize].areas[area as usize].filename.clone();
+            let msg_base = self.resolve_path(&msg_base);
+            if msg_base.with_extension("jhr").exists() {
+                JamMessageBase::open(msg_base)
+            } else {
+                JamMessageBase::create(msg_base)
+            }
+        };
+
+        match msg_base {
+            Ok(mut msg_base) => {
+                let number = msg_base.write_message(&msg)?;
+                msg_base.write_jhr_header()?;
+
+                self.display_text(text, display_flags::DEFAULT).await?;
+                self.println(TerminalTarget::Both, &number.to_string()).await?;
+                self.new_line().await?;
+            }
+            Err(err) => {
+                log::error!("while opening message base: {}", err.to_string());
+                self.display_text(IceText::MessageBaseError, display_flags::NEWLINE).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn get_email_msgbase(&mut self, user_name: &str) -> Res<JamMessageBase> {
+        let name = if user_name == self.session.sysop_name {
+            self.get_board().await.users[0].get_name().to_string()
+        } else {
+            user_name.to_string()
+        };
+        let home_dir = UserBase::get_user_home_dir(&self.resolve_path(&self.get_board().await.config.paths.home_dir), &name);
+
+        if !home_dir.exists() {
+            log::error!("Homedir for user {} does not exist", user_name);
+            self.display_text(IceText::MessageBaseError, display_flags::NEWLINE).await?;
+            return Err(IcyBoardError::HomeDirMissing(user_name.to_string()).into());
+        }
+
+        let msg_dir = home_dir.join("msg");
+        fs::create_dir_all(&msg_dir)?;
+        let msg_base = msg_dir.join("email");
+        Ok(if msg_base.with_extension("jhr").exists() {
+            JamMessageBase::open(msg_base)?
+        } else {
+            log::info!("Creating new email message base for user {}", user_name);
+            JamMessageBase::create(msg_base)?
+        })
     }
 }
 

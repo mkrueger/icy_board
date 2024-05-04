@@ -30,8 +30,8 @@ pub struct NodeMonitoringScreen {
 }
 
 impl NodeMonitoringScreen {
-    pub fn new(board: &Arc<Mutex<IcyBoard>>) -> Self {
-        let nodes = board.lock().unwrap().config.board.num_nodes;
+    pub async fn new(board: &Arc<tokio::sync::Mutex<IcyBoard>>) -> Self {
+        let nodes = board.lock().await.config.board.num_nodes;
         Self {
             nodes: nodes as usize,
             scroll_state: ScrollbarState::default().content_length(nodes as usize),
@@ -39,7 +39,12 @@ impl NodeMonitoringScreen {
         }
     }
 
-    pub fn run(&mut self, terminal: &mut Terminal<impl Backend>, board: &Arc<Mutex<IcyBoard>>, bbs: &mut Arc<Mutex<BBS>>) -> Res<NodeMonitoringScreenMessage> {
+    pub fn run(
+        &mut self,
+        terminal: &mut Terminal<impl Backend>,
+        board: &Arc<tokio::sync::Mutex<IcyBoard>>,
+        bbs: &mut Arc<Mutex<BBS>>,
+    ) -> Res<NodeMonitoringScreenMessage> {
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
         loop {
@@ -110,7 +115,7 @@ impl NodeMonitoringScreen {
         }
     }
 
-    fn ui(&mut self, frame: &mut Frame, board: &Arc<Mutex<IcyBoard>>, bbs: &mut Arc<Mutex<BBS>>) {
+    fn ui(&mut self, frame: &mut Frame, board: &Arc<tokio::sync::Mutex<IcyBoard>>, bbs: &mut Arc<Mutex<BBS>>) {
         let now = Local::now();
         let mut footer = get_text("icbmoni_footer");
         if let Some(i) = self.table_state.selected() {
@@ -138,7 +143,7 @@ impl NodeMonitoringScreen {
         self.render_scrollbar(frame, area);
     }
 
-    fn render_table(&mut self, frame: &mut Frame, _area: Rect, board: &Arc<Mutex<IcyBoard>>, bbs: &mut Arc<Mutex<BBS>>) {
+    fn render_table(&mut self, frame: &mut Frame, _area: Rect, board: &Arc<tokio::sync::Mutex<IcyBoard>>, bbs: &mut Arc<Mutex<BBS>>) {
         let header = [
             "#".to_string(),
             get_text("icbmoni_status_header"),
@@ -158,12 +163,13 @@ impl NodeMonitoringScreen {
                         let user_name = if state.cur_user < 0 {
                             get_text("icbmoni_log_in")
                         } else {
-                            if let Ok(board) = board.lock() {
-                                board.users[state.cur_user as usize].get_name().clone()
-                            } else {
-                                "Board locked".to_string()
-                            }
+                            tokio::runtime::Builder::new_current_thread()
+                                .enable_all()
+                                .build()
+                                .unwrap()
+                                .block_on(async { board.lock().await.users[state.cur_user as usize].get_name().clone() })
                         };
+
                         let activity = match state.user_activity {
                             icy_board_engine::icy_board::state::UserActivity::LoggingIn => get_text("icbmoni_user_log_in"),
                             icy_board_engine::icy_board::state::UserActivity::BrowseMenu => get_text("icbmoni_user_browse_menu"),

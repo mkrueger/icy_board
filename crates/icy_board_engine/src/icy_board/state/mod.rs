@@ -378,7 +378,7 @@ pub struct IcyBoardState {
     root_path: PathBuf,
     pub connection: Box<dyn Connection>,
 
-    pub board: Arc<Mutex<IcyBoard>>,
+    pub board: Arc<tokio::sync::Mutex<IcyBoard>>,
 
     pub node_state: Arc<Mutex<Vec<Option<NodeState>>>>,
     pub node: usize,
@@ -404,12 +404,17 @@ pub struct IcyBoardState {
 }
 
 impl IcyBoardState {
-    pub fn new(board: Arc<Mutex<IcyBoard>>, node_state: Arc<Mutex<Vec<Option<NodeState>>>>, node: usize, connection: Box<dyn Connection>) -> Self {
+    pub async fn new(
+        board: Arc<tokio::sync::Mutex<IcyBoard>>,
+        node_state: Arc<Mutex<Vec<Option<NodeState>>>>,
+        node: usize,
+        connection: Box<dyn Connection>,
+    ) -> Self {
         let mut session = Session::new();
-        session.caller_number = board.lock().unwrap().statistics.cur_caller_number() as usize;
-        session.date_format = board.lock().unwrap().config.board.date_format.clone();
-        let display_text = board.lock().unwrap().default_display_text.clone();
-        let root_path = board.lock().unwrap().root_path.clone();
+        session.caller_number = board.lock().await.statistics.cur_caller_number() as usize;
+        session.date_format = board.lock().await.config.board.date_format.clone();
+        let display_text = board.lock().await.default_display_text.clone();
+        let root_path = board.lock().await.root_path.clone();
         let mut p1 = ansi::Parser::default();
         p1.bs_is_ctrl_char = true;
         let mut p2 = ansi::Parser::default();
@@ -433,9 +438,9 @@ impl IcyBoardState {
             char_buffer: VecDeque::new(),
         }
     }
-    fn update_language(&mut self) {
+    async fn update_language(&mut self) {
         if !self.session.language.is_empty() {
-            let lang_file = &self.board.lock().unwrap().config.paths.icbtext;
+            let lang_file = self.get_board().await.config.paths.icbtext.clone();
             let lang_file = lang_file.with_extension(format!("{}.toml", self.session.language));
             let lang_file = self.resolve_path(&lang_file);
 
@@ -447,7 +452,8 @@ impl IcyBoardState {
                 }
             }
         }
-        self.display_text = self.board.lock().unwrap().default_display_text.clone();
+        let dt = self.get_board().await.default_display_text.clone();
+        self.display_text = dt;
     }
     /// Turns on keyboard check & resets the keyboard check timer.
     pub fn reset_keyboard_check_timer(&mut self) {
@@ -475,7 +481,7 @@ impl IcyBoardState {
     }
 
     pub async fn reset_color(&mut self) -> Res<()> {
-        let color = self.board.lock().unwrap().config.color_configuration.default.clone();
+        let color = self.get_board().await.config.color_configuration.default.clone();
         self.set_color(TerminalTarget::Both, color).await
     }
 
@@ -521,12 +527,11 @@ impl IcyBoardState {
         }
     }
 
-    pub fn join_conference(&mut self, conference: u16) {
-        if (conference as usize) < self.board.lock().unwrap().conferences.len() {
+    pub async fn join_conference(&mut self, conference: u16) {
+        if (conference as usize) < self.get_board().await.conferences.len() {
             self.session.current_conference_number = conference;
-            if let Ok(board) = self.board.lock() {
-                self.session.current_conference = board.conferences[conference as usize].clone();
-            }
+            let c = self.get_board().await.conferences[conference as usize].clone();
+            self.session.current_conference = c;
             self.node_state.lock().unwrap()[self.node].as_mut().unwrap().cur_conference = self.session.current_conference_number;
         }
     }
@@ -592,45 +597,34 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub fn load_bullettins(&self) -> Res<BullettinList> {
-        if let Ok(board) = self.board.lock() {
-            let path = board.resolve_file(&self.session.current_conference.blt_file);
-            BullettinList::load(&path)
-        } else {
-            Err("Board is locked".into())
-        }
+    pub async fn load_bullettins(&self) -> Res<BullettinList> {
+        let path = self.get_board().await.resolve_file(&self.session.current_conference.blt_file);
+        BullettinList::load(&path)
     }
 
-    pub fn load_surveys(&self) -> Res<SurveyList> {
-        if let Ok(board) = self.board.lock() {
-            let path = board.resolve_file(&self.session.current_conference.survey_file);
-            SurveyList::load(&path)
-        } else {
-            Err("Board is locked".into())
-        }
+    pub async fn load_surveys(&self) -> Res<SurveyList> {
+        let path = self.get_board().await.resolve_file(&self.session.current_conference.survey_file);
+        SurveyList::load(&path)
     }
 
-    pub fn get_pcbdat(&self) -> Res<String> {
-        if let Ok(board) = self.board.lock() {
-            let path = board.resolve_file(&board.config.paths.tmp_work_path);
+    pub async fn get_pcbdat(&self) -> Res<String> {
+        let board = self.get_board().await;
+        let path = board.resolve_file(&board.config.paths.tmp_work_path);
 
-            let path = PathBuf::from(path);
-            if !path.is_dir() {
-                fs::create_dir_all(&path)?;
-            }
-            let output = path.join("pcboard.dat");
-
-            if let Err(err) = board.export_pcboard(&output) {
-                log::error!("Error writing pcbdat.dat file: {}", err);
-                return Err(err);
-            }
-            Ok(output.to_str().unwrap().to_string())
-        } else {
-            Err("Board is locked".into())
+        let path = PathBuf::from(path);
+        if !path.is_dir() {
+            fs::create_dir_all(&path)?;
         }
+        let output = path.join("pcboard.dat");
+
+        if let Err(err) = board.export_pcboard(&output) {
+            log::error!("Error writing pcbdat.dat file: {}", err);
+            return Err(err);
+        }
+        Ok(output.to_str().unwrap().to_string())
     }
 
-    pub fn try_find_command(&self, command: &str) -> Option<super::commands::Command> {
+    pub async fn try_find_command(&self, command: &str) -> Option<super::commands::Command> {
         let command = command.to_ascii_uppercase();
         for cmd in &self.session.current_conference.commands {
             if cmd.keyword == command {
@@ -638,7 +632,7 @@ impl IcyBoardState {
             }
         }
 
-        for cmd in &self.board.lock().unwrap().commands.commands {
+        for cmd in &self.get_board().await.commands.commands {
             if cmd.keyword == command {
                 return Some(cmd.clone());
             }
@@ -650,7 +644,7 @@ impl IcyBoardState {
             }
         }
 
-        for cmd in &self.board.lock().unwrap().commands.commands {
+        for cmd in &self.get_board().await.commands.commands {
             if cmd.keyword.starts_with(&command) {
                 return Some(cmd.clone());
             }
@@ -681,45 +675,40 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub fn set_current_user(&mut self, user_number: usize) -> Res<()> {
+    pub async fn set_current_user(&mut self, user_number: usize) -> Res<()> {
         let old_language = self.session.language.clone();
 
         self.session.cur_user = user_number as i32;
         self.node_state.lock().unwrap()[self.node].as_mut().unwrap().cur_user = user_number as i32;
         self.node_state.lock().unwrap()[self.node].as_mut().unwrap().graphics_mode = self.session.disp_options.grapics_mode;
-        let last_conference = if let Ok(mut board) = self.board.lock() {
-            if user_number >= board.users.len() {
-                log::error!("User number {} is out of range", user_number);
-                return Err(IcyBoardError::UserNumberInvalid(user_number).into());
-            }
-            let mut user = board.users[user_number].clone();
-            user.stats.last_on = Utc::now();
-            user.stats.num_times_on += 1;
-            let conf = user.last_conference;
-            board.statistics.add_caller(user.get_name().clone());
-            if !user.date_format.is_empty() {
-                self.session.date_format = user.date_format.clone();
-            }
-            self.session.language = user.language.clone();
-            self.session.cur_security = user.security_level;
-            self.session.page_len = user.page_len;
-            self.session.user_name = user.get_name().clone();
-            self.session.alias_name = user.alias.clone();
-            self.session.fse_mode = user.flags.fse_mode.clone();
-
-            self.current_user = Some(user);
-            conf
-        } else {
-            return Err(IcyBoardError::Error("board locked".to_string()).into());
-        };
-        if self.session.language != old_language {
-            self.update_language();
+        if user_number >= self.get_board().await.users.len() {
+            log::error!("User number {} is out of range", user_number);
+            return Err(IcyBoardError::UserNumberInvalid(user_number).into());
         }
-        self.join_conference(last_conference);
+        let mut user = self.get_board().await.users[user_number].clone();
+        user.stats.last_on = Utc::now();
+        user.stats.num_times_on += 1;
+        let last_conference = user.last_conference;
+        self.get_board().await.statistics.add_caller(user.get_name().clone());
+        if !user.date_format.is_empty() {
+            self.session.date_format = user.date_format.clone();
+        }
+        self.session.language = user.language.clone();
+        self.session.cur_security = user.security_level;
+        self.session.page_len = user.page_len;
+        self.session.user_name = user.get_name().clone();
+        self.session.alias_name = user.alias.clone();
+        self.session.fse_mode = user.flags.fse_mode.clone();
+
+        self.current_user = Some(user);
+        if self.session.language != old_language {
+            self.update_language().await;
+        }
+        self.join_conference(last_conference).await;
         return Ok(());
     }
 
-    pub fn save_current_user(&mut self) -> Res<()> {
+    pub async fn save_current_user(&mut self) -> Res<()> {
         let old_language = self.session.language.clone();
         self.session.date_format = if let Some(user) = &self.current_user {
             self.session.language = user.language.clone();
@@ -733,16 +722,14 @@ impl IcyBoardState {
             self.session.date_format.clone()
         };
         if self.session.language != old_language {
-            self.update_language();
+            self.update_language().await;
         }
 
-        if let Ok(mut board) = self.board.lock() {
-            if let Some(user) = &self.current_user {
-                for u in 0..board.users.len() {
-                    if board.users[u].get_name() == user.get_name() {
-                        board.set_user(user.clone(), u)?;
-                        return Ok(());
-                    }
+        if let Some(user) = &self.current_user {
+            for u in 0..self.get_board().await.users.len() {
+                if self.get_board().await.users[u].get_name() == user.get_name() {
+                    self.get_board().await.set_user(user.clone(), u)?;
+                    return Ok(());
                 }
             }
         }
@@ -823,14 +810,18 @@ impl IcyBoardState {
     }
 
     /// Gives back the user password, or 'SECRET' if the user password should not be given to doors.
-    pub fn door_user_password(&self) -> String {
-        if self.board.lock().unwrap().config.options.give_user_password_to_doors {
+    pub async fn door_user_password(&self) -> String {
+        if self.get_board().await.config.options.give_user_password_to_doors {
             if let Some(user) = &self.current_user {
                 return user.password.password.to_string();
             }
         }
 
         "SECRET".to_string()
+    }
+
+    pub async fn get_board(&self) -> tokio::sync::MutexGuard<IcyBoard> {
+        self.board.lock().await
     }
 }
 
@@ -1087,7 +1078,7 @@ impl IcyBoardState {
                 return None;
             }
             "BICPS" => result = self.transfer_statistics.get_cps_both().to_string(),
-            "BOARDNAME" => result = self.board.lock().unwrap().config.board.name.to_string(),
+            "BOARDNAME" => result = self.get_board().await.config.board.name.to_string(),
             "BPS" | "CARRIER" => result = self.get_bps().to_string(),
 
             // TODO
@@ -1128,7 +1119,7 @@ impl IcyBoardState {
                 }
             }
             "EXPDAYS" => {
-                if self.board.lock().unwrap().config.subscription_info.is_enabled {
+                if self.get_board().await.config.subscription_info.is_enabled {
                     if let Some(user) = &self.current_user {
                         if user.exp_date.year() != 0 {
                             result  =
@@ -1195,14 +1186,14 @@ impl IcyBoardState {
             "NOCHAR" => result = self.session.no_char.to_string(),
             "NODE" => result = self.node.to_string(),
             "NUMBLT" => {
-                if let Ok(bullettins) = self.load_bullettins() {
+                if let Ok(bullettins) = self.load_bullettins().await {
                     result = bullettins.len().to_string();
                 }
             }
             "NUMCALLS" => {
-                result = self.board.lock().unwrap().statistics.total.calls.to_string();
+                result = self.get_board().await.statistics.total.calls.to_string();
             }
-            "NUMCONF" => result = self.board.lock().unwrap().conferences.len().to_string(),
+            "NUMCONF" => result = self.get_board().await.conferences.len().to_string(),
             "NUMDIR" => {
                 result = self.session.current_conference.directories.len().to_string();
             }
@@ -1275,8 +1266,8 @@ impl IcyBoardState {
             "SYSDATE" => {
                 result = self.format_date(Utc::now());
             }
-            "SYSOPIN" => result = self.board.lock().unwrap().config.sysop.sysop_start.to_string(),
-            "SYSOPOUT" => result = self.board.lock().unwrap().config.sysop.sysop_stop.to_string(),
+            "SYSOPIN" => result = self.get_board().await.config.sysop.sysop_start.to_string(),
+            "SYSOPOUT" => result = self.get_board().await.config.sysop.sysop_stop.to_string(),
             "SYSTIME" => {
                 let now = Local::now();
                 let t = now.time();
@@ -1326,7 +1317,7 @@ impl IcyBoardState {
                 return None;
             }
             "XON" => {
-                if !self.board.lock().unwrap().config.options.non_graphics {
+                if !self.get_board().await.config.options.non_graphics {
                     self.session.disp_options.grapics_mode = GraphicsMode::Graphics;
                 }
                 return None;

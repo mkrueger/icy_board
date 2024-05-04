@@ -20,7 +20,7 @@ impl PcbBoardCommand {
     pub async fn quick_message_scan(&mut self, action: &Command) -> Res<()> {
         self.state.set_activity(UserActivity::ReadMessages);
 
-        let Ok(Some(area)) = self.show_message_areas(action).await else {
+        let Ok(Some(area)) = self.state.show_message_areas(self.state.session.current_conference_number, &action.help).await else {
             self.state.press_enter().await?;
             self.display_menu = true;
             return Ok(());
@@ -31,7 +31,7 @@ impl PcbBoardCommand {
     #[async_recursion(?Send)]
     async fn quick_message_scan_in_area(&mut self, area: usize, action: &Command) -> Res<()> {
         let message_base_file = &self.state.session.current_conference.areas[area].filename;
-        let msgbase_file_resolved = self.state.board.lock().unwrap().resolve_file(message_base_file);
+        let msgbase_file_resolved = self.state.get_board().await.resolve_file(message_base_file);
         match JamMessageBase::open(&msgbase_file_resolved) {
             Ok(message_base) => {
                 self.show_quick_scans(area, message_base, action).await?;

@@ -9,7 +9,7 @@ use chrono::{Local, Utc};
 use std::fs;
 
 /// CALLINFO.BBS format from the RBBS software.
-pub fn create_callinfo_bbs(state: &IcyBoardState, path: &std::path::Path, door_number: usize) -> Res<()> {
+pub async fn create_callinfo_bbs(state: &IcyBoardState, path: &std::path::Path, door_number: usize) -> Res<()> {
     let mut contents = String::new();
     contents.push_str(&format!("{}\r\n", state.session.user_name)); // User Name
     contents.push_str("5\r\n"); // Baud 300=1, 1200=2, 2400=0, 9600=3, 19200=4, Local=5
@@ -21,7 +21,7 @@ pub fn create_callinfo_bbs(state: &IcyBoardState, path: &std::path::Path, door_n
         _ => "COLOR",
     };
     contents.push_str(&format!("{}\r\n", emulation)); // Color or Mono
-    contents.push_str(&format!("{}\r\n", state.door_user_password()));
+    contents.push_str(&format!("{}\r\n", state.door_user_password().await));
     contents.push_str(&format!("{}\r\n", state.session.cur_user + 1)); // User Reference Number
     contents.push_str("0\r\n"); // User Time On
     contents.push_str(&format!("{}\r\n", state.session.login_date.format("%H:%M"))); // Time Str

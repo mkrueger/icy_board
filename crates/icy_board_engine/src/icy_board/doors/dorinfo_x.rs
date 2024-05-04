@@ -9,37 +9,35 @@ use crate::{
 };
 
 /// RBBS/QuickBBS
-pub fn create_dorinfo(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
+pub async fn create_dorinfo(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = String::new();
-    if let Ok(board) = state.board.lock() {
-        contents.push_str(&format!("{}\r\n", board.config.board.name)); // System name
-        contents.push_str(&format!("{}\r\n", board.users[0].get_first_name())); // Sysop first name
-        contents.push_str(&format!("{}\r\n", board.users[0].get_last_name())); // Sysop last name
-        contents.push_str(&format!("COM{}\r\n", DOOR_COM_PORT)); // Communications port in use (COM0 if local)
-        contents.push_str(&format!("{} BAUD-R,N,8,1\r\n\r\n", DOOR_BPS_RATE)); // Communications port settings
-        contents.push_str("0\r\n"); // Reserved (always zero)
-        contents.push_str(&format!("{}\r\n", state.session.get_first_name())); // User first name
-        contents.push_str(&format!("{}\r\n", state.session.get_last_name())); // User last name
-        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().get_first_name())); // User first name
-        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().get_last_name())); // User last name
-        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().city_or_state)); // User location
-        let emulation = match state.session.disp_options.grapics_mode {
-            GraphicsMode::Ctty => 0,
-            GraphicsMode::Avatar => 2,
-            _ => 1,
-        };
-        contents.push_str(&format!("{}\r\n", emulation)); // User emulation (0=ASCII, 1=ANSI, 2=AVATAR)
-        contents.push_str(&format!("{}\r\n", state.session.cur_security)); // User security level
-        contents.push_str(&format!("{}\r\n", state.session.minutes_left())); // User time remaining (in minutes)
-        contents.push_str("-1\r\n"); // EOF
+    let board = state.get_board().await;
+    contents.push_str(&format!("{}\r\n", board.config.board.name)); // System name
+    contents.push_str(&format!("{}\r\n", board.users[0].get_first_name())); // Sysop first name
+    contents.push_str(&format!("{}\r\n", board.users[0].get_last_name())); // Sysop last name
+    contents.push_str(&format!("COM{}\r\n", DOOR_COM_PORT)); // Communications port in use (COM0 if local)
+    contents.push_str(&format!("{} BAUD-R,N,8,1\r\n\r\n", DOOR_BPS_RATE)); // Communications port settings
+    contents.push_str("0\r\n"); // Reserved (always zero)
+    contents.push_str(&format!("{}\r\n", state.session.get_first_name())); // User first name
+    contents.push_str(&format!("{}\r\n", state.session.get_last_name())); // User last name
+    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().get_first_name())); // User first name
+    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().get_last_name())); // User last name
+    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().city_or_state)); // User location
+    let emulation = match state.session.disp_options.grapics_mode {
+        GraphicsMode::Ctty => 0,
+        GraphicsMode::Avatar => 2,
+        _ => 1,
+    };
+    contents.push_str(&format!("{}\r\n", emulation)); // User emulation (0=ASCII, 1=ANSI, 2=AVATAR)
+    contents.push_str(&format!("{}\r\n", state.session.cur_security)); // User security level
+    contents.push_str(&format!("{}\r\n", state.session.minutes_left())); // User time remaining (in minutes)
+    contents.push_str("-1\r\n"); // EOF
 
-        let file_name = format!("DORINFO{}.DEF", state.node + 1);
-        let path = path.join(&file_name);
-        log::info!("create {}: {}", file_name, path.display());
-        fs::write(path, contents)?;
-    } else {
-        return Err("Board not found".into());
-    }
+    let file_name = format!("DORINFO{}.DEF", state.node + 1);
+    let path = path.join(&file_name);
+    log::info!("create {}: {}", file_name, path.display());
+    fs::write(path, contents)?;
+
     Ok(())
 }
 

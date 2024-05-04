@@ -23,7 +23,7 @@ impl PcbBoardCommand {
                 .await?
         };
         if !help_cmd.is_empty() {
-            let mut help_loc = self.state.board.lock().unwrap().config.paths.help_path.clone();
+            let mut help_loc = self.state.get_board().await.config.paths.help_path.clone();
             let mut found = false;
             for action in &self.state.session.current_conference.commands {
                 if action.keyword.contains(&help_cmd) && !action.help.is_empty() {

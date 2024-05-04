@@ -10,7 +10,7 @@ impl PcbBoardCommand {
     pub async fn show_bulletins(&mut self, action: &Command) -> Res<()> {
         self.state.set_activity(UserActivity::ReadBulletins);
 
-        let bulletins = self.state.load_bullettins()?;
+        let bulletins = self.state.load_bullettins().await?;
         if bulletins.is_empty() {
             self.state
                 .display_text(

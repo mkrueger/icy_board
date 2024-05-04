@@ -123,7 +123,7 @@ impl PcbBoardCommand {
             return Ok(());
         }
         let working_directory = file_name.parent().unwrap();
-        door.create_drop_file(&self.state, &working_directory, door_number)?;
+        door.create_drop_file(&self.state, &working_directory, door_number).await?;
         let mut cmd = if door.use_shell_execute {
             tokio::process::Command::new("sh")
                 .arg("-c")

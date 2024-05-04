@@ -11,7 +11,7 @@ use jamjam::jam::JamMessageBase;
 impl PcbBoardCommand {
     pub async fn delete_message(&mut self, action: &Command) -> Res<()> {
         let message_base_file = &self.state.session.current_conference.areas[0].filename;
-        let msgbase_file_resolved = self.state.board.lock().unwrap().resolve_file(message_base_file);
+        let msgbase_file_resolved = self.state.get_board().await.resolve_file(message_base_file);
 
         match JamMessageBase::open(&msgbase_file_resolved) {
             Ok(message_base) => {

@@ -1,15 +1,11 @@
 use crate::Res;
-use icy_board_engine::{
-    icy_board::{
-        commands::{Command, CommandType},
-        icb_text::IceText,
-        security::RequiredSecurity,
-        state::{functions::display_flags, IcyBoardState, UserActivity},
-        IcyBoardError,
-    },
-    vm::TerminalTarget,
+use icy_board_engine::icy_board::{
+    commands::{Command, CommandType},
+    icb_text::IceText,
+    security::RequiredSecurity,
+    state::{functions::display_flags, IcyBoardState, UserActivity},
+    IcyBoardError,
 };
-use jamjam::jam::{JamMessage, JamMessageBase};
 
 mod login;
 mod message_reader;
@@ -61,7 +57,7 @@ impl PcbBoardCommand {
         self.state.session.push_tokens(&command);
         let command = self.state.session.tokens.pop_front().unwrap();
 
-        if let Some(action) = self.state.try_find_command(&command) {
+        if let Some(action) = self.state.try_find_command(&command).await {
             return self.dispatch_action(&command, &action).await;
         }
 
@@ -296,7 +292,7 @@ impl PcbBoardCommand {
     }
 
     async fn displaycmdfile(&mut self, command_file: &str) -> Res<bool> {
-        let path = self.state.board.lock().unwrap().config.paths.command_display_path.clone();
+        let path = self.state.get_board().await.config.paths.command_display_path.clone();
         if !path.is_dir() {
             return Ok(false);
         }
@@ -314,39 +310,5 @@ impl PcbBoardCommand {
         */
 
         self.state.display_file_with_error(&file, false).await
-    }
-
-    async fn send_message(&mut self, conf: i32, area: i32, msg: JamMessage, text: IceText) -> Res<()> {
-        let msg_base = if conf < 0 {
-            let user_name = msg.get_to().unwrap().to_string();
-            self.get_email_msgbase(&user_name).await
-        } else {
-            let msg_base = self.state.board.lock().unwrap().conferences[conf as usize].areas[area as usize]
-                .filename
-                .clone();
-            let msg_base = self.state.resolve_path(&msg_base);
-            if msg_base.with_extension("jhr").exists() {
-                JamMessageBase::open(msg_base)
-            } else {
-                JamMessageBase::create(msg_base)
-            }
-        };
-
-        match msg_base {
-            Ok(mut msg_base) => {
-                let number = msg_base.write_message(&msg)?;
-                msg_base.write_jhr_header()?;
-
-                self.state.display_text(text, display_flags::DEFAULT).await?;
-                self.state.println(TerminalTarget::Both, &number.to_string()).await?;
-                self.state.new_line().await?;
-            }
-            Err(err) => {
-                log::error!("while opening message base: {}", err.to_string());
-                self.state.display_text(IceText::MessageBaseError, display_flags::NEWLINE).await?;
-            }
-        }
-
-        Ok(())
     }
 }

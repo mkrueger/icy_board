@@ -32,7 +32,7 @@ impl PcbBoardCommand {
         self.state.reset_color().await?;
         self.state.new_line().await?;
         let mut output = String::new();
-        for u in self.state.board.lock().unwrap().users.iter() {
+        for u in self.state.get_board().await.users.iter() {
             if text.is_empty() || u.get_name().to_ascii_uppercase().contains(&text.to_ascii_uppercase()) {
                 output.push_str(&format!(
                     "{:<24} {:<30} {} {}\r\n",

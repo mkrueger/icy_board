@@ -14,7 +14,7 @@ impl PcbBoardCommand {
         }
 
         let user = self.state.current_user.clone().unwrap();
-        if !(self.state.session.is_local || self.state.board.lock().unwrap().config.options.exclude_local_calls) {
+        if !(self.state.session.is_local || self.state.get_board().await.config.options.exclude_local_calls) {
             self.state.display_text(IceText::ViewSettingsCallerNumber, display_flags::DEFAULT).await?;
             self.state
                 .println(TerminalTarget::Both, &format!(" {}", self.state.session.caller_number))
@@ -64,7 +64,7 @@ impl PcbBoardCommand {
 
         self.state.display_text(IceText::ViewSettingsTransferProtocol, display_flags::DEFAULT).await?;
         let mut protocol = user.protocol.to_string();
-        for p in self.state.board.lock().unwrap().protocols.iter() {
+        for p in self.state.get_board().await.protocols.iter() {
             if p.char_code == user.protocol {
                 protocol = p.description.clone();
                 break;

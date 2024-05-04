@@ -93,21 +93,21 @@ pub struct Door {
     pub drop_file: DropFile,
 }
 impl Door {
-    pub fn create_drop_file(&self, state: &super::state::IcyBoardState, path: &std::path::Path, door_number: usize) -> Res<()> {
+    pub async fn create_drop_file(&self, state: &super::state::IcyBoardState, path: &std::path::Path, door_number: usize) -> Res<()> {
         match self.drop_file {
             DropFile::None => Ok(()),
-            DropFile::PCBoard => pcboard::create_pcboard(state, path),
-            DropFile::DoorSys => door_sys::create_door_sys(state, path),
+            DropFile::PCBoard => pcboard::create_pcboard(state, path).await,
+            DropFile::DoorSys => door_sys::create_door_sys(state, path).await,
             DropFile::Door32Sys => door32_sys::create_door32_sys(state, path),
-            DropFile::DorInfo => dorinfo_x::create_dorinfo(state, path),
-            DropFile::CallInfo => callinfo_bbs::create_callinfo_bbs(state, path, door_number),
+            DropFile::DorInfo => dorinfo_x::create_dorinfo(state, path).await,
+            DropFile::CallInfo => callinfo_bbs::create_callinfo_bbs(state, path, door_number).await,
             DropFile::DoorFileSR => doorfile_sr::create_doorfile_sr(state, path),
             DropFile::CurruserBBS => curruser_bbs::create_curruser_bbs(state, path),
-            DropFile::ChainTXT => chain_txt::create_chain_txt(state, path),
-            DropFile::TriBBSSYS => tribbs_sys::create_tribbs_sys(state, path),
-            DropFile::SFDoorsDAT => sfdoors_dat::create_sfdoors_dat(state, path),
-            DropFile::ExitInfoBBS => exitinfo_bbs::create_exitinfo_bbs(state, path),
-            DropFile::JumperDat => jumper_dat::create_jumper_dat(state, path),
+            DropFile::ChainTXT => chain_txt::create_chain_txt(state, path).await,
+            DropFile::TriBBSSYS => tribbs_sys::create_tribbs_sys(state, path).await,
+            DropFile::SFDoorsDAT => sfdoors_dat::create_sfdoors_dat(state, path).await,
+            DropFile::ExitInfoBBS => exitinfo_bbs::create_exitinfo_bbs(state, path).await,
+            DropFile::JumperDat => jumper_dat::create_jumper_dat(state, path).await,
         }
     }
 }

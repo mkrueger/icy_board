@@ -9,11 +9,11 @@ use crate::{
 };
 
 /// TriBBS doorfile format
-pub fn create_tribbs_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
+pub async fn create_tribbs_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = String::new();
     contents.push_str(&format!("{}\r\n", state.session.cur_user));
     contents.push_str(&format!("{}\r\n", state.session.user_name));
-    contents.push_str(&format!("{}\r\n", state.door_user_password()));
+    contents.push_str(&format!("{}\r\n", state.door_user_password().await));
     contents.push_str(&format!("{}\r\n", state.session.cur_security));
     contents.push_str(&format!("{}\r\n", if state.session.expert_mode { "Y" } else { "N" }));
     let ansi = match state.session.disp_options.grapics_mode {
@@ -30,12 +30,9 @@ pub fn create_tribbs_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<(
     contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE));
     contents.push_str("Y\r\n"); // ?
     contents.push_str("Y\r\n"); // Error correcting connection
-    if let Ok(board) = state.board.lock() {
-        contents.push_str(&format!("{}\r\n", board.config.board.name));
-        contents.push_str(&format!("{}\r\n", board.config.sysop.name));
-    } else {
-        return Err("Board not found".into());
-    }
+    let board = state.get_board().await;
+    contents.push_str(&format!("{}\r\n", board.config.board.name));
+    contents.push_str(&format!("{}\r\n", board.config.sysop.name));
     contents.push_str(&format!("{}\r\n", state.session.alias_name));
     let path = path.join("TRIBBS.SYS");
     log::info!("create TRIBBS.SYS: {}", path.display());

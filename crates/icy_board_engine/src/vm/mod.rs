@@ -722,9 +722,14 @@ impl<'a> VirtualMachine<'a> {
         }
     }
 
-    pub fn resolve_file<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
+    pub async fn resolve_file<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
         let file = file.as_ref().to_string_lossy().to_string().replace('\\', "/");
-        self.icy_board_state.board.lock().unwrap().resolve_file(&file)
+        if file.starts_with("C:/") {
+            log::warn!("Absolute path detected: {}, change the src file.", file);
+            self.icy_board_state.get_board().await.resolve_file(&PathBuf::from(&file[3..]))
+        } else {
+            self.icy_board_state.get_board().await.resolve_file(&file)
+        }
     }
 }
 /// .

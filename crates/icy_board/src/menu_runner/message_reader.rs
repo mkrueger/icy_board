@@ -3,7 +3,7 @@ use icy_board_engine::{
     icy_board::{
         commands::Command,
         icb_text::{IceText, TextEntry},
-        state::{functions::display_flags, IcyBoardState, UserActivity},
+        state::{functions::display_flags, IcyBoardState},
     },
     vm::TerminalTarget,
 };
@@ -127,7 +127,7 @@ impl MessageViewer {
     pub async fn display_header(&self, state: &mut IcyBoardState, msg_base: &JamMessageBase, header: &JamMessageHeader) -> Res<()> {
         state.clear_screen().await?;
 
-        let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_date.clone();
+        let c1 = state.get_board().await.config.color_configuration.msg_hdr_date.clone();
         state.set_color(TerminalTarget::Both, c1).await?;
         let time = if let Some(dt) = chrono::DateTime::from_timestamp(header.date_written as i64, 0) {
             dt.to_string()
@@ -149,22 +149,22 @@ impl MessageViewer {
         let txt = self.format_hdr_text(&self.date_num.text, &time, &msg_counter);
         state.print(TerminalTarget::Both, &txt).await?;
 
-        let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_to.clone();
+        let c1 = state.get_board().await.config.color_configuration.msg_hdr_to.clone();
         state.set_color(TerminalTarget::Both, c1).await?;
         let txt = self.format_hdr_text(&self.to_line.text, &header.get_to().unwrap().to_string(), "");
         state.print(TerminalTarget::Both, &txt).await?;
 
-        let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_from.clone();
+        let c1 = state.get_board().await.config.color_configuration.msg_hdr_from.clone();
         state.set_color(TerminalTarget::Both, c1).await?;
         let txt = self.format_hdr_text(&self.from_line.text, &header.get_from().unwrap().to_string(), "");
         state.print(TerminalTarget::Both, &txt).await?;
 
-        let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_subj.clone();
+        let c1 = state.get_board().await.config.color_configuration.msg_hdr_subj.clone();
         state.set_color(TerminalTarget::Both, c1).await?;
         let txt = self.format_hdr_text(&self.subj_line.text, &header.get_subject().unwrap().to_string(), "");
         state.print(TerminalTarget::Both, &txt).await?;
 
-        let c1 = state.board.lock().unwrap().config.color_configuration.msg_hdr_read.clone();
+        let c1 = state.get_board().await.config.color_configuration.msg_hdr_read.clone();
         state.set_color(TerminalTarget::Both, c1).await?;
         /*        let txt = self.format_hdr_text(&self.read.text, "", "");
                 state.print(TerminalTarget::Both, &txt)?;
@@ -188,60 +188,6 @@ impl MessageViewer {
 }
 
 impl PcbBoardCommand {
-    pub async fn show_message_areas(&mut self, action: &Command) -> Res<Option<usize>> {
-        self.state.set_activity(UserActivity::BrowseFiles);
-        self.state.session.disable_auto_more = false;
-        self.state.session.more_requested = false;
-
-        if self.state.session.current_conference.areas.is_empty() {
-            self.state
-                .display_text(IceText::NoAreasAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
-                .await?;
-            self.state.press_enter().await?;
-            return Ok(None);
-        }
-        let area_number = if let Some(token) = self.state.session.tokens.pop_front() {
-            token
-        } else {
-            let mnu = self.state.session.current_conference.area_menu.clone();
-            let mnu = self.state.resolve_path(&mnu);
-            self.state.display_menu(&mnu).await?;
-            self.state.new_line().await?;
-
-            self.state
-                .input_field(
-                    if self.state.session.expert_mode {
-                        IceText::AreaListCommandExpert
-                    } else {
-                        IceText::AreaListCommand
-                    },
-                    40,
-                    MASK_COMMAND,
-                    &action.help,
-                    None,
-                    display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
-                )
-                .await?
-        };
-
-        if !area_number.is_empty() {
-            if let Ok(number) = area_number.parse::<i32>() {
-                if 1 <= number && (number as usize) <= self.state.session.current_conference.areas.len() {
-                    let area = &self.state.session.current_conference.directories[number as usize - 1];
-                    if area.list_security.user_can_access(&self.state.session) {
-                        return Ok(Some(number as usize - 1));
-                    }
-                }
-            }
-
-            self.state.session.op_text = area_number;
-            self.state
-                .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::NOTBLANK)
-                .await?;
-        }
-        Ok(None)
-    }
-
     pub async fn read_msgs_from_base(&mut self, message_base: JamMessageBase, action: &Command) -> Res<()> {
         let viewer = MessageViewer::load(&self.state.display_text)?;
 

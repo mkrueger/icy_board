@@ -1,6 +1,7 @@
 use std::{fs, thread, time::Duration};
 
 use crate::{
+    datetime::IcbDate,
     executable::{PPEExpr, VariableType, VariableValue},
     icy_board::{
         icb_config::IcbColor,
@@ -8,7 +9,10 @@ use crate::{
     },
     Res,
 };
+use bstr::BString;
+use chrono::Utc;
 use codepages::tables::CP437_TO_UNICODE;
+use jamjam::jam::JamMessage;
 
 use crate::{
     icy_board::icb_text::IceText,
@@ -71,7 +75,7 @@ pub async fn confunflag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
 pub async fn dispfile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let file_name = &vm.eval_expr(&args[0]).await?.as_string();
 
-    let file_name = vm.resolve_file(&file_name);
+    let file_name = vm.resolve_file(&file_name).await;
     vm.icy_board_state.display_file(&file_name).await?;
     Ok(())
 }
@@ -81,7 +85,7 @@ pub async fn fcreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let file = vm.eval_expr(&args[1]).await?.as_string();
     let am = vm.eval_expr(&args[2]).await?.as_int();
     let sm = vm.eval_expr(&args[3]).await?.as_int();
-    let file = vm.resolve_file(&file).to_string_lossy().to_string();
+    let file = vm.resolve_file(&file).await.to_string_lossy().to_string();
     vm.io.fcreate(channel, &file, am, sm);
     Ok(())
 }
@@ -91,7 +95,7 @@ pub async fn fopen(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let file = vm.eval_expr(&args[1]).await?.as_string();
     let am = vm.eval_expr(&args[2]).await?.as_int();
     let sm = vm.eval_expr(&args[3]).await?.as_int();
-    let file = vm.resolve_file(&file).to_string_lossy().to_string();
+    let file = vm.resolve_file(&file).await.to_string_lossy().to_string();
     vm.io.fopen(channel, &file, am, sm)?;
     Ok(())
 }
@@ -101,7 +105,7 @@ pub async fn fappend(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let file = vm.eval_expr(&args[1]).await?.as_string();
     let am = vm.eval_expr(&args[2]).await?.as_int();
     let sm = vm.eval_expr(&args[3]).await?.as_int();
-    let file = vm.resolve_file(&file).to_string_lossy().to_string();
+    let file = vm.resolve_file(&file).await.to_string_lossy().to_string();
     vm.io.fappend(channel, &file, am, sm);
     Ok(())
 }
@@ -205,7 +209,7 @@ pub async fn defcolor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 
 pub async fn delete(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let file = &vm.eval_expr(&args[0]).await?.as_string();
-    let file = vm.resolve_file(&file).to_string_lossy().to_string();
+    let file = vm.resolve_file(&file).await.to_string_lossy().to_string();
     if let Err(err) = vm.io.delete(&file) {
         log::error!("Error deleting file: {}", err);
     }
@@ -501,7 +505,7 @@ pub async fn kbdstring(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
 }
 pub async fn kbdfile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let file_name = vm.eval_expr(&args[0]).await?.as_string();
-    let fil_name = vm.resolve_file(&file_name);
+    let fil_name = vm.resolve_file(&file_name).await;
     let contents = fs::read_to_string(file_name)?;
     vm.icy_board_state.put_keyboard_buffer(&contents, false)?;
 
@@ -668,10 +672,51 @@ pub async fn closecap(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     log::error!("not implemented statement!");
     panic!("TODO")
 }
+
 pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    let conf = vm.eval_expr(&args[0]).await?.as_int() as u16;
+    let to = vm.eval_expr(&args[1]).await?.as_string();
+    let from = vm.eval_expr(&args[2]).await?.as_string();
+    let subject = vm.eval_expr(&args[3]).await?.as_string();
+    let sec = vm.eval_expr(&args[4]).await?.as_string(); // Security
+    let pack_out_date = vm.eval_expr(&args[5]).await?.as_int() as u32;
+    let retreceipt = vm.eval_expr(&args[6]).await?.as_bool();
+    let echo = vm.eval_expr(&args[7]).await?.as_bool();
+    let file = vm.eval_expr(&args[8]).await?.as_string();
+    let file = vm.resolve_file(&file).await;
+    if !file.exists() {
+        log::error!("PPE function 'message': Message text file not found {}", file.display());
+        return Err(Box::new(IcyError::FileNotFound("MESSAGE".to_string(), file.display().to_string())));
+    }
+
+    if let Ok(area_opt) = vm.icy_board_state.show_message_areas(conf, "").await {
+        match area_opt {
+            Some(area) => {
+                let mut message = JamMessage::default()
+                    .with_from(BString::from(from))
+                    .with_to(BString::from(to))
+                    .with_subject(BString::from(subject))
+                    .with_date_time(Utc::now())
+                    .with_text(BString::from(fs::read_to_string(file)?));
+                // TODO: Message Security
+                if pack_out_date > 0 {
+                    message = message.with_packout_date(IcbDate::from_pcboard(pack_out_date).to_utc_date_time());
+                }
+                vm.icy_board_state
+                    .send_message(conf as i32, area as i32, message, IceText::SavingMessage)
+                    .await?;
+            }
+            None => {
+                vm.icy_board_state
+                    .display_text(IceText::MessageAborted, display_flags::LFBEFORE | display_flags::NEWLINE)
+                    .await?;
+                log::error!("Message area not found: {}", conf);
+            }
+        }
+    }
+    Ok(())
 }
+
 pub async fn savescrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
@@ -745,8 +790,8 @@ pub async fn mprintln(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 pub async fn rename(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let old = &vm.eval_expr(&args[0]).await?.as_string();
     let new = &vm.eval_expr(&args[1]).await?.as_string();
-    let old = vm.resolve_file(&old).to_string_lossy().to_string();
-    let new = vm.resolve_file(&new).to_string_lossy().to_string();
+    let old = vm.resolve_file(&old).await.to_string_lossy().to_string();
+    let new = vm.resolve_file(&new).await.to_string_lossy().to_string();
 
     if let Err(err) = vm.io.rename(&old, &new) {
         log::error!("Error renaming file: {}", err);
@@ -937,14 +982,11 @@ pub async fn wrusysdoor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
 
 pub async fn getaltuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let user_record = vm.eval_expr(&args[0]).await?.as_int() as usize;
-    let user = if let Ok(board) = vm.icy_board_state.board.lock() {
-        if user_record >= board.users.len() {
-            return Err(Box::new(VMError::UserRecordOutOfBounds(user_record)));
-        }
-        board.users[user_record].clone()
-    } else {
-        return Err(Box::new(VMError::InternalVMError));
-    };
+    if user_record >= vm.icy_board_state.get_board().await.users.len() {
+        return Err(Box::new(VMError::UserRecordOutOfBounds(user_record)));
+    }
+    let user = vm.icy_board_state.get_board().await.users[user_record].clone();
+
     vm.set_user_variables(&user);
     Ok(())
 }

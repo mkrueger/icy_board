@@ -26,18 +26,13 @@ impl PcbBoardCommand {
             let selected_protocol = protocol.to_ascii_uppercase();
 
             self.state.display_text(IceText::DefaultProtocol, display_flags::DEFAULT).await?;
-            let txt = if let Ok(board) = self.state.board.lock() {
-                let mut res = String::new();
-                for protocol in board.protocols.iter() {
-                    if &protocol.char_code == &selected_protocol {
-                        res.clone_from(&protocol.description);
-                        break;
-                    }
+            let mut txt = String::new();
+            for protocol in self.state.get_board().await.protocols.iter() {
+                if &protocol.char_code == &selected_protocol {
+                    txt.clone_from(&protocol.description);
+                    break;
                 }
-                res
-            } else {
-                "Error".to_string()
-            };
+            }
             if let Some(user) = &mut self.state.current_user {
                 user.protocol = selected_protocol;
             }
@@ -54,23 +49,27 @@ impl PcbBoardCommand {
     pub async fn ask_protocols(&mut self, cur_protocol: String) -> Res<String> {
         let mut protocols = Vec::new();
         self.state.new_line().await?;
-        if let Ok(board) = self.state.board.lock() {
-            for protocol in board.protocols.iter() {
-                if !protocol.is_enabled {
-                    continue;
-                }
-                if protocol.char_code == cur_protocol {
-                    protocols.push(format!("=> ({}) {}", protocol.char_code, protocol.description));
-                } else {
-                    protocols.push(format!("   ({}) {}", protocol.char_code, protocol.description));
-                }
+        for protocol in self.state.get_board().await.protocols.iter() {
+            if !protocol.is_enabled {
+                continue;
             }
-
-            if "N" == cur_protocol {
-                protocols.push(format!("=> (N) {}", board.default_display_text.get_display_text(IceText::None).unwrap().text));
+            if protocol.char_code == cur_protocol {
+                protocols.push(format!("=> ({}) {}", protocol.char_code, protocol.description));
             } else {
-                protocols.push(format!("   (N) {}", board.default_display_text.get_display_text(IceText::None).unwrap().text));
+                protocols.push(format!("   ({}) {}", protocol.char_code, protocol.description));
             }
+        }
+
+        if "N" == cur_protocol {
+            protocols.push(format!(
+                "=> (N) {}",
+                self.state.get_board().await.default_display_text.get_display_text(IceText::None).unwrap().text
+            ));
+        } else {
+            protocols.push(format!(
+                "   (N) {}",
+                self.state.get_board().await.default_display_text.get_display_text(IceText::None).unwrap().text
+            ));
         }
 
         self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11)).await?;

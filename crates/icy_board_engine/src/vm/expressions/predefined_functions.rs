@@ -555,7 +555,7 @@ pub async fn curconf(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<Vari
     Ok(VariableValue::new_int(vm.icy_board_state.session.current_conference_number as i32))
 }
 pub async fn pcbdat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_string(vm.icy_board_state.get_pcbdat()?))
+    Ok(VariableValue::new_string(vm.icy_board_state.get_pcbdat().await?))
 }
 
 pub async fn ppepath(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -583,7 +583,7 @@ pub async fn pcbnode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 pub async fn readline(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let file_name = vm.eval_expr(&args[0]).await?.as_string();
     let line = vm.eval_expr(&args[1]).await?.as_int();
-    let file_name = vm.resolve_file(&file_name);
+    let file_name = vm.resolve_file(&file_name).await;
 
     if let Ok(file) = fs::read(&file_name) {
         let file = file.iter().map(|x| CP437_TO_UNICODE[*x as usize]).collect::<String>();
@@ -598,7 +598,7 @@ pub async fn readline(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 
 pub async fn sysopsec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(
-        vm.icy_board_state.board.lock().unwrap().config.sysop_security_level.sysop as i32,
+        vm.icy_board_state.get_board().await.config.sysop_security_level.sysop as i32,
     ))
 }
 pub async fn onlocal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -866,7 +866,7 @@ pub async fn u_stat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
     panic!("TODO")
 }
 pub async fn defcolor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let color = vm.icy_board_state.board.lock().unwrap().config.color_configuration.default.clone();
+    let color = vm.icy_board_state.get_board().await.config.color_configuration.default.clone();
     match color {
         crate::icy_board::icb_config::IcbColor::None => Ok(VariableValue::new_int(7)),
         crate::icy_board::icb_config::IcbColor::Dos(col) => Ok(VariableValue::new_int(col as i32)),
@@ -901,7 +901,7 @@ pub async fn fileinf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     let file = vm.eval_expr(&args[0]).await?.as_string();
     let item = vm.eval_expr(&args[1]).await?.as_int();
 
-    let file = vm.resolve_file(&file);
+    let file = vm.resolve_file(&file).await;
     let path = PathBuf::from(&file);
     match item {
         1 => Ok(VariableValue::new_bool(file.exists())),
@@ -969,9 +969,8 @@ pub async fn maxnode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 pub async fn slpath(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_string(
         vm.icy_board_state
-            .board
-            .lock()
-            .unwrap()
+            .get_board()
+            .await
             .config
             .paths
             .security_file_path
@@ -981,20 +980,12 @@ pub async fn slpath(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 }
 pub async fn helppath(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_string(
-        vm.icy_board_state.board.lock().unwrap().config.paths.help_path.to_string_lossy().to_string(),
+        vm.icy_board_state.get_board().await.config.paths.help_path.to_string_lossy().to_string(),
     ))
 }
 pub async fn temppath(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_string(
-        vm.icy_board_state
-            .board
-            .lock()
-            .unwrap()
-            .config
-            .paths
-            .tmp_work_path
-            .to_string_lossy()
-            .to_string(),
+        vm.icy_board_state.get_board().await.config.paths.tmp_work_path.to_string_lossy().to_string(),
     ))
 }
 pub async fn modem(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1019,7 +1010,7 @@ pub async fn tokcount(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 
 pub async fn u_recnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let user_name = vm.eval_expr(&args[0]).await?.as_string().to_uppercase();
-    for (i, user) in vm.icy_board_state.board.lock().unwrap().users.iter().enumerate() {
+    for (i, user) in vm.icy_board_state.get_board().await.users.iter().enumerate() {
         if user.get_name().to_uppercase() == user_name {
             return Ok(VariableValue::new_int(i as i32));
         }
@@ -1125,7 +1116,7 @@ pub async fn confreg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
 
     // TODO: What is that ?
-    // vm.icy_board_state.board.lock().unwrap().conferences[conf_num].
+    // vm.icy_board_state.get_board().await.conferences[conf_num].
     Ok(VariableValue::new_bool(true))
 }
 pub async fn confexp(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1231,7 +1222,7 @@ pub async fn outbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     Ok(VariableValue::new_int(0))
 }
 pub async fn hiconfnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.board.lock().unwrap().conferences.len() as i32 - 1))
+    Ok(VariableValue::new_int(vm.icy_board_state.get_board().await.conferences.len() as i32 - 1))
 }
 
 pub async fn inbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1243,7 +1234,7 @@ pub async fn crc32(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     let param = vm.eval_expr(&args[1]).await?.as_string();
 
     if use_file {
-        let file = vm.resolve_file(&param);
+        let file = vm.resolve_file(&param).await;
         let buffer = fs::read(file)?;
         let crc = calc_crc32(&buffer);
         Ok(VariableValue::new_unsigned(crc as u64))
@@ -1523,7 +1514,7 @@ pub async fn uselmrs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 
 pub async fn new_confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
-    if let Some(conference) = &vm.icy_board_state.board.lock().unwrap().conferences.get(conf_num) {
+    if let Some(conference) = &vm.icy_board_state.get_board().await.conferences.get(conf_num) {
         vm.user_data.push(Box::new((*conference).clone()));
         Ok(VariableValue {
             data: VariableData::from_int(0),
@@ -1539,7 +1530,7 @@ pub async fn new_confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<
 pub async fn confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
     let conf_field = vm.eval_expr(&args[1]).await?.as_int();
-    if let Some(conference) = &vm.icy_board_state.board.lock().unwrap().conferences.get(conf_num) {
+    if let Some(conference) = &vm.icy_board_state.get_board().await.conferences.get(conf_num) {
         match conf_field {
             1 => Ok(VariableValue::new_string(conference.name.clone())),
             2 => Ok(VariableValue::new_bool(conference.is_public)),

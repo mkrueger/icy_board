@@ -3,7 +3,7 @@ use crate::{
     Res,
 };
 use icy_board_engine::{
-    icy_board::{commands::Command, icb_config::IcbColor, icb_text::IceText, state::functions::display_flags, IcyBoardError},
+    icy_board::{commands::Command, icb_config::IcbColor, icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
 };
 
@@ -23,7 +23,7 @@ impl PcbBoardCommand {
             if let Some(user) = &mut self.state.current_user {
                 user.language = lang;
             }
-            self.state.save_current_user()?;
+            self.state.save_current_user().await?;
         }
         self.state.press_enter().await?;
         self.display_menu = true;
@@ -33,11 +33,7 @@ impl PcbBoardCommand {
     pub async fn ask_languages(&mut self, cur_language: String) -> Res<String> {
         let mut languages = Vec::new();
         self.state.new_line().await?;
-        let l = if let Ok(board) = self.state.board.lock() {
-            board.languages.clone()
-        } else {
-            return Err(IcyBoardError::ErrorLockingBoard.into());
-        };
+        let l = self.state.get_board().await.languages.clone();
         let mut cur_lang_str = String::new();
         for (i, lang) in l.languages.iter().enumerate() {
             if lang.extension == cur_language {

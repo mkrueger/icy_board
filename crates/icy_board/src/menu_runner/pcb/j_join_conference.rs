@@ -6,7 +6,7 @@ use icy_board_engine::icy_board::{commands::Command, icb_text::IceText, state::f
 
 impl PcbBoardCommand {
     pub async fn join_conference(&mut self, action: &Command) -> Res<()> {
-        if self.state.board.lock().unwrap().conferences.is_empty() {
+        if self.state.get_board().await.conferences.is_empty() {
             self.state
                 .display_text(IceText::NoConferenceAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
@@ -16,7 +16,7 @@ impl PcbBoardCommand {
         let conf_number = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
-            let mnu = self.state.board.lock().unwrap().config.paths.conf_join_menu.clone();
+            let mnu = self.state.get_board().await.config.paths.conf_join_menu.clone();
             let mnu = self.state.resolve_path(&mnu);
 
             self.state.display_menu(&mnu).await?;
@@ -36,8 +36,8 @@ impl PcbBoardCommand {
         if !conf_number.is_empty() {
             let mut joined = false;
             if let Ok(number) = conf_number.parse::<u16>() {
-                if (number as usize) <= self.state.board.lock().unwrap().conferences.len() {
-                    self.state.join_conference(number);
+                if (number as usize) <= self.state.get_board().await.conferences.len() {
+                    self.state.join_conference(number).await;
                     self.state.session.op_text = format!(
                         "{} ({})",
                         self.state.session.current_conference.name, self.state.session.current_conference_number

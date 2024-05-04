@@ -38,7 +38,7 @@ impl PcbBoardCommand {
             return Ok(());
         };
 
-        let to = self.state.board.lock().unwrap().config.sysop.name.clone();
+        let to = self.state.get_board().await.config.sysop.name.clone();
         let subj = format!("COMMENT {}", IcbTime::now().to_string());
 
         let receipt = self
@@ -94,7 +94,7 @@ impl PcbBoardCommand {
                     .with_date_time(Utc::now())
                     .with_text(BString::from(msg));
 
-                self.send_message(conf, area, msg, text).await?;
+                self.state.send_message(conf, area, msg, text).await?;
             }
         }
         Ok(())

@@ -8,7 +8,7 @@ impl PcbBoardCommand {
     pub async fn toggle_graphics(&mut self) -> Res<()> {
         self.displaycmdfile("m").await?;
 
-        if self.state.board.lock().unwrap().config.options.non_graphics {
+        if self.state.get_board().await.config.options.non_graphics {
             self.state
                 .display_text(IceText::GraphicsUnavailable, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;

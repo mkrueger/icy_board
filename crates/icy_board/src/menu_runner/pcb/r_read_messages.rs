@@ -10,7 +10,7 @@ use crate::{menu_runner::PcbBoardCommand, Res};
 impl PcbBoardCommand {
     pub async fn read_messages(&mut self, action: &Command) -> Res<()> {
         self.state.set_activity(UserActivity::ReadMessages);
-        let Ok(Some(area)) = self.show_message_areas(action).await else {
+        let Ok(Some(area)) = self.state.show_message_areas(self.state.session.current_conference_number, &action.help).await else {
             self.state.press_enter().await?;
             self.display_menu = true;
             return Ok(());
@@ -24,7 +24,7 @@ impl PcbBoardCommand {
         while tries < 2 {
             tries += 1;
             let message_base_file = &self.state.session.current_conference.areas[area].filename;
-            let msgbase_file_resolved = self.state.board.lock().unwrap().resolve_file(message_base_file);
+            let msgbase_file_resolved = self.state.get_board().await.resolve_file(message_base_file);
             match JamMessageBase::open(&msgbase_file_resolved) {
                 Ok(message_base) => {
                     self.read_msgs_from_base(message_base, action).await?;

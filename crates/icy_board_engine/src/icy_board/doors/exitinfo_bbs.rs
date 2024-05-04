@@ -12,7 +12,7 @@ use icy_net::crc::get_crc32;
 use std::fs;
 
 /// EXITINFO.BBS format from the RemoteAccess software. (2.62 extensions)
-pub fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
+pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = Vec::new();
     contents.extend(u16::to_le_bytes(DOOR_BPS_RATE as u16));
     let Some(user) = &state.current_user else {
@@ -20,21 +20,20 @@ pub fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) -> Res
     };
 
     // SYSINFO
-    if let Ok(board) = state.board.lock() {
-        contents.extend(u32::to_le_bytes(board.statistics.total.calls as u32));
-        if let Some(last) = board.statistics.last_callers.last() {
-            contents.extend(export_cp437_string(&last.user_name, 35, 0));
-        } else {
-            contents.extend(export_cp437_string("", 35, 0));
-        }
-        if let Some(last) = board.statistics.last_callers.last() {
-            contents.extend(export_cp437_string(&last.user_name, 35, 0));
-        } else {
-            contents.extend(export_cp437_string("", 35, 0));
-        }
-        // extra space
-        contents.extend([0; 92].iter());
+    let board = state.get_board().await;
+    contents.extend(u32::to_le_bytes(board.statistics.total.calls as u32));
+    if let Some(last) = board.statistics.last_callers.last() {
+        contents.extend(export_cp437_string(&last.user_name, 35, 0));
+    } else {
+        contents.extend(export_cp437_string("", 35, 0));
     }
+    if let Some(last) = board.statistics.last_callers.last() {
+        contents.extend(export_cp437_string(&last.user_name, 35, 0));
+    } else {
+        contents.extend(export_cp437_string("", 35, 0));
+    }
+    // extra space
+    contents.extend([0; 92].iter());
 
     // OldTIMELOGrecord
     contents.extend(state.session.login_date.format("%m-%d-%y").to_string().as_bytes());
@@ -107,7 +106,7 @@ pub fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) -> Res
     contents.push(0); // LastDOBCheck
     contents.extend(u16::to_le_bytes(state.session.current_conference_number)); // MsgGroup
     contents.push(0); // Attribute3
-    contents.extend(export_cp437_string(&state.door_user_password(), 15, 0)); // Password
+    contents.extend(export_cp437_string(&state.door_user_password().await, 15, 0)); // Password
 
     contents.extend(user.stats.last_on.format("%C").to_string().as_bytes());
     contents.extend(user.stats.first_date_on.format("%C").to_string().as_bytes());

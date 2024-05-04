@@ -63,16 +63,17 @@ lazy_static::lazy_static! {
 }
 /// evlevlelvelvelv`
 
-fn main() -> Res<()> {
+#[tokio::main]
+async fn main() -> Res<()> {
     let arguments: Cli = argh::from_env();
     let file = arguments.file.clone().unwrap_or(PathBuf::from("."));
 
-    start_icy_board(&arguments, &file)?;
+    start_icy_board(&arguments, &file).await?;
 
     Ok(())
 }
 
-fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Res<()> {
+async fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Res<()> {
     let mut file = config_file.as_ref().to_path_buf();
     if file.is_dir() {
         file = file.join("icyboard.toml");
@@ -105,7 +106,7 @@ fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Res<()> 
     match IcyBoard::load(&config_file) {
         Ok(icy_board) => {
             let mut bbs = Arc::new(Mutex::new(BBS::new(icy_board.config.board.num_nodes as usize)));
-            let board = Arc::new(Mutex::new(icy_board));
+            let board = Arc::new(tokio::sync::Mutex::new(icy_board));
             if arguments.localon || arguments.ppe.is_some() {
                 let mut terminal = init_terminal()?;
                 let cmd = if let Some(ppe) = &arguments.ppe {
@@ -113,12 +114,12 @@ fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Res<()> 
                 } else {
                     CallWaitMessage::User(false)
                 };
-                run_message(cmd, &mut terminal, &board, &mut bbs)?;
+                run_message(cmd, &mut terminal, &board, &mut bbs).await?;
                 restore_terminal()?;
                 return Ok(());
             }
             {
-                let telnet_connection = board.lock().unwrap().config.login_server.telnet.clone();
+                let telnet_connection = board.lock().await.config.login_server.telnet.clone();
                 if telnet_connection.is_enabled {
                     let bbs = bbs.clone();
                     let board = board.clone();
@@ -132,7 +133,7 @@ fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Res<()> 
                         .unwrap();
                 }
 
-                let ssh_connection = board.lock().unwrap().config.login_server.ssh.clone();
+                let ssh_connection = board.lock().await.config.login_server.ssh.clone();
                 if ssh_connection.is_enabled {
                     let bbs = bbs.clone();
                     let board = board.clone();
@@ -144,7 +145,7 @@ fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Res<()> 
                         .unwrap();
                 }
 
-                let websocket_connection = board.lock().unwrap().config.login_server.websocket.clone();
+                let websocket_connection = board.lock().await.config.login_server.websocket.clone();
                 if websocket_connection.is_enabled {
                     let bbs = bbs.clone();
                     let board = board.clone();
@@ -156,7 +157,7 @@ fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Res<()> 
                         .unwrap();
                 }
 
-                let secure_websocket_connection = board.lock().unwrap().config.login_server.secure_websocket.clone();
+                let secure_websocket_connection = board.lock().await.config.login_server.secure_websocket.clone();
                 if secure_websocket_connection.is_enabled {
                     let bbs = bbs.clone();
                     let board = board.clone();
@@ -170,11 +171,11 @@ fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Res<()> 
             }
 
             loop {
-                let mut app = CallWaitScreen::new(&board)?;
+                let mut app = CallWaitScreen::new(&board).await?;
                 let mut terminal = init_terminal()?;
-                match app.run(&mut terminal, &board) {
+                match app.run(&mut terminal, &board).await {
                     Ok(msg) => {
-                        if let Err(err) = run_message(msg, &mut terminal, &board, &mut bbs) {
+                        if let Err(err) = run_message(msg, &mut terminal, &board, &mut bbs).await {
                             restore_terminal()?;
                             log::error!("while processing call wait screen message: {}", err.to_string());
                             print_error(err.to_string());
@@ -196,12 +197,17 @@ fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Res<()> 
     }
 }
 
-fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, board: &Arc<Mutex<IcyBoard>>, bbs: &mut Arc<Mutex<BBS>>) -> Res<()> {
+async fn run_message(
+    msg: CallWaitMessage,
+    terminal: &mut Terminal<impl Backend>,
+    board: &Arc<tokio::sync::Mutex<IcyBoard>>,
+    bbs: &mut Arc<Mutex<BBS>>,
+) -> Res<()> {
     match msg {
         CallWaitMessage::User(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
             let mut tui = Tui::local_mode(board, bbs, false, None);
-            if let Err(err) = tui.run(&board) {
+            if let Err(err) = tui.run(&board).await {
                 restore_terminal()?;
                 log::error!("while running board in local mode: {}", err.to_string());
                 println!("Error: {}", err);
@@ -211,7 +217,7 @@ fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, boar
         CallWaitMessage::RunPPE(ppe) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
             let mut tui = Tui::local_mode(board, bbs, true, Some(ppe));
-            if let Err(err) = tui.run(&board) {
+            if let Err(err) = tui.run(&board).await {
                 restore_terminal()?;
                 log::error!("while running board in local mode: {}", err.to_string());
                 println!("Error: {}", err);
@@ -221,7 +227,7 @@ fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, boar
         CallWaitMessage::Sysop(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
             let mut tui = Tui::local_mode(board, bbs, true, None);
-            if let Err(err) = tui.run(&board) {
+            if let Err(err) = tui.run(&board).await {
                 restore_terminal()?;
                 log::error!("while running board in local mode: {}", err.to_string());
                 println!("Error: {}", err);
@@ -234,12 +240,12 @@ fn run_message(msg: CallWaitMessage, terminal: &mut Terminal<impl Backend>, boar
             process::exit(0);
         }
         CallWaitMessage::Monitor => {
-            let mut app = node_monitoring_screen::NodeMonitoringScreen::new(&board);
+            let mut app = node_monitoring_screen::NodeMonitoringScreen::new(&board).await;
             match app.run(terminal, &board, bbs) {
                 Ok(msg) => {
                     if let NodeMonitoringScreenMessage::EnterNode(node) = msg {
                         let mut tui = Tui::sysop_mode(bbs, node)?;
-                        if let Err(err) = tui.run(&board) {
+                        if let Err(err) = tui.run(&board).await {
                             restore_terminal()?;
                             log::error!("while running board in local mode: {}", err.to_string());
                             println!("Error: {}", err);

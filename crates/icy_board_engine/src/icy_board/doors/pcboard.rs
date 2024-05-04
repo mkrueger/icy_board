@@ -11,9 +11,9 @@ use crate::{
     Res,
 };
 use chrono::{Local, Timelike};
-pub fn create_pcboard(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
+pub async fn create_pcboard(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     create_pcboard_sys(state, path)?;
-    create_user_sys(state, path)?;
+    create_user_sys(state, path).await?;
 
     Ok(())
 }
@@ -92,7 +92,7 @@ fn create_pcboard_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> 
     Ok(())
 }
 
-fn create_user_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
+async fn create_user_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = Vec::new();
 
     // HEADER
@@ -110,7 +110,7 @@ fn create_user_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     if let Some(user) = &state.current_user {
         contents.extend(export_cp437_string(&user.name, 26, 0));
         contents.extend(export_cp437_string(&user.city_or_state, 25, 0));
-        contents.extend(export_cp437_string(&state.door_user_password(), 13, 0));
+        contents.extend(export_cp437_string(&state.door_user_password().await, 13, 0));
         contents.extend(export_cp437_string(&user.bus_data_phone, 14, 0));
         contents.extend(export_cp437_string(&user.home_voice_phone, 14, 0));
         contents.extend(u16::to_le_bytes(IcbDate::from_utc(user.stats.last_on).to_pcboard_date() as u16));

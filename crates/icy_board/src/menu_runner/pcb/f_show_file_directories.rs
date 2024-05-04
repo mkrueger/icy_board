@@ -80,7 +80,7 @@ impl PcbBoardCommand {
     async fn display_file_area(&mut self, action: &Command, area: usize) -> Res<()> {
         let area = &self.state.session.current_conference.directories[area];
 
-        let colors = self.state.board.lock().unwrap().config.color_configuration.clone();
+        let colors = self.state.get_board().await.config.color_configuration.clone();
         let file_base_path = self.state.resolve_path(&area.file_base);
         let Ok(base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());

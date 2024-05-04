@@ -112,7 +112,7 @@ impl PcbBoardCommand {
         let mut msgs = 0;
 
         if scan.all_conf {
-            let confs = self.state.board.lock().unwrap().conferences.clone();
+            let confs = self.state.get_board().await.conferences.clone();
             for (i, conf) in confs.iter().enumerate() {
                 let res = self.scan_conference(&conf, &scan)?;
                 if !scan.skip_zero || (res.msg_from > 0 || res.msg_to > 0) {

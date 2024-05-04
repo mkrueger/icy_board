@@ -1,6 +1,6 @@
 use std::{
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -16,6 +16,7 @@ use ratatui::{
     prelude::*,
     widgets::{block::Title, *},
 };
+use tokio::sync::Mutex;
 
 use crate::VERSION;
 
@@ -45,7 +46,7 @@ pub struct CallWaitScreen {
 }
 
 impl CallWaitScreen {
-    pub fn new(board: &Arc<Mutex<IcyBoard>>) -> Res<Self> {
+    pub async fn new(board: &Arc<Mutex<IcyBoard>>) -> Res<Self> {
         let buttons = vec![
             Button {
                 title: get_text("call_wait_screen_user_button_busy"),
@@ -83,8 +84,8 @@ impl CallWaitScreen {
                 message: CallWaitMessage::Monitor,
             },
         ];
-        let board_name = board.lock().unwrap().config.board.name.clone();
-        let date_format = board.lock().unwrap().config.board.date_format.clone();
+        let board_name = board.lock().await.config.board.name.clone();
+        let date_format = board.lock().await.config.board.date_format.clone();
         Ok(Self {
             x: 0,
             y: 0,
@@ -96,14 +97,12 @@ impl CallWaitScreen {
         })
     }
 
-    pub fn run(&mut self, terminal: &mut Terminal<impl Backend>, board: &Arc<Mutex<IcyBoard>>) -> Res<CallWaitMessage> {
+    pub async fn run(&mut self, terminal: &mut Terminal<impl Backend>, board: &Arc<Mutex<IcyBoard>>) -> Res<CallWaitMessage> {
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
 
         loop {
-            if let Ok(board) = &board.lock() {
-                self.statistics = board.statistics.clone();
-            }
+            self.statistics = board.lock().await.statistics.clone();
 
             terminal.draw(|frame| self.ui(frame))?;
 

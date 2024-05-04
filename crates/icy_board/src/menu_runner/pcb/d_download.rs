@@ -36,12 +36,10 @@ impl PcbBoardCommand {
 
         let protocol_str: String = self.state.current_user.as_ref().unwrap().protocol.clone();
         let mut protocol = None;
-        if let Ok(board) = self.state.board.lock() {
-            for p in &board.protocols.protocols {
-                if p.is_enabled && p.char_code == protocol_str {
-                    protocol = Some(p.send_command.clone());
-                    break;
-                }
+        for p in &self.state.get_board().await.protocols.protocols {
+            if p.is_enabled && p.char_code == protocol_str {
+                protocol = Some(p.send_command.clone());
+                break;
             }
         }
 

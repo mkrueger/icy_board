@@ -79,7 +79,7 @@ impl BBS {
     }
 }
 
-pub async fn await_telnet_connections(telnet: Telnet, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+pub async fn await_telnet_connections(telnet: Telnet, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
     let addr = if telnet.address.is_empty() {
         format!("0.0.0.0:{}", telnet.port)
     } else {
@@ -120,7 +120,7 @@ pub async fn await_telnet_connections(telnet: Telnet, board: Arc<Mutex<IcyBoard>
     }
 }
 
-pub fn await_ssh_connections(_ssh: SSH, _board: Arc<Mutex<IcyBoard>>, _bbs: Arc<Mutex<BBS>>) -> Res<()> {
+pub fn await_ssh_connections(_ssh: SSH, _board: Arc<tokio::sync::Mutex<IcyBoard>>, _bbs: Arc<Mutex<BBS>>) -> Res<()> {
     /*
     let addr = if ssh.address.is_empty() {
         format!("127.0.0.1:{}", ssh.port)
@@ -171,7 +171,7 @@ pub fn await_ssh_connections(_ssh: SSH, _board: Arc<Mutex<IcyBoard>>, _bbs: Arc<
     Ok(())
 }
 
-pub fn await_websocket_connections(_ssh: Websocket, _board: Arc<Mutex<IcyBoard>>, _bbs: Arc<Mutex<BBS>>) -> Res<()> {
+pub fn await_websocket_connections(_ssh: Websocket, _board: Arc<tokio::sync::Mutex<IcyBoard>>, _bbs: Arc<Mutex<BBS>>) -> Res<()> {
     /*
     let addr = if ssh.address.is_empty() {
         format!("127.0.0.1:{}", ssh.port)
@@ -221,7 +221,7 @@ pub fn await_websocket_connections(_ssh: Websocket, _board: Arc<Mutex<IcyBoard>>
     Ok(())
 }
 
-pub fn await_securewebsocket_connections(_ssh: SecureWebsocket, _board: Arc<Mutex<IcyBoard>>, _bbs: Arc<Mutex<BBS>>) -> Res<()> {
+pub fn await_securewebsocket_connections(_ssh: SecureWebsocket, _board: Arc<tokio::sync::Mutex<IcyBoard>>, _bbs: Arc<Mutex<BBS>>) -> Res<()> {
     /*
     let addr = if ssh.address.is_empty() {
         format!("127.0.0.1:{}", ssh.port)
@@ -275,19 +275,19 @@ pub fn await_securewebsocket_connections(_ssh: SecureWebsocket, _board: Arc<Mute
 
 #[async_recursion(?Send)]
 pub async fn handle_client(
-    board: Arc<Mutex<IcyBoard>>,
+    board: Arc<tokio::sync::Mutex<IcyBoard>>,
     node_state: Arc<Mutex<Vec<Option<NodeState>>>>,
     node: usize,
     connection: Box<dyn Connection>,
     login_options: Option<LoginOptions>,
 ) -> Res<()> {
-    let mut state = IcyBoardState::new(board, node_state, node, connection);
+    let mut state = IcyBoardState::new(board, node_state, node, connection).await;
     let mut logged_in = false;
     if let Some(login_options) = &login_options {
         if login_options.login_sysop {
             logged_in = true;
             state.session.is_sysop = true;
-            state.set_current_user(0).unwrap();
+            state.set_current_user(0).await.unwrap();
         }
     }
     let mut cmd = PcbBoardCommand::new(state);

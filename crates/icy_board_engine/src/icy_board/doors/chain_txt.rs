@@ -12,59 +12,56 @@ use crate::{
 };
 
 /// CALLINFO.BBS format from the WWIV software.
-pub fn create_chain_txt(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
+pub async fn create_chain_txt(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = String::new();
-    if let Ok(board) = state.board.lock() {
-        contents.push_str(&format!("{}\r\n", state.session.cur_user));
-        contents.push_str(&format!("{}\r\n", state.session.alias_name));
-        contents.push_str(&format!("{}\r\n", state.session.user_name));
-        contents.push_str("\r\n"); // User callsign (HAM radio)
-        contents.push_str(&format!(
-            "{}\r\n",
-            Utc::now().years_since(state.current_user.as_ref().unwrap().birth_date).unwrap_or(0)
-        )); // Age
-        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().gender));
-        contents.push_str("0\r\n"); // Users Gold
-        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.last_on.format("%m/%d/%y"))); // User's last call date
-        contents.push_str(&format!("{}\r\n", state.user_screen.buffer.get_width()));
-        contents.push_str(&format!("{}\r\n", state.user_screen.buffer.get_height()));
-        contents.push_str(&format!("{}\r\n", state.session.cur_security));
-        contents.push_str("0\r\n");
-        if state.session.is_sysop {
-            contents.push_str("1\r\n");
-        } else {
-            contents.push_str("0\r\n");
-        }
-        let emulation = match state.session.disp_options.grapics_mode {
-            GraphicsMode::Ctty => "0",
-            _ => "1",
-        };
-        contents.push_str(&format!("{}\r\n", emulation));
-        contents.push_str(&format!("{}\r\n", if state.session.is_local { 0 } else { 1 }));
-        contents.push_str(&format!("{}\r\n", state.session.seconds_left())); // seconds till logofff
-        contents.push_str("C:\\WWIV\\GFILES\\\r\n");
-        contents.push_str("C:\\WWIV\\DATA\\\r\n");
-        contents.push_str("890519.LOG \r\n");
-        contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE)); // Com Port Speed
-        contents.push_str(&format!("{}\r\n", DOOR_COM_PORT)); // COM Port
-        contents.push_str(&format!("{}\r\n", board.config.board.name));
-        contents.push_str(&format!("{}\r\n", board.config.sysop.name));
-        contents.push_str(&format!("{}\r\n", state.session.login_date.time().num_seconds_from_midnight()));
-        contents.push_str(&format!("{}\r\n", (Local::now() - state.session.login_date).num_seconds()));
-        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.total_upld_bytes / 1024));
-        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.num_uploads));
-        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.today_dnld_bytes / 1024));
-        contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.num_downloads));
-        contents.push_str("8N1\r\n"); // Data bits/Parity/Stop bits
-        contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE)); // Com Port Speed
-        contents.push_str(&format!("{}\r\n", state.node)); // Node number
-
-        let path = path.join("CHAIN.TXT");
-        log::info!("create CHAIN.TXT: {}", path.display());
-        fs::write(path, contents)?;
+    let board = state.get_board().await;
+    contents.push_str(&format!("{}\r\n", state.session.cur_user));
+    contents.push_str(&format!("{}\r\n", state.session.alias_name));
+    contents.push_str(&format!("{}\r\n", state.session.user_name));
+    contents.push_str("\r\n"); // User callsign (HAM radio)
+    contents.push_str(&format!(
+        "{}\r\n",
+        Utc::now().years_since(state.current_user.as_ref().unwrap().birth_date).unwrap_or(0)
+    )); // Age
+    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().gender));
+    contents.push_str("0\r\n"); // Users Gold
+    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.last_on.format("%m/%d/%y"))); // User's last call date
+    contents.push_str(&format!("{}\r\n", state.user_screen.buffer.get_width()));
+    contents.push_str(&format!("{}\r\n", state.user_screen.buffer.get_height()));
+    contents.push_str(&format!("{}\r\n", state.session.cur_security));
+    contents.push_str("0\r\n");
+    if state.session.is_sysop {
+        contents.push_str("1\r\n");
     } else {
-        return Err("Board not found".into());
+        contents.push_str("0\r\n");
     }
+    let emulation = match state.session.disp_options.grapics_mode {
+        GraphicsMode::Ctty => "0",
+        _ => "1",
+    };
+    contents.push_str(&format!("{}\r\n", emulation));
+    contents.push_str(&format!("{}\r\n", if state.session.is_local { 0 } else { 1 }));
+    contents.push_str(&format!("{}\r\n", state.session.seconds_left())); // seconds till logofff
+    contents.push_str("C:\\WWIV\\GFILES\\\r\n");
+    contents.push_str("C:\\WWIV\\DATA\\\r\n");
+    contents.push_str("890519.LOG \r\n");
+    contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE)); // Com Port Speed
+    contents.push_str(&format!("{}\r\n", DOOR_COM_PORT)); // COM Port
+    contents.push_str(&format!("{}\r\n", board.config.board.name));
+    contents.push_str(&format!("{}\r\n", board.config.sysop.name));
+    contents.push_str(&format!("{}\r\n", state.session.login_date.time().num_seconds_from_midnight()));
+    contents.push_str(&format!("{}\r\n", (Local::now() - state.session.login_date).num_seconds()));
+    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.total_upld_bytes / 1024));
+    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.num_uploads));
+    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.today_dnld_bytes / 1024));
+    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.num_downloads));
+    contents.push_str("8N1\r\n"); // Data bits/Parity/Stop bits
+    contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE)); // Com Port Speed
+    contents.push_str(&format!("{}\r\n", state.node)); // Node number
+
+    let path = path.join("CHAIN.TXT");
+    log::info!("create CHAIN.TXT: {}", path.display());
+    fs::write(path, contents)?;
     Ok(())
 }
 

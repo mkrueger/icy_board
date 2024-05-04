@@ -44,15 +44,15 @@ impl PcbBoardCommand {
     }
 
     pub async fn bye_cmd(&mut self) -> Res<()> {
-        let survey = if let Ok(board) = self.state.board.lock() {
+        let survey = {
+            let board = self.state.get_board().await;
             Survey {
                 question_file: board.resolve_file(&board.config.paths.logon_survey),
                 answer_file: board.resolve_file(&board.config.paths.logon_answer),
                 required_security: 0,
             }
-        } else {
-            Survey::default()
         };
+
         if !self.state.session.is_sysop && survey.question_file.exists() {
             // skip the survey question.
             self.state.session.tokens.push_front(self.state.session.yes_char.to_string());

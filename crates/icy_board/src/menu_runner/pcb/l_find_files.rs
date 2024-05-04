@@ -160,7 +160,7 @@ impl<'a> FileList<'a> {
         } else {
             false
         };
-        let colors = cmd.state.board.lock().unwrap().config.color_configuration.clone();
+        let colors = cmd.state.get_board().await.config.color_configuration.clone();
 
         for header in &self.files {
             let metadata = self.base.read_metadata(header)?;
