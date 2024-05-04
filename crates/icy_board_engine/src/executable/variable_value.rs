@@ -364,7 +364,7 @@ impl Add<VariableValue> for VariableValue {
                     data.unsigned_value = self.data.unsigned_value.wrapping_add(other.data.unsigned_value);
                 }
                 VariableType::Integer => {
-                    data.int_value = self.data.int_value.wrapping_add(other.data.int_value);
+                    data.int_value = self.as_int().wrapping_add(other.as_int());
                 }
                 VariableType::Float => {
                     data.float_value = self.data.float_value + other.data.float_value;
@@ -431,7 +431,7 @@ impl Sub<VariableValue> for VariableValue {
                     data.unsigned_value = self.data.unsigned_value.wrapping_sub(other.data.unsigned_value);
                 }
                 VariableType::Integer => {
-                    data.int_value = self.data.int_value.wrapping_sub(other.data.int_value);
+                    data.int_value = self.as_int().wrapping_sub(other.as_int());
                 }
                 VariableType::Float => {
                     data.float_value = self.data.float_value - other.data.float_value;
@@ -474,8 +474,8 @@ impl Mul<VariableValue> for VariableValue {
                 dest_type = VariableType::Integer;
             }
             VariableType::String | VariableType::BigStr => {
-                let l = self.as_string().parse::<i32>().unwrap_or_default();
-                let r = other.as_string().parse::<i32>().unwrap_or_default();
+                let l = self.as_int();
+                let r = other.as_int();
                 return Self {
                     vtype: VariableType::Integer,
                     data: VariableData::from_int(l.wrapping_mul(r)),
@@ -492,7 +492,7 @@ impl Mul<VariableValue> for VariableValue {
                     data.unsigned_value = self.data.unsigned_value.wrapping_mul(other.data.unsigned_value);
                 }
                 VariableType::Integer => {
-                    data.int_value = self.data.int_value.wrapping_mul(other.data.int_value);
+                    data.int_value = self.as_int().wrapping_mul(other.as_int());
                 }
                 VariableType::Float => {
                     data.float_value = self.data.float_value * other.data.float_value;
@@ -553,7 +553,7 @@ impl Div<VariableValue> for VariableValue {
                     data.unsigned_value = self.data.unsigned_value.wrapping_div(other.data.unsigned_value);
                 }
                 VariableType::Integer => {
-                    data.int_value = self.data.int_value.wrapping_div(other.data.int_value);
+                    data.int_value = self.as_int().wrapping_div(other.as_int());
                 }
                 VariableType::Float => {
                     data.float_value = self.data.float_value / other.data.float_value;
@@ -622,7 +622,7 @@ impl Rem<VariableValue> for VariableValue {
                     data.unsigned_value = self.data.unsigned_value.wrapping_rem(other.data.unsigned_value);
                 }
                 VariableType::Integer => {
-                    data.int_value = self.data.int_value.wrapping_rem(other.data.int_value);
+                    data.int_value = self.as_int().wrapping_rem(other.as_int());
                 }
                 VariableType::Byte => {
                     data.byte_value = self.data.byte_value.wrapping_rem(other.data.byte_value);
@@ -709,7 +709,7 @@ impl Neg for VariableValue {
         let generic_data = GenericVariableData::None;
         unsafe {
             match dest_type {
-                VariableType::Integer => data.int_value = -self.data.int_value,
+                VariableType::Integer => data.int_value = -self.as_int(),
                 VariableType::SByte => data.sbyte_value = -self.data.sbyte_value,
                 VariableType::SWord => data.sword_value = -self.data.sword_value,
                 VariableType::Float => data.float_value = -self.data.float_value,

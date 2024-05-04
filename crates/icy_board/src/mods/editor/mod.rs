@@ -604,7 +604,7 @@ impl EditState {
     }
 
     pub async fn get_char_edit(&mut self, state: &mut IcyBoardState) -> Res<Option<KeyChar>> {
-        let ch = state.get_char().await?;
+        let ch = state.get_char(TerminalTarget::Both).await?;
         if ch.is_none() {
             return Ok(None);
         }
@@ -614,9 +614,9 @@ impl EditState {
                 ch.ch = control_codes::DEL;
             }
             '\x1B' => {
-                if let Some(key_char) = state.get_char().await? {
+                if let Some(key_char) = state.get_char(TerminalTarget::Both).await? {
                     if key_char.ch == '[' {
-                        if let Some(key_char) = state.get_char().await? {
+                        if let Some(key_char) = state.get_char(TerminalTarget::Both).await? {
                             match key_char.ch {
                                 'A' => ch.ch = control_codes::UP,
                                 'B' => ch.ch = control_codes::DOWN,
@@ -629,20 +629,20 @@ impl EditState {
                                 'V' => ch.ch = control_codes::PG_UP,
                                 'U' => ch.ch = control_codes::PG_DN,
                                 '@' => {
-                                    state.get_char().await?;
+                                    state.get_char(TerminalTarget::Both).await?;
                                     ch.ch = control_codes::INS;
                                 }
 
                                 '6' => {
-                                    state.get_char().await?;
+                                    state.get_char(TerminalTarget::Both).await?;
                                     ch.ch = control_codes::PG_UP;
                                 }
                                 '5' => {
-                                    state.get_char().await?;
+                                    state.get_char(TerminalTarget::Both).await?;
                                     ch.ch = control_codes::PG_DN;
                                 }
                                 '2' => {
-                                    state.get_char().await?;
+                                    state.get_char(TerminalTarget::Both).await?;
                                     ch.ch = control_codes::INS;
                                 }
 

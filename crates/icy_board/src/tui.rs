@@ -84,13 +84,7 @@ impl Tui {
             log::info!("Creating sysop mode");
             let node_state = bbs.open_connections.clone();
 
-            bbs.get_open_connections().lock().unwrap()[node]
-                .as_mut()
-                .unwrap()
-                .connections
-                .lock()
-                .unwrap()
-                .push(Box::new(connection));
+            bbs.get_open_connections().lock().unwrap()[node].as_mut().unwrap().sysop_connection = Some(connection);
 
             let screen = Arc::new(Mutex::new(Screen::new()));
             log::info!("Run terminal thread");

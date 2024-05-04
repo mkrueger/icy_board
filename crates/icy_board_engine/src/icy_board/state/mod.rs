@@ -324,7 +324,7 @@ pub enum UserActivity {
 }
 
 pub struct NodeState {
-    pub connections: Arc<Mutex<Vec<Box<ChannelConnection>>>>,
+    pub sysop_connection: Option<ChannelConnection>,
     pub cur_user: i32,
     pub cur_conference: u16,
     pub graphics_mode: GraphicsMode,
@@ -342,7 +342,7 @@ unsafe impl Sync for NodeState {}
 impl NodeState {
     pub fn new(node_number: usize, connection_type: ConnectionType) -> Self {
         Self {
-            connections: Arc::new(Mutex::new(Vec::new())),
+            sysop_connection: None,
             user_activity: UserActivity::LoggingIn,
             graphics_mode: GraphicsMode::Ansi,
             cur_user: -1,
@@ -669,11 +669,9 @@ impl IcyBoardState {
     fn shutdown_connections(&mut self) {
         let _ = self.connection.shutdown();
 
-        if let Ok(node_state) = self.node_state.lock() {
-            if let Ok(connections) = &mut node_state[self.node].as_ref().unwrap().connections.lock() {
-                for conn in connections.iter_mut() {
-                    let _ = conn.shutdown();
-                }
+        if let Ok(node_state) = &mut self.node_state.lock() {
+            if let Some(sysop_connection) = &mut node_state[self.node].as_mut().unwrap().sysop_connection {
+                let _ = sysop_connection.shutdown();
             }
         }
     }
@@ -958,11 +956,9 @@ impl IcyBoardState {
 
         if target != TerminalTarget::User {
             // Send user only not to other connections
-            if let Ok(node_state) = self.node_state.lock() {
-                if let Ok(connections) = &mut node_state[self.node].as_ref().unwrap().connections.lock() {
-                    for conn in connections.iter_mut() {
-                        let _ = conn.send(&sysop_bytes).await;
-                    }
+            if let Ok(mut node_state) = self.node_state.lock() {
+                if let Some(sysop_connection) = &mut node_state[self.node].as_mut().unwrap().sysop_connection {
+                    let _ = sysop_connection.send(&sysop_bytes).await;
                 }
             }
         }
@@ -1386,23 +1382,73 @@ impl IcyBoardState {
     }
 
     /// # Errors
-    pub async fn get_char(&mut self) -> Res<Option<KeyChar>> {
+    pub async fn get_char(&mut self, target: TerminalTarget) -> Res<Option<KeyChar>> {
         if let Some(ch) = self.char_buffer.pop_front() {
-            return Ok(Some(ch));
-        }
-        let mut key_data = [0; 1];
-        let size = self.connection.read(&mut key_data).await?;
-        if size == 1 {
-            return Ok(Some(KeyChar::new(KeySource::User, key_data[0] as char)));
-        }
-        if let Ok(node_state) = &self.node_state.lock() {
-            if let Ok(connections) = &mut node_state[self.node].as_ref().unwrap().connections.lock() {
-                for conn in connections.iter_mut() {
-                    let size = conn.read(&mut key_data).await?;
-                    if size == 1 {
-                        return Ok(Some(KeyChar::new(KeySource::Sysop, key_data[0] as char)));
+            match target {
+                TerminalTarget::Both => {
+                    return Ok(Some(ch));
+                }
+                TerminalTarget::User => {
+                    if ch.source == KeySource::User {
+                        return Ok(Some(ch));
+                    } else {
+                        self.char_buffer.push_back(ch);
                     }
                 }
+                TerminalTarget::Sysop => {
+                    if ch.source == KeySource::Sysop {
+                        return Ok(Some(ch));
+                    } else {
+                        self.char_buffer.push_back(ch);
+                    }
+                }
+            }
+        }
+
+        let mut sysop_connection = None;
+        if let Ok(node_state) = &mut self.node_state.lock() {
+            sysop_connection = node_state[self.node].as_mut().unwrap().sysop_connection.take();
+        }
+
+        let mut user_key_data = [0; 1];
+        if let Some(mut sysop_connection) = sysop_connection.take() {
+            let mut sysop_key_data = [0; 1];
+            tokio::select! {
+                size = sysop_connection.read(&mut sysop_key_data) => {
+                    match size {
+                        Ok(1) => {
+                            self.node_state.lock().unwrap()[self.node].as_mut().unwrap().sysop_connection = Some(sysop_connection);
+                            if target == TerminalTarget::User {
+                                self.char_buffer.push_back(KeyChar::new(KeySource::Sysop, sysop_key_data[0] as char));
+                                return Ok(None);
+                            }
+
+                            return Ok(Some(KeyChar::new(KeySource::Sysop, sysop_key_data[0] as char)));
+                        }
+                        Err(_) => {
+                        }
+                        _ => {}
+                    }
+                }
+                size2 = self.connection.read(&mut user_key_data) => {
+                    if let Ok(1) = size2 {
+                        self.node_state.lock().unwrap()[self.node].as_mut().unwrap().sysop_connection = Some(sysop_connection);
+                        if target == TerminalTarget::Sysop {
+                            self.char_buffer.push_back(KeyChar::new(KeySource::User, user_key_data[0] as char));
+                            return Ok(None);
+                        }
+                        return Ok(Some(KeyChar::new(KeySource::User, user_key_data[0] as char)));
+                    }
+                }
+            }
+        } else {
+            let size = self.connection.read(&mut user_key_data).await?;
+            if size == 1 {
+                if target == TerminalTarget::Sysop {
+                    // No sysop, only user
+                    return Ok(None);
+                }
+                return Ok(Some(KeyChar::new(KeySource::User, user_key_data[0] as char)));
             }
         }
 

@@ -155,13 +155,17 @@ impl PcbBoardCommand {
                                 if let Err(_) = self.state.connection.send(&read_buf[0..size]).await {
                                     break;
                                 }
-                                if let Ok(node_state) = self.state.node_state.lock() {
-                                    if let Ok(connections) = &mut node_state[self.state.node].as_ref().unwrap().connections.lock() {
-                                        for conn in connections.iter_mut() {
-                                            if let Err(_) = conn.send(&read_buf[0..size]).await {
-                                                break;
-                                            }
+                                let mut remove_sysop_connection = false;
+                                if let Ok(node_state) = &mut self.state.node_state.lock() {
+                                    if let Some(sysop_connection) = &mut node_state[self.state.node].as_mut().unwrap().sysop_connection {
+                                        if let Err(_) = sysop_connection.send(&read_buf[0..size]).await {
+                                            remove_sysop_connection = true;
                                         }
+                                    }
+                                }
+                                if remove_sysop_connection {
+                                    if let Ok(node_state) = &mut self.state.node_state.lock() {
+                                        node_state[self.state.node].as_mut().unwrap().sysop_connection = None;
                                     }
                                 }
                             }
@@ -286,11 +290,9 @@ async fn execute_door(door_connection: &mut dyn Connection, state: &mut icy_boar
                      Ok(size) => {
                           if size > 0 {
                             state.connection.send(&read_buf[0..size]).await?;
-                            if let Ok(node_state) = state.node_state.lock() {
-                                if let Ok(connections) = &mut node_state[state.node].as_ref().unwrap().connections.lock() {
-                                    for conn in connections.iter_mut() {
-                                        let _ = conn.send(&read_buf[0..size]).await;
-                                    }
+                            if let Ok(node_state) = &mut state.node_state.lock() {
+                                if let Some(sysop_connection) = &mut node_state[state.node].as_mut().unwrap().sysop_connection {
+                                    let _ = sysop_connection.send(&read_buf[0..size]).await;
                                 }
                             }
                           } else {
@@ -309,13 +311,11 @@ async fn execute_door(door_connection: &mut dyn Connection, state: &mut icy_boar
                         if size > 0 {
                             door_connection.send(&write_buf[0..size]).await?;
 
-                            if let Ok(node_state) = state.node_state.lock() {
-                                if let Ok(connections) = &mut node_state[state.node].as_ref().unwrap().connections.lock() {
-                                    for conn in connections.iter_mut() {
-                                        let size = conn.read(&mut read_buf).await?;
-                                        if size > 0 {
-                                            door_connection.send(&read_buf[0..size]).await?;
-                                        }
+                            if let Ok(node_state) = &mut state.node_state.lock() {
+                                if let Some(sysop_connection) = &mut node_state[state.node].as_mut().unwrap().sysop_connection {
+                                    let size = sysop_connection.read(&mut read_buf).await?;
+                                    if size > 0 {
+                                        door_connection.send(&read_buf[0..size]).await?;
                                     }
                                 }
                             }

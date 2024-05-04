@@ -338,7 +338,7 @@ impl IcyBoardState {
 
         let mut output = String::new();
         loop {
-            let Some(mut key_char) = self.get_char().await? else {
+            let Some(mut key_char) = self.get_char(TerminalTarget::Both).await? else {
                 continue;
             };
             if display_flags & display_flags::UPCASE != 0 {

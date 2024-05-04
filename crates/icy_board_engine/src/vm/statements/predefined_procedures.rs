@@ -721,7 +721,7 @@ pub async fn println(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         let txt = &vm.eval_expr(value).await?.as_string();
         vm.icy_board_state.print(TerminalTarget::Both, txt).await?;
     }
-    vm.icy_board_state.print(TerminalTarget::User, "\n").await?;
+    vm.icy_board_state.print(TerminalTarget::Both, "\r\n").await?;
     Ok(())
 }
 

@@ -9,7 +9,7 @@ use crate::executable::{GenericVariableData, PPEExpr, VariableData, VariableType
 use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_NUM, MASK_PATH, MASK_PWD};
 use crate::icy_board::state::GraphicsMode;
 use crate::parser::CONFERENCE_ID;
-use crate::vm::VirtualMachine;
+use crate::vm::{TerminalTarget, VirtualMachine};
 use crate::Res;
 use codepages::tables::CP437_TO_UNICODE;
 use icy_engine::{update_crc32, Position, TextPane};
@@ -488,14 +488,18 @@ pub async fn yeschar(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn inkey(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(key_char) = vm.icy_board_state.get_char().await? {
+    target_inkey(vm, TerminalTarget::Both).await
+}
+
+pub async fn target_inkey(vm: &mut VirtualMachine<'_>, target: TerminalTarget) -> Res<VariableValue> {
+    if let Some(key_char) = vm.icy_board_state.get_char(target).await? {
         if key_char.ch as u8 == 127 {
             return Ok(VariableValue::new_string("DEL".to_string()));
         }
         if key_char.ch == '\x1B' {
-            if let Some(key_char) = vm.icy_board_state.get_char().await? {
+            if let Some(key_char) = vm.icy_board_state.get_char(target).await? {
                 if key_char.ch == '[' {
-                    if let Some(key_char) = vm.icy_board_state.get_char().await? {
+                    if let Some(key_char) = vm.icy_board_state.get_char(target).await? {
                         match key_char.ch {
                             'A' => return Ok(VariableValue::new_string("UP".to_string())),
                             'B' => return Ok(VariableValue::new_string("DOWN".to_string())),
@@ -954,10 +958,10 @@ pub async fn curcolor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn kinkey(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    inkey(vm, args).await
+    target_inkey(vm, TerminalTarget::Sysop).await
 }
 pub async fn minkey(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    inkey(vm, args).await
+    target_inkey(vm, TerminalTarget::User).await
 }
 pub async fn maxnode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.icy_board_state.nodes.len() as i32))
