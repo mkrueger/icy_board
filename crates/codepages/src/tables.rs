@@ -27,6 +27,16 @@ const CP437_TO_UNICODE_NO_CTRL_CODES: [char; 256] = [
     '\u{2248}', '\u{00b0}', '\u{2219}', '\u{00b7}', '\u{221a}', '\u{207f}', '\u{00b2}', '\u{25a0}', '\u{00a0}',
 ];
 
+lazy_static::lazy_static! {
+    pub static ref UNICODE_TO_CP437_NO_CTRL_CODES: std::collections::HashMap<char, u8> = {
+        let mut res = std::collections::HashMap::new();
+        (0..256).for_each(|a| {
+            res.insert(CP437_TO_UNICODE[a], a as u8);
+        });
+        res
+    };
+}
+
 pub const CP437_TO_UNICODE: [char; 256] = [
     '\x00', '\x01', '\x02', '\x03', '\x04', '\x05', '\x06', '\x07', '\x08', '\x09', '\x0A', '\x0B', '\x0C', '\x0D', '\x0E', '\x0F', '\x10', '\x11', '\x12',
     '\x13', '\x14', '\x15', '\x16', '\x17', '\x18', '\x19', '\x1A', '\x1B', '\x1C', '\x1D', '\x1E', '\x1F', '\u{0020}', '\u{0021}', '\u{0022}', '\u{0023}',

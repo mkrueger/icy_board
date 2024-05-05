@@ -782,6 +782,9 @@ pub async fn i2s(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
 pub async fn s2i(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let src = vm.eval_expr(&args[0]).await?.as_string();
     let base = vm.eval_expr(&args[1]).await?.as_int();
+    if src.is_empty() {
+        return Ok(VariableValue::new_int(0));
+    }
     let i = i32::from_str_radix(&src, base as u32)?;
     Ok(VariableValue::new_int(i))
 }
