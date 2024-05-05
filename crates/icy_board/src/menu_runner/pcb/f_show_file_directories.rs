@@ -91,7 +91,7 @@ impl PcbBoardCommand {
             return Ok(());
         };
 
-        self.state.clear_screen().await?;
+        self.state.clear_screen(TerminalTarget::Both).await?;
 
         self.state.set_color(TerminalTarget::Both, colors.file_head).await?;
         self.state

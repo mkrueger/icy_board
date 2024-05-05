@@ -12,6 +12,7 @@ use crate::{
 use bstr::BString;
 use chrono::Utc;
 use codepages::tables::CP437_TO_UNICODE;
+use icy_engine::{BufferType, OutputFormat, SaveOptions, ScreenPreperation};
 use jamjam::jam::JamMessage;
 
 use crate::{
@@ -38,12 +39,12 @@ pub async fn end(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn cls(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.clear_screen().await;
+    vm.icy_board_state.clear_screen(TerminalTarget::Both).await?;
     Ok(())
 }
 
 pub async fn clreol(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.clear_eol().await;
+    vm.icy_board_state.clear_eol(TerminalTarget::Both).await?;
     Ok(())
 }
 
@@ -206,7 +207,7 @@ pub async fn putuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> 
 }
 
 pub async fn defcolor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.reset_color().await
+    vm.icy_board_state.reset_color(TerminalTarget::Both).await
 }
 
 pub async fn delete(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -354,8 +355,17 @@ pub async fn inputtime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     Ok(())
 }
 pub async fn promptstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    let prompt = vm.eval_expr(&args[0]).await?.as_int();
+    // 1 Output Variable
+    let len = vm.eval_expr(&args[2]).await?.as_int();
+    let valid = vm.eval_expr(&args[3]).await?.as_string();
+    let flags = vm.eval_expr(&args[4]).await?.as_int();
+    let output = vm
+        .icy_board_state
+        .input_field(IceText::from(prompt as usize), len, &valid, "", None, flags)
+        .await?;
+    vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
+    Ok(())
 }
 pub async fn dtron(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     // IGNORE
@@ -368,12 +378,14 @@ pub async fn dtroff(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn cdchkon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    // IGNORE
+    log::info!("ignore PPL statement CDCHKON");
+    Ok(())
 }
 pub async fn cdchkoff(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    // IGNORE
+    log::info!("ignore PPL statement CDCHKOFF");
+    Ok(())
 }
 
 pub async fn delay(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -386,8 +398,9 @@ pub async fn delay(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn sendmodem(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    // IGNORE
+    log::info!("ignore PPL statement SENDMODEM");
+    Ok(())
 }
 
 pub async fn inc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -720,12 +733,23 @@ pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn savescrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    let mut buf = vm.icy_board_state.user_screen.buffer.flat_clone(false);
+    buf.buffer_type = BufferType::Unicode;
+    vm.stored_screen = Some(buf);
+    Ok(())
 }
+
 pub async fn restscrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    if let Some(screen) = &vm.stored_screen {
+        let mut options = SaveOptions::default();
+        options.screen_preparation = ScreenPreperation::ClearScreen;
+        options.save_sauce = false;
+        options.modern_terminal_output = true;
+        let res = icy_engine::formats::PCBoard::default().to_bytes(screen, &options)?;
+        let res = unsafe { String::from_utf8_unchecked(res) };
+        vm.icy_board_state.print(TerminalTarget::Both, &res).await?;
+    }
+    Ok(())
 }
 pub async fn sound(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     // log::error!("not implemented statement!");
@@ -822,13 +846,13 @@ pub async fn showoff(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn pageon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    vm.icy_board_state.board.lock().await.config.options.page_bell = true;
+    Ok(())
 }
 
 pub async fn pageoff(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    vm.icy_board_state.board.lock().await.config.options.page_bell = false;
+    Ok(())
 }
 
 pub async fn fseek(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -929,8 +953,17 @@ pub async fn alias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 pub async fn redim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    let var = vm.eval_expr(&args[0]).await?;
+    let dim1 = vm.eval_expr(&args[1]).await?.as_int() as usize;
+    let dim2 = if args.len() > 2 { vm.eval_expr(&args[2]).await?.as_int() as usize } else { 0 };
+    let dim3 = if args.len() > 3 { vm.eval_expr(&args[3]).await?.as_int() as usize } else { 0 };
+
+    if let PPEExpr::Value(id) = args[0] {
+        vm.variable_table.get_value_mut(id).redim((args.len() - 1) as u8, dim1, dim2, dim3);
+    } else {
+        log::error!("redim arg[0] != variable");
+    }
+    Ok(())
 }
 pub async fn append(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");

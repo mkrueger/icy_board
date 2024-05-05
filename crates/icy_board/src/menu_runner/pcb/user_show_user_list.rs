@@ -29,7 +29,7 @@ impl PcbBoardCommand {
             .display_text(IceText::UsersHeader, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::NOTBLANK)
             .await?;
         self.state.display_text(IceText::UserScanLine, display_flags::NOTBLANK).await?;
-        self.state.reset_color().await?;
+        self.state.reset_color(TerminalTarget::Both).await?;
         self.state.new_line().await?;
         let mut output = String::new();
         for u in self.state.get_board().await.users.iter() {

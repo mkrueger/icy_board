@@ -143,7 +143,7 @@ impl NodeMonitoringScreen {
         self.render_scrollbar(frame, area);
     }
 
-    fn render_table(&mut self, frame: &mut Frame, _area: Rect, board: &Arc<tokio::sync::Mutex<IcyBoard>>, bbs: &mut Arc<Mutex<BBS>>) {
+    fn render_table(&mut self, frame: &mut Frame, _area: Rect, _board: &Arc<tokio::sync::Mutex<IcyBoard>>, bbs: &mut Arc<Mutex<BBS>>) {
         let header = [
             "#".to_string(),
             get_text("icbmoni_status_header"),

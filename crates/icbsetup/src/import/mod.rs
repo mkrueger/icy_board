@@ -362,6 +362,9 @@ impl PCBoardImporter {
                 upload_descr_lines: self.data.num_ul_desc_lines as u8,
                 non_graphics: self.data.non_graphics,
                 give_user_password_to_doors: false,
+                page_bell: true,
+                alarm: false,
+                call_log: true,
             },
         };
 

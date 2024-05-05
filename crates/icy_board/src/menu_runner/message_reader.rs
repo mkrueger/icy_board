@@ -125,7 +125,7 @@ impl MessageViewer {
     }
 
     pub async fn display_header(&self, state: &mut IcyBoardState, msg_base: &JamMessageBase, header: &JamMessageHeader) -> Res<()> {
-        state.clear_screen().await?;
+        state.clear_screen(TerminalTarget::Both).await?;
 
         let c1 = state.get_board().await.config.color_configuration.msg_hdr_date.clone();
         state.set_color(TerminalTarget::Both, c1).await?;
@@ -177,7 +177,7 @@ impl MessageViewer {
             &state.session.current_conference.areas[area].name,
         );
         state.print(TerminalTarget::Both, &txt).await?;
-        state.reset_color().await?;
+        state.reset_color(TerminalTarget::Both).await?;
 
         Ok(())
     }

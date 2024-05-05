@@ -170,9 +170,10 @@ async fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Re
                 }
             }
 
+            let mut app = CallWaitScreen::new(&board).await?;
             loop {
-                let mut app = CallWaitScreen::new(&board).await?;
                 let mut terminal = init_terminal()?;
+                app.reset(&board).await;
                 match app.run(&mut terminal, &board).await {
                     Ok(msg) => {
                         if let Err(err) = run_message(msg, &mut terminal, &board, &mut bbs).await {
@@ -207,7 +208,7 @@ async fn run_message(
         CallWaitMessage::User(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
             let mut tui = Tui::local_mode(board, bbs, false, None);
-            if let Err(err) = tui.run(&board).await {
+            if let Err(err) = tui.run(bbs, &board).await {
                 restore_terminal()?;
                 log::error!("while running board in local mode: {}", err.to_string());
                 println!("Error: {}", err);
@@ -217,7 +218,7 @@ async fn run_message(
         CallWaitMessage::RunPPE(ppe) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
             let mut tui = Tui::local_mode(board, bbs, true, Some(ppe));
-            if let Err(err) = tui.run(&board).await {
+            if let Err(err) = tui.run(bbs, &board).await {
                 restore_terminal()?;
                 log::error!("while running board in local mode: {}", err.to_string());
                 println!("Error: {}", err);
@@ -227,7 +228,7 @@ async fn run_message(
         CallWaitMessage::Sysop(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
             let mut tui = Tui::local_mode(board, bbs, true, None);
-            if let Err(err) = tui.run(&board).await {
+            if let Err(err) = tui.run(bbs, &board).await {
                 restore_terminal()?;
                 log::error!("while running board in local mode: {}", err.to_string());
                 println!("Error: {}", err);
@@ -244,8 +245,8 @@ async fn run_message(
             match app.run(terminal, &board, bbs) {
                 Ok(msg) => {
                     if let NodeMonitoringScreenMessage::EnterNode(node) = msg {
-                        let mut tui = Tui::sysop_mode(bbs, node)?;
-                        if let Err(err) = tui.run(&board).await {
+                        let mut tui = Tui::sysop_mode(bbs, node).await?;
+                        if let Err(err) = tui.run(bbs, &board).await {
                             restore_terminal()?;
                             log::error!("while running board in local mode: {}", err.to_string());
                             println!("Error: {}", err);
@@ -259,6 +260,18 @@ async fn run_message(
                     print_error(err.to_string());
                 }
             }
+        }
+        CallWaitMessage::ToggleCallLog => {
+            let config = &mut board.lock().await.config;
+            config.options.call_log = !config.options.call_log;
+        }
+        CallWaitMessage::TogglePageBell => {
+            let config = &mut board.lock().await.config;
+            config.options.page_bell = !config.options.page_bell;
+        }
+        CallWaitMessage::ToggleAlarm => {
+            let config = &mut board.lock().await.config;
+            config.options.alarm = !config.options.alarm;
         }
     }
     Ok(())

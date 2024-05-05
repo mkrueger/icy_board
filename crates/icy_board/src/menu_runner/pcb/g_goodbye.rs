@@ -1,7 +1,10 @@
-use icy_board_engine::icy_board::{
-    icb_text::IceText,
-    state::{functions::display_flags, UserActivity},
-    surveys::Survey,
+use icy_board_engine::{
+    icy_board::{
+        icb_text::IceText,
+        state::{functions::display_flags, UserActivity},
+        surveys::Survey,
+    },
+    vm::TerminalTarget,
 };
 
 use crate::{menu_runner::PcbBoardCommand, Res};
@@ -61,7 +64,7 @@ impl PcbBoardCommand {
         self.state
             .display_text(IceText::ThanksForCalling, display_flags::NEWLINE | display_flags::LFBEFORE)
             .await?;
-        self.state.reset_color().await?;
+        self.state.reset_color(TerminalTarget::Both).await?;
 
         self.state.hangup()?;
         Ok(())

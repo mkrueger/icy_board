@@ -27,6 +27,10 @@ pub enum CallWaitMessage {
     Exit(bool),
     RunPPE(PathBuf),
     Monitor,
+
+    ToggleCallLog,
+    TogglePageBell,
+    ToggleAlarm,
 }
 
 struct Button {
@@ -38,7 +42,7 @@ struct Button {
 pub struct CallWaitScreen {
     x: i32,
     y: i32,
-    selected: Option<Instant>,
+    pub selected: Option<Instant>,
     buttons: Vec<Button>,
     board_name: String,
     date_format: String,
@@ -79,11 +83,39 @@ impl CallWaitScreen {
                 message: CallWaitMessage::Exit(false),
             },
             Button {
+                title: if board.lock().await.config.options.alarm {
+                    get_text("call_wait_screen_call_log_on")
+                } else {
+                    get_text("call_wait_screen_call_log_off")
+                },
+                description: get_text("call_wait_screen_call_log_descr"),
+                message: CallWaitMessage::ToggleCallLog,
+            },
+            Button {
+                title: if board.lock().await.config.options.alarm {
+                    get_text("call_wait_screen_page_bell_on")
+                } else {
+                    get_text("call_wait_screen_page_bell_off")
+                },
+                description: get_text("call_wait_screen_page_bell_descr"),
+                message: CallWaitMessage::TogglePageBell,
+            },
+            Button {
+                title: if board.lock().await.config.options.alarm {
+                    get_text("call_wait_screen_alarm_on")
+                } else {
+                    get_text("call_wait_screen_alarm_off")
+                },
+                description: get_text("call_wait_screen_alarm_descr"),
+                message: CallWaitMessage::ToggleAlarm,
+            },
+            Button {
                 title: get_text("call_wait_screen_monitor_button_not_busy"),
                 description: get_text("call_wait_screen_monitor_button_not_busy_descr"),
                 message: CallWaitMessage::Monitor,
             },
         ];
+
         let board_name = board.lock().await.config.board.name.clone();
         let date_format = board.lock().await.config.board.date_format.clone();
         Ok(Self {
@@ -97,6 +129,27 @@ impl CallWaitScreen {
         })
     }
 
+    pub async fn reset(&mut self, board: &Arc<Mutex<IcyBoard>>) {
+        self.selected = None;
+
+        let config = &board.lock().await.config;
+
+        self.buttons[6].title = if config.options.call_log {
+            get_text("call_wait_screen_call_log_on")
+        } else {
+            get_text("call_wait_screen_call_log_off")
+        };
+        self.buttons[7].title = if config.options.page_bell {
+            get_text("call_wait_screen_page_bell_on")
+        } else {
+            get_text("call_wait_screen_page_bell_off")
+        };
+        self.buttons[8].title = if config.options.alarm {
+            get_text("call_wait_screen_alarm_on")
+        } else {
+            get_text("call_wait_screen_alarm_off")
+        };
+    }
     pub async fn run(&mut self, terminal: &mut Terminal<impl Backend>, board: &Arc<Mutex<IcyBoard>>) -> Res<CallWaitMessage> {
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
@@ -129,7 +182,7 @@ impl CallWaitScreen {
             }
 
             if let Some(selected) = self.selected {
-                if selected.elapsed() >= Duration::from_millis(300) {
+                if selected.elapsed() >= Duration::from_millis(150) {
                     return Ok(self.buttons[(self.y * 3 + self.x) as usize].message.clone());
                 }
             }

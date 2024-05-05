@@ -1,7 +1,10 @@
 use crate::{menu_runner::PcbBoardCommand, Res};
-use icy_board_engine::icy_board::{
-    icb_text::IceText,
-    state::{functions::display_flags, GraphicsMode},
+use icy_board_engine::{
+    icy_board::{
+        icb_text::IceText,
+        state::{functions::display_flags, GraphicsMode},
+    },
+    vm::TerminalTarget,
 };
 
 impl PcbBoardCommand {
@@ -16,7 +19,7 @@ impl PcbBoardCommand {
             return Ok(());
         }
 
-        self.state.reset_color().await?;
+        self.state.reset_color(TerminalTarget::Both).await?;
 
         if let Some(token) = self.state.session.tokens.pop_front() {
             let token = token.to_ascii_uppercase();

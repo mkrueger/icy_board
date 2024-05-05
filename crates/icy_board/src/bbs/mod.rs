@@ -10,7 +10,7 @@ use async_recursion::async_recursion;
 use icy_board_engine::{
     icy_board::{
         login_server::{SecureWebsocket, Telnet, Websocket, SSH},
-        state::{IcyBoardState, NodeState},
+        state::{BBSMessage, IcyBoardState, NodeState},
         IcyBoard,
     },
     vm::TerminalTarget,
@@ -21,12 +21,13 @@ use icy_net::{
     Connection,
     ConnectionType,
 };
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, sync::mpsc};
 
 use crate::menu_runner::PcbBoardCommand;
 
 pub struct BBS {
     pub open_connections: Arc<Mutex<Vec<Option<NodeState>>>>,
+    pub bbs_channels: Vec<Option<tokio::sync::mpsc::Sender<BBSMessage>>>,
 }
 
 impl BBS {
@@ -59,8 +60,10 @@ impl BBS {
         if let Ok(list) = &mut self.open_connections.lock() {
             for i in 0..list.len() {
                 if list[i].is_none() {
-                    let node_state = NodeState::new(i + 1, connection_type);
+                    let (tx, rx) = mpsc::channel(32);
+                    let node_state = NodeState::new(i + 1, connection_type, rx);
                     list[i] = Some(node_state);
+                    self.bbs_channels[i] = Some(tx);
                     return i;
                 }
             }
@@ -70,11 +73,14 @@ impl BBS {
 
     pub fn new(nodes: usize) -> BBS {
         let mut vec = Vec::new();
+        let mut vec2 = Vec::new();
         for _ in 0..nodes {
             vec.push(None);
+            vec2.push(None);
         }
         BBS {
             open_connections: Arc::new(Mutex::new(vec)),
+            bbs_channels: vec2,
         }
     }
 }
@@ -321,7 +327,7 @@ pub async fn handle_client(
                 cmd.state
                     .print(icy_board_engine::vm::TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err))
                     .await?;
-                cmd.state.reset_color().await?;
+                cmd.state.reset_color(TerminalTarget::Both).await?;
             }
         }
         cmd.state.session.disp_options.reset_printout();

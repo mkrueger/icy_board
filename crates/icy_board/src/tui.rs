@@ -19,7 +19,7 @@ use crossterm::{
     ExecutableCommand,
 };
 use icy_board_engine::icy_board::{
-    state::{GraphicsMode, NodeState},
+    state::{BBSMessage, GraphicsMode, NodeState},
     IcyBoard, IcyBoardError,
 };
 use icy_board_tui::{
@@ -34,6 +34,7 @@ use tokio::sync::mpsc;
 use crate::{bbs::BBS, icy_engine_output::Screen};
 
 pub struct Tui {
+    sysop_mode: bool,
     screen: Arc<Mutex<Screen>>,
     tx: mpsc::Sender<SendData>,
     status_bar: usize,
@@ -70,6 +71,7 @@ impl Tui {
         let (_handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone());
 
         Self {
+            sysop_mode: false,
             screen,
             tx,
             status_bar: 0,
@@ -78,19 +80,35 @@ impl Tui {
             handle: bbs.lock().unwrap().get_open_connections().clone(),
         }
     }
-    pub fn sysop_mode(bbs: &Arc<Mutex<BBS>>, node: usize) -> Res<Self> {
+
+    async fn logoff_sysop(&self, bbs: &mut Arc<Mutex<BBS>>) -> Res<()> {
+        if self.sysop_mode {
+            bbs.lock().unwrap().bbs_channels[self.node]
+                .as_ref()
+                .unwrap()
+                .send(BBSMessage::SysopLogout)
+                .await?;
+        }
+        Ok(())
+    }
+
+    pub async fn sysop_mode(bbs: &Arc<Mutex<BBS>>, node: usize) -> Res<Self> {
         let (ui_connection, connection) = ChannelConnection::create_pair();
         if let Ok(bbs) = &mut bbs.lock() {
             log::info!("Creating sysop mode");
             let node_state = bbs.open_connections.clone();
 
-            bbs.get_open_connections().lock().unwrap()[node].as_mut().unwrap().sysop_connection = Some(connection);
+            if let Some(node_state) = bbs.get_open_connections().lock().unwrap()[node].as_mut() {
+                node_state.sysop_connection = Some(connection);
+            }
+            bbs.bbs_channels[node].as_ref().unwrap().send(BBSMessage::SysopLogin).await?;
 
             let screen = Arc::new(Mutex::new(Screen::new()));
             log::info!("Run terminal thread");
             let (_handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone());
 
             Ok(Self {
+                sysop_mode: true,
                 screen,
                 tx,
                 status_bar: 0,
@@ -103,22 +121,24 @@ impl Tui {
         }
     }
 
-    pub async fn run(&mut self, board: &Arc<tokio::sync::Mutex<IcyBoard>>) -> Res<()> {
+    pub async fn run(&mut self, bbs: &mut Arc<Mutex<BBS>>, board: &Arc<tokio::sync::Mutex<IcyBoard>>) -> Res<()> {
         let mut terminal = init_terminal()?;
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(20);
         terminal.clear()?;
         //   let mut redraw = true;
         loop {
-            if self.handle.lock().unwrap()[self.node].as_ref().unwrap().handle.as_ref().unwrap().is_finished() {
-                restore_terminal()?;
-                let handle = self.handle.lock().unwrap()[self.node].as_mut().unwrap().handle.take().unwrap();
-                if let Err(_err) = handle.join() {
-                    return Err(Box::new(IcyBoardError::ThreadCrashed));
+            if let Some(Some(node_state)) = self.handle.lock().unwrap().get(self.node) {
+                if node_state.handle.as_ref().unwrap().is_finished() {
+                    restore_terminal()?;
+                    let handle = self.handle.lock().unwrap()[self.node].as_mut().unwrap().handle.take().unwrap();
+                    self.logoff_sysop(bbs).await?;
+                    if let Err(_err) = handle.join() {
+                        return Err(Box::new(IcyBoardError::ThreadCrashed));
+                    }
+                    return Ok(());
                 }
-                return Ok(());
             }
-
             //if redraw
             {
                 //  redraw = false;
@@ -139,6 +159,7 @@ impl Tui {
                                 }
                                 KeyCode::Char('x') => {
                                     let _ = restore_terminal();
+                                    self.logoff_sysop(bbs).await?;
 
                                     return Ok(());
                                 }
@@ -148,6 +169,7 @@ impl Tui {
                             match key.code {
                                 KeyCode::Char(c) => {
                                     if c == 'x' || c == 'c' {
+                                        self.logoff_sysop(bbs).await?;
                                         let _ = disable_raw_mode();
                                         return Ok(());
                                     }

@@ -369,6 +369,10 @@ pub struct BoardOptions {
     pub non_graphics: bool,
 
     pub give_user_password_to_doors: bool,
+
+    pub call_log: bool,
+    pub page_bell: bool,
+    pub alarm: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
@@ -542,6 +546,9 @@ impl IcbConfig {
                 keyboard_timeout: 5,
                 upload_descr_lines: 20,
                 give_user_password_to_doors: false,
+                page_bell: true,
+                alarm: false,
+                call_log: true,
             },
         }
     }

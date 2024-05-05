@@ -8,7 +8,8 @@ pub struct VirtualScreen {
 
 impl VirtualScreen {
     pub fn new<T: BufferParser + 'static>(parser: T) -> Self {
-        let buffer = Buffer::new((80, 25));
+        let mut buffer = Buffer::new((80, 25));
+        buffer.buffer_type = icy_engine::BufferType::Unicode;
         let caret = Caret::default();
         Self {
             parser: Box::new(parser),

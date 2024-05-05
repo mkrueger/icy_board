@@ -332,14 +332,14 @@ impl IcyBoardState {
             self.forward(len).await?;
             self.print(TerminalTarget::Both, ")").await?;
             self.backward(len + 1).await?;
-            self.reset_color().await?;
+            self.reset_color(TerminalTarget::Both).await?;
             if let Some(default) = &default_string {
                 self.print(TerminalTarget::Both, default).await?;
                 self.backward(default.len() as i32).await?;
             }
         }
         if self.use_graphics() {
-            self.reset_color().await?;
+            self.reset_color(TerminalTarget::Both).await?;
         }
 
         let mut output = String::new();
@@ -361,7 +361,7 @@ impl IcyBoardState {
                 }
 
                 if display_flags & display_flags::ERASELINE != 0 {
-                    self.clear_line().await?;
+                    self.clear_line(TerminalTarget::Both).await?;
                 }
                 break;
             }

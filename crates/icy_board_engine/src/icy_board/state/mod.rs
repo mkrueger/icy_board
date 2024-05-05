@@ -12,7 +12,7 @@ use crate::{executable::Executable, Res};
 use async_recursion::async_recursion;
 use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use codepages::tables::UNICODE_TO_CP437;
-use icy_engine::ansi;
+use icy_engine::{ansi, OutputFormat};
 use icy_engine::{ansi::constants::COLOR_OFFSETS, Position};
 use icy_engine::{TextAttribute, TextPane};
 use icy_net::{channel::ChannelConnection, terminal::virtual_screen::VirtualScreen, Connection, ConnectionType};
@@ -324,8 +324,15 @@ pub enum UserActivity {
     ReadBroadcast,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BBSMessage {
+    SysopLogin,
+    SysopLogout,
+}
+
 pub struct NodeState {
     pub sysop_connection: Option<ChannelConnection>,
+    pub bbs_channel: Option<tokio::sync::mpsc::Receiver<BBSMessage>>,
     pub cur_user: i32,
     pub cur_conference: u16,
     pub graphics_mode: GraphicsMode,
@@ -341,9 +348,10 @@ unsafe impl Send for NodeState {}
 unsafe impl Sync for NodeState {}
 
 impl NodeState {
-    pub fn new(node_number: usize, connection_type: ConnectionType) -> Self {
+    pub fn new(node_number: usize, connection_type: ConnectionType, rx: tokio::sync::mpsc::Receiver<BBSMessage>) -> Self {
         Self {
             sysop_connection: None,
+            bbs_channel: Some(rx),
             user_activity: UserActivity::LoggingIn,
             graphics_mode: GraphicsMode::Ansi,
             cur_user: -1,
@@ -484,19 +492,19 @@ impl IcyBoardState {
         // TODO: Check time left.
     }
 
-    pub async fn reset_color(&mut self) -> Res<()> {
+    pub async fn reset_color(&mut self, target: TerminalTarget) -> Res<()> {
         let color = self.get_board().await.config.color_configuration.default.clone();
-        self.set_color(TerminalTarget::Both, color).await
+        self.set_color(target, color).await
     }
 
-    pub async fn clear_screen(&mut self) -> Res<()> {
+    pub async fn clear_screen(&mut self, target: TerminalTarget) -> Res<()> {
         match self.session.disp_options.grapics_mode {
             GraphicsMode::Ctty | GraphicsMode::Avatar => {
                 // form feed character
-                self.print(TerminalTarget::Both, "\x0C").await?;
+                self.print(target, "\x0C").await?;
             }
             GraphicsMode::Ansi | GraphicsMode::Graphics => {
-                self.print(TerminalTarget::Both, "\x1B[2J\x1B[H").await?;
+                self.print(target, "\x1B[2J\x1B[H").await?;
             }
             GraphicsMode::Rip => {
                 // ignore
@@ -505,29 +513,29 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub async fn clear_line(&mut self) -> Res<()> {
+    pub async fn clear_line(&mut self, target: TerminalTarget) -> Res<()> {
         if self.use_ansi() {
-            self.print(TerminalTarget::Both, "\r\x1B[K").await
+            self.print(target, "\r\x1B[K").await
         } else {
             // TODO
             Ok(())
         }
     }
 
-    pub async fn clear_eol(&mut self) -> Res<()> {
+    pub async fn clear_eol(&mut self, target: TerminalTarget) -> Res<()> {
         match self.session.disp_options.grapics_mode {
             GraphicsMode::Ctty => {
                 let x = self.user_screen.buffer.get_width() - self.user_screen.caret.get_position().x;
                 for _ in 0..x {
-                    self.print(TerminalTarget::Both, " ").await?;
+                    self.print(target, " ").await?;
                 }
                 for _ in 0..x {
-                    self.print(TerminalTarget::Both, "\x08").await?;
+                    self.print(target, "\x08").await?;
                 }
                 Ok(())
             }
-            GraphicsMode::Ansi | GraphicsMode::Graphics | GraphicsMode::Avatar => self.print(TerminalTarget::Both, "\x1B[K").await,
-            GraphicsMode::Rip => self.print(TerminalTarget::Both, "\x1B[K").await,
+            GraphicsMode::Ansi | GraphicsMode::Graphics | GraphicsMode::Avatar => self.print(target, "\x1B[K").await,
+            GraphicsMode::Rip => self.print(target, "\x1B[K").await,
         }
     }
 
@@ -1096,11 +1104,11 @@ impl IcyBoardState {
                 }
             }
             "CLREOL" => {
-                let _ = self.clear_eol().await;
+                let _ = self.clear_eol(target).await;
                 return None;
             }
             "CLS" => {
-                let _ = self.clear_screen().await;
+                let _ = self.clear_screen(target).await;
                 return None;
             }
             "CONFNAME" => result = self.session.current_conference.name.to_string(),
@@ -1401,18 +1409,33 @@ impl IcyBoardState {
         }
 
         let mut sysop_connection = None;
+        let mut bbs_channel = None;
         if let Ok(node_state) = &mut self.node_state.lock() {
             sysop_connection = node_state[self.node].as_mut().unwrap().sysop_connection.take();
+            bbs_channel = node_state[self.node].as_mut().unwrap().bbs_channel.take();
         }
 
         let mut user_key_data = [0; 1];
+        let Some(mut bbs_channel) = bbs_channel else {
+            return Ok(None);
+        };
+
         if let Some(mut sysop_connection) = sysop_connection.take() {
             let mut sysop_key_data = [0; 1];
             tokio::select! {
+                msg = bbs_channel.recv() => {
+                    if let Some(BBSMessage::SysopLogout) = msg {
+                        self.node_state.lock().unwrap()[self.node].as_mut().unwrap().sysop_connection = None;
+                        self.node_state.lock().unwrap()[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
+                        self.print_sysop_screen().await?;
+                        return Ok(None);
+                    }
+                }
                 size = sysop_connection.read(&mut sysop_key_data) => {
                     match size {
                         Ok(1) => {
                             self.node_state.lock().unwrap()[self.node].as_mut().unwrap().sysop_connection = Some(sysop_connection);
+                            self.node_state.lock().unwrap()[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
                             if target == TerminalTarget::User {
                                 self.char_buffer.push_back(KeyChar::new(KeySource::Sysop, sysop_key_data[0] as char));
                                 return Ok(None);
@@ -1428,6 +1451,7 @@ impl IcyBoardState {
                 size2 = self.connection.read(&mut user_key_data) => {
                     if let Ok(1) = size2 {
                         self.node_state.lock().unwrap()[self.node].as_mut().unwrap().sysop_connection = Some(sysop_connection);
+                        self.node_state.lock().unwrap()[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
                         if target == TerminalTarget::Sysop {
                             self.char_buffer.push_back(KeyChar::new(KeySource::User, user_key_data[0] as char));
                             return Ok(None);
@@ -1437,18 +1461,43 @@ impl IcyBoardState {
                 }
             }
         } else {
-            let size = self.connection.read(&mut user_key_data).await?;
-            if size == 1 {
-                if target == TerminalTarget::Sysop {
-                    // No sysop, only user
-                    return Ok(None);
+            tokio::select! {
+                msg = bbs_channel.recv() => {
+                    if let Some(BBSMessage::SysopLogin) = msg {
+                        self.node_state.lock().unwrap()[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
+                        self.print_sysop_screen().await?;
+                        return Ok(None);
+                    }
                 }
-                return Ok(Some(KeyChar::new(KeySource::User, user_key_data[0] as char)));
+                size2 = self.connection.read(&mut user_key_data) => {
+                    if let Ok(1) = size2 {
+                        self.node_state.lock().unwrap()[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
+                        if target == TerminalTarget::Sysop {
+                            // No sysop, only user
+                            return Ok(None);
+                        }
+                        return Ok(Some(KeyChar::new(KeySource::User, user_key_data[0] as char)));
+                    }
+                }
             }
         }
 
         thread::sleep(Duration::from_millis(100));
         Ok(None)
+    }
+
+    async fn print_sysop_screen(&mut self) -> Res<()> {
+        let mut options = icy_engine::SaveOptions::default();
+        options.screen_preparation = icy_engine::ScreenPreperation::ClearScreen;
+        options.save_sauce = false;
+        options.modern_terminal_output = true;
+        let res = icy_engine::formats::PCBoard::default().to_bytes(&self.user_screen.buffer, &options)?;
+        let res = unsafe { String::from_utf8_unchecked(res) };
+        log::info!("Sending sysop screen: {:?}", res);
+        self.print(TerminalTarget::Sysop, &res).await?;
+        let p = self.user_screen.caret.get_position();
+        self.gotoxy(TerminalTarget::Sysop, p.x + 1, p.y + 1).await?;
+        Ok(())
     }
 
     pub fn inbytes(&mut self) -> i32 {
@@ -1464,14 +1513,21 @@ impl IcyBoardState {
         if !self.use_graphics() {
             return Ok(());
         }
+        let screen = if target == TerminalTarget::Sysop {
+            &mut self.sysop_screen
+        } else {
+            &mut self.user_screen
+        };
+
         let new_color = match color {
             IcbColor::None => {
                 return Ok(());
             }
             IcbColor::Dos(color) => {
-                if self.user_screen.caret.get_attribute().as_u8(icy_engine::IceMode::Blink) == color {
+                if screen.caret.get_attribute().as_u8(icy_engine::IceMode::Blink) == color {
                     return Ok(());
                 }
+
                 TextAttribute::from_u8(color, icy_engine::IceMode::Blink)
             }
             IcbColor::IcyEngine(_fg) => {
@@ -1487,10 +1543,10 @@ impl IcyBoardState {
         }
 
         let mut color_change = "\x1B[".to_string();
-        let was_bold = self.user_screen.caret.get_attribute().is_bold();
+        let was_bold = screen.caret.get_attribute().is_bold();
         let new_bold = new_color.is_bold() || new_color.get_foreground() > 7;
-        let mut bg = self.user_screen.caret.get_attribute().get_background();
-        let mut fg = self.user_screen.caret.get_attribute().get_foreground();
+        let mut bg = screen.caret.get_attribute().get_background();
+        let mut fg = screen.caret.get_attribute().get_foreground();
         if was_bold != new_bold {
             if new_bold {
                 color_change += "1;";
@@ -1501,7 +1557,7 @@ impl IcyBoardState {
             }
         }
 
-        if !self.user_screen.caret.get_attribute().is_blinking() && new_color.is_blinking() {
+        if !screen.caret.get_attribute().is_blinking() && new_color.is_blinking() {
             color_change += "5;";
         }
 
@@ -1543,7 +1599,7 @@ impl IcyBoardState {
         } */
         self.display_text(IceText::ThanksForCalling, display_flags::LFBEFORE | display_flags::NEWLINE)
             .await?;
-        self.reset_color().await?;
+        self.reset_color(TerminalTarget::Both).await?;
 
         self.hangup()
     }

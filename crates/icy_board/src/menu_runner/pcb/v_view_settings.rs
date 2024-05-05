@@ -19,46 +19,46 @@ impl PcbBoardCommand {
             self.state
                 .println(TerminalTarget::Both, &format!(" {}", self.state.session.caller_number))
                 .await?;
-            self.state.reset_color().await?;
+            self.state.reset_color(TerminalTarget::Both).await?;
         }
 
         self.state.new_line().await?;
 
         self.state.display_text(IceText::ViewSettingsLastDateOne, display_flags::DEFAULT).await?;
         self.state.println(TerminalTarget::Both, &self.state.format_date(user.stats.last_on)).await?;
-        self.state.reset_color().await?;
+        self.state.reset_color(TerminalTarget::Both).await?;
 
         if user.exp_date.year() > 0 {
             self.state.display_text(IceText::ViewSettingsExpireDate, display_flags::DEFAULT).await?;
             self.state.println(TerminalTarget::Both, &self.state.format_date(user.exp_date)).await?;
-            self.state.reset_color().await?;
+            self.state.reset_color(TerminalTarget::Both).await?;
         }
         self.state.display_text(IceText::ViewSettingsNumberTimesOn, display_flags::DEFAULT).await?;
         self.state.println(TerminalTarget::Both, &format!(" {}", user.stats.num_times_on)).await?;
-        self.state.reset_color().await?;
+        self.state.reset_color(TerminalTarget::Both).await?;
 
         self.state.display_text(IceText::ViewSettingsPageLength, display_flags::DEFAULT).await?;
         self.state.println(TerminalTarget::Both, &format!(" {}", self.state.session.page_len)).await?;
-        self.state.reset_color().await?;
+        self.state.reset_color(TerminalTarget::Both).await?;
 
         if self.state.session.expert_mode {
             self.state.display_text(IceText::ViewSettingsExpertModeOn, display_flags::NEWLINE).await?;
         } else {
             self.state.display_text(IceText::ViewSettingsExpertModeOff, display_flags::NEWLINE).await?;
         }
-        self.state.reset_color().await?;
+        self.state.reset_color(TerminalTarget::Both).await?;
 
         self.state.display_text(IceText::ViewSettingsSecurityLevel, display_flags::DEFAULT).await?;
         self.state.println(TerminalTarget::Both, &format!(" {}", user.security_level)).await?;
-        self.state.reset_color().await?;
+        self.state.reset_color(TerminalTarget::Both).await?;
 
         self.state.display_text(IceText::ViewSettingsNumberDownloads, display_flags::DEFAULT).await?;
         self.state.println(TerminalTarget::Both, &format!(" {}", user.stats.num_downloads)).await?;
-        self.state.reset_color().await?;
+        self.state.reset_color(TerminalTarget::Both).await?;
 
         self.state.display_text(IceText::ViewSettingsNumberUploads, display_flags::DEFAULT).await?;
         self.state.println(TerminalTarget::Both, &format!(" {}", user.stats.num_uploads)).await?;
-        self.state.reset_color().await?;
+        self.state.reset_color(TerminalTarget::Both).await?;
 
         // MsgStats don't make any sense anymore on
 
@@ -71,17 +71,17 @@ impl PcbBoardCommand {
             }
         }
         self.state.println(TerminalTarget::Both, &protocol).await?;
-        self.state.reset_color().await?;
+        self.state.reset_color(TerminalTarget::Both).await?;
 
         if self.state.session.use_alias {
             self.state.display_text(IceText::ViewSettingsAliasOn, display_flags::NEWLINE).await?;
         } else {
             self.state.display_text(IceText::ViewSettingsAliasOff, display_flags::NEWLINE).await?;
         }
-        self.state.reset_color().await?;
+        self.state.reset_color(TerminalTarget::Both).await?;
 
         self.state.display_text(IceText::ViewSettingsGraphicsMode, display_flags::NEWLINE).await?;
-        self.state.reset_color().await?;
+        self.state.reset_color(TerminalTarget::Both).await?;
 
         self.state.new_line().await?;
         self.state.press_enter().await?;

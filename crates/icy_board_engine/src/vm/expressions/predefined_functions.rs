@@ -993,8 +993,7 @@ pub async fn modem(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     panic!("TODO")
 }
 pub async fn loggedon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_bool(!vm.icy_board_state.session.user_name.is_empty()))
 }
 pub async fn callnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");

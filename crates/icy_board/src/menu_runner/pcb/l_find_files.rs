@@ -197,7 +197,7 @@ impl<'a> FileList<'a> {
             if false {
                 cmd.state.set_color(TerminalTarget::Both, colors.file_new_file.clone()).await?;
                 cmd.state.print(TerminalTarget::Both, "*").await?;
-                cmd.state.reset_color().await?;
+                cmd.state.reset_color(TerminalTarget::Both).await?;
                 cmd.state.print(TerminalTarget::Both, " ").await?;
             } else {
                 cmd.state.print(TerminalTarget::Both, "  ").await?;

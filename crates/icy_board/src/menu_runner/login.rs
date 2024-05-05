@@ -21,8 +21,8 @@ impl PcbBoardCommand {
     pub async fn login(&mut self) -> Res<bool> {
         self.state.set_activity(UserActivity::LoggingIn);
 
-        self.state.reset_color().await?;
-        self.state.clear_screen().await?;
+        self.state.reset_color(TerminalTarget::Both).await?;
+        self.state.clear_screen(TerminalTarget::Both).await?;
         self.state.get_term_caps()?;
         self.state.session.login_date = chrono::Local::now();
 

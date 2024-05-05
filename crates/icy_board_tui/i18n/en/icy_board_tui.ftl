@@ -19,6 +19,18 @@ call_wait_screen_sysop_button_not_busy_descr=Log in as the Sysop. RING Alert wil
 call_wait_screen_dos_button_not_busy=Shell - Not Busy
 call_wait_screen_dos_button_not_busy_descr=Drop to Shell. Callers will NOT get a busy signal.
 
+call_wait_screen_call_log_on=Call Log - On
+call_wait_screen_call_log_off=Call Log - Off
+call_wait_screen_call_log_descr=When on, callers will be logged.
+
+call_wait_screen_page_bell_on=Page Bell is On
+call_wait_screen_page_bell_off=Page Bell is Off
+call_wait_screen_page_bell_descr=System will BEEP when caller pages you.
+
+call_wait_screen_alarm_on=Alarm is On
+call_wait_screen_alarm_off=Alarm is Off
+call_wait_screen_alarm_descr=System BEEPs as caller logs on, etc.
+
 call_wait_screen_monitor_button_not_busy=ICBMoni
 call_wait_screen_monitor_button_not_busy_descr=Run ICBMoni to monitor NODE activity
 

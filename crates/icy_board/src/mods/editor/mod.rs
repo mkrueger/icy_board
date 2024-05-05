@@ -126,7 +126,7 @@ impl EditState {
                             self.print_divider(state).await?;
                             state.set_color(TerminalTarget::Both, IcbColor::Dos(11)).await?;
                             state.print(TerminalTarget::Both, &format!("{}: ", line)).await?;
-                            state.reset_color().await?;
+                            state.reset_color(TerminalTarget::Both).await?;
                             state.println(TerminalTarget::Both, &self.msg[line - 1]).await?;
 
                             let delete_line = state
@@ -206,7 +206,7 @@ impl EditState {
     async fn print_divider(&mut self, state: &mut IcyBoardState) -> Res<()> {
         state.set_color(TerminalTarget::Both, IcbColor::Dos(11)).await?;
         state.println(TerminalTarget::Both, &str::repeat("-", 79)).await?;
-        state.reset_color().await?;
+        state.reset_color(TerminalTarget::Both).await?;
         Ok(())
     }
 
@@ -236,7 +236,7 @@ impl EditState {
             };
             match ch.ch {
                 control_codes::ESC => {
-                    state.clear_screen().await?;
+                    state.clear_screen(TerminalTarget::Both).await?;
                     return Ok(());
                 }
                 control_codes::PG_UP => {
@@ -271,7 +271,7 @@ impl EditState {
                     let o = self.cursor.x as usize;
                     if self.cur_line().len() > o {
                         self.cur_line().drain(o..);
-                        state.clear_eol().await?;
+                        state.clear_eol(TerminalTarget::Both).await?;
                     }
                 }
 
@@ -301,7 +301,7 @@ impl EditState {
                 }
                 control_codes::CTRL_Z => {
                     state.session.disp_options.non_stop = false;
-                    state.clear_screen().await?;
+                    state.clear_screen(TerminalTarget::Both).await?;
                     state.show_help("hlpfscrn").await?;
                     state.session.disp_options.non_stop = true;
                     state.press_enter().await?;
@@ -434,7 +434,7 @@ impl EditState {
     }
 
     async fn redraw_fse_from(&mut self, state: &mut IcyBoardState, y: usize) -> Res<()> {
-        state.reset_color().await?;
+        state.reset_color(TerminalTarget::Both).await?;
         state
             .gotoxy(TerminalTarget::Both, 1, y as i32 - self.top_line as i32 + Self::HEADER_SIZE)
             .await?;
@@ -443,23 +443,23 @@ impl EditState {
             if cur_line < self.msg.len() {
                 state.print(TerminalTarget::Both, &self.msg[cur_line]).await?;
             }
-            state.clear_eol().await?;
+            state.clear_eol(TerminalTarget::Both).await?;
             state.new_line().await?;
         }
         Ok(())
     }
 
     async fn redraw_fse(&mut self, state: &mut IcyBoardState) -> Res<()> {
-        state.clear_screen().await?;
+        state.clear_screen(TerminalTarget::Both).await?;
         self.msg_header(state).await?;
-        state.reset_color().await?;
+        state.reset_color(TerminalTarget::Both).await?;
         state.gotoxy(TerminalTarget::Both, 1, Self::HEADER_SIZE).await?;
         for i in 0..(state.session.page_len as usize).saturating_sub(Self::HEADER_SIZE as usize) {
             let cur_line = i + self.top_line;
             if cur_line < self.msg.len() {
                 state.print(TerminalTarget::Both, &self.msg[cur_line]).await?;
             }
-            state.clear_eol().await?;
+            state.clear_eol(TerminalTarget::Both).await?;
             state.new_line().await?;
         }
         state.display_text(IceText::EscToExit, 0).await?;
@@ -475,8 +475,8 @@ impl EditState {
         } else {
             state.display_text(IceText::INSForInsert, 0).await?;
         }
-        state.reset_color().await?;
-        state.clear_eol().await?;
+        state.reset_color(TerminalTarget::Both).await?;
+        state.clear_eol(TerminalTarget::Both).await?;
         state
             .gotoxy(
                 TerminalTarget::Both,
@@ -671,12 +671,12 @@ impl EditState {
     }
 
     async fn print_line_number(&self, state: &mut IcyBoardState) -> Res<()> {
-        state.reset_color().await?;
+        state.reset_color(TerminalTarget::Both).await?;
         state.gotoxy(TerminalTarget::Both, 79 - 2, 1).await?;
         state
             .print(TerminalTarget::Both, &format!("{:>3}", self.top_line + self.cursor.y as usize + 1))
             .await?;
-        state.clear_eol().await?;
+        state.clear_eol(TerminalTarget::Both).await?;
         state
             .gotoxy(
                 TerminalTarget::Both,
@@ -761,7 +761,7 @@ impl EditState {
             EditUpdate::None => {}
             EditUpdate::UpdateCurrentLineFrom(pos) => {
                 state.print(TerminalTarget::Both, &self.cur_line()[pos..]).await?;
-                state.clear_eol().await?;
+                state.clear_eol(TerminalTarget::Both).await?;
                 let len = self.cur_line().len() as i32 - self.cursor.x as i32 + 1;
                 if len > 0 {
                     state.backward(len).await?;

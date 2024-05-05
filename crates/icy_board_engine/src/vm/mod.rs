@@ -15,6 +15,7 @@ use crate::icy_board::user_base::FSEMode;
 use crate::parser::UserTypeRegistry;
 use crate::Res;
 use async_recursion::async_recursion;
+use icy_engine::Buffer;
 use std::collections::HashMap;
 use std::mem;
 use std::path::Path;
@@ -155,6 +156,8 @@ pub struct VirtualMachine<'a> {
 
     pub label_table: HashMap<usize, usize>,
     pub push_pop_stack: Vec<VariableValue>,
+
+    stored_screen: Option<Buffer>,
 }
 
 impl<'a> VirtualMachine<'a> {
@@ -763,6 +766,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
         write_back_stack: Vec::new(),
         push_pop_stack: Vec::new(),
         user_data: Vec::new(),
+        stored_screen: None,
     };
 
     vm.run().await?;

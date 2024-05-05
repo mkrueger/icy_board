@@ -139,7 +139,7 @@ impl PcbBoardCommand {
         match read_with_encoding_detection(&question) {
             Ok(question) => {
                 let lines: Vec<&str> = question.lines().collect();
-                self.state.reset_color().await?;
+                self.state.reset_color(TerminalTarget::Both).await?;
                 let mut start_line = 0;
                 for line in &lines {
                     start_line += 1;
@@ -168,7 +168,7 @@ impl PcbBoardCommand {
                         self.state.set_color(TerminalTarget::Both, IcbColor::Dos(14)).await?;
                         self.state.print(TerminalTarget::Both, question).await?;
                         self.state.new_line().await?;
-                        self.state.reset_color().await?;
+                        self.state.reset_color(TerminalTarget::Both).await?;
                         let answer = self
                             .state
                             .input_string(
