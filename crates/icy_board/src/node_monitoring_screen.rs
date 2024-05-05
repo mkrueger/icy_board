@@ -6,11 +6,12 @@ use std::{
 use crate::Res;
 use chrono::{Local, Timelike};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use icy_board_engine::icy_board::{bbs::BBS, IcyBoard};
+use icy_board_engine::icy_board::{bbs::BBS, state::NodeState, IcyBoard};
 use icy_board_tui::{
     get_text,
-    theme::{DOS_BLUE, DOS_LIGHT_CYAN, DOS_RED, DOS_YELLOW},
+    theme::{DOS_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_YELLOW},
 };
+use icy_net::ConnectionType;
 use ratatui::{
     prelude::*,
     widgets::{block::Title, *},
@@ -26,6 +27,27 @@ pub struct NodeMonitoringScreen {
     nodes: usize,
     scroll_state: ScrollbarState,
     table_state: TableState,
+}
+
+pub struct Info {
+    pub user_activity: icy_board_engine::icy_board::state::UserActivity,
+    pub cur_user: Option<String>,
+    pub connection_type: ConnectionType,
+}
+impl Info {
+    fn new(board: &IcyBoard, state: &NodeState) -> Info {
+        let user = if state.cur_user >= 0 {
+            Some(board.users[state.cur_user as usize].name.clone())
+        } else {
+            None
+        };
+
+        Info {
+            user_activity: state.user_activity,
+            cur_user: user,
+            connection_type: state.connection_type,
+        }
+    }
 }
 
 impl NodeMonitoringScreen {
@@ -46,12 +68,29 @@ impl NodeMonitoringScreen {
     ) -> Res<NodeMonitoringScreenMessage> {
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
+        let mut node_info: Vec<Option<Info>> = Vec::new();
+
         loop {
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
             let mut page_len = 0;
+            if node_info.is_empty() || last_tick.elapsed() >= tick_rate {
+                let board = board.lock().await;
+                node_info.clear();
+                bbs.lock().await.clear_closed_connections().await;
+                for a in bbs.lock().await.get_open_connections().await.lock().await.iter() {
+                    if let Some(a) = a {
+                        node_info.push(Some(Info::new(&board, a)));
+                    } else {
+                        node_info.push(None);
+                    }
+                }
+
+                last_tick = Instant::now();
+            }
+
             terminal.draw(|frame| {
                 page_len = (frame.size().height as usize).saturating_sub(3);
-                self.ui(frame, board, bbs);
+                self.ui(frame, &node_info);
             })?;
             if event::poll(timeout)? {
                 if let Event::Key(key) = event::read()? {
@@ -106,22 +145,16 @@ impl NodeMonitoringScreen {
                     }
                 }
             }
-
-            if last_tick.elapsed() >= tick_rate {
-                //     self.on_tick();
-                last_tick = Instant::now();
-            }
         }
     }
 
-    fn ui(&mut self, frame: &mut Frame, board: &Arc<tokio::sync::Mutex<IcyBoard>>, bbs: &mut Arc<Mutex<BBS>>) {
+    fn ui(&mut self, frame: &mut Frame, infos: &Vec<Option<Info>>) {
         let now = Local::now();
-        let footer = get_text("icbmoni_footer");
-        if let Some(_i) = self.table_state.selected() {
-            /* TODO: ASYNC
-            if bbs.lock().unwrap().get_open_connections().lock().unwrap()[i].is_some() {
+        let mut footer = get_text("icbmoni_footer");
+        if let Some(i) = self.table_state.selected() {
+            if infos[i].is_some() {
                 footer = get_text("icbmoni_on_note_footer")
-            }*/
+            }
         }
 
         let b = Block::default()
@@ -139,12 +172,12 @@ impl NodeMonitoringScreen {
             .borders(Borders::ALL);
         b.render(frame.size(), frame.buffer_mut());
         let area = frame.size();
-        self.render_table(frame, area, board, bbs);
+        self.render_table(frame, area, infos);
         self.render_scrollbar(frame, area);
     }
 
-    fn render_table(&mut self, _frame: &mut Frame, _area: Rect, _board: &Arc<tokio::sync::Mutex<IcyBoard>>, _bbs: &mut Arc<Mutex<BBS>>) {
-        let _header = [
+    fn render_table(&mut self, frame: &mut Frame, _area: Rect, infos: &Vec<Option<Info>>) {
+        let header = [
             "#".to_string(),
             get_text("icbmoni_status_header"),
             get_text("icbmoni_user_header"),
@@ -155,78 +188,67 @@ impl NodeMonitoringScreen {
         .collect::<Row>()
         .style(Style::default().fg(DOS_LIGHT_CYAN).bg(DOS_BLUE).bold())
         .height(1);
-        /* TODO: ASYNC
-        if let Ok(mut bbs) = bbs.lock() {
-            if let Ok(con) = bbs.get_open_connections().lock() {
-                let rows = con.iter().enumerate().map(|(i, node_state)| {
-                    if let Some(state) = node_state {
-                        let user_name = //if state.cur_user < 0 {
-                            get_text("icbmoni_log_in")
-                      /*  } else {
-                            println!("user !!!");
-                            /*
-                            tokio::runtime::Builder::new_current_thread()
-                                .enable_all()
-                                .build()
-                                .unwrap()
-                                .block_on(async { board.lock().await.users[state.cur_user as usize].get_name().clone() })*/
-                        }*/;
+        let rows = infos.iter().enumerate().map(|(i, node_state)| {
+            if let Some(state) = node_state {
+                let user_name = if let Some(user) = &state.cur_user {
+                    user.clone()
+                } else {
+                    get_text("icbmoni_log_in")
+                };
 
-                        let activity = match state.user_activity {
-                            icy_board_engine::icy_board::state::UserActivity::LoggingIn => get_text("icbmoni_user_log_in"),
-                            icy_board_engine::icy_board::state::UserActivity::BrowseMenu => get_text("icbmoni_user_browse_menu"),
-                            icy_board_engine::icy_board::state::UserActivity::EnterMessage => get_text("icbmoni_user_enter_message"),
-                            icy_board_engine::icy_board::state::UserActivity::CommentToSysop => get_text("icbmoni_comment_to_sysop"),
-                            icy_board_engine::icy_board::state::UserActivity::BrowseFiles => get_text("icbmoni_user_browse_files"),
-                            icy_board_engine::icy_board::state::UserActivity::ReadMessages => get_text("icbmoni_user_read_messages"),
-                            icy_board_engine::icy_board::state::UserActivity::ReadBulletins => get_text("icbmoni_user_read_bulletins"),
-                            icy_board_engine::icy_board::state::UserActivity::TakeSurvey => get_text("icbmoni_user_take_survey"),
-                            icy_board_engine::icy_board::state::UserActivity::UploadFiles => get_text("icbmoni_user_upload"),
+                let activity = match state.user_activity {
+                    icy_board_engine::icy_board::state::UserActivity::LoggingIn => get_text("icbmoni_user_log_in"),
+                    icy_board_engine::icy_board::state::UserActivity::BrowseMenu => get_text("icbmoni_user_browse_menu"),
+                    icy_board_engine::icy_board::state::UserActivity::EnterMessage => get_text("icbmoni_user_enter_message"),
+                    icy_board_engine::icy_board::state::UserActivity::CommentToSysop => get_text("icbmoni_comment_to_sysop"),
+                    icy_board_engine::icy_board::state::UserActivity::BrowseFiles => get_text("icbmoni_user_browse_files"),
+                    icy_board_engine::icy_board::state::UserActivity::ReadMessages => get_text("icbmoni_user_read_messages"),
+                    icy_board_engine::icy_board::state::UserActivity::ReadBulletins => get_text("icbmoni_user_read_bulletins"),
+                    icy_board_engine::icy_board::state::UserActivity::TakeSurvey => get_text("icbmoni_user_take_survey"),
+                    icy_board_engine::icy_board::state::UserActivity::UploadFiles => get_text("icbmoni_user_upload"),
 
-                            icy_board_engine::icy_board::state::UserActivity::DownloadFiles => get_text("icbmoni_user_download"),
-                            icy_board_engine::icy_board::state::UserActivity::Goodbye => get_text("icbmoni_user_logoff"),
-                            icy_board_engine::icy_board::state::UserActivity::RunningDoor => get_text("icbmoni_user_door"),
-                            icy_board_engine::icy_board::state::UserActivity::ChatWithSysop => get_text("icbmoni_user_chat_with_sysop"),
-                            icy_board_engine::icy_board::state::UserActivity::GroupChat => get_text("icbmoni_user_group_chat"),
-                            icy_board_engine::icy_board::state::UserActivity::PagingSysop => get_text("icbmoni_user_page_sysop"),
-                            icy_board_engine::icy_board::state::UserActivity::ReadBroadcast => get_text("icbmoni_user_read_broadcast"),
-                        };
+                    icy_board_engine::icy_board::state::UserActivity::DownloadFiles => get_text("icbmoni_user_download"),
+                    icy_board_engine::icy_board::state::UserActivity::Goodbye => get_text("icbmoni_user_logoff"),
+                    icy_board_engine::icy_board::state::UserActivity::RunningDoor => get_text("icbmoni_user_door"),
+                    icy_board_engine::icy_board::state::UserActivity::ChatWithSysop => get_text("icbmoni_user_chat_with_sysop"),
+                    icy_board_engine::icy_board::state::UserActivity::GroupChat => get_text("icbmoni_user_group_chat"),
+                    icy_board_engine::icy_board::state::UserActivity::PagingSysop => get_text("icbmoni_user_page_sysop"),
+                    icy_board_engine::icy_board::state::UserActivity::ReadBroadcast => get_text("icbmoni_user_read_broadcast"),
+                };
 
-                        Row::new(vec![
-                            Cell::from(format!("{:<3}", i + 1)),
-                            Cell::from(activity),
-                            Cell::from(user_name),
-                            Cell::from(format!("{:?}", state.connection_type)),
-                        ])
-                    } else {
-                        Row::new(vec![
-                            Cell::from(format!("{:<3}", i + 1)),
-                            Cell::from(get_text("icbmoni_no_caller")),
-                            Cell::from(""),
-                            Cell::from(""),
-                        ])
-                    }
-                });
-                let bar = " █ ";
-                let table = Table::new(
-                    rows,
-                    [
-                        // + 1 is for padding.
-                        Constraint::Length(4),
-                        Constraint::Min(15),
-                        Constraint::Min(25),
-                        Constraint::Min(20),
-                    ],
-                )
-                .header(header)
-                .highlight_symbol(Text::from(vec!["".into(), bar.into(), bar.into(), "".into()]))
-                .highlight_style(Style::default().fg(DOS_BLUE).bg(DOS_LIGHT_GRAY))
-                .style(Style::default().fg(DOS_YELLOW).bg(DOS_BLUE))
-                .highlight_spacing(HighlightSpacing::Always);
-                let area = frame.size().inner(&Margin { vertical: 1, horizontal: 1 });
-                frame.render_stateful_widget(table, area, &mut self.table_state);
+                Row::new(vec![
+                    Cell::from(format!("{:<3}", i + 1)),
+                    Cell::from(activity),
+                    Cell::from(user_name),
+                    Cell::from(format!("{:?}", state.connection_type)),
+                ])
+            } else {
+                Row::new(vec![
+                    Cell::from(format!("{:<3}", i + 1)),
+                    Cell::from(get_text("icbmoni_no_caller")),
+                    Cell::from(""),
+                    Cell::from(""),
+                ])
             }
-        }*/
+        });
+        let bar = " █ ";
+        let table = Table::new(
+            rows,
+            [
+                // + 1 is for padding.
+                Constraint::Length(4),
+                Constraint::Min(15),
+                Constraint::Min(25),
+                Constraint::Min(20),
+            ],
+        )
+        .header(header)
+        .highlight_symbol(Text::from(vec!["".into(), bar.into(), bar.into(), "".into()]))
+        .highlight_style(Style::default().fg(DOS_BLUE).bg(DOS_LIGHT_GRAY))
+        .style(Style::default().fg(DOS_YELLOW).bg(DOS_BLUE))
+        .highlight_spacing(HighlightSpacing::Always);
+        let area = frame.size().inner(&Margin { vertical: 1, horizontal: 1 });
+        frame.render_stateful_widget(table, area, &mut self.table_state);
     }
 
     fn render_scrollbar(&mut self, frame: &mut Frame, _area: Rect) {

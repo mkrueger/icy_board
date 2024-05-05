@@ -17,14 +17,14 @@ pub struct BBS {
 }
 
 impl BBS {
-    async fn clear_closed_connections(&mut self) {
+    pub async fn clear_closed_connections(&mut self) {
         let list = &mut self.open_connections.lock().await;
         for i in 0..list.len() {
             let is_finished = if let Some(state) = &list[i] {
                 if let Some(handle) = &state.handle {
                     handle.is_finished()
                 } else {
-                    continue;
+                    true
                 }
             } else {
                 continue;
@@ -36,7 +36,6 @@ impl BBS {
     }
 
     pub async fn get_open_connections(&mut self) -> &Arc<Mutex<Vec<Option<NodeState>>>> {
-        self.clear_closed_connections().await;
         &self.open_connections
     }
 

@@ -68,6 +68,7 @@ icbmoni_status_header = Status
 icbmoni_user_header = User
 icbmoni_protocol_header = Protocol
 
+icbmoni_log_in=User logging in…
 
 #MkIcbTxt
 

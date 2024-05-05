@@ -305,6 +305,7 @@ impl Default for Session {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum UserActivity {
     LoggingIn,
     BrowseMenu,
@@ -734,9 +735,10 @@ impl IcyBoardState {
         }
 
         if let Some(user) = &self.current_user {
-            for u in 0..self.get_board().await.users.len() {
-                if self.get_board().await.users[u].get_name() == user.get_name() {
-                    self.get_board().await.set_user(user.clone(), u)?;
+            let mut board = self.get_board().await;
+            for u in 0..board.users.len() {
+                if board.users[u].get_name() == user.get_name() {
+                    board.set_user(user.clone(), u)?;
                     return Ok(());
                 }
             }
@@ -863,6 +865,7 @@ impl IcyBoardState {
                     self.chat().await?;
                     self.display_text(IceText::SysopChatEnded, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
+                    return Ok(());
                 }
             }
         }

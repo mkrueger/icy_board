@@ -271,6 +271,7 @@ pub async fn handle_client(
         cmd.state.session.disp_options.reset_printout();
         if cmd.state.session.request_logoff {
             cmd.state.connection.shutdown().await?;
+            log::info!("logoff");
             return Ok(());
         }
         thread::sleep(Duration::from_millis(20));
