@@ -124,14 +124,18 @@ impl Tui {
         terminal.clear()?;
         //   let mut redraw = true;
         loop {
-            if let Some(Some(node_state)) = self.handle.lock().await.get(self.node) {
-                if node_state.handle.as_ref().unwrap().is_finished() {
-                    restore_terminal()?;
-                    let handle = self.handle.lock().await[self.node].as_mut().unwrap().handle.take().unwrap();
-                    self.logoff_sysop(bbs).await?;
-                    if let Err(_err) = handle.join() {
-                        return Err(Box::new(IcyBoardError::ThreadCrashed));
+            if let Some(Some(node_state)) = self.handle.lock().await.get_mut(self.node) {
+                if let Some(handle) = node_state.handle.as_ref() {
+                    if handle.is_finished() {
+                        restore_terminal()?;
+                        let handle = node_state.handle.take().unwrap();
+                        if let Err(_err) = handle.join() {
+                            return Err(Box::new(IcyBoardError::ThreadCrashed));
+                        }
+                        return Ok(());
                     }
+                } else {
+                    // thread has gone
                     return Ok(());
                 }
             }

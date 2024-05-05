@@ -41,6 +41,7 @@ impl PcbBoardCommand {
         let welcome_screen = self.state.get_board().await.config.paths.welcome.clone();
         let welcome_screen = self.state.resolve_path(&welcome_screen);
         self.state.display_file(&welcome_screen).await?;
+        self.state.new_line().await?;
 
         let mut tries = 0;
 

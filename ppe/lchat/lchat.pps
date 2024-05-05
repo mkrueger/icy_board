@@ -1,32 +1,32 @@
 DECLARE FUNCTION FUNC001(BIGSTR PAR001, BIGSTR PAR002) WORD
-STRING STR001
-STRING STR002(30)
-STRING STR003(30)
-STRING STR004
+DECLARE PROCEDURE UserAbortsChat()
+DECLARE PROCEDURE DisplayChatBackground()
+DECLARE PROCEDURE SysopUnavailable()
+DECLARE PROCEDURE ExitChat()
+DECLARE PROCEDURE ReasonTooShort()
 STRING SYSOP_NAME
 
-STRING STR013
-STRING STR015
+STRING READ_KEY
 STRING SYSOP_INKEY
 STRING USER_INKEY
-STRING STR019
-STRING STR020
-STRING STR021
-STRING STR022
-STRING STR023
-STRING STR024
-STRING STR025
-STRING STR026
-STRING STR027
-STRING STR028
-STRING STR029
-BIGSTR CHAT_LINES(10, 2)
-BIGSTR BSTR031
-BOOLEAN BOOL002
-INTEGER INT003
-INTEGER INT004
-INTEGER INT005
-INTEGER INT006
+
+STRING SysopLowerColor
+STRING SysopUpperColor
+STRING SysopNumberColor
+STRING SysopPunctuationColor
+STRING SysopOtherColor
+
+STRING UserLowerColor
+STRING UserUpperColor
+STRING UserNumberColor
+STRING UserPunctuationColor
+STRING UserOtherColor
+
+STRING CHAT_LINES(10, 2)
+
+BOOLEAN PAGE_SOUND
+INTEGER CHAT_USER
+INTEGER CH
 INTEGER SYSOP_X
 INTEGER SYSOP_Y
 INTEGER USER_X
@@ -36,498 +36,298 @@ INTEGER Y_START
 INTEGER Y_END
 INTEGER CURSOR_X
 INTEGER CURSOR_Y
+
 INTEGER INT016
 INTEGER INT017
 INTEGER INT018
 INTEGER INT019
-INTEGER LOC010
-    STR002(1) = "ISB"
-    STR003(1) = "Icy Shadow BBS"
-    STR001 = GetToken()
-    GOTO LABEL058
-    END 
 
-    STR004 = "LiQUiD CHAT"
+SAVESCRN
+STRING ARG = GetToken()
+IF Upper(ARG) == "/A" GOTO PAGE_SYSOP
+STRING PageHours = ReadLine(PPEPath() + "lchat.cfg", 10 + Dow(Date()))
+IF (Left(PageHours, 8) <> Right(PageHours, 8)) GOTO LABEL021
+GOTO PAGE_SYSOP
 
-    GOTO LABEL058
-:LABEL058
-    IF (Upper(STR001) <> "/A") GOTO LABEL015
-
-    GOTO LABEL104
-:LABEL015
-    STR019 = ReadLine(PPEPath() + "lchat.cfg", 10 + Dow(Date()))
-    IF (Left(STR019, 8) <> Right(STR019, 8)) GOTO LABEL021
-
-    GOTO LABEL118
 :LABEL021
-    INT016 = Left(STR019, 2) * 10
-    INT019 = 100 * Mid(STR019, 4, 2) / 60
+    INT016 = Left(PageHours, 2) * 10
+    INT019 = 100 * Mid(PageHours, 4, 2) / 60
     INT016 = INT016 + INT019 / 10
-    INT017 = Mid(STR019, 10, 2) * 10
-    INT019 = 100 * Mid(STR019, 13, 2) / 60
+    INT017 = Mid(PageHours, 10, 2) * 10
+    INT019 = 100 * Mid(PageHours, 13, 2) / 60
     INT017 = INT017 + INT019 / 10
     INT018 = Left(Time(), 2) * 10
     INT019 = 100 * Mid(Time(), 4, 2) / 60
     INT018 = INT018 + INT019 / 10
     IF (INT018 <= INT016 | INT018 >= INT017) GOTO LABEL003
 
-    GOTO LABEL118
+    GOTO PAGE_SYSOP
 :LABEL003
     PRINTLN "@X0BT@X03he @X0BS@X03ysop can@X02'@X03t be paged now @X02..."
-    PRINTLN "@X0BT@X03ry it between @X02: @X09" + STR019
+    PRINTLN "@X0BT@X03ry it between @X02: @X09" + PageHours
     PRINTLN "@X0BB@X03ut if u know the magic code @X02... @X03u can page emergency"
-    PRINT "@X0BD@X03o you want to page emergency (Y/N) ?? "
-    STR019 = "N"
-    INPUTYN "@X00_", STR019, 7
-    IF (STR019 <> "N") GOTO LABEL136
-
+    PRINT "@X0BD@X03o you want to page emergency (Y/N)?"
+    PageHours = "N"
+    INPUTYN "@X00_", PageHours, 7
+    IF (PageHours <> "N") GOTO LABEL136
     END 
 :LABEL136
-    STR019 = "N"
+    PageHours = "N"
     PRINTLN ""
     PRINTLN "@X0BEnter the magic code : @X07"
-    INPUT "_", STR019
-    IF (Upper(STR019) <> Upper(ReadLine(PPEPath() + "lchat.cfg", 18))) GOTO LABEL082
-
-    GOTO LABEL066
+    INPUT "_", PageHours
+    IF (Upper(PageHours) <> Upper(ReadLine(PPEPath() + "lchat.cfg", 18))) GOTO LABEL082
+    GOTO PAGE_SYSOP
 :LABEL082
     PRINTLN ""
     PRINTLN "@X0BI hate lamers like you !!! ... "
     PRINTLN "I'll take you 10MB upload creds ..."
     DELAY 10
-    END 
-:LABEL066
-    GOTO LABEL118
-:LABEL104
-    GOTO LABEL118
-:LABEL020
-    IF (STR015 > "") GOTO LABEL029
+    END
 
-    GOTO LABEL135
-:LABEL029
+:HANDLE_INPUT
+    IF READ_KEY == "" RETURN
     ANSIPOS CURSOR_X, CURSOR_Y
-    GOSUB LABEL106
-    IF (STR015 = Chr(8)) GOTO LABEL142
+    CH = Asc(READ_KEY)
+    
+    ; CTRL+R - Redraw
+    IF CH == 18 THEN
+      DisplayChatBackground()
+      Y_POS = 1
+      WHILE (Y_POS < 11) DO
+        ANSIPOS 4, Y_POS
+        PRINT CHAT_LINES[Y_POS - 1, 1]
+        Y_POS = Y_POS + 1
+      ENDWHILE
+    
+      Y_POS = 12
+      WHILE (Y_POS < 23) DO
+        ANSIPOS 4, Y_POS
+        PRINT CHAT_LINES[Y_POS - 12, 2]
+        Y_POS = Y_POS + 1
+      ENDWHILE
+      ANSIPOS CURSOR_X, CURSOR_Y
+      GOTO LABEL067
+    END IF
+    
+    ; CTRL+W - Clear
+    IF CH == 23 THEN
+      Y_POS = Y_START
+      WHILE (Y_POS <= Y_END) DO
+        ANSIPOS 4, Y_POS
+        CHAT_LINES(Y_POS - Y_START + 1, CHAT_USER) = ""
+        PRINT "                                                                          "
+        Y_POS = Y_POS + 1
+      ENDWHILE
+      CURSOR_X = 4
+      CURSOR_Y = Y_START
+      ANSIPOS CURSOR_X, CURSOR_Y
+      GOTO LABEL067
+    END IF
+    
+    IF CH == 13 THEN
+        CURSOR_X = 4
+        CURSOR_Y = CURSOR_Y + 1
+        IF CURSOR_Y <= Y_END THEN        
+            CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = ""
+            ANSIPOS 4, CURSOR_Y
+            PRINT "                                                                          "
+            ANSIPOS 4, CURSOR_Y
+        ENDIF
+        GOTO LABEL067
+    ENDIF
 
-    IF (STR015 = Chr(18)) GOTO LABEL142
+    IF CH == 8 GOTO BACKPACE
 
-    IF (STR015 = Chr(23)) GOTO LABEL142
-
-    IF (STR015 = Chr(13)) GOTO LABEL142
-
-    GOSUB LABEL065
-:LABEL142
-    IF (STR015 <> Chr(18)) GOTO LABEL060
-
-    GOTO LABEL137
-:LABEL060
-    IF (STR015 <> Chr(10)) GOTO LABEL126
-
-    GOTO LABEL137
-:LABEL126
-    IF (STR015 <> Chr(23)) GOTO LABEL111
-
-    GOTO LABEL137
-:LABEL111
-    IF (STR015 <> Chr(8)) GOTO LABEL056
-
-    GOTO LABEL137
-:LABEL056
-    IF (INT003 = 1) GOTO LABEL041
-
-    GOTO LABEL032
+    IF CH >= 32 GOSUB OUTPUT_CH
+    IF CHAT_USER == 1 THEN
+        GOTO LABEL041
+    ELSE
+        GOTO LABEL032
+    ENDIF
+    
 :LABEL041
-    IF (INT004 >= 48) GOTO LABEL023
-
-    CHAT_LINES(CURSOR_Y - Y_START + 1, INT003) = CHAT_LINES[CURSOR_Y - Y_START + 1, INT003] + STR023 + STR015
+    IF (CH >= 48) GOTO LABEL023
+    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + SysopPunctuationColor + READ_KEY
 :LABEL023
-    IF (INT004 >= 65) GOTO LABEL027
-
-    IF (INT004 <= 57) GOTO LABEL027
-
-    CHAT_LINES(CURSOR_Y - Y_START + 1, INT003) = CHAT_LINES[CURSOR_Y - Y_START + 1, INT003] + STR023 + STR015
+    IF (CH >= 65 || CH <= 57) GOTO LABEL027
+    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + SysopPunctuationColor + READ_KEY
 :LABEL027
-    IF (INT004 <= 47) GOTO LABEL085
-
-    IF (INT004 >= 58) GOTO LABEL085
-
-    CHAT_LINES(CURSOR_Y - Y_START + 1, INT003) = CHAT_LINES[CURSOR_Y - Y_START + 1, INT003] + STR022 + STR015
+    IF (CH <= 47 || CH >= 58) GOTO LABEL085
+    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + SysopNumberColor + READ_KEY
 :LABEL085
-    IF (INT004 <= 64) GOTO LABEL103
-
-    IF (INT004 >= 91) GOTO LABEL103
-
-    CHAT_LINES(CURSOR_Y - Y_START + 1, INT003) = CHAT_LINES[CURSOR_Y - Y_START + 1, INT003] + STR021 + STR015
+    IF (CH <= 64 || CH >= 91) GOTO LABEL103
+    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + SysopUpperColor + READ_KEY
 :LABEL103
-    IF (INT004 <= 96) GOTO LABEL014
-
-    IF (INT004 >= 123) GOTO LABEL014
-
-    CHAT_LINES(CURSOR_Y - Y_START + 1, INT003) = CHAT_LINES[CURSOR_Y - Y_START + 1, INT003] + STR020 + STR015
+    IF (CH <= 96 || CH >= 123) GOTO LABEL014
+    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + SysopLowerColor + READ_KEY
 :LABEL014
-    IF (INT004 <= 128) GOTO LABEL089
-
-    CHAT_LINES(CURSOR_Y - Y_START + 1, INT003) = CHAT_LINES[CURSOR_Y - Y_START + 1, INT003] + STR024 + STR015
+    IF (CH <= 128) GOTO LABEL089
+    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + SysopOtherColor + READ_KEY
 :LABEL089
-    GOTO LABEL137
+    GOTO LABEL067
+
 :LABEL032
-    IF (INT004 >= 48) GOTO LABEL140
-
-    CHAT_LINES(CURSOR_Y - Y_START + 1, INT003) = CHAT_LINES[CURSOR_Y - Y_START + 1, INT003] + STR028 + STR015
+    IF (CH >= 48) GOTO LABEL140
+    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + UserPunctuationColor + READ_KEY
 :LABEL140
-    IF (INT004 >= 65) GOTO LABEL149
-
-    IF (INT004 <= 57) GOTO LABEL149
-
-    CHAT_LINES(CURSOR_Y - Y_START + 1, INT003) = CHAT_LINES[CURSOR_Y - Y_START + 1, INT003] + STR028 + STR015
+    IF (CH >= 65 || CH <= 57) GOTO LABEL149
+    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + UserPunctuationColor + READ_KEY
 :LABEL149
-    IF (INT004 <= 47) GOTO LABEL150
-
-    IF (INT004 >= 58) GOTO LABEL150
-
-    CHAT_LINES(CURSOR_Y - Y_START + 1, INT003) = CHAT_LINES[CURSOR_Y - Y_START + 1, INT003] + STR027 + STR015
+    IF (CH <= 47 || CH >= 58) GOTO LABEL150
+    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + UserNumberColor + READ_KEY
 :LABEL150
-    IF (INT004 <= 64) GOTO LABEL147
-
-    IF (INT004 >= 91) GOTO LABEL147
-
-    CHAT_LINES(CURSOR_Y - Y_START + 1, INT003) = CHAT_LINES[CURSOR_Y - Y_START + 1, INT003] + STR026 + STR015
+    IF (CH <= 64 || CH >= 91) GOTO LABEL147
+    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + UserUpperColor + READ_KEY
 :LABEL147
-    IF (INT004 <= 96) GOTO LABEL120
-
-    IF (INT004 >= 123) GOTO LABEL120
-
-    CHAT_LINES(CURSOR_Y - Y_START + 1, INT003) = CHAT_LINES[CURSOR_Y - Y_START + 1, INT003] + STR025 + STR015
+    IF (CH <= 96 || CH >= 123) GOTO LABEL120
+    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + UserLowerColor + READ_KEY
 :LABEL120
-    IF (INT004 <= 128) GOTO LABEL137
-
-    CHAT_LINES(CURSOR_Y - Y_START + 1, INT003) = CHAT_LINES[CURSOR_Y - Y_START + 1, INT003] + STR029 + STR015
-:LABEL137
-    IF (STR015 = Chr(18)) GOTO LABEL112
-
-    GOTO LABEL110
-:LABEL112
-    GOSUB LABEL036
-    Y_POS = 1
-:LABEL042
-    IF (Y_POS <= 11) GOTO LABEL109
-
-    GOTO LABEL113
-:LABEL109
-    ANSIPOS 4, Y_POS
-    PRINT CHAT_LINES[Y_POS - 2, 1]
-    Y_POS = Y_POS + 1
-    GOTO LABEL042
-:LABEL113
-    Y_POS = 12
-:LABEL132
-    IF (Y_POS <= 22) GOTO LABEL057
-
-    GOTO LABEL038
-:LABEL057
-    ANSIPOS 4, Y_POS
-    PRINT CHAT_LINES[Y_POS - 12, 2]
-    Y_POS = Y_POS + 1
-    GOTO LABEL132
-:LABEL038
-    ANSIPOS CURSOR_X, CURSOR_Y
-:LABEL110
-    IF (STR015 = Chr(23)) GOTO LABEL063
-
-    GOTO LABEL087
-:LABEL063
-    Y_POS = Y_START
-:LABEL077
-    IF (Y_POS <= Y_END) GOTO LABEL105
-
-    GOTO LABEL075
-:LABEL105
-    ANSIPOS 4, Y_POS
-    CHAT_LINES(Y_POS - Y_START + 1, INT003) = ""
-    PRINT "                                                                          "
-    Y_POS = Y_POS + 1
-    GOTO LABEL077
-:LABEL075
-    CURSOR_X = 4
-    CURSOR_Y = Y_START
-    ANSIPOS CURSOR_X, CURSOR_Y
-:LABEL087
-    IF (STR015 = Chr(8)) GOTO LABEL125
-
+    IF (CH <= 128) GOTO LABEL067
+    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + UserOtherColor + READ_KEY
     GOTO LABEL067
-:LABEL125
-    IF (CURSOR_X > 4) GOTO LABEL130
 
-    GOTO LABEL068
-:LABEL130
-    BACKUP 1
-    PRINT " "
-    BACKUP 1
-    Y_POS = Len(CHAT_LINES[CURSOR_Y - Y_START + 1, INT003])
-    Y_POS = Y_POS - 5
-    CHAT_LINES(CURSOR_Y - Y_START + 1, INT003) = Left(CHAT_LINES[CURSOR_Y - Y_START + 1, INT003], Y_POS)
-:LABEL068
-    IF (CURSOR_X <= 4 & CURSOR_Y > Y_START) GOTO LABEL144
-
-    GOTO LABEL067
-:LABEL144
+:BACKPACE
+    IF (CURSOR_X <= 4) THEN 
+        BACKUP 1
+        PRINT " "
+        BACKUP 1
+        Y_POS = Len(CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER])
+        Y_POS = Y_POS - 5
+        CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = Left(CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER], Y_POS)
+    ENDIF
+    IF !(CURSOR_X <= 4 & CURSOR_Y > Y_START) GOTO LABEL067
     CURSOR_Y = CURSOR_Y - 1
-    IF (CURSOR_Y >= Y_START) GOTO LABEL107
-
-    CURSOR_Y = Y_START
-:LABEL107
-    CURSOR_X = 3 + Len(CHAT_LINES[CURSOR_Y - Y_START + 1, INT003]) / 5
+    IF (CURSOR_Y < Y_START) CURSOR_Y = Y_START
+    
+    CURSOR_X = 3 + Len(CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER]) / 5
     ANSIPOS CURSOR_X, CURSOR_Y
     PRINT " "
     BACKUP 1
-    Y_POS = Len(CHAT_LINES[CURSOR_Y - Y_START + 1, INT003])
+    Y_POS = Len(CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER])
     Y_POS = Y_POS - 5
-    CHAT_LINES(CURSOR_Y - Y_START + 1, INT003) = Left(CHAT_LINES[CURSOR_Y - Y_START + 1, INT003], Y_POS)
+    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = Left(CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER], Y_POS)
 :LABEL067
     CURSOR_X = GetX()
     CURSOR_Y = GetY()
-    IF (STR015 = Chr(13)) GOTO LABEL108
 
-    GOTO LABEL005
-:LABEL108
-    IF (CURSOR_Y > Y_END - 1) GOTO LABEL084
+    IF CURSOR_X < 4 THEN
+      CURSOR_X = 4
+      ANSIPOS CURSOR_X, GetY()
+    ENDIF
 
-    GOTO LABEL114
-:LABEL084
-    CHAT_LINES(1, INT003) = CHAT_LINES[8, INT003]
-    CHAT_LINES(2, INT003) = CHAT_LINES[9, INT003]
-    CHAT_LINES(3, INT003) = ""
-    CHAT_LINES(4, INT003) = ""
-    CHAT_LINES(5, INT003) = ""
-    CHAT_LINES(6, INT003) = ""
-    CHAT_LINES(7, INT003) = ""
-    CHAT_LINES(8, INT003) = ""
-    IF (Len(CHAT_LINES[1, INT003]) <= 5) GOTO LABEL024
-
-    GOTO LABEL002
-:LABEL024
-    CHAT_LINES(1, INT003) = CHAT_LINES[2, INT003]
-    CHAT_LINES(2, INT003) = ""
-:LABEL002
-    Y_POS = Y_START
-:LABEL090
-    IF (Y_POS <= Y_END) GOTO LABEL006
-
-    GOTO LABEL030
-:LABEL006
-    ANSIPOS 4, Y_POS
-    PRINT "                                                                          "
-    Y_POS = Y_POS + 1
-    GOTO LABEL090
-:LABEL030
-    ANSIPOS 4, Y_START
-    PRINT CHAT_LINES[1, INT003]
-    ANSIPOS 4, Y_START + 1
-    PRINT CHAT_LINES[2, INT003]
-    CURSOR_Y = Y_START + 1
-    IF (Len(CHAT_LINES[2, INT003]) <= 5) GOTO LABEL017
-
-    GOTO LABEL114
-:LABEL017
-    CURSOR_Y = Y_START
-    IF (Len(CHAT_LINES[1, INT003]) > 5) GOTO LABEL114
-
-    CURSOR_Y = Y_START - 1
-:LABEL114
-    CURSOR_Y = CURSOR_Y + 1
-    ANSIPOS 4, CURSOR_Y
-    CHAT_LINES(CURSOR_Y - Y_START + 1, INT003) = ""
-    PRINT "                                                                          "
-    ANSIPOS 4, CURSOR_Y
-    CURSOR_X = 4
-:LABEL005
-    IF (CURSOR_X < 4) GOTO LABEL069
-
-    GOTO LABEL025
-:LABEL069
-    CURSOR_X = 4
-    ANSIPOS CURSOR_X, GetY()
-:LABEL025
-    IF (CURSOR_Y > Y_END - 1) GOTO LABEL129
-
-    GOTO LABEL115
-:LABEL129
-    IF (CURSOR_X > 77) GOTO LABEL045
-
-    GOTO LABEL115
-:LABEL045
-    CHAT_LINES(1, INT003) = CHAT_LINES[8, INT003]
-    CHAT_LINES(2, INT003) = CHAT_LINES[9, INT003]
-    CHAT_LINES(3, INT003) = ""
-    CHAT_LINES(4, INT003) = ""
-    CHAT_LINES(5, INT003) = ""
-    CHAT_LINES(6, INT003) = ""
-    CHAT_LINES(7, INT003) = ""
-    CHAT_LINES(8, INT003) = ""
-    CHAT_LINES(9, INT003) = ""
-    IF (Len(CHAT_LINES[1, INT003]) <= 5) GOTO LABEL128
-
-    GOTO LABEL046
-:LABEL128
-    CHAT_LINES(1, INT003) = CHAT_LINES[2, INT003]
-    CHAT_LINES(2, INT003) = Chr(13)
-:LABEL046
-    Y_POS = Y_START
-:LABEL007
-    IF (Y_POS <= Y_END) GOTO LABEL096
-
-    GOTO LABEL019
-:LABEL096
-    ANSIPOS 4, Y_POS
-    PRINT "                                                                          "
-    Y_POS = Y_POS + 1
-    GOTO LABEL007
-:LABEL019
-    ANSIPOS 4, Y_START
-    PRINT CHAT_LINES[1, INT003]
-    ANSIPOS 4, Y_START + 1
-    PRINT CHAT_LINES[2, INT003]
-    CURSOR_Y = Y_START + 1
-    IF (Len(CHAT_LINES[2, INT003]) <= 5) GOTO LABEL139
-
-    GOTO LABEL026
-:LABEL139
-    CURSOR_Y = Y_START
-    IF (Len(CHAT_LINES[1, INT003]) > 5) GOTO LABEL026
-
-    CURSOR_Y = Y_START - 1
 :LABEL026
-    ANSIPOS 78, GetY()
-:LABEL115
-    IF (CURSOR_X > 77) GOTO LABEL127
+    IF (CURSOR_X > 77) THEN
+        CURSOR_Y = CURSOR_Y + 1
+        CURSOR_X = FUNC001(" ", CHAT_LINES[CURSOR_Y - Y_START, CHAT_USER])
+        
+        IF CURSOR_X = 0 THEN
+        CURSOR_X = 4
+        ANSIPOS 4, CURSOR_Y
+        RETURN
+        ENDIF
 
-    GOTO LABEL135
-:LABEL127
-    CURSOR_Y = CURSOR_Y + 1
-    CURSOR_X = FUNC001(" ", CHAT_LINES[CURSOR_Y - Y_START, INT003])
-    IF (CURSOR_X = 0) GOTO LABEL018
+        STRING LINE = Right(CHAT_LINES[CURSOR_Y - Y_START, CHAT_USER], Len(CHAT_LINES[CURSOR_Y - Y_START, CHAT_USER]) - CURSOR_X)
+        CHAT_LINES(CURSOR_Y - Y_START, CHAT_USER) = Left(CHAT_LINES[CURSOR_Y - Y_START, CHAT_USER], Len(CHAT_LINES[CURSOR_Y - Y_START, CHAT_USER]) - Len(LINE))
+        CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = LINE
+        ANSIPOS 4 + Len(CHAT_LINES[CURSOR_Y - Y_START, CHAT_USER]) / 5, CURSOR_Y - 1
+        CURSOR_X = 0
 
-    GOTO LABEL121
-:LABEL018
-    CURSOR_X = 4
-    ANSIPOS 4, CURSOR_Y
-    GOTO LABEL135
-:LABEL121
-    BSTR031 = ""
-    BSTR031 = Right(CHAT_LINES[CURSOR_Y - Y_START, INT003], Len(CHAT_LINES[CURSOR_Y - Y_START, INT003]) - CURSOR_X)
-    CHAT_LINES(CURSOR_Y - Y_START, INT003) = Left(CHAT_LINES[CURSOR_Y - Y_START, INT003], Len(CHAT_LINES[CURSOR_Y - Y_START, INT003]) - Len(BSTR031))
-    CHAT_LINES(CURSOR_Y - Y_START + 1, INT003) = BSTR031
-    ANSIPOS 4 + Len(CHAT_LINES[CURSOR_Y - Y_START, INT003]) / 5, CURSOR_Y - 1
-    CURSOR_X = 0
-:LABEL098
-    IF (CURSOR_X < 74 - Len(CHAT_LINES[CURSOR_Y - Y_START, INT003]) / 5) GOTO LABEL050
+        WHILE (CURSOR_X < 74 - Len(CHAT_LINES[CURSOR_Y - Y_START, CHAT_USER]) / 5) DO
+            PRINT " "
+            CURSOR_X = CURSOR_X + 1
+        ENDWHILE
 
-    GOTO LABEL047
-:LABEL050
-    PRINT " "
-    CURSOR_X = CURSOR_X + 1
-    GOTO LABEL098
-:LABEL047
-    ANSIPOS 4, CURSOR_Y
-    PRINT BSTR031
-    CURSOR_X = Len(BSTR031) / 5 + 4
-    ANSIPOS CURSOR_X, CURSOR_Y
-:LABEL135
-    RETURN 
-:LABEL118
-    IF (Exist(PPEPath() + "lchat.cfg") = 0) GOTO LABEL070
+        ANSIPOS 4, CURSOR_Y
+        PRINT LINE
+        CURSOR_X = Len(LINE) / 5 + 4
+        ANSIPOS CURSOR_X, CURSOR_Y
+    ENDIF
+    
+    IF (CURSOR_Y >= Y_END) THEN
+        CHAT_LINES(1, CHAT_USER) = CHAT_LINES[8, CHAT_USER]
+        CHAT_LINES(2, CHAT_USER) = CHAT_LINES[9, CHAT_USER]
+        CHAT_LINES(3, CHAT_USER) = ""
+        CHAT_LINES(4, CHAT_USER) = ""
+        CHAT_LINES(5, CHAT_USER) = ""
+        CHAT_LINES(6, CHAT_USER) = ""
+        CHAT_LINES(7, CHAT_USER) = ""
+        CHAT_LINES(8, CHAT_USER) = ""
+        CHAT_LINES(9, CHAT_USER) = ""
+        CHAT_LINES(10, CHAT_USER) = ""
+        IF (Len(CHAT_LINES[1, CHAT_USER]) <= 5) THEN
+            CHAT_LINES(1, CHAT_USER) = CHAT_LINES[2, CHAT_USER]
+            CHAT_LINES(2, CHAT_USER) = ""
+        ENDIF
+        
+        Y_POS = Y_START
+        WHILE Y_POS <= Y_END DO
+            ANSIPOS 4, Y_POS
+            PRINT "                                                                          "
+            Y_POS = Y_POS + 1
+        ENDWHILE
 
-    GOTO LABEL099
-:LABEL070
-    PRINTLN "lchat.cfg not found"
-    END 
-:LABEL099
-    STR020 = ReadLine(PPEPath() + "lchat.cfg", 1)
-    STR021 = ReadLine(PPEPath() + "lchat.cfg", 2)
-    STR022 = ReadLine(PPEPath() + "lchat.cfg", 3)
-    STR023 = ReadLine(PPEPath() + "lchat.cfg", 4)
-    STR024 = ReadLine(PPEPath() + "lchat.cfg", 5)
-    STR025 = ReadLine(PPEPath() + "lchat.cfg", 6)
-    STR026 = ReadLine(PPEPath() + "lchat.cfg", 7)
-    STR027 = ReadLine(PPEPath() + "lchat.cfg", 8)
-    STR028 = ReadLine(PPEPath() + "lchat.cfg", 9)
-    STR029 = ReadLine(PPEPath() + "lchat.cfg", 10)
-    BOOL002 = TRUE
+        ANSIPOS 4, Y_START
+        PRINT CHAT_LINES[1, CHAT_USER]
+        ANSIPOS 4, Y_START + 1
+        PRINT CHAT_LINES[2, CHAT_USER]
+        
+        IF CURSOR_X >= 5 THEN
+            CURSOR_Y = Y_START + 1
+            CURSOR_X = Len(CHAT_LINES[2, CHAT_USER]) / 5 + 4
+        ELSE
+            CURSOR_Y = Y_START + 2
+        ENDIF
+        ANSIPOS CURSOR_X, CURSOR_Y
+    ENDIF
+
+
+    RETURN
+:PAGE_SYSOP
+    IF (Exist(PPEPath() + "lchat.cfg") = 0) THEN
+      PRINTLN "lchat.cfg not found"
+      END 
+    ENDIF
+    
+    SysopLowerColor = ReadLine(PPEPath() + "lchat.cfg", 1)
+    SysopUpperColor = ReadLine(PPEPath() + "lchat.cfg", 2)
+    SysopNumberColor = ReadLine(PPEPath() + "lchat.cfg", 3)
+    SysopPunctuationColor = ReadLine(PPEPath() + "lchat.cfg", 4)
+    SysopOtherColor = ReadLine(PPEPath() + "lchat.cfg", 5)
+
+    UserLowerColor = ReadLine(PPEPath() + "lchat.cfg", 6)
+    UserUpperColor = ReadLine(PPEPath() + "lchat.cfg", 7)
+    UserNumberColor = ReadLine(PPEPath() + "lchat.cfg", 8)
+    UserPunctuationColor = ReadLine(PPEPath() + "lchat.cfg", 9)
+    UserOtherColor = ReadLine(PPEPath() + "lchat.cfg", 10)
+    
+    PAGE_SOUND = TRUE
     SYSOP_NAME = ReadLine(PCBDat(), 2)
-    IF (Upper(STR001) <> "/A") GOTO LABEL091
+    IF (Upper(ARG) == "/A") GOTO START_CHAT
 
-    GOTO LABEL122
-:LABEL091
-    PRINTLN "@POFF@[0m[2J[20C[1;34m┌─[37m┐     [0;34m┌[1m─[37m┐[34m┌[0;34m─────[1m─[37m┐ [34m┌─[37m┐  [34m┌─[37m┐[0;34m┌[1m─[37m┐[34m┌[0;34m────[1m─[37m┐"
-    PRINTLN "[20C└[0;34m─┘     [1;37m└[34m─┘[37m└[34m─[0;34m─────[1m┘ [37m└[34m─┘  [37m└[34m─┘[37m└[34m─┘[37m└[34m─[0;34m────[1m┘"
-    PRINTLN "[20C[0;34m┌─┐     ┌[1m─[37m┐[0;34m┌[1m─[37m┐  [0;34m┌[1m─[37m┐ [0;34m┌─┐  ┌[1m─[37m┐[0;34m┌[1m─[37m┐[0;34m┌[1m─[37m┐  [0;34m┌[1m─[37m┐"
-    PRINTLN "[20C[34m│ │     [0;34m│ [1m│[0;34m│ [1m│ [0;34m┌┘ [1m│ [0;34m│ │  │ [1m│[0;34m│ [1m│[0;34m│ [1m│  [0;34m│ [1m│"
-    PRINTLN "[20C│ [0;34m└───[1m─[37m┐[34m│ [0;34m│[1m│ [0;34m└─┘  [1m└[37m┐[34m│ [0;34m└──┘ │[1m│ [0;34m│[1m│ [0;34m└──┘ │"
-    PRINTLN "[20C[1;37m└[34m─[0;34m─────[1m┘[37m└[34m─[0;34m┘[1;37m└[34m─[0;34m──────[1m┘[37m└[34m─[0;34m─────┘[1;37m└[34m─[0;34m┘[1;37m└[34m─[0;34m─────┘"
-    PRINTLN ""
-    PRINTLN "[22C@X0BW@X03hy do you want to chat with the sysop@X02?"
-    PRINTLN "[11C@X09┌──@X01────────@X09────@X01──────────@X09───@X01─────────────────@X09───────@X01──────┐"
-    PRINTLN "[11C@X09│@X07·························································@X01│"
-    PRINTLN "[11C@X07@X01└──────────@X09────────────────@X01─────────────────────────@X09──────┘"
-    PRINTLN ""
-    PRINTLN ""
-    PRINTLN ""
-    PRINTLN ""
-    PRINTLN ""
-    PRINTLN ""
-    PRINTLN "[23C[1;34m┌[0;34m─────[1m─[37m┐[34m┌─[37m┐  [34m┌─[37m┐[34m┌[0;34m─────[1m─[37m┐[34m┌[0;34m──────[1m─[37m┐"
-    PRINTLN "[23C└[34m─[0;34m─────[1m┘[37m└[34m─┘  [37m└[34m─┘[37m└[34m─[0;34m─────[1m┘[37m└[34m─[0;34m──────[1m┘"
-    PRINTLN "[23C[0;34m┌[1m─[37m┐     [0;34m┌─────[1m─[37m┐[0;34m┌─────[1m─[37m┐   [0;34m┌[1m─[37m┐"
-    PRINTLN "[23C[0;34m│ [1m│     [0;34m│ ┌──┐ [1m│[0;34m│ ┌──┐ [1m│   [0;34m│ [1m│"
-    PRINTLN "[23C│ [0;34m└───[1m─[37m┐[34m│ [0;34m│  [1m│ [0;34m│[1m│ [0;34m│  [1m│ [0;34m│   [1m│ [0;34m│"
-    PRINTLN "[23C[1;37m└[34m─[0;34m─────[1m┘[37m└[34m─[0;34m┘  [1;37m└[34m─[0;34m┘[1;37m└[34m─[0;34m┘  [1;37m└[34m─[0;34m┘   [1;37m└[34m─[0;34m┘[1;1H"
+    DISPFILE PPEPath() + "pagescr.pcb", GRAPH
     ANSIPOS 13, 10
-    STR013 = ""
-    INT005 = 0
-:LABEL059
-    STR015 = ""
-:LABEL119
-    IF (STR015 = "") GOTO LABEL061
+    INTEGER REASON_LEN = 0
+    LOOP 
+      READ_KEY = InKey()
+      IF READ_KEY = Chr(8) && REASON_LEN > 0 THEN
+        PRINT Chr(8), "@X07·"
+        BACKUP 1
+        REASON_LEN = REASON_LEN - 1
+        CONTINUE
+      ENDIF
 
-    GOTO LABEL064
-:LABEL061
-    STR015 = InKey()
-    GOTO LABEL119
-:LABEL064
-    GOSUB LABEL106
-    STR013 = STR013 + STR015
-    IF (STR015 <> Chr(8)) GOTO LABEL037
+      IF READ_KEY == Chr(13) THEN
+        IF REASON_LEN < 3 ReasonTooShort()
+        BREAK
+      ENDIF 
+      CH = Asc(READ_KEY)
+      IF CH >= 32 && REASON_LEN < 57 THEN
+        GOSUB OUTPUT_CH
+        REASON_LEN = REASON_LEN + 1
+      ENDIF
+    ENDLOOP
 
-    GOTO LABEL033
-:LABEL037
-    IF (GetX() < 70) GOTO LABEL116
-
-    GOTO LABEL033
-:LABEL116
-    GOSUB LABEL065
-    INT005 = INT005 + 1
-:LABEL033
-    IF (STR015 = Chr(8)) GOTO LABEL048
-
-    GOTO LABEL062
-:LABEL048
-    IF (GetX() > 13) GOTO LABEL143
-
-    GOTO LABEL062
-:LABEL143
-    GOSUB LABEL049
-    INT005 = INT005 - 1
-:LABEL062
-    IF (STR015 <> Chr(13)) GOTO LABEL013
-
-    GOTO LABEL138
-:LABEL013
-    GOTO LABEL059
-:LABEL138
-    IF (INT005 >= 3) GOTO LABEL078
-
-    GOTO LABEL088
-:LABEL078
     ANSIPOS 1, 12
     PRINTLN "[25C@X0BP@X03aging @X0BS@X03ysop @X02... @X03please wait"
     PRINTLN "[19C@X02@X01╔════════════════════════════════════════╗"
@@ -535,245 +335,169 @@ INTEGER LOC010
     PRINTLN "[19C@X01╚════════════════════════════════════════╝[0;32m"
     MPRINTLN "[34C<A>bort page"
     SPRINTLN "[15C<C>hat with user <A> Abort page <S> Turn sound off"
-    INT006 = 0
     ANSIPOS 21, 14
-:LABEL035
-    USER_INKEY = ""
-    SYSOP_INKEY = ""
-    INT006 = INT006 + 1
-    IF (BOOL002 = 1) GOTO LABEL145
+    
+    INTEGER PAGE_LOOP = 0
+    REPEAT
+      USER_INKEY = ""
+      SYSOP_INKEY = ""
+      IF PAGE_SOUND THEN
+        SOUND 400
+      END IF
+      GOSUB PAGE_INKEY
+      DELAY 1
+      GOSUB PAGE_INKEY
+      DELAY 1
+      GOSUB PAGE_INKEY
+      DELAY 1
+      GOSUB PAGE_INKEY
+      SOUND 0
+      DELAY 1
+      GOSUB PAGE_INKEY
+      DELAY 1
+      GOSUB PAGE_INKEY
+      PRINT "@X08■"
+      PAGE_LOOP = PAGE_LOOP + 1
+    UNTIL PAGE_LOOP > 40
+    SysopUnavailable()
 
-    GOTO LABEL083
-:LABEL145
-    SOUND 400
-    GOSUB PAGE_INKEY
-:LABEL083
-    GOSUB PAGE_INKEY
-    DELAY 1
-    GOSUB PAGE_INKEY
-    DELAY 1
-    GOSUB PAGE_INKEY
-    DELAY 1
-    GOSUB PAGE_INKEY
-    SOUND 0
-    DELAY 1
-    GOSUB PAGE_INKEY
-    DELAY 1
-    GOSUB PAGE_INKEY
-    PRINT "@X08■"
-    IF (INT006 <= 39) GOTO LABEL040
-
-    GOTO LABEL079
-:LABEL040
-    GOTO LABEL035
-:LABEL122
-    GOSUB LABEL036
-    ANSIPOS 4, 3
+:START_CHAT
+    DisplayChatBackground()
     SYSOP_X = 4
     SYSOP_Y = 2
     USER_X = 4
     USER_Y = 13
-:LABEL039
-    IF (SYSOP_INKEY <> Chr(27)) GOTO LABEL134
+    ANSIPOS SYSOP_X, SYSOP_Y
+    LOOP
+        CHAT_USER = 1
+        SYSOP_INKEY = KInkey()
+        IF SYSOP_INKEY == Chr(27) ExitChat()
+        READ_KEY = SYSOP_INKEY
+        Y_START = 2
+        Y_END = 11
+        CURSOR_X = SYSOP_X
+        CURSOR_Y = SYSOP_Y
+        GOSUB HANDLE_INPUT
+        SYSOP_X = CURSOR_X
+        SYSOP_Y = CURSOR_Y        
 
-    GOTO LABEL102
-:LABEL134
-    INT003 = 1
-    SYSOP_INKEY = KInkey()
-    STR015 = SYSOP_INKEY
-    Y_START = 2
-    Y_END = 11
-    CURSOR_X = SYSOP_X
-    CURSOR_Y = SYSOP_Y
-    GOSUB LABEL020
-    SYSOP_X = CURSOR_X
-    SYSOP_Y = CURSOR_Y
-    INT003 = 2
-    USER_INKEY = MInkey()
-    IF (USER_INKEY == Chr(27)) GOTO LABEL102
+        CHAT_USER = 2
+        USER_INKEY = MInkey()
+        IF USER_INKEY == Chr(27) ExitChat()
+        READ_KEY = USER_INKEY
+        Y_START = 13
+        Y_END = 22
+        CURSOR_X = USER_X
+        CURSOR_Y = USER_Y
+        GOSUB HANDLE_INPUT
+        USER_X = CURSOR_X
+        USER_Y = CURSOR_Y
+    ENDLOOP
 
-    STR015 = USER_INKEY
-    Y_START = 13
-    Y_END = 22
-    CURSOR_X = USER_X
-    CURSOR_Y = USER_Y
-    GOSUB LABEL020
-    USER_X = CURSOR_X
-    USER_Y = CURSOR_Y
-    GOTO LABEL039
-:LABEL102
-    CLS 
-    PRINT "@X0BC@X03hat ended@X02."
-    DELAY 8
-    END 
-:LABEL079
-    CLS 
-    PRINTLN ""
-    PRINTLN "@X0BT@X03he sysop is not avaible for chat now@X02."
-    DELAY 8
-    END 
-:LABEL088
-    CLS 
-    PRINTLN ""
-    PRINTLN ""
-    PRINTLN "@X0BT@X03he chat reason is not long enough @X02!"
-    DELAY 8
-    END 
-:LABEL055
-    CLS 
-    PRINTLN ""
-    PRINTLN "@X0BU@X03ser aborts chat@X02."
-    DELAY 8
-    END 
-:LABEL049
-    PRINT Chr(8)
-    PRINT "@X07·"
-    BACKUP 1
-    RETURN 
-:LABEL065
-    INT004 = Asc(STR015)
-    IF (INT003 = 1) GOTO LABEL148
-
+:OUTPUT_CH
+    CH = Asc(READ_KEY)
+    IF (CHAT_USER = 1) GOTO LABEL148
     GOTO LABEL034
 :LABEL148
-    IF (INT004 >= 48) GOTO LABEL101
-
-    PRINT STR023 + STR015
+    IF (CH >= 48) GOTO LABEL101
+    PRINT SysopPunctuationColor + READ_KEY
 :LABEL101
-    IF (INT004 >= 65) GOTO LABEL052
-
-    IF (INT004 <= 57) GOTO LABEL052
-
-    PRINT STR023 + STR015
+    IF (CH >= 65 || CH <= 57) GOTO LABEL052
+    PRINT SysopPunctuationColor + READ_KEY
 :LABEL052
-    IF (INT004 <= 47) GOTO LABEL131
-
-    IF (INT004 >= 58) GOTO LABEL131
-
-    PRINT STR022 + STR015
+    IF (CH <= 47 || CH >= 58) GOTO LABEL131
+    PRINT SysopNumberColor + READ_KEY
 :LABEL131
-    IF (INT004 <= 64) GOTO LABEL072
-
-    IF (INT004 >= 91) GOTO LABEL072
-
-    PRINT STR021 + STR015
+    IF (CH <= 64 || CH >= 91) GOTO LABEL072
+    PRINT SysopUpperColor + READ_KEY
 :LABEL072
-    IF (INT004 <= 96) GOTO LABEL031
-
-    IF (INT004 >= 123) GOTO LABEL031
-
-    PRINT STR020 + STR015
+    IF (CH <= 96 || CH >= 123) GOTO LABEL031
+    PRINT SysopLowerColor + READ_KEY
 :LABEL031
-    IF (INT004 <= 128) GOTO LABEL028
-
-    PRINT STR024 + STR015
+    IF (CH <= 128) GOTO LABEL028
+    PRINT SysopOtherColor + READ_KEY
 :LABEL028
     GOTO LABEL133
+
 :LABEL034
-    IF (INT004 >= 48) GOTO LABEL117
-
-    PRINT STR028 + STR015
+    IF (CH >= 48) GOTO LABEL117
+    PRINT UserPunctuationColor + READ_KEY
 :LABEL117
-    IF (INT004 >= 65) GOTO LABEL012
-
-    IF (INT004 <= 57) GOTO LABEL012
-
-    PRINT STR028 + STR015
+    IF (CH >= 65 || CH <= 57) GOTO LABEL012
+    PRINT UserPunctuationColor + READ_KEY
 :LABEL012
-    IF (INT004 <= 47) GOTO LABEL124
-
-    IF (INT004 >= 58) GOTO LABEL124
-
-    PRINT STR027 + STR015
+    IF (CH <= 47 || CH >= 58) GOTO LABEL124
+    PRINT UserNumberColor + READ_KEY
 :LABEL124
-    IF (INT004 <= 64) GOTO LABEL071
-
-    IF (INT004 >= 91) GOTO LABEL071
-
-    PRINT STR026 + STR015
+    IF (CH <= 64 || CH >= 91) GOTO LABEL071
+    PRINT UserUpperColor + READ_KEY
 :LABEL071
-    IF (INT004 <= 96) GOTO LABEL086
-
-    IF (INT004 >= 123) GOTO LABEL086
-
-    PRINT STR025 + STR015
+    IF (CH <= 96 || CH >= 123) GOTO LABEL086
+    PRINT UserLowerColor + READ_KEY
 :LABEL086
-    IF (INT004 <= 128) GOTO LABEL133
-
-    PRINT STR029 + STR015
+    IF (CH <= 128) GOTO LABEL133
+    PRINT UserOtherColor + READ_KEY
 :LABEL133
     RETURN 
-:LABEL106
-    IF (STR015 <> Chr(9)) GOTO LABEL123
 
-    STR015 = ""
-:LABEL123
-    IF (STR015 <> Chr(10)) GOTO LABEL011
-
-    STR015 = ""
-:LABEL011
-    IF (STR015 <> Chr(7)) GOTO LABEL100
-
-    STR015 = ""
-:LABEL100
-    IF (STR015 <> Chr(11)) GOTO LABEL022
-
-    STR015 = ""
-:LABEL022
-    IF (Len(STR015) <= 1) GOTO LABEL053
-
-    STR015 = ""
-:LABEL053
-    RETURN 
 :PAGE_INKEY
     USER_INKEY = MInkey()
     SYSOP_INKEY = KInkey()
-    IF (Upper(USER_INKEY) <> "A") GOTO LABEL073
-
-    GOTO LABEL055
-:LABEL073
-    IF (Upper(SYSOP_INKEY) = "C") GOTO LABEL054
-
-    GOTO LABEL016
-:LABEL054
-    SOUND 0
-    GOTO LABEL122
-:LABEL016
-    IF (Upper(SYSOP_INKEY) <> "S") GOTO LABEL008
-
-    BOOL002 = FALSE
-:LABEL008
-    IF (Upper(SYSOP_INKEY) <> "A") GOTO LABEL093
-
-    GOTO LABEL055
-:LABEL093
+    IF Upper(USER_INKEY) == "A" || Upper(SYSOP_INKEY) == "A" UserAbortsChat()
+    IF Upper(SYSOP_INKEY) == "C" THEN
+        SOUND 0
+        GOTO START_CHAT
+    END IF
+    IF Upper(SYSOP_INKEY) == "S" PAGE_SOUND = FALSE
     RETURN 
-:LABEL036
-    DISPFILE PPEPath() + "lchat.pcb", GRAPH
-    ANSIPOS (80 - Len(SYSOP_NAME) + 2) / 2, 1
-    PRINT "@X0F[@X0B"
-    PRINT SYSOP_NAME
-    PRINT "@X0F]"
-    ANSIPOS (80 - Len(U_Name()) + 2) / 2, 12
-    PRINT "[@X0B"
-    PRINT U_Name()
-    PRINT "@X0F]"
-    RETURN 
-    END 
 
 FUNCTION FUNC001(BIGSTR PAR001, BIGSTR PAR002) WORD
-    INTEGER LOC009
-    LOC010 = Len(PAR001)
-    LOC009 = Len(PAR002)
-:LABEL081
-    IF (Mid(PAR002, LOC009, LOC010) <> " ") GOTO LABEL094
-
-    GOTO LABEL080
-:LABEL094
-    LOC009 = LOC009 - 5
-    GOTO LABEL081
-:LABEL080
+    INTEGER LOC010 = Len(PAR001)
+    INTEGER LOC009 = Len(PAR002)
+    WHILE (Mid(PAR002, LOC009, LOC010) != " ") DO
+        LOC009 = LOC009 - 5
+    END WHILE
     FUNC001 = LOC009
 ENDFUNC
 
+PROCEDURE ReasonTooShort()
+    CLS 
+    PRINTLN "@X0BT@X03he chat reason is not long enough @X02!"
+    MORE
+    RestScrn
+    END 
+ENDPROC
 
+PROCEDURE ExitChat()
+    CLS 
+    PRINTLN "@X0BC@X03hat ended@X02."
+    MORE
+    RestScrn
+    END 
+ENDPROC
+
+PROCEDURE UserAbortsChat()
+    CLS 
+    PRINTLN "@X0BU@X03ser aborts chat@X02."
+    MORE
+    RestScrn
+    END 
+ENDPROC
+
+PROCEDURE SysopUnavailable()
+    CLS 
+    PRINTLN "@X0BT@X03he sysop is not avaible for chat now@X02."
+    MORE
+    RestScrn
+    END 
+ENDPROC
+
+PROCEDURE DisplayChatBackground()
+    DISPFILE PPEPath() + "lchat.pcb", GRAPH
+    
+    ANSIPOS (80 - Len(SYSOP_NAME) + 2) / 2, 1
+    PRINT "@X0F[@X0B", SYSOP_NAME, "@X0F]"
+    
+    ANSIPOS (80 - Len(U_Name()) + 2) / 2, 12
+    PRINT "[@X0B", U_Name(), "@X0F]"
+ENDPROC
