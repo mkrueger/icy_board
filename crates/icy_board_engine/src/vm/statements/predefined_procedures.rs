@@ -831,12 +831,13 @@ pub async fn rename(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 pub async fn frewind(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    vm.io.frewind(channel)?;
+    Ok(())
 }
 pub async fn pokedw(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
-    panic!("TODO")
+    panic!("TODO pokedw")
 }
 pub async fn dbglevel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     vm.icy_board_state.debug_level = vm.eval_expr(&args[0]).await?.as_int();
@@ -880,42 +881,71 @@ pub async fn fread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let size = vm.eval_expr(&args[2]).await?.as_int() as usize;
 
     let result = vm.io.fread(channel, size)?;
-
-    if val.get_type() == VariableType::String || val.get_type() == VariableType::BigStr {
-        let mut vs = String::new();
-
-        for c in result {
-            if c == 0 {
-                break;
+    match val.get_type() {
+        VariableType::String | VariableType::BigStr => {
+            let mut vs = String::new();
+            for c in result {
+                if c == 0 {
+                    break;
+                }
+                vs.push(CP437_TO_UNICODE[c as usize]);
             }
-            vs.push(CP437_TO_UNICODE[c as usize]);
+            vm.set_variable(&args[1], VariableValue::new_string(vs)).await?;
         }
-        vm.set_variable(&args[1], VariableValue::new_string(vs)).await?;
-        return Ok(());
-    }
-
-    match result.len() {
-        1 => {
+        VariableType::Boolean => {
+            vm.set_variable(&args[1], VariableValue::new_bool(result[0] != 0)).await?;
+        }
+        VariableType::Byte | VariableType::SByte => {
             vm.set_variable(&args[1], VariableValue::new_byte(result[0])).await?;
         }
-        2 => {
-            let i = u16::from_le_bytes([result[0], result[1]]);
-            vm.set_variable(&args[1], VariableValue::new_word(i)).await?;
+        VariableType::Word | VariableType::SWord => {
+            vm.set_variable(&args[1], VariableValue::new_word(u16::from_le_bytes([result[0], result[1]])))
+                .await?;
         }
-        4 => {
-            let i = i32::from_le_bytes([result[0], result[1], result[2], result[3]]);
-            vm.set_variable(&args[1], VariableValue::new_int(i)).await?;
+        VariableType::Double => {
+            vm.set_variable(
+                &args[1],
+                VariableValue::new_double(f64::from_le_bytes([
+                    result[0], result[1], result[2], result[3], result[4], result[5], result[6], result[7],
+                ])),
+            )
+            .await?;
         }
         _ => {
-            return Err(Box::new(VMError::FReadError(val.get_type(), result.len(), size)));
+            vm.set_variable(
+                &args[1],
+                VariableValue::new_int(i32::from_le_bytes([result[0], result[1], result[2], result[3]])),
+            )
+            .await?;
         }
-    }
+    };
 
     Ok(())
 }
 pub async fn fwrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let val = vm.eval_expr(&args[1]).await?;
+    let size = vm.eval_expr(&args[2]).await?.as_int() as usize;
+    let mut v = match val.get_type() {
+        VariableType::String | VariableType::BigStr => val.as_string().as_bytes().to_vec(),
+        VariableType::Boolean => {
+            if val.as_bool() {
+                vec![1]
+            } else {
+                vec![0]
+            }
+        }
+        VariableType::Byte | VariableType::SByte => unsafe { vec![val.data.byte_value] },
+        VariableType::Word | VariableType::SWord => unsafe { val.data.word_value.to_le_bytes().to_vec() },
+        VariableType::Double => unsafe { val.data.double_value.to_le_bytes().to_vec() },
+        _ => unsafe { val.data.int_value.to_le_bytes().to_vec() },
+    };
+
+    while v.len() < size {
+        v.push(0);
+    }
+    vm.io.fwrite(channel, &v)?;
+    Ok(())
 }
 pub async fn fdefin(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");

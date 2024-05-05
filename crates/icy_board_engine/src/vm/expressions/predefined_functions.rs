@@ -577,7 +577,7 @@ pub async fn valtime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn pcbnode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.node as i32))
+    Ok(VariableValue::new_int(vm.icy_board_state.node as i32 + 1))
 }
 
 pub async fn readline(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

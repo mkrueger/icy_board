@@ -55,15 +55,14 @@ impl PcbBoardCommand {
         }
 
         self.state.session.push_tokens(&command);
-        let command = self.state.session.tokens.pop_front().unwrap();
-
-        if let Some(action) = self.state.try_find_command(&command).await {
-            return self.dispatch_action(&command, &action).await;
+        if let Some(command) = self.state.session.tokens.pop_front() {
+            if let Some(action) = self.state.try_find_command(&command).await {
+                return self.dispatch_action(&command, &action).await;
+            }
+            self.state
+                .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFAFTER | display_flags::LFBEFORE)
+                .await?;
         }
-
-        self.state
-            .display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFAFTER | display_flags::LFBEFORE)
-            .await?;
         self.state.session.tokens.clear();
         Ok(())
     }

@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     fs::{self, File, OpenOptions},
     io::{BufRead, BufReader, Read, Result, Seek, SeekFrom, Write},
     path::Path,
@@ -70,6 +69,7 @@ pub trait PCBoardIO: Send {
     fn fget(&mut self, channel: usize) -> Res<String>;
 
     fn fread(&mut self, channel: usize, size: usize) -> Res<Vec<u8>>;
+    fn fwrite(&mut self, channel: usize, data: &[u8]) -> Res<()>;
 
     fn fseek(&mut self, channel: usize, pos: i32, seek_pos: i32) -> Res<()>;
 
@@ -274,8 +274,10 @@ impl PCBoardIO for DiskIO {
         let Some(chan) = self.channels.get_mut(channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
         };
-        if let Some(f) = chan.file.take() {
-            chan.reader = Some(BufReader::new(*f));
+        if let Some(f) = &mut chan.file {
+            let mut buf = vec![0; size];
+            f.read_exact(&mut buf)?;
+            return Ok(buf);
         }
         if let Some(reader) = &mut chan.reader {
             let mut buf = vec![0; size];
@@ -286,6 +288,21 @@ impl PCBoardIO for DiskIO {
             Ok(Vec::new())
         }
     }
+    fn fwrite(&mut self, channel: usize, data: &[u8]) -> Res<()> {
+        let Some(chan) = self.channels.get_mut(channel) else {
+            return Err(Box::new(VMError::FileChannelNotOpen(channel)));
+        };
+
+        if let Some(f) = &mut chan.file {
+            let _ = f.write(data);
+            chan.err = false;
+        } else {
+            log::error!("fwrite channel {} not found", channel);
+            chan.err = true;
+        }
+        Ok(())
+    }
+
     fn fseek(&mut self, channel: usize, pos: i32, seek_pos: i32) -> Res<()> {
         let Some(chan) = self.channels.get_mut(channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
@@ -294,13 +311,13 @@ impl PCBoardIO for DiskIO {
         match &mut chan.file {
             Some(f) => match seek_pos {
                 0 => {
-                    f.seek(SeekFrom::Start(pos as u64)).expect("seek error");
+                    f.seek(SeekFrom::Start(pos as u64))?;
                 }
                 1 => {
-                    f.seek(SeekFrom::Current(pos as i64)).expect("seek error");
+                    f.seek(SeekFrom::Current(pos as i64))?;
                 }
                 2 => {
-                    f.seek(SeekFrom::End(-pos as i64)).expect("seek error");
+                    f.seek(SeekFrom::End(-pos as i64))?;
                 }
                 _ => return Err(Box::new(VMError::InvalidSeekPosition(seek_pos))),
             },
@@ -308,13 +325,13 @@ impl PCBoardIO for DiskIO {
                 if let Some(reader) = &mut chan.reader {
                     match seek_pos {
                         0 => {
-                            reader.seek(SeekFrom::Start(pos as u64)).expect("seek error");
+                            reader.seek(SeekFrom::Start(pos as u64))?;
                         }
                         1 => {
-                            reader.seek(SeekFrom::Current(pos as i64)).expect("seek error");
+                            reader.seek(SeekFrom::Current(pos as i64))?;
                         }
                         2 => {
-                            reader.seek(SeekFrom::End(-pos as i64)).expect("seek error");
+                            reader.seek(SeekFrom::End(-pos as i64))?;
                         }
                         _ => return Err(Box::new(VMError::InvalidSeekPosition(seek_pos))),
                     }
@@ -377,211 +394,6 @@ impl PCBoardIO for DiskIO {
     fn get_file_size(&self, file: &str) -> u64 {
         if let Ok(metadata) = fs::metadata(file) {
             metadata.len()
-        } else {
-            0
-        }
-    }
-}
-
-struct SimulatedFileChannel {
-    file: Option<String>,
-    filepos: i32,
-    err: bool,
-}
-
-impl SimulatedFileChannel {
-    fn new() -> Self {
-        SimulatedFileChannel {
-            file: None,
-            filepos: 0,
-            err: false,
-        }
-    }
-}
-
-pub struct MemoryIO {
-    channels: [SimulatedFileChannel; 8],
-    pub files: HashMap<String, String>,
-}
-
-impl MemoryIO {
-    #[must_use]
-    pub fn new() -> Self {
-        MemoryIO {
-            files: HashMap::new(),
-            channels: [
-                SimulatedFileChannel::new(),
-                SimulatedFileChannel::new(),
-                SimulatedFileChannel::new(),
-                SimulatedFileChannel::new(),
-                SimulatedFileChannel::new(),
-                SimulatedFileChannel::new(),
-                SimulatedFileChannel::new(),
-                SimulatedFileChannel::new(),
-            ],
-        }
-    }
-}
-
-impl Default for MemoryIO {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl PCBoardIO for MemoryIO {
-    fn fappend(&mut self, channel: usize, file: &str, _am: i32, _sm: i32) {
-        let f = file.to_string();
-
-        let mut filepos = 0;
-
-        if let Some(v) = self.files.get(&f) {
-            filepos = v.len();
-        } else {
-            self.files.insert(f.clone(), String::new());
-        }
-
-        self.channels[channel] = SimulatedFileChannel {
-            file: Some(f),
-            filepos: filepos as i32,
-            err: false,
-        };
-    }
-
-    fn fcreate(&mut self, channel: usize, file: &str, _am: i32, _sm: i32) {
-        let f = file.to_string();
-        self.files.insert(f.clone(), String::new());
-
-        self.channels[channel] = SimulatedFileChannel {
-            file: Some(f),
-            filepos: 0,
-            err: false,
-        };
-    }
-
-    fn fopen(&mut self, channel: usize, file: &str, _am: i32, _sm: i32) -> Res<()> {
-        let f = file.to_string();
-
-        if !self.files.contains_key(&f) {
-            self.channels[channel] = SimulatedFileChannel {
-                file: None,
-                filepos: 0,
-                err: true,
-            };
-            return Ok(());
-        }
-
-        self.channels[channel] = SimulatedFileChannel {
-            file: Some(f),
-            filepos: 0,
-            err: false,
-        };
-        Ok(())
-    }
-    fn fseek(&mut self, _channel: usize, _pos: i32, _seek_pos: i32) -> Res<()> {
-        Ok(())
-    }
-
-    fn delete(&mut self, file: &str) -> std::io::Result<()> {
-        let f = file.to_string();
-        self.files.remove(&f);
-        Ok(())
-    }
-
-    fn rename(&mut self, old: &str, new: &str) -> std::io::Result<()> {
-        if let Some(removed) = self.files.remove(old) {
-            self.files.insert(new.to_string(), removed);
-        }
-        Ok(())
-    }
-
-    fn copy(&mut self, from: &str, to: &str) -> std::io::Result<()> {
-        if let Some(removed) = self.files.get(from) {
-            self.files.insert(to.to_string(), removed.clone());
-        }
-        Ok(())
-    }
-
-    fn ferr(&self, channel: usize) -> bool {
-        self.channels[channel].err
-    }
-
-    fn fput(&mut self, channel: usize, text: String) -> Res<()> {
-        if let Some(v) = &self.channels[channel].file {
-            if let Some(content) = self.files.get_mut(v) {
-                content.insert_str(self.channels[channel].filepos as usize, &text);
-                self.channels[channel].filepos += text.len() as i32;
-            } else {
-                log::error!("fput channel not valid: {}", channel);
-            }
-        } else {
-            self.channels[channel] = SimulatedFileChannel {
-                file: None,
-                filepos: 0,
-                err: true,
-            };
-        }
-        Ok(())
-    }
-
-    fn fget(&mut self, channel: usize) -> Res<String> {
-        if let Some(v) = &mut self.channels[channel].file {
-            if let Some(f) = self.files.get(v) {
-                if self.channels[channel].filepos as usize >= f.len() {
-                    self.channels[channel].err = true;
-                    return Ok(String::new());
-                }
-                let result: String = f.chars().skip(self.channels[channel].filepos as usize).take_while(|c| *c != '\n').collect();
-                self.channels[channel].filepos += result.len() as i32 + 1;
-                Ok(result)
-            } else {
-                log::error!("fget channel not valid: {}", channel);
-                Ok(String::new())
-            }
-        } else {
-            self.channels[channel].err = true;
-            Ok(String::new())
-        }
-    }
-
-    fn fread(&mut self, _channel: usize, _size: usize) -> Res<Vec<u8>> {
-        // TOOD: test implementation.
-        Ok(Vec::new())
-    }
-
-    fn frewind(&mut self, channel: usize) -> Res<()> {
-        if self.channels[channel].file.is_some() {
-            self.channels[channel].filepos = 0;
-        } else {
-            self.channels[channel] = SimulatedFileChannel {
-                file: None,
-                filepos: 0,
-                err: true,
-            };
-        }
-        Ok(())
-    }
-
-    fn fclose(&mut self, channel: usize) -> Res<()> {
-        self.channels[channel] = SimulatedFileChannel {
-            file: None,
-            filepos: 0,
-            err: false,
-        };
-        Ok(())
-    }
-
-    fn file_exists(&self, file: &str) -> bool {
-        self.files.contains_key(file)
-    }
-
-    fn get_file_date(&self, _file: &str) -> Result<SystemTime> {
-        Ok(SystemTime::UNIX_EPOCH)
-    }
-
-    fn get_file_size(&self, file: &str) -> u64 {
-        if let Some(v) = self.files.get(file) {
-            v.len() as u64
         } else {
             0
         }
