@@ -19,7 +19,7 @@ impl PcbBoardCommand {
         self.state.display_text(IceText::UserNetHeader, display_flags::NEWLINE).await?;
         self.state.display_text(IceText::UsernetUnderline, display_flags::NEWLINE).await?;
         let mut lines = Vec::new();
-        for (i, connection) in self.state.node_state.lock().unwrap().iter().enumerate() {
+        for (i, connection) in self.state.node_state.lock().await.iter().enumerate() {
             if let Some(connection) = connection {
                 if let Some(name) = self.state.get_board().await.users.get(connection.cur_user as usize) {
                     let name = name.get_name().to_string();

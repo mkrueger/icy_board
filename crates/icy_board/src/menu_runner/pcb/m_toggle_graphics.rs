@@ -26,37 +26,37 @@ impl PcbBoardCommand {
 
             match token.as_str() {
                 "CT" => {
-                    self.state.set_grapics_mode(GraphicsMode::Ctty);
+                    self.state.set_grapics_mode(GraphicsMode::Ctty).await;
                     self.state
                         .display_text(IceText::CTTYOn, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
                 }
                 "AN" => {
-                    self.state.set_grapics_mode(GraphicsMode::Ansi);
+                    self.state.set_grapics_mode(GraphicsMode::Ansi).await;
                     self.state
                         .display_text(IceText::AnsiOn, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
                 }
                 "AV" => {
-                    self.state.set_grapics_mode(GraphicsMode::Avatar);
+                    self.state.set_grapics_mode(GraphicsMode::Avatar).await;
                     self.state
                         .display_text(IceText::AvatarOn, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
                 }
                 "GR" | "ON" | "YES" => {
-                    self.state.set_grapics_mode(GraphicsMode::Graphics);
+                    self.state.set_grapics_mode(GraphicsMode::Graphics).await;
                     self.state
                         .display_text(IceText::GraphicsOn, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
                 }
                 "RI" => {
-                    self.state.set_grapics_mode(GraphicsMode::Rip);
+                    self.state.set_grapics_mode(GraphicsMode::Rip).await;
                     self.state
                         .display_text(IceText::RIPModeOn, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
                 }
                 "OFF" | "NO" => {
-                    self.state.set_grapics_mode(GraphicsMode::Ansi);
+                    self.state.set_grapics_mode(GraphicsMode::Ansi).await;
                     self.state
                         .display_text(IceText::GraphicsOff, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
@@ -70,9 +70,9 @@ impl PcbBoardCommand {
             }
         } else {
             if self.state.session.disp_options.grapics_mode == GraphicsMode::Graphics {
-                self.state.set_grapics_mode(GraphicsMode::Ansi);
+                self.state.set_grapics_mode(GraphicsMode::Ansi).await;
             } else {
-                self.state.set_grapics_mode(GraphicsMode::Graphics);
+                self.state.set_grapics_mode(GraphicsMode::Graphics).await;
             }
             let msg = if self.state.session.disp_options.grapics_mode == GraphicsMode::Graphics {
                 IceText::GraphicsOn

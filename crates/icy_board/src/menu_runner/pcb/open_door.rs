@@ -23,7 +23,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 impl PcbBoardCommand {
     pub async fn open_door(&mut self, action: &Command) -> Res<()> {
-        self.state.set_activity(UserActivity::RunningDoor);
+        self.state.set_activity(UserActivity::RunningDoor).await;
         let doors = self.state.session.current_conference.doors.clone();
         if doors.is_empty() {
             self.state
@@ -156,17 +156,14 @@ impl PcbBoardCommand {
                                     break;
                                 }
                                 let mut remove_sysop_connection = false;
-                                if let Ok(node_state) = &mut self.state.node_state.lock() {
-                                    if let Some(sysop_connection) = &mut node_state[self.state.node].as_mut().unwrap().sysop_connection {
-                                        if let Err(_) = sysop_connection.send(&read_buf[0..size]).await {
-                                            remove_sysop_connection = true;
-                                        }
+                                let node_state = &mut self.state.node_state.lock().await;
+                                if let Some(sysop_connection) = &mut node_state[self.state.node].as_mut().unwrap().sysop_connection {
+                                    if let Err(_) = sysop_connection.send(&read_buf[0..size]).await {
+                                        remove_sysop_connection = true;
                                     }
                                 }
                                 if remove_sysop_connection {
-                                    if let Ok(node_state) = &mut self.state.node_state.lock() {
-                                        node_state[self.state.node].as_mut().unwrap().sysop_connection = None;
-                                    }
+                                    node_state[self.state.node].as_mut().unwrap().sysop_connection = None;
                                 }
                             }
                         }
@@ -290,11 +287,11 @@ async fn execute_door(door_connection: &mut dyn Connection, state: &mut icy_boar
                      Ok(size) => {
                           if size > 0 {
                             state.connection.send(&read_buf[0..size]).await?;
-                            if let Ok(node_state) = &mut state.node_state.lock() {
-                                if let Some(sysop_connection) = &mut node_state[state.node].as_mut().unwrap().sysop_connection {
-                                    let _ = sysop_connection.send(&read_buf[0..size]).await;
-                                }
+                            let node_state = &mut state.node_state.lock().await;
+                            if let Some(sysop_connection) = &mut node_state[state.node].as_mut().unwrap().sysop_connection {
+                                let _ = sysop_connection.send(&read_buf[0..size]).await;
                             }
+
                           } else {
                             return Ok(());
                           }
@@ -311,12 +308,11 @@ async fn execute_door(door_connection: &mut dyn Connection, state: &mut icy_boar
                         if size > 0 {
                             door_connection.send(&write_buf[0..size]).await?;
 
-                            if let Ok(node_state) = &mut state.node_state.lock() {
-                                if let Some(sysop_connection) = &mut node_state[state.node].as_mut().unwrap().sysop_connection {
-                                    let size = sysop_connection.read(&mut read_buf).await?;
-                                    if size > 0 {
-                                        door_connection.send(&read_buf[0..size]).await?;
-                                    }
+                            let node_state = &mut state.node_state.lock().await;
+                            if let Some(sysop_connection) = &mut node_state[state.node].as_mut().unwrap().sysop_connection {
+                                let size = sysop_connection.read(&mut read_buf).await?;
+                                if size > 0 {
+                                    door_connection.send(&read_buf[0..size]).await?;
                                 }
                             }
                         }

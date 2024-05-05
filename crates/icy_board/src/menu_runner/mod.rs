@@ -31,7 +31,7 @@ impl PcbBoardCommand {
     }
 
     pub async fn do_command(&mut self) -> Res<()> {
-        self.state.set_activity(UserActivity::BrowseMenu);
+        self.state.set_activity(UserActivity::BrowseMenu).await;
         if self.display_menu && !self.state.session.expert_mode {
             self.display_menu().await?;
             self.display_menu = false;

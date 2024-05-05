@@ -52,7 +52,7 @@ impl PcbBoardCommand {
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::YESNO | display_flags::FIELDLEN,
             )
             .await?;
-        self.state.set_activity(UserActivity::CommentToSysop);
+        self.state.set_activity(UserActivity::CommentToSysop).await;
         self.write_message(
             -1,
             -1,

@@ -20,7 +20,7 @@ impl PcbBoardCommand {
                 .await?;
             return Ok(());
         }
-        self.state.set_activity(UserActivity::EnterMessage);
+        self.state.set_activity(UserActivity::EnterMessage).await;
         let conf = self.state.session.current_conference_number;
         let Ok(Some(area)) = self.state.show_message_areas(conf, &action.help).await else {
             self.state.press_enter().await?;

@@ -16,7 +16,7 @@ use super::l_find_files::FileList;
 
 impl PcbBoardCommand {
     pub async fn show_file_directories(&mut self, action: &Command) -> Res<()> {
-        self.state.set_activity(UserActivity::BrowseFiles);
+        self.state.set_activity(UserActivity::BrowseFiles).await;
 
         self.state.session.disable_auto_more = false;
         self.state.session.more_requested = false;

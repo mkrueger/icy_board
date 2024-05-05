@@ -19,7 +19,7 @@ use icy_board_engine::{
 };
 impl PcbBoardCommand {
     pub async fn login(&mut self) -> Res<bool> {
-        self.state.set_activity(UserActivity::LoggingIn);
+        self.state.set_activity(UserActivity::LoggingIn).await;
 
         self.state.reset_color(TerminalTarget::Both).await?;
         self.state.clear_screen(TerminalTarget::Both).await?;
@@ -49,7 +49,7 @@ impl PcbBoardCommand {
             if tries > 3 {
                 log::warn!("Login at {} num login tries exceeded.", Local::now().to_rfc2822());
                 self.state.display_text(IceText::DeniedRefuseToRegister, display_flags::NEWLINE).await?;
-                self.state.hangup()?;
+                self.state.hangup().await?;
                 return Ok(false);
             }
 
@@ -150,14 +150,14 @@ impl PcbBoardCommand {
                 if register == "Y" || register.trim().is_empty() {
                     if !self.new_user().await? {
                         self.state.display_text(IceText::RefusedToRegister, display_flags::NEWLINE).await?;
-                        self.state.hangup()?;
+                        self.state.hangup().await?;
                         log::info!("'{}' refused to register.", self.state.session.user_name);
                         return Ok(false);
                     }
                     return Ok(true);
                 } else {
                     self.state.display_text(IceText::RefusedToRegister, display_flags::NEWLINE).await?;
-                    self.state.hangup()?;
+                    self.state.hangup().await?;
                     log::info!("'{}' refused to register.", self.state.session.user_name);
                     return Ok(false);
                 }
@@ -172,7 +172,7 @@ impl PcbBoardCommand {
             self.newask_questions().await?;
             log::info!("New user registration for {} attempted on closed board.", self.state.session.user_name);
             self.state.display_text(IceText::ClosedBoard, display_flags::NEWLINE).await?;
-            self.state.hangup()?;
+            self.state.hangup().await?;
             return Ok(false);
         }
 
@@ -479,7 +479,7 @@ impl PcbBoardCommand {
         let check_password = if let Some(user) = &self.state.current_user {
             if user.flags.delete_flag || user.flags.disabled_flag {
                 self.state.display_text(IceText::DeniedLockedOut, display_flags::NEWLINE).await?;
-                self.state.hangup()?;
+                self.state.hangup().await?;
                 return Ok(false);
             }
 
@@ -495,7 +495,7 @@ impl PcbBoardCommand {
         if !check_password {
             log::warn!("Login from {} at {} password failed", self.state.session.user_name, Local::now().to_rfc2822());
             self.state.display_text(IceText::DeniedPasswordFailed, display_flags::NEWLINE).await?;
-            self.state.hangup()?;
+            self.state.hangup().await?;
             return Ok(false);
         }
 
@@ -505,7 +505,7 @@ impl PcbBoardCommand {
                     log::warn!("Login from expired user {} at {}", self.state.session.user_name, Local::now().to_rfc2822());
                     let exp_file = self.state.get_board().await.config.paths.expired.clone();
                     self.state.display_file(&self.state.resolve_path(&exp_file)).await?;
-                    self.state.hangup()?;
+                    self.state.hangup().await?;
                     return Ok(false);
                 }
                 let warn_days = self.state.get_board().await.config.subscription_info.warning_days as i64;

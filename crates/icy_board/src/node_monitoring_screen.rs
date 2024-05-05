@@ -1,22 +1,21 @@
 use std::{
-    sync::{Arc, Mutex},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
 use crate::Res;
 use chrono::{Local, Timelike};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use icy_board_engine::icy_board::IcyBoard;
+use icy_board_engine::icy_board::{bbs::BBS, IcyBoard};
 use icy_board_tui::{
     get_text,
-    theme::{DOS_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_YELLOW},
+    theme::{DOS_BLUE, DOS_LIGHT_CYAN, DOS_RED, DOS_YELLOW},
 };
 use ratatui::{
     prelude::*,
     widgets::{block::Title, *},
 };
-
-use crate::bbs::BBS;
+use tokio::sync::Mutex;
 
 pub enum NodeMonitoringScreenMessage {
     Exit,
@@ -39,10 +38,10 @@ impl NodeMonitoringScreen {
         }
     }
 
-    pub fn run(
+    pub async fn run(
         &mut self,
         terminal: &mut Terminal<impl Backend>,
-        board: &Arc<tokio::sync::Mutex<IcyBoard>>,
+        board: &Arc<Mutex<IcyBoard>>,
         bbs: &mut Arc<Mutex<BBS>>,
     ) -> Res<NodeMonitoringScreenMessage> {
         let mut last_tick = Instant::now();
@@ -97,7 +96,7 @@ impl NodeMonitoringScreen {
                             }
                             KeyCode::Enter => {
                                 if let Some(i) = self.table_state.selected() {
-                                    if bbs.lock().unwrap().get_open_connections().lock().unwrap()[i].is_some() {
+                                    if bbs.lock().await.get_open_connections().await.lock().await[i].is_some() {
                                         return Ok(NodeMonitoringScreenMessage::EnterNode(i));
                                     }
                                 }
@@ -117,11 +116,12 @@ impl NodeMonitoringScreen {
 
     fn ui(&mut self, frame: &mut Frame, board: &Arc<tokio::sync::Mutex<IcyBoard>>, bbs: &mut Arc<Mutex<BBS>>) {
         let now = Local::now();
-        let mut footer = get_text("icbmoni_footer");
-        if let Some(i) = self.table_state.selected() {
+        let footer = get_text("icbmoni_footer");
+        if let Some(_i) = self.table_state.selected() {
+            /* TODO: ASYNC
             if bbs.lock().unwrap().get_open_connections().lock().unwrap()[i].is_some() {
                 footer = get_text("icbmoni_on_note_footer")
-            }
+            }*/
         }
 
         let b = Block::default()
@@ -143,8 +143,8 @@ impl NodeMonitoringScreen {
         self.render_scrollbar(frame, area);
     }
 
-    fn render_table(&mut self, frame: &mut Frame, _area: Rect, _board: &Arc<tokio::sync::Mutex<IcyBoard>>, bbs: &mut Arc<Mutex<BBS>>) {
-        let header = [
+    fn render_table(&mut self, _frame: &mut Frame, _area: Rect, _board: &Arc<tokio::sync::Mutex<IcyBoard>>, _bbs: &mut Arc<Mutex<BBS>>) {
+        let _header = [
             "#".to_string(),
             get_text("icbmoni_status_header"),
             get_text("icbmoni_user_header"),
@@ -155,7 +155,7 @@ impl NodeMonitoringScreen {
         .collect::<Row>()
         .style(Style::default().fg(DOS_LIGHT_CYAN).bg(DOS_BLUE).bold())
         .height(1);
-
+        /* TODO: ASYNC
         if let Ok(mut bbs) = bbs.lock() {
             if let Ok(con) = bbs.get_open_connections().lock() {
                 let rows = con.iter().enumerate().map(|(i, node_state)| {
@@ -226,7 +226,7 @@ impl NodeMonitoringScreen {
                 let area = frame.size().inner(&Margin { vertical: 1, horizontal: 1 });
                 frame.render_stateful_widget(table, area, &mut self.table_state);
             }
-        }
+        }*/
     }
 
     fn render_scrollbar(&mut self, frame: &mut Frame, _area: Rect) {

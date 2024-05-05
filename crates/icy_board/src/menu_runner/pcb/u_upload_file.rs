@@ -16,7 +16,7 @@ use icy_net::protocol::{Protocol, TransferProtocolType, XYModemVariant, XYmodem,
 
 impl PcbBoardCommand {
     pub async fn upload_file(&mut self, action: &Command) -> Res<()> {
-        self.state.set_activity(UserActivity::UploadFiles);
+        self.state.set_activity(UserActivity::UploadFiles).await;
         let upload_location = self.state.resolve_path(&self.state.session.current_conference.pub_upload_location);
         if !upload_location.exists() {
             self.state

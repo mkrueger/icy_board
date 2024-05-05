@@ -18,7 +18,7 @@ use jamjam::jam::JamMessageBase;
 
 impl PcbBoardCommand {
     pub async fn quick_message_scan(&mut self, action: &Command) -> Res<()> {
-        self.state.set_activity(UserActivity::ReadMessages);
+        self.state.set_activity(UserActivity::ReadMessages).await;
 
         let Ok(Some(area)) = self.state.show_message_areas(self.state.session.current_conference_number, &action.help).await else {
             self.state.press_enter().await?;

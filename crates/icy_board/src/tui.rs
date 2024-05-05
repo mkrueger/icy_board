@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     io::{self, stdout, Stdout},
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -19,7 +19,8 @@ use crossterm::{
     ExecutableCommand,
 };
 use icy_board_engine::icy_board::{
-    state::{BBSMessage, GraphicsMode, NodeState},
+    bbs::{BBSMessage, BBS},
+    state::{GraphicsMode, NodeState},
     IcyBoard, IcyBoardError,
 };
 use icy_board_tui::{
@@ -29,13 +30,13 @@ use icy_board_tui::{
 use icy_engine::TextPane;
 use icy_net::{channel::ChannelConnection, ConnectionType};
 use ratatui::{prelude::*, widgets::Paragraph};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 
-use crate::{bbs::BBS, icy_engine_output::Screen};
+use crate::icy_engine_output::Screen;
 
 pub struct Tui {
     sysop_mode: bool,
-    screen: Arc<Mutex<Screen>>,
+    screen: Arc<std::sync::Mutex<Screen>>,
     tx: mpsc::Sender<SendData>,
     status_bar: usize,
     handle: Arc<Mutex<Vec<Option<NodeState>>>>,
@@ -44,12 +45,14 @@ pub struct Tui {
 }
 
 impl Tui {
-    pub fn local_mode(board: &Arc<tokio::sync::Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>, login_sysop: bool, ppe: Option<PathBuf>) -> Self {
+    pub async fn local_mode(board: &Arc<tokio::sync::Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>, login_sysop: bool, ppe: Option<PathBuf>) -> Self {
         let board = board.clone();
-        let ui_node = bbs.lock().unwrap().create_new_node(ConnectionType::Channel);
-        let node_state = bbs.lock().unwrap().open_connections.clone();
+        let bbs2 = bbs.clone();
+
+        let ui_node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
+        let node_state = bbs.lock().await.open_connections.clone();
         let node = ui_node.clone();
-        let screen = Arc::new(Mutex::new(Screen::new()));
+        let screen = Arc::new(std::sync::Mutex::new(Screen::new()));
         let (ui_connection, connection) = ChannelConnection::create_pair();
         let node_state2 = node_state.clone();
 
@@ -58,13 +61,13 @@ impl Tui {
             .name("Local mode handle".to_string())
             .spawn(move || {
                 tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                    if let Err(err) = handle_client(board, node_state2, node, Box::new(connection), Some(options)).await {
+                    if let Err(err) = handle_client(bbs2, board, node_state2, node, Box::new(connection), Some(options)).await {
                         log::error!("Error running backround client: {}", err);
                     }
                 });
             })
             .unwrap();
-        bbs.lock().unwrap().get_open_connections().as_ref().lock().unwrap()[node]
+        bbs.lock().await.get_open_connections().await.as_ref().lock().await[node]
             .as_mut()
             .unwrap()
             .handle = Some(handle);
@@ -77,48 +80,41 @@ impl Tui {
             status_bar: 0,
             node,
             node_state,
-            handle: bbs.lock().unwrap().get_open_connections().clone(),
+            handle: bbs.lock().await.get_open_connections().await.clone(),
         }
     }
 
     async fn logoff_sysop(&self, bbs: &mut Arc<Mutex<BBS>>) -> Res<()> {
         if self.sysop_mode {
-            bbs.lock().unwrap().bbs_channels[self.node]
-                .as_ref()
-                .unwrap()
-                .send(BBSMessage::SysopLogout)
-                .await?;
+            bbs.lock().await.bbs_channels[self.node].as_ref().unwrap().send(BBSMessage::SysopLogout).await?;
         }
         Ok(())
     }
 
     pub async fn sysop_mode(bbs: &Arc<Mutex<BBS>>, node: usize) -> Res<Self> {
         let (ui_connection, connection) = ChannelConnection::create_pair();
-        if let Ok(bbs) = &mut bbs.lock() {
-            log::info!("Creating sysop mode");
-            let node_state = bbs.open_connections.clone();
+        let mut bbs = bbs.lock().await;
+        log::info!("Creating sysop mode");
+        let node_state = bbs.open_connections.clone();
 
-            if let Some(node_state) = bbs.get_open_connections().lock().unwrap()[node].as_mut() {
-                node_state.sysop_connection = Some(connection);
-            }
-            bbs.bbs_channels[node].as_ref().unwrap().send(BBSMessage::SysopLogin).await?;
-
-            let screen = Arc::new(Mutex::new(Screen::new()));
-            log::info!("Run terminal thread");
-            let (_handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone());
-
-            Ok(Self {
-                sysop_mode: true,
-                screen,
-                tx,
-                status_bar: 0,
-                node,
-                node_state,
-                handle: bbs.get_open_connections().clone(),
-            })
-        } else {
-            return Err(Box::new(IcyBoardError::Error("Node not found".to_string())));
+        if let Some(node_state) = bbs.get_open_connections().await.lock().await[node].as_mut() {
+            node_state.sysop_connection = Some(connection);
         }
+        bbs.bbs_channels[node].as_ref().unwrap().send(BBSMessage::SysopLogin).await?;
+
+        let screen = Arc::new(std::sync::Mutex::new(Screen::new()));
+        log::info!("Run terminal thread");
+        let (_handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone());
+
+        Ok(Self {
+            sysop_mode: true,
+            screen,
+            tx,
+            status_bar: 0,
+            node,
+            node_state,
+            handle: bbs.get_open_connections().await.clone(),
+        })
     }
 
     pub async fn run(&mut self, bbs: &mut Arc<Mutex<BBS>>, board: &Arc<tokio::sync::Mutex<IcyBoard>>) -> Res<()> {
@@ -128,10 +124,10 @@ impl Tui {
         terminal.clear()?;
         //   let mut redraw = true;
         loop {
-            if let Some(Some(node_state)) = self.handle.lock().unwrap().get(self.node) {
+            if let Some(Some(node_state)) = self.handle.lock().await.get(self.node) {
                 if node_state.handle.as_ref().unwrap().is_finished() {
                     restore_terminal()?;
-                    let handle = self.handle.lock().unwrap()[self.node].as_mut().unwrap().handle.take().unwrap();
+                    let handle = self.handle.lock().await[self.node].as_mut().unwrap().handle.take().unwrap();
                     self.logoff_sysop(bbs).await?;
                     if let Err(_err) = handle.join() {
                         return Err(Box::new(IcyBoardError::ThreadCrashed));
@@ -467,7 +463,7 @@ pub struct StatusBarInfo {
 
 impl StatusBarInfo {
     pub async fn get_info(board: &Arc<tokio::sync::Mutex<IcyBoard>>, node_state: &Arc<Mutex<Vec<Option<NodeState>>>>, node: usize) -> Self {
-        let l = node_state.lock().unwrap();
+        let l = node_state.lock().await;
         let node_state = l[node].as_ref().unwrap();
         let current_conf = node_state.cur_conference;
         let graphics_mode = node_state.graphics_mode;

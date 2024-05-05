@@ -789,8 +789,14 @@ pub async fn carrier(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     Ok(VariableValue::new_int(vm.icy_board_state.get_bps()))
 }
 pub async fn tokenstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let mut res = String::new();
+    for tok in vm.icy_board_state.session.tokens.drain(..) {
+        if !res.is_empty() {
+            res.push(';');
+        }
+        res.push_str(&tok);
+    }
+    Ok(VariableValue::new_string(res))
 }
 pub async fn cdon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");

@@ -3,11 +3,11 @@ use std::{
     io::stdout,
     path::{Path, PathBuf},
     process,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 use argh::FromArgs;
-use bbs::{await_telnet_connections, BBS};
+use bbs::await_telnet_connections;
 use call_wait_screen::{CallWaitMessage, CallWaitScreen};
 use chrono::Local;
 use crossterm::{
@@ -16,7 +16,10 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, Clear, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use icy_board_engine::{icy_board::IcyBoard, Res};
+use icy_board_engine::{
+    icy_board::{bbs::BBS, IcyBoard},
+    Res,
+};
 
 use node_monitoring_screen::NodeMonitoringScreenMessage;
 use ratatui::{
@@ -24,6 +27,7 @@ use ratatui::{
     Terminal,
 };
 use semver::Version;
+use tokio::sync::Mutex;
 use tui::{print_exit_screen, Tui};
 
 use crate::bbs::{await_securewebsocket_connections, await_ssh_connections, await_websocket_connections};
@@ -207,7 +211,7 @@ async fn run_message(
     match msg {
         CallWaitMessage::User(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
-            let mut tui = Tui::local_mode(board, bbs, false, None);
+            let mut tui = Tui::local_mode(board, bbs, false, None).await;
             if let Err(err) = tui.run(bbs, &board).await {
                 restore_terminal()?;
                 log::error!("while running board in local mode: {}", err.to_string());
@@ -217,7 +221,7 @@ async fn run_message(
         }
         CallWaitMessage::RunPPE(ppe) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
-            let mut tui = Tui::local_mode(board, bbs, true, Some(ppe));
+            let mut tui = Tui::local_mode(board, bbs, true, Some(ppe)).await;
             if let Err(err) = tui.run(bbs, &board).await {
                 restore_terminal()?;
                 log::error!("while running board in local mode: {}", err.to_string());
@@ -227,7 +231,7 @@ async fn run_message(
         }
         CallWaitMessage::Sysop(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
-            let mut tui = Tui::local_mode(board, bbs, true, None);
+            let mut tui = Tui::local_mode(board, bbs, true, None).await;
             if let Err(err) = tui.run(bbs, &board).await {
                 restore_terminal()?;
                 log::error!("while running board in local mode: {}", err.to_string());
@@ -242,7 +246,7 @@ async fn run_message(
         }
         CallWaitMessage::Monitor => {
             let mut app = node_monitoring_screen::NodeMonitoringScreen::new(&board).await;
-            match app.run(terminal, &board, bbs) {
+            match app.run(terminal, &board, bbs).await {
                 Ok(msg) => {
                     if let NodeMonitoringScreenMessage::EnterNode(node) = msg {
                         let mut tui = Tui::sysop_mode(bbs, node).await?;

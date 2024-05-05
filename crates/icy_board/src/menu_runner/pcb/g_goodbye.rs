@@ -11,7 +11,7 @@ use crate::{menu_runner::PcbBoardCommand, Res};
 
 impl PcbBoardCommand {
     pub async fn goodbye_cmd(&mut self) -> Res<()> {
-        self.state.set_activity(UserActivity::Goodbye);
+        self.state.set_activity(UserActivity::Goodbye).await;
         self.displaycmdfile("g").await?;
 
         if !self.state.session.flagged_files.is_empty() {
@@ -66,7 +66,7 @@ impl PcbBoardCommand {
             .await?;
         self.state.reset_color(TerminalTarget::Both).await?;
 
-        self.state.hangup()?;
+        self.state.hangup().await?;
         Ok(())
     }
 }

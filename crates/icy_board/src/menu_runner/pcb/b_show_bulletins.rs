@@ -8,7 +8,7 @@ use icy_board_engine::icy_board::{
 
 impl PcbBoardCommand {
     pub async fn show_bulletins(&mut self, action: &Command) -> Res<()> {
-        self.state.set_activity(UserActivity::ReadBulletins);
+        self.state.set_activity(UserActivity::ReadBulletins).await;
 
         let bulletins = self.state.load_bullettins().await?;
         if bulletins.is_empty() {

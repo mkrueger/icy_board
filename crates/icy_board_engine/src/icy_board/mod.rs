@@ -28,6 +28,7 @@ use self::{
     xfer_protocols::SupportedProtocols,
 };
 
+pub mod bbs;
 pub mod bulletins;
 pub mod commands;
 pub mod conferences;

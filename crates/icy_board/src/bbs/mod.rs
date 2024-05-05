@@ -1,16 +1,12 @@
-use std::{
-    path::PathBuf,
-    sync::{Arc, Mutex},
-    thread,
-    time::Duration,
-};
+use std::{path::PathBuf, sync::Arc, thread, time::Duration};
 
 use crate::Res;
 use async_recursion::async_recursion;
 use icy_board_engine::{
     icy_board::{
+        bbs::BBS,
         login_server::{SecureWebsocket, Telnet, Websocket, SSH},
-        state::{BBSMessage, IcyBoardState, NodeState},
+        state::{IcyBoardState, NodeState},
         IcyBoard,
     },
     vm::TerminalTarget,
@@ -21,69 +17,9 @@ use icy_net::{
     Connection,
     ConnectionType,
 };
-use tokio::{net::TcpListener, sync::mpsc};
+use tokio::{net::TcpListener, sync::Mutex};
 
 use crate::menu_runner::PcbBoardCommand;
-
-pub struct BBS {
-    pub open_connections: Arc<Mutex<Vec<Option<NodeState>>>>,
-    pub bbs_channels: Vec<Option<tokio::sync::mpsc::Sender<BBSMessage>>>,
-}
-
-impl BBS {
-    fn clear_closed_connections(&mut self) {
-        if let Ok(list) = &mut self.open_connections.lock() {
-            for i in 0..list.len() {
-                let is_finished = if let Some(state) = &list[i] {
-                    if let Some(handle) = &state.handle {
-                        handle.is_finished()
-                    } else {
-                        continue;
-                    }
-                } else {
-                    continue;
-                };
-                if is_finished {
-                    list[i] = None;
-                }
-            }
-        }
-    }
-
-    pub fn get_open_connections(&mut self) -> &Arc<Mutex<Vec<Option<NodeState>>>> {
-        self.clear_closed_connections();
-        &self.open_connections
-    }
-
-    pub fn create_new_node(&mut self, connection_type: ConnectionType) -> usize {
-        self.clear_closed_connections();
-        if let Ok(list) = &mut self.open_connections.lock() {
-            for i in 0..list.len() {
-                if list[i].is_none() {
-                    let (tx, rx) = mpsc::channel(32);
-                    let node_state = NodeState::new(i + 1, connection_type, rx);
-                    list[i] = Some(node_state);
-                    self.bbs_channels[i] = Some(tx);
-                    return i;
-                }
-            }
-        }
-        panic!("Could not create new connection");
-    }
-
-    pub fn new(nodes: usize) -> BBS {
-        let mut vec = Vec::new();
-        let mut vec2 = Vec::new();
-        for _ in 0..nodes {
-            vec.push(None);
-            vec2.push(None);
-        }
-        BBS {
-            open_connections: Arc::new(Mutex::new(vec)),
-            bbs_channels: vec2,
-        }
-    }
-}
 
 pub async fn await_telnet_connections(telnet: Telnet, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
     let addr = if telnet.address.is_empty() {
@@ -94,8 +30,9 @@ pub async fn await_telnet_connections(telnet: Telnet, board: Arc<tokio::sync::Mu
     let listener = TcpListener::bind(addr).await?;
     loop {
         let (stream, _addr) = listener.accept().await?;
-        let node = bbs.lock().unwrap().create_new_node(ConnectionType::Telnet);
-        let node_list = bbs.lock().unwrap().get_open_connections().clone();
+        let bbs2 = bbs.clone();
+        let node = bbs.lock().await.create_new_node(ConnectionType::Telnet).await;
+        let node_list = bbs.lock().await.get_open_connections().await.clone();
         let board = board.clone();
         let handle = std::thread::Builder::new()
             .name("Telnet handle".to_string())
@@ -111,7 +48,7 @@ pub async fn await_telnet_connections(telnet: Telnet, board: Arc<tokio::sync::Mu
                     match TelnetConnection::accept(stream) {
                         Ok(connection) => {
                             // connection succeeded
-                            if let Err(err) = handle_client(board, node_list, node, Box::new(connection), None).await {
+                            if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None).await {
                                 log::error!("Error running backround client: {}", err);
                             }
                         }
@@ -122,7 +59,7 @@ pub async fn await_telnet_connections(telnet: Telnet, board: Arc<tokio::sync::Mu
                 });
             })
             .unwrap();
-        bbs.lock().unwrap().get_open_connections().lock().unwrap()[node].as_mut().unwrap().handle = Some(handle);
+        bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
     }
 }
 
@@ -281,13 +218,14 @@ pub fn await_securewebsocket_connections(_ssh: SecureWebsocket, _board: Arc<toki
 
 #[async_recursion(?Send)]
 pub async fn handle_client(
+    bbs: Arc<tokio::sync::Mutex<BBS>>,
     board: Arc<tokio::sync::Mutex<IcyBoard>>,
     node_state: Arc<Mutex<Vec<Option<NodeState>>>>,
     node: usize,
     connection: Box<dyn Connection>,
     login_options: Option<LoginOptions>,
 ) -> Res<()> {
-    let mut state = IcyBoardState::new(board, node_state, node, connection).await;
+    let mut state = IcyBoardState::new(bbs, board, node_state, node, connection).await;
     let mut logged_in = false;
     if let Some(login_options) = &login_options {
         if login_options.login_sysop {

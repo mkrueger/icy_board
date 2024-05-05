@@ -437,8 +437,14 @@ pub async fn tokenize(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 }
 
 pub async fn gettoken(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    let var = if let Some(token) = vm.icy_board_state.session.tokens.pop_front() {
+        VariableValue::new_string(token)
+    } else {
+        VariableValue::new_string(String::new())
+    };
+
+    vm.set_variable(&args[0], var).await?;
+    Ok(())
 }
 
 pub async fn shell(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -757,6 +763,7 @@ pub async fn sound(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::warn!("Sound is not supported");
     Ok(())
 }
+
 pub async fn chat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
