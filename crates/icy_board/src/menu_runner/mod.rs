@@ -248,6 +248,11 @@ impl PcbBoardCommand {
                 self.text_search(action).await?;
             }
 
+            CommandType::Broadcast => {
+                // BR
+                self.broadcast(action).await?;
+            }
+
             _ => {
                 return Err(Box::new(IcyBoardError::UnknownAction(format!("{:?}", action.command_type))));
             }

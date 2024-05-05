@@ -2,6 +2,7 @@ pub mod _4_recover_message;
 pub mod a_abandon_conference;
 pub mod alias_toggle_alias;
 pub mod b_show_bulletins;
+pub mod br_broadcast;
 pub mod c_comment_to_sysop;
 pub mod d_download;
 pub mod e_enter_message;

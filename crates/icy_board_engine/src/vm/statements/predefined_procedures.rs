@@ -555,11 +555,10 @@ pub async fn goodbye(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> 
 /// without giving users the ability to manually broadcast
 /// at any time they choose.
 pub async fn broadcast(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let lonode = vm.eval_expr(&args[0]).await?.as_int();
-    let hinode = vm.eval_expr(&args[1]).await?.as_int();
+    let lonode = vm.eval_expr(&args[0]).await?.as_int().saturating_sub(1).max(0) as u16;
+    let hinode = vm.eval_expr(&args[1]).await?.as_int().saturating_sub(1).min(65536) as u16;
     let message = vm.eval_expr(&args[2]).await?.as_string();
-    // TODO: Broadcast
-    log::error!("Broadcasting message from {lonode} to {hinode}: {message}");
+    vm.icy_board_state.broadcast(lonode, hinode, &message).await?;
     Ok(())
 }
 

@@ -4,10 +4,11 @@ use tokio::sync::{mpsc, Mutex};
 
 use super::state::NodeState;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BBSMessage {
     SysopLogin,
     SysopLogout,
+    Broadcast(String),
 }
 
 pub struct BBS {

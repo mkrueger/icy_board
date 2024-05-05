@@ -12,7 +12,7 @@ use crate::{executable::Executable, Res};
 use async_recursion::async_recursion;
 use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use codepages::tables::UNICODE_TO_CP437;
-use icy_engine::{ansi, OutputFormat};
+use icy_engine::{ansi, OutputFormat, SaveOptions, ScreenPreperation};
 use icy_engine::{ansi::constants::COLOR_OFFSETS, Position};
 use icy_engine::{TextAttribute, TextPane};
 use icy_net::{channel::ChannelConnection, terminal::virtual_screen::VirtualScreen, Connection, ConnectionType};
@@ -831,6 +831,15 @@ impl IcyBoardState {
     pub async fn get_board(&self) -> tokio::sync::MutexGuard<IcyBoard> {
         self.board.lock().await
     }
+
+    pub async fn broadcast(&self, lonode: u16, hinode: u16, message: &str) -> Res<()> {
+        for i in lonode..=hinode {
+            if let Some(Some(channel)) = self.bbs.lock().await.bbs_channels.get(i as usize) {
+                let _ = channel.send(BBSMessage::Broadcast(message.to_string())).await;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(PartialEq)]
@@ -1420,12 +1429,20 @@ impl IcyBoardState {
             let mut sysop_key_data = [0; 1];
             tokio::select! {
                 msg = bbs_channel.recv() => {
-                    if let Some(BBSMessage::SysopLogout) = msg {
-                        self.node_state.lock().await[self.node].as_mut().unwrap().sysop_connection = None;
-                        self.node_state.lock().await[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
-                        self.print_sysop_screen().await?;
-                        return Ok(None);
+                    self.node_state.lock().await[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
+                    match msg {
+                        Some(BBSMessage::SysopLogout) => {
+                            self.node_state.lock().await[self.node].as_mut().unwrap().sysop_connection = None;
+                        }
+                        Some(BBSMessage::SysopLogin) => {
+                            self.print_sysop_screen().await?;
+                        }
+                        Some(BBSMessage::Broadcast(msg)) => {
+                            self.show_broadcast(msg).await?;
+                        }
+                        _ => {}
                     }
+                    return Ok(None);
                 }
                 size = sysop_connection.read(&mut sysop_key_data) => {
                     match size {
@@ -1459,11 +1476,21 @@ impl IcyBoardState {
         } else {
             tokio::select! {
                 msg = bbs_channel.recv() => {
-                    if let Some(BBSMessage::SysopLogin) = msg {
-                        self.node_state.lock().await[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
-                        self.print_sysop_screen().await?;
-                        return Ok(None);
+                    self.node_state.lock().await[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
+                    match msg {
+                        Some(BBSMessage::SysopLogout) => {
+                            // Ignore
+                        }
+                        Some(BBSMessage::SysopLogin) => {
+                            self.print_sysop_screen().await?;
+                        }
+                        Some(BBSMessage::Broadcast(msg)) => {
+                            self.show_broadcast(msg).await?;
+                        }
+                        _ => {}
                     }
+                    return Ok(None);
+
                 }
                 size2 = self.connection.read(&mut user_key_data) => {
                     if let Ok(1) = size2 {
@@ -1482,6 +1509,29 @@ impl IcyBoardState {
         Ok(None)
     }
 
+    async fn show_broadcast(&mut self, msg: String) -> Res<()> {
+        let buf = self.user_screen.buffer.flat_clone(false);
+        let pos = self.user_screen.caret.get_position();
+        self.set_activity(UserActivity::ReadBroadcast).await;
+        self.new_line().await?;
+        self.set_color(TerminalTarget::Both, IcbColor::Dos(15)).await?;
+        self.println(TerminalTarget::Both, &"Broadcast:").await?;
+        self.println(TerminalTarget::Both, &msg).await?;
+        self.bell().await?;
+
+        self.press_enter().await?;
+
+        let mut options = SaveOptions::default();
+        options.screen_preparation = ScreenPreperation::ClearScreen;
+        options.save_sauce = false;
+        options.modern_terminal_output = true;
+        let res = icy_engine::formats::PCBoard::default().to_bytes(&buf, &options)?;
+        let res = unsafe { String::from_utf8_unchecked(res) };
+        self.print(TerminalTarget::Both, &res).await?;
+        self.gotoxy(TerminalTarget::Both, pos.x, pos.y).await;
+        Ok(())
+    }
+
     async fn print_sysop_screen(&mut self) -> Res<()> {
         let mut options = icy_engine::SaveOptions::default();
         options.screen_preparation = icy_engine::ScreenPreperation::ClearScreen;
@@ -1489,7 +1539,6 @@ impl IcyBoardState {
         options.modern_terminal_output = true;
         let res = icy_engine::formats::PCBoard::default().to_bytes(&self.user_screen.buffer, &options)?;
         let res = unsafe { String::from_utf8_unchecked(res) };
-        log::info!("Sending sysop screen: {:?}", res);
         self.print(TerminalTarget::Sysop, &res).await?;
         let p = self.user_screen.caret.get_position();
         self.gotoxy(TerminalTarget::Sysop, p.x + 1, p.y + 1).await?;
