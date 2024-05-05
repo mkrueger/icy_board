@@ -764,8 +764,8 @@ pub async fn sound(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn chat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    vm.icy_board_state.page_sysop().await?;
+    Ok(())
 }
 
 pub async fn sprint(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {

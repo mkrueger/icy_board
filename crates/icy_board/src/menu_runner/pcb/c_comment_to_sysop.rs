@@ -38,9 +38,14 @@ impl PcbBoardCommand {
             return Ok(());
         };
 
+        self.enter_comment_to_sysop().await?;
+
+        Ok(())
+    }
+
+    pub async fn enter_comment_to_sysop(&mut self) -> Res<()> {
         let to = self.state.get_board().await.config.sysop.name.clone();
         let subj = format!("COMMENT {}", IcbTime::now().to_string());
-
         let receipt = self
             .state
             .input_field(

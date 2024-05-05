@@ -151,6 +151,10 @@ impl PcbBoardCommand {
                 // N
                 self.find_new_files(action, 60000).await?;
             }
+            CommandType::PageSysop => {
+                // O
+                self.page_sysop(action).await?;
+            }
             CommandType::SetPageLength => {
                 // P
                 self.set_page_len(action).await?;

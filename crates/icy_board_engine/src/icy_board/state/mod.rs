@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crate::{executable::Executable, Res};
@@ -16,7 +16,7 @@ use icy_engine::{ansi, OutputFormat, SaveOptions, ScreenPreperation};
 use icy_engine::{ansi::constants::COLOR_OFFSETS, Position};
 use icy_engine::{TextAttribute, TextPane};
 use icy_net::{channel::ChannelConnection, terminal::virtual_screen::VirtualScreen, Connection, ConnectionType};
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, time::sleep};
 
 use crate::{
     icy_board::IcyBoardError,
@@ -840,6 +840,64 @@ impl IcyBoardState {
         }
         Ok(())
     }
+
+    pub async fn page_sysop(&mut self) -> Res<()> {
+        self.display_text(IceText::Paging, display_flags::LFBEFORE).await?;
+
+        for _i in 0..15 {
+            self.print(TerminalTarget::Both, ".").await?;
+            self.bell().await?;
+            let i = Instant::now();
+            loop {
+                if i.elapsed().as_secs() >= 1 {
+                    break;
+                }
+                let Some(ch) = self.get_char(TerminalTarget::Both).await? else {
+                    continue;
+                };
+                if ch.ch == '\x1b' || ch.ch as u32 == 11 {
+                    self.new_line().await?;
+                    return Ok(());
+                }
+                if ch.source == KeySource::Sysop {
+                    self.chat().await?;
+                    self.display_text(IceText::SysopChatEnded, display_flags::NEWLINE | display_flags::LFBEFORE)
+                        .await?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn chat(&mut self) -> Res<()> {
+        self.display_text(IceText::SysopChatActive, display_flags::NEWLINE | display_flags::LFBEFORE)
+            .await?;
+
+        loop {
+            let Some(ch) = self.get_char(TerminalTarget::Both).await? else {
+                sleep(Duration::from_millis(50)).await;
+                continue;
+            };
+            if ch.ch == '\n' || ch.ch == '\r' {
+                self.new_line().await?;
+                continue;
+            }
+            if ch.ch as u8 == 8 {
+                self.print(TerminalTarget::Both, "\x08 \x08").await?;
+                continue;
+            }
+            if ch.ch == '\x1b' || ch.ch as u32 == 11 {
+                return Ok(());
+            }
+            if ch.source == KeySource::Sysop {
+                self.set_color(TerminalTarget::Both, IcbColor::Dos(10)).await?;
+            } else {
+                self.reset_color(TerminalTarget::Both).await?;
+            }
+            self.print(TerminalTarget::Both, &ch.ch.to_string()).await?;
+        }
+    }
 }
 
 #[derive(PartialEq)]
@@ -1472,6 +1530,11 @@ impl IcyBoardState {
                         return Ok(Some(KeyChar::new(KeySource::User, user_key_data[0] as char)));
                     }
                 }
+                _ = sleep(Duration::from_millis(100)) => {
+                    self.node_state.lock().await[self.node].as_mut().unwrap().sysop_connection = Some(sysop_connection);
+                    self.node_state.lock().await[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
+                    return Ok(None);
+                }
             }
         } else {
             tokio::select! {
@@ -1502,6 +1565,11 @@ impl IcyBoardState {
                         return Ok(Some(KeyChar::new(KeySource::User, user_key_data[0] as char)));
                     }
                 }
+                _ = sleep(Duration::from_millis(100)) => {
+                    self.node_state.lock().await[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
+                    return Ok(None);
+                }
+
             }
         }
 
@@ -1528,7 +1596,7 @@ impl IcyBoardState {
         let res = icy_engine::formats::PCBoard::default().to_bytes(&buf, &options)?;
         let res = unsafe { String::from_utf8_unchecked(res) };
         self.print(TerminalTarget::Both, &res).await?;
-        self.gotoxy(TerminalTarget::Both, pos.x, pos.y).await;
+        self.gotoxy(TerminalTarget::Both, pos.x, pos.y).await?;
         Ok(())
     }
 
