@@ -236,11 +236,10 @@ pub async fn log(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 
-const TXT_STOPCHAR: char = '_';
-
 pub async fn input(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let prompt = vm.eval_expr(&args[0]).await?.as_string();
     let color = IcbColor::Dos(14);
+    let d = get_default_string(vm, &args[1]).await;
     let output = vm
         .icy_board_state
         .input_string(
@@ -249,7 +248,7 @@ pub async fn input(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
             60,
             &MASK_ALNUM,
             "",
-            None,
+            d,
             display_flags::FIELDLEN | display_flags::GUIDE | display_flags::HIGHASCII,
         )
         .await?;
@@ -264,92 +263,152 @@ pub async fn inputstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     let len = vm.eval_expr(&args[3]).await?.as_int();
     let valid = vm.eval_expr(&args[4]).await?.as_string();
     let flags = vm.eval_expr(&args[5]).await?.as_int();
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, &valid, "", None, flags).await?;
+    let d = get_default_string(vm, &args[1]).await;
+    let output = vm.icy_board_state.input_string(color.into(), prompt, len, &valid, "", d, flags).await?;
     vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
     Ok(())
 }
 
 pub async fn inputyn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let mut prompt = vm.eval_expr(&args[0]).await?.as_string();
-    if prompt.ends_with(TXT_STOPCHAR) {
-        prompt.pop();
-    }
-
+    let prompt = vm.eval_expr(&args[0]).await?.as_string();
     let color = vm.eval_expr(&args[2]).await?.as_int() as u8;
     let len = 1;
-    let valid = "YyNn";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0).await?;
+    let d = get_default_string(vm, &args[1]).await;
+    let output = vm
+        .icy_board_state
+        .input_string(
+            color.into(),
+            prompt,
+            len,
+            &"",
+            "",
+            d,
+            display_flags::YESNO | display_flags::NEWLINE | display_flags::UPCASE | display_flags::GUIDE,
+        )
+        .await?;
 
     vm.set_variable(&args[1], VariableValue::new_string(output.to_ascii_uppercase())).await?;
     Ok(())
 }
 
-pub async fn inputmoney(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let mut prompt = vm.eval_expr(&args[0]).await?.as_string();
-    if prompt.ends_with(TXT_STOPCHAR) {
-        prompt.pop();
+async fn get_default_string(vm: &mut VirtualMachine<'_>, args: &PPEExpr) -> Option<String> {
+    let default = vm.eval_expr(args).await.unwrap().as_string();
+    if default.is_empty() {
+        None
+    } else {
+        Some(default)
     }
+}
+
+pub async fn inputmoney(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let prompt = vm.eval_expr(&args[0]).await?.as_string();
 
     let color = vm.eval_expr(&args[2]).await?.as_int() as u8;
     let len = 13;
     let valid = "01234567890+-$.";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0).await?;
+    let d = get_default_string(vm, &args[1]).await;
+    let output = vm
+        .icy_board_state
+        .input_string(
+            color.into(),
+            prompt,
+            len,
+            valid,
+            "",
+            d,
+            display_flags::NEWLINE | display_flags::UPCASE | display_flags::GUIDE,
+        )
+        .await?;
     // TODO: Money conversion.
     vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
     Ok(())
 }
 
 pub async fn inputint(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let mut prompt = vm.eval_expr(&args[0]).await?.as_string();
-    if prompt.ends_with(TXT_STOPCHAR) {
-        prompt.pop();
-    }
-
+    let prompt = vm.eval_expr(&args[0]).await?.as_string();
     let color = vm.eval_expr(&args[2]).await?.as_int() as u8;
     let len = 11;
     let valid = "01234567890+-";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0).await?;
+    let d = get_default_string(vm, &args[1]).await;
+    let output = vm
+        .icy_board_state
+        .input_string(
+            color.into(),
+            prompt,
+            len,
+            valid,
+            "",
+            d,
+            display_flags::NEWLINE | display_flags::UPCASE | display_flags::GUIDE,
+        )
+        .await?;
     vm.set_variable(&args[1], VariableValue::new_int(output.parse::<i32>()?)).await?;
     Ok(())
 }
 pub async fn inputcc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let mut prompt = vm.eval_expr(&args[0]).await?.as_string();
-    if prompt.ends_with(TXT_STOPCHAR) {
-        prompt.pop();
-    }
+    let prompt = vm.eval_expr(&args[0]).await?.as_string();
 
     let color = vm.eval_expr(&args[2]).await?.as_int() as u8;
     let len = 16;
     let valid = "01234567890";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0).await?;
+    let d = get_default_string(vm, &args[1]).await;
+    let output = vm
+        .icy_board_state
+        .input_string(
+            color.into(),
+            prompt,
+            len,
+            valid,
+            "",
+            d,
+            display_flags::NEWLINE | display_flags::UPCASE | display_flags::GUIDE,
+        )
+        .await?;
     vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
     Ok(())
 }
 pub async fn inputdate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let mut prompt = vm.eval_expr(&args[0]).await?.as_string();
-    if prompt.ends_with(TXT_STOPCHAR) {
-        prompt.pop();
-    }
+    let prompt = vm.eval_expr(&args[0]).await?.as_string();
 
     let color = vm.eval_expr(&args[2]).await?.as_int() as u8;
     let len = 8;
     let valid = "01234567890-/";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0).await?;
+    let d = get_default_string(vm, &args[1]).await;
+    let output = vm
+        .icy_board_state
+        .input_string(
+            color.into(),
+            prompt,
+            len,
+            valid,
+            "",
+            d,
+            display_flags::NEWLINE | display_flags::UPCASE | display_flags::GUIDE,
+        )
+        .await?;
     // TODO: Date conversion
     vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
     Ok(())
 }
 
 pub async fn inputtime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let mut prompt = vm.eval_expr(&args[0]).await?.as_string();
-    if prompt.ends_with(TXT_STOPCHAR) {
-        prompt.pop();
-    }
-
+    let prompt = vm.eval_expr(&args[0]).await?.as_string();
     let color = vm.eval_expr(&args[2]).await?.as_int() as u8;
     let len = 8;
     let valid = "01234567890:";
-    let output = vm.icy_board_state.input_string(color.into(), prompt, len, valid, "", None, 0).await?;
+    let d = get_default_string(vm, &args[1]).await;
+    let output = vm
+        .icy_board_state
+        .input_string(
+            color.into(),
+            prompt,
+            len,
+            valid,
+            "",
+            d,
+            display_flags::NEWLINE | display_flags::UPCASE | display_flags::GUIDE,
+        )
+        .await?;
     // TODO: Time conversion
     vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
     Ok(())

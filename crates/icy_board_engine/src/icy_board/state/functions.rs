@@ -287,12 +287,14 @@ impl IcyBoardState {
         valid_mask: &str,
         help: &str,
         default_string: Option<String>,
-        display_flags: i32,
+        mut display_flags: i32,
     ) -> Res<String> {
         self.session.num_lines_printed = 0;
 
         let mut prompt = prompt;
+
         let display_question = if prompt.ends_with(TXT_STOPCHAR) {
+            display_flags &= !(display_flags::FIELDLEN | display_flags::GUIDE);
             prompt.pop();
             false
         } else {
