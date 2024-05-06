@@ -336,6 +336,14 @@ impl IcbTime {
     pub fn to_pcboard_time(&self) -> i32 {
         self.hour as i32 * 60 * 60 + self.minute as i32 * 60 + self.second as i32
     }
+
+    pub(crate) fn from_naive(date_time: NaiveDateTime) -> IcbTime {
+        IcbTime {
+            hour: date_time.hour() as u8,
+            minute: date_time.minute() as u8,
+            second: date_time.second() as u8,
+        }
+    }
 }
 
 impl fmt::Display for IcbTime {

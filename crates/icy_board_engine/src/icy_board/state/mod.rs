@@ -66,6 +66,7 @@ pub struct DisplayOptions {
     pub abort_printout: bool,
 
     pub display_text: bool,
+    pub show_on_screen: bool,
 }
 impl DisplayOptions {
     pub fn reset_printout(&mut self) {
@@ -83,6 +84,7 @@ impl Default for DisplayOptions {
             grapics_mode: GraphicsMode::Graphics,
             non_stop: false,
             display_text: true,
+            show_on_screen: true,
         }
     }
 }
@@ -132,6 +134,7 @@ pub struct Session {
     pub current_conference: Conference,
     pub caller_number: usize,
     pub is_local: bool,
+    pub paged_sysop: bool,
 
     pub login_date: DateTime<Local>,
 
@@ -248,6 +251,7 @@ impl Session {
             flagged_files: HashSet::new(),
             is_emsi_session: false,
             emsi: EmsiData::default(),
+            paged_sysop: false,
         }
     }
 
@@ -844,6 +848,7 @@ impl IcyBoardState {
     }
 
     pub async fn page_sysop(&mut self) -> Res<()> {
+        self.session.paged_sysop = true;
         self.display_text(IceText::Paging, display_flags::LFBEFORE).await?;
 
         for _i in 0..15 {
@@ -876,6 +881,7 @@ impl IcyBoardState {
     async fn chat(&mut self) -> Res<()> {
         self.display_text(IceText::SysopChatActive, display_flags::NEWLINE | display_flags::LFBEFORE)
             .await?;
+        self.session.paged_sysop = false;
 
         loop {
             let Some(ch) = self.get_char(TerminalTarget::Both).await? else {
@@ -1305,7 +1311,7 @@ impl IcyBoardState {
                 let x = self.user_screen.caret.get_position().x as usize;
                 if let Some(value) = param {
                     if let Ok(i) = value.parse::<usize>() {
-                        while result.len() + 1 < i - x {
+                        while result.len() + 1 < i.saturating_sub(x) {
                             result.push(' ');
                         }
                         return Some(result);

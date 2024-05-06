@@ -308,6 +308,7 @@ GOTO PAGE_SYSOP
     DISPFILE PPEPath() + "pagescr.pcb", GRAPH
     ANSIPOS 13, 10
     INTEGER REASON_LEN = 0
+    PAGEON
     LOOP 
       READ_KEY = InKey()
       IF READ_KEY = Chr(8) && REASON_LEN > 0 THEN
@@ -362,6 +363,7 @@ GOTO PAGE_SYSOP
     SysopUnavailable()
 
 :START_CHAT
+    PAGEOFF
     DisplayChatBackground()
     SYSOP_X = 4
     SYSOP_Y = 2

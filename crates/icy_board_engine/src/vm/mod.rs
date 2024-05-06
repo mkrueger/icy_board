@@ -198,7 +198,8 @@ impl<'a> VirtualMachine<'a> {
             .set_value(U_CMNT2, VariableValue::new_string(cur_user.sysop_comment.clone()));
         match &cur_user.password.password {
             Password::PlainText(pwd) => {
-                self.variable_table.set_value(U_PWD, VariableValue::new_string(pwd.clone()));
+                self.variable_table
+                    .set_value(U_PWD, VariableValue::new_string(pwd.clone().to_ascii_uppercase()));
             }
         }
 
@@ -522,6 +523,7 @@ impl<'a> VirtualMachine<'a> {
             let p = self.cur_ptr;
             self.cur_ptr += 1;
             let c = self.script.statements[p].command.clone();
+            // log::warn!("Running command: {:?}", c);
             self.execute_statement(&c).await?;
         }
         Ok(())

@@ -88,8 +88,6 @@ pub trait PCBoardIO: Send {
 
     fn fclose(&mut self, channel: usize) -> Res<()>;
 
-    fn file_exists(&self, file: &str) -> bool;
-
     /// .
     ///
     /// # Errors
@@ -380,10 +378,6 @@ impl PCBoardIO for DiskIO {
             }
         }
         Ok(())
-    }
-
-    fn file_exists(&self, file: &str) -> bool {
-        fs::metadata(file).is_ok()
     }
 
     fn get_file_date(&self, file: &str) -> Result<SystemTime> {

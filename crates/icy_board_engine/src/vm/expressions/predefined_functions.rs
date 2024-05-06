@@ -11,6 +11,7 @@ use crate::icy_board::state::GraphicsMode;
 use crate::parser::CONFERENCE_ID;
 use crate::vm::{TerminalTarget, VirtualMachine};
 use crate::Res;
+use chrono::Local;
 use codepages::tables::CP437_TO_UNICODE;
 use icy_engine::{update_crc32, Position, TextPane};
 use radix_fmt::radix;
@@ -396,53 +397,116 @@ pub async fn u_ldate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn u_ltime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    // TODO
-    Ok(VariableValue::new(VariableType::Time, VariableData::default()))
+    if let Some(user) = &vm.icy_board_state.current_user {
+        Ok(VariableValue::new(
+            VariableType::Time,
+            VariableData::from_int(IcbTime::from_naive(user.stats.last_on.naive_local()).to_pcboard_time()),
+        ))
+    } else {
+        Ok(VariableValue::new(VariableType::Time, VariableData::default()))
+    }
 }
 
 pub async fn u_ldir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO") // TODO
+    if let Some(user) = &vm.icy_board_state.current_user {
+        Ok(VariableValue::new(
+            VariableType::Time,
+            VariableData::from_int(IcbTime::from_naive(user.date_last_dir_read.naive_local()).to_pcboard_time()),
+        ))
+    } else {
+        Ok(VariableValue::new(VariableType::Time, VariableData::default()))
+    }
 }
 pub async fn u_lmr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO") // TODO
 }
 pub async fn u_logons(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO") // TODO
+    if let Some(user) = &vm.icy_board_state.current_user {
+        Ok(VariableValue::new(
+            VariableType::Integer,
+            VariableData::from_int(user.stats.num_times_on as i32),
+        ))
+    } else {
+        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+    }
 }
 pub async fn u_ful(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO") // TODO
+    if let Some(user) = &vm.icy_board_state.current_user {
+        Ok(VariableValue::new(VariableType::Integer, VariableData::from_int(user.stats.num_uploads as i32)))
+    } else {
+        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+    }
 }
 pub async fn u_fdl(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO") // TODO
+    if let Some(user) = &vm.icy_board_state.current_user {
+        Ok(VariableValue::new(
+            VariableType::Integer,
+            VariableData::from_int(user.stats.num_downloads as i32),
+        ))
+    } else {
+        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+    }
 }
 pub async fn u_bdlday(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO") // TODO
+    if let Some(user) = &vm.icy_board_state.current_user {
+        Ok(VariableValue::new(
+            VariableType::Integer,
+            VariableData::from_int(user.stats.today_dnld_bytes as i32),
+        ))
+    } else {
+        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+    }
 }
 pub async fn u_timeon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO") // TODO
+    if let Some(user) = &vm.icy_board_state.current_user {
+        Ok(VariableValue::new(
+            VariableType::Integer,
+            VariableData::from_int(0), // TODO: ON TIME COUNTER
+        ))
+    } else {
+        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+    }
 }
 pub async fn u_bdl(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO") // TODO
+    if let Some(user) = &vm.icy_board_state.current_user {
+        Ok(VariableValue::new(
+            VariableType::Integer,
+            VariableData::from_int(user.stats.total_dnld_bytes as i32),
+        ))
+    } else {
+        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+    }
 }
 pub async fn u_bul(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO") // TODO
+    if let Some(user) = &vm.icy_board_state.current_user {
+        Ok(VariableValue::new(
+            VariableType::Integer,
+            VariableData::from_int(user.stats.total_upld_bytes as i32),
+        ))
+    } else {
+        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+    }
 }
 pub async fn u_msgrd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO") // TODO
+    if let Some(user) = &vm.icy_board_state.current_user {
+        Ok(VariableValue::new(
+            VariableType::Integer,
+            VariableData::from_int(user.stats.messages_read as i32),
+        ))
+    } else {
+        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+    }
 }
 pub async fn u_msgwr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO") // TODO
+    if let Some(user) = &vm.icy_board_state.current_user {
+        Ok(VariableValue::new(
+            VariableType::Integer,
+            VariableData::from_int(user.stats.messages_left as i32),
+        ))
+    } else {
+        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+    }
 }
 
 pub async fn year(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -647,13 +711,14 @@ pub async fn gettoken(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     }
 }
 pub async fn minleft(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_int(vm.icy_board_state.session.minutes_left() as i32))
 }
+
 pub async fn minon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let min = (Local::now() - vm.icy_board_state.session.login_date).num_minutes();
+    Ok(VariableValue::new_int(min as i32))
 }
+
 pub async fn getenv(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let var = &vm.eval_expr(&args[0]).await?.as_string();
     if let Some(var) = vm.icy_board_state.get_env(var) {
@@ -757,7 +822,10 @@ pub async fn mkaddr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 }
 pub async fn exist(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let file_name = vm.eval_expr(&args[0]).await?.as_string();
-    Ok(VariableValue::new_bool(vm.io.file_exists(&file_name)))
+    log::warn!("1 exist: {}", file_name);
+    let file_name = vm.resolve_file(&file_name).await;
+    log::warn!("exist: {}", file_name.display());
+    Ok(VariableValue::new_bool(file_name.exists()))
 }
 
 /// Convert an integer to a string in a specified number base.
@@ -1064,12 +1132,10 @@ pub async fn scrtext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     Ok(VariableValue::new_string(res))
 }
 pub async fn showstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_bool(vm.icy_board_state.session.disp_options.show_on_screen))
 }
 pub async fn pagestat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_bool(vm.icy_board_state.session.paged_sysop))
 }
 pub async fn tobigstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::BigStr))
@@ -1114,9 +1180,10 @@ pub async fn toword(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Word))
 }
 pub async fn mixed(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let param = vm.eval_expr(&args[0]).await?.as_string();
+    Ok(VariableValue::new_string(fix_casing(param)))
 }
+
 pub async fn alias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_bool(vm.icy_board_state.session.use_alias))
 }
@@ -1214,12 +1281,12 @@ pub async fn kbdfilusued(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<V
     panic!("TODO")
 }
 pub async fn lomsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    log::error!("lomsgnum is deprecated!");
+    Ok(VariableValue::new_int(1))
 }
 pub async fn himsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    log::error!("himsgnum is deprecated!");
+    Ok(VariableValue::new_int(1))
 }
 
 pub async fn drivespace(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1675,4 +1742,72 @@ pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
 pub async fn setmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
+}
+
+/// Should be the same logic than the one in pcboard.
+fn fix_casing(param: String) -> String {
+    let mut res = String::new();
+    let mut first_char = true;
+    let mut param = param.to_ascii_lowercase().chars().collect::<Vec<char>>();
+    param.push(' ');
+    let mut i = 0;
+    while i < param.len() - 1 {
+        let mut ch = param[i];
+        if first_char {
+            if param[i..].starts_with(&['i', 'i', 'i', ' ']) {
+                res.push_str("III");
+                i += 3;
+                continue;
+            }
+
+            if param[i..].starts_with(&['i', 'i', ' ']) {
+                res.push_str("III");
+                i += 2;
+                continue;
+            }
+
+            if param[i..].starts_with(&['m', 'c']) {
+                res.push_str("Mc");
+                i += 2;
+                continue;
+            }
+
+            if param[i..].starts_with(&['v', 'o', 'n', ' ']) {
+                res.push_str("von");
+                i += 3;
+                continue;
+            }
+
+            if param[i..].starts_with(&['d', 'e', ' ']) {
+                res.push_str("de");
+                i += 2;
+                continue;
+            }
+            ch = ch.to_ascii_uppercase();
+            first_char = false;
+        } else {
+            ch = ch.to_ascii_lowercase();
+        }
+        if ch == ' ' {
+            first_char = true;
+        }
+        res.push(ch);
+        i += 1;
+    }
+    res
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fix_casing() {
+        assert_eq!(fix_casing("hello world".to_string()), "Hello World");
+        assert_eq!(fix_casing("HELLO WORLD".to_string()), "Hello World");
+        assert_eq!(fix_casing("cul de sac".to_string()), "Cul de Sac");
+        assert_eq!(fix_casing("freiherr von schaffhausen".to_string()), "Freiherr von Schaffhausen");
+        assert_eq!(fix_casing("henry iii".to_string()), "Henry III");
+        assert_eq!(fix_casing("mcdonald".to_string()), "McDonald");
+    }
 }
