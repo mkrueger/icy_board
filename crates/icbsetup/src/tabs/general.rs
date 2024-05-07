@@ -6,6 +6,7 @@ use icy_board_engine::icy_board::user_base::Password;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::config_menu::EditMode;
 use icy_board_tui::config_menu::Value;
+use icy_board_tui::tab_page::TabPage;
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
     theme::THEME,
@@ -16,8 +17,6 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Padding, Widget},
     Frame,
 };
-
-use super::TabPage;
 
 pub struct GeneralTab {
     pub state: ConfigMenuState,
@@ -611,6 +610,10 @@ impl GeneralTab {
 }
 
 impl TabPage for GeneralTab {
+    fn title(&self) -> String {
+        "General".to_string()
+    }
+
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         let area = area.inner(&Margin { horizontal: 2, vertical: 1 });
 

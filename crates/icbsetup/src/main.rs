@@ -1,4 +1,4 @@
-use app::App;
+use app::new_main_window;
 use argh::FromArgs;
 use color_eyre::Result;
 use create::IcyBoardCreator;
@@ -11,12 +11,12 @@ use std::{
     fs,
     path::PathBuf,
     process::{self, exit},
+    sync::{Arc, Mutex},
 };
 
 pub mod app;
 mod create;
 pub mod editors;
-pub mod help_view;
 mod import;
 pub mod tabs;
 
@@ -122,7 +122,12 @@ fn main() -> Result<()> {
     match IcyBoard::load(&file) {
         Ok(icy_board) => {
             let terminal = &mut term::init()?;
-            App::new(icy_board, file, arguments.full_screen).run(terminal)?;
+            let icy_board = Arc::new(Mutex::new(icy_board));
+            new_main_window(icy_board.clone(), arguments.full_screen).run(terminal)?;
+
+            if let Err(err) = icy_board.lock().unwrap().save() {
+                eprintln!("Error saving config: {}", err);
+            }
             term::restore()?;
             Ok(())
         }

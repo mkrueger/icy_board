@@ -1,329 +1,44 @@
-use core::panic;
-use std::{
-    path::PathBuf,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::sync::{Arc, Mutex};
 
-use chrono::{Local, Timelike};
-use color_eyre::{eyre::Context, Result};
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use icy_board_engine::icy_board::IcyBoard;
-use icy_board_tui::{config_menu::EditMode, term::next_event, theme::THEME, TerminalType};
-use itertools::Itertools;
-use ratatui::{prelude::*, widgets::*};
-use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
+use icy_board_tui::{
+    app::{App, Mode},
+    help_view::HelpViewState,
+};
 
 use crate::{
-    editors::{door::DoorEditor, Editor},
-    help_view::{HelpView, HelpViewState},
-    tabs::*,
+    editors::door::DoorEditor,
+    tabs::{AboutTab, ConferencesTab, GeneralTab, PathTab, ServerTab},
 };
 
-pub struct App<'a> {
-    mode: Mode,
-    tab: TabPageType,
-
-    icy_board: Arc<Mutex<IcyBoard>>,
-    _file: PathBuf,
-
-    status_line: String,
-    full_screen: bool,
-
-    general_tab: GeneralTab,
-    path_tab: PathTab<'a>,
-    server_tab: ServerTab,
-
-    conferences_tab: ConferencesTab,
-    about_tab: AboutTab,
-
-    help_state: HelpViewState<'a>,
-
-    cur_file_editor: Option<Box<dyn Editor>>,
-}
-
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-enum Mode {
-    #[default]
-    Command,
-    Quit,
-    ShowHelp,
-}
-
-#[derive(Debug, Clone, Copy, Default, Display, EnumIter, FromRepr, PartialEq, Eq)]
-enum TabPageType {
-    #[default]
-    System,
-    Paths,
-    Net,
-    Server,
-    Conferences,
-    About,
-}
-
-impl<'a> App<'a> {
-    pub fn new(icy_board: IcyBoard, file: PathBuf, full_screen: bool) -> Self {
-        let icy_board = Arc::new(Mutex::new(icy_board));
-        let general_tab = GeneralTab::new(icy_board.clone());
-        let server_tab = ServerTab::new(icy_board.clone());
-        let command_tab = ConferencesTab::new(icy_board.clone());
-        let path_tab = PathTab::new(icy_board.clone());
-        Self {
-            full_screen,
-            icy_board,
-            _file: file,
-            general_tab,
-            server_tab,
-            path_tab,
-            mode: Mode::default(),
-            tab: TabPageType::System,
-            conferences_tab: command_tab,
-            about_tab: AboutTab::default(),
-            status_line: String::new(),
-            help_state: HelpViewState::new(23),
-            cur_file_editor: None,
-        }
-    }
-
-    /// Run the app until the user quits.
-    pub fn run(&mut self, terminal: &mut TerminalType) -> Result<()> {
-        while self.is_running() {
-            self.draw(terminal)?;
-            self.handle_events(terminal)?;
-        }
-        if let Err(err) = self.icy_board.lock().unwrap().save() {
-            eprintln!("Error saving config: {}", err);
-        }
-        Ok(())
-    }
-
-    fn is_running(&self) -> bool {
-        self.mode != Mode::Quit
-    }
-
-    /// Draw a single frame of the app.
-    fn draw(&mut self, terminal: &mut TerminalType) -> Result<()> {
-        terminal
-            .draw(|frame| {
-                let screen = get_screen_size(&frame, self.full_screen);
-
-                if let Some(editor) = &mut self.cur_file_editor {
-                    editor.render(frame, screen);
-                    return;
-                }
-
-                self.ui(frame, screen);
-
-                match self.mode {
-                    Mode::ShowHelp => {
-                        self.show_help(frame, screen);
-                    }
-                    _ => {}
-                }
-            })
-            .wrap_err("terminal.draw")?;
-        Ok(())
-    }
-
-    /// Handle events from the terminal.
-    ///
-    /// This function is called once per frame, The events are polled from the stdin with timeout of
-    /// 1/50th of a second. This was chosen to try to match the default frame rate of a GIF in VHS.
-    fn handle_events(&mut self, terminal: &mut TerminalType) -> Result<()> {
-        let timeout = Duration::from_secs_f64(1.0);
-        match next_event(timeout)? {
-            Some(Event::Key(key)) if key.kind == KeyEventKind::Press => self.handle_key_press(terminal, key),
-            _ => {}
-        }
-        Ok(())
-    }
-
-    fn get_tab(&self) -> &dyn TabPage {
-        match self.tab {
-            TabPageType::System => &self.general_tab,
-            TabPageType::Paths => &self.path_tab,
-            TabPageType::Net => &self.general_tab,
-            TabPageType::Server => &self.server_tab,
-            TabPageType::Conferences => &self.conferences_tab,
-            TabPageType::About => &self.about_tab,
-        }
-    }
-
-    fn get_tab_mut(&mut self) -> &mut dyn TabPage {
-        match self.tab {
-            TabPageType::System => &mut self.general_tab,
-            TabPageType::Paths => &mut self.path_tab,
-            TabPageType::Net => &mut self.general_tab,
-            TabPageType::Server => &mut self.server_tab,
-            TabPageType::Conferences => &mut self.conferences_tab,
-            TabPageType::About => &mut self.about_tab,
-        }
-    }
-
-    fn handle_key_press(&mut self, _terminal: &mut TerminalType, key: KeyEvent) {
-        if let Some(editor) = &mut self.cur_file_editor {
-            if !editor.handle_key_press(key) {
-                self.cur_file_editor = None;
-            }
-            return;
-        }
-
-        if self.get_tab().has_control() {
-            let state = self.get_tab_mut().handle_key_press(key);
-            if let EditMode::Open(id, path) = &state.edit_mode {
-                match id.as_str() {
-                    "doors_file" => {
-                        self.cur_file_editor = Some(Box::new(DoorEditor::new(path).unwrap()));
-                    }
-                    _ => {
-                        panic!("Unknown id: {}", id);
-                    }
-                }
-            }
-
-            self.status_line = state.status_line;
-            return;
-        }
-
-        if self.mode == Mode::ShowHelp {
-            match key.code {
-                KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Command,
-                _ => {
-                    self.help_state.handle_key_press(key);
-                }
-            }
-            return;
-        }
-
-        match key.code {
-            KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Quit,
-            KeyCode::Char('h') | KeyCode::Left => self.prev_tab(),
-            KeyCode::Char('l') | KeyCode::Right => self.next_tab(),
-            KeyCode::F(1) => {
-                self.help_state.text = self.get_tab().get_help();
-                self.mode = Mode::ShowHelp;
+pub fn new_main_window<'a>(icy_board: Arc<Mutex<IcyBoard>>, full_screen: bool) -> App<'a> {
+    let general_tab = GeneralTab::new(icy_board.clone());
+    let server_tab = ServerTab::new(icy_board.clone());
+    let command_tab = ConferencesTab::new(icy_board.clone());
+    let path_tab = PathTab::new(icy_board.clone());
+    let date_format = icy_board.lock().unwrap().config.board.date_format.clone();
+    App {
+        full_screen,
+        mode: Mode::default(),
+        tab: 0,
+        date_format,
+        tabs: vec![
+            Box::new(general_tab),
+            Box::new(path_tab),
+            Box::new(server_tab),
+            Box::new(command_tab),
+            Box::new(AboutTab::default()),
+        ],
+        status_line: String::new(),
+        help_state: HelpViewState::new(23),
+        open_editor: None,
+        get_editor: Box::new(|id, path| match id {
+            "doors_file" => {
+                return Ok(Some(Box::new(DoorEditor::new(path).unwrap())));
             }
             _ => {
-                let state = self.get_tab_mut().handle_key_press(key);
-                self.status_line = state.status_line;
+                panic!("Unknown id: {}", id);
             }
-        };
-    }
-
-    fn prev_tab(&mut self) {
-        self.tab = self.tab.prev();
-        self.update_state();
-    }
-
-    fn next_tab(&mut self) {
-        self.tab = self.tab.next();
-        self.update_state();
-    }
-
-    fn ui(&mut self, frame: &mut Frame, area: Rect) {
-        let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1), Constraint::Length(1), Constraint::Length(1)]);
-        let [title_bar, tab, key_bar, status_line] = vertical.areas(area);
-
-        Block::new().style(THEME.title_bar).render(area, frame.buffer_mut());
-        self.render_title_bar(title_bar, frame.buffer_mut());
-        self.render_selected_tab(frame, tab);
-        App::render_key_help_view(key_bar, frame.buffer_mut());
-        self.render_status_line(status_line, frame.buffer_mut());
-    }
-
-    fn update_state(&mut self) {
-        let state = self.get_tab().request_status();
-        self.status_line = state.status_line;
-    }
-
-    fn show_help(&mut self, frame: &mut Frame, screen: Rect) {
-        let area = screen.inner(&Margin { horizontal: 2, vertical: 2 });
-        Clear.render(area, frame.buffer_mut());
-        HelpView::default().render(area, frame.buffer_mut(), &mut self.help_state);
-    }
-}
-
-impl<'a> App<'a> {
-    fn render_title_bar(&self, area: Rect, buf: &mut Buffer) {
-        let len: u16 = TabPageType::iter().map(|p| TabPageType::title(p).len() as u16).sum();
-        let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(len)]);
-        let [title, tabs] = layout.areas(area);
-
-        Span::styled(format!(" IcyBoard Setup Utility"), THEME.app_title).render(title, buf);
-        let titles = TabPageType::iter().map(TabPageType::title);
-        Tabs::new(titles)
-            .style(THEME.tabs)
-            .highlight_style(THEME.tabs_selected)
-            .select(self.tab as usize)
-            .divider("")
-            .padding("", "")
-            .render(tabs, buf);
-    }
-
-    fn render_selected_tab(&mut self, frame: &mut Frame, area: Rect) {
-        icy_board_tui::colors::RgbSwatch.render(area, frame.buffer_mut());
-        self.get_tab_mut().render(frame, area);
-    }
-
-    fn render_key_help_view(area: Rect, buf: &mut Buffer) {
-        let keys = [("H/←", "Left"), ("L/→", "Right"), ("K/↑", "Up"), ("J/↓", "Down"), ("Q/Esc", "Quit")];
-        let spans = keys
-            .iter()
-            .flat_map(|(key, desc)| {
-                let key = Span::styled(format!(" {key} "), THEME.key_binding);
-                let desc = Span::styled(format!(" {desc} "), THEME.key_binding_description);
-                [key, desc]
-            })
-            .collect_vec();
-        Line::from(spans).centered().style((Color::Indexed(236), Color::Indexed(232))).render(area, buf);
-    }
-
-    fn render_status_line(&self, area: Rect, buf: &mut Buffer) {
-        let now = Local::now();
-        let time_status = format!(
-            " {} {} |",
-            now.time().with_nanosecond(0).unwrap(),
-            now.date_naive().format(&self.icy_board.lock().unwrap().config.board.date_format)
-        );
-        let time_len = time_status.len() as u16;
-        Line::from(time_status).left_aligned().style(THEME.status_line).render(area, buf);
-        let mut area = area;
-        area.x += time_len + 1;
-        area.width -= time_len + 1;
-        Line::from(self.status_line.clone())
-            .left_aligned()
-            .style(THEME.status_line_text)
-            .render(area, buf);
-    }
-}
-
-impl TabPageType {
-    fn next(self) -> Self {
-        let current_index = self as usize;
-        let next_index = current_index.saturating_add(1);
-        Self::from_repr(next_index).unwrap_or(self)
-    }
-
-    fn prev(self) -> Self {
-        let current_index = self as usize;
-        let prev_index = current_index.saturating_sub(1);
-        Self::from_repr(prev_index).unwrap_or(self)
-    }
-
-    fn title(self) -> String {
-        format!(" {self} ")
-    }
-}
-
-pub fn get_screen_size(frame: &Frame, is_full_screen: bool) -> Rect {
-    if is_full_screen {
-        frame.size()
-    } else {
-        let width = frame.size().width.min(80);
-        let height = frame.size().height.min(25);
-
-        let x = frame.size().x + (frame.size().width - width) / 2;
-        let y = frame.size().y + (frame.size().height - height) / 2;
-        Rect::new(frame.size().x + x, frame.size().y + y, width, height)
+        }),
     }
 }

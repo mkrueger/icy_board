@@ -1,5 +1,4 @@
 use crossterm::event::{KeyCode, KeyEvent};
-use icy_board_tui::theme::THEME;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
@@ -10,6 +9,8 @@ use ratatui::{
     prelude::*,
     widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
 };
+
+use crate::theme::THEME;
 
 /// necessary as ScrollbarState fields are private
 #[derive(Debug, Default)]

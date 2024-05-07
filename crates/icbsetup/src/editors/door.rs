@@ -7,10 +7,11 @@ use icy_board_engine::{
     },
     Res,
 };
-use icy_board_tui::config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue};
+use icy_board_tui::{
+    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
+    tab_page::Editor,
+};
 use ratatui::{layout::Rect, Frame};
-
-use super::Editor;
 
 pub struct DoorEditor {
     path: std::path::PathBuf,

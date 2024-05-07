@@ -5,7 +5,10 @@ use crate::{
     executable::{PPEExpr, VariableType, VariableValue},
     icy_board::{
         icb_config::IcbColor,
-        state::{functions::{display_flags, MASK_ALNUM}, GraphicsMode},
+        state::{
+            functions::{display_flags, MASK_ALNUM},
+            GraphicsMode,
+        },
     },
     Res,
 };
@@ -958,7 +961,7 @@ pub async fn fread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 async fn internal_fread(vm: &mut VirtualMachine<'_>, channel: usize, size: usize, arg: &PPEExpr) -> Res<()> {
     let val = vm.eval_expr(&arg).await?;
-    
+
     let result = vm.io.fread(channel, size).map_err(|e| {
         log::error!("fread error: {} ({})", e, channel);
         e
@@ -1027,7 +1030,7 @@ pub async fn fwrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 async fn internal_fwrite(vm: &mut VirtualMachine<'_>, channel: usize, val: VariableValue, size: usize) -> Res<()> {
-        let mut v = match val.get_type() {
+    let mut v = match val.get_type() {
         VariableType::String | VariableType::BigStr => val.as_string().as_bytes().to_vec(),
         VariableType::Boolean => {
             if val.as_bool() {
@@ -1179,7 +1182,6 @@ pub async fn download(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     panic!("TODO")
 }
 
-
 pub async fn getaltuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let user_record = vm.eval_expr(&args[0]).await?.as_int() as usize;
     if user_record >= vm.icy_board_state.get_board().await.users.len() {
@@ -1279,14 +1281,14 @@ pub async fn sort(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 pub async fn mousereg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     // RIP ONLY
-    // num    = Is the RIP region number  
-    // x1,y1  = The (X,Y) coordinates of the upper-left of the region  
-    // x2,y2  = The (X,Y) coordinates of the lower-right of the region  
-    // fontX  = The width of each character in pixels  
-    // fontY  = The height of each character in pixels  
-    // invert = A boolean flag (TRUE to invert the region when clicked)  
-    // clear  = A boolean flag (TRUE to clear and full screen the text window)  
-    // text   = Text that the remote terminal should transmit when the region is clicked  
+    // num    = Is the RIP region number
+    // x1,y1  = The (X,Y) coordinates of the upper-left of the region
+    // x2,y2  = The (X,Y) coordinates of the lower-right of the region
+    // fontX  = The width of each character in pixels
+    // fontY  = The height of each character in pixels
+    // invert = A boolean flag (TRUE to invert the region when clicked)
+    // clear  = A boolean flag (TRUE to clear and full screen the text window)
+    // text   = Text that the remote terminal should transmit when the region is clicked
     log::error!("mousereg not implemented statement!");
     panic!("TODO")
 }
@@ -1568,16 +1570,17 @@ pub async fn grafmode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
             // In PCBoard 1) turns graphics on but checks for ANSI
             vm.icy_board_state.session.disp_options.grapics_mode = GraphicsMode::Graphics;
         }
-        3 => { 
+        3 => {
             vm.icy_board_state.session.disp_options.grapics_mode = GraphicsMode::Ansi;
         }
-        4 => { 
+        4 => {
             vm.icy_board_state.session.disp_options.grapics_mode = GraphicsMode::Ctty;
         }
-        5 => { 
+        5 => {
             vm.icy_board_state.session.disp_options.grapics_mode = GraphicsMode::Rip;
         }
-        6 => { // 6 is new for IcyBoard
+        6 => {
+            // 6 is new for IcyBoard
             vm.icy_board_state.session.disp_options.grapics_mode = GraphicsMode::Avatar;
         }
         _ => {

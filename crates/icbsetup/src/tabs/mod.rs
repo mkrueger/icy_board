@@ -1,9 +1,7 @@
 pub mod about;
-
 pub use about::*;
 
 pub mod general;
-use crossterm::event::KeyEvent;
 pub use general::*;
 
 pub mod conferences;
@@ -14,29 +12,3 @@ pub use paths::*;
 
 pub mod server_tab;
 pub use server_tab::*;
-
-use icy_board_tui::config_menu::ResultState;
-use ratatui::{layout::Rect, text::Text, Frame};
-
-pub trait TabPage {
-    fn render(&mut self, frame: &mut Frame, area: Rect);
-
-    fn handle_key_press(&mut self, _key: KeyEvent) -> ResultState {
-        ResultState::default()
-    }
-
-    fn request_status(&self) -> ResultState {
-        ResultState::default()
-    }
-
-    fn set_cursor_position(&self, _frame: &mut Frame) {}
-
-    fn has_control(&self) -> bool {
-        false
-    }
-
-    fn get_help(&self) -> Text<'static> {
-        let input = include_str!("../../data/general_help.md");
-        tui_markdown::from_str(input)
-    }
-}

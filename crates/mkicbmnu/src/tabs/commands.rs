@@ -1,16 +1,14 @@
 use std::sync::Arc;
 
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::icy_board::menu::Menu;
-use icy_board_tui::{theme::THEME, TerminalType};
+use icy_board_tui::{config_menu::ResultState, theme::THEME};
 use ratatui::{
     layout::{Constraint, Margin, Rect},
     text::Text,
     widgets::{Cell, Clear, HighlightSpacing, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState, Widget},
     Frame,
 };
-
-use crate::{app::ResultState, edit_command_dialog::EditCommandDialog};
 
 use super::TabPage;
 
@@ -19,6 +17,7 @@ pub struct CommandsTab {
     scroll_state: ScrollbarState,
     table_state: TableState,
     commands: Vec<icy_board_engine::icy_board::commands::Command>,
+    in_edit_mode: bool,
 }
 
 impl CommandsTab {
@@ -27,6 +26,7 @@ impl CommandsTab {
             scroll_state: ScrollbarState::default().content_length(menu.commands.len()),
             table_state: TableState::default(),
             commands: menu.commands.clone(),
+            in_edit_mode: false,
         }
     }
 
@@ -129,20 +129,47 @@ impl TabPage for CommandsTab {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
+        /*   if self.in_edit_mode {
+            match key.code {
+                KeyCode::Esc => {
+                    self.in_edit_mode = false;
+                    self.write_config();
+                    return ResultState::default();
+                }
+                KeyCode::F(2) => {
+                    if let Some(item) = self.conference_config.get_item(self.state.selected) {
+                        if item.id == "doors_file" {
+                            if let ListValue::Path(path) = &item.value {
+                                let path = self.icy_board.lock().unwrap().resolve_file(path);
+                                return ResultState {
+                                    edit_mode: EditMode::Open("doors_file".to_string(), path.clone()),
+                                    status_line: String::new(),
+                                };
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    self.conference_config.handle_key_press(key, &mut self.state);
+                }
+            }
+            return ResultState::status_line(String::new());
+        }*/
         match key.code {
-            crossterm::event::KeyCode::Char('k') | crossterm::event::KeyCode::Up => self.prev(),
-            crossterm::event::KeyCode::Char('j') | crossterm::event::KeyCode::Down => self.next(),
-            crossterm::event::KeyCode::Char('i') | crossterm::event::KeyCode::Insert => self.insert(),
+            KeyCode::Char('k') | KeyCode::Up => self.prev(),
+            KeyCode::Char('j') | KeyCode::Down => self.next(),
+            KeyCode::Char('i') | KeyCode::Insert => self.insert(),
+            // KeyCode::Char('r') | KeyCode::Delete => self.remove(),
+            KeyCode::Char('d') | KeyCode::Enter => {
+                if let Some(state) = self.table_state.selected() {
+                    self.in_edit_mode = true;
+                    //self.open_editor(state);
+                    return ResultState::status_line(String::new());
+                } else {
+                    self.in_edit_mode = false;
+                }
+            }
             _ => {}
-        }
-
-        ResultState::default()
-    }
-
-    fn request_edit_mode(&mut self, terminal: &mut TerminalType, full_screen: bool) -> ResultState {
-        if let Some(sel) = self.table_state.selected() {
-            let cmd = &self.commands[sel];
-            EditCommandDialog::new(cmd.clone(), full_screen).run(terminal).unwrap();
         }
         ResultState::default()
     }

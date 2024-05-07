@@ -12,6 +12,7 @@ use icy_board_tui::config_menu::ConfigMenuState;
 use icy_board_tui::config_menu::EditMode;
 use icy_board_tui::config_menu::ListItem;
 use icy_board_tui::config_menu::ListValue;
+use icy_board_tui::tab_page::TabPage;
 use icy_board_tui::{config_menu::ResultState, theme::THEME};
 use ratatui::{
     layout::{Constraint, Margin, Rect},
@@ -19,8 +20,6 @@ use ratatui::{
     widgets::{Cell, Clear, HighlightSpacing, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState, Widget},
     Frame,
 };
-
-use super::TabPage;
 
 pub struct ConferencesTab {
     scroll_state: ScrollbarState,
@@ -314,6 +313,9 @@ impl ConferencesTab {
 }
 
 impl TabPage for ConferencesTab {
+    fn title(&self) -> String {
+        "Conferences".to_string()
+    }
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         let area = area.inner(&Margin { vertical: 1, horizontal: 2 });
         Clear.render(area, frame.buffer_mut());

@@ -1,16 +1,7 @@
-pub mod about;
-
-pub use about::*;
-
-pub mod general;
 use crossterm::event::KeyEvent;
-pub use general::*;
-
-pub mod commands;
-pub use commands::*;
-
-use icy_board_tui::{config_menu::ResultState, TerminalType};
 use ratatui::{layout::Rect, text::Text, Frame};
+
+use crate::config_menu::ResultState;
 
 pub trait TabPage {
     fn render(&mut self, frame: &mut Frame, area: Rect);
@@ -29,7 +20,14 @@ pub trait TabPage {
         false
     }
 
+    fn title(&self) -> String;
+
     fn get_help(&self) -> Text<'static> {
         Text::from("")
     }
+}
+
+pub trait Editor {
+    fn render(&mut self, frame: &mut Frame, area: Rect);
+    fn handle_key_press(&mut self, _key: KeyEvent) -> bool;
 }

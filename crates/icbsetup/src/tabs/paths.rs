@@ -1,4 +1,5 @@
 use icy_board_tui::config_menu::EditMode;
+use icy_board_tui::tab_page::TabPage;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -16,8 +17,6 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Padding, Widget},
     Frame,
 };
-
-use super::TabPage;
 
 pub struct PathTab<'a> {
     pub state: ConfigMenuState,
@@ -364,6 +363,9 @@ impl<'a> PathTab<'a> {
 }
 
 impl<'a> TabPage for PathTab<'a> {
+    fn title(&self) -> String {
+        "Paths".to_string()
+    }
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         let area = area.inner(&Margin { horizontal: 2, vertical: 1 });
         Clear.render(area, frame.buffer_mut());

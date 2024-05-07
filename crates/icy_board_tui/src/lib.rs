@@ -5,8 +5,11 @@ use crossterm::{
     style::{Attribute, Color, Print, SetAttribute, SetForegroundColor},
 };
 
+pub mod app;
 pub mod colors;
 pub mod config_menu;
+pub mod help_view;
+pub mod tab_page;
 pub mod term;
 pub mod text_field;
 pub mod theme;

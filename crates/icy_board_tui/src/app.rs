@@ -1,65 +1,43 @@
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{path::PathBuf, time::Duration};
 
 use chrono::{Local, Timelike};
 use color_eyre::{eyre::Context, Result};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
-use icy_board_engine::icy_board::menu::Menu;
-use icy_board_tui::{term::next_event, theme::THEME, TerminalType};
-use itertools::Itertools;
+
 use ratatui::{prelude::*, widgets::*};
-use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 
-use crate::tabs::*;
+use crate::{
+    colors::RgbSwatch,
+    config_menu::EditMode,
+    help_view::{HelpView, HelpViewState},
+    tab_page::{Editor, TabPage},
+    term::next_event,
+    theme::THEME,
+    TerminalType,
+};
 
-pub struct App {
-    mode: Mode,
-    tab: TabPageType,
+pub struct App<'a> {
+    pub mode: Mode,
+    pub tab: usize,
+    pub status_line: String,
+    pub full_screen: bool,
+    pub date_format: String,
 
-    file: PathBuf,
-
-    cursor: Option<(u16, u16)>,
-    status_line: String,
-    full_screen: bool,
-
-    general_tab: GeneralTab,
-    command_tab: CommandsTab,
-    about_tab: AboutTab,
+    pub tabs: Vec<Box<dyn TabPage>>,
+    pub help_state: HelpViewState<'a>,
+    pub open_editor: Option<Box<dyn Editor>>,
+    pub get_editor: Box<dyn Fn(&str, &PathBuf) -> Result<Option<Box<dyn Editor>>>>,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-enum Mode {
+pub enum Mode {
     #[default]
     Command,
-    Edit,
     Quit,
+    ShowHelp,
 }
 
-#[derive(Debug, Clone, Copy, Default, Display, EnumIter, FromRepr, PartialEq, Eq)]
-enum TabPageType {
-    #[default]
-    General,
-    Commands,
-    About,
-}
-
-impl App {
-    pub fn new(mnu: Menu, file: PathBuf, full_screen: bool) -> Self {
-        let mnu = Arc::new(mnu);
-        let general_tab = GeneralTab::new(mnu.clone());
-        let command_tab = CommandsTab::new(mnu.clone());
-        Self {
-            full_screen,
-            file,
-            general_tab,
-            cursor: None,
-            mode: Mode::default(),
-            tab: TabPageType::General,
-            command_tab,
-            about_tab: AboutTab::default(),
-            status_line: String::new(),
-        }
-    }
-
+impl<'a> App<'a> {
     /// Run the app until the user quits.
     pub fn run(&mut self, terminal: &mut TerminalType) -> Result<()> {
         while self.is_running() {
@@ -78,10 +56,19 @@ impl App {
         terminal
             .draw(|frame| {
                 let screen = get_screen_size(&frame, self.full_screen);
+
+                if let Some(editor) = &mut self.open_editor {
+                    editor.render(frame, screen);
+                    return;
+                }
+
                 self.ui(frame, screen);
 
-                if let Some((x, y)) = self.cursor {
-                    frame.set_cursor(x, y);
+                match self.mode {
+                    Mode::ShowHelp => {
+                        self.show_help(frame, screen);
+                    }
+                    _ => {}
                 }
             })
             .wrap_err("terminal.draw")?;
@@ -102,26 +89,17 @@ impl App {
     }
 
     fn get_tab(&self) -> &dyn TabPage {
-        match self.tab {
-            TabPageType::General => &self.general_tab,
-            TabPageType::Commands => &self.command_tab,
-            TabPageType::About => &self.about_tab,
-        }
+        self.tabs[self.tab].as_ref()
     }
 
     fn get_tab_mut(&mut self) -> &mut dyn TabPage {
-        match self.tab {
-            TabPageType::General => &mut self.general_tab,
-            TabPageType::Commands => &mut self.command_tab,
-            TabPageType::About => &mut self.about_tab,
-        }
+        self.tabs[self.tab].as_mut()
     }
 
     fn handle_key_press(&mut self, _terminal: &mut TerminalType, key: KeyEvent) {
-        /*
-        if let Some(editor) = &mut self.cur_file_editor {
+        if let Some(editor) = &mut self.open_editor {
             if !editor.handle_key_press(key) {
-                self.cur_file_editor = None;
+                self.open_editor = None;
             }
             return;
         }
@@ -129,13 +107,8 @@ impl App {
         if self.get_tab().has_control() {
             let state = self.get_tab_mut().handle_key_press(key);
             if let EditMode::Open(id, path) = &state.edit_mode {
-                match id.as_str() {
-                    "doors_file" => {
-                        self.cur_file_editor = Some(Box::new(DoorEditor::new(path).unwrap()));
-                    }
-                    _ => {
-                        panic!("Unknown id: {}", id);
-                    }
+                if let Ok(res) = (*self.get_editor)(id, path) {
+                    self.open_editor = res;
                 }
             }
 
@@ -151,16 +124,16 @@ impl App {
                 }
             }
             return;
-        }*/
+        }
 
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Quit,
             KeyCode::Char('h') | KeyCode::Left => self.prev_tab(),
             KeyCode::Char('l') | KeyCode::Right => self.next_tab(),
-            /*    KeyCode::F(1) => {
+            KeyCode::F(1) => {
                 self.help_state.text = self.get_tab().get_help();
                 self.mode = Mode::ShowHelp;
-            }*/
+            }
             _ => {
                 let state = self.get_tab_mut().handle_key_press(key);
                 self.status_line = state.status_line;
@@ -169,12 +142,12 @@ impl App {
     }
 
     fn prev_tab(&mut self) {
-        self.tab = self.tab.prev();
+        self.tab = self.tab.saturating_sub(1);
         self.update_state();
     }
 
     fn next_tab(&mut self) {
-        self.tab = self.tab.next();
+        self.tab = (self.tab + 1).min(self.tabs.len() - 1);
         self.update_state();
     }
 
@@ -193,20 +166,30 @@ impl App {
         let state = self.get_tab().request_status();
         self.status_line = state.status_line;
     }
+
+    fn show_help(&mut self, frame: &mut Frame, screen: Rect) {
+        let area = screen.inner(&Margin { horizontal: 2, vertical: 2 });
+        Clear.render(area, frame.buffer_mut());
+        HelpView::default().render(area, frame.buffer_mut(), &mut self.help_state);
+    }
 }
 
-impl App {
+impl<'a> App<'a> {
     fn render_title_bar(&self, area: Rect, buf: &mut Buffer) {
-        let len: u16 = TabPageType::iter().map(|p| TabPageType::title(p).len() as u16).sum();
-        let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(len)]);
+        let len: u16 = self.tabs.iter().map(|t| t.title().len() as u16 + 1).sum();
+        let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(1 + len)]);
         let [title, tabs] = layout.areas(area);
 
-        Span::styled(
-            format!(" MNU File Editor ({})", self.file.file_name().unwrap().to_string_lossy()),
-            THEME.app_title,
-        )
-        .render(title, buf);
-        let titles = TabPageType::iter().map(TabPageType::title);
+        Span::styled(format!(" IcyBoard Setup Utility"), THEME.app_title).render(title, buf);
+        let titles = self.tabs.iter().enumerate().map(|(i, t)| {
+            if i == self.tab {
+                format!(" {} ", t.title())
+            } else if i == self.tab + 1 {
+                format!("{}", t.title())
+            } else {
+                format!(" {}", t.title())
+            }
+        });
         Tabs::new(titles)
             .style(THEME.tabs)
             .highlight_style(THEME.tabs_selected)
@@ -217,7 +200,7 @@ impl App {
     }
 
     fn render_selected_tab(&mut self, frame: &mut Frame, area: Rect) {
-        icy_board_tui::colors::RgbSwatch.render(area, frame.buffer_mut());
+        RgbSwatch.render(area, frame.buffer_mut());
         self.get_tab_mut().render(frame, area);
     }
 
@@ -230,13 +213,13 @@ impl App {
                 let desc = Span::styled(format!(" {desc} "), THEME.key_binding_description);
                 [key, desc]
             })
-            .collect_vec();
+            .collect::<Vec<Span>>();
         Line::from(spans).centered().style((Color::Indexed(236), Color::Indexed(232))).render(area, buf);
     }
 
     fn render_status_line(&self, area: Rect, buf: &mut Buffer) {
         let now = Local::now();
-        let time_status = format!(" {} {} |", now.time().with_nanosecond(0).unwrap(), now.date_naive().format("%m-%d-%y"));
+        let time_status = format!(" {} {} |", now.time().with_nanosecond(0).unwrap(), now.date_naive().format(&self.date_format));
         let time_len = time_status.len() as u16;
         Line::from(time_status).left_aligned().style(THEME.status_line).render(area, buf);
         let mut area = area;
@@ -246,24 +229,6 @@ impl App {
             .left_aligned()
             .style(THEME.status_line_text)
             .render(area, buf);
-    }
-}
-
-impl TabPageType {
-    fn next(self) -> Self {
-        let current_index = self as usize;
-        let next_index = current_index.saturating_add(1);
-        Self::from_repr(next_index).unwrap_or(self)
-    }
-
-    fn prev(self) -> Self {
-        let current_index = self as usize;
-        let prev_index = current_index.saturating_sub(1);
-        Self::from_repr(prev_index).unwrap_or(self)
-    }
-
-    fn title(self) -> String {
-        format!(" {self} ")
     }
 }
 
