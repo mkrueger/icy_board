@@ -3,7 +3,7 @@ use std::{io, time::Duration};
 use color_eyre::{eyre::Context, Result};
 use crossterm::event::{Event, KeyCode};
 use icy_board_engine::icy_board::commands::Command;
-use icy_board_tui::{term::next_event, theme::THEME, TerminalType};
+use icy_board_tui::{app::get_screen_size, term::next_event, theme::THEME, TerminalType};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Alignment, Rect},
@@ -50,7 +50,7 @@ impl EditCommandDialog {
     fn draw(&self, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> {
         terminal
             .draw(|frame| {
-                let screen = crate::app::get_screen_size(frame, self.is_full_screen);
+                let screen = get_screen_size(frame, self.is_full_screen);
                 self.ui(frame, screen);
             })
             .wrap_err("terminal.draw")?;

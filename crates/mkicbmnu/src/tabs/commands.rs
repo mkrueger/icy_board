@@ -1,16 +1,14 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::icy_board::menu::Menu;
-use icy_board_tui::{config_menu::ResultState, theme::THEME};
+use icy_board_tui::{config_menu::ResultState, tab_page::TabPage, theme::THEME};
 use ratatui::{
     layout::{Constraint, Margin, Rect},
     text::Text,
     widgets::{Cell, Clear, HighlightSpacing, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState, Widget},
     Frame,
 };
-
-use super::TabPage;
 
 #[derive(Clone, PartialEq)]
 pub struct CommandsTab {
@@ -21,11 +19,12 @@ pub struct CommandsTab {
 }
 
 impl CommandsTab {
-    pub fn new(menu: Arc<Menu>) -> Self {
+    pub fn new(menu: Arc<Mutex<Menu>>) -> Self {
+        let mnu = menu.lock().unwrap();
         Self {
-            scroll_state: ScrollbarState::default().content_length(menu.commands.len()),
+            scroll_state: ScrollbarState::default().content_length(mnu.commands.len()),
             table_state: TableState::default(),
-            commands: menu.commands.clone(),
+            commands: mnu.commands.clone(),
             in_edit_mode: false,
         }
     }
@@ -121,6 +120,10 @@ impl CommandsTab {
 }
 
 impl TabPage for CommandsTab {
+    fn title(&self) -> String {
+        "Commands".to_string()
+    }
+
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         let area = area.inner(&Margin { vertical: 2, horizontal: 2 });
         Clear.render(area, frame.buffer_mut());
@@ -161,7 +164,7 @@ impl TabPage for CommandsTab {
             KeyCode::Char('i') | KeyCode::Insert => self.insert(),
             // KeyCode::Char('r') | KeyCode::Delete => self.remove(),
             KeyCode::Char('d') | KeyCode::Enter => {
-                if let Some(state) = self.table_state.selected() {
+                if let Some(_state) = self.table_state.selected() {
                     self.in_edit_mode = true;
                     //self.open_editor(state);
                     return ResultState::status_line(String::new());

@@ -1,5 +1,7 @@
-use super::TabPage;
-use icy_board_tui::theme::{DOS_LIGHT_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE, THEME};
+use icy_board_tui::{
+    tab_page::TabPage,
+    theme::{DOS_LIGHT_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE, THEME},
+};
 use ratatui::{
     layout::{Margin, Rect},
     style::Style,
@@ -47,6 +49,9 @@ impl IceText {
 }
 
 impl TabPage for AboutTab {
+    fn title(&self) -> String {
+        "About".to_string()
+    }
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         let text = vec![
             format!("mkicbmnu Configuration Utility v{}", crate::VERSION.to_string()),

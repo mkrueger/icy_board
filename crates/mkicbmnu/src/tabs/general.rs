@@ -1,9 +1,10 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::menu::Menu;
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, EditMode, ListItem, ListValue, ResultState},
+    tab_page::TabPage,
     theme::THEME,
 };
 use ratatui::{
@@ -12,45 +13,57 @@ use ratatui::{
     Frame,
 };
 
-use crate::TabPage;
-
 pub struct GeneralTab {
     state: ConfigMenuState,
     config: ConfigMenu,
 }
 
 impl GeneralTab {
-    pub fn new(menu: Arc<Menu>) -> Self {
+    pub fn new(menu: Arc<Mutex<Menu>>) -> Self {
+        let mnu = menu.lock().unwrap();
+        let info_width = 16;
+
         let items = vec![
-            ConfigEntry::Item(ListItem::new("title", "Title".to_string(), ListValue::Text(25, menu.title.clone()))),
-            ConfigEntry::Item(ListItem::new(
-                "display_file",
-                "Display File".to_string(),
-                ListValue::Text(25, menu.display_file.to_string_lossy().to_string()),
-            )),
-            ConfigEntry::Item(ListItem::new("help_file", "Help File".to_string(), ListValue::Path(menu.help_file.clone()))),
-            ConfigEntry::Item(ListItem::new("prompt", "Prompt".to_string(), ListValue::Text(25, menu.prompt.clone()))),
+            ConfigEntry::Item(
+                ListItem::new("title", "Title".to_string(), ListValue::Text(25, mnu.title.clone()))
+                    .with_status("Enter the title of the menu.")
+                    .with_label_width(info_width),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "display_file",
+                    "Display File".to_string(),
+                    ListValue::Text(25, mnu.display_file.to_string_lossy().to_string()),
+                )
+                .with_status("The menu background file to display.")
+                .with_label_width(info_width),
+            ),
+            ConfigEntry::Item(
+                ListItem::new("help_file", "Help File".to_string(), ListValue::Path(mnu.help_file.clone()))
+                    .with_status("The help file to display.")
+                    .with_label_width(info_width),
+            ),
+            ConfigEntry::Item(
+                ListItem::new("prompt", "Prompt".to_string(), ListValue::Text(25, mnu.prompt.clone()))
+                    .with_status("The prompt for the menu.")
+                    .with_label_width(info_width),
+            ),
         ];
 
         Self {
             state: ConfigMenuState::default(),
             config: ConfigMenu {
-                items: vec![ConfigEntry::Group("Switches".to_string(), items)],
+                items: vec![ConfigEntry::Group(String::new(), items)],
             },
         }
-    }
-    fn prev(&mut self) {
-        let selected = self.state.selected;
-        self.state.selected = (selected + 3) % 4;
-    }
-
-    fn next(&mut self) {
-        let selected = self.state.selected;
-        self.state.selected = (selected + 1) % 4;
     }
 }
 
 impl TabPage for GeneralTab {
+    fn title(&self) -> String {
+        "General".to_string()
+    }
+
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         let width = (2 + 50 + 2).min(area.width) as u16;
 

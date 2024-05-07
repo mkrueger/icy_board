@@ -480,19 +480,21 @@ impl ConfigMenu {
                     *i += 1;
                 }
                 ConfigEntry::Group(title, items) => {
-                    if *y >= state.first_row && *y < area.height + state.first_row {
-                        let left_area = Rect {
-                            x: area.x + *x,
-                            y: area.y + *y - state.first_row,
-                            width: area.width - *x - 1,
-                            height: 1,
-                        };
-                        Text::from(format!(" {}", title.clone()))
-                            .alignment(ratatui::layout::Alignment::Left)
-                            .style(THEME.config_title.italic())
-                            .render(left_area, frame.buffer_mut());
+                    if !title.is_empty() {
+                        if *y >= state.first_row && *y < area.height + state.first_row {
+                            let left_area = Rect {
+                                x: area.x + *x,
+                                y: area.y + *y - state.first_row,
+                                width: area.width - *x - 1,
+                                height: 1,
+                            };
+                            Text::from(format!(" {}", title.clone()))
+                                .alignment(ratatui::layout::Alignment::Left)
+                                .style(THEME.config_title.italic())
+                                .render(left_area, frame.buffer_mut());
+                        }
+                        *y += 1;
                     }
-                    *y += 1;
                     Self::display_list(i, items, area, y, x, frame, state);
                 }
                 ConfigEntry::Table(_cols, items) => {

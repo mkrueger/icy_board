@@ -1,10 +1,15 @@
-use app::App;
+use app::new_main_window;
 use argh::FromArgs;
 use color_eyre::Result;
 use icy_board_engine::icy_board::{menu::Menu, IcyBoardSerializer};
 use icy_board_tui::{get_text_args, print_error, term};
 use semver::Version;
-use std::{collections::HashMap, path::PathBuf, process::exit};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    process::exit,
+    sync::{Arc, Mutex},
+};
 
 mod app;
 
@@ -55,7 +60,8 @@ fn main() -> Result<()> {
             mnu.help_file = PathBuf::from("help.txt");
             mnu.prompt = "Enter selection: ".to_string();
             let terminal = &mut term::init()?;
-            App::new(mnu, file, arguments.full_screen).run(terminal)?;
+            let mnu = Arc::new(Mutex::new(mnu));
+            new_main_window(mnu, arguments.full_screen).run(terminal)?;
             term::restore()?;
             Ok(())
         }
