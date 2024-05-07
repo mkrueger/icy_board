@@ -195,6 +195,8 @@ pub struct Session {
 
     pub is_emsi_session: bool,
     pub emsi: EmsiData,
+
+    pub bytes_remaining: i64
 }
 
 #[derive(Clone, Default)]
@@ -252,6 +254,7 @@ impl Session {
             is_emsi_session: false,
             emsi: EmsiData::default(),
             paged_sysop: false,
+            bytes_remaining: 0
         }
     }
 
@@ -410,6 +413,7 @@ pub struct IcyBoardState {
     sysop_screen: VirtualScreen,
 
     char_buffer: VecDeque<KeyChar>,
+
 }
 
 impl IcyBoardState {

@@ -158,6 +158,9 @@ pub struct VirtualMachine<'a> {
     pub push_pop_stack: Vec<VariableValue>,
 
     stored_screen: Option<Buffer>,
+
+    pub fd_default_in: usize,
+    pub fd_default_out: usize,
 }
 
 impl<'a> VirtualMachine<'a> {
@@ -769,6 +772,8 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
         push_pop_stack: Vec::new(),
         user_data: Vec::new(),
         stored_screen: None,
+        fd_default_in: 0,
+        fd_default_out: 0,
     };
 
     vm.run().await?;

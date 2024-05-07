@@ -1605,6 +1605,10 @@ pub async fn new_confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<
 pub async fn confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
     let conf_field = vm.eval_expr(&args[1]).await?.as_int();
+
+    get_confinfo(vm, conf_num, conf_field).await
+}
+pub async fn get_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_field: i32) -> Res<VariableValue> {
     if let Some(conference) = &vm.icy_board_state.get_board().await.conferences.get(conf_num) {
         match conf_field {
             1 => Ok(VariableValue::new_string(conference.name.clone())),

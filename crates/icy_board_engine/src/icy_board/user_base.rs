@@ -182,6 +182,7 @@ pub struct UserStats {
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_64")]
     pub today_dnld_bytes: u64,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_64")]
     pub today_upld_bytes: u64,

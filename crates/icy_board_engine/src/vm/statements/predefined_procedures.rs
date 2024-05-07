@@ -5,7 +5,7 @@ use crate::{
     executable::{PPEExpr, VariableType, VariableValue},
     icy_board::{
         icb_config::IcbColor,
-        state::functions::{display_flags, MASK_ALNUM},
+        state::{functions::{display_flags, MASK_ALNUM}, GraphicsMode},
     },
     Res,
 };
@@ -65,6 +65,15 @@ pub async fn color(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn confflag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let conf = vm.eval_expr(&args[0]).await?.as_int() as u16;
+    let flags = vm.eval_expr(&args[0]).await?.as_int();
+    // 1 = registered
+    // 2 = expired
+    // 4 = selected
+    // 8 = conference sysop
+    //16 = mail waiting
+    //32 = net status
+
     log::error!("not implemented statement!");
     panic!("TODO")
 }
@@ -734,6 +743,10 @@ pub async fn freshline(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     vm.icy_board_state.print(TerminalTarget::Both, "\r\n").await?;
     Ok(())
 }
+pub async fn wrusysdoor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    log::error!("wrusysdoor not implemented statement!");
+    panic!("TODO")
+}
 pub async fn wrusys(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("USER.SYS is not supported")
@@ -939,9 +952,13 @@ pub async fn fflush(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 pub async fn fread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
-    let val = vm.eval_expr(&args[1]).await?;
     let size = vm.eval_expr(&args[2]).await?.as_int() as usize;
+    internal_fread(vm, channel, size, &args[1]).await
+}
 
+async fn internal_fread(vm: &mut VirtualMachine<'_>, channel: usize, size: usize, arg: &PPEExpr) -> Res<()> {
+    let val = vm.eval_expr(&arg).await?;
+    
     let result = vm.io.fread(channel, size).map_err(|e| {
         log::error!("fread error: {} ({})", e, channel);
         e
@@ -956,21 +973,21 @@ pub async fn fread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
                 }
                 vs.push(CP437_TO_UNICODE[c as usize]);
             }
-            vm.set_variable(&args[1], VariableValue::new_string(vs)).await?;
+            vm.set_variable(arg, VariableValue::new_string(vs)).await?;
         }
         VariableType::Boolean => {
-            vm.set_variable(&args[1], VariableValue::new_bool(result[0] != 0)).await?;
+            vm.set_variable(arg, VariableValue::new_bool(result[0] != 0)).await?;
         }
         VariableType::Byte | VariableType::SByte => {
-            vm.set_variable(&args[1], VariableValue::new_byte(result[0])).await?;
+            vm.set_variable(arg, VariableValue::new_byte(result[0])).await?;
         }
         VariableType::Word | VariableType::SWord => {
-            vm.set_variable(&args[1], VariableValue::new_word(u16::from_le_bytes([result[0], result[1]])))
+            vm.set_variable(arg, VariableValue::new_word(u16::from_le_bytes([result[0], result[1]])))
                 .await?;
         }
         VariableType::Double => {
             vm.set_variable(
-                &args[1],
+                arg,
                 VariableValue::new_double(f64::from_le_bytes([
                     result[0], result[1], result[2], result[3], result[4], result[5], result[6], result[7],
                 ])),
@@ -980,17 +997,17 @@ pub async fn fread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         _ => {
             match result.len() {
                 0 => {
-                    vm.set_variable(&args[1], VariableValue::new_int(0)).await?;
+                    vm.set_variable(arg, VariableValue::new_int(0)).await?;
                 }
                 1 => {
-                    vm.set_variable(&args[1], VariableValue::new_int(result[0] as i32)).await?;
+                    vm.set_variable(arg, VariableValue::new_int(result[0] as i32)).await?;
                 }
                 2 => {
-                    vm.set_variable(&args[1], VariableValue::new_int(i16::from_le_bytes(result[..2].try_into().unwrap()) as i32))
+                    vm.set_variable(arg, VariableValue::new_int(i16::from_le_bytes(result[..2].try_into().unwrap()) as i32))
                         .await?;
                 }
                 4 => {
-                    vm.set_variable(&args[1], VariableValue::new_int(i32::from_le_bytes(result[..4].try_into().unwrap())))
+                    vm.set_variable(arg, VariableValue::new_int(i32::from_le_bytes(result[..4].try_into().unwrap())))
                         .await?;
                 }
                 _ => {
@@ -999,14 +1016,18 @@ pub async fn fread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
             };
         }
     };
-
     Ok(())
 }
+
 pub async fn fwrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
     let val = vm.eval_expr(&args[1]).await?;
     let size = vm.eval_expr(&args[2]).await?.as_int() as usize;
-    let mut v = match val.get_type() {
+    internal_fwrite(vm, channel, val, size).await
+}
+
+async fn internal_fwrite(vm: &mut VirtualMachine<'_>, channel: usize, val: VariableValue, size: usize) -> Res<()> {
+        let mut v = match val.get_type() {
         VariableType::String | VariableType::BigStr => val.as_string().as_bytes().to_vec(),
         VariableType::Boolean => {
             if val.as_bool() {
@@ -1030,41 +1051,66 @@ pub async fn fwrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     })?;
     Ok(())
 }
+
 pub async fn fdefin(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!(" fdefin not implemented statement!");
-    panic!("TODO")
+    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    vm.fd_default_in = channel;
+    Ok(())
 }
 pub async fn fdefout(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!(" fdefout not implemented statement!");
-    panic!("TODO")
+    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    vm.fd_default_out = channel;
+    Ok(())
 }
 pub async fn fdget(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("fdget not implemented statement!");
-    panic!("TODO")
+    let value = VariableValue::new_string(vm.io.fget(vm.fd_default_in)?);
+    vm.set_variable(&args[0], value).await?;
+    Ok(())
 }
+
 pub async fn fdput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("fdput not implemented statement!");
-    panic!("TODO")
+    for value in args {
+        let text = vm.eval_expr(value).await?.as_string();
+        vm.io.fput(vm.fd_default_out, text)?;
+    }
+    Ok(())
 }
 pub async fn fdputln(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("fdputlnnot implemented statement!");
-    panic!("TODO")
+    for value in args {
+        let text = vm.eval_expr(value).await?.as_string();
+        vm.io.fput(vm.fd_default_out, text)?;
+    }
+    vm.io.fput(vm.fd_default_out, "\n".to_string())?;
+    Ok(())
 }
 pub async fn fdputpad(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("fdputpad not implemented statement!");
     panic!("TODO")
 }
 pub async fn fdread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("fdreadnot implemented statement!");
-    panic!("TODO")
+    let size = vm.eval_expr(&args[1]).await?.as_int() as usize;
+    internal_fread(vm, vm.fd_default_in, size, &args[0]).await
 }
+
 pub async fn fdwrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("fdwrite not implemented statement!");
-    panic!("TODO")
+    let val = vm.eval_expr(&args[0]).await?;
+    let size = vm.eval_expr(&args[1]).await?.as_int() as usize;
+    internal_fwrite(vm, vm.fd_default_out, val, size).await
 }
+
 pub async fn adjbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("adjbytes not implemented statement!");
-    panic!("TODO")
+    let bytes = vm.eval_expr(&args[0]).await?.as_int();
+    if let Some(user) = &mut vm.icy_board_state.current_user {
+        if bytes > 0 {
+            user.stats.total_dnld_bytes += bytes as u64;
+            user.stats.today_dnld_bytes += bytes as u64;
+        } else {
+            user.stats.total_dnld_bytes = user.stats.total_dnld_bytes.saturating_sub(bytes as u64);
+            user.stats.today_dnld_bytes = user.stats.today_dnld_bytes.saturating_sub(bytes as u64);
+        }
+        vm.icy_board_state.session.bytes_remaining += bytes as i64;
+    }
+    Ok(())
 }
 
 pub async fn alias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -1132,10 +1178,7 @@ pub async fn download(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     log::error!("download not implemented statement!");
     panic!("TODO")
 }
-pub async fn wrusysdoor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("wrusysdoor not implemented statement!");
-    panic!("TODO")
-}
+
 
 pub async fn getaltuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let user_record = vm.eval_expr(&args[0]).await?.as_int() as usize;
@@ -1149,20 +1192,53 @@ pub async fn getaltuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
 }
 
 pub async fn adjdbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("adjdbytes not implemented statement!");
-    panic!("TODO")
+    let bytes = vm.eval_expr(&args[0]).await?.as_int();
+    if let Some(user) = &mut vm.icy_board_state.current_user {
+        if bytes > 0 {
+            user.stats.today_dnld_bytes += bytes as u64;
+        } else {
+            user.stats.today_dnld_bytes = user.stats.today_dnld_bytes.saturating_sub(bytes as u64);
+        }
+        vm.icy_board_state.session.bytes_remaining += bytes as i64;
+    }
+    Ok(())
 }
 pub async fn adjtbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("adjtbytes not implemented statement!");
-    panic!("TODO")
+    let bytes: i32 = vm.eval_expr(&args[0]).await?.as_int();
+    if let Some(user) = &mut vm.icy_board_state.current_user {
+        if bytes > 0 {
+            user.stats.total_dnld_bytes += bytes as u64;
+        } else {
+            user.stats.total_dnld_bytes = user.stats.total_dnld_bytes.saturating_sub(bytes as u64);
+        }
+    }
+    Ok(())
 }
 pub async fn ayjtfiles(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("ayjtfiles not implemented statement!");
-    panic!("TODO")
+    let files = vm.eval_expr(&args[0]).await?.as_int();
+    if let Some(user) = &mut vm.icy_board_state.current_user {
+        if files > 0 {
+            user.stats.num_downloads += files as u64;
+        } else {
+            user.stats.num_downloads = user.stats.num_downloads.saturating_sub(files as u64);
+        }
+    }
+    Ok(())
 }
+
 pub async fn lang(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("lang not implemented statement!");
-    panic!("TODO")
+    let language = vm.eval_expr(&args[0]).await?.as_int();
+    let lang = if let Some(lang) = vm.icy_board_state.board.lock().await.languages.languages.get(language as usize) {
+        lang.extension.clone()
+    } else {
+        log::error!("PPE: lang(): Language not found: {}", language);
+        return Ok(());
+    };
+    vm.icy_board_state.session.language = lang.clone();
+    if let Some(user) = &mut vm.icy_board_state.current_user {
+        user.language = lang;
+    }
+    Ok(())
 }
 
 pub async fn sort(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -1202,13 +1278,24 @@ pub async fn sort(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn mousereg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    // RIP ONLY
+    // num    = Is the RIP region number  
+    // x1,y1  = The (X,Y) coordinates of the upper-left of the region  
+    // x2,y2  = The (X,Y) coordinates of the lower-right of the region  
+    // fontX  = The width of each character in pixels  
+    // fontY  = The height of each character in pixels  
+    // invert = A boolean flag (TRUE to invert the region when clicked)  
+    // clear  = A boolean flag (TRUE to clear and full screen the text window)  
+    // text   = Text that the remote terminal should transmit when the region is clicked  
     log::error!("mousereg not implemented statement!");
     panic!("TODO")
 }
+
 pub async fn scrfile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("scrfile not implemented statement!");
     panic!("TODO")
 }
+
 pub async fn searchinit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("searchinit not implemented statement!");
     panic!("TODO")
@@ -1229,6 +1316,7 @@ pub async fn prfoundln(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     log::error!(" prfoundlnnot implemented statement!");
     panic!("TODO")
 }
+
 pub async fn tpaget(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");
     panic!("TODO")
@@ -1453,17 +1541,52 @@ pub async fn uselmrs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     panic!("TODO")
 }
 pub async fn confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("confinfo not implemented statement!");
-    panic!("TODO")
+    let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let conf_field = vm.eval_expr(&args[1]).await?.as_int();
+
+    let value = crate::vm::expressions::get_confinfo(vm, conf_num, conf_field).await?;
+    vm.set_variable(&args[2], value).await?;
+    Ok(())
 }
+
 pub async fn adjtubytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("adjtubytes not implemented statement!");
-    panic!("TODO")
+    let bytes: i32 = vm.eval_expr(&args[0]).await?.as_int();
+    if let Some(user) = &mut vm.icy_board_state.current_user {
+        if bytes > 0 {
+            user.stats.total_upld_bytes += bytes as u64;
+        } else {
+            user.stats.total_upld_bytes = user.stats.total_upld_bytes.saturating_sub(bytes as u64);
+        }
+    }
+    Ok(())
 }
+
 pub async fn grafmode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("grafmode not implemented statement!");
-    panic!("TODO")
+    let mode = vm.eval_expr(&args[0]).await?.as_int();
+    match mode {
+        1 | 2 => {
+            // In PCBoard 1) turns graphics on but checks for ANSI
+            vm.icy_board_state.session.disp_options.grapics_mode = GraphicsMode::Graphics;
+        }
+        3 => { 
+            vm.icy_board_state.session.disp_options.grapics_mode = GraphicsMode::Ansi;
+        }
+        4 => { 
+            vm.icy_board_state.session.disp_options.grapics_mode = GraphicsMode::Ctty;
+        }
+        5 => { 
+            vm.icy_board_state.session.disp_options.grapics_mode = GraphicsMode::Rip;
+        }
+        6 => { // 6 is new for IcyBoard
+            vm.icy_board_state.session.disp_options.grapics_mode = GraphicsMode::Avatar;
+        }
+        _ => {
+            log::error!("PPE unsupported graphics mode: {}", mode);
+        }
+    }
+    Ok(())
 }
+
 pub async fn adduser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("adduser not implemented statement!");
     panic!("TODO")
