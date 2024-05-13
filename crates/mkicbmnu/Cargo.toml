@@ -17,9 +17,11 @@ chrono = { workspace = true }
 argh = { workspace = true }
 crossterm = { workspace = true }
 ratatui = { workspace = true }
+log = { workspace = true }
 
 tui-input = "0.8.0"
 ariadne = "0.4.0"
+fern = "0.6.2"
 unicase = { workspace = true }
 color-eyre = { workspace = true }
 itertools = "0.12.1"

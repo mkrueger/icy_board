@@ -14,6 +14,10 @@ use crate::app::ResultState;
 pub trait TabPage {
     fn render(&mut self, frame: &mut Frame, area: Rect);
 
+    fn grab_focus(&self) -> bool {
+        false
+    }
+
     fn handle_key_press(&mut self, _key: KeyEvent) -> ResultState {
         ResultState::default()
     }

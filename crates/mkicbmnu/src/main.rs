@@ -1,5 +1,6 @@
 use app::new_main_window;
 use argh::FromArgs;
+use chrono::Local;
 use color_eyre::Result;
 use icy_board_engine::icy_board::{menu::Menu, IcyBoardSerializer};
 use icy_board_tui::{get_text_args, print_error, term};
@@ -40,6 +41,27 @@ struct Cli {
 
 fn main() -> Result<()> {
     let arguments: Cli = argh::from_env();
+    //    let log_file = arguments.file.with_extension("log");
+    fern::Dispatch::new()
+        // Perform allocation-free log formatting
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{} {} {}] {}",
+                Local::now().format("%Y-%m-%d %H:%M:%S"),
+                record.level(),
+                record.target(),
+                message
+            ))
+        })
+        // Add blanket level filter -
+        .level(log::LevelFilter::Info)
+        // - and per-module overrides
+        // Output to stdout, files, and other Dispatch configurations
+        .chain(std::io::stdout())
+        //        .chain(fern::log_file(&log_file).unwrap())
+        // Apply globally
+        .apply()
+        .unwrap();
 
     let file = arguments.file.with_extension("mnu");
     if !file.exists() && !arguments.create {
@@ -55,14 +77,11 @@ fn main() -> Result<()> {
 
     match Menu::load(&file) {
         Ok(mut mnu) => {
-            mnu.title = "Title Menu".to_string();
-            mnu.display_file = PathBuf::from("file.txt");
-            mnu.help_file = PathBuf::from("help.txt");
-            mnu.prompt = "Enter selection: ".to_string();
             let terminal = &mut term::init()?;
             let mnu = Arc::new(Mutex::new(mnu));
-            new_main_window(mnu, arguments.full_screen).run(terminal)?;
+            new_main_window(mnu.clone(), arguments.full_screen).run(terminal)?;
             term::restore()?;
+            mnu.lock().unwrap().save(&file).unwrap();
             Ok(())
         }
         Err(err) => {

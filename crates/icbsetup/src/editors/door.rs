@@ -52,7 +52,7 @@ impl DoorEditor {
             )),
         ];
 
-        let menu = ConfigMenu { items };
+        let menu = ConfigMenu { entry: items };
 
         Ok(Self {
             path: path.clone(),

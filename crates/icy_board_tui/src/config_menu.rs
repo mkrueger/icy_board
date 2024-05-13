@@ -6,7 +6,7 @@ use ratatui::{
     layout::Rect,
     style::Stylize,
     text::Text,
-    widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState, Widget},
+    widgets::{Block, BorderType, Borders, Clear, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget},
     Frame,
 };
 
@@ -49,7 +49,69 @@ impl Value {
     }
 }
 
+#[derive(Clone)]
+pub struct ComboBoxValue {
+    pub display: String,
+    pub value: String,
+}
+
+impl ComboBoxValue {
+    pub fn new(display: impl Into<String>, value: impl Into<String>) -> Self {
+        Self {
+            display: display.into(),
+            value: value.into(),
+        }
+    }
+}
+
+pub struct ComboBox {
+    pub values: Vec<ComboBoxValue>,
+    pub cur_value: ComboBoxValue,
+    pub first: usize,
+    pub scroll_state: ScrollbarState,
+}
+impl ComboBox {
+    fn handle_input(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Home => {
+                self.first = 0;
+                self.cur_value = self.values.get(0).unwrap().clone();
+                self.scroll_state = self.scroll_state.position(0);
+            }
+            KeyCode::End => {
+                self.first = self.values.len().saturating_sub(10);
+                self.cur_value = self.values.get(self.values.len() - 1).unwrap().clone();
+                self.scroll_state = self.scroll_state.position(self.values.len() - 1);
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                let i = self.values.iter().position(|v| v.value == self.cur_value.value).unwrap_or(0).saturating_sub(1);
+                self.cur_value = self.values.get(i).unwrap().clone();
+                self.scroll_state = self.scroll_state.position(i);
+                if i < self.first {
+                    self.first = i;
+                }
+            }
+            KeyCode::Char('j') | KeyCode::Down => {
+                let i = self
+                    .values
+                    .iter()
+                    .position(|v| v.value == self.cur_value.value)
+                    .unwrap_or(0)
+                    .saturating_add(1)
+                    .min(self.values.len() - 1);
+                self.cur_value = self.values.get(i).unwrap().clone();
+                self.scroll_state = self.scroll_state.position(i);
+                if i >= self.first + 10 {
+                    self.first = i - 9;
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 pub enum ListValue {
+    ComboBox(ComboBox),
     Text(u16, String),
     Path(PathBuf),
     U32(u32, u32, u32),
@@ -122,6 +184,9 @@ impl ListItem {
             ListValue::Text(_, text) => {
                 Text::from(text.clone()).style(THEME.value).render(area, frame.buffer_mut());
             }
+            ListValue::ComboBox(v) => {
+                Text::from(v.cur_value.display.clone()).style(THEME.value).render(area, frame.buffer_mut());
+            }
 
             ListValue::Path(text) => {
                 Text::from(format!("{}", text.display())).style(THEME.value).render(area, frame.buffer_mut());
@@ -150,7 +215,7 @@ impl ListItem {
     }
 
     fn render_editor(&mut self, area: Rect, frame: &mut Frame) {
-        match &self.value {
+        match &mut self.value {
             ListValue::Text(_edit_len, text) => {
                 let field = TextField::new().with_value(text.to_string());
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
@@ -182,6 +247,36 @@ impl ListItem {
                 }
                 Text::from(cur_value.clone()).style(THEME.edit_value).render(area, frame.buffer_mut());
             }
+            ListValue::ComboBox(c) => {
+                let mut area = area;
+                Clear.render(area, frame.buffer_mut());
+                area.width = c.values.iter().map(|l| l.display.len()).max().unwrap_or(0) as u16 + 2;
+                area.height = c.values.len().min(12) as u16;
+
+                let block = Block::new()
+                    //  .title(Title::from(Span::from(" Edit Action ").style(THEME.content_box_title)).alignment(Alignment::Center))
+                    .style(THEME.content_box)
+                    //  .padding(Padding::new(2, 2, 1, 1))
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Double);
+                //     let area =  footer.inner(&Margin { vertical: 15, horizontal: 5 });
+                block.render(area, frame.buffer_mut());
+
+                let mut line = area;
+                line.x += 1;
+                line.width -= 2;
+                line.y += 1;
+                line.height = 1;
+                for l in c.values.iter().skip(c.first).take(10) {
+                    if l.value == c.cur_value.value {
+                        Text::from(l.display.clone()).style(THEME.edit_value).render(line, frame.buffer_mut());
+                    } else {
+                        Text::from(l.display.clone()).style(THEME.value).render(line, frame.buffer_mut());
+                    }
+                    line.y += 1;
+                }
+                Scrollbar::new(ScrollbarOrientation::VerticalRight).render(area, frame.buffer_mut(), &mut c.scroll_state);
+            }
         }
     }
 
@@ -202,6 +297,7 @@ impl ListItem {
             ListValue::Text(_edit_len, text) => {
                 self.text_field_state.handle_input(key, text);
             }
+
             ListValue::Path(path) => {
                 let mut text = format!("{}", path.display());
                 self.text_field_state.handle_input(key, &mut text);
@@ -231,6 +327,9 @@ impl ListItem {
             }
 
             ListValue::Color(_) => {}
+            ListValue::ComboBox(combo) => {
+                combo.handle_input(key);
+            }
         }
         return ResultState::status_line(self.status.clone());
     }
@@ -265,7 +364,7 @@ impl ConfigEntry {
 }
 
 pub struct ConfigMenu {
-    pub items: Vec<ConfigEntry>,
+    pub entry: Vec<ConfigEntry>,
 }
 
 #[derive(Default)]
@@ -288,7 +387,12 @@ impl ConfigMenu {
 
         state.area_height = area.height;
 
-        Self::display_list(&mut i, &mut self.items, area, &mut y, &mut x, frame, state);
+        Self::display_list(&mut i, &mut self.entry, area, &mut y, &mut x, frame, state, false);
+
+        let mut y = 0;
+        let mut x = 0;
+        let mut i = 0;
+        Self::display_list(&mut i, &mut self.entry, area, &mut y, &mut x, frame, state, true);
 
         state.scroll_state = state.scroll_state.position(state.first_row as usize).content_length(state.area_height as usize);
         Self::render_scrollbar(state, frame, area);
@@ -312,13 +416,13 @@ impl ConfigMenu {
 
     pub fn count(&self) -> usize {
         let mut len = 0;
-        self.count_items(&self.items, &mut len);
+        self.count_items(&self.entry, &mut len);
         len
     }
 
     pub fn get_item(&self, i: usize) -> Option<&ListItem> {
         let mut len = 0;
-        Self::get_item_internal(&self.items, &mut len, i)
+        Self::get_item_internal(&self.entry, &mut len, i)
     }
 
     pub fn get_item_internal<'a>(items: &'a Vec<ConfigEntry>, len: &mut usize, i: usize) -> Option<&'a ListItem> {
@@ -351,7 +455,7 @@ impl ConfigMenu {
 
     pub fn get_item_mut(&mut self, i: usize) -> Option<&mut ListItem> {
         let mut len = 0;
-        Self::get_item_internal_mut(&mut self.items, &mut len, i)
+        Self::get_item_internal_mut(&mut self.entry, &mut len, i)
     }
 
     pub fn get_item_internal_mut<'a>(items: &'a mut Vec<ConfigEntry>, len: &mut usize, i: usize) -> Option<&'a mut ListItem> {
@@ -399,7 +503,16 @@ impl ConfigMenu {
         }
     }
 
-    fn display_table(i: &mut usize, items: &mut Vec<ConfigEntry>, area: Rect, y: &mut u16, x: &mut u16, frame: &mut Frame, state: &mut ConfigMenuState) {
+    fn display_table(
+        i: &mut usize,
+        items: &mut Vec<ConfigEntry>,
+        area: Rect,
+        y: &mut u16,
+        x: &mut u16,
+        frame: &mut Frame,
+        state: &mut ConfigMenuState,
+        display_editor: bool,
+    ) {
         let x1 = *x;
         let x2 = *x + area.width / 2;
 
@@ -415,8 +528,9 @@ impl ConfigMenu {
                             width: max as u16 + 2,
                             height: 1,
                         };
-
-                        item.render_label(left_area, frame, *i == state.selected, state.in_edit);
+                        if !display_editor {
+                            item.render_label(left_area, frame, *i == state.selected, state.in_edit);
+                        }
                         let xright = if *x >= x2 { area.right() - 1 } else { area.x + x2 };
                         let right_area = Rect {
                             x: left_area.right() + 1,
@@ -425,8 +539,10 @@ impl ConfigMenu {
                             height: 1,
                         };
                         if state.in_edit && *i == state.selected {
-                            item.render_editor(right_area, frame);
-                        } else {
+                            if display_editor {
+                                item.render_editor(right_area, frame);
+                            }
+                        } else if !display_editor {
                             item.render_value(right_area, frame);
                         }
                     }
@@ -447,7 +563,16 @@ impl ConfigMenu {
         }
         *x = x1;
     }
-    pub fn display_list(i: &mut usize, items: &mut Vec<ConfigEntry>, area: Rect, y: &mut u16, x: &mut u16, frame: &mut Frame, state: &mut ConfigMenuState) {
+    pub fn display_list(
+        i: &mut usize,
+        items: &mut Vec<ConfigEntry>,
+        area: Rect,
+        y: &mut u16,
+        x: &mut u16,
+        frame: &mut Frame,
+        state: &mut ConfigMenuState,
+        display_editor: bool,
+    ) {
         for item in items.iter_mut() {
             match item {
                 ConfigEntry::Item(item) => {
@@ -459,9 +584,9 @@ impl ConfigMenu {
                             width: max + 2,
                             height: 1,
                         };
-
-                        item.render_label(left_area, frame, *i == state.selected, state.in_edit);
-
+                        if !display_editor {
+                            item.render_label(left_area, frame, *i == state.selected, state.in_edit);
+                        }
                         let right_area = Rect {
                             x: area.x + *x + max + 3,
                             y: area.y + *y - state.first_row,
@@ -469,8 +594,10 @@ impl ConfigMenu {
                             height: 1,
                         };
                         if state.in_edit && *i == state.selected {
-                            item.render_editor(right_area, frame);
-                        } else {
+                            if display_editor {
+                                item.render_editor(right_area, frame);
+                            }
+                        } else if !display_editor {
                             item.render_value(right_area, frame);
                         }
                     }
@@ -488,17 +615,19 @@ impl ConfigMenu {
                                 width: area.width - *x - 1,
                                 height: 1,
                             };
-                            Text::from(format!(" {}", title.clone()))
-                                .alignment(ratatui::layout::Alignment::Left)
-                                .style(THEME.config_title.italic())
-                                .render(left_area, frame.buffer_mut());
+                            if display_editor {
+                                Text::from(format!(" {}", title.clone()))
+                                    .alignment(ratatui::layout::Alignment::Left)
+                                    .style(THEME.config_title.italic())
+                                    .render(left_area, frame.buffer_mut());
+                            }
                         }
                         *y += 1;
                     }
-                    Self::display_list(i, items, area, y, x, frame, state);
+                    Self::display_list(i, items, area, y, x, frame, state, display_editor);
                 }
                 ConfigEntry::Table(_cols, items) => {
-                    Self::display_table(i, items, area, y, x, frame, state);
+                    Self::display_table(i, items, area, y, x, frame, state, display_editor);
                 }
                 ConfigEntry::Separator => {
                     /*
@@ -571,7 +700,12 @@ impl ConfigMenu {
             _ => {}
         }
 
-        ResultState::status_line(self.get_item(state.selected).unwrap().status.clone())
+        if let Some(item) = self.get_item(state.selected) {
+            ResultState::status_line(item.status.clone())
+        } else {
+            log::error!("config_menu: no item found for index {}", state.selected);
+            ResultState::default()
+        }
     }
 
     fn prev(state: &mut ConfigMenuState) {
@@ -601,7 +735,7 @@ impl ConfigMenu {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &ListItem> {
-        ConfigMenuIter { iter: vec![self.items.iter()] }
+        ConfigMenuIter { iter: vec![self.entry.iter()] }
     }
 }
 

@@ -276,7 +276,7 @@ impl<'a> PathTab<'a> {
         Self {
             state: ConfigMenuState::default(),
             config: ConfigMenu {
-                items: vec![
+                entry: vec![
                     ConfigEntry::Group("System Files & Directories".to_string(), system_files),
                     ConfigEntry::Group("Configuration Files".to_string(), configuration_files),
                     ConfigEntry::Group("Display Files".to_string(), display_files),
@@ -290,7 +290,7 @@ impl<'a> PathTab<'a> {
     }
 
     fn write_back(&self, icy_board: &mut IcyBoard) {
-        for entry in self.config.items.iter() {
+        for entry in self.config.entry.iter() {
             self.visit_item(&entry, icy_board);
         }
     }
@@ -313,6 +313,7 @@ impl<'a> PathTab<'a> {
             ListValue::Text(_, _text) => match item.id.as_str() {
                 _ => panic!("Unknown id: {}", item.id),
             },
+            ListValue::ComboBox(_) => panic!("Unknown id: {}", item.id),
             ListValue::Path(path) => match item.id.as_str() {
                 "conf_data" => icy_board.config.paths.conferences = path.clone(),
                 "home_dir" => icy_board.config.paths.home_dir = path.clone(),
@@ -440,7 +441,7 @@ impl<'a> TabPage for PathTab<'a> {
     fn request_status(&self) -> ResultState {
         return ResultState {
             edit_mode: EditMode::None,
-            status_line: if self.state.selected < self.config.items.len() {
+            status_line: if self.state.selected < self.config.entry.len() {
                 "".to_string()
             } else {
                 "".to_string()

@@ -218,7 +218,7 @@ impl CallWaitScreen {
             .borders(Borders::ALL);
         b.render(area, frame.buffer_mut());
 
-        let vertical = Layout::vertical([
+        let vertical: Layout = Layout::vertical([
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Fill(1),

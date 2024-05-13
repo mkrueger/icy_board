@@ -503,7 +503,7 @@ impl GeneralTab {
             state: ConfigMenuState::default(),
             icy_board: lock.clone(),
             config: ConfigMenu {
-                items: vec![
+                entry: vec![
                     ConfigEntry::Group("Sysop Information".to_string(), sysop_info),
                     ConfigEntry::Group("Board Information".to_string(), board_info),
                     ConfigEntry::Group("New User Settings".to_string(), new_user_info),
@@ -540,6 +540,9 @@ impl GeneralTab {
                 "f10" => icy_board.config.func_keys[9] = text.clone(),
                 _ => panic!("Unknown id: {}", item.id),
             },
+            ListValue::ComboBox(_) => {
+                panic!("Unknown id: {}", item.id);
+            }
             ListValue::Path(_path) => match item.id.as_str() {
                 _ => panic!("Unknown id: {}", item.id),
             },
@@ -653,7 +656,7 @@ impl TabPage for GeneralTab {
     fn request_status(&self) -> ResultState {
         return ResultState {
             edit_mode: EditMode::None,
-            status_line: if self.state.selected < self.config.items.len() {
+            status_line: if self.state.selected < self.config.entry.len() {
                 "".to_string()
             } else {
                 "".to_string()

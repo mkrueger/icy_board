@@ -221,6 +221,12 @@ impl<'a> App<'a> {
                 return;
             }
             _ => {
+                if self.get_tab().grab_focus() {
+                    let state = self.get_tab_mut().handle_key_press(key);
+                    self.status_line = state.status_line;
+                    return;
+                }
+
                 match key.code {
                     Char('q') | Esc => {
                         if self.record_tab.is_dirty(&self.orig) {

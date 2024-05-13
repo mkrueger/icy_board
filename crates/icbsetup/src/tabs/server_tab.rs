@@ -120,7 +120,7 @@ impl ServerTab {
             state: ConfigMenuState::default(),
             icy_board: lock.clone(),
             config: ConfigMenu {
-                items: vec![
+                entry: vec![
                     ConfigEntry::Group("Terminal (TELNET)".to_string(), telnet),
                     ConfigEntry::Group("Terminal (SSH)".to_string(), ssh),
                     ConfigEntry::Group("Terminal (WEBSOCKET)".to_string(), websocket),
@@ -131,7 +131,7 @@ impl ServerTab {
     }
 
     fn write_back(&self, icy_board: &mut IcyBoard) {
-        for entry in self.config.items.iter() {
+        for entry in self.config.entry.iter() {
             self.visit_item(&entry, icy_board);
         }
     }
@@ -158,6 +158,9 @@ impl ServerTab {
                 "secure_websocket_address" => icy_board.config.login_server.secure_websocket.address = text.clone(),
                 _ => panic!("Unknown id: {}", item.id),
             },
+            ListValue::ComboBox(_) => {
+                panic!("Unknown id: {}", item.id);
+            }
             ListValue::Path(path) => match item.id.as_str() {
                 "telnet_display_file" => icy_board.config.login_server.telnet.display_file = path.clone(),
                 "ssh_display_file" => icy_board.config.login_server.ssh.display_file = path.clone(),
@@ -230,7 +233,7 @@ impl TabPage for ServerTab {
     fn request_status(&self) -> ResultState {
         return ResultState {
             edit_mode: EditMode::None,
-            status_line: if self.state.selected < self.config.items.len() {
+            status_line: if self.state.selected < self.config.entry.len() {
                 "".to_string()
             } else {
                 "".to_string()

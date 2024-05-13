@@ -80,7 +80,7 @@ pub const THEME: Theme = /* Theme {
         config_title: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_CYAN),
         value: Style::new().bg(DOS_BLACK).fg(LIGHT_GRAY),
         edit_value: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
-        table_header: Style::new().bg(DOS_BLUE).fg(DOS_WHITE),
+        table_header: Style::new().bg(DOS_BLACK).fg(DOS_CYAN),
 
         filter_text: Style::new().bg(DOS_BLUE).fg(DOS_YELLOW),
         description_text: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),

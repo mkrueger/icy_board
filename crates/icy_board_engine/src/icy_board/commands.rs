@@ -1,9 +1,12 @@
+use std::fmt::Display;
+
 use crate::Res;
 use serde::{Deserialize, Serialize};
+use strum::{EnumIter, EnumString};
 
 use super::{security::RequiredSecurity, IcyBoardSerializer, PCBoardRecordImporter};
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, Default, EnumIter, EnumString)]
 pub enum CommandType {
     /// Do nothing
     #[default]
@@ -14,11 +17,6 @@ pub enum CommandType {
     /// This would effectively let you create a sub-menu type system that is very
     /// easy to navigate.
     Menu,
-
-    /// Using this option, you can execute any PPE file you wish.
-    /// This only further enhances the options or tasks you can perform with
-    /// each menu.
-    PPE,
 
     /// Execute a script file. The script number to execute should be specified
     /// in the Parameters field.
@@ -219,17 +217,103 @@ pub enum CommandType {
     // '@W'
     WriteEmail,
 
-    // 'PPE'
+    /// Using this option, you can execute any PPE file you wish.
+    /// This only further enhances the options or tasks you can perform with
+    /// each menu.
     RunPPE,
 
     // 'TS'
     TextSearch,
 }
 
+impl Display for CommandType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CommandType::Disabled => write!(f, "Disabled"),
+            CommandType::Menu => write!(f, "Menu"),
+            //         CommandType::PPE => write!(f, "PPE"),
+            CommandType::Script => write!(f, "Script"),
+            CommandType::Conference => write!(f, "Conference"),
+            CommandType::DisplayDir => write!(f, "DisplayDir"),
+            CommandType::DisableMenuOption => write!(f, "DisableMenuOption"),
+            CommandType::Door => write!(f, "Door"),
+            CommandType::ExitMenus => write!(f, "ExitMenus"),
+            CommandType::QuitMenu => write!(f, "QuitMenu"),
+            CommandType::DisplayFile => write!(f, "DisplayFile"),
+            CommandType::StuffTextAndExitMenu => write!(f, "StuffTextAndExitMenu"),
+            CommandType::StuffTextAndExitMenuSilent => write!(f, "StuffTextAndExitMenuSilent"),
+            CommandType::StuffText => write!(f, "StuffText"),
+            CommandType::StuffTextSilent => write!(f, "StuffTextSilent"),
+            CommandType::StuffFile => write!(f, "StuffFile"),
+            CommandType::StuffFileSilent => write!(f, "StuffFileSilent"),
+            CommandType::RedisplayCommand => write!(f, "(!)\tRedisplayCommand"),
+            CommandType::AbandonConference => write!(f, "(A)\tAbandonConference"),
+            CommandType::BulletinList => write!(f, "(B)\tBulletinList"),
+            CommandType::CommentToSysop => write!(f, "(C)\tCommentToSysop"),
+            CommandType::Download => write!(f, "(D)\tDownload"),
+            CommandType::EnterMessage => write!(f, "(E)\tEnterMessage"),
+            CommandType::FileDirectory => write!(f, "(F)\tFileDirectory"),
+            CommandType::Goodbye => write!(f, "(G)\tGoodbye"),
+            CommandType::Bye => write!(f, "(G;Y)\tBye"),
+            CommandType::Help => write!(f, "(H)\tHelp"),
+            CommandType::InitialWelcome => write!(f, "(I)\tInitialWelcome"),
+            CommandType::JoinConference => write!(f, "(J)\tJoinConference"),
+            CommandType::DeleteMessage => write!(f, "(K)\tDeleteMessage"),
+            CommandType::LocateFile => write!(f, "(L)\tLocateFile"),
+            CommandType::ToggleGraphics => write!(f, "(M)\tToggleGraphics"),
+            CommandType::NewFileScan => write!(f, "(N)\tNewFileScan"),
+            CommandType::PageSysop => write!(f, "(O)\tPageSysop"),
+            CommandType::SetPageLength => write!(f, "(P)\tSetPageLength"),
+            CommandType::QuickMessageScan => write!(f, "(Q)\tQuickMessageScan"),
+            CommandType::ReadMessages => write!(f, "(R)\tReadMessages"),
+            CommandType::Survey => write!(f, "(S)\tSurvey"),
+            CommandType::SetTransferProtocol => write!(f, "(T)\tSetTransferProtocol"),
+            CommandType::UploadFile => write!(f, "(U)\tUploadFile"),
+            CommandType::ViewSettings => write!(f, "(V)\tViewSettings"),
+            CommandType::WriteSettings => write!(f, "(W)\tWriteSettings"),
+            CommandType::ExpertMode => write!(f, "(X)\tExpertMode"),
+            CommandType::PersonalMail => write!(f, "(Y)\tPersonalMail"),
+            CommandType::ZippyDirectoryScan => write!(f, "(Z)\tZippyDirectoryScan"),
+            CommandType::GroupChat => write!(f, "(CHAT)\tGroupChat"),
+            CommandType::OpenDoor => write!(f, "(DOOR)\tOpenDoor"),
+            CommandType::TestFile => write!(f, "(TEST)\tTestFile"),
+            CommandType::UserList => write!(f, "(USER)\tUserList"),
+            CommandType::WhoIsOnline => write!(f, "(WHO)\tWhoIsOnline"),
+            CommandType::ShowMenu => write!(f, "(MENU)\tShowMenu"),
+            CommandType::Command => write!(f, "Command"),
+            CommandType::GlobalCommand => write!(f, "GlobalCommand"),
+            CommandType::DisplayNews => write!(f, "(NEWS)\tDisplayNews"),
+            CommandType::SetLanguage => write!(f, "(LANG)\tSetLanguage"),
+            CommandType::ReplyMessage => write!(f, "(REPLY)\tReplyMessage"),
+            CommandType::EnableAlias => write!(f, "(ALIAS)\tEnableAlias"),
+            CommandType::Broadcast => write!(f, "(BROADCAST)\tBroadcast"),
+            CommandType::RestoreMessage => write!(f, "(RESTORE)\tRestoreMessage"),
+            CommandType::ReadEmail => write!(f, "(@)\tReadEmail"),
+            CommandType::WriteEmail => write!(f, "(@W)\tWriteEmail"),
+            CommandType::RunPPE => write!(f, "(PPE)\tRunPPE"),
+            CommandType::TextSearch => write!(f, "(TS)\tTextSearch"),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Default)]
+pub struct Position {
+    pub x: u16,
+    pub y: u16,
+}
+
+impl Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Command {
     pub display: String,
     pub lighbar_display: String,
+
+    pub position: Position,
 
     pub keyword: String,
 
@@ -237,15 +321,30 @@ pub struct Command {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub help: String,
 
+    #[serde(default)]
+    #[serde(skip_serializing_if = "RequiredSecurity::is_empty")]
+    pub security: RequiredSecurity,
+
+    #[serde(default)]
+    pub actions: Vec<CommandAction>,
+}
+
+#[derive(Serialize, Clone, Deserialize, PartialEq, Debug, Default)]
+pub enum ActionTrigger {
+    #[default]
+    Activation,
+    Selection,
+}
+
+#[derive(Serialize, Clone, Deserialize, Default)]
+pub struct CommandAction {
     pub command_type: CommandType,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub parameter: String,
 
-    #[serde(default)]
-    #[serde(skip_serializing_if = "RequiredSecurity::is_empty")]
-    pub security: RequiredSecurity,
+    pub trigger: ActionTrigger,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -269,7 +368,7 @@ impl PCBoardRecordImporter<Command> for CommandList {
         let command_type = if uc.ends_with(".MNU") {
             CommandType::Menu
         } else if uc.ends_with(".PPE") {
-            CommandType::PPE
+            CommandType::RunPPE
         } else {
             CommandType::StuffText
         };
@@ -280,8 +379,12 @@ impl PCBoardRecordImporter<Command> for CommandList {
             display: "".to_string(),
             lighbar_display: "".to_string(),
             help: "".to_string(),
-            command_type,
-            parameter,
+            position: Position::default(),
+            actions: vec![CommandAction {
+                command_type,
+                parameter,
+                trigger: ActionTrigger::Activation,
+            }],
             security: RequiredSecurity::new(security),
         })
     }

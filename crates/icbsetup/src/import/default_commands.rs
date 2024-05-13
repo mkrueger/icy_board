@@ -11,8 +11,12 @@ fn convert_cmd(name: &str, cmd_type: CommandType, security: i32) -> icy_board_en
         display: "".to_string(),
         lighbar_display: "".to_string(),
         help: format!("hlp{}", name.to_ascii_lowercase()),
-        command_type: cmd_type,
-        parameter: "".to_string(),
+        position: Default::default(),
+        actions: vec![icy_board_engine::icy_board::commands::CommandAction {
+            command_type: cmd_type,
+            parameter: "".to_string(),
+            trigger: Default::default(),
+        }],
         security: RequiredSecurity::new(security as u8),
     }
 }

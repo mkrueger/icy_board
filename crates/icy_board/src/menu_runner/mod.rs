@@ -82,182 +82,185 @@ impl PcbBoardCommand {
         if !self.check_sec(command, &action.security).await? {
             return Ok(());
         }
-        match action.command_type {
-            CommandType::RedisplayCommand => {
-                // !
-                self.redisplay_cmd()?;
-            }
-            CommandType::AbandonConference => {
-                // A
-                self.abandon_conference().await?;
-            }
-            CommandType::BulletinList => {
-                // B
-                self.show_bulletins(action).await?;
-            }
-            CommandType::CommentToSysop => {
-                // C
-                self.comment_to_sysop(action).await?;
-            }
 
-            CommandType::Download => {
-                // D
-                self.download(action).await?;
-            }
-            CommandType::EnterMessage => {
-                // E
-                self.enter_message(action).await?;
-            }
+        for cmd_action in &action.actions {
+            match cmd_action.command_type {
+                CommandType::RedisplayCommand => {
+                    // !
+                    self.redisplay_cmd()?;
+                }
+                CommandType::AbandonConference => {
+                    // A
+                    self.abandon_conference().await?;
+                }
+                CommandType::BulletinList => {
+                    // B
+                    self.show_bulletins(action).await?;
+                }
+                CommandType::CommentToSysop => {
+                    // C
+                    self.comment_to_sysop(action).await?;
+                }
 
-            CommandType::FileDirectory => {
-                // F
-                self.show_file_directories(action).await?;
-            }
+                CommandType::Download => {
+                    // D
+                    self.download(action).await?;
+                }
+                CommandType::EnterMessage => {
+                    // E
+                    self.enter_message(action).await?;
+                }
 
-            CommandType::Goodbye => {
-                // G
-                self.goodbye_cmd().await?;
-            }
-            CommandType::Bye => {
-                // BYE
-                self.bye_cmd().await?;
-            }
-            CommandType::Help => {
-                // H
-                self.show_help().await?;
-            }
-            CommandType::InitialWelcome => {
-                // I
-                self.initial_welcome().await?;
-            }
-            CommandType::JoinConference => {
-                // J
-                self.join_conference(action).await?;
-            }
-            CommandType::DeleteMessage => {
-                // K
-                self.delete_message(action).await?;
-            }
-            CommandType::LocateFile => {
-                // L
-                self.find_files(action).await?;
-            }
-            CommandType::ToggleGraphics => {
-                // M
-                self.toggle_graphics().await?;
-            }
-            CommandType::NewFileScan => {
-                // N
-                self.find_new_files(action, 60000).await?;
-            }
-            CommandType::PageSysop => {
-                // O
-                self.page_sysop(action).await?;
-            }
-            CommandType::SetPageLength => {
-                // P
-                self.set_page_len(action).await?;
-            }
-            CommandType::QuickMessageScan => {
-                // Q
-                self.quick_message_scan(action).await?;
-            }
-            CommandType::ReadMessages => {
-                // R
-                self.read_messages(action).await?;
-            }
-            CommandType::Survey => {
-                // S
-                self.take_survey(action).await?;
-            }
-            CommandType::SetTransferProtocol => {
-                // T
-                self.set_transfer_protocol(action).await?;
-            }
-            CommandType::UploadFile => {
-                // U
-                self.upload_file(action).await?;
-            }
-            CommandType::ViewSettings => {
-                // V
-                self.view_settings(action).await?;
-            }
+                CommandType::FileDirectory => {
+                    // F
+                    self.show_file_directories(action).await?;
+                }
 
-            CommandType::WriteSettings => {
-                // W
-                self.write_settings(action).await?;
-            }
-            CommandType::ExpertMode => {
-                // X
-                self.set_expert_mode().await?;
-            }
-            CommandType::PersonalMail => {
-                // Y
-                self.personal_mail(action).await?;
-            }
-            CommandType::ZippyDirectoryScan => {
-                // Z
-                self.zippy_directory_scan(action).await?;
-            }
+                CommandType::Goodbye => {
+                    // G
+                    self.goodbye_cmd().await?;
+                }
+                CommandType::Bye => {
+                    // BYE
+                    self.bye_cmd().await?;
+                }
+                CommandType::Help => {
+                    // H
+                    self.show_help().await?;
+                }
+                CommandType::InitialWelcome => {
+                    // I
+                    self.initial_welcome().await?;
+                }
+                CommandType::JoinConference => {
+                    // J
+                    self.join_conference(action).await?;
+                }
+                CommandType::DeleteMessage => {
+                    // K
+                    self.delete_message(action).await?;
+                }
+                CommandType::LocateFile => {
+                    // L
+                    self.find_files(action).await?;
+                }
+                CommandType::ToggleGraphics => {
+                    // M
+                    self.toggle_graphics().await?;
+                }
+                CommandType::NewFileScan => {
+                    // N
+                    self.find_new_files(action, 60000).await?;
+                }
+                CommandType::PageSysop => {
+                    // O
+                    self.page_sysop(action).await?;
+                }
+                CommandType::SetPageLength => {
+                    // P
+                    self.set_page_len(action).await?;
+                }
+                CommandType::QuickMessageScan => {
+                    // Q
+                    self.quick_message_scan(action).await?;
+                }
+                CommandType::ReadMessages => {
+                    // R
+                    self.read_messages(action).await?;
+                }
+                CommandType::Survey => {
+                    // S
+                    self.take_survey(action).await?;
+                }
+                CommandType::SetTransferProtocol => {
+                    // T
+                    self.set_transfer_protocol(action).await?;
+                }
+                CommandType::UploadFile => {
+                    // U
+                    self.upload_file(action).await?;
+                }
+                CommandType::ViewSettings => {
+                    // V
+                    self.view_settings(action).await?;
+                }
 
-            CommandType::ShowMenu => {
-                // MENU
-                self.display_menu().await?;
-                self.display_menu = false;
-            }
+                CommandType::WriteSettings => {
+                    // W
+                    self.write_settings(action).await?;
+                }
+                CommandType::ExpertMode => {
+                    // X
+                    self.set_expert_mode().await?;
+                }
+                CommandType::PersonalMail => {
+                    // Y
+                    self.personal_mail(action).await?;
+                }
+                CommandType::ZippyDirectoryScan => {
+                    // Z
+                    self.zippy_directory_scan(action).await?;
+                }
 
-            CommandType::DisplayNews => {
-                // NEWS
-                self.display_news().await?;
-            }
-            CommandType::UserList => {
-                // USER
-                self.show_user_list(action).await?;
-            }
-            CommandType::SetLanguage => {
-                // LANG
-                self.set_language(action).await?;
-            }
-            CommandType::EnableAlias => {
-                // ALIAS
-                self.toggle_alias(action).await?;
-            }
-            CommandType::WhoIsOnline => {
-                // WHO
-                self.who_display_nodes(action).await?;
-            }
+                CommandType::ShowMenu => {
+                    // MENU
+                    self.display_menu().await?;
+                    self.display_menu = false;
+                }
 
-            CommandType::OpenDoor => {
-                // DOOR/OPEN
-                self.open_door(action).await?;
-            }
+                CommandType::DisplayNews => {
+                    // NEWS
+                    self.display_news().await?;
+                }
+                CommandType::UserList => {
+                    // USER
+                    self.show_user_list(action).await?;
+                }
+                CommandType::SetLanguage => {
+                    // LANG
+                    self.set_language(action).await?;
+                }
+                CommandType::EnableAlias => {
+                    // ALIAS
+                    self.toggle_alias(action).await?;
+                }
+                CommandType::WhoIsOnline => {
+                    // WHO
+                    self.who_display_nodes(action).await?;
+                }
 
-            CommandType::RestoreMessage => {
-                // 4
-                self.restore_message(action).await?;
-            }
+                CommandType::OpenDoor => {
+                    // DOOR/OPEN
+                    self.open_door(action).await?;
+                }
 
-            CommandType::ReadEmail => {
-                // @
-                self.read_email(action).await?;
-            }
-            CommandType::RunPPE => {
-                // PPE
-                self.ppe_run().await?;
-            }
+                CommandType::RestoreMessage => {
+                    // 4
+                    self.restore_message(action).await?;
+                }
 
-            CommandType::TextSearch => {
-                // TS
-                self.text_search(action).await?;
-            }
+                CommandType::ReadEmail => {
+                    // @
+                    self.read_email(action).await?;
+                }
+                CommandType::RunPPE => {
+                    // PPE
+                    self.ppe_run().await?;
+                }
 
-            CommandType::Broadcast => {
-                // BR
-                self.broadcast(action).await?;
-            }
+                CommandType::TextSearch => {
+                    // TS
+                    self.text_search(action).await?;
+                }
 
-            _ => {
-                return Err(Box::new(IcyBoardError::UnknownAction(format!("{:?}", action.command_type))));
+                CommandType::Broadcast => {
+                    // BR
+                    self.broadcast(action).await?;
+                }
+
+                _ => {
+                    return Err(Box::new(IcyBoardError::UnknownAction(format!("{:?}", cmd_action.command_type))));
+                }
             }
         }
         self.state.session.tokens.clear();

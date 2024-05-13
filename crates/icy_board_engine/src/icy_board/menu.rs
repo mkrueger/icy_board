@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use crate::vm::errors::IcyError;
 
 use super::{
-    commands::{Command, CommandType},
+    commands::{ActionTrigger, Command, CommandAction, CommandType},
     is_false, path_is_empty, read_with_encoding_detection,
     security::RequiredSecurity,
     IcyBoardSerializer,
@@ -112,7 +112,7 @@ impl Menu {
                 11 => CommandType::Goodbye,
                 12 => CommandType::QuitMenu,
                 13 => CommandType::ExitMenus,
-                14 => CommandType::PPE,
+                14 => CommandType::RunPPE,
                 15 => CommandType::StuffTextAndExitMenu,
                 16 => CommandType::StuffTextAndExitMenuSilent,
                 17 => CommandType::Disabled,
@@ -131,10 +131,14 @@ impl Menu {
                 keyword,
                 display: "".to_string(),
                 lighbar_display: "".to_string(),
+                position: Default::default(),
                 security: RequiredSecurity::new(security),
                 help: "".to_string(),
-                command_type: cmd_type,
-                parameter,
+                actions: vec![CommandAction {
+                    command_type: cmd_type,
+                    parameter,
+                    trigger: ActionTrigger::default(),
+                }],
             });
         }
 

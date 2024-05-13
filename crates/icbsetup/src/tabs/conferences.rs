@@ -42,7 +42,7 @@ impl ConferencesTab {
             table_state: TableState::default().with_selected(0),
             icy_board: icy_board.clone(),
             in_edit_mode: false,
-            conference_config: ConfigMenu { items },
+            conference_config: ConfigMenu { entry: items },
             state: ConfigMenuState::default(),
             edit_conference: 0,
         }
@@ -258,7 +258,7 @@ impl ConferencesTab {
                 ],
             ),
         ];
-        self.conference_config.items = items;
+        self.conference_config.entry = items;
     }
 
     fn write_config(&self) {
@@ -277,6 +277,9 @@ impl ConferencesTab {
                 "password" => conf.password = Password::PlainText(text.clone()),
                 _ => panic!("Unknown id: {}", item.id),
             },
+            ListValue::ComboBox(_) => {
+                panic!("Unknown id: {}", item.id);
+            }
             ListValue::Path(path) => match item.id.as_str() {
                 "users_menu" => conf.users_menu = path.clone(),
                 "sysop_menu" => conf.sysop_menu = path.clone(),
