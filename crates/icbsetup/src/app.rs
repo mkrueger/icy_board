@@ -19,6 +19,7 @@ pub fn new_main_window<'a>(icy_board: Arc<Mutex<IcyBoard>>, full_screen: bool) -
     let date_format = icy_board.lock().unwrap().config.board.date_format.clone();
     App {
         full_screen,
+        title: " IcyBoard Setup Utility".to_string(),
         mode: Mode::default(),
         tab: 0,
         date_format,
@@ -40,5 +41,6 @@ pub fn new_main_window<'a>(icy_board: Arc<Mutex<IcyBoard>>, full_screen: bool) -
                 panic!("Unknown id: {}", id);
             }
         }),
+        save: false,
     }
 }

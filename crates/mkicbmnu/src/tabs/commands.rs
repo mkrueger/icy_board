@@ -1,12 +1,12 @@
 use std::sync::{Arc, Mutex};
 
 use crossterm::event::{KeyCode, KeyEvent};
-use icy_board_engine::icy_board::menu::Menu;
-use icy_board_tui::{config_menu::ResultState, insert_table::InsertTable, pcb_line::get_styled_pcb_line, tab_page::TabPage};
+use icy_board_engine::icy_board::{menu::Menu, IcyBoard};
+use icy_board_tui::{config_menu::ResultState, insert_table::InsertTable, pcb_line::get_styled_pcb_line, tab_page::TabPage, theme::THEME};
 use ratatui::{
     layout::{Margin, Rect},
     text::Line,
-    widgets::{Clear, ScrollbarState, TableState, Widget},
+    widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget},
     Frame,
 };
 
@@ -16,21 +16,27 @@ pub struct CommandsTab<'a> {
     menu: Arc<Mutex<Menu>>,
     insert_table: InsertTable<'a>,
     edit_cmd_dialog: Option<EditCommandDialog<'a>>,
+    icy_board: Arc<Mutex<IcyBoard>>,
 }
 
 impl<'a> CommandsTab<'a> {
-    pub fn new(menu: Arc<Mutex<Menu>>) -> Self {
-        let len = menu.lock().unwrap().commands.len();
+    pub fn new(icy_board: Arc<Mutex<IcyBoard>>, menu: Arc<Mutex<Menu>>) -> Self {
+        let len = menu.lock().unwrap().commands.len().max(1);
         let mnu2 = menu.clone();
         let insert_table = InsertTable {
             scroll_state: ScrollbarState::default().content_length(len),
-            table_state: TableState::default(),
+            table_state: TableState::default().with_selected(0),
             headers: vec![String::new(), "Keyword".to_string(), "Display".to_string()],
-            get_content: Box::new(move |_table, i, j| match j {
-                0 => Line::from(format!("{})", i)),
-                1 => Line::from(mnu2.lock().unwrap().commands[*i].keyword.clone()),
-                2 => get_styled_pcb_line(&mnu2.lock().unwrap().commands[*i].display),
-                _ => Line::from("".to_string()),
+            get_content: Box::new(move |_table, i, j| {
+                if *i >= mnu2.lock().unwrap().commands.len() {
+                    return Line::from("".to_string());
+                }
+                match j {
+                    0 => Line::from(format!("{})", i)),
+                    1 => Line::from(mnu2.lock().unwrap().commands[*i].keyword.clone()),
+                    2 => get_styled_pcb_line(&mnu2.lock().unwrap().commands[*i].display),
+                    _ => Line::from("".to_string()),
+                }
             }),
             content_length: len,
         };
@@ -39,6 +45,7 @@ impl<'a> CommandsTab<'a> {
             insert_table,
             menu,
             edit_cmd_dialog: None,
+            icy_board,
         }
     }
     fn insert(&mut self) {
@@ -95,8 +102,18 @@ impl<'a> TabPage for CommandsTab<'a> {
             dialog.ui(frame, area);
             return;
         }
-        let area = area.inner(&Margin { vertical: 2, horizontal: 2 });
+        let area = area.inner(&Margin::new(2, 2));
+
         Clear.render(area, frame.buffer_mut());
+
+        let block = Block::new()
+            .style(THEME.content_box)
+            .padding(Padding::new(2, 2, 1, 1))
+            .borders(Borders::ALL)
+            .border_type(BorderType::Double);
+        block.render(area, frame.buffer_mut());
+
+        let area = area.inner(&Margin::new(1, 1));
         self.insert_table.render_table(frame, area);
     }
 
@@ -125,7 +142,7 @@ impl<'a> TabPage for CommandsTab<'a> {
                 if let Some(selected) = self.insert_table.table_state.selected() {
                     let cmd = self.menu.lock().unwrap().commands[selected].clone();
                     let m = self.menu.clone();
-                    self.edit_cmd_dialog = Some(EditCommandDialog::new(m, cmd));
+                    self.edit_cmd_dialog = Some(EditCommandDialog::new(self.icy_board.clone(), m, cmd, selected + 1));
                     return ResultState::status_line(String::new());
                 }
             }

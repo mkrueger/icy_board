@@ -344,7 +344,7 @@ impl Display for Position {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Default)]
+#[derive(Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct Command {
     #[serde(default)]
     pub display: String,
@@ -379,7 +379,7 @@ pub enum ActionTrigger {
     Selection,
 }
 
-#[derive(Serialize, Clone, Deserialize, Default)]
+#[derive(Serialize, Clone, Deserialize, Default, PartialEq)]
 pub struct CommandAction {
     pub command_type: CommandType,
 

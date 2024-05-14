@@ -255,9 +255,9 @@ impl ListItem {
             }
             ListValue::ComboBox(c) => {
                 let mut area = area;
-                Clear.render(area, frame.buffer_mut());
                 area.width = c.values.iter().map(|l| l.display.len()).max().unwrap_or(0) as u16 + 2;
                 area.height = c.values.len().min(12) as u16;
+                Clear.render(area, frame.buffer_mut());
 
                 let block = Block::new()
                     //  .title(Title::from(Span::from(" Edit Action ").style(THEME.content_box_title)).alignment(Alignment::Center))

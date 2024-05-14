@@ -2,7 +2,7 @@ use core::panic;
 use std::sync::{Arc, Mutex};
 
 use crossterm::event::KeyEvent;
-use icy_board_engine::icy_board::menu::Menu;
+use icy_board_engine::icy_board::{menu::Menu, IcyBoard};
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, EditMode, ListItem, ListValue, ResultState},
     tab_page::TabPage,
@@ -18,11 +18,14 @@ pub struct GeneralTab {
     state: ConfigMenuState,
     config: ConfigMenu,
     menu: Arc<Mutex<Menu>>,
+    original: Menu,
+    _icy_board: Arc<Mutex<IcyBoard>>,
 }
 
 impl GeneralTab {
-    pub fn new(menu: Arc<Mutex<Menu>>) -> Self {
+    pub fn new(icy_board: Arc<Mutex<IcyBoard>>, menu: Arc<Mutex<Menu>>) -> Self {
         let info_width = 16;
+        let original = menu.lock().unwrap().clone();
 
         let items = if let Ok(mnu) = menu.lock() {
             vec![
@@ -57,6 +60,8 @@ impl GeneralTab {
                 entry: vec![ConfigEntry::Group(String::new(), items)],
             },
             menu,
+            original,
+            _icy_board: icy_board,
         }
     }
 
@@ -107,7 +112,9 @@ impl TabPage for GeneralTab {
     fn title(&self) -> String {
         "General".to_string()
     }
-
+    fn is_dirty(&self) -> bool {
+        self.menu.lock().unwrap().clone() != self.original
+    }
     fn has_control(&self) -> bool {
         self.state.in_edit
     }

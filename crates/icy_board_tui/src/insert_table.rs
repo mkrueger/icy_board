@@ -19,7 +19,7 @@ pub struct InsertTable<'a> {
 }
 
 impl<'a> InsertTable<'a> {
-    pub fn render_table(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn render_table(&mut self, frame: &mut Frame, mut area: Rect) {
         let header = self
             .headers
             .iter()
@@ -47,8 +47,9 @@ impl<'a> InsertTable<'a> {
             .header(header)
             .highlight_style(THEME.selected_item)
             .highlight_symbol(Text::from(vec!["".into(), bar.into(), bar.into(), "".into()]))
-            //.bg(THEME.content.bg.unwrap())
+            .style(THEME.table)
             .highlight_spacing(HighlightSpacing::Always);
+        area.width -= 1;
         frame.render_stateful_widget(table, area, &mut self.table_state);
     }
 

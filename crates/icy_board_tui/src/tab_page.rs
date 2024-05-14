@@ -25,6 +25,10 @@ pub trait TabPage {
     fn get_help(&self) -> Text<'static> {
         Text::from("")
     }
+
+    fn is_dirty(&self) -> bool {
+        false
+    }
 }
 
 pub trait Editor {

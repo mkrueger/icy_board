@@ -25,6 +25,7 @@ pub struct Theme {
     pub filter_text: Style,
     pub description_text: Style,
 
+    pub table: Style,
     pub table_header: Style,
     pub help_box: Style,
     pub swatch: bool,
@@ -80,6 +81,7 @@ pub const THEME: Theme = /* Theme {
         config_title: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_CYAN),
         value: Style::new().bg(DOS_BLACK).fg(LIGHT_GRAY),
         edit_value: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
+        table: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
         table_header: Style::new().bg(DOS_BLACK).fg(DOS_CYAN),
 
         filter_text: Style::new().bg(DOS_BLUE).fg(DOS_YELLOW),

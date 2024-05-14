@@ -5,6 +5,7 @@ use icy_board_engine::{
     icy_board::{
         commands::{ActionTrigger, Command, CommandAction, CommandType},
         menu::Menu,
+        IcyBoard,
     },
     Res,
 };
@@ -32,6 +33,7 @@ enum EditCommandMode {
 
 pub struct EditCommandDialog<'a> {
     pub command: Arc<Mutex<Command>>,
+    id: usize,
     mode: EditCommandMode,
 
     state: ConfigMenuState,
@@ -44,12 +46,12 @@ pub struct EditCommandDialog<'a> {
 }
 
 impl<'a> EditCommandDialog<'a> {
-    pub(crate) fn new(menu: Arc<Mutex<Menu>>, command: Command) -> Self {
+    pub(crate) fn new(icy_board: Arc<Mutex<IcyBoard>>, menu: Arc<Mutex<Menu>>, command: Command, id: usize) -> Self {
         let info_width = 16;
 
         let command_arc = Arc::new(Mutex::new(command.clone()));
         let cmd3 = command_arc.clone();
-        let file = menu.lock().unwrap().display_file.clone();
+        let file = icy_board.lock().unwrap().resolve_file(&menu.lock().unwrap().display_file);
 
         let buffer = if file.exists() {
             icy_engine::Buffer::load_buffer(&file, true).unwrap()
@@ -123,21 +125,27 @@ impl<'a> EditCommandDialog<'a> {
         ];
 
         let cmd2 = command_arc.clone();
-        let content_length = cmd2.lock().unwrap().actions.len();
+        let content_length = cmd2.lock().unwrap().actions.len().max(1);
         let insert_table = InsertTable {
             scroll_state: ScrollbarState::default().content_length(command_arc.lock().unwrap().actions.len()),
-            table_state: TableState::default(),
-            headers: vec!["Command Type                   ".to_string(), "Parameter".to_string()],
-            get_content: Box::new(move |_table, i, j| match j {
-                0 => Line::from(format!("{:?}", cmd2.lock().unwrap().actions[*i].command_type)),
-                1 => Line::from(cmd2.lock().unwrap().actions[*i].parameter.clone()),
-                _ => Line::from("".to_string()),
+            table_state: TableState::default().with_selected(0),
+            headers: vec!["Command Type    ".to_string(), "Parameter".to_string()],
+            get_content: Box::new(move |_table, i, j| {
+                if *i >= cmd2.lock().unwrap().actions.len() {
+                    return Line::from("".to_string());
+                }
+                match j {
+                    0 => Line::from(format!("{:?}", cmd2.lock().unwrap().actions[*i].command_type)),
+                    1 => Line::from(cmd2.lock().unwrap().actions[*i].parameter.clone()),
+                    _ => Line::from("".to_string()),
+                }
             }),
             content_length,
         };
 
         Self {
             command: command_arc,
+            id,
             state: ConfigMenuState::default(),
             config: ConfigMenu {
                 entry: vec![ConfigEntry::Group(String::new(), items)],
@@ -205,23 +213,54 @@ impl<'a> EditCommandDialog<'a> {
                     self.mode = EditCommandMode::Config;
                 }
             }
-            KeyCode::Insert => {
-                self.command.lock().unwrap().actions.push(CommandAction::default());
-                self.insert_table.content_length = self.command.lock().unwrap().actions.len();
-                self.insert_table.scroll_state = self.insert_table.scroll_state.content_length(self.insert_table.content_length);
-            }
 
             _ => match self.mode {
                 EditCommandMode::Config => {
                     self.config.handle_key_press(key, &mut self.state);
                     self.write_back_values();
                 }
-                EditCommandMode::Table => {
-                    if key.code == KeyCode::Enter {
+                EditCommandMode::Table => match key.code {
+                    KeyCode::Char('1') => {
+                        if let Some(selected) = self.insert_table.table_state.selected() {
+                            if selected > 0 {
+                                let mut menu = self.command.lock().unwrap();
+                                menu.actions.swap(selected, selected - 1);
+                                self.insert_table.table_state.select(Some(selected - 1));
+                            }
+                        }
+                    }
+                    KeyCode::Char('2') => {
+                        if let Some(selected) = self.insert_table.table_state.selected() {
+                            if selected + 1 < self.command.lock().unwrap().actions.len() {
+                                let mut menu = self.command.lock().unwrap();
+                                menu.actions.swap(selected, selected + 1);
+                                self.insert_table.table_state.select(Some(selected + 1));
+                            }
+                        }
+                    }
+
+                    KeyCode::Insert => {
+                        self.command.lock().unwrap().actions.push(CommandAction::default());
+                        self.insert_table.content_length = self.command.lock().unwrap().actions.len();
+                        self.insert_table.scroll_state = self.insert_table.scroll_state.content_length(self.insert_table.content_length);
+                    }
+                    KeyCode::Delete => {
+                        if let Some(selected_item) = self.insert_table.table_state.selected() {
+                            if selected_item < self.command.lock().unwrap().actions.len() {
+                                self.command.lock().unwrap().actions.remove(selected_item);
+                                self.insert_table.content_length = self.command.lock().unwrap().actions.len();
+                            }
+                        }
+                    }
+
+                    KeyCode::Enter => {
                         self.edit_config_state = ConfigMenuState::default();
 
                         if let Some(selected_item) = self.insert_table.table_state.selected() {
-                            let action = &mut self.command.lock().unwrap().actions[selected_item];
+                            let cmd = self.command.lock().unwrap();
+                            let Some(action) = cmd.actions.get(selected_item) else {
+                                return Ok(true);
+                            };
                             let parameter = action.parameter.clone();
 
                             self.edit_config = Some(ConfigMenu {
@@ -258,10 +297,11 @@ impl<'a> EditCommandDialog<'a> {
                         } else {
                             self.insert_table.handle_key_press(key)?;
                         }
-                    } else {
+                    }
+                    _ => {
                         self.insert_table.handle_key_press(key)?;
                     }
-                }
+                },
             },
         }
         Ok(true)
@@ -301,11 +341,11 @@ impl<'a> EditCommandDialog<'a> {
     }
 
     pub fn ui(&mut self, frame: &mut Frame, screen: Rect) {
-        let area = screen;
+        let area = screen.inner(&Margin::new(2, 2));
         Clear.render(area, frame.buffer_mut());
 
         let block = Block::new()
-            .title(Title::from(Span::from(" Command ID 1 ").style(THEME.content_box_title)).alignment(Alignment::Center))
+            .title(Title::from(Span::from(format!(" Command ID {} ", self.id)).style(THEME.content_box_title)).alignment(Alignment::Center))
             .style(THEME.content_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
@@ -338,7 +378,8 @@ impl<'a> EditCommandDialog<'a> {
         self.insert_table.table_state.select(sel);
 
         if let Some(edit_config) = &mut self.edit_config {
-            let area = area.inner(&Margin { vertical: 8, horizontal: 5 });
+            let area = area.inner(&Margin { vertical: 6, horizontal: 3 });
+            Clear.render(area, frame.buffer_mut());
             let block = Block::new()
                 .title(Title::from(Span::from(" Edit Action ").style(THEME.content_box_title)).alignment(Alignment::Center))
                 .style(THEME.content_box)

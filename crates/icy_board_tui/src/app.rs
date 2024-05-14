@@ -9,16 +9,18 @@ use ratatui::{prelude::*, widgets::*};
 use crate::{
     colors::RgbSwatch,
     config_menu::EditMode,
+    get_text,
     help_view::{HelpView, HelpViewState},
     tab_page::{Editor, TabPage},
     term::next_event,
-    theme::THEME,
+    theme::{DOS_DARK_GRAY, DOS_LIGHT_GRAY, DOS_WHITE, THEME},
     TerminalType,
 };
 
 pub struct App<'a> {
     pub mode: Mode,
     pub tab: usize,
+    pub title: String,
     pub status_line: String,
     pub full_screen: bool,
     pub date_format: String,
@@ -27,6 +29,8 @@ pub struct App<'a> {
     pub help_state: HelpViewState<'a>,
     pub open_editor: Option<Box<dyn Editor>>,
     pub get_editor: Box<dyn Fn(&str, &PathBuf) -> Result<Option<Box<dyn Editor>>>>,
+
+    pub save: bool,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -34,6 +38,7 @@ pub enum Mode {
     #[default]
     Command,
     Quit,
+    RequestQuit,
     ShowHelp,
 }
 
@@ -97,6 +102,20 @@ impl<'a> App<'a> {
     }
 
     fn handle_key_press(&mut self, _terminal: &mut TerminalType, key: KeyEvent) {
+        if self.mode == Mode::RequestQuit {
+            match key.code {
+                KeyCode::Left | KeyCode::Right => self.save = !self.save,
+                KeyCode::Enter => {
+                    self.mode = Mode::Quit;
+                }
+                KeyCode::Esc => {
+                    self.mode = Mode::Command;
+                }
+                _ => {}
+            };
+            return;
+        }
+
         if let Some(editor) = &mut self.open_editor {
             if !editor.handle_key_press(key) {
                 self.open_editor = None;
@@ -127,7 +146,13 @@ impl<'a> App<'a> {
         }
 
         match key.code {
-            KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Quit,
+            KeyCode::Char('q') | KeyCode::Esc => {
+                if self.tabs.iter().any(|t| t.is_dirty()) {
+                    self.mode = Mode::RequestQuit;
+                } else {
+                    self.mode = Mode::Quit;
+                }
+            }
             KeyCode::Char('h') | KeyCode::Left => self.prev_tab(),
             KeyCode::Char('l') | KeyCode::Right => self.next_tab(),
             KeyCode::F(1) => {
@@ -160,6 +185,34 @@ impl<'a> App<'a> {
         self.render_selected_tab(frame, tab);
         App::render_key_help_view(key_bar, frame.buffer_mut());
         self.render_status_line(status_line, frame.buffer_mut());
+
+        if self.mode == Mode::RequestQuit {
+            let save_text = format!("{} ", get_text("icbtext_save_changes"));
+            let mut save_area = Rect::new(
+                area.x + (area.width - (save_text.len() as u16 + 10)) / 2,
+                area.y + (area.height - 3) / 2,
+                save_text.len() as u16 + 10,
+                3,
+            );
+
+            Clear.render(save_area, frame.buffer_mut());
+
+            Block::new()
+                .borders(Borders::ALL)
+                .style(THEME.content_box)
+                .border_type(BorderType::Double)
+                .render(save_area, frame.buffer_mut());
+
+            let field = Line::from(vec![
+                Span::styled(save_text, Style::default().fg(DOS_LIGHT_GRAY)),
+                Span::styled(get_text("yes"), Style::default().fg(if self.save { DOS_WHITE } else { DOS_DARK_GRAY })),
+                Span::styled("/", Style::default().fg(DOS_LIGHT_GRAY)),
+                Span::styled(get_text("no"), Style::default().fg(if !self.save { DOS_WHITE } else { DOS_DARK_GRAY })),
+            ]);
+            save_area.y += 1;
+            save_area.x += 1;
+            field.render(save_area.inner(&Margin { horizontal: 1, vertical: 0 }), frame.buffer_mut());
+        }
     }
 
     fn update_state(&mut self) {
@@ -180,7 +233,7 @@ impl<'a> App<'a> {
         let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(1 + len)]);
         let [title, tabs] = layout.areas(area);
 
-        Span::styled(format!(" IcyBoard Setup Utility"), THEME.app_title).render(title, buf);
+        Span::styled(&self.title, THEME.app_title).render(title, buf);
         let titles = self.tabs.iter().enumerate().map(|(i, t)| {
             if i == self.tab {
                 format!(" {} ", t.title())
