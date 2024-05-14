@@ -526,7 +526,7 @@ impl<'a> VirtualMachine<'a> {
             let p = self.cur_ptr;
             self.cur_ptr += 1;
             let c = self.script.statements[p].command.clone();
-            // log::warn!("Running command: {:?}", c);
+           // log::warn!("Running command: {:?}", c);
             self.execute_statement(&c).await?;
         }
         Ok(())
@@ -714,7 +714,10 @@ impl<'a> VirtualMachine<'a> {
                 (header.flags, header.variable_type)
             };
             if (flags & 0x1) == 0x0 {
-                self.variable_table.set_value(id, vtype.create_empty_value());
+                let entry = self.variable_table.get_var_entry(id);
+                let mut val = vtype.create_empty_value();
+                val.generic_data = entry.header.create_generic_data();
+                self.variable_table.set_value(id, val);
             }
         }
 
