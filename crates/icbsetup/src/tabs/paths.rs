@@ -310,10 +310,6 @@ impl<'a> PathTab<'a> {
 
     fn write_item(&self, item: &ListItem, icy_board: &mut IcyBoard) {
         match &item.value {
-            ListValue::Text(_, _text) => match item.id.as_str() {
-                _ => panic!("Unknown id: {}", item.id),
-            },
-            ListValue::ComboBox(_) => panic!("Unknown id: {}", item.id),
             ListValue::Path(path) => match item.id.as_str() {
                 "conf_data" => icy_board.config.paths.conferences = path.clone(),
                 "home_dir" => icy_board.config.paths.home_dir = path.clone(),
@@ -349,16 +345,7 @@ impl<'a> PathTab<'a> {
 
                 _ => panic!("Unknown id: {}", item.id),
             },
-            ListValue::U32(_i, _, _) => match item.id.as_str() {
-                _ => panic!("Unknown id: {}", item.id),
-            },
-            ListValue::Bool(_b) => match item.id.as_str() {
-                _ => panic!("Unknown id: {}", item.id),
-            },
-            ListValue::Color(_c) => match item.id.as_str() {
-                _ => panic!("Unknown id: {}", item.id),
-            },
-            ListValue::ValueList(_, _) => todo!(),
+            _ => todo!(),
         }
     }
 }

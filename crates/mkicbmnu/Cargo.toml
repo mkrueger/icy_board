@@ -9,6 +9,7 @@ version.workspace = true
 [dependencies]
 icy_board_engine = { workspace = true }
 icy_board_tui = { workspace = true }
+icy_engine = { workspace = true }
 
 lazy_static = { workspace = true }
 thiserror = { workspace = true }

@@ -158,9 +158,6 @@ impl ServerTab {
                 "secure_websocket_address" => icy_board.config.login_server.secure_websocket.address = text.clone(),
                 _ => panic!("Unknown id: {}", item.id),
             },
-            ListValue::ComboBox(_) => {
-                panic!("Unknown id: {}", item.id);
-            }
             ListValue::Path(path) => match item.id.as_str() {
                 "telnet_display_file" => icy_board.config.login_server.telnet.display_file = path.clone(),
                 "ssh_display_file" => icy_board.config.login_server.ssh.display_file = path.clone(),
@@ -182,10 +179,7 @@ impl ServerTab {
                 "secure_websocket_is_enabled" => icy_board.config.login_server.secure_websocket.is_enabled = *b,
                 _ => panic!("Unknown id: {}", item.id),
             },
-            ListValue::Color(_c) => match item.id.as_str() {
-                _ => panic!("Unknown id: {}", item.id),
-            },
-            ListValue::ValueList(_, _) => todo!(),
+            _ => todo!(),
         }
     }
 }

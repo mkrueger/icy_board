@@ -6,6 +6,7 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use icy_board_engine::icy_board::icb_text::{IcbTextFile, IcbTextStyle, TextEntry};
 use icy_board_tui::{
     get_text, get_text_args,
+    pcb_line::get_styled_pcb_line,
     term::next_event,
     text_field::{TextField, TextfieldState},
     theme::{DOS_DARK_GRAY, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE, THEME},
@@ -367,7 +368,7 @@ impl<'a> App<'a> {
                     .style(Style::default().fg(DOS_LIGHT_CYAN).italic())
                     .render(area, frame.buffer_mut());
                 area.y += 1;
-                Line::from(get_styled_pcb_line(&self.edit_entry.text))
+                Text::from(get_styled_pcb_line(&self.edit_entry.text))
                     .style(convert_style(self.edit_entry.style))
                     .render(area, frame.buffer_mut());
                 area.y += 2;

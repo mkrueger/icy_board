@@ -35,7 +35,6 @@ pub async fn create_dorinfo(state: &IcyBoardState, path: &std::path::Path) -> Re
 
     let file_name = format!("DORINFO{}.DEF", state.node + 1);
     let path = path.join(&file_name);
-    log::info!("create {}: {}", file_name, path.display());
     fs::write(path, contents)?;
 
     Ok(())

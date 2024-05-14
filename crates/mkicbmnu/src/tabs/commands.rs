@@ -1,218 +1,91 @@
 use std::sync::{Arc, Mutex};
 
 use crossterm::event::{KeyCode, KeyEvent};
-use icy_board_engine::{icy_board::menu::Menu, Res};
-use icy_board_tui::{config_menu::ResultState, tab_page::TabPage, theme::THEME};
+use icy_board_engine::icy_board::menu::Menu;
+use icy_board_tui::{config_menu::ResultState, insert_table::InsertTable, pcb_line::get_styled_pcb_line, tab_page::TabPage};
 use ratatui::{
-    layout::{Constraint, Margin, Rect},
-    text::Text,
-    widgets::{Cell, Clear, HighlightSpacing, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState, Widget},
+    layout::{Margin, Rect},
+    text::Line,
+    widgets::{Clear, ScrollbarState, TableState, Widget},
     Frame,
 };
 
-pub struct InsertTable {
-    pub scroll_state: ScrollbarState,
-    pub table_state: TableState,
-    pub headers: Vec<String>,
-
-    pub get_content: Box<dyn Fn(&InsertTable, &usize, &usize) -> String>,
-    pub content_length: usize,
-}
-
-impl InsertTable {
-    pub fn render_table(&mut self, frame: &mut Frame, area: Rect) {
-        let header = self
-            .headers
-            .iter()
-            .cloned()
-            .map(Cell::from)
-            .collect::<Row>()
-            .style(THEME.table_header)
-            .height(1);
-
-        let mut rows = Vec::new();
-        for i in 0..self.content_length {
-            let mut row = Vec::new();
-            for j in 0..self.headers.len() {
-                row.push(Cell::from((self.get_content)(self, &i, &j)));
-            }
-            rows.push(Row::new(row));
-        }
-        let bar = " █ ";
-        let table = Table::new(
-            rows,
-            [
-                // + 1 is for padding.
-                Constraint::Length(self.headers[0].len() as u16 + 2),
-                Constraint::Min(25 + 1),
-            ],
-        )
-        .header(header)
-        .highlight_style(THEME.selected_item)
-        .highlight_symbol(Text::from(vec!["".into(), bar.into(), bar.into(), "".into()]))
-        //.bg(THEME.content.bg.unwrap())
-        .highlight_spacing(HighlightSpacing::Always);
-        frame.render_stateful_widget(table, area, &mut self.table_state);
-    }
-
-    pub(crate) fn handle_key_press(&mut self, key: KeyEvent) -> Res<()> {
-        match key.code {
-            KeyCode::Char('k') | KeyCode::Up => self.prev(),
-            KeyCode::Char('j') | KeyCode::Down => self.next(),
-            //KeyCode::Char('i') | KeyCode::Insert => self.insert(),
-            // KeyCode::Char('r') | KeyCode::Delete => self.remove(),
-            // KeyCode::Char('d') | KeyCode::Enter => self.edit(),
-            _ => {}
-        }
-        Ok(())
-    }
-
-    fn prev(&mut self) {
-        let i = match self.table_state.selected() {
-            Some(i) => {
-                if i > 0 {
-                    i - 1
-                } else {
-                    i
-                }
-            }
-            None => 0,
-        };
-        self.table_state.select(Some(i));
-        self.scroll_state = self.scroll_state.position(i * 1);
-    }
-
-    fn next(&mut self) {
-        let i = match self.table_state.selected() {
-            Some(i) => {
-                if i + 1 < self.content_length {
-                    i + 1
-                } else {
-                    i
-                }
-            }
-            None => 0,
-        };
-        self.table_state.select(Some(i));
-        self.scroll_state = self.scroll_state.position(i * 1);
-    }
-}
-
 use crate::edit_command_dialog::EditCommandDialog;
 
-pub struct CommandsTab {
+pub struct CommandsTab<'a> {
     menu: Arc<Mutex<Menu>>,
-    scroll_state: ScrollbarState,
-    table_state: TableState,
-    edit_cmd_dialog: Option<EditCommandDialog>,
+    insert_table: InsertTable<'a>,
+    edit_cmd_dialog: Option<EditCommandDialog<'a>>,
 }
 
-impl CommandsTab {
+impl<'a> CommandsTab<'a> {
     pub fn new(menu: Arc<Mutex<Menu>>) -> Self {
         let len = menu.lock().unwrap().commands.len();
-        Self {
+        let mnu2 = menu.clone();
+        let insert_table = InsertTable {
             scroll_state: ScrollbarState::default().content_length(len),
             table_state: TableState::default(),
+            headers: vec![String::new(), "Keyword".to_string(), "Display".to_string()],
+            get_content: Box::new(move |_table, i, j| match j {
+                0 => Line::from(format!("{})", i)),
+                1 => Line::from(mnu2.lock().unwrap().commands[*i].keyword.clone()),
+                2 => get_styled_pcb_line(&mnu2.lock().unwrap().commands[*i].display),
+                _ => Line::from("".to_string()),
+            }),
+            content_length: len,
+        };
+
+        Self {
+            insert_table,
             menu,
             edit_cmd_dialog: None,
         }
     }
-
-    fn render_scrollbar(&mut self, frame: &mut Frame, mut area: Rect) {
-        area.y += 1;
-        area.height -= 1;
-        frame.render_stateful_widget(
-            Scrollbar::default()
-                .style(THEME.content_box)
-                .orientation(ScrollbarOrientation::VerticalRight)
-                .begin_symbol(Some("▲"))
-                .thumb_symbol("█")
-                .track_symbol(Some("░"))
-                .end_symbol(Some("▼")),
-            area,
-            &mut self.scroll_state,
-        );
-    }
-    fn render_table(&mut self, frame: &mut Frame, area: Rect) {
-        let header = ["", "Keyword", "Display"]
-            .into_iter()
-            .map(Cell::from)
-            .collect::<Row>()
-            .style(THEME.table_header)
-            .height(1);
-        let l = self.menu.lock().unwrap();
-        let rows = l.commands.iter().enumerate().map(|(i, cmd)| {
-            Row::new(vec![
-                Cell::from(format!("{:-3})", i + 1)),
-                Cell::from(cmd.keyword.clone()),
-                Cell::from(cmd.display.clone()),
-            ])
-        });
-        let bar = " █ ";
-        let table = Table::new(
-            rows,
-            [
-                // + 1 is for padding.
-                Constraint::Length(4 + 1),
-                Constraint::Min(25 + 1),
-                Constraint::Min(25),
-            ],
-        )
-        .header(header)
-        .highlight_style(THEME.selected_item)
-        .highlight_symbol(Text::from(vec!["".into(), bar.into(), bar.into(), "".into()]))
-        //.bg(THEME.content.bg.unwrap())
-        .highlight_spacing(HighlightSpacing::Always);
-        frame.render_stateful_widget(table, area, &mut self.table_state);
-    }
-
-    fn prev(&mut self) {
-        if self.menu.lock().unwrap().commands.is_empty() {
-            return;
-        }
-        let i = match self.table_state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.menu.lock().unwrap().commands.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.table_state.select(Some(i));
-        self.scroll_state = self.scroll_state.position(i * 1);
-    }
-
-    fn next(&mut self) {
-        if self.menu.lock().unwrap().commands.is_empty() {
-            return;
-        }
-        let i = match self.table_state.selected() {
-            Some(i) => {
-                if i + 1 >= self.menu.lock().unwrap().commands.len() {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.table_state.select(Some(i));
-        self.scroll_state = self.scroll_state.position(i * 1);
-    }
-
     fn insert(&mut self) {
         self.menu
             .lock()
             .unwrap()
             .commands
             .push(icy_board_engine::icy_board::commands::Command::default());
-        self.scroll_state = self.scroll_state.content_length(self.menu.lock().unwrap().commands.len());
+        self.insert_table.scroll_state = self.insert_table.scroll_state.content_length(self.menu.lock().unwrap().commands.len());
+        self.insert_table.content_length += 1;
+    }
+
+    fn remove(&mut self) {
+        if let Some(selected) = self.insert_table.table_state.selected() {
+            self.menu.lock().unwrap().commands.remove(selected);
+            let len = self.menu.lock().unwrap().commands.len();
+            if len > 0 {
+                self.insert_table.table_state.select(Some(selected.min(len - 1)))
+            } else {
+                self.insert_table.table_state.select(None)
+            }
+            self.insert_table.content_length -= 1;
+        }
+    }
+
+    fn move_up(&mut self) {
+        if let Some(selected) = self.insert_table.table_state.selected() {
+            if selected > 0 {
+                let mut menu = self.menu.lock().unwrap();
+                menu.commands.swap(selected, selected - 1);
+                self.insert_table.table_state.select(Some(selected - 1));
+            }
+        }
+    }
+
+    fn move_down(&mut self) {
+        if let Some(selected) = self.insert_table.table_state.selected() {
+            if selected + 1 < self.menu.lock().unwrap().commands.len() {
+                let mut menu = self.menu.lock().unwrap();
+                menu.commands.swap(selected, selected + 1);
+                self.insert_table.table_state.select(Some(selected + 1));
+            }
+        }
     }
 }
 
-impl TabPage for CommandsTab {
+impl<'a> TabPage for CommandsTab<'a> {
     fn title(&self) -> String {
         "Commands".to_string()
     }
@@ -224,9 +97,7 @@ impl TabPage for CommandsTab {
         }
         let area = area.inner(&Margin { vertical: 2, horizontal: 2 });
         Clear.render(area, frame.buffer_mut());
-
-        self.render_table(frame, area);
-        self.render_scrollbar(frame, area);
+        self.insert_table.render_table(frame, area);
     }
 
     fn has_control(&self) -> bool {
@@ -236,7 +107,7 @@ impl TabPage for CommandsTab {
     fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
         if let Some(dialog) = &mut self.edit_cmd_dialog {
             if let Ok(false) = dialog.handle_key_press(key) {
-                if let Some(selected) = self.table_state.selected() {
+                if let Some(selected) = self.insert_table.table_state.selected() {
                     self.menu.lock().unwrap().commands[selected] = dialog.command.lock().unwrap().clone();
                 }
                 self.edit_cmd_dialog = None;
@@ -245,17 +116,22 @@ impl TabPage for CommandsTab {
             return ResultState::status_line(String::new());
         }
         match key.code {
-            KeyCode::Char('k') | KeyCode::Up => self.prev(),
-            KeyCode::Char('j') | KeyCode::Down => self.next(),
+            KeyCode::Char('1') => self.move_up(),
+            KeyCode::Char('2') => self.move_down(),
             KeyCode::Char('i') | KeyCode::Insert => self.insert(),
-            // KeyCode::Char('r') | KeyCode::Delete => self.remove(),
+            KeyCode::Char('r') | KeyCode::Delete => self.remove(),
+
             KeyCode::Char('d') | KeyCode::Enter => {
-                if let Some(selected) = self.table_state.selected() {
-                    self.edit_cmd_dialog = Some(EditCommandDialog::new(self.menu.lock().unwrap().commands[selected].clone()));
+                if let Some(selected) = self.insert_table.table_state.selected() {
+                    let cmd = self.menu.lock().unwrap().commands[selected].clone();
+                    let m = self.menu.clone();
+                    self.edit_cmd_dialog = Some(EditCommandDialog::new(m, cmd));
                     return ResultState::status_line(String::new());
                 }
             }
-            _ => {}
+            _ => {
+                let _ = self.insert_table.handle_key_press(key);
+            }
         }
         ResultState::default()
     }

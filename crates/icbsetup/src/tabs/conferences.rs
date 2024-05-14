@@ -277,9 +277,6 @@ impl ConferencesTab {
                 "password" => conf.password = Password::PlainText(text.clone()),
                 _ => panic!("Unknown id: {}", item.id),
             },
-            ListValue::ComboBox(_) => {
-                panic!("Unknown id: {}", item.id);
-            }
             ListValue::Path(path) => match item.id.as_str() {
                 "users_menu" => conf.users_menu = path.clone(),
                 "sysop_menu" => conf.sysop_menu = path.clone(),
@@ -309,8 +306,7 @@ impl ConferencesTab {
                 "is_public" => conf.is_public = *b,
                 _ => panic!("Unknown id: {}", item.id),
             },
-            ListValue::Color(_) => todo!(),
-            ListValue::ValueList(_, _) => todo!(),
+            _ => todo!(),
         }
     }
 }

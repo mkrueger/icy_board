@@ -76,7 +76,7 @@ fn main() -> Result<()> {
     }
 
     match Menu::load(&file) {
-        Ok(mut mnu) => {
+        Ok(mnu) => {
             let terminal = &mut term::init()?;
             let mnu = Arc::new(Mutex::new(mnu));
             new_main_window(mnu.clone(), arguments.full_screen).run(terminal)?;

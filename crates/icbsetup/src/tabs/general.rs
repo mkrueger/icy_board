@@ -540,12 +540,6 @@ impl GeneralTab {
                 "f10" => icy_board.config.func_keys[9] = text.clone(),
                 _ => panic!("Unknown id: {}", item.id),
             },
-            ListValue::ComboBox(_) => {
-                panic!("Unknown id: {}", item.id);
-            }
-            ListValue::Path(_path) => match item.id.as_str() {
-                _ => panic!("Unknown id: {}", item.id),
-            },
             ListValue::U32(i, _, _) => match item.id.as_str() {
                 "sec_level" => icy_board.config.new_user_settings.sec_level = *i as u8,
                 "num_nodes" => icy_board.config.board.num_nodes = *i as u16,
@@ -608,6 +602,7 @@ impl GeneralTab {
                 "date_format" => icy_board.config.board.date_format = val.clone(),
                 _ => panic!("Unknown id: {}", item.id),
             },
+            _ => panic!("Unknown id: {}", item.id),
         }
     }
 }

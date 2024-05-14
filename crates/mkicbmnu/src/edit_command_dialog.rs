@@ -2,22 +2,27 @@ use std::sync::{Arc, Mutex};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
-    icy_board::commands::{ActionTrigger, Command, CommandAction, CommandType},
+    icy_board::{
+        commands::{ActionTrigger, Command, CommandAction, CommandType},
+        menu::Menu,
+    },
     Res,
 };
 use icy_board_tui::{
     config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
+    insert_table::InsertTable,
+    pcb_line::get_styled_pcb_line,
+    position_editor::PositionEditor,
     theme::THEME,
 };
+use icy_engine::TextPane;
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Margin, Rect},
-    text::Span,
+    text::{Line, Span},
     widgets::{block::Title, Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget},
     Frame,
 };
 use strum::IntoEnumIterator;
-
-use crate::InsertTable;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum EditCommandMode {
@@ -25,23 +30,36 @@ enum EditCommandMode {
     Table,
 }
 
-pub struct EditCommandDialog {
+pub struct EditCommandDialog<'a> {
     pub command: Arc<Mutex<Command>>,
     mode: EditCommandMode,
 
     state: ConfigMenuState,
     config: ConfigMenu,
 
-    insert_table: InsertTable,
+    insert_table: InsertTable<'a>,
 
     edit_config_state: ConfigMenuState,
     edit_config: Option<ConfigMenu>,
 }
 
-impl EditCommandDialog {
-    pub(crate) fn new(command: Command) -> Self {
+impl<'a> EditCommandDialog<'a> {
+    pub(crate) fn new(menu: Arc<Mutex<Menu>>, command: Command) -> Self {
         let info_width = 16;
 
+        let command_arc = Arc::new(Mutex::new(command.clone()));
+        let cmd3 = command_arc.clone();
+        let file = menu.lock().unwrap().display_file.clone();
+
+        let buffer = if file.exists() {
+            icy_engine::Buffer::load_buffer(&file, true).unwrap()
+        } else {
+            icy_engine::Buffer::new((80, 25))
+        };
+
+        let position_editor = Arc::new(Mutex::new(PositionEditor { buffer }));
+
+        let pos_ed = position_editor.clone();
         let items = vec![
             ConfigEntry::Item(
                 ListItem::new("text", "Display Text".to_string(), ListValue::Text(25, command.display.clone()))
@@ -58,9 +76,44 @@ impl EditCommandDialog {
                 .with_label_width(info_width),
             ),
             ConfigEntry::Item(
-                ListItem::new("position", "Position".to_string(), ListValue::Text(10, command.position.to_string()))
-                    .with_status("The help file to display.")
-                    .with_label_width(info_width),
+                ListItem::new(
+                    "position",
+                    "Position".to_string(),
+                    ListValue::Position(
+                        Box::new(move |frame, pos| {
+                            let size = pos_ed.lock().unwrap().buffer.get_size();
+                            let area = Rect::new(
+                                (frame.size().width - size.width as u16) / 2,
+                                (frame.size().height - size.height as u16) / 2,
+                                size.width as u16,
+                                size.height as u16,
+                            );
+
+                            pos_ed.lock().unwrap().ui(frame, pos, area);
+
+                            for c in menu.lock().unwrap().commands.iter() {
+                                if c.display == cmd3.lock().unwrap().display {
+                                    continue;
+                                };
+                                let position_line = get_styled_pcb_line(&c.display);
+                                let line_area = Rect::new(area.x + c.position.x, area.y + c.position.y, position_line.width() as u16, 1);
+                                position_line.render(line_area, frame.buffer_mut());
+                            }
+                            for c in menu.lock().unwrap().commands.iter() {
+                                if c.display != cmd3.lock().unwrap().display {
+                                    continue;
+                                }
+                                let position_line = get_styled_pcb_line(&c.display);
+                                let line_area = Rect::new(area.x + pos.x, area.y + pos.y, position_line.width() as u16, 1);
+                                position_line.render(line_area, frame.buffer_mut());
+                            }
+                        }),
+                        Box::new(move |evt, pos| position_editor.lock().unwrap().handle_event(evt, pos)),
+                        command.position,
+                    ),
+                )
+                .with_status("The help file to display.")
+                .with_label_width(info_width),
             ),
             ConfigEntry::Item(
                 ListItem::new("keyword", "Keyword".to_string(), ListValue::Text(10, command.keyword.to_string()))
@@ -69,23 +122,22 @@ impl EditCommandDialog {
             ),
         ];
 
-        let command = Arc::new(Mutex::new(command));
-        let cmd2 = command.clone();
+        let cmd2 = command_arc.clone();
         let content_length = cmd2.lock().unwrap().actions.len();
         let insert_table = InsertTable {
-            scroll_state: ScrollbarState::default().content_length(command.lock().unwrap().actions.len()),
+            scroll_state: ScrollbarState::default().content_length(command_arc.lock().unwrap().actions.len()),
             table_state: TableState::default(),
             headers: vec!["Command Type                   ".to_string(), "Parameter".to_string()],
             get_content: Box::new(move |_table, i, j| match j {
-                0 => format!("{:?}", cmd2.lock().unwrap().actions[*i].command_type),
-                1 => cmd2.lock().unwrap().actions[*i].parameter.clone(),
-                _ => "".to_string(),
+                0 => Line::from(format!("{:?}", cmd2.lock().unwrap().actions[*i].command_type)),
+                1 => Line::from(cmd2.lock().unwrap().actions[*i].parameter.clone()),
+                _ => Line::from("".to_string()),
             }),
             content_length,
         };
 
         Self {
-            command,
+            command: command_arc,
             state: ConfigMenuState::default(),
             config: ConfigMenu {
                 entry: vec![ConfigEntry::Group(String::new(), items)],
@@ -233,9 +285,9 @@ impl EditCommandDialog {
                         }
                     }
                     "position" => {
-                        /*   if let ListValue::Text(_, ref value) = item.value {
-                            self.command.lock().unwrap().position = value.parse().unwrap();
-                        }*/
+                        if let ListValue::Position(_, _, ref value) = item.value {
+                            self.command.lock().unwrap().position = value.clone();
+                        }
                     }
                     "keyword" => {
                         if let ListValue::Text(_, ref value) = item.value {
@@ -270,6 +322,10 @@ impl EditCommandDialog {
         }
         self.config.render(header, frame, &mut self.state);
         if self.state.in_edit {
+            // POSITION EDIT (full screen editor)
+            if self.state.selected == 2 {
+                return;
+            }
             self.config.get_item(self.state.selected).unwrap().text_field_state.set_cursor_position(frame);
         }
         self.state.selected = sel;

@@ -1,7 +1,8 @@
 use std::fmt::Display;
 
 use crate::Res;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 use strum::{EnumIter, EnumString};
 
 use super::{security::RequiredSecurity, IcyBoardSerializer, PCBoardRecordImporter};
@@ -296,10 +297,28 @@ impl Display for CommandType {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Clone, PartialEq, Default)]
 pub struct Position {
     pub x: u16,
     pub y: u16,
+}
+
+impl Serialize for Position {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        (&self.x, &self.y).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Position {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Deserialize::deserialize(deserializer).map(|(x, y)| Position { x, y })
+    }
 }
 
 impl Display for Position {
@@ -310,11 +329,17 @@ impl Display for Position {
 
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Command {
+    #[serde(default)]
     pub display: String,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub lighbar_display: String,
 
+    #[serde(default)]
     pub position: Position,
 
+    #[serde(default)]
     pub keyword: String,
 
     #[serde(default)]
@@ -326,6 +351,7 @@ pub struct Command {
     pub security: RequiredSecurity,
 
     #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub actions: Vec<CommandAction>,
 }
 

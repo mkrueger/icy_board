@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use crossterm::event::{KeyCode, KeyEvent};
-use icy_board_engine::icy_board::icb_config::IcbColor;
+use icy_board_engine::icy_board::{commands::Position, icb_config::IcbColor};
 use ratatui::{
     layout::Rect,
     style::Stylize,
@@ -118,6 +118,7 @@ pub enum ListValue {
     Bool(bool),
     Color(IcbColor),
     ValueList(String, Vec<Value>),
+    Position(Box<dyn Fn(&mut Frame, &Position)>, Box<dyn Fn(KeyEvent, &Position) -> Position>, Position),
 }
 
 pub struct ListItem {
@@ -211,10 +212,15 @@ impl ListItem {
                 }
                 Text::from(cur_value.clone()).style(THEME.value).render(area, frame.buffer_mut());
             }
+            ListValue::Position(_, _, pos) => {
+                Text::from(format!("x: {} y: {}", pos.x, pos.y))
+                    .style(THEME.value)
+                    .render(area, frame.buffer_mut());
+            }
         }
     }
 
-    fn render_editor(&mut self, area: Rect, frame: &mut Frame) {
+    fn render_editor(&mut self, area: Rect, frame: &mut Frame) -> bool {
         match &mut self.value {
             ListValue::Text(_edit_len, text) => {
                 let field = TextField::new().with_value(text.to_string());
@@ -242,7 +248,7 @@ impl ListItem {
                 for l in list {
                     if l.value == *cur_value {
                         Text::from(l.display.clone()).style(THEME.edit_value).render(area, frame.buffer_mut());
-                        return;
+                        return true;
                     }
                 }
                 Text::from(cur_value.clone()).style(THEME.edit_value).render(area, frame.buffer_mut());
@@ -277,7 +283,12 @@ impl ListItem {
                 }
                 Scrollbar::new(ScrollbarOrientation::VerticalRight).render(area, frame.buffer_mut(), &mut c.scroll_state);
             }
+            ListValue::Position(show_editor, _, pos) => {
+                show_editor(frame, pos);
+                return false;
+            }
         }
+        true
     }
 
     fn handle_key_press(&mut self, key: KeyEvent, state: &mut ConfigMenuState) -> ResultState {
@@ -329,6 +340,9 @@ impl ListItem {
             ListValue::Color(_) => {}
             ListValue::ComboBox(combo) => {
                 combo.handle_input(key);
+            }
+            ListValue::Position(_, input, pos) => {
+                *pos = input(key, pos);
             }
         }
         return ResultState::status_line(self.status.clone());
@@ -387,12 +401,16 @@ impl ConfigMenu {
 
         state.area_height = area.height;
 
-        Self::display_list(&mut i, &mut self.entry, area, &mut y, &mut x, frame, state, false);
+        if !Self::display_list(&mut i, &mut self.entry, area, &mut y, &mut x, frame, state, false) {
+            return;
+        }
 
         let mut y = 0;
         let mut x = 0;
         let mut i = 0;
-        Self::display_list(&mut i, &mut self.entry, area, &mut y, &mut x, frame, state, true);
+        if !Self::display_list(&mut i, &mut self.entry, area, &mut y, &mut x, frame, state, true) {
+            return;
+        }
 
         state.scroll_state = state.scroll_state.position(state.first_row as usize).content_length(state.area_height as usize);
         Self::render_scrollbar(state, frame, area);
@@ -512,7 +530,7 @@ impl ConfigMenu {
         frame: &mut Frame,
         state: &mut ConfigMenuState,
         display_editor: bool,
-    ) {
+    ) -> bool {
         let x1 = *x;
         let x2 = *x + area.width / 2;
 
@@ -540,7 +558,9 @@ impl ConfigMenu {
                         };
                         if state.in_edit && *i == state.selected {
                             if display_editor {
-                                item.render_editor(right_area, frame);
+                                if !item.render_editor(right_area, frame) {
+                                    return false;
+                                }
                             }
                         } else if !display_editor {
                             item.render_value(right_area, frame);
@@ -562,6 +582,7 @@ impl ConfigMenu {
             }
         }
         *x = x1;
+        true
     }
     pub fn display_list(
         i: &mut usize,
@@ -572,7 +593,7 @@ impl ConfigMenu {
         frame: &mut Frame,
         state: &mut ConfigMenuState,
         display_editor: bool,
-    ) {
+    ) -> bool {
         for item in items.iter_mut() {
             match item {
                 ConfigEntry::Item(item) => {
@@ -595,7 +616,9 @@ impl ConfigMenu {
                         };
                         if state.in_edit && *i == state.selected {
                             if display_editor {
-                                item.render_editor(right_area, frame);
+                                if !item.render_editor(right_area, frame) {
+                                    return false;
+                                }
                             }
                         } else if !display_editor {
                             item.render_value(right_area, frame);
@@ -607,7 +630,7 @@ impl ConfigMenu {
                     *i += 1;
                 }
                 ConfigEntry::Group(title, items) => {
-                    if !title.is_empty() {
+                    if !display_editor && !title.is_empty() {
                         if *y >= state.first_row && *y < area.height + state.first_row {
                             let left_area = Rect {
                                 x: area.x + *x,
@@ -624,10 +647,14 @@ impl ConfigMenu {
                         }
                         *y += 1;
                     }
-                    Self::display_list(i, items, area, y, x, frame, state, display_editor);
+                    if !Self::display_list(i, items, area, y, x, frame, state, display_editor) {
+                        return false;
+                    }
                 }
                 ConfigEntry::Table(_cols, items) => {
-                    Self::display_table(i, items, area, y, x, frame, state, display_editor);
+                    if !Self::display_table(i, items, area, y, x, frame, state, display_editor) {
+                        return false;
+                    }
                 }
                 ConfigEntry::Separator => {
                     /*
@@ -648,6 +675,7 @@ impl ConfigMenu {
                 }
             }
         }
+        true
     }
 
     pub fn handle_key_press(&mut self, key: KeyEvent, state: &mut ConfigMenuState) -> ResultState {
