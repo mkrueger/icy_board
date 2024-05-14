@@ -9,7 +9,6 @@ use chrono::Local;
 use icy_board_engine::{
     icy_board::{
         bulletins::MASK_BULLETINS,
-        commands::Command,
         icb_config::IcbColor,
         icb_text::IceText,
         read_with_encoding_detection,
@@ -22,7 +21,7 @@ use icy_board_engine::{
 };
 
 impl PcbBoardCommand {
-    pub async fn take_survey(&mut self, action: &Command) -> Res<()> {
+    pub async fn take_survey(&mut self, help: &str) -> Res<()> {
         self.state.set_activity(UserActivity::TakeSurvey).await;
 
         let surveys = self.state.load_surveys().await?;
@@ -50,7 +49,7 @@ impl PcbBoardCommand {
                         IceText::QuestionNumberToAnswer,
                         12,
                         MASK_BULLETINS,
-                        &action.help,
+                        help,
                         None,
                         display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
                     )

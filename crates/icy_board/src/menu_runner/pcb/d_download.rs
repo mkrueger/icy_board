@@ -2,12 +2,12 @@ use std::path::PathBuf;
 
 use crate::{menu_runner::PcbBoardCommand, Res};
 use icy_board_engine::{
-    icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags},
+    icy_board::{icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
 };
 
 impl PcbBoardCommand {
-    pub async fn download(&mut self, _action: &Command) -> Res<()> {
+    pub async fn download(&mut self) -> Res<()> {
         if self.state.session.flagged_files.is_empty() {
             self.state.println(TerminalTarget::Both, "No files flagged for download.").await?;
             self.state.new_line().await?;

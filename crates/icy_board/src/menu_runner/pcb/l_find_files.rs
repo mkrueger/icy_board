@@ -8,7 +8,6 @@ use dizbase::file_base::{file_header::FileHeader, metadata::MetadaType, FileBase
 use humanize_bytes::humanize_bytes_decimal;
 use icy_board_engine::{
     icy_board::{
-        commands::Command,
         icb_config::IcbColor,
         icb_text::IceText,
         state::{
@@ -20,7 +19,7 @@ use icy_board_engine::{
 };
 
 impl PcbBoardCommand {
-    pub async fn find_files(&mut self, action: &Command) -> Res<()> {
+    pub async fn find_files(&mut self, help: &str) -> Res<()> {
         self.state.set_activity(UserActivity::BrowseFiles).await;
 
         if self.state.session.current_conference.directories.is_empty() {
@@ -38,7 +37,7 @@ impl PcbBoardCommand {
                     IceText::SearchFileName,
                     40,
                     &MASK_ASCII,
-                    &action.help,
+                    help,
                     None,
                     display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
                 )
@@ -62,7 +61,7 @@ impl PcbBoardCommand {
                     },
                     40,
                     MASK_COMMAND,
-                    &action.help,
+                    help,
                     None,
                     display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
                 )
@@ -82,7 +81,7 @@ impl PcbBoardCommand {
                     .list_security
                     .user_can_access(&self.state.session)
                 {
-                    self.search_file_area(action, area, search_pattern.clone()).await?;
+                    self.search_file_area(help, area, search_pattern.clone()).await?;
                 }
                 if self.state.session.cancel_batch {
                     break;
@@ -93,7 +92,7 @@ impl PcbBoardCommand {
             if 1 <= number && (number as usize) <= self.state.session.current_conference.directories.len() {
                 let area = &self.state.session.current_conference.directories[number as usize - 1];
                 if area.list_security.user_can_access(&self.state.session) {
-                    self.search_file_area(action, number as usize - 1, search_pattern).await?;
+                    self.search_file_area(help, number as usize - 1, search_pattern).await?;
                 }
 
                 joined = true;
@@ -113,7 +112,7 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    async fn search_file_area(&mut self, action: &Command, area: usize, search_pattern: String) -> Res<()> {
+    async fn search_file_area(&mut self, help: &str, area: usize, search_pattern: String) -> Res<()> {
         let file_base_path = self.state.resolve_path(&self.state.session.current_conference.directories[area].file_base);
         let Ok(mut base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());
@@ -137,11 +136,7 @@ impl PcbBoardCommand {
         base.load_headers()?;
         let files = base.find_files(search_pattern.as_str())?;
 
-        let mut list = FileList {
-            base: &base,
-            files,
-            help: &action.help,
-        };
+        let mut list = FileList { base: &base, files, help };
         list.display_file_list(self).await
     }
 }

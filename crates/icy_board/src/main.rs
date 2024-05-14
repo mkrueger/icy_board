@@ -231,7 +231,7 @@ async fn run_message(
         }
         CallWaitMessage::Sysop(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
-            let mut tui = Tui::local_mode(board, bbs, true, None).await;
+            let mut tui: Tui = Tui::local_mode(board, bbs, true, None).await;
             if let Err(err) = tui.run(bbs, &board).await {
                 restore_terminal()?;
                 log::error!("while running board in local mode: {}", err.to_string());

@@ -256,7 +256,6 @@ pub async fn handle_client(
             }
         }
     }
-
     loop {
         if let Err(err) = cmd.do_command().await {
             cmd.state.session.disp_options.reset_printout();

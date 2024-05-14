@@ -1589,6 +1589,66 @@ impl IcyBoardState {
         Ok(None)
     }
 
+    pub async fn get_char_edit(&mut self) -> Res<Option<KeyChar>> {
+        let ch = self.get_char(TerminalTarget::Both).await?;
+        if ch.is_none() {
+            return Ok(None);
+        }
+        let mut ch: KeyChar = ch.unwrap();
+        match ch.ch {
+            control_codes::DEL_HIGH => {
+                ch.ch = control_codes::DEL;
+            }
+            '\x1B' => {
+                if let Some(key_char) = self.get_char(TerminalTarget::Both).await? {
+                    if key_char.ch == '[' {
+                        if let Some(key_char) = self.get_char(TerminalTarget::Both).await? {
+                            match key_char.ch {
+                                'A' => ch.ch = control_codes::UP,
+                                'B' => ch.ch = control_codes::DOWN,
+                                'C' => ch.ch = control_codes::RIGHT,
+                                'D' => ch.ch = control_codes::LEFT,
+
+                                'H' => ch.ch = control_codes::HOME,
+                                'K' => ch.ch = control_codes::END,
+
+                                'V' => ch.ch = control_codes::PG_UP,
+                                'U' => ch.ch = control_codes::PG_DN,
+                                '@' => {
+                                    self.get_char(TerminalTarget::Both).await?;
+                                    ch.ch = control_codes::INS;
+                                }
+
+                                '6' => {
+                                    self.get_char(TerminalTarget::Both).await?;
+                                    ch.ch = control_codes::PG_UP;
+                                }
+                                '5' => {
+                                    self.get_char(TerminalTarget::Both).await?;
+                                    ch.ch = control_codes::PG_DN;
+                                }
+                                '2' => {
+                                    self.get_char(TerminalTarget::Both).await?;
+                                    ch.ch = control_codes::INS;
+                                }
+
+                                'F' => ch.ch = control_codes::END,
+
+                                _ => {
+                                    // don't pass ctrl codes
+                                    return Ok(None);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        Ok(Some(ch))
+    }
+
     async fn show_broadcast(&mut self, msg: String) -> Res<()> {
         let buf = self.user_screen.buffer.flat_clone(false);
         let pos = self.user_screen.caret.get_position();

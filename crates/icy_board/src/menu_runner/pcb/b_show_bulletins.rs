@@ -1,13 +1,12 @@
 use crate::{menu_runner::PcbBoardCommand, Res};
 use icy_board_engine::icy_board::{
     bulletins::MASK_BULLETINS,
-    commands::Command,
     icb_text::IceText,
     state::{functions::display_flags, UserActivity},
 };
 
 impl PcbBoardCommand {
-    pub async fn show_bulletins(&mut self, action: &Command) -> Res<()> {
+    pub async fn show_bulletins(&mut self, help: &str) -> Res<()> {
         self.state.set_activity(UserActivity::ReadBulletins).await;
 
         let bulletins = self.state.load_bullettins().await?;
@@ -39,7 +38,7 @@ impl PcbBoardCommand {
                         },
                         12,
                         MASK_BULLETINS,
-                        &action.help,
+                        help,
                         None,
                         display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
                     )

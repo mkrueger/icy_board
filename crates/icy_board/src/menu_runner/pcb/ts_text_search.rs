@@ -1,6 +1,5 @@
 use bstr::BString;
 use icy_board_engine::icy_board::{
-    commands::Command,
     icb_text::IceText,
     state::{functions::display_flags, UserActivity},
 };
@@ -12,9 +11,9 @@ use crate::{
 };
 
 impl PcbBoardCommand {
-    pub async fn text_search(&mut self, action: &Command) -> Res<()> {
+    pub async fn text_search(&mut self, help: &str) -> Res<()> {
         self.state.set_activity(UserActivity::ReadMessages).await;
-        let Ok(Some(area)) = self.state.show_message_areas(self.state.session.current_conference_number, &action.help).await else {
+        let Ok(Some(area)) = self.state.show_message_areas(self.state.session.current_conference_number, help).await else {
             self.state.press_enter().await?;
             self.display_menu = true;
             return Ok(());
@@ -28,7 +27,7 @@ impl PcbBoardCommand {
                     IceText::TextToScanFor,
                     40,
                     MASK_COMMAND,
-                    &action.help,
+                    help,
                     None,
                     display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
                 )
@@ -39,10 +38,10 @@ impl PcbBoardCommand {
             self.display_menu = true;
             return Ok(());
         }
-        self.text_search_in_area(&search_text, area, action).await
+        self.text_search_in_area(&search_text, area, help).await
     }
 
-    async fn text_search_in_area(&mut self, search_text: &str, area: usize, action: &Command) -> Res<()> {
+    async fn text_search_in_area(&mut self, search_text: &str, area: usize, help: &str) -> Res<()> {
         let message_base_file = &self.state.session.current_conference.areas[area].filename;
         let msgbase_file_resolved = self.state.get_board().await.resolve_file(message_base_file);
         match JamMessageBase::open(&msgbase_file_resolved) {
@@ -56,7 +55,7 @@ impl PcbBoardCommand {
                             IceText::MessageSearchFrom,
                             8,
                             MASK_NUMBER,
-                            &action.help,
+                            help,
                             None,
                             display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
                         )

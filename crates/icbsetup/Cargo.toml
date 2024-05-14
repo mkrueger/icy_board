@@ -35,3 +35,5 @@ color-eyre = { workspace = true }
 itertools = "0.12.1"
 substring = { workspace = true }
 strum = { workspace = true }
+log = { workspace = true }
+fern = "0.6.2"

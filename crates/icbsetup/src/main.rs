@@ -1,5 +1,6 @@
 use app::new_main_window;
 use argh::FromArgs;
+use chrono::Local;
 use color_eyre::Result;
 use create::IcyBoardCreator;
 use icy_board_engine::icy_board::IcyBoard;
@@ -69,6 +70,27 @@ struct Create {
 }
 
 fn main() -> Result<()> {
+    fern::Dispatch::new()
+        // Perform allocation-free log formatting
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{} {} {}] {}",
+                Local::now().format("%Y-%m-%d %H:%M:%S"),
+                record.level(),
+                record.target(),
+                message
+            ))
+        })
+        // Add blanket level filter -
+        .level(log::LevelFilter::Info)
+        // - and per-module overrides
+        .level_for("hyper", log::LevelFilter::Info)
+        // Output to stdout, files, and other Dispatch configurations
+        .chain(fern::log_file("icbsetup.log").unwrap())
+        // Apply globally
+        .apply()
+        .unwrap();
+
     let arguments: Cli = argh::from_env();
 
     match &arguments.command {

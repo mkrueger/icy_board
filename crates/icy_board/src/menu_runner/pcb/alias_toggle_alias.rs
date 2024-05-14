@@ -1,8 +1,8 @@
 use crate::{menu_runner::PcbBoardCommand, Res};
-use icy_board_engine::icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags};
+use icy_board_engine::icy_board::{icb_text::IceText, state::functions::display_flags};
 
 impl PcbBoardCommand {
-    pub async fn toggle_alias(&mut self, _action: &Command) -> Res<()> {
+    pub async fn toggle_alias(&mut self) -> Res<()> {
         self.displaycmdfile("alias").await?;
 
         self.state.session.use_alias = !self.state.session.use_alias;

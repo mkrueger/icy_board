@@ -1,8 +1,8 @@
 use crate::{menu_runner::PcbBoardCommand, Res};
-use icy_board_engine::icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags};
+use icy_board_engine::icy_board::{icb_text::IceText, state::functions::display_flags};
 
 impl PcbBoardCommand {
-    pub async fn page_sysop(&mut self, action: &Command) -> Res<()> {
+    pub async fn page_sysop(&mut self, help: &str) -> Res<()> {
         if !self.state.get_board().await.config.options.page_bell {
             self.state
                 .display_text(IceText::SysopUnAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
@@ -20,7 +20,7 @@ impl PcbBoardCommand {
                 )
                 .await?;
             if comment == self.state.session.yes_char.to_string() {
-                self.comment_to_sysop(action).await?;
+                self.comment_to_sysop(help).await?;
             }
             self.enter_comment_to_sysop().await?;
             return Ok(());

@@ -144,6 +144,136 @@ impl Menu {
 
         Ok(res)
     }
+
+    pub fn up(&self, cur: usize) -> usize {
+        let cp = self.commands[cur].position;
+        let mut next = None;
+
+        for i in 0..self.commands.len() {
+            let cmd = &self.commands[i];
+            if cur == i || cmd.position.y >= cp.y {
+                continue;
+            }
+            if let Some(j) = next {
+                let current: &Command = &self.commands[j];
+                if (cmd.position.x as i32 - cp.x as i32).abs() < (current.position.x as i32 - cp.x as i32).abs() || current.position.y < cmd.position.y {
+                    next = Some(i);
+                }
+            } else {
+                next = Some(i);
+            }
+        }
+
+        if next.is_none() {
+            next = Some(cur);
+            for i in 0..self.commands.len() {
+                let cmd = &self.commands[i];
+                let current: &Command = &self.commands[next.unwrap()];
+                if current.position.y < cmd.position.y && cmd.position.x < cp.x {
+                    next = Some(i);
+                }
+            }
+        }
+        if next == Some(cur) {
+            for i in 0..self.commands.len() {
+                let cmd = &self.commands[i];
+                let current: &Command = &self.commands[next.unwrap()];
+                if current.position.y < cmd.position.y || current.position.x < cmd.position.x {
+                    next = Some(i);
+                }
+            }
+        }
+        next.unwrap_or_default()
+    }
+
+    pub fn down(&self, cur: usize) -> usize {
+        let cp = self.commands[cur].position;
+        let mut next = None;
+
+        for i in 0..self.commands.len() {
+            let cmd = &self.commands[i];
+            if cur == i || cmd.position.y <= cp.y {
+                continue;
+            }
+            if let Some(j) = next {
+                let current: &Command = &self.commands[j];
+                if (cmd.position.x as i32 - cp.x as i32).abs() < (current.position.x as i32 - cp.x as i32).abs() || current.position.y > cmd.position.y {
+                    next = Some(i);
+                }
+            } else {
+                next = Some(i);
+            }
+        }
+
+        if next.is_none() {
+            next = Some(cur);
+            for i in 0..self.commands.len() {
+                let cmd = &self.commands[i];
+                let current: &Command = &self.commands[next.unwrap()];
+                if current.position.y > cmd.position.y && cmd.position.x < cp.x {
+                    next = Some(i);
+                }
+            }
+        }
+        if next == Some(cur) {
+            for i in 0..self.commands.len() {
+                let cmd = &self.commands[i];
+                let current: &Command = &self.commands[next.unwrap()];
+                if current.position.y > cmd.position.y || current.position.x < cmd.position.x {
+                    next = Some(i);
+                }
+            }
+        }
+        next.unwrap_or_default()
+    }
+
+    pub fn left(&self, cur: usize) -> usize {
+        let cp = self.commands[cur].position;
+        let mut next = None;
+
+        for i in 0..self.commands.len() {
+            let cmd = &self.commands[i];
+            if cur == i || cmd.position.x >= cp.x {
+                continue;
+            }
+            if let Some(j) = next {
+                let current: &Command = &self.commands[j];
+                if (cmd.position.y as i32 - cp.y as i32).abs() < (current.position.y as i32 - cp.y as i32).abs() || current.position.x < cmd.position.x {
+                    next = Some(i);
+                }
+            } else {
+                next = Some(i);
+            }
+        }
+        if next.is_none() {
+            next = Some(cur);
+        }
+        next.unwrap_or_default()
+    }
+
+    pub fn right(&self, cur: usize) -> usize {
+        let cp = self.commands[cur].position;
+        let mut next = None;
+
+        for i in 0..self.commands.len() {
+            let cmd = &self.commands[i];
+            if cur == i || cmd.position.x <= cp.x {
+                continue;
+            }
+            if let Some(j) = next {
+                let current: &Command = &self.commands[j];
+                if (cmd.position.y as i32 - cp.y as i32).abs() < (current.position.y as i32 - cp.y as i32).abs() || current.position.x > cmd.position.x {
+                    next = Some(i);
+                }
+            } else {
+                next = Some(i);
+            }
+        }
+        if next.is_none() {
+            next = Some(cur);
+        }
+        next.unwrap_or_default()
+    }
 }
 
 impl IcyBoardSerializer for Menu {

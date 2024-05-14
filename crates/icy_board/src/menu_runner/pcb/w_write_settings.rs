@@ -2,7 +2,6 @@ use crate::{menu_runner::PcbBoardCommand, Res};
 use icy_board_engine::{
     datetime::IcbDate,
     icy_board::{
-        commands::Command,
         icb_text::IceText,
         state::functions::{display_flags, MASK_ALNUM, MASK_PHONE, MASK_WEB},
         user_base::FSEMode,
@@ -10,7 +9,7 @@ use icy_board_engine::{
 };
 
 impl PcbBoardCommand {
-    pub async fn write_settings(&mut self, _action: &Command) -> Res<()> {
+    pub async fn write_settings(&mut self) -> Res<()> {
         self.state
             .display_text(IceText::EnterNoChange, display_flags::LFBEFORE | display_flags::NEWLINE)
             .await?;

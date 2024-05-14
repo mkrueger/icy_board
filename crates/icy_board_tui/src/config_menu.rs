@@ -793,7 +793,10 @@ impl<'a> Iterator for ConfigMenuIter<'a> {
                     self.iter.push(items.iter());
                     self.next()
                 }
-                ConfigEntry::Separator => self.next(),
+                ConfigEntry::Separator => {
+                    self.iter.push(l);
+                    self.next()
+                }
             },
             None => self.next(),
         }

@@ -7,7 +7,7 @@ use icy_board_engine::{
         state::{
             control_codes,
             functions::{display_flags, MASK_NUM},
-            IcyBoardState, KeyChar,
+            IcyBoardState,
         },
     },
     vm::TerminalTarget,
@@ -231,7 +231,7 @@ impl EditState {
         self.redraw_fse(state).await?;
 
         loop {
-            let Some(ch) = self.get_char_edit(state).await? else {
+            let Some(ch) = state.get_char_edit().await? else {
                 continue;
             };
             match ch.ch {
@@ -518,7 +518,7 @@ impl EditState {
         state.print(TerminalTarget::Both, &edit_line).await?;
 
         loop {
-            let Some(ch) = self.get_char_edit(state).await? else {
+            let Some(ch) = state.get_char_edit().await? else {
                 continue;
             };
             match ch.ch {
@@ -601,66 +601,6 @@ impl EditState {
                 }
             }
         }
-    }
-
-    pub async fn get_char_edit(&mut self, state: &mut IcyBoardState) -> Res<Option<KeyChar>> {
-        let ch = state.get_char(TerminalTarget::Both).await?;
-        if ch.is_none() {
-            return Ok(None);
-        }
-        let mut ch: KeyChar = ch.unwrap();
-        match ch.ch {
-            control_codes::DEL_HIGH => {
-                ch.ch = control_codes::DEL;
-            }
-            '\x1B' => {
-                if let Some(key_char) = state.get_char(TerminalTarget::Both).await? {
-                    if key_char.ch == '[' {
-                        if let Some(key_char) = state.get_char(TerminalTarget::Both).await? {
-                            match key_char.ch {
-                                'A' => ch.ch = control_codes::UP,
-                                'B' => ch.ch = control_codes::DOWN,
-                                'C' => ch.ch = control_codes::RIGHT,
-                                'D' => ch.ch = control_codes::LEFT,
-
-                                'H' => ch.ch = control_codes::HOME,
-                                'K' => ch.ch = control_codes::END,
-
-                                'V' => ch.ch = control_codes::PG_UP,
-                                'U' => ch.ch = control_codes::PG_DN,
-                                '@' => {
-                                    state.get_char(TerminalTarget::Both).await?;
-                                    ch.ch = control_codes::INS;
-                                }
-
-                                '6' => {
-                                    state.get_char(TerminalTarget::Both).await?;
-                                    ch.ch = control_codes::PG_UP;
-                                }
-                                '5' => {
-                                    state.get_char(TerminalTarget::Both).await?;
-                                    ch.ch = control_codes::PG_DN;
-                                }
-                                '2' => {
-                                    state.get_char(TerminalTarget::Both).await?;
-                                    ch.ch = control_codes::INS;
-                                }
-
-                                'F' => ch.ch = control_codes::END,
-
-                                _ => {
-                                    // don't pass ctrl codes
-                                    return Ok(None);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
-
-        Ok(Some(ch))
     }
 
     fn cur_line(&mut self) -> &mut String {

@@ -2,12 +2,12 @@ use crate::{menu_runner::PcbBoardCommand, Res};
 
 use chrono::Datelike;
 use icy_board_engine::{
-    icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags},
+    icy_board::{icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
 };
 
 impl PcbBoardCommand {
-    pub async fn view_settings(&mut self, _action: &Command) -> Res<()> {
+    pub async fn view_settings(&mut self) -> Res<()> {
         self.displaycmdfile("prestat").await?;
         if self.displaycmdfile("stat").await? {
             return Ok(());

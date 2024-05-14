@@ -8,7 +8,6 @@ use icy_board_engine::icy_board::user_base::FSEMode;
 use icy_board_engine::{
     datetime::IcbTime,
     icy_board::{
-        commands::Command,
         icb_text::IceText,
         state::{functions::display_flags, UserActivity},
     },
@@ -17,14 +16,14 @@ use icy_engine::Position;
 use jamjam::jam::JamMessage;
 
 impl PcbBoardCommand {
-    pub async fn comment_to_sysop(&mut self, action: &Command) -> Res<()> {
+    pub async fn comment_to_sysop(&mut self, help: &str) -> Res<()> {
         let leave_comment = self
             .state
             .input_field(
                 IceText::LeaveComment,
                 1,
                 "",
-                &action.help,
+                help,
                 Some(self.state.session.no_char.to_string()),
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::YESNO,
             )

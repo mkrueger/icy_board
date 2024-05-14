@@ -5,7 +5,6 @@ use crate::{
 use dizbase::file_base::{file_header::FileHeader, FileBase};
 use icy_board_engine::{
     icy_board::{
-        commands::Command,
         icb_text::IceText,
         state::{functions::display_flags, UserActivity},
     },
@@ -15,7 +14,7 @@ use icy_board_engine::{
 use super::l_find_files::FileList;
 
 impl PcbBoardCommand {
-    pub async fn show_file_directories(&mut self, action: &Command) -> Res<()> {
+    pub async fn show_file_directories(&mut self, help: &str) -> Res<()> {
         self.state.set_activity(UserActivity::BrowseFiles).await;
 
         self.state.session.disable_auto_more = false;
@@ -45,7 +44,7 @@ impl PcbBoardCommand {
                     },
                     40,
                     MASK_COMMAND,
-                    &action.help,
+                    help,
                     None,
                     display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
                 )
@@ -58,7 +57,7 @@ impl PcbBoardCommand {
                 if 1 <= number && (number as usize) <= self.state.session.current_conference.directories.len() {
                     let area = &self.state.session.current_conference.directories[number as usize - 1];
                     if area.list_security.user_can_access(&self.state.session) {
-                        self.display_file_area(action, number as usize - 1).await?;
+                        self.display_file_area(help, number as usize - 1).await?;
                     }
                     joined = true;
                 }
@@ -77,7 +76,7 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    async fn display_file_area(&mut self, action: &Command, area: usize) -> Res<()> {
+    async fn display_file_area(&mut self, help: &str, area: usize) -> Res<()> {
         let area = &self.state.session.current_conference.directories[area];
 
         let colors = self.state.get_board().await.config.color_configuration.clone();
@@ -109,11 +108,7 @@ impl PcbBoardCommand {
         let files: Vec<FileHeader> = base.iter().flatten().collect();
         let files: Vec<&FileHeader> = files.iter().collect();
 
-        let mut list = FileList {
-            base: &base,
-            files,
-            help: &action.help,
-        };
+        let mut list = FileList { base: &base, files, help };
         list.display_file_list(self).await?;
 
         if self.state.session.num_lines_printed > 0 {

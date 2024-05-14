@@ -1,7 +1,6 @@
 use crate::Res;
 use icy_board_engine::{
     icy_board::{
-        commands::Command,
         icb_text::{IceText, TextEntry},
         state::{functions::display_flags, IcyBoardState},
     },
@@ -188,7 +187,7 @@ impl MessageViewer {
 }
 
 impl PcbBoardCommand {
-    pub async fn read_msgs_from_base(&mut self, message_base: JamMessageBase, action: &Command) -> Res<()> {
+    pub async fn read_msgs_from_base(&mut self, message_base: JamMessageBase, help: &str) -> Res<()> {
         let viewer = MessageViewer::load(&self.state.display_text)?;
 
         while !self.state.session.disp_options.abort_printout {
@@ -205,7 +204,7 @@ impl PcbBoardCommand {
                     prompt,
                     40,
                     MASK_COMMAND,
-                    &action.help,
+                    help,
                     None,
                     display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
                 )

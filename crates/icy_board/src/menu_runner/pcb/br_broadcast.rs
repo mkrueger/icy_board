@@ -1,8 +1,7 @@
 use crate::{menu_runner::PcbBoardCommand, Res};
-use icy_board_engine::icy_board::commands::Command;
 
 impl PcbBoardCommand {
-    pub async fn broadcast(&mut self, _action: &Command) -> Res<()> {
+    pub async fn broadcast(&mut self) -> Res<()> {
         let mut hi = 0;
         let mut lo = 0;
         if let Some(node) = self.state.session.tokens.pop_front() {

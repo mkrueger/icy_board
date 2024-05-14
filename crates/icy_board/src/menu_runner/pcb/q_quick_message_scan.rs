@@ -7,7 +7,6 @@ use async_recursion::async_recursion;
 use bstr::{BString, ByteSlice};
 use icy_board_engine::{
     icy_board::{
-        commands::Command,
         icb_config::IcbColor,
         icb_text::IceText,
         state::{functions::display_flags, UserActivity},
@@ -17,24 +16,24 @@ use icy_board_engine::{
 use jamjam::jam::JamMessageBase;
 
 impl PcbBoardCommand {
-    pub async fn quick_message_scan(&mut self, action: &Command) -> Res<()> {
+    pub async fn quick_message_scan(&mut self, help: &str) -> Res<()> {
         self.state.set_activity(UserActivity::ReadMessages).await;
 
-        let Ok(Some(area)) = self.state.show_message_areas(self.state.session.current_conference_number, &action.help).await else {
+        let Ok(Some(area)) = self.state.show_message_areas(self.state.session.current_conference_number, help).await else {
             self.state.press_enter().await?;
             self.display_menu = true;
             return Ok(());
         };
-        self.quick_message_scan_in_area(area, action).await
+        self.quick_message_scan_in_area(area, help).await
     }
 
     #[async_recursion(?Send)]
-    async fn quick_message_scan_in_area(&mut self, area: usize, action: &Command) -> Res<()> {
+    async fn quick_message_scan_in_area(&mut self, area: usize, help: &str) -> Res<()> {
         let message_base_file = &self.state.session.current_conference.areas[area].filename;
         let msgbase_file_resolved = self.state.get_board().await.resolve_file(message_base_file);
         match JamMessageBase::open(&msgbase_file_resolved) {
             Ok(message_base) => {
-                self.show_quick_scans(area, message_base, action).await?;
+                self.show_quick_scans(area, message_base, help).await?;
                 Ok(())
             }
             Err(err) => {
@@ -45,7 +44,7 @@ impl PcbBoardCommand {
                     .await?;
                 if JamMessageBase::create(msgbase_file_resolved).is_ok() {
                     log::error!("successfully created new message index.");
-                    return self.quick_message_scan_in_area(area, action).await;
+                    return self.quick_message_scan_in_area(area, help).await;
                 }
                 log::error!("failed to create message index.");
 
@@ -60,7 +59,7 @@ impl PcbBoardCommand {
         }
     }
 
-    async fn show_quick_scans(&mut self, area: usize, message_base: JamMessageBase, action: &Command) -> Res<()> {
+    async fn show_quick_scans(&mut self, area: usize, message_base: JamMessageBase, help: &str) -> Res<()> {
         let prompt = if self.state.session.expert_mode {
             IceText::MessageScanCommandExpertmode
         } else {
@@ -74,7 +73,7 @@ impl PcbBoardCommand {
                 prompt,
                 40,
                 MASK_COMMAND,
-                &action.help,
+                help,
                 None,
                 display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
             )
@@ -152,7 +151,7 @@ impl PcbBoardCommand {
             }
         }
 
-        self.read_msgs_from_base(message_base, action).await
+        self.read_msgs_from_base(message_base, help).await
     }
 }
 

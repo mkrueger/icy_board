@@ -87,6 +87,12 @@ pub enum CommandType {
     /// the Parameters field. The stuffed text will not be shown on the screen.
     StuffFileSilent,
 
+    /// Moves caret to a specific position
+    GotoXY,
+
+    /// Print a text
+    PrintText,
+
     // user commands
     /// ! command
     RedisplayCommand,
@@ -293,14 +299,25 @@ impl Display for CommandType {
             CommandType::WriteEmail => write!(f, "(@W)\tWriteEmail"),
             CommandType::RunPPE => write!(f, "(PPE)\tRunPPE"),
             CommandType::TextSearch => write!(f, "(TS)\tTextSearch"),
+            CommandType::GotoXY => write!(f, "GotoXY"),
+            CommandType::PrintText => write!(f, "PrintText"),
         }
     }
 }
 
-#[derive(Clone, PartialEq, Default)]
+#[derive(Clone, Copy, PartialEq, Default)]
 pub struct Position {
     pub x: u16,
     pub y: u16,
+}
+
+impl Position {
+    pub fn parse(txt: &str) -> Self {
+        let mut parts = txt.split(',');
+        let x = parts.next().unwrap_or("0").trim().parse().unwrap_or(0);
+        let y = parts.next().unwrap_or("0").trim().parse().unwrap_or(0);
+        Position { x, y }
+    }
 }
 
 impl Serialize for Position {

@@ -1,7 +1,6 @@
 use bstr::BString;
 use icy_board_engine::{
     icy_board::{
-        commands::Command,
         conferences::Conference,
         icb_config::IcbColor,
         icb_text::IceText,
@@ -30,7 +29,7 @@ struct ScanResult {
 }
 
 impl PcbBoardCommand {
-    pub async fn personal_mail(&mut self, action: &Command) -> Res<()> {
+    pub async fn personal_mail(&mut self, help: &str) -> Res<()> {
         let text = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
@@ -39,7 +38,7 @@ impl PcbBoardCommand {
                     IceText::MessageScanPrompt,
                     8,
                     &MASK_ASCII,
-                    &action.help,
+                    help,
                     None,
                     display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE | display_flags::STACKED,
                 )

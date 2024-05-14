@@ -3,12 +3,12 @@ use crate::{
     Res,
 };
 use icy_board_engine::{
-    icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags},
+    icy_board::{icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
 };
 
 impl PcbBoardCommand {
-    pub async fn set_page_len(&mut self, action: &Command) -> Res<()> {
+    pub async fn set_page_len(&mut self, help: &str) -> Res<()> {
         let page_len = if let Some(token) = self.state.session.tokens.pop_front() {
             token
         } else {
@@ -19,7 +19,7 @@ impl PcbBoardCommand {
                     IceText::EnterPageLength,
                     2,
                     MASK_NUMBER,
-                    &action.help,
+                    help,
                     Some(self.state.session.page_len.to_string()),
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
                 )

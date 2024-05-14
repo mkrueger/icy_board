@@ -3,13 +3,13 @@ use crate::{
     Res,
 };
 use icy_board_engine::{
-    icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags},
+    icy_board::{icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
 };
 use jamjam::jam::JamMessageBase;
 
 impl PcbBoardCommand {
-    pub async fn restore_message(&mut self, action: &Command) -> Res<()> {
+    pub async fn restore_message(&mut self, help: &str) -> Res<()> {
         let message_base_file = &self.state.session.current_conference.areas[0].filename;
         let msgbase_file_resolved = self.state.get_board().await.resolve_file(message_base_file);
 
@@ -25,7 +25,7 @@ impl PcbBoardCommand {
                             IceText::MessageNumberToActivate,
                             40,
                             MASK_COMMAND,
-                            &action.help,
+                            help,
                             None,
                             display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
                         )
@@ -48,7 +48,7 @@ impl PcbBoardCommand {
                     .await?;
                 if JamMessageBase::create(msgbase_file_resolved).is_ok() {
                     log::error!("successfully created new message index.");
-                    return self.read_messages(action).await;
+                    return self.read_messages(help).await;
                 }
                 log::error!("failed to create message index.");
 

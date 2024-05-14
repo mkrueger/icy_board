@@ -3,12 +3,12 @@ use crate::{
     Res,
 };
 use icy_board_engine::{
-    icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags},
+    icy_board::{icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
 };
 
 impl PcbBoardCommand {
-    pub async fn show_user_list(&mut self, action: &Command) -> Res<()> {
+    pub async fn show_user_list(&mut self, help: &str) -> Res<()> {
         self.state.new_line().await?;
         let text = if let Some(token) = self.state.session.tokens.pop_front() {
             token
@@ -18,7 +18,7 @@ impl PcbBoardCommand {
                     IceText::UserScan,
                     40,
                     MASK_COMMAND,
-                    &action.help,
+                    help,
                     None,
                     display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
                 )

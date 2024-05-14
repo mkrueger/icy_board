@@ -1,6 +1,5 @@
 use icy_board_engine::{
     icy_board::{
-        commands::Command,
         icb_config::IcbColor,
         icb_text::IceText,
         state::{functions::display_flags, UserActivity},
@@ -11,7 +10,7 @@ use icy_board_engine::{
 use crate::{menu_runner::PcbBoardCommand, Res};
 
 impl PcbBoardCommand {
-    pub async fn who_display_nodes(&mut self, _action: &Command) -> Res<()> {
+    pub async fn who_display_nodes(&mut self) -> Res<()> {
         if self.displaycmdfile("who").await? {
             return Ok(());
         }

@@ -3,7 +3,6 @@ use std::{process::Stdio, time::Duration};
 use crate::{menu_runner::PcbBoardCommand, Res};
 
 use icy_board_engine::icy_board::{
-    commands::Command,
     doors::{BBSLink, Door, DoorList, DoorServerAccount, DoorType},
     icb_text::IceText,
     state::{
@@ -22,7 +21,7 @@ use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 impl PcbBoardCommand {
-    pub async fn open_door(&mut self, action: &Command) -> Res<()> {
+    pub async fn open_door(&mut self, help: &str) -> Res<()> {
         self.state.set_activity(UserActivity::RunningDoor).await;
         let doors = self.state.session.current_conference.doors.clone();
         if doors.is_empty() {
@@ -52,7 +51,7 @@ impl PcbBoardCommand {
                     },
                     20,
                     &MASK_ALNUM,
-                    &action.help,
+                    help,
                     None,
                     display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
                 )

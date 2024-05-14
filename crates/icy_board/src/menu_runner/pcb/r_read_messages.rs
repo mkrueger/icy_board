@@ -1,5 +1,4 @@
 use icy_board_engine::icy_board::{
-    commands::Command,
     icb_text::IceText,
     state::{functions::display_flags, UserActivity},
 };
@@ -8,17 +7,17 @@ use jamjam::jam::JamMessageBase;
 use crate::{menu_runner::PcbBoardCommand, Res};
 
 impl PcbBoardCommand {
-    pub async fn read_messages(&mut self, action: &Command) -> Res<()> {
+    pub async fn read_messages(&mut self, help: &str) -> Res<()> {
         self.state.set_activity(UserActivity::ReadMessages).await;
-        let Ok(Some(area)) = self.state.show_message_areas(self.state.session.current_conference_number, &action.help).await else {
+        let Ok(Some(area)) = self.state.show_message_areas(self.state.session.current_conference_number, help).await else {
             self.state.press_enter().await?;
             self.display_menu = true;
             return Ok(());
         };
-        self.read_messages_in_area(area, action).await
+        self.read_messages_in_area(area, help).await
     }
 
-    async fn read_messages_in_area(&mut self, area: usize, action: &Command) -> Res<()> {
+    async fn read_messages_in_area(&mut self, area: usize, help: &str) -> Res<()> {
         // loop for recreating the message base without async recursion problem.
         let mut tries = 0;
         while tries < 2 {
@@ -27,7 +26,7 @@ impl PcbBoardCommand {
             let msgbase_file_resolved = self.state.get_board().await.resolve_file(message_base_file);
             match JamMessageBase::open(&msgbase_file_resolved) {
                 Ok(message_base) => {
-                    self.read_msgs_from_base(message_base, action).await?;
+                    self.read_msgs_from_base(message_base, help).await?;
                     return Ok(());
                 }
                 Err(err) => {

@@ -3,12 +3,12 @@ use crate::{
     Res,
 };
 use icy_board_engine::{
-    icy_board::{commands::Command, icb_config::IcbColor, icb_text::IceText, state::functions::display_flags},
+    icy_board::{icb_config::IcbColor, icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
 };
 
 impl PcbBoardCommand {
-    pub async fn set_language(&mut self, _action: &Command) -> Res<()> {
+    pub async fn set_language(&mut self) -> Res<()> {
         if self.displaycmdfile("lang").await? {
             return Ok(());
         }

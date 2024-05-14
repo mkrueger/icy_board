@@ -3,7 +3,6 @@ use chrono::Utc;
 use dizbase::file_base::{file_info::FileInfo, FileBase};
 use icy_board_engine::{
     icy_board::{
-        commands::Command,
         icb_text::IceText,
         state::{
             functions::{display_flags, MASK_ASCII},
@@ -15,7 +14,7 @@ use icy_board_engine::{
 use icy_net::protocol::{Protocol, TransferProtocolType, XYModemVariant, XYmodem, Zmodem};
 
 impl PcbBoardCommand {
-    pub async fn upload_file(&mut self, action: &Command) -> Res<()> {
+    pub async fn upload_file(&mut self, help: &str) -> Res<()> {
         self.state.set_activity(UserActivity::UploadFiles).await;
         let upload_location = self.state.resolve_path(&self.state.session.current_conference.pub_upload_location);
         if !upload_location.exists() {
@@ -36,7 +35,7 @@ impl PcbBoardCommand {
                 IceText::FileNameToUpload,
                 60,
                 &MASK_ASCII,
-                &action.help,
+                help,
                 None,
                 display_flags::NEWLINE | display_flags::LFBEFORE,
             )
@@ -56,7 +55,7 @@ impl PcbBoardCommand {
                     IceText::GoodbyeAfterUpload,
                     1,
                     &"AGP",
-                    &action.help,
+                    help,
                     None,
                     display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE | display_flags::FIELDLEN,
                 )
@@ -73,7 +72,7 @@ impl PcbBoardCommand {
                     break;
                 }
                 "P" => {
-                    self.set_transfer_protocol(action).await?;
+                    self.set_transfer_protocol().await?;
                     continue;
                 }
                 "" => {

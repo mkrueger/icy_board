@@ -2,10 +2,10 @@ use crate::{
     menu_runner::{PcbBoardCommand, MASK_COMMAND},
     Res,
 };
-use icy_board_engine::icy_board::{commands::Command, icb_text::IceText, state::functions::display_flags};
+use icy_board_engine::icy_board::{icb_text::IceText, state::functions::display_flags};
 
 impl PcbBoardCommand {
-    pub async fn join_conference(&mut self, action: &Command) -> Res<()> {
+    pub async fn join_conference(&mut self, help: &str) -> Res<()> {
         if self.state.get_board().await.conferences.is_empty() {
             self.state
                 .display_text(IceText::NoConferenceAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
@@ -27,7 +27,7 @@ impl PcbBoardCommand {
                     IceText::JoinConferenceNumber,
                     40,
                     MASK_COMMAND,
-                    &action.help,
+                    help,
                     None,
                     display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
                 )

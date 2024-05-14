@@ -1,7 +1,6 @@
 use crate::{menu_runner::PcbBoardCommand, Res};
 use icy_board_engine::{
     icy_board::{
-        commands::Command,
         icb_config::IcbColor,
         icb_text::IceText,
         state::functions::{display_flags, MASK_ALNUM},
@@ -10,7 +9,7 @@ use icy_board_engine::{
 };
 
 impl PcbBoardCommand {
-    pub async fn set_transfer_protocol(&mut self, _action: &Command) -> Res<()> {
+    pub async fn set_transfer_protocol(&mut self) -> Res<()> {
         self.displaycmdfile("preprot").await?;
         if self.displaycmdfile("prot").await? {
             return Ok(());

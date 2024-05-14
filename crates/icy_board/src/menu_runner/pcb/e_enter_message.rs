@@ -1,7 +1,6 @@
 use crate::{menu_runner::PcbBoardCommand, Res};
 
 use icy_board_engine::icy_board::{
-    commands::Command,
     icb_text::IceText,
     state::{
         functions::{display_flags, MASK_ASCII},
@@ -10,7 +9,7 @@ use icy_board_engine::icy_board::{
 };
 
 impl PcbBoardCommand {
-    pub async fn enter_message(&mut self, action: &Command) -> Res<()> {
+    pub async fn enter_message(&mut self, help: &str) -> Res<()> {
         if self.state.session.current_conference.is_read_only {
             self.state
                 .display_text(
@@ -22,7 +21,7 @@ impl PcbBoardCommand {
         }
         self.state.set_activity(UserActivity::EnterMessage).await;
         let conf = self.state.session.current_conference_number;
-        let Ok(Some(area)) = self.state.show_message_areas(conf, &action.help).await else {
+        let Ok(Some(area)) = self.state.show_message_areas(conf, help).await else {
             self.state.press_enter().await?;
             self.display_menu = true;
             return Ok(());
@@ -34,7 +33,7 @@ impl PcbBoardCommand {
                 IceText::MessageTo,
                 54,
                 &MASK_ASCII,
-                &action.help,
+                help,
                 Some("ALL".to_string()),
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN,
             )
@@ -50,7 +49,7 @@ impl PcbBoardCommand {
                 IceText::MessageSubject,
                 54,
                 &MASK_ASCII,
-                &action.help,
+                help,
                 None,
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN,
             )
