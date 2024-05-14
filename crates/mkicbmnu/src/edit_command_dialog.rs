@@ -12,7 +12,7 @@ use icy_board_engine::{
 use icy_board_tui::{
     config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
     insert_table::InsertTable,
-    pcb_line::get_styled_pcb_line,
+    pcb_line::{get_styled_pcb_line, get_styled_pcb_line_with_highlight},
     position_editor::PositionEditor,
     theme::THEME,
 };
@@ -63,11 +63,13 @@ impl<'a> EditCommandDialog<'a> {
 
         let pos_ed = position_editor.clone();
         let items = vec![
+            ConfigEntry::Separator,
             ConfigEntry::Item(
                 ListItem::new("text", "Display Text".to_string(), ListValue::Text(25, command.display.clone()))
                     .with_status("Text displayed.")
                     .with_label_width(info_width),
             ),
+            ConfigEntry::Separator,
             ConfigEntry::Item(
                 ListItem::new(
                     "highlight_text",
@@ -105,7 +107,7 @@ impl<'a> EditCommandDialog<'a> {
                                 if c.display != cmd3.lock().unwrap().display {
                                     continue;
                                 }
-                                let position_line = get_styled_pcb_line(&c.display);
+                                let position_line = get_styled_pcb_line_with_highlight(&c.display, true);
                                 let line_area = Rect::new(area.x + pos.x, area.y + pos.y, position_line.width() as u16, 1);
                                 position_line.render(line_area, frame.buffer_mut());
                             }
@@ -352,8 +354,7 @@ impl<'a> EditCommandDialog<'a> {
             .border_type(BorderType::Double);
         block.render(area, frame.buffer_mut());
 
-        let vertical = Layout::vertical([Constraint::Length(5), Constraint::Fill(1)]);
-
+        let vertical = Layout::vertical([Constraint::Length(7), Constraint::Fill(1)]);
         let [header, footer] = vertical.areas(area.inner(&Margin { vertical: 1, horizontal: 1 }));
 
         let sel = self.state.selected;
@@ -361,6 +362,7 @@ impl<'a> EditCommandDialog<'a> {
             self.state.selected = usize::MAX;
         }
         self.config.render(header, frame, &mut self.state);
+
         if self.state.in_edit {
             // POSITION EDIT (full screen editor)
             if self.state.selected == 2 {
@@ -368,6 +370,30 @@ impl<'a> EditCommandDialog<'a> {
             }
             self.config.get_item(self.state.selected).unwrap().text_field_state.set_cursor_position(frame);
         }
+
+        for i in self.config.iter() {
+            if i.id == "text" {
+                if let ListValue::Text(_, ref value) = &i.value {
+                    let mut area = header;
+                    area.x += 19;
+                    area.width -= 19;
+                    area.height = 1;
+
+                    get_styled_pcb_line(value).render(area, frame.buffer_mut());
+                }
+            }
+            if i.id == "highlight_text" {
+                if let ListValue::Text(_, ref value) = &i.value {
+                    let mut area = header;
+                    area.x += 19;
+                    area.width -= 19;
+                    area.y += 2;
+                    area.height = 1;
+                    get_styled_pcb_line(value).render(area, frame.buffer_mut());
+                }
+            }
+        }
+
         self.state.selected = sel;
 
         let sel = self.insert_table.table_state.selected();

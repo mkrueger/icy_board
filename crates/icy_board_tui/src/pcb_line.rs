@@ -1,5 +1,5 @@
 use ratatui::{
-    style::Style,
+    style::{Style, Stylize},
     text::{Line, Span},
 };
 
@@ -15,8 +15,11 @@ enum PcbState {
     ReadColor1,
     ReadColor2,
 }
-
 pub fn get_styled_pcb_line<'a>(txt: &str) -> Line<'a> {
+    get_styled_pcb_line_with_highlight(txt, false)
+}
+
+pub fn get_styled_pcb_line_with_highlight<'a>(txt: &str, highlight: bool) -> Line<'a> {
     let mut spans = Vec::new();
 
     let mut span_builder = String::new();
@@ -103,11 +106,16 @@ pub fn get_styled_pcb_line<'a>(txt: &str) -> Line<'a> {
             PcbState::Default => {
                 if last_fg != cur_fg_color || last_bg != cur_bg_color {
                     if !span_builder.is_empty() {
-                        if let (Some(fg), Some(bg)) = (last_bg, last_fg) {
-                            spans.push(Span::styled(span_builder.clone(), Style::default().fg(fg).fg(bg)));
+                        let mut s = if let (Some(fg), Some(bg)) = (last_bg, last_fg) {
+                            Span::styled(span_builder.clone(), Style::default().fg(fg).fg(bg))
                         } else {
-                            spans.push(Span::raw(span_builder.clone()));
+                            Span::raw(span_builder.clone())
+                        };
+                        if highlight {
+                            s = s.bold();
                         }
+                        spans.push(s);
+
                         span_builder.clear();
                     }
                     last_fg = cur_fg_color;
@@ -124,11 +132,16 @@ pub fn get_styled_pcb_line<'a>(txt: &str) -> Line<'a> {
     }
 
     if !span_builder.is_empty() {
-        if let (Some(fg), Some(bg)) = (cur_fg_color, cur_bg_color) {
-            spans.push(Span::styled(span_builder.clone(), Style::default().fg(fg).bg(bg)));
+        let mut s = if let (Some(fg), Some(bg)) = (cur_fg_color, cur_bg_color) {
+            Span::styled(span_builder.clone(), Style::default().fg(fg).bg(bg))
         } else {
-            spans.push(Span::raw(span_builder.clone()));
+            Span::raw(span_builder.clone())
+        };
+        if highlight {
+            s = s.bold();
         }
+        spans.push(s);
+
         span_builder.clear();
     }
     Line::from(spans)

@@ -26,13 +26,13 @@ impl<'a> CommandsTab<'a> {
         let insert_table = InsertTable {
             scroll_state: ScrollbarState::default().content_length(len),
             table_state: TableState::default().with_selected(0),
-            headers: vec![String::new(), "Keyword".to_string(), "Display".to_string()],
+            headers: vec!["   ".to_string(), "Keyword".to_string(), "Display".to_string()],
             get_content: Box::new(move |_table, i, j| {
                 if *i >= mnu2.lock().unwrap().commands.len() {
                     return Line::from("".to_string());
                 }
                 match j {
-                    0 => Line::from(format!("{})", i)),
+                    0 => Line::from(format!("{})", i + 1)),
                     1 => Line::from(mnu2.lock().unwrap().commands[*i].keyword.clone()),
                     2 => get_styled_pcb_line(&mnu2.lock().unwrap().commands[*i].display),
                     _ => Line::from("".to_string()),
