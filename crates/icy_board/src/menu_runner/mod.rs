@@ -4,7 +4,7 @@ use icy_board_engine::{
     icy_board::{
         commands::{ActionTrigger, Command, CommandType},
         icb_text::IceText,
-        menu::Menu,
+        menu::{Menu, MenuType},
         security::RequiredSecurity,
         state::{control_codes, functions::display_flags, IcyBoardState, UserActivity},
         IcyBoardError, IcyBoardSerializer,
@@ -118,6 +118,15 @@ impl PcbBoardCommand {
             }
             self.state.session.push_tokens(&command);
             if let Some(command) = self.state.session.tokens.pop_front() {
+                let cmd = mnu.commands.iter().find(|cmd| cmd.keyword.eq_ignore_ascii_case(&command));
+                if let Some(cmd) = cmd {
+                    self.state.session.last_new_line_y = self.state.user_screen.caret.get_position().y;
+                    self.state.session.num_lines_printed = 0;
+                    self.dispatch_command(&command, &cmd).await?;
+                    self.state.session.tokens.clear();
+                    continue;
+                }
+
                 if let Some(action) = self.state.try_find_command(&command).await {
                     self.state.session.last_new_line_y = self.state.user_screen.caret.get_position().y;
                     self.state.session.num_lines_printed = 0;
@@ -416,25 +425,31 @@ impl PcbBoardCommand {
 
     async fn move_lightbar(&mut self, mnu: &Menu, current_item: &mut usize, new_item: usize) -> Res<()> {
         if new_item != *current_item {
+            if new_item >= mnu.commands.len() {
+                return Ok(());
+            }
+
             self.state.print(TerminalTarget::Both, "\x1b[s").await?;
-            let cmd = &mnu.commands[*current_item];
-            self.state
-                .gotoxy(TerminalTarget::Both, 1 + cmd.position.x as i32, 1 + cmd.position.y as i32)
-                .await?;
-            self.state.print(TerminalTarget::Both, &cmd.display).await?;
+            if *current_item < mnu.commands.len() {
+                let cmd = &mnu.commands[*current_item];
+                self.state
+                    .gotoxy(TerminalTarget::Both, 1 + cmd.position.x as i32, 1 + cmd.position.y as i32)
+                    .await?;
+                self.state.print(TerminalTarget::Both, &cmd.display).await?;
+            }
 
             let cmd = &mnu.commands[new_item];
             self.state
                 .gotoxy(TerminalTarget::Both, 1 + cmd.position.x as i32, 1 + cmd.position.y as i32)
                 .await?;
             self.state.print(TerminalTarget::Both, &cmd.lighbar_display).await?;
-            self.state.print(TerminalTarget::Both, "\x1b[u").await?;
 
             for a in &cmd.actions {
                 if a.trigger == ActionTrigger::Selection {
                     self.run_action(a, &cmd.help).await?;
                 }
             }
+            self.state.print(TerminalTarget::Both, "\x1b[u").await?;
 
             *current_item = new_item;
         }
@@ -476,6 +491,10 @@ impl PcbBoardCommand {
                 _ => {
                     if (output.len() as i32) < len && MASK_COMMAND.contains(key_char.ch) {
                         output.push(key_char.ch);
+                        self.state.print(TerminalTarget::Both, &key_char.ch.to_string()).await?;
+                        if mnu.menu_type == MenuType::Hotkey {
+                            return Ok(output);
+                        }
                     }
                 }
             }

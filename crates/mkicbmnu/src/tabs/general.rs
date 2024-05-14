@@ -1,18 +1,26 @@
 use core::panic;
-use std::sync::{Arc, Mutex};
+use std::{
+    str::FromStr,
+    sync::{Arc, Mutex},
+    vec,
+};
 
 use crossterm::event::KeyEvent;
-use icy_board_engine::icy_board::{menu::Menu, IcyBoard};
+use icy_board_engine::icy_board::{
+    menu::{Menu, MenuType},
+    IcyBoard,
+};
 use icy_board_tui::{
-    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, EditMode, ListItem, ListValue, ResultState},
+    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, EditMode, ListItem, ListValue, ResultState},
     tab_page::TabPage,
     theme::THEME,
 };
 use ratatui::{
     layout::{Margin, Rect},
-    widgets::{Block, BorderType, Borders, Clear, Padding, Widget},
+    widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, Widget},
     Frame,
 };
+use strum::IntoEnumIterator;
 
 pub struct GeneralTab {
     state: ConfigMenuState,
@@ -26,7 +34,6 @@ impl GeneralTab {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>, menu: Arc<Mutex<Menu>>) -> Self {
         let info_width = 16;
         let original = menu.lock().unwrap().clone();
-
         let items = if let Ok(mnu) = menu.lock() {
             vec![
                 ConfigEntry::Item(
@@ -45,6 +52,22 @@ impl GeneralTab {
                         .with_label_width(info_width),
                 ),
                 ConfigEntry::Item(
+                    ListItem::new(
+                        "menu_type",
+                        "Menu Type".to_string(),
+                        ListValue::ComboBox(ComboBox {
+                            cur_value: ComboBoxValue::new(format!("{:?}", mnu.menu_type), format!("{:?}", mnu.menu_type)),
+                            first: 0,
+                            scroll_state: ScrollbarState::default(),
+                            values: MenuType::iter()
+                                .map(|x| ComboBoxValue::new(format!("{:?}", x), format!("{:?}", x)))
+                                .collect::<Vec<ComboBoxValue>>(),
+                        }),
+                    )
+                    .with_status("The type of the menu.")
+                    .with_label_width(info_width),
+                ),
+                ConfigEntry::Item(
                     ListItem::new("prompt", "Prompt".to_string(), ListValue::Text(25, mnu.prompt.clone()))
                         .with_status("The prompt for the menu.")
                         .with_label_width(info_width),
@@ -53,7 +76,12 @@ impl GeneralTab {
         } else {
             panic!();
         };
+        /*
 
+        format!("{:?}", mnu.menu_type), MenuType::iter().map(|x| format!("{:?}", x)).collect::<Vec<String>>()))
+        .with_status("The type of the menu.")
+        .with_label_width(info_width),
+        */
         Self {
             state: ConfigMenuState::default(),
             config: ConfigMenu {
@@ -100,6 +128,14 @@ impl GeneralTab {
                             }
                         }
                     }
+                    "menu_type" => {
+                        if let ListValue::ComboBox(value) = &item.value {
+                            if let Ok(mut mnu) = self.menu.lock() {
+                                mnu.menu_type = MenuType::from_str(&value.cur_value.value).unwrap();
+                            }
+                        }
+                    }
+
                     _ => {}
                 },
                 _ => {}

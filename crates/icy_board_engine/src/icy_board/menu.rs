@@ -1,6 +1,7 @@
 use crate::Res;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use strum::{EnumIter, EnumString};
 
 use crate::vm::errors::IcyError;
 
@@ -10,6 +11,14 @@ use super::{
     security::RequiredSecurity,
     IcyBoardSerializer,
 };
+
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq, EnumString, EnumIter, Debug)]
+pub enum MenuType {
+    #[default]
+    Hotkey,
+    Lightbar,
+    Command,
+}
 
 #[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Menu {
@@ -27,8 +36,7 @@ pub struct Menu {
     pub force_display: bool,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "is_false")]
-    pub use_hotkeys: bool,
+    pub menu_type: MenuType,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
@@ -63,7 +71,7 @@ impl Menu {
         res.display_file = PathBuf::from(splitted_line[0]);
         if splitted_line.len() > 1 {
             res.force_display = splitted_line[1] == "1";
-            res.use_hotkeys = splitted_line[2] == "1";
+            res.menu_type = if splitted_line[2] == "1" { MenuType::Hotkey } else { MenuType::Command };
             res.pass_through = splitted_line[3] == "1";
         }
         res.help_file = PathBuf::from(lines[2].to_string());

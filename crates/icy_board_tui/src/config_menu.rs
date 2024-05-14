@@ -256,7 +256,7 @@ impl ListItem {
             ListValue::ComboBox(c) => {
                 let mut area = area;
                 area.width = c.values.iter().map(|l| l.display.len()).max().unwrap_or(0) as u16 + 2;
-                area.height = c.values.len().min(12) as u16;
+                area.height = (c.values.len() + 2).min(12) as u16;
                 Clear.render(area, frame.buffer_mut());
 
                 let block = Block::new()
