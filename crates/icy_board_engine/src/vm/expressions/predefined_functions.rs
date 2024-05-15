@@ -12,11 +12,10 @@ use crate::parser::CONFERENCE_ID;
 use crate::vm::{TerminalTarget, VirtualMachine};
 use crate::Res;
 use chrono::Local;
-use codepages::tables::CP437_TO_UNICODE;
+use codepages::tables::{CP437_TO_UNICODE, UNICODE_TO_CP437};
 use icy_engine::{update_crc32, Position, TextPane};
 use radix_fmt::radix;
 use rand::Rng; // 0.8.5
-use substring::Substring;
 
 /// Should never be called. But some op codes are invalid as function call (like plus or function call)
 /// and are handled by it's own `PPEExpressions` and will point to this function.
@@ -39,7 +38,7 @@ pub async fn invalid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 /// According to specs 256 is the maximum returned
 pub async fn len(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let str = vm.eval_expr(&args[0]).await?.as_string();
-    Ok(VariableValue::new_int(str.len() as i32))
+    Ok(VariableValue::new_int(str.chars().count() as i32))
 }
 
 /// Returns the lowercase equivalent of a string
@@ -85,7 +84,7 @@ pub async fn mid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     }
 
     if chars > 0 {
-        res.push_str(str.substring(pos as usize, (pos + chars) as usize));
+        str.chars().skip(pos as usize).take(chars as usize).for_each(|c| res.push(c));
     }
     Ok(VariableValue::new_string(res))
 }
@@ -95,13 +94,13 @@ pub async fn left(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variable
     if chars <= 0 {
         return Ok(VariableValue::new_string(String::new()));
     }
-    let str = vm.eval_expr(&args[0]).await?.as_string();
+    let str = vm.eval_expr(&args[0]).await?.as_string().chars().collect::<Vec<_>>();
     let mut res = String::new();
     if chars > 0 {
         if chars < str.len() as i32 {
-            res.push_str(str.substring(0, chars as usize));
+            str.iter().take(chars as usize).for_each(|c| res.push(*c));
         } else {
-            res.push_str(str.as_str());
+            str.iter().for_each(|c| res.push(*c));
             chars -= str.len() as i32;
             while chars > 0 {
                 res.push(' ');
@@ -120,13 +119,13 @@ pub async fn right(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     let mut chars = chars as usize;
 
     let mut res = String::new();
-    let str: String = vm.eval_expr(&args[0]).await?.as_string();
+    let str = vm.eval_expr(&args[0]).await?.as_string().chars().collect::<Vec<_>>();
     if chars > 0 {
         while chars > str.len() {
             res.push(' ');
             chars -= 1;
         }
-        res.push_str(str.substring(str.len() - chars, str.len()));
+        str.iter().rev().take(chars).for_each(|c| res.push(*c));
     }
     Ok(VariableValue::new_string(res))
 }
@@ -170,7 +169,11 @@ pub async fn asc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     if c.is_empty() {
         return Ok(VariableValue::new_int(0));
     }
-    Ok(VariableValue::new_int(c.as_bytes()[0] as i32))
+    let ch = c.chars().next().unwrap_or('\0');
+    if let Some(cp437) = UNICODE_TO_CP437.get(&ch) {
+        return Ok(VariableValue::new_int(*cp437 as i32));
+    }
+    Ok(VariableValue::new_int(ch as i32))
 }
 
 /// Returns the position of a substring
@@ -1112,7 +1115,6 @@ pub async fn scrtext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     let row = vm.eval_expr(&args[1]).await?.as_int() - 1;
     let len = vm.eval_expr(&args[2]).await?.as_int();
     let code = vm.eval_expr(&args[3]).await?.as_bool();
-
     let mut res = String::new();
 
     let mut cur_color = -1;
@@ -1120,7 +1122,7 @@ pub async fn scrtext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
         let ch = vm.icy_board_state.user_screen.buffer.get_char(Position::new(col + i, row));
         if code {
             let col = ch.attribute.as_u8(icy_engine::IceMode::Blink) as i32;
-            if cur_color != col {
+            if cur_color != col && (!ch.is_transparent() || cur_color & 0b0111_0000 != col & 0b0111_0000) {
                 res.push_str(&format!("@X{:02X}", col));
                 cur_color = col;
             }
@@ -1128,7 +1130,6 @@ pub async fn scrtext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 
         res.push(ch.ch);
     }
-
     Ok(VariableValue::new_string(res))
 }
 pub async fn showstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

@@ -526,7 +526,7 @@ impl<'a> VirtualMachine<'a> {
             let p = self.cur_ptr;
             self.cur_ptr += 1;
             let c = self.script.statements[p].command.clone();
-           // log::warn!("Running command: {:?}", c);
+            // log::info!("{p}: {c:?}");
             self.execute_statement(&c).await?;
         }
         Ok(())
