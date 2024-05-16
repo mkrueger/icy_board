@@ -6,7 +6,7 @@ use strum::{EnumIter, EnumString};
 use crate::vm::errors::IcyError;
 
 use super::{
-    commands::{ActionTrigger, Command, CommandAction, CommandType},
+    commands::{ActionTrigger, AutoRun, Command, CommandAction, CommandType},
     is_false, path_is_empty, read_with_encoding_detection,
     security::RequiredSecurity,
     IcyBoardSerializer,
@@ -140,6 +140,8 @@ impl Menu {
                 display: "".to_string(),
                 lighbar_display: "".to_string(),
                 position: Default::default(),
+                auto_run: AutoRun::Disabled,
+                autorun_time: 0,
                 security: RequiredSecurity::new(security),
                 help: "".to_string(),
                 actions: vec![CommandAction {

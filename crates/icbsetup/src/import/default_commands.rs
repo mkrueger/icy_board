@@ -1,5 +1,5 @@
 use icy_board_engine::icy_board::{
-    commands::{CommandList, CommandType},
+    commands::{AutoRun, CommandList, CommandType},
     pcboard_data::PcbBoardData,
     security::RequiredSecurity,
     PCBoardRecordImporter,
@@ -11,6 +11,8 @@ fn convert_cmd(name: &str, cmd_type: CommandType, security: i32) -> icy_board_en
         display: "".to_string(),
         lighbar_display: "".to_string(),
         help: format!("hlp{}", name.to_ascii_lowercase()),
+        auto_run: AutoRun::Disabled,
+        autorun_time: 0,
         position: Default::default(),
         actions: vec![icy_board_engine::icy_board::commands::CommandAction {
             command_type: cmd_type,

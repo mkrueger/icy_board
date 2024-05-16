@@ -93,6 +93,9 @@ pub enum CommandType {
     /// Print a text
     PrintText,
 
+    /// Refreshes the display string of the command.
+    RefreshDisplayString,
+
     // user commands
     /// ! command
     RedisplayCommand,
@@ -301,6 +304,7 @@ impl Display for CommandType {
             CommandType::TextSearch => write!(f, "(TS)\tTextSearch"),
             CommandType::GotoXY => write!(f, "GotoXY"),
             CommandType::PrintText => write!(f, "PrintText"),
+            CommandType::RefreshDisplayString => write!(f, "RefreshDisplayString"),
         }
     }
 }
@@ -344,6 +348,25 @@ impl Display for Position {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq, EnumString, EnumIter, Debug)]
+pub enum AutoRun {
+    #[default]
+    Disabled,
+
+    /// Run the command the first time the menu is loaded
+    FirstCmd,
+
+    /// Run the command every time before the menu is displayed
+    Every,
+
+    /// Run the command every time after the menu is displayed
+    After,
+
+    /// Run the command after a certain timeout in a loop
+    /// For example to display the current time or to update a scrolling message
+    Loop,
+}
+
 #[derive(Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct Command {
     #[serde(default)]
@@ -358,6 +381,12 @@ pub struct Command {
 
     #[serde(default)]
     pub keyword: String,
+
+    #[serde(default)]
+    pub auto_run: AutoRun,
+
+    #[serde(default)]
+    pub autorun_time: u64,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -422,6 +451,8 @@ impl PCBoardRecordImporter<Command> for CommandList {
             display: "".to_string(),
             lighbar_display: "".to_string(),
             help: "".to_string(),
+            auto_run: AutoRun::Disabled,
+            autorun_time: 0,
             position: Position::default(),
             actions: vec![CommandAction {
                 command_type,

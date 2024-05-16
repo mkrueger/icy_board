@@ -49,7 +49,7 @@ impl Value {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct ComboBoxValue {
     pub display: String,
     pub value: String,

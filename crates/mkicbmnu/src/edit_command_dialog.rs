@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
     icy_board::{
-        commands::{ActionTrigger, Command, CommandAction, CommandType},
+        commands::{ActionTrigger, AutoRun, Command, CommandAction, CommandType},
         menu::Menu,
         IcyBoard,
     },
@@ -122,6 +122,27 @@ impl<'a> EditCommandDialog<'a> {
             ConfigEntry::Item(
                 ListItem::new("keyword", "Keyword".to_string(), ListValue::Text(10, command.keyword.to_string()))
                     .with_status("The help file to display.")
+                    .with_label_width(info_width),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "autorun",
+                    "Autorun".to_string(),
+                    ListValue::ComboBox(ComboBox {
+                        cur_value: ComboBoxValue::new(format!("{:?}", command.auto_run), format!("{:?}", command.auto_run)),
+                        first: 0,
+                        scroll_state: ScrollbarState::default(),
+                        values: AutoRun::iter()
+                            .map(|x| ComboBoxValue::new(format!("{:?}", x), format!("{:?}", x)))
+                            .collect::<Vec<ComboBoxValue>>(),
+                    }),
+                )
+                .with_status("The type of the menu.")
+                .with_label_width(info_width),
+            ),
+            ConfigEntry::Item(
+                ListItem::new("autorun_time", "Time".to_string(), ListValue::U32(command.autorun_time as u32, 0, 3600))
+                    .with_status("Autorun after a specific amount of time.")
                     .with_label_width(info_width),
             ),
         ];
@@ -336,6 +357,17 @@ impl<'a> EditCommandDialog<'a> {
                             self.command.lock().unwrap().keyword = value.clone();
                         }
                     }
+                    "autorun" => {
+                        if let ListValue::ComboBox(ref value) = item.value {
+                            let value = value.cur_value.value.parse::<AutoRun>().unwrap();
+                            self.command.lock().unwrap().auto_run = value;
+                        }
+                    }
+                    "autorun_time" => {
+                        if let ListValue::U32(value, _, _) = item.value {
+                            self.command.lock().unwrap().autorun_time = value as u64;
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -354,8 +386,11 @@ impl<'a> EditCommandDialog<'a> {
             .border_type(BorderType::Double);
         block.render(area, frame.buffer_mut());
 
-        let vertical = Layout::vertical([Constraint::Length(7), Constraint::Fill(1)]);
+        let vertical = Layout::vertical([Constraint::Length(9), Constraint::Fill(1)]);
         let [header, footer] = vertical.areas(area.inner(&Margin { vertical: 1, horizontal: 1 }));
+        if self.state.in_edit {
+            self.display_insert_table(frame, &area, &footer);
+        }
 
         let sel = self.state.selected;
         if self.mode == EditCommandMode::Table {
@@ -393,14 +428,18 @@ impl<'a> EditCommandDialog<'a> {
                 }
             }
         }
-
         self.state.selected = sel;
+        if !self.state.in_edit {
+            self.display_insert_table(frame, &area, &footer);
+        }
+    }
 
+    fn display_insert_table(&mut self, frame: &mut Frame, area: &Rect, footer: &Rect) {
         let sel = self.insert_table.table_state.selected();
         if self.mode == EditCommandMode::Config {
             self.insert_table.table_state.select(None);
         }
-        self.insert_table.render_table(frame, footer);
+        self.insert_table.render_table(frame, *footer);
         self.insert_table.table_state.select(sel);
 
         if let Some(edit_config) = &mut self.edit_config {

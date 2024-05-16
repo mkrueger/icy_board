@@ -157,7 +157,7 @@ impl TabPage for GeneralTab {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         let width = (2 + 50 + 2).min(area.width) as u16;
 
-        let lines = (6).min(area.height) as u16;
+        let lines = (7).min(area.height) as u16;
         let area = Rect::new(area.x + (area.width - width) / 2, (area.y + area.height - lines) / 2, width + 2, lines);
 
         Clear.render(area, frame.buffer_mut());
