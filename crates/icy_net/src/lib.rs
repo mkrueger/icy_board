@@ -4,6 +4,7 @@ pub mod crc;
 pub mod iemsi;
 pub mod protocol;
 pub mod terminal;
+pub mod zconnect;
 
 use thiserror::Error;
 

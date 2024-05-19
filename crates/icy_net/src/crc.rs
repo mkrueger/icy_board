@@ -29,7 +29,8 @@ pub fn update_crc16(crc: u16, b: u8) -> u16 {
     (crc << 8) ^ CRC16_CCITT_TABLE[(((crc >> 8) as u8) ^ b) as usize]
 }
 
-fn buggy_update(crc: u16, b: u8) -> u16 {
+#[must_use]
+pub fn buggy_update(crc: u16, b: u8) -> u16 {
     CRC16_CCITT_TABLE[(crc >> 8) as usize] ^ (crc << 8) ^ (b as u16)
 }
 
