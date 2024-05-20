@@ -15,6 +15,16 @@ pub enum BlockCode {
     Block3,
     Block4,
 }
+impl BlockCode {
+    pub fn next(&self) -> BlockCode {
+        match self {
+            BlockCode::Block1 => BlockCode::Block2,
+            BlockCode::Block2 => BlockCode::Block3,
+            BlockCode::Block3 => BlockCode::Block4,
+            BlockCode::Block4 => BlockCode::Block1,
+        }
+    }
+}
 
 impl std::fmt::Display for BlockCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -72,6 +82,7 @@ pub enum ZConnectState {
     Tme(BlockCode),
     Eot(EndTransmission),
     Begin(ProtocolTransition),
+    Nak0,
 }
 
 impl Default for ZConnectState {
@@ -88,6 +99,7 @@ impl std::fmt::Display for ZConnectState {
             ZConnectState::Tme(b) => write!(f, "TME{}", *b),
             ZConnectState::Eot(b) => write!(f, "EOT{}", *b),
             ZConnectState::Begin(b) => write!(f, "BEG{}", *b),
+            ZConnectState::Nak0 => write!(f, "NAK0"),
         }
     }
 }
@@ -209,6 +221,7 @@ fn parse_state(parameter: &str) -> crate::Result<ZConnectState> {
         "EOT6" => Ok(ZConnectState::Eot(EndTransmission::Prot6)),
         "BEG5" => Ok(ZConnectState::Begin(ProtocolTransition::Prot5)),
         "BEG6" => Ok(ZConnectState::Begin(ProtocolTransition::Prot6)),
+        "NAK0" => Ok(ZConnectState::Nak0),
         _ => Err("Invalid state".into()),
     }
 }

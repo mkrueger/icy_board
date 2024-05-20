@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use super::{ZConnectBlock, ZConnectState};
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Compressor {
+pub enum Acer {
     /// ARC/PAK
     Arc,
     /// Arj
@@ -36,46 +36,46 @@ pub enum Compressor {
     Unknown(String),
 }
 
-impl Compressor {
-    fn parse(s: &str) -> Compressor {
+impl Acer {
+    fn parse(s: &str) -> Acer {
         match s.to_ascii_uppercase().as_str() {
-            "ARC" => Compressor::Arc,
-            "ARJ" => Compressor::Arj,
-            "LHARC" | "LZH" => Compressor::LHArc,
-            "LHA" => Compressor::LHA,
-            "RAR" => Compressor::RAR,
-            "ZOO" => Compressor::ZOO,
-            "ZIP" | "ZI1" => Compressor::ZIP,
-            "ZIP2" | "ZI2" => Compressor::ZIP2,
-            "COMPRESS" => Compressor::Compress,
-            "GZIP" => Compressor::GZIP,
-            "TAR-COMPRESS" => Compressor::TarCompress,
-            "TAR-GZIP" => Compressor::TarGZip,
-            "RM" => Compressor::RM,
-            "NONE" => Compressor::NONE,
-            _ => Compressor::Unknown(s.to_string()),
+            "ARC" => Acer::Arc,
+            "ARJ" => Acer::Arj,
+            "LHARC" | "LZH" => Acer::LHArc,
+            "LHA" => Acer::LHA,
+            "RAR" => Acer::RAR,
+            "ZOO" => Acer::ZOO,
+            "ZIP" | "ZI1" => Acer::ZIP,
+            "ZIP2" | "ZI2" => Acer::ZIP2,
+            "COMPRESS" => Acer::Compress,
+            "GZIP" => Acer::GZIP,
+            "TAR-COMPRESS" => Acer::TarCompress,
+            "TAR-GZIP" => Acer::TarGZip,
+            "RM" => Acer::RM,
+            "NONE" => Acer::NONE,
+            _ => Acer::Unknown(s.to_string()),
         }
     }
 }
 
-impl std::fmt::Display for Compressor {
+impl std::fmt::Display for Acer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Compressor::Arc => write!(f, "ARC"),
-            Compressor::Arj => write!(f, "ARJ"),
-            Compressor::LHArc => write!(f, "LHARC"),
-            Compressor::LHA => write!(f, "LHA"),
-            Compressor::RAR => write!(f, "RAR"),
-            Compressor::ZOO => write!(f, "ZOO"),
-            Compressor::ZIP => write!(f, "ZIP"),
-            Compressor::ZIP2 => write!(f, "ZIP2"),
-            Compressor::Compress => write!(f, "COMPRESS"),
-            Compressor::GZIP => write!(f, "GZIP"),
-            Compressor::TarCompress => write!(f, "TAR-COMPRESS"),
-            Compressor::TarGZip => write!(f, "TAR-GZIP"),
-            Compressor::RM => write!(f, "RM"),
-            Compressor::NONE => write!(f, "NONE"),
-            Compressor::Unknown(s) => write!(f, "{}", s),
+            Acer::Arc => write!(f, "ARC"),
+            Acer::Arj => write!(f, "ARJ"),
+            Acer::LHArc => write!(f, "LHARC"),
+            Acer::LHA => write!(f, "LHA"),
+            Acer::RAR => write!(f, "RAR"),
+            Acer::ZOO => write!(f, "ZOO"),
+            Acer::ZIP => write!(f, "ZIP"),
+            Acer::ZIP2 => write!(f, "ZIP2"),
+            Acer::Compress => write!(f, "COMPRESS"),
+            Acer::GZIP => write!(f, "GZIP"),
+            Acer::TarCompress => write!(f, "TAR-COMPRESS"),
+            Acer::TarGZip => write!(f, "TAR-GZIP"),
+            Acer::RM => write!(f, "RM"),
+            Acer::NONE => write!(f, "NONE"),
+            Acer::Unknown(s) => write!(f, "{}", s),
         }
     }
 }
@@ -257,13 +257,13 @@ pub struct ZConnectHeaderBlock {
     maps: Option<String>,
     iso2: HashMap<usize, String>,
     iso3: HashMap<usize, String>,
-    acer: HashMap<usize, Vec<Compressor>>,
+    acer: HashMap<usize, Vec<Acer>>,
     password: String,
     protocols: HashMap<usize, Vec<TransferProtocol>>,
     voice_phone: Option<String>,
     crypt: HashMap<usize, Vec<Crypt>>,
-    acer_in: Option<Compressor>,
-    acer_out: Option<Compressor>,
+    acer_in: Option<Acer>,
+    acer_out: Option<Acer>,
     mailer: HashMap<usize, Vec<Mailer>>,
     mailformat: HashMap<usize, Vec<Mailformat>>, // Not sure about position
     coords: Option<String>,                      // Not sure about position
@@ -337,11 +337,11 @@ impl ZConnectHeaderBlock {
         self.iso3.insert(index, iso3.into());
     }
 
-    pub fn acer(&self, index: usize) -> Option<&Vec<Compressor>> {
+    pub fn acer(&self, index: usize) -> Option<&Vec<Acer>> {
         self.acer.get(&index)
     }
 
-    pub fn add_acer(&mut self, index: usize, compressor: Compressor) {
+    pub fn add_acer(&mut self, index: usize, compressor: Acer) {
         self.acer.entry(index).or_insert_with(Vec::new).push(compressor);
     }
 
@@ -373,17 +373,17 @@ impl ZConnectHeaderBlock {
         self.crypt.entry(index).or_insert_with(Vec::new).push(crypt);
     }
 
-    pub fn acer_in(&self) -> Option<Compressor> {
+    pub fn acer_in(&self) -> Option<Acer> {
         self.acer_in.clone()
     }
-    pub fn set_acer_in(&mut self, acer_in: Compressor) {
+    pub fn set_acer_in(&mut self, acer_in: Acer) {
         self.acer_in = Some(acer_in);
     }
 
-    pub fn acer_out(&self) -> Option<Compressor> {
+    pub fn acer_out(&self) -> Option<Acer> {
         self.acer_out.clone()
     }
-    pub fn set_acer_out(&mut self, acer_out: Compressor) {
+    pub fn set_acer_out(&mut self, acer_out: Acer) {
         self.acer_out = Some(acer_out);
     }
 
@@ -409,7 +409,7 @@ impl ZConnectHeaderBlock {
     }
 
     pub fn parse(input: &str) -> crate::Result<Self> {
-        let mut res = ZConnectHeaderBlock::default();
+        let mut res = Self::default();
         res.parse_block(input)?;
         Ok(res)
     }
@@ -543,7 +543,7 @@ impl ZConnectBlock for ZConnectHeaderBlock {
             "ARC" => {
                 let mut parts = parameter.splitn(2, ' ');
                 let index: usize = parts.next().unwrap().parse()?;
-                let compressors = parts.next().unwrap().split(|c| c == ';' || c == ' ').map(|s| Compressor::parse(s)).collect();
+                let compressors = parts.next().unwrap().split(|c| c == ';' || c == ' ').map(|s| Acer::parse(s)).collect();
                 self.acer.insert(index - 1, compressors);
             }
             "PASSWD" => self.password = parameter,
@@ -565,8 +565,8 @@ impl ZConnectBlock for ZConnectHeaderBlock {
                 let crypts = parts.next().unwrap().split(|c| c == ';' || c == ' ').map(|s| Crypt::parse(s)).collect();
                 self.crypt.insert(index - 1, crypts);
             }
-            "ACERIN" => self.acer_in = Some(Compressor::parse(&parameter)),
-            "ACEROUT" => self.acer_out = Some(Compressor::parse(&parameter)),
+            "ACERIN" => self.acer_in = Some(Acer::parse(&parameter)),
+            "ACEROUT" => self.acer_out = Some(Acer::parse(&parameter)),
             "MAILER" => {
                 let mut parts = parameter.splitn(2, ' ');
                 let index: usize = parts.next().unwrap().parse()?;
@@ -605,13 +605,13 @@ mod tests {
         blk.set_domains(vec!["icyshadow.com".to_string()]);
         blk.add_iso2(0, "V.32bis");
         blk.add_iso3(0, "V.42.bis");
-        blk.add_acer(0, crate::zconnect::header::Compressor::ZIP);
-        blk.add_acer(0, crate::zconnect::header::Compressor::Arj);
+        blk.add_acer(0, crate::zconnect::header::Acer::ZIP);
+        blk.add_acer(0, crate::zconnect::header::Acer::Arj);
         blk.set_password("password");
         blk.set_voice_phone("+49-VOICE");
         blk.add_protocol(0, crate::zconnect::header::TransferProtocol::ZModem);
-        blk.set_acer_in(crate::zconnect::header::Compressor::ZIP);
-        blk.set_acer_out(crate::zconnect::header::Compressor::ZIP);
+        blk.set_acer_in(crate::zconnect::header::Acer::ZIP);
+        blk.set_acer_out(crate::zconnect::header::Acer::ZIP);
         blk.add_mailer(0, crate::zconnect::header::Mailer::ZConnect);
         assert_eq!("Sys:Icy Shadow BBS\rSysop:SYSOP\rSerNr:123456\rPost:Zossen, Germany\rPort:1\rTel:1 unknown\rDomain:icyshadow.com\rISO2:1 V.32bis\rISO3:1 V.42.bis\rArc:1 ZIP;ARJ\rProto:1 ZMODEM\rPasswd:password\rTelefon:+49-VOICE\rAcerin:ZIP\rAcerout:ZIP\rMailer:1 ZCONNECT\rStatus:BLK1\rCRC:1095\r\r", blk.display());
     }
@@ -630,13 +630,13 @@ mod tests {
         assert_eq!(header.iso3().get(&0), Some(&"V.42.bis".to_string()));
         assert_eq!(
             header.acer(0),
-            Some(&vec![crate::zconnect::header::Compressor::ZIP, crate::zconnect::header::Compressor::Arj])
+            Some(&vec![crate::zconnect::header::Acer::ZIP, crate::zconnect::header::Acer::Arj])
         );
         assert_eq!(header.password(), "password");
         assert_eq!(header.voice_phone(), Some("+49-VOICE"));
         assert_eq!(header.protocols(0), Some(&vec![crate::zconnect::header::TransferProtocol::ZModem]));
-        assert_eq!(header.acer_in(), Some(crate::zconnect::header::Compressor::ZIP));
-        assert_eq!(header.acer_out(), Some(crate::zconnect::header::Compressor::ZIP));
+        assert_eq!(header.acer_in(), Some(crate::zconnect::header::Acer::ZIP));
+        assert_eq!(header.acer_out(), Some(crate::zconnect::header::Acer::ZIP));
         assert_eq!(header.mailer(0), Some(&vec![crate::zconnect::header::Mailer::ZConnect]));
     }
 
@@ -654,13 +654,13 @@ mod tests {
         assert_eq!(header.iso3().get(&0), Some(&"V.42.bis".to_string()));
         assert_eq!(
             header.acer(0),
-            Some(&vec![crate::zconnect::header::Compressor::ZIP, crate::zconnect::header::Compressor::Arj])
+            Some(&vec![crate::zconnect::header::Acer::ZIP, crate::zconnect::header::Acer::Arj])
         );
         assert_eq!(header.password(), "password");
         assert_eq!(header.voice_phone(), Some("+49-VOICE"));
         assert_eq!(header.protocols(0), Some(&vec![crate::zconnect::header::TransferProtocol::ZModem]));
-        assert_eq!(header.acer_in(), Some(crate::zconnect::header::Compressor::ZIP));
-        assert_eq!(header.acer_out(), Some(crate::zconnect::header::Compressor::ZIP));
+        assert_eq!(header.acer_in(), Some(crate::zconnect::header::Acer::ZIP));
+        assert_eq!(header.acer_out(), Some(crate::zconnect::header::Acer::ZIP));
         assert_eq!(header.mailer(0), Some(&vec![crate::zconnect::header::Mailer::ZConnect]));
     }
 

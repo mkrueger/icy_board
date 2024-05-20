@@ -2,6 +2,7 @@ pub mod connection;
 pub use connection::*;
 pub mod crc;
 pub mod iemsi;
+pub mod pattern_recognizer;
 pub mod protocol;
 pub mod terminal;
 pub mod zconnect;

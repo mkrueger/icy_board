@@ -1,4 +1,4 @@
-use super::{ZConnectBlock, ZConnectState};
+use super::{ProtocolTransition, ZConnectBlock, ZConnectState};
 
 pub mod mails {
     pub const ALL: u8 = PERSONAL | URGENT | NEWS | ERRORS;
@@ -121,51 +121,44 @@ impl ZConnectBlock for ZConnectCommandBlock {
     fn parse_cmd(&mut self, command: &str, parameter: String) -> crate::Result<()> {
         match command {
             "GET" => {
-                self.get(parse_mail_parameter(&parameter));
+                self.commands.push(ZConnectCmd::Get(parse_mail_parameter(&parameter)));
             }
             "PUT" => {
-                self.put(parse_mail_parameter(&parameter));
+                self.commands.push(ZConnectCmd::Put(parse_mail_parameter(&parameter)));
             }
             "DEL" => {
-                self.delete(parse_mail_parameter(&parameter));
+                self.commands.push(ZConnectCmd::Delete(parse_mail_parameter(&parameter)));
             }
             "FILEREQ" => {
-                self.filereq(parameter);
+                self.commands.push(ZConnectCmd::Filereq(parameter));
             }
             "FILESEND" => {
-                self.filesend(&parameter);
+                self.commands.push(ZConnectCmd::Filesend(parameter));
             }
             "PGP-KEYREQ" => {
-                self.pgp_keyreq();
+                self.commands.push(ZConnectCmd::PgpKeyreq);
             }
             "EXECUTE" => {
-                self.execute(match parameter.as_str() {
-                    "J" | "Y" => Execute::Yes, // Only 'J' is specified but in the zconnect examples 'Y' is used - so we accept both
-                    "N" => Execute::No,
-                    "L" => Execute::Later,
-                    _ => {
-                        log::error!("Unknown execute parameter: {}", parameter);
-                        return Err(format!("Unknown execute parameter: {}", parameter).into());
-                    }
-                });
+                self.commands.push(ZConnectCmd::Execute(Execute::from_str(&parameter)));
             }
             "WAIT" => {
-                self.wait(match parameter.as_str() {
+                let p = match parameter.as_str() {
                     "N" => None,
                     _ => Some(parameter.parse()?),
-                });
+                };
+                self.commands.push(ZConnectCmd::Wait(p));
             }
             "BYTES" => {
-                self.file_size(parameter.parse()?);
+                self.commands.push(ZConnectCmd::Bytes(parameter.parse()?));
             }
             "FILE-CRC" => {
-                self.file_crc(u32::from_str_radix(&parameter, 16)?);
+                self.commands.push(ZConnectCmd::FileCrc(u32::from_str_radix(&parameter, 16)?));
             }
             "LOGOFF" => {
-                self.logoff();
+                self.commands.push(ZConnectCmd::Logoff);
             }
             "RETRANSMIT" => {
-                self.retransmit();
+                self.commands.push(ZConnectCmd::Retransmit);
             }
             _ => {
                 log::error!("Unknown zconnect command: {}", command);
@@ -190,6 +183,19 @@ fn parse_mail_parameter(parameter: &str) -> u8 {
 }
 
 impl ZConnectCommandBlock {
+    pub const EOT4: ZConnectCommandBlock = ZConnectCommandBlock {
+        state: ZConnectState::Eot(super::EndTransmission::End4),
+        commands: Vec::new(),
+    };
+    pub const EOT5: ZConnectCommandBlock = ZConnectCommandBlock {
+        state: ZConnectState::Eot(super::EndTransmission::Prot5),
+        commands: Vec::new(),
+    };
+    pub const BEG5: ZConnectCommandBlock = ZConnectCommandBlock {
+        state: ZConnectState::Begin(ProtocolTransition::Prot5),
+        commands: Vec::new(),
+    };
+
     /// Get mails from the server
     /// Message is for ex. 'GET:PEBF' the parameter specifies hich mail type should be requested.
     /// The server can answer with a 'PUT' message which mail types are available.
@@ -197,68 +203,87 @@ impl ZConnectCommandBlock {
     /// If 'PUT' is empty no mails are available.
     /// Note that the mails are given in blocks so 'GET' needs to be requested multiple times until
     /// an empty 'PUT' message is received.
-    pub fn get(&mut self, attr: u8) {
+    pub fn get(mut self, attr: u8) -> Self {
         self.commands.push(ZConnectCmd::Get(attr));
+        self
     }
 
     /// See 'GET'. 'PUT' is an answer from the mailbox to 'get'
-    pub fn put(&mut self, attr: u8) {
+    pub fn put(mut self, attr: u8) -> Self {
         self.commands.push(ZConnectCmd::Put(attr));
+        self
     }
 
     /// Delete mails from the server with the extension '.PRV', '.KOM', '.BRT', '.ERR' or '.EIL'
     /// Routmails are never deleted. Delete has priority over 'GET'.
-    pub fn delete(&mut self, attr: u8) {
+    pub fn delete(mut self, attr: u8) -> Self {
         self.commands.push(ZConnectCmd::Delete(attr));
+        self
     }
 
     /// Optional Default: ZCONNECT
-    pub fn format(&mut self) {
+    pub fn format(mut self) -> Self {
         self.commands.push(ZConnectCmd::Format("Z_CONNECT".to_string()));
+        self
     }
 
     /// Optional request file from the file server
-    pub fn filereq(&mut self, path: impl Into<String>) {
+    pub fn filereq(mut self, path: impl Into<String>) -> Self {
         self.commands.push(ZConnectCmd::Filereq(path.into()));
+        self
     }
 
     /// Server wants to send file to the client
-    pub fn filesend(&mut self, path: &str) {
+    pub fn filesend(mut self, path: &str) -> Self {
         self.commands.push(ZConnectCmd::Filesend(path.to_string()));
+        self
     }
 
     /// Request PGP key from the client
-    pub fn pgp_keyreq(&mut self) {
+    pub fn pgp_keyreq(mut self) -> Self {
         self.commands.push(ZConnectCmd::PgpKeyreq);
+        self
     }
 
-    pub fn execute(&mut self, exec: Execute) {
+    pub fn execute(mut self, exec: Execute) -> Self {
         self.commands.push(ZConnectCmd::Execute(exec));
+        self
     }
 
     /// Wait in seconds
-    pub fn wait(&mut self, secs_opt: Option<u32>) {
+    pub fn wait(mut self, secs_opt: Option<u32>) -> Self {
         self.commands.push(ZConnectCmd::Wait(secs_opt));
+        self
     }
 
     /// Size of the file to transmit in bytes
-    pub fn file_size(&mut self, file_size: u64) {
+    pub fn file_size(mut self, file_size: u64) -> Self {
         self.commands.push(ZConnectCmd::Bytes(file_size));
+        self
     }
 
     /// Optional 32 bit CCITT/Z-MODEM crc32 of the file
-    pub fn file_crc(&mut self, crc32: u32) {
+    pub fn file_crc(mut self, crc32: u32) -> Self {
         self.commands.push(ZConnectCmd::FileCrc(crc32));
+        self
     }
 
     /// Request logoff
-    pub fn logoff(&mut self) {
+    pub fn logoff(mut self) -> Self {
         self.commands.push(ZConnectCmd::Logoff);
+        self
     }
 
     /// Retransmit file
-    pub fn retransmit(&mut self) {
+    pub fn retransmit(mut self) -> Self {
         self.commands.push(ZConnectCmd::Retransmit);
+        self
+    }
+
+    pub fn parse(input: &str) -> crate::Result<Self> {
+        let mut res = Self::default();
+        res.parse_block(input)?;
+        Ok(res)
     }
 }
 
@@ -266,6 +291,17 @@ pub enum Execute {
     Yes,
     No,
     Later,
+}
+
+impl Execute {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "J" | "Y" => Execute::Yes,
+            "N" => Execute::No,
+            "L" => Execute::Later,
+            _ => panic!("Unknown execute parameter: {}", s),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -286,9 +322,7 @@ mod tests {
     #[test]
     fn test_crc16_multiple() {
         // crc taken from another zconnect implementation.
-        let mut blk = ZConnectCommandBlock::default();
-        blk.get(mails::ALL);
-        blk.put(mails::ALL);
+        let mut blk = ZConnectCommandBlock::default().get(mails::ALL).put(mails::ALL);
         blk.block(BlockCode::Block1);
         assert_eq!("Get:PEBF\rPut:PEBF\rStatus:BLK1\rCRC:DC1C\r\r", blk.display());
     }
