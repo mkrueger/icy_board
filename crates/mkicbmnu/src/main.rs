@@ -88,9 +88,12 @@ fn main() -> Result<()> {
         Ok(mnu) => {
             let terminal = &mut term::init()?;
             let mnu = Arc::new(Mutex::new(mnu));
-            new_main_window(icy_board, mnu.clone(), arguments.full_screen, &arguments.file).run(terminal)?;
+            let mut app = new_main_window(icy_board, mnu.clone(), arguments.full_screen, &arguments.file);
+            app.run(terminal)?;
             term::restore()?;
-            mnu.lock().unwrap().save(&file).unwrap();
+            if app.save {
+                mnu.lock().unwrap().save(&file).unwrap();
+            }
             Ok(())
         }
         Err(err) => {

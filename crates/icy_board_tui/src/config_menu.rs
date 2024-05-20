@@ -70,6 +70,7 @@ pub struct ComboBox {
     pub first: usize,
     pub scroll_state: ScrollbarState,
 }
+
 impl ComboBox {
     fn handle_input(&mut self, key: KeyEvent) {
         match key.code {

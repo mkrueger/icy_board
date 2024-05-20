@@ -285,6 +285,16 @@ impl<'a> EditCommandDialog<'a> {
                                 return Ok(true);
                             };
                             let parameter = action.parameter.clone();
+                            let mut first = 0;
+                            let values = CommandType::iter()
+                                .enumerate()
+                                .map(|(i, x)| {
+                                    if x == action.command_type {
+                                        first = i.saturating_sub(4);
+                                    }
+                                    ComboBoxValue::new(format!("{}", x), format!("{:?}", x))
+                                })
+                                .collect();
 
                             self.edit_config = Some(ConfigMenu {
                                 entry: vec![
@@ -293,10 +303,10 @@ impl<'a> EditCommandDialog<'a> {
                                             "command_type",
                                             "Command Type".to_string(),
                                             ListValue::ComboBox(ComboBox {
-                                                first: 0,
+                                                first,
                                                 scroll_state: ScrollbarState::default().content_length(CommandType::iter().count()),
                                                 cur_value: ComboBoxValue::new(format!("{}", action.command_type), format!("{:?}", action.command_type)),
-                                                values: CommandType::iter().map(|x| ComboBoxValue::new(format!("{}", x), format!("{:?}", x))).collect(),
+                                                values,
                                             }),
                                         )
                                         .with_label_width(16),
