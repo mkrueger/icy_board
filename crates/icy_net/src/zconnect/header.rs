@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::crc;
+use super::{ZConnectBlock, ZConnectState};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Compressor {
@@ -35,6 +35,7 @@ pub enum Compressor {
 
     Unknown(String),
 }
+
 impl Compressor {
     fn parse(s: &str) -> Compressor {
         match s.to_ascii_uppercase().as_str() {
@@ -175,6 +176,7 @@ pub enum TransferProtocol {
     NCopy,
     Unknown(String),
 }
+
 impl TransferProtocol {
     fn parse(s: &str) -> TransferProtocol {
         match s.to_ascii_uppercase().as_str() {
@@ -243,7 +245,8 @@ impl std::fmt::Display for Crypt {
 }
 
 #[derive(Default)]
-pub struct ZConnectHeader {
+pub struct ZConnectHeaderBlock {
+    state: ZConnectState,
     system: String,
     sysop: String,
     serial: Option<String>,
@@ -258,7 +261,6 @@ pub struct ZConnectHeader {
     password: String,
     protocols: HashMap<usize, Vec<TransferProtocol>>,
     voice_phone: Option<String>,
-    block_number: usize,
     crypt: HashMap<usize, Vec<Crypt>>,
     acer_in: Option<Compressor>,
     acer_out: Option<Compressor>,
@@ -267,7 +269,7 @@ pub struct ZConnectHeader {
     coords: Option<String>,                      // Not sure about position
 }
 
-impl ZConnectHeader {
+impl ZConnectHeaderBlock {
     pub fn system(&self) -> &str {
         &self.system
     }
@@ -357,13 +359,6 @@ impl ZConnectHeader {
         self.voice_phone = Some(voice_phone.into());
     }
 
-    pub fn block_number(&self) -> usize {
-        self.block_number
-    }
-    pub fn set_block_number(&mut self, block_number: usize) {
-        self.block_number = block_number;
-    }
-
     pub fn protocols(&self, index: usize) -> Option<&Vec<TransferProtocol>> {
         self.protocols.get(&index)
     }
@@ -414,128 +409,21 @@ impl ZConnectHeader {
     }
 
     pub fn parse(input: &str) -> crate::Result<Self> {
-        let mut res = ZConnectHeader::default();
-        let mut command = String::new();
-        let mut parameter = String::new();
-
-        let mut is_start = true;
-        let mut crc = u16::MAX;
-        let mut last_crc = crc;
-
-        for c in input.chars() {
-            if c == '\r' {
-                is_start = true;
-                if !command.is_empty() {
-                    if command == "CRC" {
-                        let crc_val = u16::from_str_radix(&parameter, 16)?;
-                        if crc_val != last_crc {
-                            return Err("CRC mismatch".into());
-                        }
-                        break;
-                    }
-                    res.parse_cmd(&command, parameter)?;
-                    command.clear();
-                    parameter = String::new();
-                    last_crc = crc;
-                }
-                continue;
-            }
-            if c < ' ' || c >= '\x7F' {
-                continue;
-            }
-            crc = crc::buggy_update(crc, c as u8);
-            if is_start {
-                if c == ':' {
-                    is_start = false;
-                } else {
-                    command.push(c.to_ascii_uppercase());
-                }
-            } else {
-                parameter.push(c);
-            }
-        }
-
+        let mut res = ZConnectHeaderBlock::default();
+        res.parse_block(input)?;
         Ok(res)
-    }
-
-    fn parse_cmd(&mut self, command: &str, parameter: String) -> crate::Result<()> {
-        match command {
-            "SYS" => self.system = parameter,
-            "SYSOP" => self.sysop = parameter,
-            "SERNR" => self.serial = Some(parameter),
-            "POST" => self.post = Some(parameter),
-            "PORT" => self.port = parameter.parse().unwrap_or(1) - 1,
-            "TEL" => {
-                let mut parts = parameter.splitn(2, ' ');
-                let index: usize = parts.next().unwrap().parse()?;
-                let phone = parts.next().unwrap().to_string();
-                self.phone.insert(index - 1, phone);
-            }
-            "DOMAIN" => self.domains = parameter.split(|c| c == ';' || c == ' ').map(|s| s.to_string()).collect(),
-            "MAPS" => self.maps = Some(parameter),
-            "ISO2" => {
-                let mut parts = parameter.splitn(2, ' ');
-                let index: usize = parts.next().unwrap().parse()?;
-                let iso2 = parts.next().unwrap().to_string();
-                self.iso2.insert(index - 1, iso2);
-            }
-            "ISO3" => {
-                let mut parts = parameter.splitn(2, ' ');
-                let index: usize = parts.next().unwrap().parse()?;
-                let iso3 = parts.next().unwrap().to_string();
-                self.iso3.insert(index - 1, iso3);
-            }
-            "ARC" => {
-                let mut parts = parameter.splitn(2, ' ');
-                let index: usize = parts.next().unwrap().parse()?;
-                let compressors = parts.next().unwrap().split(|c| c == ';' || c == ' ').map(|s| Compressor::parse(s)).collect();
-                self.acer.insert(index - 1, compressors);
-            }
-            "PASSWD" => self.password = parameter,
-            "TELEFON" => self.voice_phone = Some(parameter),
-            "STATUS" => self.block_number = parameter.parse().unwrap_or(1) - 1,
-            "PROTO" => {
-                let mut parts = parameter.splitn(2, ' ');
-                let index: usize = parts.next().unwrap().parse()?;
-                let protocols = parts
-                    .next()
-                    .unwrap()
-                    .split(|c| c == ';' || c == ' ')
-                    .map(|s| TransferProtocol::parse(s))
-                    .collect();
-                self.protocols.insert(index - 1, protocols);
-            }
-            "CRYPT" => {
-                let mut parts = parameter.splitn(2, ' ');
-                let index: usize = parts.next().unwrap().parse()?;
-                let crypts = parts.next().unwrap().split(|c| c == ';' || c == ' ').map(|s| Crypt::parse(s)).collect();
-                self.crypt.insert(index - 1, crypts);
-            }
-            "ACERIN" => self.acer_in = Some(Compressor::parse(&parameter)),
-            "ACEROUT" => self.acer_out = Some(Compressor::parse(&parameter)),
-            "MAILER" => {
-                let mut parts = parameter.splitn(2, ' ');
-                let index: usize = parts.next().unwrap().parse()?;
-                let mailers = parts.next().unwrap().split(|c| c == ';' || c == ' ').map(|s| Mailer::parse(s)).collect();
-                self.mailer.insert(index - 1, mailers);
-            }
-            "MAILFORMAT" => {
-                let mut parts = parameter.splitn(2, ' ');
-                let index: usize = parts.next().unwrap().parse()?;
-                let mailformats = parts.next().unwrap().split(|c| c == ';' || c == ' ').map(|s| Mailformat::parse(s)).collect();
-                self.mailformat.insert(index - 1, mailformats);
-            }
-            "KOORDINATEN" => self.coords = Some(parameter),
-            _ => {
-                log::warn!("unknown Z-connect header entry: {}", command)
-            }
-        }
-        Ok(())
     }
 }
 
-impl std::fmt::Display for ZConnectHeader {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl ZConnectBlock for ZConnectHeaderBlock {
+    fn state(&self) -> ZConnectState {
+        self.state
+    }
+    fn set_state(&mut self, state: ZConnectState) {
+        self.state = state;
+    }
+
+    fn generate_lines(&self) -> Vec<String> {
         let mut lines = Vec::new();
         lines.push(format!("Sys:{}", self.system));
         lines.push(format!("Sysop:{}", self.sysop));
@@ -587,8 +475,6 @@ impl std::fmt::Display for ZConnectHeader {
             lines.push(format!("Telefon:{}", voice_phone));
         }
 
-        lines.push(format!("Status:BLK{}", self.block_number + 1));
-
         for (i, crypt) in self.crypt.iter() {
             lines.push(format!(
                 "Crypt:{} {}",
@@ -624,26 +510,92 @@ impl std::fmt::Display for ZConnectHeader {
         if let Some(coords) = &self.coords {
             lines.push(format!("Koordinaten:{}", coords));
         }
-        let mut crc = u16::MAX;
-        for cmd_str in &lines {
-            for b in cmd_str.as_bytes() {
-                crc = crc::buggy_update(crc, *b);
+        lines
+    }
+
+    fn parse_cmd(&mut self, command: &str, parameter: String) -> crate::Result<()> {
+        match command {
+            "SYS" => self.system = parameter,
+            "SYSOP" => self.sysop = parameter,
+            "SERNR" => self.serial = Some(parameter),
+            "POST" => self.post = Some(parameter),
+            "PORT" => self.port = parameter.parse().unwrap_or(1) - 1,
+            "TEL" => {
+                let mut parts = parameter.splitn(2, ' ');
+                let index: usize = parts.next().unwrap().parse()?;
+                let phone = parts.next().unwrap().to_string();
+                self.phone.insert(index - 1, phone);
+            }
+            "DOMAIN" => self.domains = parameter.split(|c| c == ';' || c == ' ').map(|s| s.to_string()).collect(),
+            "MAPS" => self.maps = Some(parameter),
+            "ISO2" => {
+                let mut parts = parameter.splitn(2, ' ');
+                let index: usize = parts.next().unwrap().parse()?;
+                let iso2 = parts.next().unwrap().to_string();
+                self.iso2.insert(index - 1, iso2);
+            }
+            "ISO3" => {
+                let mut parts = parameter.splitn(2, ' ');
+                let index: usize = parts.next().unwrap().parse()?;
+                let iso3 = parts.next().unwrap().to_string();
+                self.iso3.insert(index - 1, iso3);
+            }
+            "ARC" => {
+                let mut parts = parameter.splitn(2, ' ');
+                let index: usize = parts.next().unwrap().parse()?;
+                let compressors = parts.next().unwrap().split(|c| c == ';' || c == ' ').map(|s| Compressor::parse(s)).collect();
+                self.acer.insert(index - 1, compressors);
+            }
+            "PASSWD" => self.password = parameter,
+            "TELEFON" => self.voice_phone = Some(parameter),
+            "PROTO" => {
+                let mut parts = parameter.splitn(2, ' ');
+                let index: usize = parts.next().unwrap().parse()?;
+                let protocols = parts
+                    .next()
+                    .unwrap()
+                    .split(|c| c == ';' || c == ' ')
+                    .map(|s| TransferProtocol::parse(s))
+                    .collect();
+                self.protocols.insert(index - 1, protocols);
+            }
+            "CRYPT" => {
+                let mut parts = parameter.splitn(2, ' ');
+                let index: usize = parts.next().unwrap().parse()?;
+                let crypts = parts.next().unwrap().split(|c| c == ';' || c == ' ').map(|s| Crypt::parse(s)).collect();
+                self.crypt.insert(index - 1, crypts);
+            }
+            "ACERIN" => self.acer_in = Some(Compressor::parse(&parameter)),
+            "ACEROUT" => self.acer_out = Some(Compressor::parse(&parameter)),
+            "MAILER" => {
+                let mut parts = parameter.splitn(2, ' ');
+                let index: usize = parts.next().unwrap().parse()?;
+                let mailers = parts.next().unwrap().split(|c| c == ';' || c == ' ').map(|s| Mailer::parse(s)).collect();
+                self.mailer.insert(index - 1, mailers);
+            }
+            "MAILFORMAT" => {
+                let mut parts = parameter.splitn(2, ' ');
+                let index: usize = parts.next().unwrap().parse()?;
+                let mailformats = parts.next().unwrap().split(|c| c == ';' || c == ' ').map(|s| Mailformat::parse(s)).collect();
+                self.mailformat.insert(index - 1, mailformats);
+            }
+            "KOORDINATEN" => self.coords = Some(parameter),
+            _ => {
+                log::warn!("unknown Z-connect header entry: {}", command)
             }
         }
-        lines.push(format!("CRC:{:04X}\r", crc));
-
-        write!(f, "{}\r", lines.join("\r"))
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::zconnect::header::ZConnectHeader;
+    use crate::zconnect::{header::ZConnectHeaderBlock, ZConnectBlock};
 
     #[test]
     fn test_generate_header() {
         // crc taken from official documentation
-        let mut blk = ZConnectHeader::default();
+        let mut blk = ZConnectHeaderBlock::default();
         blk.set_system("Icy Shadow BBS");
         blk.set_sysop("SYSOP");
         blk.set_serial("123456");
@@ -657,18 +609,16 @@ mod tests {
         blk.add_acer(0, crate::zconnect::header::Compressor::Arj);
         blk.set_password("password");
         blk.set_voice_phone("+49-VOICE");
-        blk.set_block_number(0);
         blk.add_protocol(0, crate::zconnect::header::TransferProtocol::ZModem);
         blk.set_acer_in(crate::zconnect::header::Compressor::ZIP);
         blk.set_acer_out(crate::zconnect::header::Compressor::ZIP);
         blk.add_mailer(0, crate::zconnect::header::Mailer::ZConnect);
-
-        assert_eq!("Sys:Icy Shadow BBS\rSysop:SYSOP\rSerNr:123456\rPost:Zossen, Germany\rPort:1\rTel:1 unknown\rDomain:icyshadow.com\rISO2:1 V.32bis\rISO3:1 V.42.bis\rArc:1 ZIP;ARJ\rProto:1 ZMODEM\rPasswd:password\rTelefon:+49-VOICE\rStatus:BLK1\rAcerIn:ZIP\rAcerOut:ZIP\rMailer:1 ZCONNECT\rCRC:BD70\r\r", blk.to_string());
+        assert_eq!("Sys:Icy Shadow BBS\rSysop:SYSOP\rSerNr:123456\rPost:Zossen, Germany\rPort:1\rTel:1 unknown\rDomain:icyshadow.com\rISO2:1 V.32bis\rISO3:1 V.42.bis\rArc:1 ZIP;ARJ\rProto:1 ZMODEM\rPasswd:password\rTelefon:+49-VOICE\rAcerin:ZIP\rAcerout:ZIP\rMailer:1 ZCONNECT\rStatus:BLK1\rCRC:1095\r\r", blk.display());
     }
 
     #[test]
     fn test_parse_header() {
-        let header = ZConnectHeader::parse("Sys:Icy Shadow BBS\rSysop:SYSOP\rSerNr:123456\rPost:Zossen, Germany\rPort:1\rTel:1 unknown\rDomain:icyshadow.com\rISO2:1 V.32bis\rISO3:1 V.42.bis\rArc:1 ZIP;ARJ\rProto:1 ZMODEM\rPasswd:password\rTelefon:+49-VOICE\rStatus:BLK1\rAcerIn:ZIP\rAcerOut:ZIP\rMailer:1 ZCONNECT\rCRC:BD70\r\r").unwrap();
+        let header = ZConnectHeaderBlock::parse("Sys:Icy Shadow BBS\rSysop:SYSOP\rSerNr:123456\rPost:Zossen, Germany\rPort:1\rTel:1 unknown\rDomain:icyshadow.com\rISO2:1 V.32bis\rISO3:1 V.42.bis\rArc:1 ZIP;ARJ\rProto:1 ZMODEM\rPasswd:password\rTelefon:+49-VOICE\rAcerin:ZIP\rAcerout:ZIP\rMailer:1 ZCONNECT\rStatus:BLK1\rCRC:1095\r\r").unwrap();
         assert_eq!(header.system(), "Icy Shadow BBS");
         assert_eq!(header.sysop(), "SYSOP");
         assert_eq!(header.serial(), Some("123456"));
@@ -684,7 +634,30 @@ mod tests {
         );
         assert_eq!(header.password(), "password");
         assert_eq!(header.voice_phone(), Some("+49-VOICE"));
-        assert_eq!(header.block_number(), 0);
+        assert_eq!(header.protocols(0), Some(&vec![crate::zconnect::header::TransferProtocol::ZModem]));
+        assert_eq!(header.acer_in(), Some(crate::zconnect::header::Compressor::ZIP));
+        assert_eq!(header.acer_out(), Some(crate::zconnect::header::Compressor::ZIP));
+        assert_eq!(header.mailer(0), Some(&vec![crate::zconnect::header::Mailer::ZConnect]));
+    }
+
+    #[test]
+    fn test_crc_position() {
+        let header = ZConnectHeaderBlock::parse("CRC:1095\rSys:Icy Shadow BBS\rSysop:SYSOP\rSerNr:123456\rPost:Zossen, Germany\rPort:1\rTel:1 unknown\rDomain:icyshadow.com\rISO2:1 V.32bis\rISO3:1 V.42.bis\rArc:1 ZIP;ARJ\rProto:1 ZMODEM\rPasswd:password\rTelefon:+49-VOICE\rAcerin:ZIP\rAcerout:ZIP\rMailer:1 ZCONNECT\rStatus:BLK1\r\r").unwrap();
+        assert_eq!(header.system(), "Icy Shadow BBS");
+        assert_eq!(header.sysop(), "SYSOP");
+        assert_eq!(header.serial(), Some("123456"));
+        assert_eq!(header.post(), Some("Zossen, Germany"));
+        assert_eq!(header.port(), 0);
+        assert_eq!(header.phone().get(&0), Some(&"unknown".to_string()));
+        assert_eq!(header.domains(), &vec!["icyshadow.com".to_string()]);
+        assert_eq!(header.iso2().get(&0), Some(&"V.32bis".to_string()));
+        assert_eq!(header.iso3().get(&0), Some(&"V.42.bis".to_string()));
+        assert_eq!(
+            header.acer(0),
+            Some(&vec![crate::zconnect::header::Compressor::ZIP, crate::zconnect::header::Compressor::Arj])
+        );
+        assert_eq!(header.password(), "password");
+        assert_eq!(header.voice_phone(), Some("+49-VOICE"));
         assert_eq!(header.protocols(0), Some(&vec![crate::zconnect::header::TransferProtocol::ZModem]));
         assert_eq!(header.acer_in(), Some(crate::zconnect::header::Compressor::ZIP));
         assert_eq!(header.acer_out(), Some(crate::zconnect::header::Compressor::ZIP));
@@ -693,7 +666,7 @@ mod tests {
 
     #[test]
     fn test_crc_mismatch() {
-        let header = ZConnectHeader::parse("Sys:Icy Shadow BBS\rSysop:SYSOP\rSerNr:123456\rPost:Zossen, Germany\rPort:1\rTel:1 223\rDomain:icyshadow.com\rISO2:1 V.32bis\rISO3:1 V.42.bis\rArc:1 ZIP;ARJ\rProto:1 ZMODEM\rPasswd:password\rTelefon:+49-VOICE\rStatus:BLK1\rAcerIn:ZIP\rAcerOut:ZIP\rMailer:1 ZCONNECT\rCRC:BD70\r\r");
+        let header = ZConnectHeaderBlock::parse("Sys:Icy Shadow BBS\rSysop:SYSOP\rSerNr:123456\rPost:Zossen, Germany\rPort:1\rTel:1 223\rDomain:icyshadow.com\rISO2:1 V.32bis\rISO3:1 V.42.bis\rArc:1 ZIP;ARJ\rProto:1 ZMODEM\rPasswd:password\rTelefon:+49-VOICE\rStatus:BLK1\rAcerIn:ZIP\rAcerOut:ZIP\rMailer:1 ZCONNECT\rCRC:BD70\r\r");
         assert!(header.is_err());
     }
 }
