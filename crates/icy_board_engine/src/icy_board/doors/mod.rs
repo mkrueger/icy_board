@@ -9,6 +9,7 @@ use crate::{
 use super::{security::RequiredSecurity, IcyBoardSerializer};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use strum::{EnumIter, EnumString};
 
 mod callinfo_bbs;
 mod chain_txt;
@@ -38,7 +39,7 @@ pub enum DoorServerAccount {
     BBSLink(BBSLink),
 }
 
-#[derive(Clone, Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default, Debug, EnumIter, EnumString)]
 pub enum DoorType {
     #[default]
     Local,

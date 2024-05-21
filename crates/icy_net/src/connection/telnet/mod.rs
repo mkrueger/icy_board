@@ -41,6 +41,7 @@ pub enum TerminalEmulation {
     ViewData,
     Mode7,
     Rip,
+    Skypix,
     IGS,
 }
 
@@ -117,6 +118,7 @@ impl TelnetConnection {
                                     TerminalEmulation::Ascii => buf.extend_from_slice(b"RAW"),
                                     TerminalEmulation::Avatar => buf.extend_from_slice(b"AVATAR"),
                                     TerminalEmulation::Rip => buf.extend_from_slice(b"RIP"),
+                                    TerminalEmulation::Skypix => buf.extend_from_slice(b"SKYPIX"),
                                     TerminalEmulation::IGS => buf.extend_from_slice(b"IGS"),
                                     TerminalEmulation::Mode7 => buf.extend_from_slice(b"MODE7"),
                                 }

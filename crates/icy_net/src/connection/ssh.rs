@@ -26,7 +26,7 @@ const SUPPORTED_KEY_EXCHANGES: &str = "ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecd
 impl SSHConnection {
     pub async fn open<A: ToSocketAddrs>(addr: &A, caps: TermCaps, credentials: Credentials) -> crate::Result<Self> {
         let ssh = SshClient::connect(addr, &credentials.user_name, credentials.password).await?;
-
+        println!("Connected to SSH server   ");
         let channel = ssh.session.channel_open_session().await?;
         let terminal_type: String = format!("{:?}", caps.terminal).to_lowercase();
         channel

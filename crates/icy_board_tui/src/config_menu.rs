@@ -631,15 +631,15 @@ impl ConfigMenu {
                     *i += 1;
                 }
                 ConfigEntry::Group(title, items) => {
-                    if !display_editor && !title.is_empty() {
-                        if *y >= state.first_row && *y < area.height + state.first_row {
-                            let left_area = Rect {
-                                x: area.x + *x,
-                                y: area.y + *y - state.first_row,
-                                width: area.width - *x - 1,
-                                height: 1,
-                            };
-                            if display_editor {
+                    if !title.is_empty() {
+                        if !display_editor {
+                            if *y >= state.first_row && *y < area.height + state.first_row {
+                                let left_area = Rect {
+                                    x: area.x + *x,
+                                    y: area.y + *y - state.first_row,
+                                    width: area.width - *x - 1,
+                                    height: 1,
+                                };
                                 Text::from(format!(" {}", title.clone()))
                                     .alignment(ratatui::layout::Alignment::Left)
                                     .style(THEME.config_title.italic())
