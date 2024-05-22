@@ -13,9 +13,9 @@ pub fn create_curruser_bbs(state: &IcyBoardState, path: &std::path::Path) -> Res
     let mut contents = String::new();
     contents.push_str(&format!("{}\r\n", state.session.user_name));
     contents.push_str(&format!("{}\r\n", state.session.cur_security));
-    contents.push_str(&format!("{}\r\n", state.session.cur_user));
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().home_voice_phone));
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().city_or_state));
+    contents.push_str(&format!("{}\r\n", state.session.cur_user_id));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().home_voice_phone));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state));
     contents.push_str(&format!("{}\r\n", DOOR_COM_PORT)); // COM Port
     contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE)); // Com Port Speed
     contents.push_str("N\r\n");

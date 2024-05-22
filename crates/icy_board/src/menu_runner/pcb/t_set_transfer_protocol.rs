@@ -14,7 +14,7 @@ impl PcbBoardCommand {
         if self.displaycmdfile("prot").await? {
             return Ok(());
         }
-        let cur_protocol = if let Some(user) = &mut self.state.current_user {
+        let cur_protocol = if let Some(user) = &mut self.state.session.current_user {
             user.protocol.clone()
         } else {
             String::new()
@@ -32,7 +32,7 @@ impl PcbBoardCommand {
                     break;
                 }
             }
-            if let Some(user) = &mut self.state.current_user {
+            if let Some(user) = &mut self.state.session.current_user {
                 user.protocol = selected_protocol;
             }
             self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11)).await?;

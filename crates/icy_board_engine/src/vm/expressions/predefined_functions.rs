@@ -381,7 +381,7 @@ pub async fn time(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variable
 }
 
 pub async fn u_name(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.current_user {
+    if let Some(user) = &vm.icy_board_state.session.current_user {
         Ok(VariableValue::new_string(user.get_name().clone()))
     } else {
         Ok(VariableValue::new_string(String::new()))
@@ -389,7 +389,7 @@ pub async fn u_name(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 }
 
 pub async fn u_ldate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.current_user {
+    if let Some(user) = &vm.icy_board_state.session.current_user {
         Ok(VariableValue::new(
             VariableType::Date,
             VariableData::from_int(IcbDate::from_utc(user.stats.last_on).to_pcboard_date()),
@@ -400,7 +400,7 @@ pub async fn u_ldate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn u_ltime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.current_user {
+    if let Some(user) = &vm.icy_board_state.session.current_user {
         Ok(VariableValue::new(
             VariableType::Time,
             VariableData::from_int(IcbTime::from_naive(user.stats.last_on.naive_local()).to_pcboard_time()),
@@ -411,7 +411,7 @@ pub async fn u_ltime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn u_ldir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.current_user {
+    if let Some(user) = &vm.icy_board_state.session.current_user {
         Ok(VariableValue::new(
             VariableType::Time,
             VariableData::from_int(IcbTime::from_naive(user.date_last_dir_read.naive_local()).to_pcboard_time()),
@@ -425,7 +425,7 @@ pub async fn u_lmr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     panic!("TODO") // TODO
 }
 pub async fn u_logons(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.current_user {
+    if let Some(user) = &vm.icy_board_state.session.current_user {
         Ok(VariableValue::new(
             VariableType::Integer,
             VariableData::from_int(user.stats.num_times_on as i32),
@@ -435,14 +435,14 @@ pub async fn u_logons(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     }
 }
 pub async fn u_ful(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.current_user {
+    if let Some(user) = &vm.icy_board_state.session.current_user {
         Ok(VariableValue::new(VariableType::Integer, VariableData::from_int(user.stats.num_uploads as i32)))
     } else {
         Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
     }
 }
 pub async fn u_fdl(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.current_user {
+    if let Some(user) = &vm.icy_board_state.session.current_user {
         Ok(VariableValue::new(
             VariableType::Integer,
             VariableData::from_int(user.stats.num_downloads as i32),
@@ -452,7 +452,7 @@ pub async fn u_fdl(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     }
 }
 pub async fn u_bdlday(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.current_user {
+    if let Some(user) = &vm.icy_board_state.session.current_user {
         Ok(VariableValue::new(
             VariableType::Integer,
             VariableData::from_int(user.stats.today_dnld_bytes as i32),
@@ -462,7 +462,7 @@ pub async fn u_bdlday(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     }
 }
 pub async fn u_timeon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.current_user {
+    if let Some(user) = &vm.icy_board_state.session.current_user {
         Ok(VariableValue::new(
             VariableType::Integer,
             VariableData::from_int(0), // TODO: ON TIME COUNTER
@@ -472,7 +472,7 @@ pub async fn u_timeon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     }
 }
 pub async fn u_bdl(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.current_user {
+    if let Some(user) = &vm.icy_board_state.session.current_user {
         Ok(VariableValue::new(
             VariableType::Integer,
             VariableData::from_int(user.stats.total_dnld_bytes as i32),
@@ -482,7 +482,7 @@ pub async fn u_bdl(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     }
 }
 pub async fn u_bul(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.current_user {
+    if let Some(user) = &vm.icy_board_state.session.current_user {
         Ok(VariableValue::new(
             VariableType::Integer,
             VariableData::from_int(user.stats.total_upld_bytes as i32),
@@ -492,7 +492,7 @@ pub async fn u_bul(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     }
 }
 pub async fn u_msgrd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.current_user {
+    if let Some(user) = &vm.icy_board_state.session.current_user {
         Ok(VariableValue::new(
             VariableType::Integer,
             VariableData::from_int(user.stats.messages_read as i32),
@@ -502,7 +502,7 @@ pub async fn u_msgrd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     }
 }
 pub async fn u_msgwr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.current_user {
+    if let Some(user) = &vm.icy_board_state.session.current_user {
         Ok(VariableValue::new(
             VariableType::Integer,
             VariableData::from_int(user.stats.messages_left as i32),
@@ -1233,7 +1233,7 @@ pub async fn useralias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
     ))
 }
 pub async fn curuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.session.cur_user as i32))
+    Ok(VariableValue::new_int(vm.icy_board_state.session.cur_user_id as i32))
 }
 pub async fn chatstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");

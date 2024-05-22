@@ -198,7 +198,7 @@ pub async fn hangup(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
 /// # Errors
 /// Errors if the variable is not found.
 pub async fn getuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    let user = if let Some(user) = &mut vm.icy_board_state.current_user {
+    let user = if let Some(user) = &mut vm.icy_board_state.session.current_user {
         user.clone()
     } else {
         return Err(Box::new(IcyError::UserNotFound(String::new())));
@@ -211,9 +211,9 @@ pub async fn getuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> 
 /// # Errors
 /// Errors if the variable is not found.
 pub async fn putuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    if let Some(mut user) = vm.icy_board_state.current_user.take() {
+    if let Some(mut user) = vm.icy_board_state.session.current_user.take() {
         vm.put_user_variables(&mut user);
-        vm.icy_board_state.current_user = Some(user);
+        vm.icy_board_state.session.current_user = Some(user);
     }
     Ok(())
 }
@@ -1103,7 +1103,7 @@ pub async fn fdwrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 pub async fn adjbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let bytes = vm.eval_expr(&args[0]).await?.as_int();
-    if let Some(user) = &mut vm.icy_board_state.current_user {
+    if let Some(user) = &mut vm.icy_board_state.session.current_user {
         if bytes > 0 {
             user.stats.total_dnld_bytes += bytes as u64;
             user.stats.today_dnld_bytes += bytes as u64;
@@ -1168,7 +1168,7 @@ pub async fn keyflush(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 }
 pub async fn lastin(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let conf = vm.eval_expr(&args[0]).await?.as_int();
-    if let Some(user) = &mut vm.icy_board_state.current_user {
+    if let Some(user) = &mut vm.icy_board_state.session.current_user {
         user.last_conference = conf as u16;
     }
     Ok(())
@@ -1195,7 +1195,7 @@ pub async fn getaltuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
 
 pub async fn adjdbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let bytes = vm.eval_expr(&args[0]).await?.as_int();
-    if let Some(user) = &mut vm.icy_board_state.current_user {
+    if let Some(user) = &mut vm.icy_board_state.session.current_user {
         if bytes > 0 {
             user.stats.today_dnld_bytes += bytes as u64;
         } else {
@@ -1207,7 +1207,7 @@ pub async fn adjdbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
 }
 pub async fn adjtbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let bytes: i32 = vm.eval_expr(&args[0]).await?.as_int();
-    if let Some(user) = &mut vm.icy_board_state.current_user {
+    if let Some(user) = &mut vm.icy_board_state.session.current_user {
         if bytes > 0 {
             user.stats.total_dnld_bytes += bytes as u64;
         } else {
@@ -1218,7 +1218,7 @@ pub async fn adjtbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
 }
 pub async fn ayjtfiles(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let files = vm.eval_expr(&args[0]).await?.as_int();
-    if let Some(user) = &mut vm.icy_board_state.current_user {
+    if let Some(user) = &mut vm.icy_board_state.session.current_user {
         if files > 0 {
             user.stats.num_downloads += files as u64;
         } else {
@@ -1237,7 +1237,7 @@ pub async fn lang(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         return Ok(());
     };
     vm.icy_board_state.session.language = lang.clone();
-    if let Some(user) = &mut vm.icy_board_state.current_user {
+    if let Some(user) = &mut vm.icy_board_state.session.current_user {
         user.language = lang;
     }
     Ok(())
@@ -1553,7 +1553,7 @@ pub async fn confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 
 pub async fn adjtubytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let bytes: i32 = vm.eval_expr(&args[0]).await?.as_int();
-    if let Some(user) = &mut vm.icy_board_state.current_user {
+    if let Some(user) = &mut vm.icy_board_state.session.current_user {
         if bytes > 0 {
             user.stats.total_upld_bytes += bytes as u64;
         } else {

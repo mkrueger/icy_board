@@ -29,7 +29,7 @@ impl PcbBoardCommand {
         if !page_len.is_empty() {
             let page_len = page_len.parse::<u16>().unwrap_or_default();
             self.state.session.page_len = page_len;
-            if let Some(user) = &mut self.state.current_user {
+            if let Some(user) = &mut self.state.session.current_user {
                 user.page_len = page_len;
             }
         }

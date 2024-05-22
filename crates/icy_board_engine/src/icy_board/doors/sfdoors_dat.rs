@@ -13,7 +13,7 @@ use crate::{
 /// SpitFire BBS
 pub async fn create_sfdoors_dat(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = String::new();
-    contents.push_str(&format!("{}\r\n", state.session.cur_user));
+    contents.push_str(&format!("{}\r\n", state.session.cur_user_id));
     contents.push_str(&format!("{}\r\n", state.session.user_name));
     contents.push_str(&format!("{}\r\n", state.door_user_password().await));
     contents.push_str(&format!("{}\r\n", state.session.get_first_name()));
@@ -28,8 +28,8 @@ pub async fn create_sfdoors_dat(state: &IcyBoardState, path: &std::path::Path) -
     };
     contents.push_str(&format!("{}\r\n", graphics_mode));
     contents.push_str(&format!("{}\r\n", state.session.cur_security));
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.num_uploads));
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.num_downloads));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_uploads));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_downloads));
     contents.push_str(&format!("{}\r\n", state.session.minutes_left()));
     contents.push_str(&format!("{}\r\n", state.session.login_date.time().num_seconds_from_midnight())); // Secs since midnight (logon)
     contents.push_str("0\r\n"); // Extra time in seconds
@@ -43,13 +43,13 @@ pub async fn create_sfdoors_dat(state: &IcyBoardState, path: &std::path::Path) -
     contents.push_str(&format!("{}\r\n", state.node + 1));
 
     contents.push_str("32768\r\n"); // Downloads allowed per day
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.today_num_downloads));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.today_num_downloads));
     contents.push_str("1000000\r\n"); // Download bytes allowed/day
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.today_dnld_bytes));
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.total_upld_bytes / 1024));
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.total_dnld_bytes / 1024));
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().home_voice_phone));
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().city_or_state));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.today_dnld_bytes));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.total_upld_bytes / 1024));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.total_dnld_bytes / 1024));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().home_voice_phone));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state));
 
     contents.push_str("3600\r\n"); // Minutes Allowed per day
     contents.push_str("FALSE\r\n"); // ?

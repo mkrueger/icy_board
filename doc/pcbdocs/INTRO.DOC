@@ -1,0 +1,315 @@
+1
+==============================================================================
+Introduction
+
+
+
+
+
+
+
+
+
+What is PCBoard?
+
+PCBoard’s Key Features
+
+System Requirements
+
+Technical Support
+
+Getting Started
+
+
+What is PCBoard?
+
+PCBoard Bulletin Board Software allows your computer to operate as a 
+communications host, known as a Bulletin Board System or BBS. With your 
+BBS you can transfer information between two computers which may be 
+connected via modem or Local Area Network (LAN) connection. 
+
+In the beginning, bulletin board systems primarily exchanged messages.  
+As bulletin board systems become more and more popular, the demand for 
+more features increased.  Today, users logged into a BBS may read and 
+write messages, transfer files, chat with other users online and more.  
+PCBoard meets these and other user demands with several key features.  
+
+PCBoard’s Key Features
+
+PCBoard has many powerful features. The features listed below are but 
+just a few of the features that PCBoard has. You will discover the other 
+features as you read through the remainder of the manual and configure 
+your BBS.
+
+Quick Installation. The installation program will provide you with a 
+basic setup in just minutes. Then from that base installation you can 
+customize your system.
+
+Powerful security features to restrict the information that you allow 
+your users to see/transfer.
+
+Customizable display files to make it easy for your users to find 
+information and for you to give your BBS a unique look and feel.
+
+Up to 65,535 conference areas. You can use conferences to focus on a 
+particular subject or to isolate information or a group of users from 
+the rest of  the BBS.
+
+Extensive support for third party add-in software. You can draw upon the 
+huge third party support that PCBoard has, to add door games, or run any 
+DOS text mode application such as an informational  database. 
+
+Multilingual support allows callers to choose which “language” the BBS 
+prompts and display files will be displayed in.
+
+Bulletins may be used to display ASCII documents or text files online.
+
+Powerful boolean text searching capabilities. You can search messages, 
+file descriptions, bulletins and more for simple or complex search 
+strings using boolean operands such as AND, OR, and NOT. 
+
+Multiasker aware. This allows the computer to be running other tasks 
+when PCBoard does not immediately need the computers resources, or to 
+run several nodes of PCBoard software on a single machine.
+
+Works with any network which uses standard MS-DOS file/record locking 
+procedures.
+
+Grows to fit your needs. PCBoard can expand up to 32,768 nodes 
+(concurrent users online) if you need additional nodes you simply 
+purchase the appropriate software upgrade.
+
+Optional command stacking. PCBoard allows you to stack commands on a 
+single command line so expert users can quickly get to where they wish 
+to go. Novice users are not ignored either. They may enter one command 
+at a time and get the extra guidence to help them do what they wish to 
+do.
+
+Powerful serial port routines written in ‘C’ and assembly language for 
+speed. Supports up to 8 standard COM ports and all 15 IRQ settings.  
+There is also the option which allows you to use popular intelligent 
+serial port boards or fossil drivers.
+
+System Requirements
+
+Below is a list of hardware and software that is necessary for a base 
+configuration of PCBoard with one node.
+
+Hardware
+
+IBM (R) or compatible computer (8088, 8086, 80286, 80386, 80486, etc.)
+
+Properly connected “AT command-set” modem for each dial-in node
+
+384K of RAM
+
+Software
+
+MS-DOS or PC-DOS v3.1 or later
+
+PCBoard Software
+
+
+NOTE:  If you plan on running multiple nodes please see the Multiple 
+Nodes chapter of this manual.  This section has a list of required 
+hardware and software for various system configurations.Technical 
+Support
+
+With a program as powerful  as PCBoard you may run into a situation 
+where you cannot find an answer to one of your questions.  In such a 
+case , you should first access online help (if possible) by pressing 1.  
+If that fails to answer your question you should then search your manual 
+to see if you can find the answer there.  If neither of these approaches 
+brings you closer to a solution, you may want to consider contacting 
+Clark Development for your support needs.
+
+Clark Development Offers a trained technical support staff to answer 
+your questions no matter how seemingly unimportant or complex.  Our 
+technical support staff will be more than happy to help you with any 
+problem related to the PCBoard program itself. Unfortunately, our 
+technical support staff cannot help you with third-party add-ins or 
+other programs not written by Clark Development.  If you have a question 
+about another program your best solution  would be to contact the author 
+of that program or to leave a message addressed to ALL on Salt Air where 
+other, more experienced users may be able to assist you .
+
+When Calling For Technical Support Via Phone:
+
+Have your serial number ready
+
+If possible, be at the computer you are experiencing the problem with.
+
+Be prepared to describe, in detail,  the problem or question that you 
+have, including the exact text of any error messages you may be getting.
+
+If you have made attempts to correct the problem, be prepared to 
+describe the actions taken to the technician.
+
+When Requesting Technical Support Via BBS Message:
+
+Describe the problem or question that you have in detail.
+
+When necessary, try to use screen captures to enhance the readability of 
+your message.
+
+You receive one year of technical support with any new PCBoard purchase 
+or product level-upgrade.  After the first year, you may renew your 
+support at any time by calling our toll free order line at 
+800-356-1686.Benefits Of Keeping Your Support Current
+
+There are several benefits that you will enjoy if you keep your support 
+current.  As you can see from the list below we do more than just answer 
+your questions!
+
+Technical support by phone Monday through Friday between 8 a.m. and 5 
+p.m.  Mountain Time (MT).
+
+Technical support via Salt Air BBS 24 hours a day.  You may enter a 
+message on Salt Air and will always receive a prompt reply.
+
+Technical support via numerous "EchoMail" networks such as RIME, ILink, 
+Intelec, etc.
+
+FREE program updates available on Salt Air.  This includes minor updates 
+and major version upgrades.
+
+Our comprehensive newsletter will be mailed to you free of charge as 
+each issue is released.
+
+Access to several hundred third party add-ins and utility programs via 
+Salt Air BBS that may be  used with your PCBoard BBS.
+
+Direct access to many of the more popular third-party authors via 
+special conferences on Salt Air BBS.
+
+How To Obtain Technical Support
+
+As mentioned before, there are three ways you can get technical support:  
+phone, support BBS, and EchoMail networks.
+
+Phone
+
+Voice technical support is available Monday through Friday from 8 a.m. 
+to 5 p.m. Mountain Time at 801-261-1686.
+
+Support BBS (Salt Air)
+
+Our support BBS is available 24 hours a day, 7 days a week. Just leave a 
+message and you will receive a reply as soon as possible.  Our support 
+BBS has three main phone numbers; all modems are capable of V.32 and 
+V.32bis connections.
+
+
+	801-261-8976 - USRobotics HST Dual Standards
+	801-261-8979 - Hayes Ultras
+	801-261-8977 - USRobotics HST Dual Standards - Extended support
+                       purchasers only
+
+EchoMail networks
+
+Several mail networks carry our support conference (e.g. RIME, ILink, 
+etc.).  You may leave a message in our support conference and get a 
+reply from any of our trained technicians.  If you do decide to use the 
+mail networks for support questions, it is important to use an account 
+with the same logon name that you use for your established Salt Air BBS 
+account, and that your support is current on Salt Air.
+
+Getting Started
+
+Your first experience with PCBoard will be to install or upgrade your 
+current version.  For this information, refer to the Installation 
+chapter of this manual.  Once PCBoard is installed, refer to the rest of 
+the chapters in this book for additional information.  The following 
+sections summarize the rest of the chapters in this manual.
+
+Chapter 2: Install
+
+Whether you are installing PCBoard for the first time or upgrading a 
+previous version, this chapter provides both quick and detailed 
+instructions for installing this version of PCBoard.
+
+Chapter 3: PCBoard
+
+This chapter discusses how to load PCBoard including any command line or 
+environment switches that you may want to use.  In addition, any error 
+messages that can occur while PCBoard loads are described in detail.
+
+Chapter 4: PCBoard Commands
+
+When logged into PCBoard, all tasks are accomplished by entering 
+commands at a command prompt.  This chapter details the user and SysOp 
+commands that are available and how to use them.
+
+Chapter 5: PCBSetup
+
+The PCBSetup utility is used to alter the configuration files that 
+make-up your bulletin board system.  With the exception of conference 
+configurations, all options and switches are discussed in great detail.  
+Refer to this chapter when you are making changes to your system and you 
+need additional information about the screens and options that are 
+presented to you.Chapter 6: Conference Setup
+
+There are several options, switches, and files that make up each 
+conference's configuration.  This chapter details the components that 
+make up a conference in explicit detail.  For information on creating or 
+registering users in a conference, refer to the Sysop's Guide chapter 
+instead.
+
+Chapter 7: Multiple Nodes
+
+It is quite common for a bulletin board system to have several nodes.  
+Each node can accommodate one caller at a time.  If you have three 
+nodes, three users can be accessing your system at the same time.  This 
+chapter discusses how to setup multiple nodes using a network or 
+multitasker.
+
+Chapter 8: Sysop's Guide
+
+This chapter of the manual ties together key concepts of your 
+configuration to help you understand how to do certain things on your 
+BBS.  In this chapter you will find that the following topics are 
+discussed:
+
+
+file transfers
+messages
+conferences
+events
+system security
+maintenance tasks
+new users
+user subscriptions
+semi-techinical information about modems
+
+Chapter 9: Customizing Your BBS
+
+If all bulletin board systems looked the same, it would make for a 
+pretty dull environment.  This chapter details some changes that you can 
+make to your system to help give it a unique look and feel.Chapter 10: 
+System Manager
+
+System Manager is a utility that is used in conjunction with PCBoard to 
+modify user records.  You can adjust the security levels of users, 
+individual records, and many other tasks.  This chapter describes all of 
+the options and screens in System Manager.
+
+Chapter 11: PCBFiler
+
+Use PCBFiler to help you maintain your file directories.  Using PCBFiler 
+you can move files from the directory where they were uploaded to a new 
+location.  This chapter discusses how to use PCBFiler.
+
+Chapter 12: Utilities
+
+Several utilities are included with your PCBoard package.  For example, 
+you would use PCBPack to help keep the size of your message bases down.  
+This chapter describes each of the utilities that are included with your 
+package.
+
+Chapter 13: Batch Files
+
+There are several features of PCBoard that require the use of a batch 
+file.  For example, when testing uploads, PCBoard is executing a batch 
+file, allowing you to use any program you desire to do the actual 
+testing.  This chapter discusses the various batch files that you will 
+create when setting up PCBoard.

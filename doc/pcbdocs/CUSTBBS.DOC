@@ -1,0 +1,1893 @@
+9
+==============================================================================
+Customizing Your BBS
+
+
+
+
+
+
+
+
+
+Internationalization
+
+Menus
+
+Adding Commands
+
+The Look And Feel Of Your BBS
+
+Display File Conventions
+
+
+
+
+Internationalization
+
+Adding A Language
+
+To add a language to your system, you need to edit your PCBML.DAT file 
+(PCBSetup | File Locations | Configuration Files).  By default, your file 
+should look like the following:
+
+      Language             Extension  Country  CodePage  Yes  No
+-------------------------  ---------  -------  --------  ---  --
+English (Default)                                         Y    N
+
+
+If you want to add the French language to your system, you would press ALT-I 
+to insert a new line.  The following describes each of the fields in this 
+file:
+
+Language        The name of the language.  This is the text that is displayed 
+                to users when they are asked to choose a language at login.  
+                You should include the number of the language on this line.
+
+Extension       The filename extension for language specific files. For 
+                example, if you are adding the French language, you may want 
+                to make the extension .FRE.  This means if a file called 
+                WELCOME.FRE exists, it will be displayed at login to anyone 
+                who selects the French language.
+
+Country         If you also want PCBoard to add date, numerical separator, 
+                and capitalization support for the language you are defining, 
+                enter the country number to use as defined by COUNTRY.SYS.  
+                For the French language this value is 033.
+
+CodePage        The code page is also a function of COUNTRY.SYS and defines 
+                what characters are available in the language you are 
+                defining.  This information should be provided in your 
+                operating system manual.  As an example, the French language 
+                uses 850 in this field.
+
+Yes             Since Yes and No are not the same in all languages, you can 
+                define the character that will be used to represent a 
+                response of Yes.  In French, you most likely would like to 
+                use the letter O.
+
+No              As with the Yes field, the language you are defining may use 
+                a character other than N to represent a response of No.  
+                Simply enter the character you wish to use to represent a 
+                response of No.
+
+Keeping all of the previous information in mind, your entry for the French 
+language might look like the following:
+
+      
+      Language             Extension  Country  CodePage  Yes  No
+-------------------------  ---------  -------  --------  ---  --
+English (Default)                                         Y    N
+French                        FRE       033      850      O    N
+
+
+Country Support
+
+PCBoard has the ability to extract the dates, thousands separator, and 
+upper/lower case information from COUNTRY.SYS you can install with your 
+operating system (DOS or OS/2).  These changes will take effect  when a 
+language is chosen which selects a different country code.  
+
+NOTE:  If a user is on remotely, your status line will continue to use the 
+default information as specified in your computer setup.  That way, a user 
+could be logged in, using the French language, but you, the SysOp, would 
+continue to see the dates and numbers displayed as you are used to seeing 
+them.
+
+Dates
+
+Dates will be displayed and entered using the country information specified 
+by the language.  For example, the United States uses the mmddyy format, 
+where most European countries use the ddmmyy format for specifying dates.  
+This all depends on the information provided by COUNTRY.SYS.
+
+If you are using a country which specifies dates in a format other than 
+mmddyy, you will need to modify some of the records in the PCBTEXT file for 
+the language.  In particular, you will need to modify records 72, 266, and 
+688 because they ask the user to enter the date in mmddyy format.
+
+Thousands Separator
+
+As with the dates, PCBoard will be able to decide if the language specified 
+needs to use the comma or the period for the thousands separator.  For 
+example, in the United States, a number could be displayed as 1,024,000 
+whereas with periods it would be displayed as 1.024.000.
+
+Upper And Lower Case
+
+In addition to reading the date and number information from COUNTRY.SYS, 
+PCBoard can also determine what the proper capitalized and lower case 
+characters are for a particular language.  PCBoard will use this information 
+throughout the system so users can enter responses in the syntax that they 
+are most familiar with.
+
+Installing COUNTRY.SYS
+
+For PCBoard to support internationalization of dates, thousands separator and 
+capitalization you must have COUNTRY.SYS installed on your system   
+COUNTRY.SYS should come with your operating system including the instructions 
+on how to install it in your system.  The following sections shows you 
+samples of how to install COUNTRY.SYS in both DOS and OS/2.
+
+DOS
+
+In your CONFIG.SYS file, add:
+
+COUNTRY=001,437,C:\DOS\COUNTRY.SYS
+
+This example shows an entry for the United States.  By referring to your 
+operating system manual, you should be able to see that 001 is the country 
+number, 437 is the code page number to use, and the last parameter is the 
+location of your COUNTRY.SYS file.
+
+OS/2
+
+The configuration for OS/2 is quite similar to the configuration for DOS 
+machines.  You need to add the following line to your CONFIG.SYS file:
+
+COUNTRY=001,C:\OS2\SYSTEM\COUNTRY.SYS
+
+This example also shows you the configuration as it would appear for the 
+United States.  As you can tell, you need to only enter the country number 
+and the location of your COUNTRY.SYS file.
+
+International Fonts
+
+The code-page information that you specify in PCBML.DAT gives PCBoard the 
+ability to change the font used by the display adapter whenever a caller 
+changes languages.    The font change only shows up on the local screen and 
+then only when it is a local login.  In addition, you must have an EGA/VGA 
+adapter in order to setup the ability to change fonts.
+
+If you will recall, the previous section discussed how to add the French 
+language to your system.  The examples, for this section will revolve around 
+installing French on your system as well.
+
+DOS
+
+In your CONFIG.SYS, add the following:
+
+
+DEVICE=C:\DOS\DISPLAY.SYS CON=(EGA,437,2)
+
+In your AUTOEXEC.BAT, add these lines:
+
+NLSFUNC
+MODE CON: CP PREPARE=((437 850) C:\DOS\EGA.CPI)
+
+
+For additional information on DISPLAY.SYS, NLSFUNC, and MODE please refer to 
+your DOS manual.
+
+If you are running multiple nodes under DESQview, you should be aware that 
+the font support is a little unpredictable in that the font changes in one 
+node may show up in another node's display instead.  In addition, Microsoft 
+Windows will not show the font change, unless you are running in a 
+full-screen window.
+
+OS/2
+
+In your CONFIG.SYS add the following:
+
+
+CODEPAGE=437,850
+
+
+OS/2 does a good job of displaying fonts.  You can easily have two separate 
+windows using two different fonts.
+
+
+For additional information on using the CODEPAGE line in your CONFIG.SYS, 
+please refer to your OS/2 manual.
+
+Multiple Languages And Caller Logs
+
+The PCBTEXT file contains almost all of the text that is written to the 
+caller log files.  If you have several languages available on your system, 
+you may find it difficult to interpret the information written to the caller 
+log because it would be written in the language chosen by the user.
+
+To help ease the reading of the log files, PCBoard will use the entries from 
+the default PCBTEXT file (the one with no file extension) when writing to the 
+log files.  This means all of the entries will be the same for your callers 
+no matter what language they select.
+
+Menus
+
+There are several hooks in PCBoard where you can use a menu instead of the 
+normal input.  By using menus, you can help distribute the information 
+presented to the caller so they do not become overwhelmed with the choices 
+available at any one prompt.  You can access doors, bulletins, script, and 
+more from within the menu.
+
+Creating A Menu
+
+To create a menu, you need to create what is called an MNU file. To create 
+this type of file, you need to use the MKPCBMNU program that is included with 
+your package.  To create or edit a MNU file, specify the MNU file to edit on 
+the command line.  For example, if you wanted to edit or create 
+C:\PCB\MNU\MAIN.MNU, type the following at the DOS prompt:
+
+
+MKPCBMNU C:\PCB\MNU\MAIN.MNU
+
+If you do not specify a filename to edit, the usage screen will be shown to 
+you which shows you how to specify a MNU file to edit.
+
+If you specify a valid filename to edit or create, the MKPCBMNU program will 
+be loaded.
+
+If the filename you specify already exists, you will be able to edit the 
+contents of that file.  If the file does not exist, you will be creating a 
+new MNU file.
+
+You will see that the first screen has three fields.  To access the rest of 
+the fields, press F2 to toggle between the various configuration screens.
+
+Title
+
+In this field, enter the title or name of this menu.  This will be used for 
+the prompt after each menu is displayed.  For example, if you enter a title 
+of FILE, you will see the following prompt at the end of the menu:
+
+
+FILE Menu Command ('MENU' for options)
+
+
+The rest of the prompt can be configured to read however you wish by using 
+MKPCBTXT.EXE to edit record #682 in your PCBTEXT file.  For example, you may 
+want for it to say
+
+
+FILE Selection ('MENU' for options)
+
+
+in which case you would edit record #682 in PCBTEXT to look as follows:
+
+
+@OPTEXT@ Selection ('MENU' for options)
+
+
+As you can see, the @OPTEXT@ in the prompt is replaced by whatever you enter 
+as the title for the prompt.
+
+Display File
+
+This is the file you want to display for the menu.  This file should list all 
+of the options that are available in this menu. As with virtually any other 
+file that PCBoard displays, you can make security, graphics, and language 
+specific versions of this display file.
+
+When a user is in novice mode, this file will be displayed each time before 
+they are asked to make a selection.  When in expert mode, the only way for a 
+user to be able to view this menu is to type MENU when prompted for input.
+
+Help File
+
+Keeping in line with PCBoard's extensive online help system, you can have 
+help files for each menu that you create.  Simply enter the filename you wish 
+to display when a ? is entered at your prompt for the menu.  Instead of the ? 
+a user could also enter H, HE, HEL, HELP unless you have replaced those 
+commands in your menu.
+
+Menu Prompts
+
+There is a default prompt in PCBTEXT (record #678) that is used by all menus.  
+It may not meet your needs for every menu though. However, since it is used 
+by all menus, it cannot easily be modified by MKPCBTXT to handle different 
+situations without making it worthless for other menus.  Because of this, you 
+can create different custom language prompts for each menu. MKPCBMNU allows 
+the editing of 32 language specific menu prompts.
+
+The second screen in the menu editor (accessible by pressing F2) is where you 
+define the multi-lingual prompts that you wish to use.  Simply type in the 
+way you want the input prompt to appear for each language defined.
+
+You will notice the first entry automatically has an extension of DEFAULT.  
+This is the prompt displayed to the user if they have the default language.  
+If you leave this blank, PCBoard will use the prompt from record #682 in your 
+PCBTEXT file.
+
+In a previous example, you were shown how to change the prompt from @OPTEXT@ 
+Menu Command ('MENU' for options) to @OPTEXT@ Selection ('MENU' for options).  
+You could accomplish the same thing without modifying your PCBTEXT file.  
+Instead, change the default prompt on this screen to look like the following:
+
+
+@OPTEXT@ Selection ('MENU' for options)
+
+
+To add other language specific prompts, press ALT-I.  In the extension field, 
+type in the extension you would like to replace the prompt for.  Press TAB to 
+go to the MNU Prompt field and type in the prompt for that language.  If a 
+prompt cannot be found for the current language, the default prompt will be 
+used.
+
+Defining Options
+
+The final configuration screen is where you define the menu options that will 
+be available.
+
+Keyword:  This is the command you want to define.  You can enter any command 
+          name up to 8 characters in length.  This means you are not limited 
+          to single letter commands, but you may certainly use single letter 
+          commands if it will make it easier for your users.
+
+Sec:      In this field you need to enter the minimum security level required 
+          to access the command you are defining.  You may enter any value 
+          between 0 and 255.
+
+Type:     Each menu option can be of a certain type.  In other words, one 
+          menu option may execute a door program, while another may display a 
+          bulletin.  The following list details each of the types you can 
+          assign to a command.
+
+          BLT   This option type enables you to display any bulletin that is 
+                defined in the current conference.  In the Parameters field, 
+                enter the number of the bulletin you wish to display.
+
+          BYE   This option is identical to using the BYE user command 
+                available in PCBoard.  This option skips any warnings or 
+                questions at logoff.  By default, this menu option is 
+                available in every menu you create, unless you override the 
+                command in your menu definition.  
+
+          CONF  This option type enables you to change the conference number. 
+                In the Parameters field, specify the conference name or 
+                number you wish to join.
+
+          DIR   You can display any of the file directories available in the 
+                current conference.  Specify the directory number you wish to 
+                display in the Parameters field.
+
+          DIS   If you want to disable a menu option without actually 
+                deleting it from the list of options available, use this 
+                option.
+  
+          DOOR  If you want to execute a door application from a menu, you 
+                may do so using this option type.  Only the doors normally 
+                available in the current conference will be available for 
+                execution.  Specify the door number or name to execute in the 
+                Parameters field of the option you are defining.
+
+          EXIT  While this option type is similar to QUIT, it is different 
+                because it will quit all active menus.
+
+          FILE  If you want to display a text file to the caller, you may do 
+                so using this option type.  As with normal PCBoard display 
+                files, you can create security, graphics, and language 
+                specific versions of the file you are displaying to the 
+                caller.  In the Parameters field, specify the path and 
+                filename to display.
+
+          GBYE  This option is identical to the G user command available in 
+                PCBoard.  By default, this command is available in every menu 
+                that you create, unless you use define G to perform some 
+                other action in your menu.
+
+          MENU  If you have assigned a menu command to have this type, you 
+                can load another MNU file as specified in the Parameters 
+                field. This would effectively let you create a sub-menu type 
+                system that is very easy to navigate.
+   
+          PPE   Using this option, you can execute any PPE file you wish. 
+                This only further enhances the options or tasks you can 
+                perform with each menu.
+
+          QUIT  To quit the current menu and return to the previous menu (if 
+                any), define a menu option that uses this option type. 
+                Remember that only the current menu will be exited.  To exit 
+                all menus, use the EXIT option instead.
+
+          SCR   Execute a script file.  The script number to execute should 
+                be specified in the Parameters field.  For example, if you 
+                want to execute script #3 in the current conference for a 
+                particular menu option, set the type of the option to SCR and 
+                in the parameters field,  enter 3.
+
+          SFNR  To increase the capability of MNU files, this option type 
+                enables you to stuff any text into the keyboard.  The text to 
+                stuff comes from the file specified in the Parameters field. 
+                Stuffing the keyboard will make it appear the user typed in 
+                the text when in reality it is your menu.  Once the stuffed 
+                text has been acted upon, the user will not be returned to 
+                the menu file.
+
+          SQNR  Stuff the keyboard with the text entered in the Parameters 
+                field.  The text that is stuffed will not be displayed on the 
+                screen.  Additionally, the user will not be returned to the 
+                menu once the stuffed text has been acted upon.
+
+          SSNR  Stuff the keyboard with the text entered in the Parameters 
+                field.  Once the stuffted text has been acted upon, the user 
+                will not be returned to the menu.
+
+          STFF  Stuff the keyboard with the contents of the file specified in 
+                the Parameters field.  Once the stuffed text has been acted 
+                upon, the user wiill be returned to the menu.  
+
+          STFQ  Stuff the keyboard with the contents of the file specified in 
+                the Parameters field.  The stuffed text will not be shown on 
+                the screen.
+
+          STFS  Stuff the keyboard with the text entered in the Parameters 
+                field.  To represent the user pressing ENTER, use ^M where 
+                ENTER would normally be used. Once the stuffed text has been 
+                acted upon, the user will be returned to the menu.
+
+          XPRT  Using this option, you can toggle expert mode status or 
+                explicitly state if you want expert mode on or off.  In the 
+                Parameters field, simply enter ON, OFF, or TOGGLE based on 
+                the action that you wish to perform.
+
+Parameters:  In this field, enter any parameters required for the option type 
+that you are defining.  For example, if you use the STFF option type, you 
+need some way to specify the filename that you want to stuff the keyboard 
+with.  In the Parameters field, enter the filename that you want to display.  
+The description for each option will inform you if you need to enter anything 
+in the Parameters field.
+
+NOTE:  There are some commands that are available with every menu even if you 
+do not have them actually defined in your MNU file.  The following lists all 
+of the default commands in all menus:
+
+?, H, HE, HEL, HELP - Displays the help file for this menu (if it exists)
+ME, MEN, MENU - Displays the menu file which shows menu options available
+Q - Quit the current menu and return to the previous menu (if applicable)
+X - Exit all menus.
+G - Logoff the system.  Warnings will be displayed at logoff
+BYE - Logoff the system.  Warnings will not be displayed.
+
+The only commands that you cannot change or create are the top two items in 
+the list which display the help files and display file for the current menu.  
+All the rest of the options have option types you can assign to other 
+commands.
+
+Adding Menu
+
+There are three way you can install a menu file into PCBoard. They are as 
+follows:
+
+Menu display files (e.g., BRDM, CNFN)
+Most display files (e.g., WELCOME, NEWS)
+CMD.LST (PCBSetup | File Locations | Configuration Files)
+Virtually any PCBText Entry
+
+Using these methods, you should be able to install a menu into virtually any 
+area in your bulletin board system.  This means you can install a menu file 
+virtually anywhere in PCBoard.  The following sections describe the various 
+methods you can use to install a menu.
+
+Menu Display Files
+
+The most common place for you to insert a menu is when the user is going to 
+be prompted for input.  If you have a lot of conferences on your system, 
+chances are that your users will have difficulty deciding the conference to 
+join.  By using menu files instead of a single display file, you can help 
+your users find what they are after.  The following lists some likely 
+candidates for installing menus by adding a .MNU on the name of the menu 
+display file:
+
+BRDM (PCBSetup | Conference Configuration) - Displayed at the conference 
+command prompt, but only when in novice mode, or when the MENU command is 
+used.
+
+CNFN (PCBSetup | File Locations | Display Files) - Displayed when a user uses 
+the J user command.
+
+DOORS (PCBSetup | Conference Configuration) - Displayed when a
+user uses the OPEN or DOOR user command.
+
+BLT (PCBSetup | Conference Configuration) - Displayed when the B user command 
+is executed.
+
+SCRIPT (PCBSetup | Conference Configuration) - Displayed when the S user 
+command is executed.
+
+DIR (PCBSetup | Conference Configuration) - Displayed when the F user command 
+is executed.
+
+For any of these display files, you can create a menu file that will be used 
+instead by adding a .MNU extension on the filename. For example, to create a 
+menu for your conferences, follow these steps:
+
+Look at the location of your CNFN file (PCBSetup | File Locations | Display 
+Files).   You may see C:\PCB\GEN\CNFN.  In this case, you would create a MNU 
+file called CNFN.MNU and store it in the C:\PCB\GEN\ subdirectory.
+
+Use MKPCBMNU to create the C:\PCB\GEN\CNFN.MNU file.  Follow the instructions 
+for creating a menu as outlined previously.  When you have finished defining 
+your menu file, save it.
+
+Now whenever you type in J and press ENTER you will notice your menu file is 
+being used instead of the normal display file.
+
+The most important thing to remember, is the menus are only used when the 
+normal display file would have been used.  If a user were to type J;3 your 
+menu will never be used because the conference menu would not have normally 
+been displayed by PCBoard.  Likewise, if you replace the BRDM file with a 
+BRDM.MNU, it will only be used when the BRDM file would have been normally 
+been displayed.  This means that if a user is in expert mode, they will not 
+see the menu, because the main menu is not normally displayed to them.  
+However, if a user in expert types MENU,  your menu file will be used.
+
+CMD.LST
+
+In the CMD.LST file (PCBSetup | File Locations | Configuration Files) you can 
+add new commands to your system.  The commands you define in this file will 
+only be available from the conference command prompt.  If you edit your 
+CMD.LST file, you will see a screen which resembles the following:
+
+
+                             File Locations
+
+       Command     Security  PPE/MNU File -or- Keystroke Replacement
+   --------------  --------  ---------------------------------------
+1)
+
+You can add a MNU file by specifying the command you want to use for the 
+menu, the security level required to execute the command, and the actual 
+location of your MNU file.  For example, if you want to add a command called 
+ORDER which will put the user into a menu system where you could help them 
+make purchasing decisions, add the following entry:
+
+
+                             File Locations
+
+       Command     Security  PPE/MNU File -or- Keystroke Replacement
+   --------------  --------  ---------------------------------------
+1) ORDER               0     F:\PCB\MENUS\ORDER.MNU
+
+
+PCBText Entry
+
+Instead of displaying a PCBTEXT record, you can have use a menu file instead.  
+To use a menu file, begin the PCBTEXT record with a $ followed by the name of 
+the menu filename that you want to use.  For additional information, refer to 
+the PCBText Utilities section in the Utilities chapter of this manual.
+
+Adding Commands
+
+One of the requirements of a bulletin board system is that it be customizable 
+to meet the needs of your users.  PCBoard gives you the ability to add new 
+commands to the system.  You can define these new commands to do the 
+following things:
+
+Open a door - When you define a door, you must give it a name. You can 
+execute this door by typing entering the door name at the conference command 
+prompt.  There is no need to use the OPEN or DOOR user commands.  This method 
+enables you to add the door name to your main menu making it appear as a 
+command on your system.
+
+Stuff the keyboard - Sometimes you may want to make things easier for your 
+users by combining commonly used commands into one single command.  For 
+example, if your users have a hard time remembering that R;Y;ALL would read 
+their own mail, create a command called YOURMAIL which stuffs the keyboard 
+with  R;Y;ALL. 
+
+Run a PPE - A PPE can be generated by the PPL Compiler or by downloading a 
+pre-compiled PPE.
+
+Execute a menu file - If you want to run a menu file as a new command, 
+specify the menu file you wish to execute.
+
+All new commands you add to your main menu (with the exception of doors) need 
+to be added using the CMD.LST file (PCBSetup | File Locations | Configuration 
+Files).
+
+Stuffing Text Into The Keyboard
+
+Perhaps the most common way to add a new command is to stuff text into the 
+keyboard buffer.  Using this method you can create commands based on common 
+things your users may do.  In the CMD.LST, specify the text to stuff in the 
+right-most field on the screen (PPE/MNU File -or- Keystroke Replacement.)  
+The text you specify will stuffed into the keyboard buffer as if the user 
+entered it directly from their keyboard.
+
+For example:
+
+       Command     Security  PPE/MNU File -or- Keystroke Replacement
+   --------------  --------  ---------------------------------------
+1) #                   0     D;ALLFILES.ARJ;N^M
+
+
+This entry defines the # command.  When this command is executed, the 
+commands necessary to download ALLFILES.ARJ are executed.  In addition the ;N 
+is added which will force PCBoard to use the (N)one protocol.  In essence, 
+this will force a protocol to be picked for transfer even if a default 
+protocol has already been selected.
+
+There are two things you need to be aware of when stuffing the keyboard.  To 
+simulate pressing ENTER add a ^M to the text that you are stuffing into the 
+keyboard buffer.  In addition, you need to realize that any text you stuff 
+into the keyboard buffer will be lost if you run a door.  If you need to 
+stuff more characters than are available in the field, you should stuff a 
+file instead.
+
+Stuffing A File To The Keyboard
+
+To specify that you wish to stuff an ASCII text file instead of the text, 
+enter a % followed by the filename you wish to stuff. For example, if you 
+wished to create a command called VIEW that will stuff the text file 
+C:\PCB\TEMP\STUFFIT.TXT, add this entry:
+
+       Command     Security  PPE/MNU File -or- Keystroke Replacement
+   --------------  --------  ---------------------------------------
+1) VIEW                0     %C:\PCB\TEMP\STUFFIT.TXT
+
+
+Stuffing the keyboard buffer with a file is virtually identical to stuffing 
+the keyboard buffer with text (described in previous section) with the 
+following exceptions:
+
+You may stuff as many characters as necessary.  When stuffing text, you are 
+limited to 256 characters.  However, with a file, all of the text inside the 
+file will be stuffed.
+
+Instead of using ^M to represent ENTER, press ENTER when you are creating 
+your ASCII file to stuff into the keyboard buffer.
+
+If you were to stuff S^M2^M when stuffing text, the ^M will be converted to 
+carriage returns.
+
+If you were to stuff the same text from a file, it will resemble the 
+following:
+
+                S
+		2
+
+Using A PPE File
+
+To specify the command to execute a PPE file is very simple. All you need to 
+do is specify the new command, the security level required to execute the 
+command, and finally the name of the PPE filename to execute.  For example, 
+to create a command called STATS which will execute C:\PCB\PPE\STATS.PPE, 
+make the following entry:
+
+
+       Command     Security  PPE/MNU File -or- Keystroke Replacement
+   --------------  --------  ---------------------------------------
+1) STATS               0     C:\PCB\PPE\STATS\STATS.PPE
+
+Using A Menu File
+
+You can add a MNU file by specifying the command you want to use for the 
+menu, the security level required to execute the command, and the actual 
+location of your MNU file.  For example, if you want to add a command called 
+ORDER which would put the user into a menu system where you could help them 
+make purchasing decisions, add the following entry:
+
+
+                             File Locations
+       
+       Command     Security  PPE/MNU File -or- Keystroke Replacement
+   --------------  --------  ---------------------------------------
+1) ORDER               0     F:\PCB\MENUS\ORDER.MNU
+
+Replacing Existing Commands
+
+Using the CMD.LST file, it is possible for you to override PCBoard's internal 
+commands.  The commands defined in CMD.LST have the highest priority of any 
+command or function in PCBoard.
+
+Even when you override a command, you can still access the original internal 
+command as strange as that might sound.  As a very simple example, add the 
+following entry to your CMD.LST file:
+
+       
+       Command     Security  PPE/MNU File -or- Keystroke Replacement
+   --------------  --------  ---------------------------------------
+1) N                   0     N
+
+
+As you can see, this will stuff N into the keyboard buffer when the user 
+executes the N user command.  If you login and execute then N command you 
+will notice it is identical to before you implemented the change.  If you 
+want to make sure everything is working properly, modify your N command in 
+CMD.LST so it looks like this:
+
+
+       Command     Security  PPE/MNU File -or- Keystroke Replacement
+   --------------  --------  ---------------------------------------
+1) N                   0     N;S
+
+
+If you login and execute the N command, you will not be prompted for the 
+date.  Instead, you will be asked immediately for the directory numbers you 
+wish to search through.  This is because the internal N command is still 
+being used.
+
+The Look And Feel Of Your BBS
+
+PCBoard uses several display files and hundreds of text records (PCBTEXT) to 
+display information to the caller of the system. Each of these display files 
+and nearly all of the text records can be modified to your liking.
+
+Without a doubt, you will spend a large amount of your time customizing your 
+bulletin board system to suit your needs and to help differentiate your 
+system from the other bulletin board systems.  This section describes some of 
+the ways you can customize the look and feel of your system.
+
+Colorizing Screens
+
+To help enhance the presentation of your display files, PCBoard will allow 
+you to create graphic specific versions of all of your display files by 
+adding a G to the end of the filename to be displayed.  For example, if you 
+use a file called WELCOME and you want to create a graphics specific version 
+of the file, create a file called WELCOMEG.  These graphic specific files are 
+usually created using either ANSI codes or @X color codes. There are several 
+ANSI screen and @X editors such as PCBEdit (included with PCBoard).  Simply 
+use the editor program to create your file and save the file using ANSI or @X 
+codes.
+
+Despite the fact that you can create graphic specific files, you may not want 
+to create both a non-graphic and graphic version of the same file.  With the 
+@X code format, PCBoard can analyze the file and will omit the color 
+information in the file if the caller is not in graphics mode.  By making 
+just one version of the file, you can save a lot of maintenance time and 
+probably a significant amount of disk space.
+
+Editing PCBText Records
+
+Because most of the text that PCBoard displays comes from the PCBTEXT file 
+(for each language) you can put a great deal of time into customizing the 
+PCBTEXT records.
+
+Each PCBTEXT record varies in length up to 79 characters.  There are nearly 
+700 records in the PCBTEXT file that you may customize to fit your own needs.
+
+To edit the PCBTEXT file, use a utility called MKPCBTXT.EXE which is included 
+with your package.  This utility will enable you to edit each record in the 
+PCBTEXT file to say whatever you want it to display.
+
+If you browse through the various records, you may notice what appears to be 
+duplicate records which contain the same text. One record is displayed to the 
+user when they are in novice mode, and the other record is displayed when the 
+user is in expert mode.  The best way to determine which is which is by trial 
+and error -- there is no set method.
+
+To increase the flexibility of each PCBTEXT record, there are some special 
+characters you can use at the beginning of a line to signify you would like 
+to do something other than display the record text.
+
+For example, if you begin a record with a % followed by a filename, PCBoard 
+will display the filename instead.  This enables you to break the record 
+length limit in case you need to display additional text.  The screen on the 
+following page is a sample record showing you what it would look like to 
+display a filename instead:
+
+You can also elect to execute a menu rather than displaying a particular 
+record.  This can be done by starting the line with a $ followed by the MNU 
+file that you wish to use for your menu.
+
+If you have a PPE file that you wish to execute in place of a normal record 
+you may do so by beginning the record with an ! followed by the filename of 
+the PPE to execute.
+
+NOTE:  There are some records that are built by PCBoard on the fly and 
+therefore cannot use the %, $, or ! characters as the first line.  A good 
+example would be record #609 in the PCBTEXT file which displays the credits 
+that are rewarded to a user after uploading.  PCBoard replaces the 0 in that 
+record with the appropriate values, hence it builds the record before 
+displaying it to a user.  If you use %, $, or ! as the first character, it 
+will be ignored.
+
+For more information on MKPCBTXT, refer to the Utilities chapter of this 
+manual.
+
+PPE Files
+
+Perhaps the greatest way to customize how your bulletin board system operates 
+is to use PPE files.  You can use PPE files in the following places:
+
+In a PCBTEXT record as described in the previous section
+
+In place of a standard script questionnaire file simply by specifying the 
+filename of the PPE (including the PPE extension) in SCRIPT.LST.
+
+In place of any menu display file (BRDM, CNFN, DIR, BLT, etc.) by creating a 
+PPE file using the base name.  For example to execute a PPE file instead of 
+displaying the normal menu, create a file called BRDM.PPE in the same 
+location as BRDM.
+
+Within any display file by beginning a line (column 1) with an ! followed by 
+the filename of the PPE to execute.
+
+From a menu selection as defined in a MNU file.
+
+A PPE (PCBoard Programming Executable) file is simply the compiled version of 
+a PPL file.  In order to compile your own PPE file you will need to purchase 
+the PPL Compiler which is an optional add-on to your PCBoard software.  If 
+you have any background in BASIC or batch file programming, you should be 
+able to easily understand the PPL language.
+
+Configurable Online Help
+
+PCBoard uses standard text files for its context sensitive help system.  
+Therefore, you may modify the files that make up the help system to suit your 
+needs.  Your help files will be located in the directory you specified in the 
+Location of Help Files (PCBSetup | File Locations | System Files).  The 
+following lists the help files names that are included with PCBoard and a 
+description of the command or function that they provide assistance with.
+
+        HLP!    (!) Repeat command
+        HLPA    (A)pandon a Conference
+	HLPALIAS	(ALIAS) enable/disable
+	HLPB	(B)ulletins
+	HLPBR	(BR)oadcast another node
+	HLPC	(C)omment to SysOp
+	HLPCHAT	(CHAT) or (NODE) commands
+	HLPCMENU	Menu available by pressing E while in chat.
+	HLPD	(D)ownload file(s)
+	HLPE	(E)nter a message
+	HLPENDR	Options available at the End of Message Command prompt.
+	HLPF	(F)ile directories
+	HLPFLAG	(FLAG) a file for download
+	HLPFSCRN	Full-screen editor (entering a message)
+	HLPG	(G)oodbye
+	HLPH	(H)elp
+	HLPI	(I)nitial Welcome
+	HLPJ	(J)oin a conference
+	HLPK	(K)ill a message
+	HLPL	(L)ocate a file
+	HLPLANG	(LANG) Change active language
+	HLPM	(M)ode of graphics (if any)
+	HLPN	(N)ew file scan
+	HLPNEWS	(NEWS) Online news
+	HLPO	(O)perator Page
+	HLPOPEN	(OPEN) a (DOOR)
+	HLPP	(P)age length setting
+	HLPQ	(Q)uick message scan
+	HLPQWK	(QWK) mail transfers
+	HLPR	(R)ead a message
+	HLPREG	Set conference registrations (within user record edit)
+	HLPREP	(REPLY) to a message
+	HLPRM	(RM)  Re-read memorized message number
+	HLPS	(S)cript questionnaire
+	HLPSEC	Message security (when entering a message)
+	HLPSEL	(SELECT) conferences to include in message scan
+                Scan for prompts.
+	HLPT	(T)ransfer protocol
+	HLPTEST	(TEST) a file that is available for download.
+	HLPTS	(TS)  Search messages for text
+	HLPU	(U)pload a file
+        HLPUSERS(USER)  Display list of users on the system
+	HLPV	(V)iew user statistics
+	HLPW	(W)rite personal information
+	HLPWHO	(WHO) is currently online
+	HLPX	(X)pert mode toggle
+	HLPY	(Y)our mail scan
+	HLPZ	(Z)ippy search the file directories.
+
+Display File Conventions
+
+Display Filename Conventions
+
+With virtually any filename that PCBoard displays to the caller, you can send 
+different versions of the file based on:
+
+
+the security level of the user
+the current language
+the graphics mode (if any) being used
+
+Base Filename
+
+Before you can understand how this works, you must know what PCBoard calls a 
+base filename.  The base filename is what you enter for the filename in a 
+PCBSetup location.  Look at the following example:
+
+
+Name/Loc of Conference Join Menu  : C:\PCB\GEN\CNFN
+
+
+In this example, the filename is CNFN and hence it is the base filename.
+
+
+By creating new files which have special characters added to the filename, 
+you can make special versions of the display files for a restricted group of 
+users.  These special characters are described below:
+
+Language Specific
+
+To make a display file for a particular language make the filename extension 
+equal to the filename extension of the language as listed in your PCBML.DAT 
+(PCBSetup | File Locations | Configuration Files).  
+
+
+
+                         BASE.LAN
+                          ³    ³
+         base filenameÄÄÄÄÙ    ÀÄÄÄÄÄÄÄlanguage extension
+
+
+Remember, that the default language does not have a file extension.  
+Therefore, you would  use the base filename with no file extension specified.
+
+Security Specific
+
+If you want to make a file only viewable by a particular security level, you 
+may do so by adding the security level to the base filename.  For example, if 
+you wanted to create a BRDM file that is only displayed to users with a 
+security level of 40, create a new file called BRDM40.
+
+
+
+                        BASE###
+                         ³   ³
+         base filenameÄÄÄÙ   ÀÄÄÄÄÄ Security level
+
+
+Graphic Specific
+
+PCBoard supports two different graphics specific files -- ANSI and RIPscrip.  
+To make separate files for the users that are currently using graphics mode 
+on your system is very easy. Simply add a G to the base filename for ANSI 
+specific files and an R to the base filename for RIPscrip files.
+
+For example, if you wanted to create a version of the BRDM for those users 
+who have graphics mode enabled, create a file called BRDMG.
+
+
+
+                          BASEG
+                           ³  ³
+          base filenameÄÄÄÄÙ  ÀÄÄÄÄ specifies file is for
+                                    graphics mode only
+
+
+Likewise, if you want to create a file that would be viewed by those in 
+RIPscrip mode, you would create a file called BRDMR.
+
+
+                         BASER
+                          ³  ³
+         base filenameÄÄÄÄÙ  ÀÄÄÄÄ specifies file is for
+                                   RIPscrip mode only
+
+
+If the user is in RIPscrip mode, but a RIPscrip version of the file does not 
+exist, PCBoard will attempt to find an ANSI specific version of the file 
+(because RIPscript also supports ANSI).  If no ANSI file is found, the base 
+filename is used.
+
+Combining
+
+You are not limited to using one specific method.  For example, you can make 
+graphics and non-graphic versions of security specific files.  Look at the 
+following figure:
+
+
+                         BASE###G
+                          ³   ³ ³
+         base filenameÄÄÄÄÙ   ³ ÀÄÄÄÄ specifies this file
+                           security   is for graphics only
+
+Taking this one step further, you could even make this file language specific 
+as illustrated in the following example:
+
+
+                          security
+                              ³     ÚÄÄÄ language
+                              ³     ³
+                         BASE###G.LAN
+                          ³     ³
+         base filename ÄÄÄÙ     ³
+                            graphics specific
+
+Order Of Language, Security, and Graphic Specific Files
+
+In order to properly use language, security, and graphic specific files, you 
+need to understand the process that PCBoard goes through in case the specific 
+file does not exist.
+
+PCBoard will use the most specific file that it can find.  For example, you 
+may have the following specific versions of your NEWS file:
+
+
+NEWS
+NEWS10
+NEWS20
+NEWS20G
+NEWS.SPA
+
+
+For this first example a user logs into the system selecting the default 
+language, and the user also selects graphics mode.  This particular user has 
+been assigned a security level of 20.  When the NEWS file is displayed to the 
+caller, PCBoard checks to see what language the user selected.  In this case, 
+the user selected the default language so no language specific files will be 
+looked for.
+
+Now, PCBoard checks to see if there is a security specific version of the 
+file.  Upon searching, security specific files are found for levels 10 and 
+20.  Because this user has a security level of 20, PCBoard must display 
+either the NEWS20 or NEWS20G file.  Of course the final check is for the 
+graphics mode of the caller.  If you recall, this user selected graphics mode 
+so the NEWS20G file will be shown.
+
+The caller hangs up and calls back again.  This time, the caller selects 
+language which happens to have an extension of SPA defined in the PCBML.DAT 
+file.  The news file is displayed to the caller only this time, the user has 
+selected a language other than the default.  PCBoard begins by checking to 
+see if there are any language specific files.  In our list of NEWS files, 
+there was a file called NEWS.SPA.  This was the only file with the SPA 
+extension.  Therefore, PCBoard will stop there since there are no security or 
+graphic specific versions of the NEWS file with an SPA extension.  This means 
+that the caller will be shown the NEWS.SPA file.
+
+For the final example, another user calls into your system. This caller 
+selects the default language and chooses to enable graphics mode.  This 
+caller has been assigned a security level of 25 on your system.  When the 
+NEWS file is displayed to the caller, PCBoard does not check for language 
+specific files because the caller choose the default language.  Next, PCBoard 
+searches for security specific files but only security specific files for 
+levels 10 and 20 are found.  
+
+Since there were no language or security specific matches, PCBoard will check 
+for a graphics specific file (NEWSG). However, that file does not exist, so 
+the NEWS file will be displayed instead.
+
+All Possible Specific Files
+
+The following examples will help better illustrate the various files that you 
+can create to make specific files based on language, security level, and 
+graphics mode.
+
+If PCBoard is going to display the following text file:
+
+C:\PCB\GEN\BRDM
+
+You can create the following language, security, and graphics specific 
+versions of that same file:
+
+
+BRDM
+BRDMG
+BRDMR
+BRDM###
+BRDM###G
+BRDM###R
+BRDM.LAN
+BRDMG.LAN
+BRDMR.LAN
+BRDM###.LAN
+BRDM###G.LAN
+BRDM###R.LAN
+
+
+Remember, the ### in each of these examples represents a security level.  
+Therefore, you could conceivably  have 255 different security specific files 
+if you have defined all 255 security levels.  In addition, the .LAN 
+represents the language extension.  You can define multiple languages in your 
+PCBML.DAT file so you would replace the .LAN with whatever language you want 
+to make the display file for.
+
+PCBoard @ Macros
+
+In some of your display files you may want to display information that is 
+specific to the caller currently viewing the file (e.g., name, connect speed, 
+node number, etc.).  Another possibility is that you may want to control the 
+display of some of your files so that they pause at a particular point.  
+PCBoard uses @ macros to help you accomplish these tasks.  These macros are 
+special codes that you can enter in text files to make PCBoard display 
+certain information or perform a particular action.  All macros must begin 
+and end with the @ character with the text between being in uppercase.
+
+The following groups the macros into sections.  Following the brief summary 
+is a list of all @ macros in alphabetical order for easy reference.
+
+Action Related Macros
+
+@AUTOMORE@        Subsequent more prompts are treated as @PAUSE@.
+
+@BEEP@            Send a beep to the caller.
+
+@CLREOL@          Clear all text on the current line to the right of the 
+                  cursor.
+
+@CLS@             Clear the screen.
+
+@DELAY:nn@        Pause for the nn tenths of a second.
+
+@HANGUP@          Disconnect the caller.
+
+@MORE@            Interrupt display asking caller if they wish to see more.
+
+@PAUSE@           Same as @MORE@ but continues after 10 seconds.
+
+@POFF@            Disable normal more prompts when screen fills up.
+
+@PON@             Enable normal more prompting usage.
+
+@POS:nn@          Advance cursor to position nn.
+        
+@QOFF@            Do not allow the display of the file to be aborted.
+
+@QON@             Allow the file display to be aborted.
+
+@WAIT@            Interrupt display of file with a Press Enter prompt.
+
+File Transfer Related Macros
+
+@BYTELIMIT@       Number of bytes that can be downloaded on a daily basis.
+
+@BYTERATIO@       Current byte ratio of caller.
+
+@BYTESLEFT@       Number of bytes user can download during current call.
+
+@DAYBYTES@        Number of bytes downloaded today.
+              
+@DLBYTES@         Total number of bytes downloaded by the caller.
+                
+@DLFILES@         Total number of files download  by the caller.
+               
+@FILERATIO@       Current file ratio of the caller.
+
+@KBLEFT@          @BYTESLEFT@ expressed in kilobytes.
+
+@KBLIMIT@         @BYTELIMIT@ expressed in kilobytes.
+
+@NUMDIR@          Number of file directories in current conference.
+
+@PRODESC@         Description of the default protocol selected.
+
+@PROLTR@          Default protocol selected by the current caller.
+              
+@UPBYTES@         Total number of bytes uploaded by the caller.
+
+@UPFILES@         Total number of files uploaded by the caller.
+
+Message Related Macros
+
+@CURMSGNUM@       Current message number being read.
+
+@HIGHMSGNUM@      High message number in message base.
+
+@LMR@             Last message read by user in the current conference.
+
+@LOWMSGNUM@       Low message number in the message base.
+
+@MSGLEFT@         Total number of messages entered by the user.
+            
+@MSGREAD@         Total number of messages read by the user.
+
+Miscellaneous Related Macros
+
+@BOARDNAME@       The name of the bulletin board system.
+
+@CONFNAME@        The name of the current conference.
+
+@CONFNUM@         The number of the current conference.
+               
+@EVENT@           The time that the next event is scheduled to take place.
+
+@FREESPACE@       Bytes available for uploading in the current conference.
+
+@INCONF@          Current conference number and name.
+                
+@LASTCALLERNODE@  The last user that called the current node.
+
+@LASTCALLERSYSTEM@The last user that called the system.
+
+@NODE@            The current node number.
+
+@NUMBLT@          The number of bulletins defined in the current
+                  conference.
+
+@NUMCALLS@        Total number of calls answered by the BBS.
+
+@OFFHOURS@        Hours that lower speed callers can call into the system.
+
+@OPTEXT@          Used in PCBTEXT to transfer information by PCBoard.
+
+@SYSDATE@         The current system date.
+
+@SYSOPIN@         Beginning time when the SysOp is available for chat.
+
+@SYSOPOUT@        Ending time when the SysOp is available for chat.
+
+@SYSTIME@         The current system time.
+
+@WHO@             Prints a list of who is currently online.
+
+User Related Macros
+
+@BPS@             Carrier speed of caller as reported by PCBoard.
+
+@CARRIER@         Carrier speed of caller as reported by the modem.
+
+@CITY@            Information entered in the city field of user's record.
+
+@DATAPHONE@       Information entered in the data phone field of
+user's record.
+
+@EXPDATE@         Expiration date of the caller.
+
+@EXPDAYS@         Number of days until the user's subscription will
+expire            
+
+@FIRST@           First name of caller displayed in mixed case.
+
+@FIRSTU@          First name of caller displayed in all upper case.
+
+@HOMEPHONE@       Information entered in the home phone field of user record.
+
+@LASTDATEON@      Last date the caller called the system.
+
+@LASTTIMEON@      Last time the caller called the system.
+                 
+@MINLEFT@         Minutes left on system (includes download time estimates).      
+
+@NUMTIMESON@      Number of times user has called the system.
+
+@SECURITY@        Current security level of the caller.
+
+@TIMELEFT@        Minutes left on system (excludes download time estimates).
+
+@TIMELIMIT@       The daily/session time limit of the caller.
+
+@TIMEUSED@        Total number of minutes used during current call.
+
+@TOTALTIME@       Total number of minutes used during current day.
+
+@USER@            The caller's name displayed in uppercase.
+
+
+Formatting @ macros
+
+With the exception of the Action Related @ Macros,  you can apply the 
+following formatting to any macro:
+
+The total number of characters used to display the macro.  This is commonly 
+referred to as the maximum field length.
+
+Whether the text should be center, right, or left justified when a maximum 
+field length is specified.
+
+To specify a maximum field length for a macro, enter a colon followed by the 
+field length before the last @ of the macro. For example, if you wanted to 
+display the user's name in a 30 character field, enter the following macro:
+
+
+@USER:30@
+
+
+Text is normally left justified in a field.  If you want the text to be right 
+or center justified, add a special character after the field length.  To make 
+the text in the field right justified, add an R to the field length.  To make 
+the text center justified, add a C to the field length.  For example, to make 
+the user's name in the previous example center justified, enter the following 
+instead:
+
+
+@USER:30C@
+
+
+To make the same display right justified, enter:
+
+
+@USER:30R@
+
+Alphabetical List Of @ Macros
+
+The following table lists all of the @ macros that PCBoard will allow you to 
+use.  The list is arranged in alphabetical order for easy access.
+
+ @VARIABLE@ 	Description / Sample 
+
+@##@               When entered in the TO: field of a message, you may 
+                   address a message to a particular security level.  You 
+                   should replace the ## with the actual security level you 
+                   wish to address the message to.  This macro may only be 
+                   used in the TO: field of a message.
+                   
+                   Example:     @20@ 
+
+@##-##@            When entered in the TO: field of a message, you may 
+                   address  a message to a range of security levels.  You 
+                   should replace the first ## with the lowest security level 
+                   to address the message to.  The second ## should be 
+                   replaced with the highest security level to address the 
+                   message to.     This macro may only be used in the TO: 
+                   field of a message.
+                     
+                   Example: @20-35@ 
+
+@AUTOMORE@         Any More? prompts displayed after this macro will be 
+                   interpreted as @PAUSE@ codes.  If the user does not 
+                   respond to the More? prompt within 10 seconds, the default 
+                   of Y is accepted. 
+
+@BEEP@             This macro sends an audible tone ( CTRL-G ) to the remote 
+                   caller.  In order for you to hear this audible tone, you 
+                   must have the Bell turned on at the call waiting screen. 
+
+@BICPS@            Used internally by PCBoard to display file transfer 
+                   statistics. 
+
+@BOARDNAME@        Displays the name of the BBS.  This information is stored 
+                   in PCBSetup | Node Information 
+
+@BPS@              Displays the connect speed that PCBoard announced at 
+                   login.  For error-correcting connections, the opening port 
+                   speed will be displayed.  Otherwise, the actual carrier 
+                   speed will be displayed.  If you want to always display 
+                   the carrier speed of the caller, use the @CARRIER@ macro 
+                   instead.
+                     
+                   Example output: 38400 
+
+@BYTELIMIT@        Displays the daily download byte limit of the caller.  
+                   
+                   Example output:     737,280 
+
+@BYTERATIO@        Displays the byte ratio for the current caller. The format 
+                   for the output is downloads:uploads.  For example, if a 
+                   caller has downloaded 10,000 bytes and uploaded 2,000 
+                   bytes, they have a 5:1 byte ratio.  In other words, for 
+                   each five bytes they download they have uploaded one byte.
+  
+                   Example output: 5:1 
+
+@BYTESLEFT@        Displays the number of bytes the caller has left for the 
+                   day. If the caller has been given unlimited downloads, the 
+                   word Unlimited will be displayed instead of the actual 
+                   amount of bytes.  
+                   
+                   Example output:     325,567 
+
+@CARRIER@          Displays the connect speed of the caller as returned by 
+                   the modem.  If the user is on via a local login, the 
+                   opening port speed is reported.  
+                   
+                   Example output:  14400 
+
+@CITY@             This macro will display the caller's city.  This 
+                   information is stored inside of the user file in the City 
+                   field.
+                    
+                   Example output:     MURRAY, UT 
+
+@CLREOL@           Clears the current text line to the end of the line (the 
+                   last column on the display screen).  This is useful if you 
+                   want to make sure there is no other text to the right of 
+                   the @CLREOL@ macro or if you are using a background color 
+                   in your color displays and want to have it extend to the 
+                   end of the text line.   
+
+@CLS@              Clears the screen (i.e., no information is displayed on 
+                   the screen immediately after this macro is used). 
+
+@CONFNAME@         Displays the current conference name.  This is quite 
+                   similar to the @INCONF@ macro except it does not display 
+                   the conference number.  
+                   
+                   Example output:     Main Board 
+
+@CONFNUM@          Displays the current conference number  
+
+                   Example output:     3 
+
+@CURMSGNUM@        Displays the last message number the caller read, not 
+                   necessarily the highest message number the caller has 
+                   read. For example, if the caller had read to message 
+                   number 532 but decided to go back and read message number 
+                   1, this macro would display 1 because that is the last 
+                   message the caller actually read.  
+                   
+                   Example output:     32,322 
+
+@DATAPHONE@        This macro will display the business/data phone number 
+                   stored in each user record.  The actual text is not 
+                   formatted -- it is taken straight from the user record.  
+                   
+                   Example output:     801-261-8976 
+
+@DAYBYTES@         Displays the number of bytes downloaded on the current 
+                   day.  If the value displayed is negative, the caller has 
+                   been given credit for an upload.  Negative bytes are added 
+                   to the daily byte limit of the caller.  For example, if 
+                   you used this macro and it displayed -52,322, that would 
+                   mean that the caller could download 52,322 bytes in 
+                   addition to their normal daily limit.  
+                   
+                   Example output:     332,356 
+
+@DELAY:nn@         Delays for nn tenths of a second.  If you enter 
+                   @DELAY:50@, PCBoard will pause for 5 seconds (50 * .10  = 
+                   5.0). You can enter any value between 0 and 255 meaning 
+                   that you can pause between 0 and 25.5 seconds. 
+
+@DLBYTES@          Displays the total number of  bytes that the caller has 
+                   downloaded from the system.  
+                   
+                   Example output:  2,352,532  
+
+@DLFILES@          Displays the total number of files the caller has 
+                   downloaded from the system.   
+                   
+                   Example output:     1,054 
+
+@EVENT@            Displays the time (in 24 hour format) that the next system 
+                   event will run.  If you do not have your system scheduled 
+                   to run an event or no events are defined, the time 
+                   displayed will be 00:00.  
+                   
+                   Example output:     14:30  
+
+@EXPDATE@          This macro will display the expiration date of the current 
+                   caller.  If a user has no expiration date or if you have 
+                   disabled subscription mode,  00-00-00 will be displayed. 
+                   
+                   Example output:     08-30-94 
+
+@EXPDAYS@          Displays the number of days until the caller's 
+                   subscription will expire.  If the user does not have an 
+                   expiration date or you have disasbled subscription mode, 
+                   nothing will be displayed on the screen.  
+                   
+                   Example output:     325 
+
+@FILERATIO@        Displays the file ratio for the current caller. The format 
+                   for the output is downloads:uploads.  For example, if a 
+                   caller has downloaded 150 files and uploaded 30 files, 
+                   they would have a 5:1 file ratio.  In other words, for 
+                   each five files they download, they have uploaded one 
+                   file.  
+                   
+                   Example output:     5:1  
+
+@FIRST@            This macro will display the first name of the caller. When 
+                   the caller's first name is displayed, the first letter 
+                   will be capitalized and all subsequent letters in the 
+                   first name will be lower case.  
+                   
+                   Example output:     Stanley  
+
+@FIRSTU@           This macro will display the exact same information as 
+                   @FIRST@ only the first name will be displayed in all upper 
+                   case letters.  
+                   
+                   Example output:     STANLEY 
+
+@FREESPACE@        Displays the amount of drive space in bytes that are 
+                   available on the private upload drive of the current 
+                   conference.  
+                   
+                   Example output:     122,346,098 
+
+@HANGUP@           This macro will disconnect the current caller.  When the 
+                   caller is disconnected, the number of minutes used and the 
+                   Thanks for calling message will be displayed.  This macro 
+                   may only be used in display files but not in messages.  In 
+                   order for PCBoard to recognize this macro, it must begin 
+                   at the first character of the line. 
+
+@HIGHMSGNUM@       Displays the highest message number in the conference that 
+                   the caller is currently in.  
+                   
+                   Example output: 11,523 
+
+@HOMEPHONE@        This macro will display the business/data phone number 
+                   stored in each user record.  The actual text is not 
+                   formatted -- it is taken straight from the user record.  
+                   
+                   Example output:     202-555-1212 
+
+@INCONF@           Displays the conference name and conference number that 
+                   the caller is currently in.  In addition, the word 
+                   Conference will be added to end of the conference name and 
+                   number.  The only exception is the Main Board conference 
+                   which will simply display Main Board.  If you do not want 
+                   the word Conference to be added, use the @CONFNUM@ and 
+                   @CONFNAME@ macros instead.  
+                   
+                   Example output:     Support (1) Conference 
+
+@KBLEFT@           Displays the number of kilobytes the caller has available 
+                   for the rest of the day.  If a user has earned upload 
+                   bytes, they will be added to their normal daily limit.  
+                   
+                   Example output:     768 
+
+@KBLIMIT@          This macro will display the total number of kilobytes the 
+                   caller is normally allowed to download each day.  
+                   
+                   Example output:     2,048 
+
+@LASTCALLERNODE@   Displays the name and city of the last caller to the 
+                   current node.  
+                   
+                   Example output:     JIM SMITH (ANYWHERE, USA) 
+
+@LASTCALLERSYSTEM@ Displays the name and city of the last caller to the 
+                   entire system (all nodes are searched).  
+                   
+                   Example output:     BOB JONES (ANYPLACE, USA) 
+
+@LASTDATEON@       This macro will display the last date the caller was on 
+                   the BBS.  The current call will not be taken into account.  
+                   
+                   Example output:  09-25-93 
+
+@LASTTIMEON@       This macro will display the last time the caller was on 
+                   the BBS.  The time is displayed in 24-hour format.  This 
+                   macro will not take the current call into account.  
+                   
+                   Example output:     16:32 
+
+@LIST@             This macro will enable you to address a single message to 
+                   a list of users on the system.  You can only enter this 
+                   macro in the TO: field when addressing a message.  
+
+@LMR@              Displays the highest message number the caller has read in 
+                   the current conference.  This is sometimes referred to as 
+                   the Last Message Read pointer and is stored inside of the 
+                   user's record.  
+                   
+                   Example output:     7,938 
+
+@LOWMSGNUM@        Displays the lowest message number in the conference the 
+                   caller is currently in.  
+                   
+                   Example output: 11,523 
+
+@MINLEFT@          Displays the total number of minutes the caller has 
+                   remaining for this session.  If a user has flagged files 
+                   for download, the estimated time that it will take to 
+                   transfer those files is reflected in the @MINLEFT@ macro.  
+                   In other words, if a caller has 35 minutes left for the 
+                   session and they flag 10 minutes worth of files, the 
+                   @MINLEFT@ macro will display 25.  If you do not want to 
+                   take the flagged files into account, use the @TIMELEFT@ 
+                   macro instead.  
+                   
+                   Example output:     34 
+
+@MORE@             Displays a More? prompt.  This is the same prompt that is 
+                   normally displayed when the screen is full.  You can 
+                   manually insert a More? prompt to help control the display 
+                   of a text file.  
+                   
+                   Example output:     (57 min left), (H)elp, More? 
+
+@MSGLEFT@          Displays the number of messages the user has entered on 
+                   the BBS system.  This information is stored in the user 
+                   record. 
+               
+@MSGREAD@          Displays the number of messages the user has read on the 
+                   BBS system.  This information is stored in the user 
+                   record. 
+
+@NODE@             Displays the node number the caller is currently using. 
+                   
+                   Example output:     10 
+
+@NUMBLT@           This macro will display the total number of bulletins 
+                   available in the current conference.  
+                   
+                   Example output:     32 
+
+@NUMCALLS@         Displays the number of calls the BBS system has answered.  
+                   
+                   Example output:     124,329 
+
+@NUMDIR@           Displays the total number of file directories available in 
+                   the current conference.  
+                   
+                   Example output:     60 
+ 
+@NUMTIMESON@       This macro will display the number of times the caller has 
+                   called this BBS system.  This number is stored in the user 
+                   record.  
+                   
+                   Example output:     365 
+
+@OFFHOURS@         This macro will display the hours you allow lower speed 
+                   callers to call your system.  All hour displays are listed 
+                   in 24 hour format.  These hours are defined in PCBSetup | 
+                   Modem Information | Allowed Access Speeds.    
+                   
+                   Example output: 01:00-06:00 
+
+@OPTEXT@           This macro is used throughout PCBTEXT to pass information 
+                   from PCBoard into the records in PCBTEXT.  You should only 
+                   use this macro within those records that were designed to 
+                   use @OPTEXT@. 
+
+@PAUSE@            Displays a More? prompt.  If the caller does not respond 
+                   to the prompt within 10 seconds, the default value of Y 
+                   will be assumed and the display will continue.  
+                   
+                   Example output: (38 min left), (H)elp, More? 
+
+@POFF@             Disables the More? prompt while displaying the file.  If 
+                   you use this command, make sure you use the @PON@ command 
+                   at the end of the file to enable the more prompts again. 
+
+@PON@              Enables the More? prompt while displaying a file.  The 
+                   default is to always display a More? prompt.  However, if 
+                   you use the @POFF@ macro, you will want to use the @PON@ 
+                   macro to enable More? prompts again. 
+
+@POS:nn@           Moves the cursor to position nn on the current line. If 
+                   the cursor is already beyond the position entered, no 
+                   action is taken.  Otherwise, spaces are printed until the 
+                   cursor reaches the position you specify. 
+
+@PRODESC@          Displays the description of the default protocol the
+                   caller has selected.  
+                   
+                   Example output:     Zmodem 
+
+@PROLTR@           Displays the protocol letter the caller has chosen for
+                   their default protocol.  
+                   
+                   Example output:     Z 
+
+@QOFF@             This macro will disable CTRL-X / CTRL-K checking.  
+                   Thismeans the caller will not be able to interrupt or 
+                   abort the display of the file.  Any More? prompts that are 
+                   displayed after a @QOFF@ macro will be turned into Press 
+                   (Enter) to continue? prompts because the caller cannot 
+                   abort the display. 
+
+@QON@              This macro will enable CTRL-X / CTRL-K checking.  You 
+                   should use this macro whenever you have turned off the 
+                   checking and wish to turn it back on again. 
+
+@RBYTES@           Used internally by PCBoard for file transfer statistics. 
+
+@RCPS@             Used internally by PCBoard for file transfer statistics 
+
+@RFILES@           Used internally by PCBoard for file transfer statistics. 
+
+@SBYTES@           Used internally by PCBoard for file transfer statistics. 
+
+@SCPS@             Used internally by PCBoard for file transfer statistics. 
+
+@SECURITY@         Displays the security level of the user.  Any security 
+                   level adjustments added when joining a conference will be 
+                   reflected in the value displayed.  
+                   
+                   Example output:     60 
+
+@SFILES@           Used internally by PCBoard for file transfer statistics. 
+
+@SYSDATE@          Displays the current date.  
+
+                   Example output:    09-23-93 
+
+@SYSOPIN@          Displays the beginning time a user may page the SysOp for 
+                   chat.  This time is defined in PCBSetup | Configuration 
+                   Options | Limits.   All time displays are in 24-hour 
+                   format. 
+                   
+                   Example output:     18:00 
+
+@SYSOPOUT@         This macro will display the ending time a user may page 
+                   the SysOp for chat.  This time is defined in PCBSetup | 
+                   Configuration Options | Limits..  All time displays are in 
+                   24-hour format.  
+                   
+                   Example output:     17:00 
+
+@SYSTIME@          Displays the current time.  All time displays are in 
+                   24-hour format.  
+                   
+                   Example output:     15:32 
+
+@TIMELEFT@         Displays the amount of time the caller has left for this 
+                   session.  This macro does not take into account any files 
+                   the user has flagged for download.  If you wish to take 
+                   flagged files into account, use the @MINLEFT@ macro 
+                   instead.   
+                   
+                   Example output:     32 
+
+@TIMELIMIT@        Displays the total time in minutes a user can use per 
+                   day/session.  This limit is defined in the PWRD file in 
+                   PCBSetup.  
+                   
+                   Example output:     60 
+
+@TIMEUSED@         Displays the number of minutes used during the current 
+                   call.  
+                   
+                   Example output:     12 
+
+@TOTALTIME@        Displays the total amount of time (in minutes) that the 
+                   caller has used on the system for the day.  
+                   
+                   Example output: 128 
+
+@UPBYTES@          Displays the total number of bytes the user has uploaded 
+                   to the BBS.  
+                   
+                   Example output:     36,928,674 
+
+@UPFILES@          Displays the total number of files that the user has 
+                   uploaded to the BBS.  
+                   
+                   Example output:     352 
+
+@USER@             This macro will display the full user name of the caller 
+                   in all uppercase letters.  You can also use this macro in 
+                   the TO: field of a message.  If you do, your single 
+                   generic message will appear to each user to be addressed 
+                   personally to them..
+                    
+                   Example output: EDWARD B. SMITH 
+
+@WAIT@             This macro will display a Press (Enter) to continue? 
+                   prompt to the user.  Of course, the only way to continue 
+                   past this prompt is for the caller to press EMTER. 
+
+@WHO@              This macro will display the exact same thing as if the 
+                   user had typed WHO at the PCBoard command prompt.  The 
+                   display includes all active node numbers and who is on 
+                   each of the respective nodes.  NOTE:  Once the @WHO@ macro 
+                   is used, the page line counter is reset to maximize screen 
+                   output.  Therefore, if you put the @WHO@ macro in the 
+                   middle of the screen, be aware that the top of the screen 
+                   may scroll off.  To prevent this, you should put an 
+                   @PAUSE@ or an @MORE@ just before the @WHO@. 
+   
+                   Example output:
+  
+  (#)   Status                  User
+  ---   ---------------------   -----------------------------
+    1   No Caller this Node
+    2   Unavailable for CHAT    GREGORY GLENN (CHARLTON, ID)   
+    3   Available for CHAT      BRIAN LARSEN (FREEDOM, LA)   
+    4   No Caller this Node   
+    5   No Caller this Node   
+    6   No Caller this Node   
+    7   Entering a Message      MILTA BARBOSA (ARMINE, NY)   
+    8   Entering a Message      HUGH MCDEVITT (ARROYO, CA)   
+    9   Available for CHAT      JACOB VANRIJ (OAKGROVE, ME)  
+   10   No Caller this Node 
+
+
+@X Color Codes
+
+In addition to supporting ANSI display files, you can choose to use PCBoard's 
+@X color codes to colorize your display file and PCBTEXT prompts.  If you 
+choose to use ANSI to colorize your display files, you will need to create an 
+graphics specific version of each display file in addition to the regular 
+file.
+
+The @X codes are eventually translated to ANSI so the caller can view the 
+color screens.  Before this occurs, however, PCBoard will check to see if the 
+caller is capable of ANSI.  If they are, PCBoard will translate the color 
+codes into ANSI.  If they are not, PCBoard will bypass the color codes so the 
+user does not end up seeing what appears to be garbage on their screen. 
+Because PCBoard is smart enough to determine if the caller is capable of ANSI 
+or not, you can create one single display file for both your ANSI and 
+non-ANSI callers.  This saves you time when creating and updating your 
+display files.
+
+Included with your PCBoard package is a program called PCBEdit. This program 
+should be used to create screens that are colorized with @X codes.  You 
+should also be aware that there are several other programs available as 
+shareware which you can use to create screens in the PCBoard @X color code 
+format.
+
+If you want to enter @X codes in message or if you manually create your 
+display files, you will need to know the proper format for the @X codes.  The 
+format is as follows:
+
+
+@X[background value][foreground value]
+
+
+After you enter @X, you need to enter a background value, followed by a 
+foreground value.  If you look at the table which follows this paragraph, you 
+will notice that it is broken down into two halves.  One half shows the 
+values for the background colors and the other half shows the values for the 
+foreground value.  Notice also that the background and foreground sections 
+are also divided.   Background colors can be set to be blinking or not, and 
+foreground values can be set to be bright or normal (dull) versions of the 
+color that is shown in the left column of the table.
+
+
+ 	Background (1st Digit) 		Foreground (2nd Digit) 	
+Color 	Normal 	Blinking 	Normal 	Bright 
+-------------------------------------------------------------
+Black     0        8              0       8 
+Blue      1        9              1       9 
+Green     2        A              2       A 
+Cyan      3        B              3       B 
+Red       4        C              4       C 
+Magenta   5        D              5       D 
+Yellow    6        E              6       E 
+White     7        F              7       F 
+
+
+Using the color code table you can quickly determine that by entering @X1F, 
+you will be setting the current color to bright white text on a blue 
+background.  To help illustrate the color selection scheme, the following are 
+sample @X color codes:
+
+
+@X07 - Dull white (gray) text on a black background
+@X47 - Dull white (gray) text on a red background
+@X0B - Bright cyan text on a black background
+@X8F - Bright white text on a blinking black background
+@XC7 - Dull white (gray) text on a blinking red background.
+
+Using @ Macros and @X Codes
+
+There are primarily three places in PCBoard where you can use @ macros and @X 
+codes.  They are:
+
+Display files
+
+Most PCBTEXT entries (some does not support @ macros or @X codes).
+
+Inside of messages left on the BBS.
+
+To use the macros or codes, simply enter them into the display file, PCBTEXT 
+entry, or message editor in the proper format.  If you do, the code or macro 
+will be properly substituted.
+
+To help illustrate how to use macros and codes, this example is going to show 
+you how to enter an @ macro and then to colorize the text that is displayed 
+by the @ macro.
+
+Begin by logging into PCBoard as the SysOp and getting to the conference 
+command prompt.
+
+Shell to DOS by pressing F5.  You should now be at a DOS prompt. If you are 
+not, you have disabled local shell to DOS in PCBSetup | Configuration Options 
+| System Control.
+
+Using a text editor of your choice, edit a file called TUTOR in the current 
+directory.  In this file, enter @USER@ and save the file and exit your text 
+editor.
+
+When you are back at the DOS prompt, type EXIT to return back to PCBoard.  
+Now, type 6 TUTOR at the conference command prompt. You are using the 6 SysOp 
+command which enables you to view any file on disk.
+
+Once the command is entered, you should see one line which prints your user 
+name on the screen.  Since you are the SysOp, it will print SYSOP instead of 
+your user name.  You will notice that if you log in as a different user, the 
+user's name will be displayed on the screen.
+
+Next, we will colorize the name to help provide emphasis.  Shell to DOS 
+again, and edit your TUTOR file.
+
+In front of the @USER@, enter @X1F.  After the @USER@, enter a space followed 
+by @X07is the current user.  Save the file, exit your text editor and type 
+EXIT to return to PCBoard.
+
+View the TUTOR file using the 6 SysOp command.  This time, you should see 
+your user name in white text on a blue background. After your user name, the 
+text changes back to gray on black and the is the current user is printed.
+
+Even though this example showed you only one of the places you can use @X 
+codes and @ macros, you can apply the principles learned in this example to 
+the other two places where you can use these flexible tools.
+

@@ -20,7 +20,6 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, Widget},
     Frame,
 };
-use strum::IntoEnumIterator;
 
 pub struct GeneralTab {
     state: ConfigMenuState,

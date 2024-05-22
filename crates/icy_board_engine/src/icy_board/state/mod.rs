@@ -138,7 +138,8 @@ pub struct Session {
 
     pub login_date: DateTime<Local>,
 
-    pub cur_user: i32,
+    pub current_user: Option<User>,
+    pub cur_user_id: i32,
     pub cur_security: u8,
     pub cur_groups: Vec<String>,
     pub language: String,
@@ -215,7 +216,8 @@ impl Session {
             current_conference_number: 0,
             current_conference: Conference::default(),
             login_date: Local::now(),
-            cur_user: -1,
+            current_user: None,
+            cur_user_id: -1,
             cur_security: 0,
             caller_number: 0,
             cur_groups: Vec::new(),
@@ -399,8 +401,6 @@ pub struct IcyBoardState {
 
     pub transfer_statistics: TransferStatistics,
 
-    pub current_user: Option<User>,
-
     pub session: Session,
 
     pub display_text: IcbTextFile,
@@ -444,7 +444,6 @@ impl IcyBoardState {
             node_state,
             node,
             nodes: Vec::new(),
-            current_user: None,
             debug_level: 0,
             display_text,
             env_vars: HashMap::new(),
@@ -694,7 +693,7 @@ impl IcyBoardState {
     pub async fn set_current_user(&mut self, user_number: usize) -> Res<()> {
         let old_language = self.session.language.clone();
 
-        self.session.cur_user = user_number as i32;
+        self.session.cur_user_id = user_number as i32;
         self.node_state.lock().await[self.node].as_mut().unwrap().cur_user = user_number as i32;
         self.node_state.lock().await[self.node].as_mut().unwrap().graphics_mode = self.session.disp_options.grapics_mode;
         if user_number >= self.get_board().await.users.len() {
@@ -716,7 +715,7 @@ impl IcyBoardState {
         self.session.alias_name = user.alias.clone();
         self.session.fse_mode = user.flags.fse_mode.clone();
 
-        self.current_user = Some(user);
+        self.session.current_user = Some(user);
         if self.session.language != old_language {
             self.update_language().await;
         }
@@ -726,7 +725,7 @@ impl IcyBoardState {
 
     pub async fn save_current_user(&mut self) -> Res<()> {
         let old_language = self.session.language.clone();
-        self.session.date_format = if let Some(user) = &self.current_user {
+        self.session.date_format = if let Some(user) = &self.session.current_user {
             self.session.language = user.language.clone();
             self.session.fse_mode = user.flags.fse_mode.clone();
             if !user.date_format.is_empty() {
@@ -741,7 +740,7 @@ impl IcyBoardState {
             self.update_language().await;
         }
 
-        if let Some(user) = &self.current_user {
+        if let Some(user) = &self.session.current_user {
             let mut board = self.get_board().await;
             for u in 0..board.users.len() {
                 if board.users[u].get_name() == user.get_name() {
@@ -829,7 +828,7 @@ impl IcyBoardState {
     /// Gives back the user password, or 'SECRET' if the user password should not be given to doors.
     pub async fn door_user_password(&self) -> String {
         if self.get_board().await.config.options.give_user_password_to_doors {
-            if let Some(user) = &self.current_user {
+            if let Some(user) = &self.session.current_user {
                 return user.password.password.to_string();
             }
         }
@@ -1148,7 +1147,7 @@ impl IcyBoardState {
         let mut result = String::new();
         match id {
             "ALIAS" => {
-                if let Some(user) = &self.current_user {
+                if let Some(user) = &self.session.current_user {
                     result = user.alias.to_string();
                 }
                 if result.is_empty() {
@@ -1173,7 +1172,7 @@ impl IcyBoardState {
             }
 
             "CITY" => {
-                if let Some(user) = &self.current_user {
+                if let Some(user) = &self.session.current_user {
                     result = user.city_or_state.to_string();
                 }
             }
@@ -1192,13 +1191,13 @@ impl IcyBoardState {
             "CREDLEFT" | "CREDNOW" | "CREDSTART" | "CREDUSED" | "CURMSGNUM" => {}
 
             "DATAPHONE" => {
-                if let Some(user) = &self.current_user {
+                if let Some(user) = &self.session.current_user {
                     result = user.bus_data_phone.to_string();
                 }
             }
             "DAYBYTES" | "DELAY" | "DLBYTES" | "DLFILES" | "EVENT" => {}
             "EXPDATE" => {
-                if let Some(user) = &self.current_user {
+                if let Some(user) = &self.session.current_user {
                     result = self.format_date(user.exp_date);
                 } else {
                     result = "NEVER".to_string();
@@ -1206,7 +1205,7 @@ impl IcyBoardState {
             }
             "EXPDAYS" => {
                 if self.get_board().await.config.subscription_info.is_enabled {
-                    if let Some(user) = &self.current_user {
+                    if let Some(user) = &self.session.current_user {
                         if user.exp_date.year() != 0 {
                             result  =
                                 0.to_string() // TODO
@@ -1245,7 +1244,7 @@ impl IcyBoardState {
                 };
             }
             "HOMEPHONE" => {
-                if let Some(user) = &self.current_user {
+                if let Some(user) = &self.session.current_user {
                     result = user.home_voice_phone.to_string();
                 }
             }
@@ -1260,12 +1259,12 @@ impl IcyBoardState {
                 return None;
             }
             "MSGLEFT" => {
-                if let Some(user) = &self.current_user {
+                if let Some(user) = &self.session.current_user {
                     result = user.stats.messages_left.to_string();
                 }
             }
             "MSGREAD" => {
-                if let Some(user) = &self.current_user {
+                if let Some(user) = &self.session.current_user {
                     result = user.stats.messages_read.to_string();
                 }
             }
@@ -1298,7 +1297,7 @@ impl IcyBoardState {
                 result = self.session.current_conference.areas.len().to_string();
             }
             "NUMTIMESON" => {
-                if let Some(user) = &self.current_user {
+                if let Some(user) = &self.session.current_user {
                     result = user.stats.num_times_on.to_string();
                 }
             }
@@ -1337,12 +1336,12 @@ impl IcyBoardState {
             "RBYTES" => result = self.transfer_statistics.uploaded_bytes.to_string(),
             "RFILES" => result = self.transfer_statistics.uploaded_files.to_string(),
             "REAL" => {
-                if let Some(user) = &self.current_user {
+                if let Some(user) = &self.session.current_user {
                     result = user.get_name().to_string();
                 }
             }
             "SECURITY" => {
-                if let Some(user) = &self.current_user {
+                if let Some(user) = &self.session.current_user {
                     result = user.security_level.to_string()
                 }
             }
@@ -1372,17 +1371,17 @@ impl IcyBoardState {
             "TIMEUSED" => {}
             "TOTALTIME" => {}
             "UPBYTES" => {
-                if let Some(user) = &self.current_user {
+                if let Some(user) = &self.session.current_user {
                     result = user.stats.total_upld_bytes.to_string();
                 }
             }
             "UPFILES" => {
-                if let Some(user) = &self.current_user {
+                if let Some(user) = &self.session.current_user {
                     result = user.stats.num_uploads.to_string();
                 }
             }
             "USER" => {
-                if let Some(user) = &self.current_user {
+                if let Some(user) = &self.session.current_user {
                     if self.session.use_alias {
                         if user.alias.is_empty() {
                             result = user.get_name().to_ascii_uppercase().to_string();

@@ -1,7 +1,9 @@
 use crate::Res;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
-use strum::{EnumIter, EnumString};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use crate::vm::errors::IcyError;
 
@@ -12,12 +14,31 @@ use super::{
     IcyBoardSerializer,
 };
 
-#[derive(Clone, Serialize, Deserialize, Default, PartialEq, EnumString, EnumIter, Debug)]
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq, Debug)]
 pub enum MenuType {
     #[default]
     Hotkey,
     Lightbar,
     Command,
+}
+
+impl MenuType {
+    pub fn iter() -> impl Iterator<Item = MenuType> {
+        vec![MenuType::Hotkey, MenuType::Lightbar, MenuType::Command].into_iter()
+    }
+}
+
+impl FromStr for MenuType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Hotkey" => Ok(MenuType::Hotkey),
+            "Lightbar" => Ok(MenuType::Lightbar),
+            "Command" => Ok(MenuType::Command),
+            _ => Err("Invalid MenuType".to_string()),
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Default, PartialEq)]

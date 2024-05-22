@@ -13,7 +13,7 @@ impl PcbBoardCommand {
             return Ok(());
         }
 
-        let user = self.state.current_user.clone().unwrap();
+        let user = self.state.session.current_user.clone().unwrap();
         if !(self.state.session.is_local || self.state.get_board().await.config.options.exclude_local_calls) {
             self.state.display_text(IceText::ViewSettingsCallerNumber, display_flags::DEFAULT).await?;
             self.state

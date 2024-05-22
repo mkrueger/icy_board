@@ -19,7 +19,7 @@ pub fn create_doorfile_sr(state: &IcyBoardState, path: &std::path::Path) -> Res<
     };
     contents.push_str(&format!("{}\r\n", emulation)); // ANSI status:  1 = yes, 0 = no, -1 = don't know
     contents.push_str("1\r\n"); // IBM Graphic characters:  1 = yes, 0 = no, -1 = unknown
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().city_or_state)); // Calling From
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state)); // Calling From
     contents.push_str(&format!("{}\r\n", state.session.page_len)); // Page length of screen, in lines.  Assume 25 if unknown
     contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE)); // Baud Rate
     contents.push_str(&format!("{}\r\n", DOOR_COM_PORT)); // Baud Rate

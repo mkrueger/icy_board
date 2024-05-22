@@ -16,7 +16,7 @@ pub fn create_door32_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<(
     contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE)); // Line 3 : Baud rate
 
     contents.push_str(&format!("Icy Board {}\r\n", crate::VERSION.to_string())); // Line 4 : BBSID (software name and version)
-    contents.push_str(&format!("{}\r\n", state.session.cur_user + 1)); // Line 5 : User record position (1-based)
+    contents.push_str(&format!("{}\r\n", state.session.cur_user_id + 1)); // Line 5 : User record position (1-based)
     contents.push_str(&format!("{}\r\n", state.session.user_name)); // Line 6 : User's real name
     contents.push_str(&format!("{}\r\n", state.session.alias_name)); // Line 7 : User's handle/alias
     contents.push_str(&format!("{}\r\n", state.session.cur_security)); // Line 8 : User's security level

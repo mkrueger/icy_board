@@ -1,0 +1,2697 @@
+7
+==============================================================================
+                                                                Multiple Nodes
+
+
+
+
+
+
+
+
+
+Overview
+
+Preparing the Multiport Version of PCBoard
+
+Multiple Nodes Using Multitasking Software
+
+PCBoard And Local Area Networks
+
+Possible IRQ Conflicts
+
+Restricting Access To A Node
+
+DOORWAY And Multiple Nodes
+
+Answers to Common Multinode Questions
+
+Overview
+
+
+PCBoard is designed with multi-user access to a system in mind. Each user 
+that accesses the system must log in through a node. A node refers to a copy 
+of PCBoard that is running on a network, multitasker, or some other system 
+that has the ability to share resources through shared file access.  Users 
+may access the system remotely through a modem or locally through a network 
+or local node.
+
+What Is Needed to Run More Than One Node?
+
+There are two different ways to run multiple nodes with PCBoard: multitasking 
+and networking.  Each method has various advantages and disadvantages but 
+they all have one thing in common -- the ability to share files.
+
+What is Multitasking
+
+Multitasking is a method of running more than one program at a time on a 
+single machine.  When multitasking, you are not actually running all of the 
+programs at the same time as the CPU is not capable of doing so. Instead, the 
+multitasking software manages the resources of the CPU and switches very 
+quickly between each program.  Of course, since you are switching back and 
+forth between each task having a faster CPU will make each task run more 
+smoothly.
+
+To really be effective in running multiple nodes. you will need to use an 
+80386 based machine or higher.  The internal capabilities of the 80386 and 
+higher class CPUs are designed better for multitasking than any of the other 
+processors (80286, 8086, 8088) and are therefore strongly recommended for 
+multitasking.
+
+What is a Network?
+
+A network allows several different computers to share resources (hard drives, 
+printers, etc.) with each other.  In order for a resource to be considered 
+sharable, it must be stored on a computer that is referred to as a server.  
+The workstations (other computers in the network) can use the resources 
+located on the server as if they are installed on the workstation computer.
+
+The most popular network is called a Local Area Network (LAN). All 
+communications in a LAN is done between cabling which is hooked into each 
+machine.  Another network is also called a Wide Area Network (WAN). The 
+machines in these networks are so far apart that you could not use cabling to 
+connect them.  Instead, alternate methods such as dedicated phone lines are 
+used to send data across the network.
+
+As an example of shared resources, if you had a 1.2 gigabyte drive on one 
+machine and you hooked up a LAN, the server is the computer with the large 
+hard drive and the workstation is the computer that will access that drive 
+via the network.  The server drive can then be accessed from the workstation 
+as if it were installed on the workstation itself.
+
+Should I Use a Network or a Multitasker?
+
+There are a few questions you need to ask yourself when you are considering 
+your multi-node setup.  These questions will help you get a better feel if 
+you should use a network, a multitasker, or a combination of both.
+
+How many nodes do I plan to run?
+
+If you are considering running more than 16 nodes on one machine, then you 
+should immediately rule out running them on one single machine. With the 
+multi-port (/M) version of PCBoard, you can take advantage of some of the 4, 
+8, or 16 port intelligent serial boards provided by Arnet and DigiBoard.  The 
+intelligent boards off-load some of the processing from the main CPU allowing 
+you to run more ports on a single machine. If you are not using an 
+intelligent serial board, you will need to use standard COM ports with 4 
+being the maximum you could use in a single machine.
+
+A network gives you the ability to expand beyond the 4-16 node limit imposed 
+by running on a single machine.  For example, you can have a dedicated server 
+and, for example, 20 workstations on the network.  On each workstation, you 
+can run a multitasker and consequently 4-16 nodes on each workstation.  
+Conceivably, you can run 80-320 nodes in a 21 machine network if you used a 
+multitasker on all of the workstations with intelligent serial cards.  Of 
+course, you do not have to run multitaskers on each of your workstations.  
+Instead, you could run one copy of PCBoard on each workstation limiting 
+yourself to about 20 nodes on a 20 system network.
+
+How important is performance?
+
+When multitasking nodes on a machine you do pay a price -- performance 
+(because you are running multiple copies of PCBoard on one processor). If you 
+get one of the fastest machines money can buy, the constant switching between 
+tasks in a multitasker will seem much smoother.  If performance is extremely 
+important to you, invest in a network with one copy of PCBoard running on 
+each workstation.  A network would be pointless though from the performance 
+angle if you were to use slow machines like XTs as your workstations.  Using 
+XTs for your workstations would defeat the purpose.  Instead, you would be 
+better served by using 386 or higher machines as your workstations and 
+multitask on them.
+
+How much money is in the budget?
+
+Whether you choose networking, multitasking, or a combination of both your 
+primary expense is going to be the hardware that is required to run the 
+number of nodes that you desire to run. Some of the more expensive items to 
+consider in your setup would be the computers, network cards (if you choose 
+networking) or even the intelligent serial boards (for multitasking).  Of the 
+items listed, the computers are the likely to be the most expensive item.  
+Therefore, everything you can do to reduce the number of computers that you 
+will have to buy while still meeting your performance requirements will be to 
+your advantage.
+
+As an example, if you need to run five nodes and performance is rather 
+important to you, setup a three machine peer-to-peer network with one server 
+and two workstations.  On each of the workstations multitask two nodes using 
+a 386 or 486 and on your server run a single node.  Running two nodes on a 
+workstation means less computers in your network and it also means lower 
+overall cost.
+
+How much room is available for computer equipment?
+
+Another valid concern about your multi-node setup is how much physical room 
+it is going to take.  This is especially true of a setup which uses a network 
+because there are multiple machines in the network.  If space is limited and 
+you are using a network, perhaps you will want to multitask on your 
+workstations to reduce the number of machines that are required on your 
+network.
+
+Can I fit all of the storage space on one machine?
+
+Another item you will need to plan for is how much file storage space will 
+you have online and will it all fit on one machine. For example, if you 
+wanted to put 8 gigabytes online, it may be very difficult to do so inside of 
+one machine.  In a situation like this, you would have to go to a network 
+setup with multiple servers to accommodate all of the storage space.
+
+In summary, the following tables list the advantages and disadvantages of 
+multitasking, networking, and running a multitasker on the workstations of a 
+network:
+
+Multitasking: Advantages
+
+You can run more than one node on a single computer
+
+Less hardware cost per node (hard drives, monitors, etc.)
+
+Different nodes are a keyboard away
+
+Multitasking: Disadvantages
+
+System is harder to tune; lockups may occur
+
+A  system which uses serial ports other than  COM1 or COM2 may find that not 
+all third party program that access  the COM ports will work with 
+non-standard or FOSSIL ports.
+
+If a multitasking machine crashes or hangs, all nodes on the machine will be 
+hung.
+
+
+Networking: Advantages
+
+Each node uses a dedicated CPU.  This can dramatically increase performance.
+
+You are not limited to the number of nodes you can run on one machine.
+
+When one workstation crashes, the entire system is not down.
+
+Networking: Disadvantages
+
+Cost.  A LAN configuration requires both hardware and software. You must have 
+a network card and proper cabling in addition to the network software for 
+each machine on the network.
+
+Networking - multitasking workstations: Advantages
+
+More than one node can be run from one computer while still retaining all of 
+the advantages of a network.
+
+More economical than running one node per workstation
+
+Saves space because you do not use a computer for each node
+
+Networking - multitasking workstations: Disadvantages
+
+Requires that both your multitasking setup and network setup are well tuned 
+because you are running a multitasker on top of a network configuration
+
+The remaining sections in this chapter will cover setting up multiple nodes 
+using either a multitasker or a network.  Please refer to the appropriate 
+section for the method you have chosen to implement your multiple node setup.
+
+Preparing the Multiport Version of PCBoard
+
+If you do not have the multiport (/M) version of PCBoard or you will not be 
+using a multiport card, you should skip this section and proceed to Multiple 
+Nodes Using Multitasking Software.
+
+When you installed PCBoard, you were asked if you wanted to install the 
+multiport driver.  If you elected to install the multiport driver then you 
+must insure that it is properly configured before you begin setting up 
+multiple nodes.  In your \COMMDRV directory you will find a program named 
+DRVSETUP.EXE. This is the program which will create the setup file for the 
+multiport driver.  This setup file contains information about the serial 
+ports that you want to make available to PCBoard.
+
+NOTE:  If you will be using a multiport card in conjunction with standard 
+serial ports, you will not need to define the standard ports with the 
+DRVSETUP program.  Have PCBoard use the Asynchronous COMM driver (PCBSetup | 
+Modem Information | Modem Setup) and enter the COM port you want to use.  
+This will avoid the extra overhead of defining the COM port to be used with 
+the multiport driver.
+
+Loading the Multiport Driver Setup Program
+
+As mention previously, you need to use DRVSETUP.EXE to configure the 
+multiport driver. This utility is in the \COMMDRV subdirectory on the same 
+drive that you installed PCBoard on. The syntax for DRVSETUP is as follows:
+
+DRVSETUP config.dat
+
+config.dat is the setup file that you want to create or edit. You may enter 
+any valid DOS filename.  For example:
+
+DRVSETUP ARNET4P.DAT
+
+If the filename that you specify does not exist, it will be created.  If it 
+does exist, it will be loaded into the editor where you may make any 
+necessary changes to the file.
+
+Configuring the Multiport Driver
+
+To properly configure the multiport driver, load DRVSETUP as described in the 
+previous section.  When you do, you will see a screen which resembles the 
+following:
+
+Within the DRVSETUP editor, the following keyboard commands are
+valid:
+
+        ESC     Exit the DRVSETUP editor.  If you have made any changes to 
+                the config file, you will be asked if you wish to save the 
+                changes that have been made.
+
+        PgUp    View next 16 entries.  Only a portion of the possible entries 
+                can be viewed on the screen at one time.  To view the 
+                previous 16 entries, use this keyboard command.
+
+        PgDn    View previous 16 entries.  Only a portion of the possible 
+                entries can be viewed on the screen at one time.  To view the 
+                next 16 entries, use this keyboard command.
+
+        F2      Pick card type.  When the Card Type field is highlighted, a 
+                list of card types that are supported by the multiport driver 
+                will be listed.  Pick the type that matches your serial card.
+
+        ALT-R   Repeat currently highlighted line.  If you are creating 
+                entries that are very similar in definition, you can use this 
+                keyboard command to duplicate the currently highlighted 
+                entry. The new entry will be inserted just below the current 
+                line.
+
+        ALT-I   Insert a new entry.  If you need to add a new entry between 
+                two existing entries, use this keyboard command.  A new blank 
+                entry will be inserted just below the current line that you 
+                can edit to suit your needs.
+
+        ALT-D   Delete current entry.  This keyboard command will delete the 
+                currently highlighted entry.  There is no undo function to 
+                get the original line back.  If you make a mistake, exit 
+                without saving and attempt to make the changes again.
+
+The following describes each of the fields that are displayed on the screen 
+of the DRVSETUP program:
+
+Port Number
+
+This field represents the port number that you will be defining. This is the 
+number that you will specify in PCBSetup | Modem Information | Modem Setup 
+for the Comm Port if you answered C to the Comm Driver to use question.  You 
+cannot edit the contents of this field.
+
+Card Type
+
+When this field is highlighted, you may press 2 to pick a list of supported 
+card types.  The following card types are available
+        
+        UART    If you will be using a standard serial port that has a 16550, 
+                16450, or 8250 UART (e.g., COM1, COM2), select this option.  
+                If you plan on running multiple nodes, you should be using 
+                serial ports that are equipped with 16550 UARTs to prevent 
+                data loss.  Each port that you define using this card type 
+                must have a unique base address and IRQ.
+
+        HUB6    Choose this option if you have an Intel HUB6 non-itelligent 
+                serial card installed in your machine. This card can share 
+                one IRQ for all ports but it cannot share one base address 
+                for all of the ports.  Each port must have a unique base 
+                address.
+
+        COM/XI  If you have a Digiboard (R) COM/XI serial card installed in 
+                your machine, select this option.
+     
+        ARNET   Choose this option if you have an Arnet (R) SmartPort or 
+                SmartPort Plus intelligent serial card installed in your 
+                system.
+
+        AST     If you have an AST (R) non-intelligent serial card installed 
+                in your system, select this menu option.
+
+        PC/XI   Choose this option if you have a Digiboard® PC/XI or PC/XE 
+                serial card installed in your system.
+
+        PC-COM  If you have a Willies (WCSC) non-intelligent 4 or 8 port 
+                serial card installed in your system, select this menu 
+                option.
+
+Sub-Port
+
+In this field, enter the sub-port number you wish to use.  If the card type 
+that is defined requires that all ports have unique IRQs, you should enter 1 
+in this field.  If the card type will allow you to use one IRQ for all of the 
+ports, you will need to enter the appropriate sub-port number in this field.
+
+How do you know what the sub-port number is?  The sub-port number is most 
+likely referred to as the port number on the card.  This should not be 
+confused with the port number field on the left side of the setup screen.  
+For example, if you are using an Arnet SmartPort 8, you will have 8 different 
+ports on the card.  Enter the appropriate port number on the card into the 
+sub-port number on the screen.  The following is an example setup for an 
+Arnet SmartPort 4 port card:
+
+If you want to use a standard serial card in addition to an intelligent 
+serial card, you can with the multiport driver.  The following shows a 
+configuration where COM2 is defined in the first entry, and the rest of the 
+entries define the 4 ports on the Arnet card:
+
+Notice the sub-port values remained the same for the ports referring to the 
+Arnet serial board. When sub-port 1 is specified, it is referring to port 1 
+on the Arnet card and so on.
+
+Base Address
+
+In this field, enter the base or i/o port address (in hexadecimal) which will 
+be used for the port you are defining. The value you enter should also match 
+the way you have configured your serial card.  If it does not, you will not 
+be able to communicate with the serial port.
+
+When configuring your serial card, make sure it is configured to not conflict 
+with any other devices or cards in your system.  If it does, you will not be 
+able to communicate with the serial port.  Standard serial ports require that 
+each COM port use a unique base address to operate properly.  Refer to the 
+documentation for your serial card for additional information on configuring 
+the base addresses for your serial ports.
+
+IRQ
+
+In this field, enter the IRQ that will be used for the serial port you are 
+defining.  Like the base address, you should refer to how your serial card is 
+defined to get the value you should enter. Most of the multiport cards will 
+allow you to use one IRQ for all of the ports on the card. Standard serial 
+ports, however, require that each COM port use a unique IRQ to operate 
+properly.  Refer to the documentation for your serial card for more 
+information on this subject.
+
+It is critical that the IRQ that you select for use with your serial card 
+does not conflict with any other devices in your system.  For example, you 
+cannot have two serial boards using the same IRQ nor can you have a network 
+card and a serial card sharing the same IRQ.  If you do, your system may 
+become prone to lockups or will not function as you think it should.
+
+NOTE:  It is recommended that you do not use IRQ2 or IRQ9 for any of your 
+devices if at all possible.  These IRQs are known as the cascading interrupts 
+because they are used to communicate with IRQs above 8.  If you use IRQ2 or 
+IRQ9 and you have devices which use IRQs above 8, you can run into some 
+serious conflicts which may cause unpredictable operation of your computer.
+
+Card Segment
+
+Intelligent serial cards commonly use a 32 or 64 kilobyte segment in high 
+memory for transferring data to and from the serial card.  In this field, 
+enter the starting address value for the segment you have configured the 
+serial card to use.
+
+When you have finished configuring DRVSETUP, configure your memory manager so 
+it does not use the 32 or 64 kilobyte segment your intelligent serial card 
+uses.  Refer to the documentation for your memory manager for additional 
+information on excluding memory.
+
+FOSSIL
+
+The value you enter in this field will determine whether or not the multiport 
+driver should provide a FOSSIL interface for the port you are defining.  
+Valid options for this field are:
+
+
+
+        N       No FOSSIL interface will be provided for this port.  Select 
+                this option if PCBoard will be the only application 
+                communicating with the port. If you run doors or other third 
+                party applications which access the serial port, they will 
+                not be able to function properly with this setting.
+
+        Y       The FOSSIL interface will be provided for this port.  Select 
+                this option if you use or will be using any third party 
+                applications which access the serial port.  You should check 
+                all third party applications to insure they will communicate 
+                with a FOSSIL interface before installing them on your 
+                system.
+
+When you have finished configuring all the serial ports you want to define in 
+DRVSETUP, press ESC to exit the editor, and when prompted if you want to save 
+the changes, answer Y and press ENTER. Next, add the driver to your 
+AUTOEXEC.BAT and test to make sure you have configured everything properly.
+
+Installing the Multiport Driver
+
+Once you have used DRVSETUP to configure the ports, you need to install the 
+driver in your AUTOEXEC.BAT file.  The program you need to execute is called 
+COMMTSR.EXE.  The syntax for COMMTSR is as follows:
+
+
+COMMTSR -i filename.dat
+
+
+The filename.dat parameter is the filename you defined earlier using 
+DRVSETUP.  Most likely you will not have COMMTSR and the data file stored in 
+your root directory so you will need to add the drive and subdirectory where 
+these files can be found as shown in the following example:
+
+
+C:\COMMDRV\COMMTSR -i C:\COMMDRV\MYSETUP.DAT
+
+
+NOTE:  The -i parameter is case-sensitive and must be entered in lower-case.  
+Otherwise, the driver will not load and will report that an invalid option 
+was specified.
+
+This line, which loads the multiport driver, should be entered towards the 
+top of your AUTOEXEC.BAT file because the driver must be loaded before your 
+multitasking software is loaded.  The driver itself uses quite a bit of 
+memory and may affect the configuration of your machine by leaving you less 
+conventional memory available than before you installed the driver.  You can 
+load the driver high, but it is not recommended.  If you must load the driver 
+into high memory using your memory manager, make sure the driver is the first 
+program run in your AUTOEXEC.BAT.
+
+NOTE:  If any drivers are included with your serial card, do not install 
+them.  The driver provided with the multiport  version of PCBoard is the only 
+driver you will need to install.
+
+Once you have made the necessary changes, reboot your system to make sure 
+your setup is correct and the multiport driver initializes properly.  If you 
+define four ports with DRVSETUP, the display you may see when the driver is 
+initialized will resemble the following:
+
+
+(COMMTSR) COMM-DRV v14.0 Copr (C) 1989-1993 Willies' Computer Software Co.
+ALL RIGHTS RESERVED. Houston, Texas (713) 498-4832
+COMMDV00.DRV installed(GENERIC     1.01). ADR=171B:0000 SIZE=1118
+Port #0 Installed successfully
+Port #1 Installed successfully
+Port #2 Installed successfully
+Port #3 Installed successfully
+Attaching to INT14H Handler
+COMMDRV Installed START=1461:0000 END=1863:0100 MPX=C0
+
+
+Notice that all 4 ports were Installed successfully.  The multiport driver 
+refers to ports 0 through 3, which PCBoard translates to ports 1 through 4 
+(because port 0 in PCBoard refers to a local login).  If you receive any 
+errors when the ports are attempting to be installed, double check your 
+configuration, making sure all base addresses and IRQ settings are correct 
+and reboot your system.  If you still experience a problem, contact technical 
+support for additional assistance.
+
+Configuring PCBoard to Use the Multiport Version
+
+When installing PCBoard, you should have been asked if you wanted to install 
+the multiport driver.  If you answered Y to that question, the install 
+program properly configured PCBoard to operate with multiport driver.  If you 
+answered N to that question, you will need to change the following items in 
+your PCBoard Configuration:
+
+In PCBSetup | Modem Information | Modem Setup you will need to answer C to 
+the Comm Driver to use question.
+
+You will need to edit the PCBOARD line in your BOARD.BAT to read PCBOARDM 
+instead.
+
+PCBoard should now be ready to function properly with your multiport card.  
+At this point, setup your first node and test to make sure that it is 
+operating properly.  Once you get one node setup, you may proceed to the next 
+section which will discuss the steps that are necessary to add the rest of 
+your nodes.
+
+Multiple Nodes Using Multitasking Software
+
+Getting Started
+
+Whether you are using standard serial ports or intelligent serial boards, 
+multitasking enables you to run several nodes on a single computer.  This 
+type of setup may seem complicated at first, but after reading this 
+explanation the majority of your questions about setting up a multi-node 
+system should be answered.
+
+Recommended Hardware:
+
+80386 (or better) based computer with 1 megabyte of memory for each node.
+
+One serial port for each modem you plan to use per machine.  If you are using 
+standard serial ports, use serial ports with NS16550AFN UARTs.  Each standard 
+serial port must use a unique base address and unique IRQ.  If you are using 
+any other type of serial board (such as an intelligent Arnet or DigiBoard 
+card), make sure it is supported by the multiport version of PCBoard before 
+purchasing.
+
+Floppy drive (5 1/4" or 3 1/2")
+
+Hard drive
+
+Monitor and video card
+
+Modem for each phone line
+
+
+NOTE:  If you are going to be using OS/2 for your multitasker and you have 
+the multiport version of PCBoard, you cannot make use of the COMMTSR software 
+because it is a DOS device driver. This means that under OS/2 you are limited 
+to using standard COM ports that use unique base address and IRQ settings.
+
+Necessary Software:
+
+MS-DOS (V3.3 or higher)
+Multitasking Software (e.g., DESQview or Windows)
+PCBoard
+
+
+Disk caching software
+
+Modifying System Files
+
+There are a few changes you will likely have to make to your AUTOEXEC.BAT and 
+CONFIG.SYS system files.  You should already have an AUTOEXEC.BAT and 
+CONFIG.SYS for your system.  This section details what you must have in these 
+files in order to properly run a multinode setup using multitasking software.  
+If you have other items in these files, do not worry as they may be necessary 
+for your particular system (hardware drivers, etc.)
+
+CONFIG.SYS
+
+At this point, make sure you have the following items in your CONFIG.SYS:
+
+
+DEVICE=[memory manager] [optional parameters]
+DEVICE=[disk cache program]
+FILES=nn
+BUFFERS=nn
+STACKS=0,0
+SHELL=C:\DOS\COMMAND.COM C:\DOS\ /E:512 /P
+FCBS=n,n (This line is optional)
+
+
+DEVICE=[memory manager]:  On this line load your memory manager (e.g., QEMM, 
+386MAX, HIMEM.SYS, etc.)  The  installation program for your memory manager 
+will place this line in your CONFIG.SYS. If not, please consult the 
+instructions for your memory manager for proper installation instructions.  
+Almost every memory manager has parameters you can use to customize what 
+memory will be used.  Unless you have a good reason to specify different 
+parameters, leave them as is.  If you do have to make changes, be sure to 
+consult your manual.
+
+DEVICE=[disk cache program]:  A good disk cache will do wonders for your 
+system performance.  A disk cache is similar to a dynamic ram disk.  Instead 
+of reserving memory and storing files in memory, a disk cache stores the most 
+frequently accessed data in memory.  If a program requests a read from disk 
+and the data is in the disk cache, your machine will pull the data from the 
+cache rather than the hard disk.  If your system does not already have a disk 
+cache installed, check your DOS manual to see if one is included with your 
+package.
+
+Some disk caches load in AUTOEXEC.BAT rather than CONFIG.SYS. Check the 
+manual for your disk cache to see if the disk cache needs to be loaded in 
+AUTOEXEC.BAT or CONFIG.SYS.
+
+You may be asking "Why not use a ram disk instead of a disk cache?"  If you 
+use a ram disk instead of a disk cache, you are more likely to lose data if 
+the power goes down.  Additionally, you may not really be putting the files 
+in the ram disk which will give the biggest performance boost to your system.  
+A ram disk does is advantageous if you use a program which creates numerous 
+temporary files.  The best bet is to use a disk cache instead of a ram disk.
+
+FILES=nn:  On this line replace nn with 25 multiplied by the number of nodes 
+you plan to run.  For example, if you are planning on running 3 nodes on your 
+machine, set this value to 75 (25*3).
+
+BUFFERS=nn:  For optimum performance, this value should be set to equal the 
+size of your hard disk clusters.  The easiest way to determine what your hard 
+disk cluster is to run CHKDSK.  You will see a line that says nnnn bytes in 
+each allocation unit The number at the beginning of that line is how big your 
+cluster size is for the drive you ran CHKDSK on.  To determine how many 
+kilobytes there are in each allocation unit, divide the number of bytes by 
+1024.  For example, if your hard disk cluster size is 2048 bytes, use 
+BUFFERS=4.  Since each buffer is 512 bytes, four buffers would equal 2048 
+bytes which is your desired setting.
+
+All of the buffer recommendations assume you are using a disk cache.  If you 
+are not using a disk cache, increase the number of buffers to help make up 
+for the lack of a disk cache.  A setting of BUFFERS=20 or BUFFERS=30 might be 
+an appropriate setting for this situation.
+
+STACKS=0,0:  If you do not already have a STACKS= line in your CONFIG.SYS 
+file, add this line to it.  This line is necessary when running multitasking 
+software.  By making this change you will also free up additional memory. On 
+some systems, using no interrupt stacks may cause lockups or other 
+unexplained problems.  If you are experiencing any strange problems or your 
+system becomes unstable, try setting your STACKS= statement to 9,128.
+
+FCBS=n,n: FCBs were only used in older DOS programs.  If you are not running 
+old programs that use FCBs, you may be able to omit this line.  The first 
+parameter is the number of FCBs you want, and the second number is the number 
+to lock.  If you do not need FCBs, set this to 1,0 and free up even more 
+memory for your multitasker.
+
+SHELL=C:\DOS\COMMAND.COM:  Increases the available environment space to 512 
+bytes.  This should be plenty of room for the environment variables PCBoard 
+will create along with any other variables you or any other programs you run 
+may create.
+
+If You Are Using OS/2
+
+The changes outlined in this section are different for OS/2 because you will 
+change the settings for one window rather than the entire system.  For 
+additional information, see Setting Up Your Nodes Under A Specific 
+Multitasker.
+
+
+AUTOEXEC.BAT
+
+The path to locate your PCBoard executable and utilities must be in your 
+PATH= statement (e.g., PATH=C:\DOS;C:\PCB).
+
+Make sure SHARE.EXE is being loaded inside your AUTOEXEC.BAT. Reports have 
+indicated that loading SHARE in high memory can slow system performance.  It 
+is up to you whether you load it in high memory or in conventional memory.  
+The actual difference in system performance is very small.
+
+Add a line at the end of your AUTOEXEC.BAT that will load your multitasker.  
+Whatever multitasker you choose it should be able to automatically bring up 
+your nodes when you load your multitasker.  If your multitasker does not have 
+this ability, your system will not be able to load the nodes automatically if 
+your machine gets rebooted.  Examples on how to load your nodes automatically 
+are provided for DESQview, Microsoft Windows and OS/2 in Automatically 
+Loading Your Nodes at Bootup later in this section.
+
+NOTE:  If you are using OS/2 as your multitasker, skip items 2
+and 3 as they really do not apply to the OS/2 operating system.
+
+
+An example AUTOEXEC.BAT might look like the following:
+
+
+@ECHO OFF
+C:\DOS\SHARE.EXE
+PATH=C:\PCB;C:\DOS;C:\UTILITY
+PROMPT=$P$G
+
+If you are using DESQview, add the following lines to your
+AUTOEXEC.BAT:
+
+
+CD\DV
+DV
+
+
+If you are using Windows, add these two lines:
+
+
+CD\WINDOWS
+WIN
+
+
+Now that you have modified AUTOEXEC.BAT and CONFIG.SYS you are ready to 
+install additional PCBoard nodes.
+
+Installing Additional Nodes
+
+If you have not already installed PCBoard, refer to the Installation chapter 
+in this manual before proceeding.  Next, get all of your files created and 
+make sure that the single node is running properly.  It will make a multiple 
+node setup much easier.  For this section we will assume you installed 
+PCBoard in the C:\PCB\ subdirectory.
+
+Creating the NODE Subdirectories
+
+You need to create a separate subdirectory for each PCBoard node you plan to 
+run.  For node 1, create a subdirectory off of your C:\PCB\ subdirectory and 
+call it NODE1.  To do this, change to the C:\PCB\ subdirectory and type MD 
+NODE1.  Do this for each node you want to add (e.g., for node 3's 
+subdirectory you would type MD NODE3). From here on, these subdirectories 
+will be referred to as node subdirectories.
+
+You should have a directory structure that resembles the following:
+
+
+             C:\PCB
+             ÃÄÄÄÄNODE1
+             ÃÄÄÄÄNODE2
+             ÃÄÄÄÄNODE3
+             ÀÄÄÄÄNODE4
+
+Next, copy the following files from the C:\PCB subdirectory into each node 
+directory:
+
+
+BOARD.BAT
+PCBERR.OLD
+PCBOARD.DAT
+REMOTE.SYS
+
+For example, you can copy BOARD.BAT from the C:\PCB directory to
+your node 1 subdirectory by typing:
+
+
+COPY C:\PCB\BOARD.BAT C:\PCB\NODE1
+
+Repeat this step for each file and each node.  Once you have copied the above 
+list of files to each of the NODE subdirectories, delete the files listed 
+from the C:\PCB subdirectory.  If you do not delete these files, there is the 
+chance you could load a node using the wrong setup files.
+
+Setting Up PCBoard
+
+In your PCBoard setup you will have to modify a few items for proper 
+operation.  This section details some changes you will want to your 
+configuration using PCBSetup and also how you should modify the BOARD.BAT 
+files you copied to each node subdirectory.
+
+PCBSetup
+
+There are a few setup items which you may wish to change if you are running 
+under a multitasking environment.  Change to each node subdirectory and 
+execute PCBSETUP.EXE. Once PCBSetup is loaded, perform the following steps:
+
+In PCBSetup | Node Configuration change the node number found on this screen 
+to reflect the number you want to assign to this node.  Remember, each node 
+must have a unique node number.  In addition, answer Y to the Running a 
+Network / Multitasker System question.
+
+Whenever possible, specify a path to a file.  This is inclusive of batch 
+files and your setup of PCBoard in general. This can slightly enhance the 
+speed of your system and it can make it less complex.
+
+In PCBSetup | File Locations | Configuration Files make sure PCBPROT.DAT 
+contains the path to locate the file.  For example: C:\PCB\PCBPROT.DAT.  In a 
+default PCBoard setup, PCBPROT.DAT is entered on the line.  Because no path 
+is specified, it will cause problems in your multiple node setup.  By 
+changing all nodes to read one PCBPROT.DAT file, you will find that adding, 
+changing, or deleting protocols will become a lot easier.
+
+Like the entry for PCBPROT.DAT in File Locations | Configuration Files, make 
+sure the entry for your Color Definition File contains the full path and 
+filename.  The default configuration will assume the file will be found in 
+the default subdirectory. By changing all nodes to point to the same file, 
+your file directories will be colored on-the-fly.  If you finish setting up 
+all of your nodes and one or more of your nodes do not display your file 
+directories in color, you need to run PCBSetup from that node directory and 
+verify that a valid PCBFILER.DEF file.
+
+Verify that all of the options and file locations in menu options A-H from 
+the PCBSetup Main Menu contain the proper values and settings that you desire 
+for each node.  Normally you will be concerned most with file locations, but 
+you may also want to change the way that a particular node operates as well. 
+You should not concern yourself with the conference configuration at this 
+time because all of that information is contained in the CNAMES file you 
+specify in PCBSetup | File Locations | System Files.
+
+When you have completed steps 1 through 5, exit PCBSetup saving your changes 
+as you exit.
+
+Modifying BOARD.BAT
+
+The default BOARD.BAT in each node's directory resembles the following:
+
+
+@echo off
+c: cd\pcb
+set DSZLOG=PCBDSZ.LOG
+if exist REMOTE.BAT rename REMOTE.BAT REMOTE.SYS
+if exist DOOR.BAT del DOOR.BAT
+if exist ENDPCB del ENDPCB
+PCBOARD
+if exist REMOTE.BAT REMOTE
+if exist DOOR.BAT DOOR
+if exist EVENT.BAT EVENT
+if exist ENDPCB goto end
+board
+:end
+
+You will need to modify each node's BOARD.BAT file so that the batch file 
+changes to the subdirectory where the node resides. In addition, there are 
+several new lines that can be added to aid you in your multitasking 
+configuration.  For example, node 1's new batch file will look like the 
+following (the highlighted items will be explained in the following 
+sections):
+
+
+
+@echo off
+C:
+cd\PCB\NODE1
+C:\DV\DVANSI
+set COMBASE=bbb
+set COMIRQ=i
+set PORT=p
+set DSZLOG=PCBDSZ.LOG
+if exist REMOTE.BAT rename REMOTE.BAT REMOTE.SYS
+if exist DOOR.BAT del DOOR.BAT
+if exist ENDPCB del ENDPCB
+PCBOARD
+if exist REMOTE.BAT REMOTE
+if exist DOOR.BAT DOOR
+if exist EVENT.BAT EVENT
+if exist ENDPCB goto end
+board
+:end
+exit
+
+Notice the cd\PCB\NODE1 line towards the top of the BOARD.BAT file.  This 
+line is used to change the current subdirectory to the subdirectory you have 
+defined as the node subdirectory.  In node 1's case, this directory is 
+\PCB\NODE1.  As you are setting up the rest of the nodes, change this line in 
+the batch file so it points to the appropriate node subdirectory.  For 
+example, if you are setting up the batch file for node 2, change the line to 
+read cd\PCB\NODE2.
+
+In the example, we mentioned there would be several new lines added to your 
+BOARD.BAT file.  The following describes each of the new lines in detail.
+
+C:\DV\DVANSI:  This line is only necessary if you are using DESQview as your 
+multitasker. The DVANSI program is an ANSI driver which is more friendly to 
+DESQview.
+
+set COMBASE:  This command sets an environment variable you can use in your 
+batch files to reference the base address for the COM port.  The value bbb is 
+the three digit hexadecimal base address for the COM port (e.g., 3f8, 2f8, 
+3e8, 2e8).  This variable will prove extremely useful when you start 
+installing external programs (doors, protocols, etc.) and if you use 
+non-standard COM ports.  If you are using the COMM-TSR driver that comes with 
+the multiport version of PCBoard or if you are using only COM1 and/or COM2 as 
+your serial ports, omit this line.
+
+set COMIRQ:  This line creates an environment variable called COMIRQ which 
+will store the IRQ the node will use.  The value i is the IRQ number for the 
+COM port.  Like the COMBASE environment variable, this environment variable 
+will be indispensable when you start configuring third-party programs. If you 
+are using the COMM-TSR driver that comes with the multiport version of 
+PCBoard or if you are using only COM1 and/or COM2 as your serial ports, omit 
+this line.
+
+set PORT:  This line will create a variable called PORT which will hold the 
+number of the COM port you are using for the node. The value p is the port 
+number you defined in PCBSetup | Modem Information | Modem Setup.  You can 
+use this variable from any batch file making it especially useful when 
+configuring third-party programs.  If you are using the multiport version of 
+PCBoard, this port refers to the FOSSIL port number, not the actual port 
+number on the serial board..
+
+exit:  Adding this line will assure that when you exit to DOS through the 
+call-waiting screen the window on your multitasker will close.  If you wish 
+for it to stay open, you should make sure you do not add this line and also 
+make sure you setup your multitasker so it does not close the window upon 
+completion of the program.
+
+Setting Up Your Nodes Under a Specific Multitasker
+
+The instructions that follow detail the steps you need to take in order to 
+add nodes to DESQview, Windows 3.1, and OS/2.  This first section details how 
+to setup the PIF files for both DESQview and Windows 3.x.  This same section 
+also details how to setup the icon for your nodes under OS/2.  The next 
+section details how to automatically load your nodes each time you you run 
+your multitasker.  Each section also lists any special considerations you 
+should be aware of with each multitasker. The other information provided 
+throughout this section (except where appropriately titled) is independent of 
+the multitasker you are using.
+
+Once you have followed the instructions detailed in the specific section for 
+the multitasker you are using, proceed to the section entitled Automatically 
+Loading Your Nodes at Bootup.
+
+DESQview (R)
+
+Before proceeding with a setup under DESQview you should first become 
+familiar with how to add programs in your DESQview environment if you are not 
+already familiar with that topic.
+
+To configure your nodes to run under DESQview, load the setup program for 
+DESQview.  To do this, change to your DESQview directory and at the DOS 
+prompt type SETUP and press ENTER.  Next, select Performance.  You screen 
+should resemble the following:
+
+                  É1ÍÍAdvancedÍSetup:ÍPerformanceÍÍÍÍÍÍÍÍÍÍ»
+                  º                                        º
+                  º  Task Processing Time (in Clock Ticks) º
+                  º            Foreground:    2            º
+                  º            Background:    2            º
+                  º                                        º
+                  º  Memory Usage (in K)                   º
+                  º      Common Memory:      17            º
+                  º      DOS Buffer for EMS:  4            º
+                  º                                        º
+                  º  Optimize communications?    (Y/N): N  º
+                  º  Allow swapping of programs? (Y/N): N  º
+                  º  Manage printer contention?  (Y/N): N  º
+                  º                                        º
+                  º           Next field     Tab           º
+                  º           Backup menu    Esc           º
+                  º           DONE           <-Ù           º
+                  º                                        º
+                  ÈÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¼
+
+Foreground and Background Processing Time:  It is very important that you set 
+the foreground and background ticks to an equal value.  Otherwise, your 
+system will likely suffer a performance degradation which callers may 
+perceive as an intermittent, jerking display.  The exact value for these two 
+settings varies, depending on how many nodes you are running and the 
+processing speed of your computer.  Avoid setting these values to 1, which 
+may result in sluggish system performance.  You may experiment with this 
+value to see which works best on your machine, though using 2 or 3 seems to 
+be the best choice.
+
+Two of the most important settings you will change are Optimize 
+Communications and Manage printer contention.  Set both of these to N to help 
+avoid possible system lockups.
+
+Next, you need to add each of the nodes to your DESQview menu so you can 
+bring up a node with just a couple of keystrokes.  To add each node to the 
+DESQview menu, do the following:
+
+Select Open Window from the DESQview main menu
+
+Select Add Program
+
+Select Other (Add program not found in list).  You will be asked
+to specify a path to the program.  Supply a node directory for
+each program you add.  For example, enter C:\PCB\NODE1,
+C:\PCB\NODE2, etc.
+
+Once you have typed in a path you will be taken to the Add a Program screen 
+where you will edit the PIF file for this program.  You will need to go 
+through this procedure for each node you plan to run.  The two following 
+screen captures will show you the recommended PIF settings for your first 
+node:
+
+
+  ÉAddÍaÍProgramÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ»
+  º                      Specify Program Information                       º
+  º                                                                        º
+  º Program Name............: Node 1                                       º
+  º                                                                        º
+  º Keys to Use on Open Menu: N1                   Memory Size (in K): 450 º
+  ºÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº
+  º Program...: C:\PCB\NODE1\BOARD.BAT                                     º
+  º                                                                        º
+  º Parameters:                                                            º
+  º                                                                        º
+  º Directory.: C:\PCB\NODE1                                               º
+  ºÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº
+  º Options:                                                               º
+  º               Writes text directly to screen.......: [Y]               º
+  º               Displays graphics information........: [N]               º
+  º               Virtualize text/graphics (Y,N,T).....: [T]               º
+  º               Uses serial ports (Y,N,1,2)..........: [Y]               º
+  º               Requires floppy diskette.............: [N]               º
+  º                                                                        º
+  º  Press F1 for advanced options            Press <-Ù when you are DONE  º
+  ÈÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¼
+
+There are four fields you should pay special attention to in this setup 
+screen:
+
+Program Name:  You can enter anything you wish here as it is the title that 
+will be displayed on your window.  You may want to enter something like NODE 
+1 or NODE 2.  It does not matter what name you wish to have displayed as your 
+window title.  Make sure whatever you enter is unique for each so you can 
+easily identify your windows when they are displayed on the screen or when 
+you switch to them.  If they all said Alphabet BBS, you will have a hard time 
+discerning which node is which on your screen.
+
+Keys to Open:  In this field enter the two keys which will be used to open 
+the window from the DESQview menu.  See your manual for more information.  
+The keys you choose must be unique.  You may want to enter something like N1 
+or N2 to distinguish between your node numbers.
+
+Program:  In this field, enter the name of the program you wish to run.  You 
+should always run BOARD.BAT when loading PCBoard and since each node has a 
+different BOARD.BAT, you must change what you enter for each of your nodes 
+(e.g., C:\PCB\NODE1\BOARD.BAT, C:\PCB\NODE2\BOARD.BAT, etc.).
+
+Directory:  This field should point to the node subdirectory for each node.  
+For example, in node 2's PIF file, enter C:\PCB\NODE2 in this field.  For 
+node 3's PIF file, enter C:\PCB\NODE3.
+
+When you are finished editing the first screen, press F1 for advanced 
+options.  You will be presented with another screen. When you are finished 
+filling in the values for this screen, your screen should resemble the screen 
+on the following page.
+
+
+ÉAddÍaÍProgramÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ»
+º                 Specify Program Information Advanced Options                º
+º                                                                             º
+º System Memory (in K).......:   0   Maximum Program Memory Size (in K)..:    º
+º                                                                             º
+º Script Buffer Size.......:     0   Maximum Expanded Memory Size (in K):     º
+º                                                                             º
+º Text Pages: 1  Graphics Pages: 0   Initial Mode:       Interrupts: 00 to FF º
+ºÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº
+º Window Position:                                                            º
+º    Maximum Height:  25       Starting Height:           Starting Row...:    º
+º    Maximum Width.:  80       Starting Width.:           Starting Column:    º
+ºÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº
+º                                Shared Program                               º
+º Pathname..:                                                                 º
+º Data......:                                                                 º
+ºÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº
+º Close on exit (Y,N,blank)......: [N] Uses its own colors..............: [Y] º
+º Allow Close Window command.....: [N] Runs in background (Y,N,blank)...: [Y] º
+º Uses math coprocessor..........: [N] Keyboard conflict (0-F)..........: [0] º
+º Share CPU when foreground......: [Y] Share EGA when foreground/zoomed.: [N] º
+º Can be swapped out (Y,N,blank).: [N] Protection level (0-3)...........: [0] º
+º                                                                             º
+º  Press F1 for standard options                 Press <-Ù when you are DONE  º
+ÈÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¼
+
+System Memory:  You should enter 0 in this field unless you are running a 
+program written specifically for DESQview.
+
+Script Buffer:  Most likely, you will not be using DESQview scripts inside of 
+this window.  You can save additional memory by entering 0 in this field.
+
+Close on Exit:  If you elected to add the exit line at the end of your 
+BOARD.BAT file, no matter what you select here, the window will always close 
+when you select DOS - Busy or DOS - Not Busy from the call waiting screen.  
+If you did not add the exit statement, enter Y in this field.  If you enter Y 
+in this field, the window will close when you select DOS - Busy or DOS - Not 
+Busy.  If you enter N instead, the window will stay open at a DOS prompt when 
+you exit PCBoard.
+
+Uses own colors:  Entering Y in this field will allow PCBoard to set the 
+colors for the window rather than using DESQview's default colors.
+
+Allow Close:  Entering N in this field will not allow you to select Close 
+Window command to be executed from the DESQview menu.  Instead, you must 
+properly exit the program or reboot the window to close the window.  
+Remember, it is always best to properly exit a program whenever possible.
+
+Runs in background:  In this field, enter a Y on all dial-in nodes and an N 
+on any local maintenance nodes you may have. Setting any local nodes to not 
+be active in the background can save precious processor time in case you 
+accidentally leave your maintenance node running in the background.
+
+Uses Math Coprocessor:  Enter an N in this field since PCBoard does not 
+utilize any math coprocessors.  You will save precious memory and may even 
+slightly improve performance.
+
+Can be swapped:  In this field, enter an N for any PIFs you are setting up 
+for communications programs (such as PCBoard).  If you set this field to Y, 
+it may eventually cause a hard system lock.
+
+Microsoft Windows (R) v3.1
+
+In order to run multiple nodes under Windows you will need to create a PIF 
+file for each node.  It is assumed you have some knowledge on how to create a 
+PIF file under Windows.  If this area is new to you, it is suggested you 
+first read the section in your Windows manual detailing how to create a PIF 
+file before continuing with your configuration.
+
+While you are in the Windows environment, load the PIF editor. This program 
+will be used to create the PIF files for each node. Create a new PIF file.  
+When you have finished filling in the required information on the first 
+screen of your PIF file, it should resemble the following:
+
+         ÚÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+         ³Ä³                                                          ³
+         ÃÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ´
+         ³ File  Mode  Help                                           ³
+         ÃÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ´
+         ³ Program Filename:     C:\PCB\NODE1\BOARD.BAT               ³
+         ³                                                            ³
+         ³ Window Title:         NODE1                                ³
+         ³                                                            ³
+         ³ Optional Parameters:                                       ³
+         ³                                                            ³
+         ³ Start-up Directory:   C:\PCB\NODE1                         ³
+         ³                                                            ³
+         ³ Video Memory:     þ Text   O Low Graphics   O High Graphics³
+         ³ Memory Requirements:  KB Require   450  KB Desired   640   ³
+         ³                                                            ³
+         ³ EMS Memory:           KB Required    0  KB Limit     400   ³
+         ³ XMS Memory:           KB Required    0  KB Limit     400   ³
+         ³                                                            ³
+         ³ Display Usage:  þ Full Screen    Execution:   þ Background ³
+         ³                 O Windowed                    O Exclusive  ³
+         ³                                                            ³
+         ³ þ Close Window on Exit        Advanced                     ³
+         ÃÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ´
+         ³ Press F1 for help on Program Filename                      ³
+         ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+Program Filename:  In this field, enter the name of the program you wish to 
+run.  You should always run BOARD.BAT when loading PCBoard.  If you do not, 
+your door programs, events, and remote drops to DOS will not run.  The batch 
+file you enter in this field will change for each node because you load a 
+different BOARD.BAT for each node.  For example, node 2's PIF file will 
+contain C:\PCB\NODE2\BOARD.BAT.
+
+Window Title:  You may enter anything you wish here as it is the title 
+displayed on your window.  You may want to enter something like NODE 1 or 
+NODE 2.  It does not matter what name you wish to have displayed as your 
+window title.  Make sure the title you enter is unique for each node so you 
+can easily identify your windows when they are displayed on the screen or 
+when you switch to them.  If they all are titled Alphabet BBS, you will have 
+a hard time discerning which node is which on your screen.
+
+Start-up Directory:  In this field, enter the node subdirectory. For example, 
+node 2's PIF file will contain C:\PCB\NODE2 in this field.  For node 3's PIF 
+file, enter C:\PCB\NODE3.
+
+Display Usage-Full Screen:  Mark this setting so each node runs in 
+full-screen mode rather than in windowed mode.  When a non-Windows 
+application is running full-screen, the overhead of virtualizing the screen 
+in a graphical window is eliminated giving you better system performance.
+
+Close Window on Exit:  If you elected to add the exit line at the end of your 
+BOARD.BAT file, no matter what you select here the window will always close 
+when you select DOS - Busy or DOS - Not Busy from the call waiting screen.  
+If you did not add the exit statement, entering Y in this field will cause 
+the window to close when you select DOS - Busy or DOS - Not Busy.  If you 
+enter N in this field, the window will remain at a DOS prompt when you quit 
+PCBoard.
+
+You should now click the Advanced button to get to the second screen for your 
+PIF file.  When you have finished filling in the requested information, your 
+screen should resemble the following:
+
+       ÚÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+       ³Ä³                     Advanced Options                          ³
+       ÃÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ´
+       ³Ú Multitasking Options ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿            ³
+       ³³Background Priority:  100  Foreground Priority: 100³            ³
+       ³³                  þ Detect Idle Time               ³            ³
+       ³ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ            ³
+       ³Ú Memory Options ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿  ³
+       ³³    O EMS Memory Locked            O XMS Memory Locked       ³  ³
+       ³³    þ Uses High Memory Area        O Lock Application Memory ³  ³
+       ³ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ  ³
+       ³Ú Display Options ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿  ³
+       ³³Monitor Ports:     O Text   O Low Graphics  O High Graphics  ³  ³
+       ³³              þ Emulate Text Mode    O Retain Video Memory   ³  ³
+       ³ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ  ³
+       ³ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿  ³
+       ³³þ Allow Fast Paste                O Allow Close When Active  ³  ³
+       ³³Reserve Shortcut Keys: O Alt+Tab   O Alt+Esc    O Ctrl+Esc   ³  ³
+       ³³                       O PrtSc     O Alt+PrtSc  O Alt+Space  ³  ³
+       ³³                       O Alt+Enter                           ³  ³
+       ³³Application Shortcut Key:  None                              ³  ³
+       ³ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ  ³
+       ÃÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ´
+       ³ Press F1 for help on Priority.                                  ³
+       ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+Background Priority:  Make sure the value entered in this field is equal to 
+the value entered in the Foreground Priority field. If it does not, the nodes 
+running in the background will run slower than the node in the foreground.
+
+Lock Application Memory:  You want to lock the application memory so the 
+window will not swap out of memory while your node is running.  If the window 
+swaps out of memory, the node will quit functioning.
+
+Once you have the PIF files defined, add each node as an icon to Program 
+Manager.  Consult your Windows manual for further information on adding 
+programs to Program Manager.
+
+OS/2 v2.x
+
+To run multiple nodes under OS/2 you will want to create program objects for 
+each of your nodes and store them in a folder on the desktop for easy access.  
+It is assumed you have a good knowledge of how to work with objects in the 
+Workplace Shell environment.  If this area is new to you, it is suggested 
+that you first read the section in your manual detailing how to use the 
+Workplace Shell.
+
+The first place to start is to create a folder on your desktop that will hold 
+the program objects for each of your nodes.  One way of doing this is to open 
+up your templates folder and drag a folder out to the desktop and change the 
+name of the folder in the settings for the object.  Next, you need to add a 
+program object to this folder.  As with the folder, you can drag a program 
+object from your templates folder to the new folder. When you do, the 
+following dialog box will appear on the screen:
+
+     ÚÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÂÄÂÄ¿
+     ÃÄÅÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÂÂÂÂÂÄÄÄÄÄÄÁÄÁÄ´
+     ³ ³                                                 ÀÁÁÁÁÄÄÄ¿      ³
+     ³ ³                                                  Program³      ³
+     ³ ³                                                 ÚÂÄÄÄÄÄÄÁÄ¿    ³
+     ³ ³ Required                                        ³³Session ³    ³
+     ³ ³   Path and file name:                           ³ÃÂÄÄÄÄÄÄÄÁÄÄÄ¿³
+     ³ ³   ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿ ÚÄÄÄÄÄÄÄÄ¿        ³³³Association³³
+     ³ ³   ³                         ³ ³  Find  ³        ³³ÃÂÄÄÄÄÄÄÄÄÄÄ´³
+     ³ ³   ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ ÀÄÄÄÄÄÄÄÄÙ        ³³³³Window    ³³
+     ³ ³                                                 ³³³ÃÂÄÄÄÄÄÄÄÄÄ´³
+     ³ ³ Optional                                        ³³³³³General  ³³
+     ³ ³   Parameters:                                   ³³³³ÃÄÄÄÄÄÄÄÄÄÙ³
+     ³ ³   ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿        ³³³³³          ³
+     ³ ³   ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ        ³³³³³          ³
+     ³ ³   Working directory:                            ³³³³³          ³
+     ³ ³   ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿        ³³³³³          ³
+     ³ ³   ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ        ³³³³³          ³
+     ³ ³ ÚÄÄÄÄÄÄÄÄ¿ ÚÄÄÄÄÄÄÄÄ¿                           ³³³³³          ³
+     ³ ³ ³  Undo  ³ ³  Help  ³                           ³³³³³          ³
+     ³ ³ ÀÄÄÄÄÄÄÄÄÙ ÀÄÄÄÄÄÄÄÄÙ                           ³³³³³          ³
+     ÀÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÁÁÁÁÁÄÄÄÄÄÄÄÄÄÄÙ
+                                                                    
+You can skip this screen as you will fill it in later for each object you 
+create for your nodes.  The next thing you need to do is to change some of 
+the DOS settings for PCBoard.  To do this, click on the Session tab and then 
+click on the DOS settings box. When you do, you will see a dialogue box that 
+resembles the screen on the following page.
+
+    ÚÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+    ÃÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ´
+    ³ Setting:                        Value:                             ³
+    ³ ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿                                      ³
+    ³ ³COM_HOLD                   ³   þ On         O Off                 ³
+    ³ ³DOS_BACKGROUND_EXECUTION   ³                                      ³
+    ³ ³DOS_BREAK                  ³                                      ³
+    ³ ³DOS_DEVICE                 ³                                      ³
+    ³ ³DOS_FCBS                   ³                                      ³
+    ³ ³DOS_FCBS_KEEP              ³                                      ³
+    ³ ³DOS_FILES                  ³                                      ³
+    ³ ³DOS_HIGH                   ³                                      ³
+    ³ ³DOS_LASTDRIVE              ³                                      ³
+    ³ ³DOS_RMSIZE                 ³  ÚDescriptionÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿ ³
+    ³ ³DOS_SHELL                  ³  ³                                 ³ ³
+    ³ ³DOS_STARTUP_DRIVE          ³  ³Use this setting to keep open a  ³ ³
+    ³ ³DOS_UMB                    ³  ³communications resource (for     ³ ³
+    ³ ³DOS_VERSION                ³  ³example, COM1) until the DOS     ³ ³
+    ³ ³DPMI_DOS_API               ³  ³session ends.                    ³ ³
+    ³ ³DPMI_MEMORY_LIMIT          ³  ³                                 ³ ³
+    ³ ÃÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ´  ³                                 ³ ³
+    ³ ÀÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ  ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ ³
+    ³                                                                    ³
+    ³ ÚÄÄÄÄÄÄÄ¿ ÚÄÄÄÄÄÄÄ¿ ÚÄÄÄÄÄÄÄ¿ ÚÄÄÄÄÄÄÄ¿                            ³
+    ³ ³ Save  ³ ³Default³ ³Cancel ³ ³ Help  ³                            ³
+    ³ ÀÄÄÄÄÄÄÄÙ ÀÄÄÄÄÄÄÄÙ ÀÄÄÄÄÄÄÄÙ ÀÄÄÄÄÄÄÄÙ                            ³
+    ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+You need to change the following settings for this object to reflect the 
+values to the right of the equal sign:
+
+COM_HOLD         = ON
+COM_DIRECT       = OFF
+DOS_BACKGROUND   = ON
+DOS_BREAK        = OFF
+DPMI_DOS_API     = DISABLED
+EMS_MEMORY       = 512
+IDLE_SECONDS     = 0
+IDLE_SENSITIVITY = 75
+XMS_MEMORY_LIMIT = 0
+
+Click on the Save button to store the changes you have made to the DOS 
+settings.  Next, click on the General tab so you can change the name of the 
+object.  In the Title box, enter text that will be used to identify this 
+object.  For example, you ccan enter Node in this field.  To help make adding 
+new node program objects easier, you should also click on the Template check 
+box to make this object a template.  Your screen will resemble the following:
+
+     ÚÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÂÄÂÄ¿
+     ÃÄÅÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÂÂÂÂÂÄÄÄÄÄÄÁÄÁÄ´
+     ³ ³       ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿                ÃÁÁÁÁÄÄÄÄÄ¿    ³
+     ³ ³ Title:³Node                    ³                ³Program  ³    ³
+     ³ ³       ³                        ³                ÃÂÄÄÄÄÄÄÄÄ´    ³
+     ³ ³       ³                        ³                ³³Session ³    ³
+     ³ ³       ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ                ³ÃÂÄÄÄÄÄÄÄÁÄÄÄ¿³
+     ³ ³                                                 ³³³Association³³
+     ³ ³ ÚÄCurrent iconÄÄ¿ ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿             ³³ÃÂÄÄÄÄÄÄÄÄÄÄ´³
+     ³ ³ ³               ³ ³ Create another³             ³³³³Window    ³³
+     ³ ³ ³  ÉÍÍÍÍÍ»      ³ ÃÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ´             ÀÁÁÁÄÄÄÄÄÄÄÄÄÄ´³
+     ³ ³ ³  º DOS º      ³ ³     Edit      ³               General     ³³
+     ³ ³ ³  ÈÍÍÍÍÍ¼      ³ ÃÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ´             ÚÂÂÂÂÄÄÄÄÄÄÄÄÄÙ³
+     ³ ³ ³               ³ ³     Find      ³             ³³³³³          ³
+     ³ ³ ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ             ³³³³³          ³
+     ³ ³                                                 ³³³³³          ³
+     ³ ³  û  Template                                    ³³³³³          ³
+     ³ ³                                                 ³³³³³          ³
+     ³ ³ ÚÄÄÄÄÄÄÄÄ¿ ÚÄÄÄÄÄÄÄÄ¿ ÚÄÄÄÄÄÄÄÄ¿                ³³³³³          ³
+     ³ ³ ³  Undo  ³ ³Default ³ ³  Help  ³                ³³³³³          ³
+     ³ ³ ÀÄÄÄÄÄÄÄÄÙ ÀÄÄÄÄÄÄÄÄÙ ÀÄÄÄÄÄÄÄÄÙ                ³³³³³          ³
+     ÀÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÁÁÁÁÁÄÄÄÄÄÄÄÄÄÄÙ
+
+Next, close the Settings notebook to return to the Workplace Shell.  Notice, 
+you now have a new object in your folder and that it is titled whatever you 
+entered previously.  Your folder may look like the following:
+
+         ÚÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÂÄÂÄ¿
+         ÃÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÁÄÁÄ´
+         ³ ÚÄÄÄÄÄÄ¿                                          ³
+         ³ ³ ÉÍÍ» ³                                          ³
+         ³ ³ ÈÍÍ¼ ³                                          ³
+         ³ ÀÄÄÄÄÄÄÙ                                          ³
+         ³   Node                                            ³
+         ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+         
+Next, you need to simply copy objects for the rest of your nodes.  Highlight 
+your template and drag an object out of your template for each of your nodes 
+and place them in the folder you created.  Each time you drag a copy and let 
+go of the mouse button, you will be asked to supply the program that you wish 
+to run.  Once you have copied the objects, you need to change the following 
+information for each of the objects:
+
+Path and file name:  Enter the BOARD.BAT that you need to run for this node.  
+For example, you may enter C:\PCB\NODE1\BOARD.BAT for node 1's object.
+
+Working directory:  In this field, enter the node subdirectory for each node.  
+For example, you may enter C:\PCB\NODE1 for node 1's object.
+
+Once you have finished these steps, the folder you created for your nodes may 
+resemble the following if you define four nodes:
+
+         ÚÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÂÄÂÄ¿
+         ÃÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÁÄÅÄ´
+         ³ ÚÄÄÄÄÄÄ¿  ÉÍÍÍÍÍÍ» ÉÍÍÍÍÍÍ» ÉÍÍÍÍÍÍ» ÉÍÍÍÍÍÍ»   ÃÄ´
+         ³ ³ ÉÍÍ» ³  º DOS  º º DOS  º º DOS  º º DOS  º   ³ ³
+         ³ ³ ÈÍÍ¼ ³  ÈÍÍÍÍÍÍ¼ ÈÍÍÍÍÍÍ¼ ÈÍÍÍÍÍÍ¼ ÈÍÍÍÍÍÍ¼   ³ ³
+         ³ ÀÄÄÄÄÄÄÙ                                        ³ ³
+         ³   Node     Node:1    Node:2   Node:3   Node:4   ÃÄ´
+         ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÁÄÙ
+
+At this point, you should be able to click on any of your node objects to 
+load the corresponding node on your system.  The next step is to 
+automatically configure OS/2 to load your nodes at startup.
+
+
+Automatically Loading The Nodes at Bootup
+
+Since, for the most part, your bulletin board will be unattended, you will 
+want your nodes to automatically load when you boot your machine.  This will 
+prevent events like power outages from bringing down your system until you 
+can manually bring up your bulletin board system.  This section gives you 
+detailed instructions for automatically bringing up your system under 
+DESQview, Windows, and OS/2.
+
+DESQview
+
+In order to have all of your nodes load up every time you start DESQview, you 
+will need to use a script.  The following key sequence will create a script 
+for starting up your nodes on one machine.
+
+Initiate DESQview's script learning mode by pressing SHIFT-ALT.
+
+Select Start Script.  When prompted for a key to define, hold down ALT while 
+typing 255 on the numeric keypad.  By assigning it to an obscure key you 
+lower the chances of accidentally activating the script.
+
+Give your script a name.  Make sure it starts with an ! (exclamation point) 
+or it will not be executed when you start up DESQview.
+
+Open all of your nodes manually from the DESQview Open Window menu.  When you 
+are finished, press SHIFT-ALT and select Finish script.
+
+Close all of the nodes you opened by selecting DOS - Not Busy from the call 
+waiting screen.
+
+Quit DESQview.  When quitting, you will be informed you have some scripts 
+that have not been saved and you are asked if you wish to save them.  Save 
+the scripts to a filename called DESQVIEW.DVS.
+
+
+
+Microsoft Windows v3.1
+
+To automatically load your nodes under Microsoft Windows, simply move the 
+icons for your nodes to the Startup folder in Program Manager.  When Windows 
+loads, it will automatically load all programs that are in your Startup 
+folder.
+
+OS/2 v2.x
+
+Select all of your node objects (but not the node template) and hold down the 
+CTRL key while dragging them to the Startup folder in your OS/2 System folder.  
+The program objects will be moved to that folder.  When OS/2 loads, it will 
+execute any programs in your Startup folder.
+
+PCBoard And Local Area Networks
+
+Getting Started
+
+A local area network will enable you to expand your system to run more than 
+four nodes and also enable you to add even more storage space than you can 
+fit in one machine.  The next few sections detail how to configure your 
+network to work with PCBoard.  You may not need all of the information 
+provided, but reading it will help give you a better overview of how PCBoard 
+works in conjunction with networks.
+
+Required Hardware
+
+Enough computers to handle your desired nodes.  You can run one node per 
+machine or you can use a multitasker on a workstation to run up to four nodes 
+on a machine. 
+
+Network card for each machine
+
+If you are running standard serial ports in each machine, they should have 
+16550 UARTs for each serial port (prevents COM overruns).
+
+If you are using a multi-port card in conjunction with the multiport version 
+of PCBoard, make sure the card you are using is supported by COMM-TSR.EXE.
+
+Required Software
+
+PCBoard Bulletin Board Software
+
+Networking software that compliments the network hardware you have installed.
+
+Types of Networks Supported
+
+PCBoard works with virtually all of the DOS based LAN products including 
+3COM, Banyan, LANtastic, and Novell NetWare.  PCBoard requires the network to 
+support DOS 3.1 and higher file/record locking procedures.  Almost any 
+NETBIOS compatible network will work since these networks typically support 
+the proper file/record locking procedures.
+
+Testing Network Compatibility
+
+If you are unsure whether your network software will meet PCBoard's 
+requirements, you will want to test your network for compatibility.  The next 
+few steps will show you a short test you can run to make sure PCBoard will 
+work correctly.
+
+NOTE:  It is assumed that by now you have at least installed PCBoard. If you 
+have not yet installed PCBoard, refer to the Installation chapter of this 
+manual for further instructions. You must have an installed copy of PCBoard 
+before you test your network for compatibility. Additionally you must either 
+load SHARE.EXE that comes with DOS or check your network software to see if 
+it has the functionality of SHARE built in.
+
+If you are unsure if your existing network will work with PCBoard, run 
+PCBDIAG.EXE which is in the directory where you installed PCBoard.  When you 
+run PCBDIAG you will see the this screen:
+
+You will see the following three questions on your screen:
+
+
+Print ALL configuration files
+Perform the Analysis Section
+Analyze USERS and INDEX files
+
+These questions will determine how thorough of a diagnostics report you want 
+to run.  The analysis section of the report is the part that will contain the 
+information on whether your existing network will work with PCBoard or not.  
+Therefore, you will want to answer N to all of the questions except to 
+Perform Analysis Section which you will answer with a Y.
+
+When you press PgDn, you will be asked for the printer specification.  Type 
+in the device name for your printer (e.g., LPT1).  If you wish to send the 
+report to disk instead, you may type in a filename such as DIAG.TXT.  After 
+you have printed or saved your report to disk look for the following section 
+towards the top of the report:
+
+Test SHARE functions:
+
+Open DENY ALL  / attempt to share file by second process failed-OKAY
+Open DENY NONE / attempt to share file by second process succeeded - OKAY
+Attempt to lock record #1 by first  process succeeded - OKAY
+Attempt to lock record #1 by second process failed    - OKAY
+Attempt to read record #1 by second process failed    - OKAY
+
+
+These are the results you will see if your network is compatible with 
+PCBoard.  All tests should report OKAY.  If not, try loading the DOS SHARE 
+command and re-run the test.  If some of the tests still fail, you do not 
+have a compatible network.
+
+Planning Your Network Setup and File Locations
+
+What Type of Computers Should Be Used?
+
+A common question most people ask if they are setting up a network for the 
+first time is "What type of computers should I get for the servers and the 
+workstations?"  There is no definite answer to this question.  In fact, the 
+answers you will get depend on how you want your system setup.
+
+For example, you may have a network setup with one server using a 80486 
+processor and have one node per workstation with each workstation using a low 
+end 386 processor.  Of course the ideal situation is to have the absolute 
+fastest computers possible as both the servers and the workstations.  In most 
+cases, however, those type of machines would not be economically feasible so 
+you must decide which would be best for your setup.
+
+When you are planning what type of machines to use for your network, keep the 
+following in mind:
+
+Server  Your server needs to be powerful enough to support the number of 
+nodes in your network.  For a 2-3 node setup you can most likely get by with 
+a low end 80386.  As you add more nodes, however, you will want a more 
+powerful machine like an 80486. The faster machine will give the server the 
+capability to keep up with all of the workstation requests.
+
+Workstations    This is where the majority of your processing will go on.  
+Since the programs will be running on these machines, do not hesitate to put 
+a reasonably fast computer on the network as one of your workstations.  Most 
+people are under the misconception that you need to have an extremely fast 
+server and put XTs on the network as your workstations.  Weigh your needs and 
+remember a fast workstation will make your system look like it is running 
+even faster.
+
+One popular solution is to use a 80486 as your server and then use 80386 or 
+80486 computers as your workstations.  On each workstation multitask several 
+nodes to help keep the overall floor space used to a minimum.  This type of 
+setup does require you to properly setup your multitasker using the 
+instructions outlined earlier in this chapter.  In addition, you must also 
+setup the workstation properly as far as the network is concerned.  This will 
+include such items as assigning network drives and checking for IRQ 
+conflicts.
+
+Where Should The PCBoard Files Be Stored?
+
+Once you have your network set up and working correctly, setting up PCBoard 
+for multiple nodes is really not much more difficult than setting up a single 
+node.  This is due to the fact that PCBoard enables you to specify where just 
+about any file is located.  You need to insure the file is really where you 
+specify -- whether it is a network or local drive.
+
+There are only a handful of files that must be located on a shared drive 
+(server drive).  You need to make sure the following files are all located on 
+a server drive because they are automatically updated as people call into the 
+system.
+
+
+Name/Loc of Users File
+Name/Loc of Users Info File
+Name/Loc of Group CHAT File
+Name/Loc of Caller Log 
+Name/Loc of USERNET.XXX File 
+Location of USERS File Index Files
+Name/Loc of MSGS File (All conferences)
+Name/Loc Upload DIR File, Location of Uploads (all conferences)
+
+
+The locations for these files are specified in PCBSetup | File Locations | 
+System Files with the exception of those relating to conferences which can be 
+found in each conference's configuration screen.  If you store these files on 
+your workstations, you will have no way to update the other workstations when 
+a new user logs in or as the files listed below change.  There are more files 
+that are recommended you store on a server drive but are not required to be 
+stored on a server drive:
+
+Name/Loc of Conference Data
+Doors - Menu Listing, Path/Name List File (all conferences)
+Bulletins - Menu Listing, Path/Name List File (all conferences)
+Scripts - Menu Listing, Path/Name List File (all conferences)
+Directories - Menu Listing, Path/Name List File (all conferences)
+
+With the remaining files in your PCBoard configuration, you must decide if 
+you wish to put them on the server, the workstation, or put some on the 
+server and some on the workstations.
+
+The following lists a few reasons you may wish to store a
+majority of the files on a workstation:
+
+Running on a slow network (e.g., 2 mpbs)
+
+You wish to keep network traffic down
+
+You have a large number of nodes on your network (e.g., 20+) and
+your server cannot handle all of the nodes requests if the files
+are stored on the server.
+
+
+The following lists a few reasons you may wish to store a
+majority of files on the server:
+
+
+You do not wish to manually update all workstations every time a
+file on the server is changed
+
+Your workstations do not have hard-drives in them
+
+You have a relatively small network and accessing all of the
+files across the network will not degrade network performance.
+
+
+When deciding where to store a file on your system it always helps to have a 
+strategy or a plan to help guide you.  One that works well for most systems 
+is to store a file on the server if it changes often.  Otherwise, store the 
+file on each workstation to help keep network traffic down.
+
+If speed is your primary concern, you will end up putting most of your files 
+on the workstations.  This usually means more maintenance for you when 
+updating the files on the workstations because you can have a lot of 
+workstations to update.
+
+If you desire the easiest setup instead of speed, store most of your files on 
+the server.  When a file is updated on the server, any nodes or workstations 
+that access that file will automatically see the change in the file because 
+they read from a shared location.
+
+For now, use the above information to help you consider where files will be 
+stored on your network.  In the section titled Installing Your Other Nodes, 
+you will actually make the changes to your system configuration.
+
+Configuring The Network Drives
+
+If you want to save yourself a lot of confusion in your network setup, you 
+will want to configure your network setup so the server drives are the same 
+letters throughout the entire network. Setting up your network to use all of 
+the same drives allows you to specify the same drive throughout PCBSetup on 
+all of your nodes, and your third party utilities.
+
+If you do not make it so that the server drives use the same letter on all 
+workstations, your setup and configuration will be more complex.  For 
+example, you may find it confusing and more complex if the drive with the 
+message bases is referred to as drive H on one workstation, and drive J on 
+another workstation. With the server drives using the same letters on all of 
+your workstations, you will make it easier to expand and maintain your 
+system.
+
+To help illustrate how to configure your workstations and servers to refer to 
+the same drive letters for all drives, look at the following example 4 
+machine - 2 server system:
+
+
+Machine 1 - Server (Network name: SERVER1)
+System Drive 	Network Resource Name 
+
+C:      DRIVE-C 
+D: 	DRIVE-D 
+E:      DRIVE-E
+F: 	DRIVE-F 
+G: 	DRIVE-G 
+
+
+Machine 2 - Server (Network name:  SERVER2)
+System Drive 	Network Resource Name 
+
+C: 	DRIVE-C 
+D: 	DRIVE-D 
+
+
+Machine 3 - Workstation
+System Drive 	Network Resource Name 
+
+C: 	N/A (not a server) 
+
+
+Machine 4 - Workstation
+System Drive 	Network Resource Name 
+
+C: 	N/A (not a server) 
+
+
+NOTE:  All of the examples in this section use Artisoft's LANtastic syntax.  
+If you are not using LANtastic then please consult the documentation for your 
+network to find out how your network refers to network resources.
+
+You can see we have a little dilemma in this setup.  Not only do all of the 
+computers in this example have C: drives, but the two servers both have a 
+drive D as well. To further complicate matters, you will want to let every 
+computer have their own local drive C.  What you need to do to rectify this 
+conflict is to begin using all of the network drives at drive H.
+
+You can begin by first assigning drive letters of your network drives on 
+SERVER1.  As was mentioned before, you can begin at drive letter H and work 
+your way down to drive Z.  You can do this because you do not have any local 
+drives that use the drive letter H.  The highest local drive letter is G and 
+that is on the first server.
+
+To assign the drive letters on the various machines of the network, you will 
+use two different methods.  If the drive is a physical drive in the server, 
+use the SUBST command provided by DOS to assign the appropriate drive letter.  
+Otherwise, use the command your network provides for assigning drives.    The 
+examples shown in this section use  LANtastic format for the network 
+commands.  If you use a different network, consult your documentation for 
+further instructions.
+
+Now that you understand why we used SUBST in some cases and the NET USE 
+command in others you should be ready to assign the drives for all four 
+nodes.  The following shows you the commands that should be added to 
+AUTOEXEC.BAT or your network startup batch file:
+
+
+Machine 1 (SERVER1)
+
+SUBST H: C:\
+SUBST I: D:\
+SUBST J: E:\
+SUBST K: F:\
+SUBST L: G:\
+NET USE M: \\SERVER2\C-DRIVE
+NET USE N: \\SERVER2\D-DRIVE
+
+
+Machine 2 (SERVER2)
+
+NET USE H: \\SERVER1\C-DRIVE
+NET USE I: \\SERVER1\D-DRIVE
+NET USE J: \\SERVER1\E-DRIVE
+NET USE K: \\SERVER1\F-DRIVE
+NET USE L: \\SERVER1\G-DRIVE
+SUBST M: C:\
+SUBST N: D:\
+
+
+Machine 3 (Workstation)
+
+NET USE H: \\SERVER1\C-DRIVE
+NET USE I: \\SERVER1\D-DRIVE
+NET USE J: \\SERVER1\E-DRIVE
+NET USE K: \\SERVER1\F-DRIVE
+NET USE L: \\SERVER1\G-DRIVE
+NET USE M: \\SERVER2\C-DRIVE
+NET USE N: \\SERVER2\D-DRIVE
+
+
+Machine 4 (Workstation)
+
+NET USE H: \\SERVER1\C-DRIVE
+NET USE I: \\SERVER1\D-DRIVE
+NET USE J: \\SERVER1\E-DRIVE
+NET USE K: \\SERVER1\F-DRIVE
+NET USE L: \\SERVER1\G-DRIVE
+NET USE M: \\SERVER2\C-DRIVE
+NET USE N: \\SERVER2\D-DRIVE
+
+
+If you look at each node, you will see drive H refers to the same drive on 
+all four nodes.  Likewise, the rest of the drives (I-N) also reference the 
+same drives on all nodes.  This is the setup you want to achieve.  It does 
+not matter what drive letters you use, but it does matter that you use the 
+same drive letters across the entire network.
+
+Modifying Your System Files
+
+There are a few changes you will likely have to make to your AUTOEXEC.BAT and 
+CONFIG.SYS system files.  You should already have an AUTOEXEC.BAT and 
+CONFIG.SYS for your system.  This section details what you must have in these 
+files in order to properly run a multinode setup using multitasking software.  
+If you have other items in these files, do not worry as they may be necessary 
+for your particular system (hardware drivers, etc.)
+
+CONFIG.SYS
+
+In you CONFIG.SYS files, modify the number of file handles you define for 
+your system.  Your server should have the number of file handles equal to 25 
+times the number of nodes the server will manage plus 25 for itself.  In 
+other words, if you have a 7 nodes running on your network (including the 
+server), add FILES=175 to your CONFIG.SYS..
+
+Your workstations need 25 file handles for each DOS process that is running.  
+Unless you are using a multitasker to run more than one node per workstation, 
+add FILES=25 to your CONFIG.SYS.  If you are running more than one node per 
+workstation, add 25 times the number of nodes you are running on the machine.  
+For example, if you are running 4 nodes, add FILES=100 to the workstation's 
+CONFIG.SYS.
+
+DOS cannot provide more than 255 file handles in CONFIG.SYS.  If you need 
+more than 255 file handles consult your network documentation to see if a 
+method to override the CONFIG.SYS settings is provided.
+
+Normally, DOS will allow you to address up to drive E without having to 
+modify your CONFIG.SYS.  In the examples used in this section, you will 
+notice we went past drive E.  For DOS to be able to access these drives, add 
+the LASTDRIVE=Z statement to your CONFIG.SYS file.  You do not have to 
+specify Z as your last drive letter, but for the small amount of memory it 
+consumes, you may end up saving time.
+
+AUTOEXEC.BAT
+
+For a multi-node setup, you must insure SHARE is either loaded or built-in to 
+your network.  By now you should have already completed the network 
+compatibility test described earlier. If you had to load SHARE.EXE for the 
+test and you have not added it to your AUTOEXEC.BAT, do that now.
+
+Installing Dial-In Nodes
+
+There are basically two types of nodes in a network setup -- dial-in and 
+local.  Dial-in nodes are those expecting calls to come from a modem or 
+serial port.
+
+Once you have installed PCBoard on your server, there are numerous ways you 
+can go about adding nodes.  You can add one node per workstation on the 
+network or you can setup a multitasker on your workstations and run more than 
+one node on each workstation.
+
+There are three primary steps you should follow when adding new
+nodes to your network configuration.  They are:
+
+Whichever method you choose each of your workstation machines should have a 
+hard drive and each of them should also have a \PCB subdirectory.  The 
+following files should be copied from the \PCB subdirectory on the server to 
+the \PCB subdirectory on the workstation.
+
+   *.EXE
+   *.COM
+   *.BAT
+   REMOTE.SYS
+   PCBOARD.DAT
+   PCBFILER.DEF
+   PCBSM.HLP
+
+In PCBSetup | Node Configuration and make sure you have answered Y to the 
+Running a Network / Multitasker System question and that you have defined the 
+proper node number on each node you have defined.
+
+In menu options A-H from the PCBSetup Main Menu, insure you have properly 
+specified all drive and path references.  You should use the information 
+provided in Where Should The PCBoard Files Be Stored to determine where the 
+files pointed to in menu options A-H should be stored.
+
+If you plan on setting up your dial-in nodes on a multitasking workstation, 
+reference the multitasking section earlier in this chapter.  About the only 
+difference between multitasking on a stand-alone machine and on a workstation 
+is that you must realize some of the files in your configuration will be read 
+from the server rather than from a local drive.  This means you simply change 
+the location of files like your users file and you will be up and running.
+
+If you decide to multitask nodes on a workstation, there are a few 
+considerations you should be aware of:
+
+You should reduce the amount of time that your workstation spends monitoring 
+the network.  This will make network transfers a little less snappy, but will 
+allocate more system time to your multi-tasker which means snappier displays 
+for your users. LANtastic uses the run_burst command line switch on the 
+AILANBIO program.  If you are using a different network consult your manual.
+
+Most multitasking programs have provisions for networks such as network 
+buffers, etc.  Consult the manual for your multitasking manual to see exactly 
+what type of support for networks that it offers.
+
+If you are using QEMM as your memory manager, increase the number of tasks.  
+To do this add tasks=nn (where nn is the number of tasks to allocate) to your 
+QEMM386.SYS line in CONFIG.SYS.  Set this value to 16 times the number of 
+nodes you plan to run.  In QEMM, a task is a data structure that is used to 
+handle interrupts out of protected mode.  If you are using a different memory 
+manager, consult your manual for further details.
+
+If you have plenty of conventional memory, you can gain a small increase in 
+speed from your network if you load all of your network drivers in 
+conventional memory.  The overall performance gain will be very, very small 
+but for some even a very small gain is important.
+
+Installing Local or In-House Nodes
+
+There are basically two types of nodes in a network setup -- dial-in and 
+local.  A local login is where the user runs PCBoard directly and interacts 
+using the local keyboard.
+
+PCBoard works equally well across a network as it does when accessed through 
+external connections.  When users login across the network, they are simply 
+running a copy of PCBoard which has its own setup (PCBOARD.DAT) file.  
+Because this method is used, PCBoard does not have to talk directly to the 
+network operating system (NETBIOS, IPX, etc.).
+
+Protecting Files From Local Users
+
+Some may question if allowing users to run PCBOARD across the network will 
+compromise security of the system by allowing users to access SysOp 
+functions.  When you use the /LOCALON command line parameter for PCBOARD.EXE, 
+it causes PCBoard to bypass the call waiting screen and go directly to the Do 
+you want graphics? prompt. In addition, the user may not shell out to 
+PCBFiler, PCBSetup, PCBSysMgr, or PCBMoni while logged in.
+
+If you wish to protect your users from accessing some of the setup and 
+configuration utilities, you can make a separate subdirectory for those files 
+and move them to that subdirectory where they can be protected via network 
+security.  Be careful about what you do with network security, however, as 
+all of the PCBoard files must have full read, write, and delete network 
+rights to function properly.
+
+Floating Local Node Numbers
+
+Setting up local login nodes are, for the most part, easier than setting up 
+dial-in nodes because you can float the node number. When you float the node 
+number it allows PCBoard to pick a node that is not being used and assign the 
+local user this node number.  This method of assigning node numbers avoids 
+the need to assign everyone a unique node number and also makes your batch 
+files and general setup much easier.  If you float the node numbers of your 
+local users, you could easily have 1000 or more users vying for access to a 
+100 node system.  If PCBoard is unable to find a free node (all nodes are 
+busy), the user will receive an ALL NODES ARE BUSY message.
+
+What makes the ability to float a node so useful is that you can have one 
+batch file and one setup file for all local nodes.  Not only that, but you 
+can start your local logins at any node number and automatically have them 
+float all the way until you run out of the concurrent logins you software 
+license allows. This means less maintenance for you in the long run and you 
+can protect your dial-in nodes (if you have any) from being used by local 
+logins.  Having one batch file for all of your logins, however, means you 
+will not be able to hard code drives and subdirectories in your batch files.
+
+Every user must have a home directory to be used by PCBoard. You must 
+guarantee that this home directory is unique to each local user.  This 
+subdirectory could be on the server set aside for a particular user, or it 
+could be a subdirectory set aside on the local hard drive of every 
+workstation.  In this subdirectory PCBOARD.SYS and ENDPCB will be created for 
+each user.
+
+PCBOARD.SYS is created for every user and contains information like the last 
+time they logged on, user name, city, etc.  ENDPCB is created by PCBoard when 
+exiting.  These are the only files that will remain in this unique 
+subdirectory.
+
+Configuring Your System To Float Nodes
+
+The first thing you will want to do to float nodes is to create a 
+subdirectory on the file server where you will store the files relating to 
+local logins.  You may want to call it LOCAL and create it under your PCB 
+subdirectory.  For example, if your server drive is F:, create an 
+F:\PCB\LOCAL\ subdirectory which will hold the local login files.  From now 
+on, this will be referred to as your local subdirectory.  Once you have 
+created the subdirectory, copy your BOARD.BAT and your PCBOARD.DAT from your 
+PCBoard installation subdirectory to your newly defined local subdirectory.
+
+The first file you need to edit is the BOARD.BAT file in your local 
+subdirectory.  There are some lines in the batch file that are not necessary 
+for local logins and also some information you will need to add.  For this 
+example, the BOARD.BAT used is the exact same one that is created when you 
+install PCBoard.  If you have made changes to your BOARD.BAT, you will need 
+to compensate where necessary.
+
+Your BOARD.BAT may resemble the following:
+
+ECHO OFF
+C:
+CD \PCB
+SET PCB=
+SET DSZLOG=PCBDSZ.LOG
+IF EXIST REMOTE.BAT RENAME REMOTE.BAT REMOTE.SYS
+IF EXIST DOOR.BAT DEL DOOR.BAT
+IF EXIST ENDPCB DEL ENDPCB
+PCBOARD
+IF EXIST REMOTE.BAT REMOTE
+IF EXIST DOOR.BAT DOOR
+IF EXIST EVENT.BAT EVENT
+IF EXIST ENDPCB GOTO END
+BOARD
+:END
+
+
+You can trim your BOARD.BAT so these lines remain:
+
+ECHO OFF
+SET PCB=
+IF EXIST DOOR.BAT DEL DOOR.BAT
+IF EXIST ENDPCB DEL ENDPCB
+PCBOARD
+IF EXIST DOOR.BAT DOOR
+
+At this point you are probably wondering why the new BOARD.BAT is so small.  
+The next few paragraphs discuss the lines that were removed and why.
+
+The first two lines that were removed are C:, and CD\PCB. These two lines 
+together change to a specific drive and directory. While this works great for 
+a dial in line, it will not work when floating nodes.  Remember, you cannot 
+hard code subdirectories or you are going to run into conflicts when floating 
+nodes.  If two users attempted to login simultaneously, they would attempt to 
+read the same PCBOARD.SYS file and cause other problems with board 
+operations.  By eliminating these two lines, you can help guarantee that the 
+user is in a unique directory before they load PCBoard.
+
+The only time you may want to change to a specific drive and subdirectory 
+would be if the subdirectory is truly unique to each user on the network.  As 
+an example, you can use the local drive c available on many or all of your 
+network workstations. On each of the workstation's local drives, make a 
+subdirectory called PCBLOCAL and use the BOARD.BAT to change to that 
+subdirectory before loading PCBoard..
+
+As another example, your users may have unique directories set aside on the 
+network server that only their account can access. You can set this up so 
+that this subdirectory is referred to as drive F (by assigning network 
+drives).  In this case, have BOARD.BAT change to the root subdirectory of the 
+F: drive and load PCBoard.
+
+The next line to be removed is SET DSZLOG=PCBDSZ.LOG.  Normally, you will 
+want this environment variable defined for transferring files.  However, 
+PCBoard provides the capability for local file transfers so this line becomes 
+un-necessary.
+
+IF EXIST REMOTE.BAT... and IF EXIST EVENT.BAT... can also be removed because 
+remote DOS sessions and events will not be a concern when you do a local 
+login.  There are also similar statements below PCBOARD in the BOARD.BAT 
+which start out the same way (IF EXIST) -- these lines should be removed.
+
+BOARD was removed from your batch file because there is no reason you would 
+need to reload BOARD.BAT from within you local batch file.  This line is 
+still necessary in all of your dial-in nodes though.
+
+When your final batch file is done, you will never make reference to the END 
+batch label so remove the :END from the batch file as well.  There is no 
+sense in leaving it in BOARD.BAT if you do not use it.
+
+After you have removed these lines, you will have the new stream-lined 
+BOARD.BAT.  Next, you must add or change some lines to help accommodate local 
+logins.
+
+PCBOARD should be changed to
+
+ 
+ PCBOARD /FILE:<local subdirectory>\PCBOARD.DAT /LOCALON
+
+
+The /FILE parameter tells PCBoard where it can find the PCBOARD.DAT file.  
+PCBoard normally looks in the current subdirectory.  Rather than copying a 
+the DAT file to each local subdirectory, why not tell PCBoard where it should 
+find the file?  When you step back and look at it, you will notice the only 
+thing that really changes for your local login users is the node number.  
+Therefore, it is to your advantage to access one PCBOARD.DAT for all of your 
+local logins.
+
+The <local subdirectory> should be replaced with the drive and subdirectory 
+of the local subdirectory created previously.  If this subdirectory happens 
+to be H:\PCB\LOCAL\, your new PCBOARD line will be:
+
+
+PCBOARD /FILE:H:\PCB\LOCAL\PCBOARD.DAT /LOCALON.
+
+
+The /LOCALON parameter totally bypasses the call-waiting screen and places 
+the user at the Do you want graphics? prompt.  From this prompt, the user can 
+choose if they want to use graphics or not, type in their user name and 
+password and continue on.  When the /LOCALON switch is used, almost all of 
+the SysOp functions are disabled except the following:
+
+        ALT-F   File Out.  This can be used to output the text PCBoard 
+                displays to a text file 
+
+        ALT-I   File In.  Used to import text from an ASCII file.  This 
+                keyboard command is very useful for importing prepared ASCII 
+                messages into the message editor.
+
+        ALT-P   Printer.  PCBoard will echo text it displays on the screen to 
+                the printer port defined in PCBSetup | Node Configuraiton. In 
+                this example, PCBoard will look in H:\PCB\LOCAL\PCBOARD.DAT 
+                to find the printer port.
+
+        ALT-T   Top of Form.  Sends a form feed to the printer you have 
+                defined in PCBSetup | Node Configuration.
+
+        F5      Shell.  Allows the person at the computer to shell to DOS. 
+                You can disable this option in PCBSetup | Configuration 
+                Options | System Control by answering N to Allow Local SHELL 
+                to DOS.
+
+If you wish, you can have your BOARD.BAT also stuff the keyboard so users 
+logging in locally will not have to answer the Do you want graphics prompt.  
+For more information on how to do this, refer to the /KEY command line 
+parameter in the PCBoard chapter of this manual.
+
+If PCBOARD.EXE is not located in the current directory or in a directory that 
+is listed in your PATH= statement, you will receive a bad command or filename 
+message from DOS.  If you do, tell your batch file where to find your 
+executable file.  For example, if your PCBOARD.EXE file is located in Q:\PCB\ 
+(which is not in your path), you can type Q:\PCB\PCBOARD.EXE to load the 
+PCBoard executable.  You will do the same thing to the BOARD.BAT file -- add 
+Q:\PCB\ in front of PCBOARD.
+
+The final line in your batch file - IF EXIST ENDPCB GOTO END should be 
+changed to IF EXIST ENDPCB DEL ENDPCB.  PCBoard will create the ENDPCB when a 
+local user logs off the system.  There really is no sense in leaving the file 
+around if it is not going to be used.
+
+You final BOARD.BAT will look like the following if your local subdirectory 
+is setup as H:\PCB\LOCAL\:
+
+ECHO OFF
+SET PCB=
+IF EXIST DOOR.BAT DEL DOOR.BAT
+IF EXIST ENDPCB DEL ENDPCB
+PCBOARD /FILE:H:\PCB\LOCAL\PCBOARD.DAT /LOCALON
+IF EXIST DOOR.BAT DOOR
+IF EXIST ENDPCB DEL ENDPCB
+
+One last thing that should be mentioned is that if all nodes are busy, 
+PCBoard will exit with a DOS errorlevel of 99.  Therefore, you can use an IF 
+ERRORLEVEL statement in your BOARD.BAT file to check for errorlevel 99.  If 
+you detect an errorlevel of 99, you know there has been an error and that you 
+should perform some other action instead.  For additional information on 
+testing errorlevels, refer to your DOS manual.
+
+When you are floating nodes, PCBoard will begin filling up the nodes at the 
+node number specified in PCBSetup.  Since PCBSetup gets most of its 
+information from PCBOARD.DAT, the file has to be copied into your local 
+subdirectory so changes can be made to it.  An advantage of having this 
+separate DAT file for your local nodes is that you can disable certain 
+features which are not necessary for local logins.
+
+Testing Your Configuration
+
+Before you begin testing your floating nodes, insure that the node number in 
+the PCBOARD.DAT  you are using is set to the proper value.  To change the 
+node number, load PCBSetup from the local subdirectory.  After PCBSetup is 
+loaded, select Node Configuration from the menu.  The fifth item from the top 
+of the screen is Node Number on the Network.  In this field, enter the first 
+node number that will be used by your local login users. Once you have made 
+this change, exit PCBSetup and save the changes you have made.
+
+At this point your floating node setup should be complete.  To test your 
+setup you can follow these steps:
+
+Find two stations on the network that you can use for testing.
+
+Change to the unique drive and directory on both workstations. This should be 
+a drive and directory nobody else on the network can/would use.
+
+Run BOARD.BAT on each workstation.
+
+The machine which ran BOARD.BAT first should come up as the node you 
+specified in the PCBOARD.DAT stored in your local subdirectory.  You can 
+verify this by completing the login and typing WHO at the command prompt.  
+The other machine should be listed as the next node.  In other words, if you 
+set your beginning node number to 4, the first machine should come up as node 
+4 and the second machine should come up as node 5.
+
+If the first local node shows node 4 and the second shows node 5, everything 
+(as far as PCBoard is concerned) is working correctly.  If it did not, your 
+configuration is not correct. Double check your setup and make sure you 
+followed all of the previous instructions.
+
+If two or more users try to login using the same directory PCBoard will go 
+directly to the command prompt rather than the familiar Do you want graphics? 
+prompt. In addition, PCBoard also thinks this new person is the same name and 
+node number as the other person.  In a sense the second person will be 
+invisible. However, with two or more people accessing the system like this, 
+you are likely to have file access errors and other unforeseen problems.  If 
+a user ever reports that they went immediately to the PCBoard command prompt 
+on their first login make sure they immediately logoff and check your 
+configuration to make sure two nodes do not and cannot conflict.
+
+If your nodes do not return to the same directory after loading a third party 
+program they left from,  there is a chance they could stomp on someone else's 
+session or they could come up under a different node number without being 
+logged off from the previous node.  If this happens, the user will be told 
+that their name is already in use on another node when they attempt to login.  
+If this occurs, you will want to use the USERNET utility provided with your 
+package.
+
+USERNET.EXE (USERNET) is a utility that allows you to manipulate the 
+USERNET.XXX file.  This file is used by PCBoard to store who is currently 
+online and what they are doing.  You will find instructions for USERNET in 
+the Utilities chapter of this manual.
+
+Once PCBoard is working correctly, verify all third party programs to make 
+sure they are setup properly (if you have any installed).  It is strongly 
+recommended that you read the Multiple node section for Doors in the 
+Conference Setup chapter of this manual for additional information on running 
+doors in a multi-node environment.
+
+In your setup you will find it useful if you know how PCBoard determines if a 
+node is busy or not.  PCBoard first scans the PCBOARD.DAT you pointed to with 
+the /FILE parameter to determine the beginning node number it can start 
+floating from.  Once PCBoard finds this number, it scans USERNET.XXX 
+beginning at that node number up to the number of nodes that your software 
+license allows.  If a free node is found, the user will be logged in.  If it 
+does not find a free node, PCBoard will print the all nodes are busy message.
+
+If you would like to verify PCBoard's findings you can always log into the 
+system and issue the WHO command to see who is currently online.  This 
+command will list all people online, the node number they are using, and what 
+they are currently doing (Entering a Message, Trasferring a File, etc.).
+
+Optimizing A Network Setup
+
+Nothing helps a system out more than a good disk cache.  You should use a 
+disk cache both on your server and on your workstations.  If you do, you will 
+see a dramatic improvement in your hard disk performance.  The most recent 
+versions of both MS-DOS and DR-DOS come with disk caching programs.  Consult 
+your DOS manual for more information on how to install the disk cache.
+
+In PCBSetup | Node Configuration there is a field labeled Node Chat 
+Frequency.  This field is used to determine how often a node scans 
+USERNET.XXX (to update who is online, etc.) and also how often each node is 
+checked for new lines of text when two users are in node chat.  If you find 
+that your system is really strained, increase the value of this field so that 
+the network is strained less often.  Do not make this value too large though, 
+as it may end up slowing down some of the functions of your bulletin board 
+system.
+
+When you are determining how big to set your network buffers in your network, 
+consider a buffer size that is in multiples of 2k or 4k.  Because PCBoard 
+does so many different tasks and because the type of network and computers 
+you are using vary so much, there is no single buffer value you should use.  
+Use a trial and error method where you login, perform what you think is a 
+normal call, check your performance time and then change your network buffer 
+size and try the test again.
+
+In your CONFIG.SYS, set your BUFFERS= statement to the cluster size (in 
+kilobytes) of the largest disk partition on each of your computers multiplied 
+by 2.  You multiply by 2 because each DOS buffer is 512 bytes.  For example, 
+if your largest partition uses a 4096 byte cluster size, you will divide 4096 
+by 1024 to get your cluster size in kilobytes and then multiple the resulting 
+value by 2.  In this example, you would set BUFFERS=8.
+
+If you do not know your cluster size, use CHKDSK to see what value is to the 
+left of bytes in each allocation unit.  Of course if you are on a server 
+drive, you will probably receive a message which says Cannot CHKDSK a network 
+drive.  If that is the case, you can use a utility called PCBDISK.EXE which 
+is included with your package.  PCBDISK will report bytes per cluster in 
+parentheses at the beginning of its screen.
+
+To help conserve a little bit of memory you can also add a statement in your 
+CONFIG.SYS which says FCBS=1,0.  DOS usually defaults to a higher number of 
+FCBs (File Control Blocks).  Very few programs use FCBs anymore so by setting 
+it to the minimum that DOS allows, 1 FCB, you can save some additional 
+conventional memory.
+
+Special Considerations For Novell Networks
+
+If you are running Novell NetWare as your network, you may want to modify the 
+way it searches for data files so it behaves more like DOS.  This change is 
+recommended at least on the PCBoard executables -- it may not be appropriate 
+for all of the files on your system.
+
+Novell, unlike DOS, searches the path not only for executable files but for 
+data files as well.  This can cause problems for PCBoard.  Therefore, it is 
+recommended that you change to the subdirectory where PCBoard is installed 
+and type:
+
+
+SMODE *.EXE 2
+
+By doing this, you tell NetWare to not search the path for data files when 
+you run your executable programs.  In all actuality, you have made NetWare 
+behave more like DOS in regards to the search path.
+
+Possible IRQ Conflicts
+
+Whenever you are adding hardware to a system (whether it be more COM ports or 
+a network card ), you need to be concerned about IRQ line conflicts.  IRQ 
+lines are used to pass hardware interrupts which are used to notify the CPU 
+that the device has some input/output that needs to be taken care of.  If two 
+devices use the same IRQ line, you will run into some serious conflicts. 
+Multitasking and networking setups will have different common scenarios which 
+are described in the next two sections.
+
+Multitasking
+
+If you are running three or more standard COM ports in a single machine, it 
+is quite likely you have already experienced a COM port conflict.  Below is a 
+table which lists typical defaults for 4 COM ports:
+
+ COM 	Base Address 	 IRQ 
+1 	03F8h 	4 
+2 	02F8h 	3 
+3 	03E8h 	4 
+4 	02E8h 	3 
+
+
+Right away you should notice a problem.  COM1 and COM3 are set to share IRQ 
+4.  Likewise, COM2 and COM4 share the same IRQ. This will DEFINITELY not 
+work.  Therefore, you need to do find two different IRQs to use for COM3 and 
+COM4.  At this point, you are probably asking yourself "What IRQs can I use?"  
+IRQs 2 and 5 are usually available in a system and a wide variety of serial 
+port boards support IRQs 2-5.  Below is a table listing base addresses and 
+IRQs which might be used in a computer with four serial ports:
+
+ COM 	Base Address 	 IRQ 
+1 	03F8h 	4 
+2 	02F8h 	3 
+3 	03E8h 	5 
+4 	02E8h 	2 
+
+
+If you decide to use IRQ 2, you need to realize that it is special.  IRQ 2 is 
+used to cascade the interrupts from the upper IRQs (8-15).  Therefore, if you 
+have any devices using IRQs 8-15 make sure that by using IRQ 2 you will not 
+cause problems for other devices because their interrupts cannot be properly 
+cascaded through IRQ 2.  If you do run into a problem, try using IRQ 7 
+instead.  This IRQ is used for LPT1 but it is usually safe to use.
+
+If you have two COM ports or a COM port and another device which conflict 
+with one another, you can get modem reset errors when you load PCBoard.  This 
+is because two or more devices are trying to get exclusive use of one IRQ.  
+Another thing that can happen is that the second device, which was contending 
+for the IRQ, will get it making the other device appear as if it has ceased 
+functioning.  The solution to these symptoms is to resolve the IRQ conflict.  
+Double check your configuration and make sure that no two devices conflict.
+
+One of the reasons external modems are recommended instead of internal modems 
+is that internal modems rarely let you select a large range of IRQs for the 
+COM ports.  If you are using external modems and run into an IRQ conflict, 
+you can change the settings on the serial port card rather than a modem card.  
+If your serial port card does not allow you to select a wide range of IRQs, 
+you can buy a new serial port card that will.
+
+Networking
+
+Like COM ports, LAN cards must communicate with the computer through using an 
+IRQ.  Therefore, make sure the IRQ settings you use for your COM port(s) and 
+your network card do not conflict with one another.  If they do conflict, you 
+could experience lockups, excessive network time-outs, or while PCBoard is 
+running you may see constant Network Delay... messages.
+
+Restricting Access To A Node
+
+When you are dealing with multiple nodes, you may need to restrict the users 
+which can access a particular node.  This section discusses how you can 
+prevent users from logging into your system based on their security level or 
+their connect speed.
+
+Throughout this section, we will be referring to a public node as a node 
+which any user can access.  Private nodes are any node which restricts 
+access.
+
+By security level
+
+If you are trying to restrict access to a node based on security level, it is 
+usually because you have public and private nodes with the private nodes 
+requiring a higher security level to access.
+
+At this point, you probably have one single PWRD file (PCBSetup | File 
+Locations | Configuration Files) for all of your nodes. If you are going to 
+restrict access to nodes by security level, you will need to change this in 
+your configuration.  What you need is different PWRD files for the public and 
+private nodes.
+
+One way of accomplishing this is to leave the location of your PWRD file on 
+the public nodes unchanged since it is functioning properly.  On the nodes 
+that you wish to have as private nodes, specify a different filename such as 
+PRIVPWRD or something similar.
+
+To save yourself some additional time, copy your PWRD file to the PWRD file 
+name you have chosen for your private nodes.  For example, if you were at the 
+DOS prompt and in the same directory where the PWRD file is, type the 
+following:
+
+COPY PWRD PRIVPWRD
+
+Next, run PCBSetup on one of your private nodes and edit the PWRD file (File 
+Locations | Configuration Files).  You should see a screen which resembles 
+the following:
+
+To lock out a particular security level, set the time limit to 0 minutes per 
+day.  When PCBoard sees the security level is allowed zero minutes per day, 
+it will display the CLOSED file and disconnect the caller from the system.
+
+By Carrier Speed
+
+If you look at the options available in PCBSetup | Modem Information | 
+Allowed Access Speeds, you will see you have several fields that control what 
+speeds will be allowed to login to this particular node.
+
+As an example, let's assume we want the following:
+
+Anyone can access this node at anytime if they connect at 2400 bps or higher.
+
+Anyone who connects at a speed less than 2400 bps will not be allowed to 
+login to the system unless they call between 1 am and 8am.
+
+To accomplish this, enter the following values:
+
+Lowest Desired Baud     :   2400
+Allow Lower Speeds      : Y
+Begin Time              : 01:00
+End Time                : 08:00
+
+To cover all of the bases, PCBoard also gives you the ability to override the 
+connection speed checking for security levels equal to or greater than the 
+level that you specify in the following field:
+
+Security Level Override :   0
+
+If you enter a security level of 0, the override function will be disabled.  
+With the security level override disabled, everyone that logs into your 
+system must meet the connect speed requirements you specify.  If you enter a 
+security level override, users who have a security level equal to or greater 
+than the value you specify will be allowed to login regardless of the time 
+they call or the speed of 
+
+DOORWAY And Multiple Nodes
+
+The shareware version of DOORWAY is included with your package so that you 
+can access DOS from remote via your REMOTE.SYS file. Each node should have a 
+REMOTE.SYS file in the node directory. If you look at this file, it should 
+resemble the following:
+
+set box=no 
+doorway com1 /v:d^O /m:600 /g:on /o: /k:v0 /c:dos
+set box=
+c:
+cd \pcb
+board
+
+If you are using a serial port other than COM1, you will need to change this 
+value to reflect the serial port that you are using. If you are using a 
+serial port other than COM1 or COM2, you will need to change the way that you 
+specify the serial port for DOORWAY.
+
+When using standard serial ports (normal serial cards but using a 
+non-standard IRQ or base address), you need to tell DOORWAY what IRQ and base 
+address you are using for each node.  For example, if you have a node which 
+uses COM3 with a base address of 3E8h and an IRQ of 5, you will enter
+
+doorway port:03e8:5 ... ... ... ...
+
+instead of
+
+doorway com3 ... ... ... ...
+
+
+NOTE:  The 0 in front of the three digit hexadecimal base address is 
+necessary on the DOORWAY command line because it is the expected syntax.  If 
+it is not, an error message informing you that the syntax for the PORT 
+parameter is incorrect will be displayed.
+
+If you are using the /M version of PCBoard, you should recall that third 
+party applications should be using the FOSSIL interface to communicate with 
+your card.  For this to work, you need to enable FOSSIL support for all of 
+your ports in DRVSETUP. Once you have insured you have setup your driver 
+properly, simply change your DOORWAY command line to point to the proper 
+port.  For example, if the node you are configuring the REMOTE.SYS for uses 
+port 2, enter the following:
+
+
+doorway com2f
+
+
+Notice that you enter the port number after the com and then add an f so 
+DOORWAY knows this is a FOSSIL port rather than a standard serial port.
+
+For further information about DOORWAY, refer to the manual which accompanies 
+DOORWAY or to DOORWAY.ZIP in the directory where you installed PCBoard.
+
+
+Answers to Common Multinode Questions
+
+Q: When I make a change to one of the conferences (including the Main Board), 
+   the change shows up on all of the nodes.  Why?
+
+A: The reason that this happens is that all of your nodes point to the same 
+   Conference Data file (PCBSetup | File Locations | System Files).  Since 
+   this file contains all of the conference information for your system and 
+   since you are using one file, you see the changes reflected on all nodes.
+
+
+
+   The obvious solution would be to specify different Conference Data files 
+   for each node. This solution is not recommended though, because any time 
+   you make a change to any conference you will have to make that same change 
+   on each node.  For example, if you setup a new conference, you will have 
+   to set it up on each node and hope you have set it up exactly the same on 
+   all nodes. Specifying a different Conference Data file for each node 
+   increases your chances of making errors in your system configuration.  If 
+   you determine that you must have some nodes that do not share the same 
+   information as the rest, you can use what is referred to as relative 
+   addressing.
+
+   Relative addressing depends on the current subdirectory to determine where 
+   it looks for files.  If you enter the filename (no drive or subdirectory 
+   locations) in a field, PCBoard will look for the file in the current or 
+   default directory.  Because each of your nodes use a different node 
+   subdirecotry, you can keep one copy of your Conference Data while still 
+   being able to have unique conference files for each node.
+
+   Relative addressing looks like the following examples:
+
+   DOORS.LST
+   GEN\BLT
+   \PCB\MAIN\SCRIPT.LST
+
+   Because no directory information is specified you are telling the program 
+   to look in the current subdirectory for the filename DOORS.LST.  If your 
+   current subdirectory is C:\PCB\, the program is going to try and open 
+   C:\PCB\DOORS.LST. On another machine your current subdirectory may be 
+   D:\PCB\. If so, the program will look for D:\PCB\DOORS.LST instead.
+
+   This example does have a directory included in the file specification but 
+   notice that there is no backslash (\) at the beginning.  This simply means 
+   to look for a subdirectory called GEN underneath the current subdirectory.  
+   For example, if your current subdirectory is C:\PCB\, the GEN\BLT will be 
+   added on to create C:\PCB\GEN\BLT.
+
+   If all that is different is the drive letters that you use between 
+   machines, you may want to use the type of relative addressing shown in 
+   this example. Notice how this example starts with a backslash. This will 
+   cause the program to begin looking for that file from the root 
+   subdirectory on the current drive.
+
+   Be careful when using relative addressing.  If you are not careful, you 
+   can create a message base or user file that is specific to one particular 
+   node.  For example if you have two nodes running and you are having 
+   problems with one node not being able to read the MSGS file you may be 
+   tempted to use relative addressing.  If you do, you will not get the file 
+   not found errors, but you will end up creating two separate files with 
+   each copy specific to a particular node.  This means that a message 
+   entered on one node will never show up on another node because each node 
+   is using  separate message base files.
+
+   Absolute addressing, on the other hand, looks like the following:
+
+   C:\PCB\GEN\DOORS.LST
+   D:\PCB\GEN\BLT
+   E:\PCB\MAIN\SCRIPTS\SCRIPT.LST
+   F:\PCB\GEN\DIR.LST
+ 
+   You will notice that each of these examples are quite similar. The reason 
+   that they are so similar is that absolute addressing requires that you 
+   start with the drive letter and give the complete path and filename.
+
+   I am planning on running multiple nodes but I only want one phone number 
+   to access all of my nodes.  How can I do this?
+
+   This is something you need to consult your local telephone company about. 
+   Your phone company should provide a service called hunt groups or 
+   ring-down groups.  You still get a phone number for each incoming line, 
+   but if the first number is busy it rings down to the second and so on.
+
+   When I try to login to a second node, the first node's session is accessed 
+   instead of a new session.  What am I doing wrong?
+
+   You are attempting to start PCBoard from the same directory that another 
+   node has started from.  Recall that PCBoard requires being loaded from a 
+   unique drive and subdirectory because it will write PCBOARD.SYS, DOOR.SYS, 
+   USERS.SYS, and ENDPCB to the directory you load PCBoard from.  If two 
+   nodes try to load from the same directory, they will conflict.
+
+Q: Will PCBoard use a modem on another computer via a network?
+
+A: No.  PCBoard talks directly to the COM port.  Therefore, this type of 
+   setup is not possible.
+
+
+Q: Every once in a while I will see a message that says SHARING VIOLATION.  
+   What exactly is a sharing violation?
+
+A: A sharing violation occurs when two programs attempt to access the same 
+   file when one of the programs has the file locked.  In normal multi-node 
+   operations, it is quite common for two or more programs to read/access a 
+   file at the same time.  Sometimes though, a program needs to update a file 
+   and while it writes to the file it will lock the file from all other 
+   programs. When a file is locked, it means that no other program can read 
+   from or write to the file.  These errors can be reported by the programs 
+   themselves or by DOS.  To resolve the conflict check and see what programs 
+   are accessing the same files and try to work around them trying to access 
+   the file at the same time.
+
+
+Q: In my network startup batch file I tell it to redirect the local C: drive 
+   to the C: drive on the server.  Just after this line executes in my batch 
+   file, the batch file stops running.  Why?
+
+A: This is one of the reasons why you should not redirect you local C: drive. 
+   Presumably you were redirecting your drives in your AUTOEXEC.BAT file 
+   which is loaded from your C: drive at bootup. When you reassigned your 
+   local C: to another drive while the batch file is running on C:, DOS can 
+   no longer find the same batch file it was executing and consequently 
+   stops. 
+
+
+Q: Whenever I open up a node's window, it loads the wrong node and sometimes 
+   gives a modem reset error.  Why does it do this?
+
+A: This is most commonly caused by changing to the wrong node directory in 
+   your BOARD.BAT which means PCBoard might end up using the wrong serial 
+   port.  Make sure you change to the correct node directory before you 
+   execute PCBoard so the correct PCBOARD.DAT (setup) file is read.
+
+   If your setup checks out okay, also make sure you have resolved all IRQ 
+   conflicts between the COM ports and all other devices in your computer. 
+   The most common conflict is to use IRQ for both COM1 and COM3.
+
+Q: When a door runs it will display the opening screen okay but when a user 
+   types something it does not show up on the screen.
+
+A: This problem occurs more often on a multitasking setup because you are 
+   more likely to be using non-standard COM ports.  The door programs you are 
+   running are not currently setup to use non standard COM ports.  In other 
+   words, the IRQ the door thinks you are using and the one you are actually 
+   using are different.  You should check the documentation for your door 
+   program to see if there is a way to specify the IRQ you are using for the 
+   COM port on your system.
+
+I have often noticed that some programs that wish to run in the event require 
+that all nodes be down while one node runs the event.  How can I make sure 
+that all of the nodes are down?
+
+The most common solution to this dilemma is to have the other nodes run a 
+program which will wait x minutes while the other node does its processing. 
+There is a third-party freeware utility available on Salt Air under the 
+filename of WAIT4.ZIP. If you have an event defined that uses PACKIT for the 
+batch file and has node 1 pack your message bases, your batch files may 
+resemble the following:
+
+
+PACKIT.001
+
+@ECHO OFF
+PCBPACK /AREA:ALL /DAYS:90 /KEEP
+BOARD
+
+
+PACKIT
+
+@ECHO OFF
+WAIT4 360
+BOARD
+
+Using these example event batch files, node 1 will pack the message bases and 
+then re-load BOARD.BAT upon completion.  In the meantime, the rest of your 
+nodes will be on hold for 360 seconds (6 minutes).  After the 6 minute 
+countdown has completed, BOARD.BAT will be re-loaded.
+
+Q: I am running multiple nodes using standard serial ports. Everyone seems to 
+   recommend 16550 UARTs for my COM ports.  What are they?  How do I find out 
+   what type of UART I have?  And why do I need them?
+
+A: A UART is the chip on standard serial port boards which handles the input 
+   and output of the serial port.  What makes the 16550 UART important to 
+   multiple node setups is that it can buffer more data than other UARTs.  
+   The 16550 will buffer up to 16 bytes of data as opposed to the one byte 
+   most other UART chips handle.  In order to maintain error-free connections 
+   with high speed modems, multitaskers, or networks a 16550 is highly 
+   recommended.
+
+   You can find out what type of UART you have by loading PCBoard (with the 
+   COM port you want to check specified in PCBSetup | Modem Information | 
+   Modem Setup) and logging in as the SysOp. Once you are in the BBS, press 
+   ALT-H four times.  You will notice that the status line will change each 
+   time and will look like the example below:
+
+   Notice that on the bottom line towards the right hand side is the text 
+   16550A FIFO.  If you have a different type of UART (e.g., 8250A/16450) you 
+   may want to upgrade to the 16550.
+
+   If you do not have 16550 UARTs on all of your serial ports, you may be 
+   able to replace your existing UARTs.  Check your serial board to see if 
+   the UARTs are socketed or not.  If they are socketed, you can contact your 
+   local electronics warehouse and ask for part number PC16550CN or 
+   NS16550AFN.  Once you have the new UART, you can simply remove the old one 
+   and replace it with a 16550.  If the UART(s) on your existing card are 
+   soldered in place or you do not feel comfortable in replacing them, it is 
+   advised that you contact a computer technician who will do it for you.
+
+
+Q: I seem to see a message that always says out of environment space while my 
+   BBS is running.  What does that mean and how do I fix it?
+
+A: When you receive an out of environment space message from DOS it means you 
+   did not have enough room in your environment to store an environment 
+   variable you attempted to create or modify. You can increase the size of 
+   your environment by using the SHELL= statement in CONFIG.SYS.  It is not 
+   recommended that you exceed 1000 bytes for your environment size because 
+   some programs have exhibited problems with environments of that size.  An 
+   environment between 512 and 768 bytes should be more than adequate for 
+   most systems.
+
+   If you have Windows 3.1, you will need to modify your SYSTEM.INI to 
+   increase the size of the environment available in a DOS window.  Windows 
+   3.1 allows you to specify the size you want for your DOS windows via your 
+   SYSTEM.INI file.  In the NonWindowsApp section of your SYSTEM.INI should 
+   be a line that says CommandEnvSize=512.  This line tells Windows how much 
+   environment space to allow to each DOS window that is opened. You should 
+   note that the default value is 512 bytes which should be fine for nearly 
+   all systems.  If you need to change that value (or add the line to your 
+   SYSTEM.INI) please refer to your Windows documentation for further 
+   instructions.
+
+Q: I seem to be experiencing sharing violations when PCBoard is loading or 
+   returning from DOOR applications.  What is causing this?
+
+A: PCBoard is overlaid which means it stores some of the executable code on 
+   disk.  There is a chance that two or more nodes can conflict while 
+   loading.  To help prevent this, make your PCBOARD.EXE file read only. To 
+   make this file read only, use the ATTRIB command provided by DOS as in the 
+   example below:
+
+      ATTRIB +R PCBOARD.EXE

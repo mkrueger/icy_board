@@ -151,10 +151,10 @@ impl IcyBoardCreator {
         lang.save(&self.destination.join(&config.paths.language_file))?;
 
         self.logger.start_action("Write default groups file".to_string());
-        config.paths.group_file = PathBuf::from("config/groups.toml");
+        config.paths.group_file = PathBuf::from("config/groups");
         let mut list = GroupList::default();
-        list.add_group("sysop", "System sysops", &vec!["SYSOP".to_string()]);
-        list.add_group("user", "Users", &vec![]);
+        list.add_group("sysop", "System Operators");
+        list.add_group("users", "Common Users");
         list.save(&self.destination.join(&config.paths.group_file))?;
 
         self.logger.start_action("Create default user (SYSOP)".to_string());

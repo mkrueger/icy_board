@@ -150,7 +150,7 @@ pub struct FileList<'a> {
 impl<'a> FileList<'a> {
     pub async fn display_file_list(&mut self, cmd: &mut PcbBoardCommand) -> Res<()> {
         cmd.state.session.disable_auto_more = true;
-        let short_header = if let Some(user) = &cmd.state.current_user {
+        let short_header = if let Some(user) = &cmd.state.session.current_user {
             user.flags.use_short_filedescr
         } else {
             false

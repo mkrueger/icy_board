@@ -1,0 +1,349 @@
+2
+==============================================================================
+                                                                  Installation
+
+
+
+
+
+
+
+
+
+Quick Install
+
+Detailed Installation Instructions
+
+
+
+
+For PCBoard to operate properly, you must install it on your system.  The 
+installation program provided on disk #1 will insure that PCBoard is properly 
+installed.  If you are installing PCBoard for the first time or upgrading a 
+previous version, the installation program will get you running in a minimal 
+amount of time.
+
+Quick Install
+
+If you have previously installed a version of PCBoard or are very familiar 
+with installing a bulletin board, this section will provide you with only the 
+necessary information that you will need to install PCBoard.  If you require 
+explanations of each of the questions that the install program will ask you, 
+skip to the Detailed Installation Instructions section of this chapter.
+
+PCBoard is supplied on both 3.5" and 5.25" disks.  Both disk sets are the 
+same.  Select the disk size appropriate to your machine and insert Disk #1 
+into your A or B drive as required. At the DOS prompt, enter:
+
+    a:install  (ENTER)  (if using Drive A)
+
+    or
+
+    b:install  (ENTER)  (if using Drive B)
+
+The installation program will then ask you for the destination of your 
+PCBoard installation on your hard disk (defaulting to C:\PCB), as well as 
+verifying the source location of the installation disks (A or B above).
+
+If you are upgrading from a previous version of PCBoard, or installing a 
+registered copy of PCBoard in place of a demo copy, the installation program 
+will automatically recognize your previous installation and will only update 
+the necessary files required for the upgrade. In either case, the install 
+program will not modify your previous configuration.
+
+Continue with the installation by following the instructions that are 
+displayed on the screen.  When the installation is complete, change to the 
+directory where you installed PCBoard and run BOARD.BAT.
+
+Detailed Installation Instructions
+
+PCBoard can be installed directly from the distribution disks, or from a 
+temporary location on your hard disk.  If you will be installing several 
+copies of PCBoard on multiple machines in a network environment, it is 
+suggested that you install from a temporary location on your main file 
+server.  For additional information on installing more than one node, refer 
+to the Multiple Nodes chapter of this manual once PCBoard is installed.
+
+If you are installing PCBoard for the first time, you will be asked to enter 
+information regarding the System Operator (SysOp) - including their name, 
+remote logon password, etc. Please be prepared to complete this information 
+during the initial installation.
+
+If you have downloaded a new release of PCBoard from Salt Air, follow the 
+instructions under Upgrading a Current Installation from Hard Disk Files 
+found later in this section.
+
+At any time during the installation procedure, you may press E when a prompt 
+is displayed to abort the installation.  Files which have already been 
+installed will not be removed from your hard disk.  If you abort an initial 
+installation and perform a subsequent complete installation, do not select 
+the upgrade option since all files may not have been installed during the 
+initial aborted install.  Instead, tell the install program that you are 
+performing a new installation to ensure all files are properly installed on 
+your system.
+
+Installing from the Distribution Disks
+
+PCBoard is supplied on both 3.5" and 5.25" high-density disks. Both disk sets 
+contain the same information.  Select the disk size appropriate to your 
+machine and insert Disk #1 into your A or B drive as required.  At the DOS 
+prompt, enter:
+
+    a:install  (ENTER)  (if using Drive A)
+
+    or
+
+    b:install  (ENTER)  (if using Drive B)
+
+If you are upgrading from a previous version of PCBoard, or installing a 
+registered copy of PCBoard in place of a demo copy, the installation program 
+will automatically recognize your previous installation and will only update 
+the necessary files required for the upgrade.  In either case, the install 
+program will not modify your previous configuration.
+
+The installation program will then ask the following two questions:
+
+Are you installing from a Floppy Drive ?  Y 
+Installing from Floppy Drive (A or B): ?  A
+
+You should enter a Y at the Are you installing from a Floppy Drive question, 
+and enter the floppy drive letter you are installing from at the Installing 
+from Floppy Drive (A or B) question.  You may skip the next section, 
+Installing from Hard Disk Files, and proceed with the section entitled 
+Installation Instructions Common to All Installation Methods.
+
+Installing from Hard Disk Files
+
+NOTE:  If you are installing PCBoard for the first time, you will be asked to 
+enter information regarding the System Operator (SysOp) - including their 
+name, remote logon password, etc. Please be prepared to complete this 
+information during the initial installation.
+
+PCBoard is supplied on both 3.5" and 5.25" high-density disks. Both disk sets 
+contain the same information.  Select the disk size appropriate to your 
+machine and insert Disk #1 into your A or B drive as required. Next, decide 
+on a temporary location on your hard disk to which you will be copying the 
+distribution disks.  This location must not be the same location that you 
+will be installing PCBoard to.  Next, copy the appropriate size distribution 
+disks to that location by using the DOS COPY command.  For example, if your 
+temporary drive location is D:\TEMP, at the DOS prompt, enter:
+
+    COPY A:\*.* D:\TEMP  (ENTER)
+
+Repeat the above procedure for each distribution disk of the size chosen.  
+Next, switch to your temporary file location and execute the install program.  
+Assuming that you copied the files on the distribution disk to D:\TEMP, you 
+would enter the following:
+
+    d:       (ENTER)
+    cd\temp  (ENTER)
+    install  (ENTER)
+
+If you are upgrading from a previous version of PCBoard, or installing a 
+registered copy of PCBoard in place of a demo copy, the installation program 
+will automatically recognize your previous installation and will only update 
+the necessary files required for the upgrade.  In either case, the install 
+program will not modify your previous configuration.
+
+The installation program will then ask the following question:
+
+    Are you installing from a Floppy Drive ?  N
+
+You should enter an N at the Are you installing from a Floppy Drive question 
+which tells the installation program to proceed with the remainder of the 
+installation without prompting for a floppy drive location.
+
+Installation Instructions Common to All Installation Methods
+
+Next, the installation program will display a screen briefly describing the 
+installation process and will ask you to complete the following three 
+questions:
+
+Do you want to proceed with the installation ? 
+Enter your destination drive (C) through (Z) ? 
+Enter the directory path to install ? 
+
+At the Do you want to proceed with the installation? prompt, reply with a Y 
+unless you do not have the required System Operator (SysOp) information 
+available which includes the SysOp name and password to be used for local 
+login.
+
+At the Enter your destination drive (C) through (Z)? prompt, enter the hard 
+disk drive location on which PCBoard will be installed.  The drive that you 
+enter should be a physical drive, not a ram drive or other temporary drive.
+
+At the Enter the directory path to install? prompt, enter the subdirectory or 
+path location on the drive previously indicated that you wish the PCBoard 
+files to be installed to.  This location defaults to \PCB.  Unless you have a 
+specific reason to change this location, it is strongly suggested that you 
+accept the default location since PCBoard defaults to the \PCB location.  If 
+you change this location from the \PCB default, you will have to manually 
+change all of the program defaults inside PCBSetup once the installation is 
+complete.
+
+After completing the above, the installation program will create the 
+following subdirectories on the destination drive you have specified and in 
+general will contain the files indicated (if you accept the default install 
+location of \PCB):
+
+        \PCB            Program executable files, system batch files, and 
+                        node specific data  files
+
+        \DL01           Can be used to place downloadable files here
+
+        \PCB\GEN        Used to store system text files, menus, bulletins, 
+                        and file listings
+
+	\PCB\HELP	Used to store system help files
+
+        \PCB\MAIN       Used to store USERS and MSGS files as well as other 
+                        sensitive system files which need to be protected 
+                        from downloading
+
+        \PCB\CONVERT    Used to store conversion files which contain 
+                        instructions on converting 12.x and earlier versions 
+                        of PCBoard
+
+	\PCB\UPLOAD	Used to store new public uploads to your system
+
+	\PCB\PRIVUPLD	Used to store new private uploads to your system
+
+Once the necessary subdirectories have been created, the installation program 
+will copy and expand the files from the distribution disks to their 
+appropriate locations on your hard disk.  After all files have been 
+successfully installed, the program will ask you the following:
+
+Did you purchase a registered DOORWAY ?  N
+
+DOORWAY is an advanced serial and local screen I/O redirector which can be 
+used to support remote DOS operations for the system operator as well as for 
+running applications as a door. which have not been specifically written to 
+operate as a door.. A non-registered version of the software is provided with 
+your copy of PCBoard.  If you have purchased a fully registered copy of 
+DOORWAY with your copy of PCBoard and you have the registered DOORWAY disk 
+available, answer Y to this question.  Otherwise, accept the default of N and 
+continue the installation process.
+
+At a later date, you can purchase a registered copy of DOORWAY if desired.  
+To update your configuration with the registered copy, replace the 
+DOORWAY.EXE file in the directory where you installed PCBoard with the 
+DOORWAY.EXE on your registered version disk.
+
+NOTE:  The non-registered version of DOORWAY that is supplied with your copy 
+of PCBoard is limited to 10 minutes of activity each time you run it.  Once 
+the 10 minutes are up, you will be returned to PCBoard.
+
+The installation program will then ask the following question:
+
+Will you be running in a multitasking environment such as
+DESQview, TaskView or OmniView or DoubleDOS (Y/N) ?  N
+
+If you will be running multiple nodes on one machine under any of the above 
+multitasking programs (including Windows or OS/2), you should answer Y to 
+this question.  If you answer Y, the installation program will automatically 
+adjust your default COM port opening speed to insure proper multi-node modem 
+operation. If at a later time you wish to adjust your COM port opening speed 
+to either a higher or lower setting, you can do so using PCBSetup.
+
+After indicating whether you will be running in a multitasking environment, 
+the installation program will check your CONFIG.SYS file to insure you have a 
+sufficient number of file handles defined for proper program operation.  Each 
+PCBoard node requires approximately 25 file handles for operation.  If the 
+installation program detects an insufficient number of handles, you will be 
+asked if you wish to update your CONFIG.SYS file with an appropriate FILES= 
+statement.  If you do not allow the install program to update your CONFIG.SYS 
+file, be sure to manually update it before attempting to run PCBoard.
+
+Next, the program will ask you to complete the System Operator (SysOp) 
+information by asking the following questions:
+
+What is your first name ?
+What is your last name ?
+City/State Information ?
+Password for remote login ?
+
+The password you enter in this screen will be the one the SysOp uses for 
+remote access to this system.  Since the integrity of the system can be 
+jeopardized by unauthorized access, you should enter a password which is not 
+used for accessing other systems. In other words, the password entered should 
+be unique to this system only!
+
+After completing the above, the program will create the system's USERS file 
+and associated index files.  This screen must be completed before attempting 
+to access your system since the required USERS file information will not be 
+present unless the above screen is properly completed.
+
+The installation program will now ask if you wish to configure a modem for 
+operation by asking the following:
+
+   Do you wish to Install a MODEM (Y/N) ?
+
+In order to configure your modem at this time, it must be connected to your 
+hardware and be powered on.  If you do not have a modem connected, reply with 
+an N to skip this operation. If you do have a modem, and it is connected and 
+powered up, reply with a Y.  The installation program will then run PCBModem 
+which will setup your modem properly.  For more information on PCBModem, 
+refer to the Utilities chapter of this manual.  
+
+Once you have selected and initialized your modem, you will be returned to 
+the PCBModem menu.  Press E until you are informed that PCBSetup will be run.  
+This is the next step in the installation process.
+
+Next, the installation program will run PCBSetup so that you can alter some 
+of the finer details of your configuration.  If you are installing PCBoard 
+for the first time, it is suggested that you immediately exit from PCBSetup 
+without altering any of the default settings until you have reviewed the 
+chapters in this manual which detail PCBSetup.  To exit PCBoard without 
+making changes, press E, and answer N to the question that you are asked.  
+
+Altering PCBoard's defaults at this time, without having a complete 
+understanding of the overall operation of the program, can cause frustration 
+in trying to put things back to their default settings at a later time.
+
+Finally, the installation program will ask if you wish to view the WHATSNEW 
+and Q&A.TXT (Questions and Answers) files.  If you do, simply respond with a 
+Y to both prompts and you will be shown the two files for review.
+
+After completing the installation process, you are ready to run PCBoard by 
+entering:
+
+   board  (ENTER)
+
+at the DOS prompt in the directory where you installed PCBoard.
+
+NOTE:  If you need to setup more than one node of PCBoard, proceed to the 
+Multiple Nodes chapter of this manual for additional information.
+
+Upgrading a Current Installation from Hard Disk Files
+
+If you have already installed a demo version of PCBoard, or are upgrading 
+your current registered version of PCBoard with a newer version, copy the 
+upgrade files and/or disks supplied to a temporary location on your hard 
+disk.  This location must not be the same location as your current program 
+location.  For example, Using the location D:\TEMP as your temporary 
+location, you would copy or place the files downloaded from the Salt Air BBS, 
+or the disks supplied, to that location.
+
+Next, change directories to the location where you copied the upgrade files 
+and type:
+
+d:        (ENTER)
+cd \temp  (ENTER)
+install   (ENTER)
+
+Tell the installation program you are not installing from a floppy drive.  
+When asked to enter the destination drive and path location for the software, 
+enter the location of your current PCBoard files.  At this point, the 
+installation program will display a screen indicating that you have already 
+installed PCBoard and ask if you wish to perform a new installation or an 
+upgrade:
+
+Would you like to Upgrade or install a New system (U/N) ?   U
+
+If you are doing a first-time reinstall of the software due a previously 
+aborted installation, enter N.  Otherwise, enter U for upgrade.  Entering U 
+will only upgrade the necessary files on your system, leaving all other 
+configuration and data files intact.
+
+CAUTION:  DO NOT SELECT A NEW INSTALLATION IF YOU ARE SIMPLY UPGRADING A 
+CURRENT SYSTEM AS ALL CURRENT DATA FILES WILL BE OVER-WRITTEN.

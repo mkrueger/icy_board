@@ -1,4 +1,7 @@
-use std::ops::{Deref, DerefMut};
+use std::{
+    ops::{Deref, DerefMut},
+    str::FromStr,
+};
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
@@ -9,7 +12,6 @@ use crate::{
 use super::{security::RequiredSecurity, IcyBoardSerializer};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use strum::{EnumIter, EnumString};
 
 mod callinfo_bbs;
 mod chain_txt;
@@ -39,11 +41,38 @@ pub enum DoorServerAccount {
     BBSLink(BBSLink),
 }
 
-#[derive(Clone, Serialize, Deserialize, Default, Debug, EnumIter, EnumString)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub enum DoorType {
     #[default]
     Local,
     BBSlink,
+}
+
+impl std::fmt::Display for DoorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DoorType::Local => write!(f, "Local"),
+            DoorType::BBSlink => write!(f, "BBSlink"),
+        }
+    }
+}
+
+impl DoorType {
+    pub fn iter() -> impl Iterator<Item = DoorType> {
+        vec![DoorType::Local, DoorType::BBSlink].into_iter()
+    }
+}
+
+impl FromStr for DoorType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Local" => Ok(DoorType::Local),
+            "BBSlink" => Ok(DoorType::BBSlink),
+            _ => Err(format!("Invalid DoorType: {}", s)),
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Default, PartialEq, Eq, Debug)]

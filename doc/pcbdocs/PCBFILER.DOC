@@ -1,0 +1,1546 @@
+11
+==============================================================================
+PCBFiler
+
+
+
+
+
+
+
+
+
+Accessing PCBFiler
+
+Explanation of PCBoard's File System
+
+The PCBFiler Menu
+
+The Directory Editor
+
+Adding New Files
+
+
+PCBFiler is designed to help you maintain the file directories on your 
+bulletin board system.  With PCBFiler, you can move/copy files between 
+file directories and conferences.  In addition, you may also create 
+complete file lists and even more.
+
+Accessing PCBFiler
+
+There are several ways to access PCBFiler.  Simply pick the method that 
+corresponds to what you are doing at the time when you want to load 
+PCBFiler.  The following describes the various ways you can load 
+PCBFiler:
+
+At a DOS prompt:  Because PCBFiler is an executable file, you can load 
+it from the DOS command line by changing to a directory which has a 
+PCBOARD.DAT file in it and typing PCBFILER on the command prompt.  The 
+only way to pass command line parameters to PCBFiler is via the DOS 
+command prompt.  See Command Line Parameters towards the end of this 
+chapter for additional details. 
+
+From the call-waiting screen:  Simply move the selection bar over to the 
+box which shows PCBFiler and press ENTER.
+
+While logged into PCBoard:  If you are logged in locally to PCBoard, you 
+may press A-D to load PCBFiler.  If you are logged in locally using the 
+/LOCALON command line switch for PCBoard, ALT-D will be disabled to 
+prevent unauthorized users from accessing PCBFiler.
+
+From System Manager:  From the Main Menu in System Manager, you can 
+select Directory  Maintenance (PCBFILER) to load PCBFiler.
+
+Explanation of PCBoard's File System
+
+If you understand how PCBoard's file system works, it will be easier to 
+setup your system to work the way you want it to work. The following is 
+a brief explanation of all files that are relevant to your file 
+directory system.
+
+DIR:  This is the file that is displayed to users when they select F 
+from your main menu to view the file directories on your system.  In 
+essence, this is a text file which lists what each file directory on 
+your system contains so users can select the file directory they wish to 
+view.
+
+DIR.LST:  This is the file PCBoard uses to determine where the file 
+descriptions are stored, and the description for the directory contents.  
+PCBFiler uses DIR.LST to determine where the files are stored on your 
+hard drive or similar device. PCBFiler also determines what method to 
+use when you sort your directories by reading DIR.LST.
+
+DLPATH.LST is a file which contains a list of paths PCBoard will search 
+through for files that a user requests to download.  Only the paths 
+listed in this file are searched when a user requests a download.
+
+There is no direct relation to downloading and the description of the 
+files.  The descriptions for the files are merely a convenience to the 
+user so they know what files are on your system.  
+
+The PCBFiler Menu
+
+When you load PCBFiler, you will be presented with the Main Menu.  From 
+the Main Menu, you can edit directory files, configure the PCBFiler 
+options, and perform other tasks related to maintaining file 
+directories.  The following describes each menu option.
+
+Edit DIR Files
+
+This menu option enables you to edit the file directories on your 
+system.  When you are editing your file directories, you can move, copy, 
+or delete the files that are listed.  When you select this menu option, 
+you are presented with the following choices:
+
+Main Board Directories
+
+This menu option will allow you to edit the file directories for the 
+Main Board Conference (conference #0).  To edit the file directories of 
+another conference, select Conference Directories instead of Main Board 
+Directories.
+
+From this point on, the screens are exactly the same as if you selected 
+Conference Directories instead.  Therefore, see the following section 
+for more information.
+
+Conference Directories
+
+If you have conferences in which files are available for download, this 
+option will enable you to access these conferences.  You are shown a 
+list of available conferences. After you select a conference, you will 
+be presented with a new screen.
+
+This new screen informs what the available directory numbers are for the 
+current conference.  This information is determined by examining the 
+DIR.LST file for each conference.  At any time, you can access the 
+private directory which is directory 0 within PCBFiler.
+
+Before you select a directory number to edit, you may press F2 to edit 
+the DIR.LST file for the current conference.  When you do, the DIR.LST 
+editor will be displayed on the screen.  You may change and save the 
+information on this screen as you would in PCBSetup | Conferences.
+
+You may notice that PCBFiler lists one more directory than you have 
+defined in your DIR.LST file.  If you have answered N to the Make All 
+Uploads Private, PCBoard will add your public upload directory as the 
+last directory in the conference. If you have defined 14 directories in 
+DIR.LST, your public upload directory will be listed as directory 15.
+
+Once you select a directory to edit, you are shown some information 
+about that directory.  The following is a sample:
+
+Selected DIR Text File: C:\PCB\GEN\UPLOAD
+Attached Subdirectory : C:\PCB\UPLOAD\
+DIR File Description  : Main Board upload
+
+Selected DIR Text File:  Displays the location of your description file.  
+This is the file you entered in the DIR Text File Name & Path field in 
+DIR.LST.
+
+Attached Subdirectory:  This field should contain the disk directory 
+where the majority of files are physically located for this file 
+directory.  If you have not specified any subdirectory in your DIR.LST 
+file, you are informed there is no attached subdirectory.
+
+DIR File Description:  In DIR.LST you are given over 30 characters to 
+describe the file directory.  For example, you may have entered 
+something like Miscellaneous Screen Utilities. Whatever you entered in 
+that field will be displayed here.
+
+Next, you will be asked two questions.  The following describes
+each question:
+
+Include files found on DISK that are not listed in the DIR file:
+There are two valid responses to this question.  The valid
+responses are:
+
+        N       Files which exist in the attached subdirectory but do 
+                not have descriptions will not be listed in the editor.
+
+        Y       All files in the attached subdirectory will be listed in 
+                the editor.  The files which do not have descriptions 
+                will have DSK or D next to each filename.
+
+Verify file existence directory:  There are three valid responses to 
+this question -- Y, N, and A.
+
+        A       Verify all files in the directory listing to see if the 
+                actual file exists in one of the directories listed in 
+                DLPATH.LST.  Use this option if you want to check and 
+                make sure a file is downloadable.  If the file is not 
+                found in any of the directories listed in DLPATH.LST, 
+                the editor will display notification to the right of the 
+                filename.  Selecting this option will significantly 
+                increase the time it takes to load the file into the 
+                editor.
+
+        N       Do not verify any of the files listed in the directory 
+                listing.  This would be the choice to select if you want 
+                to do some quick editing of a file directory and do not 
+                care to check if the files actually exist on disk.
+
+        Y       Verify all files listed in the directory listing to see 
+                if they exist in the directory defined as the Attached 
+                Subdirectory.  PCBFiler will report if the file actually 
+                exists when you are in the editor.  Depending on how 
+                many files you have in the file directory, it may 
+                significantly increase the time it takes to load the 
+                file into the directory editor.
+
+Once you have answered the two questions, the directory file will be 
+loaded and you will be placed in the directory editor. For instructions 
+on how to use the directory editor, see the section titled The Directory 
+Editor.
+
+Off-Line Directories
+
+If you select this option, you will be immediately taken into the 
+directory editor and all of the files that are stored in your off-line 
+directory will be displayed inside the editor. Since there is no 
+description file associated with the off-line file directory, you will 
+not see any descriptions.  See The Directory Editor and Maintaining 
+Files for additional information.
+
+Undo last change
+
+Whenever you perform operations in the directory editor (e.g., moving or 
+copying these files), PCBoard will record the changes made in case you 
+wish to undo them.  Only one level of undo is maintained.  If you wish 
+to undo the most recent changes, select this menu option.
+
+If you moved files, PCBoard will move the descriptions and files back to 
+the original directories.  If you copied files, the copies of the file 
+and description that were made will be deleted.  However, if you deleted 
+files, PCBoard does not undelete the file but it will restore the file 
+description.
+
+Sort all DIR Files
+
+Allows you to sort file directories in all conferences using the sort 
+method specified in DIR.LST and in the conference configuration (for the 
+upload directories).  Once you select this option,  you are asked if you 
+wish to only sort the upload directories in each conference.  If you 
+choose to select only the upload directories, both the private and 
+public upload directories for each conference will be sorted (if they 
+exist).  
+
+Create Files List
+
+If you want to compile a list of all files available in a particular 
+conference, use this menu option.  PCBFiler will create a file called 
+PCBFILES.LST.  This file will contain a compilation of all of the 
+directories in the conferences you defined in the PCBFiler Defaults menu 
+option.
+
+PCBFiler will put a header before each file directory so your 
+directories can be easily distinguished.  The header has the following 
+format:
+
+[Conf_Name]: [Directory_Number]) [Directory_Description]
+========================================================
+
+where [Conf_Name] is the name of the conference,
+[Directory_Number] is the number of the file directory and
+[Directory_Description] is the description of the file directory.
+
+For example, you may see the following in your PCBFILES.LST file:
+
+Main Board: 1) Sample Files
+====================================
+
+SAMPLE1.FIL    168046  12-28-90  Filename and description holder
+SAMPLE2.FIL      2662  12-10-92  No description available
+TEST3.TXT        2839  04-01-92  No description available (yet)
+
+Because your description files support @X color codes and included files 
+(%filename), PCBFiler must take these into consideration.  When you 
+create a file list using this menu option, PCBFiler will strip all @X 
+color codes in the description file, and will automatically include any 
+files pointed to by %filename.
+
+Scan for Duplicate/Missing Files
+
+Periodically you may want to scan your file system for duplicate or 
+missing files.  This menu option will print a comprehensive report to a 
+file called ANALYSIS.RPT in the default directory. You can use this 
+report to help fix problems in your setup or to eliminate redundancy.  
+The duplicate/missing report contains the following information:
+
+Conferences Included in Scan:  As a reminder, this will list all 
+conferences you have told PCBFiler to include in the missing/duplicate 
+scan.  This can be changed in PCBFiler | Defaults Page 2.
+
+Disk directories scanned:  Lists the disk directories that were scanned 
+for duplicates or missing files.  This information is obtained from 
+DLPATH.LST in each conference scanned.
+
+DIR files scanned:  Lists the directory description files (sometimes 
+called DIR files) that were scanned for duplicates or missing files.  
+This information is obtained from the DIR.LST file in each conference.
+
+Files listed in DIR files but missing from Disk:  The files listed in 
+this section were listed in a directory description file, but when the 
+entries in DLPATH.LST were scanned, the corresponding file could not be 
+found on disk.  This means the file is not available for download.
+
+Duplicate Files found in Disk subdirectories:  The files listed in this 
+section were found in more than one subdirectory.  To determine this 
+information, PCBFiler scans the DLPATH.LST file for all conferences.  If 
+the file is available in more than one subdirectory, it is considered to 
+be a duplicate.
+
+Duplicate Files found in DIR files:  If a file has descriptions in more 
+than one directory, it will be listed in this section of the report.  
+You will be shown what directory numbers each description number is in 
+so you may fix the problem if necessary.
+
+Locate File Spec on Disk
+
+This menu selection is almost identical to the L user command that can 
+be used to search for filenames which match a particular filename or 
+wildcard.  PCBoard will not search the file directories.  Instead, it 
+will search the download paths in all conferences to look for matching 
+files.    This menu option is useful if you are looking for a file you 
+think might be available for download but are not sure where it can be 
+found on your system.
+
+The following lists the fundamental differences between this menu 
+option, and the L user command.
+
+PCBFiler searches the disk instead of the description files.
+
+All conferences are searched
+
+PCBFiler searches through all subdirectories listed in the DLPATH.LST 
+for each conference to find  a match.
+
+When you select this menu option, you are asked for the filename or 
+filespec you would like to search for.  You may enter any valid filename 
+(including wildcards).  Once you have entered the filename to search 
+for, PCBFiler will begin scanning all conferences for matches. If a 
+match is found, you will be shown the drive, path, and filename to help 
+you locate the file on disk faster.
+
+Notice how the scan begins with the Main Board conference.  Any matches 
+will show the complete path and filename where the file can be found.  
+Files will be listed even if they do not have descriptions written for 
+them.  If you want to see only files with descriptions, use the Locate 
+File Spec in DIR Files menu option instead.
+
+Locate File Spec in DIR Files
+
+If you select this menu option, you will be asked what filename you 
+would like to search the directory description files for. To help find 
+multiple files, you may specify wildcards. PCBFiler will scan all 
+directory description files in all conferences for a match.  If a match 
+is found, the description will be displayed on the screen as shown in 
+the following example:
+
+The scan begins in the first file directory of conference 0 (the Main 
+Board) and proceeds to scan all file directories in all conferences.  
+Any matching files will show the complete file description including the 
+date, file size, and filename.
+
+Locate Text in DIR Files
+
+If you wish to search the descriptions of all files in all conferences, 
+select this menu option.  You will be asked for the text to search for.  
+Once you type in the text to search for, PCBFiler will begin searching 
+all files in all conferences for the text you entered.
+
+As with just about any other text searching function associated with 
+PCBoard, you can specify Boolean operators to help narrow your search.
+
+Notice that the description for CALGUIDE.ZIP contains the word HELP on 
+the fourth line of the description.  Since all file directories were 
+being scanned for the word HELP and this particular description has the 
+word help, the entire file description is displayed.
+
+Edit PCBFiler Defaults Page 1
+
+There are numerous options you can configure to help you control how 
+PCBFiler operates.  There are two menu options (Defaults Page 1 and 
+Default Page 2).  This section describes each of the options available 
+in  Page 1 of the defaults.
+
+Maximum number of lines allowed in DIR file editor
+
+This field controls how many lines you can load into the Directory 
+Editor.  You should enter a value high enough so you can load any of 
+your file directories into the Directory Editor. If you specify a value 
+which is too low for your system, you may see a message stating Error: 
+reached maximum number of records.  If you see this error, increase the 
+value of this field.
+
+While you can enter any value up to 32000 in this field, you should keep 
+the value relatively close to the size of your largest directory because 
+you may be wasting un-necessary memory by specifying a very large 
+number.
+
+
+NOTE:  If PCBFiler runs out of conventional memory while loading a file 
+directory into memory, it will attempt to use virtual memory on your 
+hard disk which may slow down your load time slightly.
+
+Include files found on DISK that are not listed in the DIR file
+
+This option enables you to control what the default will be for the 
+Include files found on DISK question.  The following are valid defaults:
+
+N               Do not include any files which do not have descriptions 
+                into the Directory Editor.
+
+Y               Include files found in the attached subdirectory 
+                (contained in DIR.LST) which do not have descriptions 
+                yet.  This option is extremely useful for adding new 
+                files to the system.
+
+Verify file existence
+
+When loading files into the directory editor, you can have PCBFiler 
+verify that a file really exists on one of the drives in your system.  
+The following are the valid options for this field:
+
+A               Verify file existence by searching all entries in the 
+                DLPATH.LST for the current conference.  This is 
+                extremely useful if you have a file directory which has 
+                files in two or more different subdirectories.  For 
+                example, you may have some of the files stored on a hard 
+                drive and the rest of the files stored on a CD-ROM.  If 
+                both paths are listed in your DLPATH.LST file, the files 
+                will be verified properly.  Basically, if the file is 
+                available for download, it will be verified properly.
+
+N               Do not verify file existence.  This will reduce the 
+                amount of time it takes to load the file into the 
+                Directory Editor because PCBFiler does not have to check 
+                and see if each file listed really exists.
+
+Y               Verify file existence, but only verify using the 
+                attached subdirectory listed in the DIR.LST file.
+
+If you use either the Y or A option when loading a directory into the 
+editor, you will see the status of the file existence to the left of 
+each filename when in the editor.  The following are keywords that you 
+may see:
+
+[blank] If the file could be found, you will not see any status codes.
+
+DIR     If there is a description for a file, but the corresponding file 
+        could not be found, you will see DIR next to the file name if 
+        you are using novice mode in the editor.  If you are using 
+        expert mode in the editor, you will see an L to the left of the 
+        filename instead.
+
+NOTE:  If you choose to verify file existence, the file date and file 
+size will be updated when the file is loaded into the editor.  The file 
+date will be updated only when the Update FILE DATE with date found on 
+disk file option is enabled.
+
+Perform operation (Move/Rename/Delete) on marked files
+
+If you have made changes while in the Directory Editor, you will be 
+asked if you want to perform the file operations (Move/Rename/Delete).  
+The valid options are as follows:
+
+A               PCBFiler will search for the entries in the DLPATH.LST 
+                for the current conference to see if the file exists.  
+                If it exists, it will be moved, copied, or deleted as 
+                specified in the directory editor.
+
+N               If you select this option, only the descriptions of the 
+                files that have been marked to be copied, moved, or 
+                deleted, will be processed.  This means the physical 
+                files on disk will remain untouched.
+
+Y               If you select this option, both the files and the file 
+                descriptions will be processed as specified in the 
+                directory editor.
+
+Check for duplicate files in each text DIR listing processed
+
+After all of the changes have been made as specified in the directory 
+editor, you can have PCBFiler check all of the processed directories to 
+see if there are any duplicates in any one file directory.  The 
+following are the valid options for this field:
+
+
+N               Do not check for duplicates after all files have been 
+                processed.  In all likelihood, you will not need to 
+                check for duplicates each time you make changes to a 
+                directory.  However, it is recommended that you do check 
+                for duplicates from time to time.
+
+Y               Defaults to check for duplicates each time changes are 
+                made to file directories.  If duplicates are found, you 
+                are shown the duplicates and asked which description (if 
+                any) you would like to delete from the file directory.
+
+Perform DIR processing in NON-STOP mode (no pause when screen full)
+
+When PCBFiler is processing the changes you made, it outputs what it is 
+currently doing to the screen.  You can control whether or not PCBFiler 
+should pause after each screen of data is displayed on your screen.  The 
+following are the valid options for this field:
+
+
+N               If you select this option, PCBFiler will pause after 
+                each screen of data is displayed on your screen.  Each 
+                time PCBFiler pauses, you are given the option to go 
+                into continuous or non-stop mode by pressing C at the 
+                prompt.
+
+Y               Process the files in non-stop or continuous mode.  
+                PCBFiler will not pause each time the screen fills up.
+
+Delete tagged files from disk
+
+If you have selected any files to be deleted from a file directory, 
+during processing you may be asked if you actually wish to delete the 
+files from disk.  The following are the valid defaults for this field:
+
+A               If you select this default, the files will always be 
+                deleted from disk.  In fact, you are never even asked if 
+                you want to delete the files--PCBFiler will do it 
+                automatically.
+
+N               Default to not delete the files from disk.  If you 
+                answer N to the Delete tagged files from disk, the 
+                descriptions will still be deleted, but the files will 
+                still remain on disk.  This means you only removed the 
+                description from the file directory.
+
+Y               Default to delete any files that have been marked for 
+                deletion in the directory editor.  This means both the 
+                file description and the file itself will be deleted 
+                from the file directory.
+
+Update FILE DATE with date found on disk file
+
+If you have chosen to verify file existence when loading a file into the 
+directory editor, you may also choose to have the file date updated to 
+the date found on disk or leave the date unchanged.  The following are 
+the valid defaults for this option:
+
+
+N               Do not update the description to reflect the current 
+                file date found on disk.  The date that listed in the 
+                description will remain as the date for the file.
+
+Y               Update the file date listed in the description for the 
+                file to reflect the date of the file on disk.  If a file 
+                gets updated frequently or ever changes file dates, you 
+                may want to have it reflect the current date.  If so, 
+                select this as the default.
+
+Set FILE DATE to today when moving/copying files
+
+This option allows you to choose if you want to set the file date in the 
+description to the current date when moving or copying files.  The 
+following are valid defaults for this field:
+
+
+
+A               Ask each time files are processed.  By defaulting to 
+                ask, you can choose to set the file dates of all files 
+                being moved or copied to the current date.
+
+N               Always leave the file date as listed in the Directory 
+                Editor when moving or copying files.
+
+Y               Always change the file date to the current date of any 
+                file being moved or copied.
+
+Create 0-byte file when moving OFF-LINE or creating DELETED entries
+
+This option allows you to control if a zero-byte file is left behind 
+when a file is removed from the file directory (using F7 in the Directory 
+Editor) or moved to the OFF-LINE directory. The following are the valid 
+defaults for this field:
+
+N               A zero-byte file will not be left in the directory where 
+                the file used to reside.  This means a user can 
+                re-upload the file to the system because the file will 
+                no longer exist on the system.
+
+Y               A zero-byte file with the same name will be left in the 
+                directory where it used to reside.  This will help 
+                prevent users from uploading a file with the same name 
+                as the one just deleted because technically, the file 
+                still exists on the system.
+
+Default to Expert Mode inside DIR File Editor
+
+There are two modes of operation in the Directory Editor--novice and 
+expert.  You can choose which method you prefer to default to when using 
+the Directory Editor.  The following are the valid defaults:
+
+
+
+N               Defaults to novice mode when you load the Directory 
+                Editor. This means you will see more meaningful status 
+                indicators if you choose to verify file existence.  For 
+                example, expert mode will show a D next to the left of a 
+                filename if it exists on disk but has no description.  
+                In novice mode, PCBFiler will print DSK instead.
+
+Y               Defaults to expert mode when using the Directory Editor. 
+                When in expert mode, you will see a shortened status 
+                indicator, conference number, and directory number to 
+                the left of each filename.  Expert mode is very useful 
+                when you are moving a large quanity of files to many 
+                different subdirectories because you can quickly change 
+                the directory number or conference number where the file 
+                will be moved.  You can do all of this without having to 
+                select the file and then pressing ALT-M to move the file.
+
+NOTE:  You can toggle between expert and novice modes while in the 
+Directory Editor by pressing ALT-X.
+
+Default indentation for vertical bar on Secondary Lines
+
+When you are inserting secondary lines in the Directory Editor, you can 
+control what position the secondary line character ( | ) will be placed.  
+You may enter any value between 2 and 79.  You may not enter a 1 because 
+PCBoard requires that there be a space preceding the secondary line 
+character.  To match the 45 character lines PCBoard uses, enter a 
+default indentation of 32. Speaking of PCBoard, this option will not 
+change the 45 character limit per description line that the user enters.
+
+Edit PCBFiler Defaults Page 2
+
+Like Defaults Page 1, this screen allows you to change options that will 
+affect the operation of PCBFiler.  The following describes each of the 
+fields available via this menu option.
+
+Include Conferences in File List
+
+This field holds the conferences you want to include whenever you create 
+a file list from either the main menu in PCBFiler or with the /LIST 
+command line parameter.  You may specify a single conference, a range of 
+conferences, or a combination of the two in this field.  For example, if 
+you want to include conference 0 (Main Board), conferences 10-15, and 
+conference 22 in your file lists, enter the following in this field:
+
+0,10-15,22
+
+Include for Missing/Dupe Scan
+
+In this field, specify the conferences you want to include in the 
+missing/dupe scan that you can select from the Main Menu. Like the 
+previous field, you can specify a single conference, a range of 
+conferences, or a combination of the two.
+
+Maximum number of files allowed in scan
+
+The number you choose here should be high enough to handle the total 
+number of files listed in all directory files plus the total of all of 
+the files on disk.  (maximum number is 65,000)
+
+The scan for duplicate/missing files feature stores the names and 
+locations of all files in DIRs and hard disks in virtual memory to speed 
+the sorting and comparison process.  Therefore, if you select a number 
+which is too high for your system, you may end up using the virtual 
+memory much faster than you need to which will slow down the 
+duplicate/missing report.
+
+Off-line directory
+
+In this field, specify the drive and subdirectory where you want to 
+store files you have marked as being moved off-line. PCBFiler will copy 
+the files to the location specified in this field and mark the file as 
+being off-line in the file description.
+
+If you are really moving the files off-line, you may want to specify the 
+location of a DOS device which supports removable media (e.g., floppy 
+disk drive, magneto-optical drive, etc.). If you move files to a 
+location which has removable media, you can fill up one disk or 
+cartridge, store it, then put in a new one and move some more files 
+off-line.
+
+Backup directory
+
+When PCBFiler processes files, it makes backups of all directory files 
+it modifies in case you choose to undo the changes made. This field 
+enables you to specify where the backup files will be created.  In this 
+field, specify the drive and subdirectory where you want your backup 
+files to be created.  If you leave this field blank, the backup files 
+will be created in the default or current subdirectory.
+
+Original Directory
+
+Some SysOps may copy their directory files to RAM disks when they boot 
+their system while the masters are stored on a hard-drive or other fixed 
+media device.  If you use this type of setup, PCBFiler can help you make 
+all of your changes to the physical copies of your DIR files stored on 
+the hard-drive.  
+
+In this field, enter the name of the directory you would like to 
+translate to a new location.  For example, you may physically store your 
+directory files in C:\PCB\GEN\ but you may copy them out to F:\, a ram 
+drive, for quicker access.  If this resembles your setup, enter F:\ in 
+this field.  The F:\ will be replaced with whatever you enter in the New 
+Directory field.
+
+NOTE:  If you do not intend to use this feature, you must leave
+this field blank.
+
+New Directory
+
+If a file directory is found which includes the path specified in the 
+Original Directory field, the original directory will be replaced with 
+your entry in this field.  If your system resembled the previous 
+example, enter C:\PCB\GEN in this field.
+
+File VIEWERS
+
+When you are in the Directory Editor, you have the ability to view the 
+currently highlighted file by pressing ALT-V.  In this section you may 
+specify up to six viewable extensions.  Each viewable extension can 
+execute a program or batch file which may then allow you to view the 
+file while in the Directory Editor.
+
+In the File Extension field, enter the viewable extension.  In the DOS 
+Command field, enter the DOS command whenever you press ALT-V in the 
+Directory Editor while a filename with this particular extension is 
+highlighted.  PCBFiler will run the command you specify after it appends 
+the filename you are currently viewing onto the command.  For example, 
+if you enter EDIT in this field and you press ALT-V while viewing a file 
+called TESTRUN.TXT that is stored in  C:\PCB\DL01\, PCBFiler will 
+execute the following command:
+
+EDIT C:\PCB\DL01\TESTRUN.TXT.
+
+PCBFiler will begin scanning the file extensions in the File VIEWERS 
+block from the top down to the bottom acting upon the first match found.  
+There is a special extension you may specify which will match on every 
+extension.  If you want to take advantage of this, make this new entry 
+your last file extension. The extension you want to enter is ???.  The 
+question marks are wildcard characters which will match any filename 
+extension. What type of viewing utility should you use for this entry? 
+Most SysOps will use a all-purpose viewing utility which will simply 
+show the raw content of the file.
+
+
+The following is a sample setup.
+
+File Extension : ZIP      DOS Command : PCBFV C:\PCBFV\PCBFV.CNF /L
+File Extension : ARJ      DOS Command : PCBFV C:\PCBFV\PCBFV.CNF /L
+File Extension : ARC      DOS Command : INTERNAL
+File Extension : ???      DOS Command : LIST
+
+
+If a filename is viewed which has an extension of ZIP or ARJ, PCBFiler 
+will execute PCBFV C:\PCBFV\PCBFV.CNF /L [filename]. If a filename is 
+viewed which has an extension of ARC, PCBFiler will use its internal 
+viewer for ARC compressed files.  Any other files will get viewed 
+(because of the ??? extension) and will be viewed using a utility called 
+LIST.
+
+
+NOTE:  PCBFiler has two internal viewers.  One internal viewer is for 
+ARC compressed files and the other is for ZIP compressed files.  These 
+internal viewers simply list the files stored in the compressed file and 
+their sizes.  To use these internal viewers, specify INTERNAL in the DOS 
+Command field.
+
+Choose PCBoard DIR File Colors
+
+PCBoard will colorize your file directories on the fly.  You can 
+colorize the following elements of your directory files:
+
+
+Header or banner at the top of a directory file
+Filename
+File size
+File date
+First line of a description
+Any additional lines of a description
+Text lines in the middles of a directory file
+OFF-LINE notices (in the date field)
+DELETED notices (in the date field)
+
+To choose your colors, simply move the cursor on the sample screen to 
+the color or section you want to change and press ENTER. When you press 
+ENTER, you are presented with a box which shows all possible color 
+selections you may choose.  Move the cursor around in the box until you 
+have found the color you wish to use.  Once you press ENTER on the color 
+you wish to use, you will see the sample screen update to show you what 
+your directories will look like.
+
+When you are done making all of your selections, press ESC to exit.  If 
+you have made any changes, you will be prompted if you wish to save the 
+changes.  To save the changes, answer Y to this question.
+
+The Directory Editor
+
+The Directory is the heart and soul of PCBFiler.  Within the editor, you 
+can easily maintain your file directories by moving, copying, or 
+deleting files located in a particular directory. Once you understand 
+how the directory editor works, you will be able to quickly and easily 
+place files where you want them.
+
+The Directory Editor Screen
+
+Understanding the Directory Editor screen will help you be more 
+productive while using it.  The following screen shows points of 
+interest.  Following the screen, an explanation will be given which 
+describe what each arrow points to.
+
+status indicators:  The status indicators are always displayed but are 
+different for novice and expert users.  These status indicators are 
+typically shown in bright red on the left side of the screen.  The 
+following explains each status indicator and what it looks like in both 
+novice and expert modes.
+
+Status Codes 	 	Detailed Description 
+
+Novice 	Expert 	 
+
+  DIR     L     There is a description for this file.  However, the 
+                actual file could not be found on disk.  PCBFiler will 
+                either check the attached directory as defined in 
+                DIR.LST or for all paths listed in DLPATH.LST depending 
+                on how you choose to verify existence. 
+ 
+  DSK     D     This file was found on disk, but does not have a 
+                description yet.  You must enter a description for this 
+                file if you want it listed in the file directories. 
+
+
+
+Action Codes 	 	Detailed Description 
+
+
+Novice  Expert   
+
+CPY 	C 	The file and description are marked for copying. 
+
+DEL 	D 	The file and description are marked for deletion. 
+
+MOV 	M 	The file and description are marked for moving. 
+
+REM 	R 	The description will be deleted, leaving a 0-byte file. 
+
+SEL     S       The file has been selected.  You can move all files that 
+                are selected, by pressing ALT-M while you have files 
+                selected.  All selected files will be moved. 
+
+
+current line number:  Represents the current line number that is 
+highlighted in the directory file.  These line numbers include all 
+description lines, text lines, blank lines, etc.
+
+lines in directory:  The total number of lines that are in the file 
+directory currently loaded into the editor.
+
+primary description line:  Every file must have a description if you 
+want the file to be listed in your file directories.  The first line of 
+the description is known as the primary description line because it is 
+required.
+
+secondary description line:  A secondary description line is any line in 
+a multi-line description other than the first line. This line always has 
+a vertical bar ( | ) to help separate it from a primary description 
+line.  When the file is listed in the file directory, the vertical bar 
+will not be shown to the user.
+
+text line:  Any line in a file directory which does not describe a file, 
+is considered a text line.  You have 79 characters on a text line which 
+you can enter text.  The previous example points to a text line that 
+says %H:\PCB\DIR\H_PCBD2.  The % in the first column is a special 
+feature of PCBoard and PCBFiler.  In this case, PCBFiler will display 
+the H:\PCB\DIR\H_PCBD2.
+
+conference number:  The conference number is only displayed when you are 
+using expert mode in the editor.  If you change the value in this field, 
+the file will be automatically marked for moving to the new conference 
+you specify.
+
+directory number:  Like the conference number, the directory number is 
+only displayed while you are using expert mode in the editor.  If you 
+change the value in this field, the file will be moved to the new 
+directory you specify.  If you want to move the file to the off-line 
+directory, you can enter an X for the directory number.
+
+Navigating In The Editor
+
+There are some keystrokes you will want to remember to help you navigate 
+while you are in the Directory Editor.  These keys will easily let you 
+go to the beginning or end of a directory file. In addition, you can use 
+these keystrokes to step through fields in the editor.
+
+You can tell what the current field is, because it will be highlighted.  
+For example, if the date field is the current field, you can enter any 
+valid date into the field and it will be saved.  Likewise, you can move 
+over to the description area, and enter or change text in that field.
+
+Keystroke 	Description of action 
+--------   ---------------------------------------------------------
+up        Move to the field above the currently highlighted field. 
+
+down      Move to the field below the currently highlighted field. 
+
+left      Move the cursor one character to the right in the current field. 
+
+right     Move the cursor one character to the left in the current field. 
+
+TAB       Move to the next field. 
+
+SHIFT-TAB Move to the previous field. 
+
+Home      Move the cursor to the beginning of the current field. 
+
+End       Move the cursor to the end of the current field. 
+
+up        Display the previous 15 lines (page) of the file directory. 
+
+down      Display the next 15 lines (page) of the file directory. 
+
+CTRL-End  Delete everything from the cursor to the end of the field. 
+
+CTRL-up   If you press this once, PCBFiler will move to the first field 
+          on the current screen.  If you press this keystroke twice 
+          (quickly), you will be placed at the beginning of the file 
+          directory. 
+
+CTRL-down If you press this once, PCBFiler will move to the last field 
+          on the current screen.  If you press this keystroke twice 
+          (quickly), you will be placed at the end or last field of the 
+          file directory. 
+
+
+
+Commands Available
+
+Within PCBFiler there are several commands you can execute which
+will allow you to perform actions on various files, check free
+space, shell to DOS, etc.  The following is a list of commands
+available while you are in the Directory Editor of PCBFiler:
+
+
+Key       Description 
+-------   --------------------------------------------------------
+ ESC      Exit the Directory Editor.  When you are done making changes, 
+          press this key to exit the editor.  If you have made changes, 
+          you will be prompted if you would like to save the changes you 
+          have made.  You can choose to save the changes, abort the 
+          changes, or return to the editor. 
+
+ F1       Access on-line help.  On-line context sensitive help is 
+          available from just about anywhere in PCBFiler.  To access 
+          this on-line help, press F1. 
+
+ F2       Display file directory setup.  Sometimes you may need to view 
+          the directory setup for a particular conference so you know 
+          what directory you want to move or copy a file to.  When you 
+          press F2 you are asked for the conference you want to view the 
+          directory setup of. 
+
+ F3       Convert to upper-case.  All alphabetical characters in the 
+          current field will be converted to upper-case letters.  
+          Numbers are not effected. 
+
+ F4       Convert to lower-case.  All alphabetical characters in the 
+          current field will be converted to lower-case letters.  
+          Numbers are not effected. 
+
+ F5       Convert file listing to text line.  Normally, PCBFiler will 
+          split-up a file description into various fields (filename, 
+          date, size, etc.).  You can tell PCBoard to convert the 
+          current file description into a text line using this command. 
+
+ F6       Convert text line to file listing.  If a text line is in the 
+          proper format for a file description (see The File Directory 
+          Format), the text line will be changed back so you can access 
+          one field at a time rather than the entire line. 
+
+ F7       Remove file.  Marks the current filename to be removed. When 
+          the file is removed, the file description remains but the date 
+          changes to show that the file was deleted.  A zero byte file 
+          is also usually left (Depending on Defaults Page 1) where the 
+          file used to be so the file cannot be uploaded again. 
+
+ F8       Copy file.  After you have marked a filename to be moved, you 
+          can change it so the file is copied instead of moved.  This 
+          means both the file and the description will be left in the 
+          current directory and also copied to the destination 
+          directory. 
+
+ F9       Delete file.  The current filename is marked for deletion. 
+          This means both the file on disk and the file description will 
+          be permanently deleted from this file directory. 
+
+ F10      Undo line.  If you have made changes to a field, you can undo 
+          those changes while you are still in the field by pressing 
+          F10.  Any changes you have made will be lost. 
+
+ ALT-A    Repeat last command.  There are certain commands you may want 
+          to repeat frequently.  For example, you may use ALT-L and 
+          ALT-Z several times to find the right file.  To make things 
+          easier, PCBFiler will repeat the last search when you press 
+          ALT-A. 
+
+ ALT-D    Delete current line.  The current line will be deleted from 
+          the directory editor.  It does not matter if the line is a 
+          text line or a file description.  The deletion cannot be 
+          undone while in the editor. 
+
+ ALT-F    Check free drive space.  When you are moving files around it 
+          may become essential to see how much space you have available 
+          on a system drive.  When you issue this command, you are asked 
+          for the drive letter you wish to see the free-space for.  Once 
+          you enter a valid drive letter, you are shown the total space 
+          available on the drive and the amount of free space on the 
+          drive. 
+
+ ALT-I    Insert a line.  Somewhere down the road, you may need to 
+          insert a line in your file directory.  PCBFiler allows you to 
+          enter three different types of lines.  If you select the first 
+          type, a totally blank line will be inserted.  If you pick 
+          option B, a line will be inserted showing you the fields in a 
+          file description.  Finally, if you choose the default (option 
+          C), a secondary description line will be entered.  This is 
+          most useful when you are adding a new line to a description. 
+
+ ALT-L    Locate a filename.  When you are working with several files, 
+          you may need to locate a particular filename.  This command 
+          allows you to find a specific filename.  You may enter a 
+          filename to search for or you may enter any valid wildcards.  
+          If a match is found, the highlight bar will be moved to the 
+          match. 
+
+ ALT-M    Move a file.  If your highlight bar is currently on a file 
+          description, you can mark the file to be moved to another 
+          directory.  You are prompted for the conference number, and 
+          directory number you want to move the file to.  You are also 
+          asked if you wish to copy the file instead.  See Moving or 
+          Deleting Files. 
+
+ ALT-O    Shell to DOS.  Nothing is more handy than being able to shell 
+          to DOS when you need to.  You can shell to DOS at any time 
+          while you are in the Directory Editor by pressing ALT-O. 
+
+ ALT-S    Select current file.  When your highlight bar is on a file 
+          description, the current file will be marked as a selected 
+          file.  You can use ALT-M to move all selected files to a new 
+          directory.  This is very handy if you are moving lots of files 
+          and do not want to press ALT-M on each file description. 
+
+ ALT-T    Change file date to today's date.  The date of the current 
+          filename will be changed to today's date. 
+
+ ALT-V    View current file.  PCBFiler will view the currently 
+          highlighted filename using the programs you defined in 
+          Defaults Page 2. 
+
+ ALT-X    Toggle expert/novice mode.  As mentioned previously, there are 
+          two different modes of operation within the Directory 
+          Editor--novice and expert.  You can toggle novice and expert 
+          mode using this command. 
+
+ ALT-Z    Search for text.  Like the (Z)ippy command in PCBoard, you can 
+          use this command to search for text in a description.  If a 
+          match is found, the highlight bar will be moved to the 
+          matching filename. 
+
+Moving or Deleting Files
+
+An integral part of the file system is the ability to move and delete 
+files.  Most SysOps will have several file directories defined.  Since 
+all uploads go into one directory, you need a way to move files out of 
+the upload directory into a new directory.  Likewise, you may need to 
+delete a file because you do not want to put it online for download and 
+you do not want it wasting space.
+
+Moving Files To Another Directory
+
+There are two different ways to move files within the Directory Editor.  
+Each method has advantages and disadvantages.  The following discusses 
+the two methods:
+
+        ALT-M      If you press ALT-M while your highlight bar is on a 
+                   valid file description, you will see a box pop up. 
+                   This box asks you the following information:
+
+Conference Number: The conference number to move the file to.
+Directory Number:  The file directory to move the file to.
+Move or Copy (M/C):  Enter M to move or C to copy the file.
+Move File Offline:  Enter Y if you wish to move the file off-line.
+
+
+Simply fill in this information, and press ESC to mark the file for 
+moving.  You will see either a MOV or an M next to the filename showing 
+you that the filename is marked to be moved.
+
+
+If you press ALT-M while you have files that are marked as selected (SEL 
+or S) all files that were selected will be moved to the location you 
+specify and the files will be unmarked.
+
+        Expert  While you are in expert mode in the Directory Editor you 
+                can change the number located in either the conference 
+                or directory number field.  If a new number is specified 
+                in either of those fields, you will notice that the file 
+                will be marked for moving.
+
+Using this method can save you time because you never have to hit ALT-M 
+and you do not have to select files.  Another advantage is that you can 
+see the conference and file directory the files are designated to be 
+moved to.
+
+Moving Files Off-Line
+
+Just as there are two ways to move a file, there are two ways to move a 
+file to the off-line file directory.  When you press ALT-M you will 
+notice there is a prompt asking you if you want to move the file 
+off-line.  If you answer Y, the file will be moved to the off-line file 
+directory and a zero-byte file will be left behind to prevent the 
+filename from being uploaded again.
+
+In expert mode, you can simply put an X in the conference column.  You  
+will immediately notice the file is marked for moving.  The file will be 
+moved to the directory that you specified as the off-line directory and 
+the date in the description will be changed to say OFF-LINE.
+
+Deleting Files
+
+You may either delete a file or remove a file from a file directory.  
+The following describes the difference between deleting and removing a 
+file:
+
+Deleting:  Both the file description and the file will be marked for 
+deletion.  This is the method that you will want to use if you want to 
+totally purge a file from the system.
+
+Removing:  Only the physical file is deleted leaving the file 
+description behind.  To help differentiate a normal file from a file 
+which has been removed, the date in the file description will be changed 
+to DELETED.  In addition, a zero-byte file is left behind on disk to 
+prevent a file with the same name from being uploaded again.
+
+Changing a Filename, Date or Description
+
+Changing a filename, date or description is extremely easy.  All you 
+have to do is move your highlighting bar to one of the fields mentioned 
+previously and simply type in the new filename, date or description.  
+When you exit the Directory Editor, your changes will be made to both 
+the file description and the physical file on disk.
+
+Multi-line descriptions
+
+Obviously it would be quite difficult to describe a file with only 45 
+characters.  PCBoard and PCBFiler allow you to enter up to 65 lines for 
+your file descriptions.  To add a description line to an existing file 
+description you insert a new line using ALT-I.  Insert a secondary 
+description line and start typing.  If you need another line, simply 
+press ALT-I again to insert another secondary description line.
+
+Make sure whenever you are entering a description and it is not the 
+first line that it has a | character before the place where your 
+description begins.  Otherwise, your description line will be treated as 
+a text line instead of a description line.
+
+Processing changes made in directory files
+
+Once you have made all of the changes you want to make in the directory 
+editor, you need to actually carry out those changes. To do this,  press 
+E to exit the Directory Editor and save your changes.
+
+At this point you will be asked some questions regarding processing.
+
+Perform operation (Move/Rename/Delete) on marked files
+
+PCBFiler allows you to control if the physical files will be processed 
+in addition to the file descriptions.  In most situations, you will want 
+to move the physical files with their descriptions.  The following are 
+the valid responses to this question.
+
+        A       PCBFiler will search for the entries in the DLPATH.LST 
+                for the current conference to see if the file exists.  
+                If it exists, it will be moved, copied, or deleted as 
+                you specified in the directory editor.
+
+        N       If you select this option, any files which have been 
+                marked to be copied, moved, or deleted, will have only 
+                the description acted upon.  The physical file will 
+                remain untouched.
+
+        Y       If you select this option then both the files (on disk) 
+                and the file description will be processed as you have 
+                specified in the directory editor.
+
+Check for duplicate files in each text DIR listing processed
+
+After all of the changes have been made as specified in the directory 
+editor, you can have PCBFiler check all of the directories that were 
+processed to see if there are any duplicates in any one file directory.  
+The following are the valid responses for this field:
+
+        N       Do not check for duplicates after all files have been 
+                processed.  In all likelihood, you will not need to 
+                check for duplicates each time you make changes to a 
+                directory.  However, it is recommended that you do check 
+                for duplicates from time to time.
+
+        Y       Defaults to check for duplicates each time changes are 
+                made to file directories.  If duplicates are found, you 
+                are shown the duplicates and asked which description (if 
+                any) you would like to delete from the file directory.
+
+Set FILE DATE to today's date when moving/copying files
+
+This question will only appear if you set the default of this field to 
+A.  This option allows you to choose if you wish to set the file date in 
+the description to the current date when moving or copying files.  The 
+following are valid responses.
+
+
+        N       Always leave the file date as listed in the Directory 
+                Editor when moving or copying files.
+
+        Y       Always change the file date to the current date of any 
+                file that is being moved or copied.
+
+Processing The Files
+
+Once you have answered all of the questions, PCBFiler will begin 
+processing each of the file directories that are involved.  A single 
+line will be displayed showing what is currently being processed.  For 
+example, you may see the following:
+
+
+Backing up: H:\UTIL\FDIR2
+Changed   : HISTRY14.ZIP file date
+Moved File: HISTRY14.ZIP to Area 9, DIR 8
+Sorting   : H:\DOOR\UPLOAD by Date (Ascending)
+
+
+From the first line you can see that PCBFiler backed up the directory 
+file in case you wish to undo the changes.  Next, the file date on 
+HISTRY14.ZIP was changed to reflect the new date that was entered in the 
+editor.  Finally, the file was moved to conference 9, file directory 8 
+and the destination file directory was sorted using the method specified 
+in DIR.LST.
+
+Sharing Violations
+
+As your system becomes larger there is a better chance you will start to 
+see sharing violations.  These are notifications that the current action 
+could not be processed yet, because someone is accessing the file that 
+is needed for processing.  These errors are common in a multinode 
+environment and are normal.
+
+Whenever PCBFiler runs into a sharing violation, it will wait 10 seconds 
+and try to access the file again.  The best way to avoid or minimize the 
+number of sharing violations you get while processing files is to do 
+your directory maintenance in off-peak hours when fewer people are 
+online.
+
+The File Directory Format
+
+PCBoard stores the file directories in ASCII format.  In other words, 
+you can look at your file directories with a text editor and see exactly 
+what they look like.  Because the file directories are stored in ASCII 
+format, the text must be placed in certain positions and follow certain 
+rules in order to be considered valid.
+
+If you do not manually edit your file directory listings, you most 
+likely will not need to pay attention to this section. Those that 
+manually edit their file directories will find this section full of 
+useful information.
+
+Text lines:  Any line that is not part of a file description is 
+considered a text line.  Obviously, there is no format required for a 
+text line.  Simply enter up to 78 characters per line and it will be 
+displayed as entered.  You can use text lines at the top of your file 
+directory as a header which will describe the contents of a file 
+directory.  There is no real limit to what you can do with text lines.  
+Remember that even text lines get sorted if you have chosen to sort the 
+file directory.
+
+------------------------------------------------------------------------
+         Directory 1 - PCBoard Bulletin Board Software
+------------------------------------------------------------------------
+
++----------------------------------------------------------------------+
+| PCBoard software is only available from inside the Support           |
+¦ Conference.  However, the files below can be downloaded by any       ¦
+¦ caller to this system - including the complete PCBoard documentation ¦
+¦ file.  It is provided for your use in the event you are considering  ¦
+¦ the purchase of PCBoard software.  You can order PCBoard software    ¦
+¦ while online with us by completing Script Questionnaire #2.          ¦
++----------------------------------------------------------------------+
+
+PCB145AM.ZIP   168046  12-28-90  PCBoard v 14.5 ASCII Manual
+PCBORDER.ZIP     2662  12-10-92  PCBoard v 14.x Ordering Information
+PCBCOMP.ZIP      2839  04-01-92  PCBoard v 14.5a Comparison Guide
+                                 Use this to compare other BBS packages                                    with PCBoard.
+
+In the previous screen capture the text lines are the dashed lines 
+explaining the directory, and the box. 
+
+Include files:  An included file is a line which begins with a % 
+followed by a valid filename.  The file specified will be viewed at the 
+point it is stored in the directory file.  The include file feature is 
+very handy to use especially if you have a disclaimer that you put in 
+each file directory.  That way, you may only have to enter something 
+like %C:\PCB\GEN\DISCLAIM on a blank line instead of all of the text.  
+When you make a change to the DISCLAIM file the changes are 
+automatically spread through all directories which display the file.
+
+Primary description line:  This is the line that contains the filename, 
+date, size, and first line of the description.  The following 
+specifications must be met for this line to be considered as a valid 
+primary description line.
+
+The file name is valid and contains no spaces within it.
+
+The file size is flush right in column #21.  No commas please.
+
+The file date begins in column #24 and uses dashes to separate the date 
+(e.g., 03-19-94).  All values less than 10 include leading zeroes as in 
+"01" instead of " 1".
+
+The file description begins in column 34 and must not extended beyond 
+78.
+
+The following shows some sample primary description lines:
+
+PCB145AM.ZIP   168046  12-28-90  PCBoard v 14.5 ASCII Manual
+PCBORDER.ZIP     2662  12-10-92  PCBoard v 14.x Ordering Information
+PCBLINFO.ZIP     7205  01-18-89  PCBoard/LANtastic Thoughts/Ideas
+PCBFILES.ZIP   259861  02-23-93* Complete List of All Files on Salt Air
+
+As you can see, these listings all adhere to the proper format. If you 
+do not adhere to the format as outlined previously, the entire line will 
+be considered a text line and will be treated as such.
+
+Secondary file listings:  Secondary lines allow you to improve the 
+description of a file by providing a much longer description.  Rules for 
+valid secondary lines are as follows:
+
+* Must follow a valid primary or secondary file listing.
+* Must begin with a space in the first column.
+* Must include a vertical bar (a ¦ character) somewhere on the line (the 
+  default is in column 32 at the end of the date field).
+
+PCBoard will, when displaying the file to the caller, remove the
+vertical bar so as not to clutter up the display.
+
+Colorization:  PCBoard performs automatic colorization of the DIR files 
+as they are being displayed by recognizing text lines, filenames, sizes, 
+dates, descriptions, and secondary lines according to the previous rules 
+and according to the color scheme defined in PCBFiler's Choose DIR 
+Colors menu option..
+
+Any additional colorations desired (via @-codes) are permissable as long 
+as they are placed in non-column-sensitive areas such as text or 
+secondary lines.  You will not be able to place color codes anywhere to 
+the left of the description field on a primary description line.
+
+Adding New Files
+
+At some point you will need to add files to your file directories.  You 
+could be starting your BBS for the first time and adding new files, or 
+you may have obtained a large number of files that you would like to add 
+to a particular file directory. This section discusses the steps 
+necessary to add files to a particular file directory.
+
+To help illustrate this technique we are going to use a very simple 
+setup as an example.  In our sample setup, all files are stored in the 
+Main Board and there are only two directories defined in DIR.LST which 
+looks like the following:
+
+
+     DIR Text File Name & Path       Hard Disk Subdirectory       Sort
+     -------------------------       ----------------------       ----
+1)   C:\PCB\GEN\DIR1                 D:\DEMO\                       1
+2)   C:\PCB\GEN\DIR2                 F:\UTILS\                      1
+
+
+The first thing you need to do once you have decided on the directory 
+that you want to add files to is to copy the files you want to add to 
+the subdirectory specified in the Hard Disk Subdirectory field.
+
+Once the files have been copied to the subdirectory, run PCBFiler so you 
+can describe the files you just copied.
+
+Use the Edit DIR Files menu option to load the directory you copied the 
+files to into the directory editor.  Make sure you answer Y to the 
+Include files found on DISK that are not listed in the DIR file.  If you 
+do not, you will not be able to describe these files because they will 
+not be listed in the Directory Editor.
+
+Once the file is loaded into the editor, you can go to the end of the 
+directory by pressing CTRL-PgDn twice.  You will  see the filenames you 
+copied to the directory listed with either a DSK or a D next to the 
+filename.  This is telling you that file exists in the subdirectory but 
+there is no description for the file.  
+
+Now simply move over to the description field and start entering 
+descriptions for the files you copied to the directory.  When you are 
+done entering all of the descriptions, press E to exit the Editor and 
+save your changes.
+
+Command Line Parameters
+
+You can use command line parameters to modify what PCBFiler will do when 
+it loads.  To use a command line parameter add the parameter after 
+PCBFILER.EXE.  For example, you may type PCBFILER.EXE /LIST:3.  The 
+/LIST:3 in this example is the command line parameter.
+
+/CONF:[conf]
+
+When PCBFiler loads, you will immediately be taken to the conference 
+number you specify so you may begin editing file directories.  You are 
+locked into this conference, and you cannot return to the Main Menu of 
+PCBFiler.
+
+For example, if you typed in PCBFILER /CONF:0 you may see the following:
+
+
+               PCBFiler - A Utility for PCBoard Directories
+                            Directory Selection
+
+
+Available DIR numbers are 0 for PRIVATE and 1 through 1
+Enter Number of Main Board DIR to Edit ? 1
+
+
+Notice that you do not have to go through all of the menus to get where 
+you need to get going.  In addition, this is very handy if you have 
+conference SysOp or co-SysOps that you wantto lock into a particular 
+conference so they do not edit files in conferences you do not want them 
+to access.
+
+/CONF:PCBOARD.SYS
+
+This command line parameter is identical to the /CONF:[conf] parameter 
+with one exception.  Instead of specifying a conference number to be 
+locked into, PCBFiler will pull the current conference from the 
+PCBOARD.SYS in the current directory.  If the PCBOARD.SYS does not have 
+a conference number in it (because nobody is online), PCBFiler will 
+return back to DOS.
+
+/FILE:[location of PCBOARD.DAT]
+
+PCBFiler needs to access the PCBOARD.DAT file so it can access 
+information about your various file directories.  Normally, PCBFiler 
+will look in the current directory for the PCBOARD.DAT file.  However, 
+you can tell it where to find the file by using this command line 
+parameter.
+
+Simply replace the [location of PCBOARD.DAT] with the full path and 
+filename where it can be found (e.g., C:\PCB\PCBOARD.DAT).
+
+
+        Example
+
+        PCBFILER /FILE:C:\PCB\PCBOARD.DAT
+
+        The example above will load PCBFiler and tell it to use the 
+        PCBOARD.DAT located in C:\PCB\.  If you did not use this 
+        parameter, only the current directory will be searched.
+
+
+
+/LIST:[conferences to include in the list]
+
+Using this command line parameter is equivalent to selecting Create 
+Files List from the PCBFiler Main Menu.  If you use /LIST as the command 
+line parameter, the conferences that will be included in the list will 
+be those that are listed in Defaults Page 2.  You may override these 
+conferences by specifying a : after the /LIST followed by a list of 
+conferences you want to include in the file lists.
+
+
+        Examples
+
+        PCBFILER /LIST:1
+
+        The above example would create a file list using only the files 
+        that are available from conference 1 on your system.
+
+        PCBFILER /LIST:0-10,15
+
+        This command line will create a file list of all files available 
+        in conferences 0 through 10 and conference 15.
+
+
+
+/PROCESS:conf:dir:[A]
+
+If you have files that change dates or sizes on a regular basis, you may 
+want to update the file descriptions to show the current file date and 
+size.  This command line option enables you to update the file size and 
+the file date.
+
+
+NOTE:  In order to update the date, you must have answered Y to the 
+Update FILE DATE with date found on disk file option in Defaults Page 1.
+
+In order for this command line switch to work, you must specify the 
+conference number and the directory number in the conference you want to 
+update.
+
+By adding :A to the end of the command line, PCBFiler will search all 
+directories in your DLPATH.LST for the conference you specify to see if 
+it can find the file on disk.  If the file cannot be found in the 
+default location for the file directory or in the DLPATH.LST file, 
+PCBFiler will not be able to update the file information.
+
+
+        Examples
+
+        PCBFILER /PROCESS:0:1
+
+        This example would update the file information of file directory 
+        #1 in conference #0 (Main Board)
+
+        PCBFILER /PROCESS:1:1:A
+
+        The example above would update the file directories in directory 
+        #1 of conference #1.  Because the :A is specified, PCBFiler will 
+        search all subdirectories listed in DLPATH.LST if it cannot find 
+        the file in the default location for the file directory.
+
+
+
+/SCAN
+
+This is the equivalent of selecting Scan for Duplicate/Missing Files 
+from the PCBFiler Main Menu.  This is most useful if you regularly scan 
+for duplicate or missing files within an event. Remember, the report 
+will be written to ANALYSIS.RPT in the current subdirectory.
+
+/SCAN:[conferences to include in scan]
+
+The only exception between this and the /SCAN parameter is that you may 
+override the conferences you listed to include in dupe/missing scan in 
+Defaults Page 2.  Simply enter the conferences to include in the scan 
+after the colon.  For example, to include conferences 0-39 in the 
+duplicate/missing scan, enter the following:
+
+
+PCBFILER /SCAN:0-39
+
+
+
+/SORT
+
+Using this command line parameter is equivalent to selecting Sort all 
+DIR Files from the Main Menu.  The only difference is you are not asked 
+if you wish to sort only the upload directories of each conference.  All 
+directory files will be sorted according to the methods you specified in 
+DIR.LST.
+
+
+
+/SORT:UPLOAD
+
+All upload directories in all conferences will be re-sorted. The sort 
+method used will be the one defined in the conference configuration.  
+Remember, only the upload directories (private and public) will be 
+sorted.  If you want to have all directories sorted, use /SORT instead.
+

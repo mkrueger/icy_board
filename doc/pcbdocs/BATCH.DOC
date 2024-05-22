@@ -1,0 +1,421 @@
+13
+============================================================================
+                                                                 Batch Files
+
+
+
+
+
+
+
+
+
+Door Batch Files
+
+Event Batch Files
+
+External File Transfer Protocols
+
+NODE.BAT
+
+PCBCMPRS.BAT
+
+PCBQWK.BAT
+
+PCBTEST.BAT
+
+PCBVIEW.BAT
+
+REMOTE.SYS
+
+$$LOGON.BAT
+
+$$LOGOFF.BAT
+
+
+This chapter discusses the various batch files used by PCBoard including any 
+special information you should know about these files.  PCBoard uses numerous 
+batch files to increase its flexibility.  Because batch files are used 
+throughout PCBoard you can control the programs that are actually run. If you 
+are unfamiliar with batch files, please refer to your DOS manual for further 
+instructions on creating batch files.
+
+Door Batch Files
+
+One of the most flexible aspects of PCBoard is its ability to run 
+applications as door programs.  As mentioned previously, a door simply 
+executes a batch file.  Since it is a batch file, you can run anything for a 
+door.  However, if you want the door to interact with the user, you must 
+insure that the program supports the serial ports you have installed on your 
+machine. If you are using the multiport version of PCBoard and COMM-TSR, the 
+program that you want to interact with the user must support the FOSSIL 
+interface.
+
+In the DOORS.LST file for each conference, you specify the batch file that 
+will be run when the user opens the door.  To find out the filename and the 
+location of the batch file, combine the Filename and Path to DOOR files 
+fields.  The following entry requires that you edit C:\PCB\QUERY to modify 
+the batch file:
+
+                                   USER DOOR
+  Filename    Password   Sec Login SYS  SYS  Shell    Path to DOOR Files
+ ---------- ------------ --- ----- ---- ---- ----- ---------------------
+1) QUERY                   0   N    Y    N     N   C:\PCB\
+
+Notice that there is no BAT extension that is usually associated with a batch 
+file.  Rather than editing the batch file from the DOS prompt, you can 
+highlight the Filename field and press F2 to use the text editor defined in 
+System Manager.
+
+Event Batch Files
+
+Each event can have a batch file for each node.  If a node-specific batch 
+file is not defined, it will run the batch file without an extension.  For 
+example, if you have the following event defined
+
+               Batch     Begin  End
+     Act  Mod  File      Time   Time
+     ---  ---  --------  -----  -----
+1)    Y    E   DAILY     06:45  07:00
+
+and the location of your event batch files are:
+
+Location of EVENT Files               : C:\PCB\EVENTS\
+
+you would need to edit the C:\PCB\EVENTS\DAILY to modify the programs that 
+will run during your event.  As with door batch files, you will notice that 
+this batch file does not have a BAT extension.  This gives you the ability to 
+create node-specific batch files, if you have different nodes performing 
+different tasks.
+
+Hypothetically, you could have one node packing the message and user files 
+while other nodes run maintenance programs for door or other utility programs 
+you have installed.  To perform this in a two node system, you would create 
+the following batch files:
+
+DAILY.001
+DAILY.002
+
+The extension specified represents the node number that the batch file will 
+run on.  Under no circumstances will DAILY.001 run on node 2 or likewise 
+DAILY.002 on node 1.  If a node cannot find a node-specific event batch file 
+it will check to see if a batch file exists without the node number 
+extension.  If it exists, that batch file will run.  If it does not, the node 
+will not run the event.
+
+External File Transfer 
+Protocols
+
+Even though 8 file transfer protocols are provided with PCBoard (7 internal 
+and 1 external), you may need to add additional protocols to satisfy the 
+needs of your users.  Any protocols that you add to the system are called 
+external protocols. External protocols require two batch files to be created 
+before the protocol will be available to your callers -- one for receiving 
+and one for sending.  In the batch files, you will need to run the external 
+protocol program.  Most external protocols ship with one executable and you 
+use command line parameters to determine if the protocol is sending or 
+receiving.
+
+Protocols are defined by a letter or digit in PCBPROT.DAT (PCBSetup | File 
+Locations | Configuration Files).  The receive batch file will be named using 
+the following convention:
+
+PCBR[protocol letter].BAT
+
+Likewise, the send batch file will be named:
+
+PCBS[protocol letter].BAT
+
+In these examples, replace [protocol letter] with the character you entered 
+in the Use column of PCBPROT.DAT to define the protocol.
+
+Because there are so many external protocols, no specific instructions can be 
+given for installing the protocols.  To help interface with the external 
+protocol, PCBoard passes parameters to the batch file.
+
+Parameters Passed
+
+To use a parameter in your batch file, enter the parameter when you want to 
+use what it represents.  For example, %1 for external protocols will return 
+the COM port number defined in PCBSetup | Modem Information | Modem Setup. If 
+your protocol needs this information, place %1 in the appropriate place in 
+your batch file.  The parameters passed to external protocols are:
+
+        %1      Returns the COM port number defined in PCBSetup | Modem 
+                Information | Modem Setup.  If you are using standard serial 
+                ports with non-standard definitions for the base address or 
+                IRQ, you will need to provide that information to the 
+                protocol yourself because PCBoard does not provide this 
+                information.
+
+        %2      Returns the speed between the modem and the computer.  This 
+                is commonly referred to as the DTE speed.  For modems which 
+                support locked port rates, the value of %2 will be the 
+                opening port rate speed defined in PCBSetup | Modem 
+                Information | Modem Setup.
+
+        %3      Specifies the file(s) to transfer.  The actual text that is 
+                passed as the parameter varies depending on the type of 
+                protocol and whether files are being sent or received.
+
+                Batch file transfers (Protocol types D and B):  When sending 
+                a single file, the location of the file will be passed.  When 
+                sending more than one file, the filenames that are to be 
+                transferred will be provided in a carriage return / line feed 
+                delimited list.  An @ sign is specified before the filename 
+                to the list as it is the most common way to refer to such a 
+                list. Check to make sure that your external protocol supports 
+                this method.  When receiving files, the private upload 
+                directory for the current conference will be passed.
+
+                Non-batch file transfers (Protocol type S):  The filename to 
+                be sent or received is always specified.
+
+        %4      Returns the connect speed as reported by PCBoard. 
+                Error-correcting modems will report the locked port rate 
+                speed. Other connections will report the carrier speed.
+                
+        %5      Returns the connect speed as reported by the modem.  This is 
+                referred to as the carrier or DCE speed.
+
+        %6      Returns the private upload directory for the current 
+                conference.  This parameter is most commonly used in 
+                conjunction with bi-directional protocol because they need to 
+                know where the upload directory is even while 
+                downloading.
+                
+NODE.BAT
+
+In addition to displaying who is online to the system, PCBMoni has the 
+capability to run a batch file for a particular node. Why would you want to 
+do this?  Most networks have what is called a spy utility.  This utility 
+enables you to spy on another machine in the network. Typically, you can view 
+the screen of this machine and take control of the keyboard. Obviously, this 
+would be handy to be able to access.
+
+When scrolling through the list of nodes in PCBMoni, you can press ENTER on 
+any node and PCBoard will run NODE.BAT.  So that you know the node number 
+that was specified, PCBoard will pass two parameters to NODE.BAT. You should 
+use these parameters when calling your spy utility.
+
+Parameters Passed
+
+%1              The node number is specified as Node[number] where [number] 
+                is replaced by the node number you pressed ENTER on.  The 
+                following are examples of what will be passed:
+
+                        Node 3
+                        Node 4
+                        Node 5
+
+
+%2              The node number with no preceding text is passed to the batch 
+                file.  The following are examples of what will be passed:
+
+
+                        3
+                        4
+                        5
+        
+PCBCMPRS.BAT
+
+If you will recall, the R user command has a Z subcommand that can be used to 
+capture messages in a compressed format.  To compress the captured messages, 
+PCBoard will execute PCBCMPRS.BAT with two parameters.
+
+Parameters Passed
+
+        %1      Returns the target filename.  PCBoard uses the capture 
+                filename that you enter in PCBSetup | Configuration Options | 
+                Messages and the extension specified in PCBSetup | File 
+                Locations | Configuration Files.
+
+        %2      Returns the source filename.  This will be the filename that 
+                PCBoard temporarily captured the messages to.
+
+If your file compression program uses the following syntax
+
+
+COMPRESS -a [target filename] [source filename]
+
+
+you would create a PCBCMPRS.BAT which looks like this:
+
+
+COMPRESS -a %1 %2
+
+
+If the target filename does not exist when PCBCMPRS.BAT is done executing, 
+PCBoard will report that there was an error compressing the file.  If you see 
+this error message, check the syntax of your batch file and make sure that 
+you have used the parameters properly.
+
+NOTE:  PCBoard ships with a PCBCMPRS.BAT that is already setup for use with 
+PKWare's PKZIP (R) compression program.
+
+PCBQWK.BAT
+
+To create QWK packets and to uncompress REP packets, PCBoard will execute 
+PCBQWK.BAT.  There are four parameters that will be passed to the PCBQWK 
+batch file.
+
+Parameters Passed
+
+        %1      Either COMPRESS or EXTRACT is returned in all upper case. 
+                When COMPRESS is returned, a QWK packet is being created.  
+                When EXTRACT is returned, the user uploaded a REP packet and 
+                it needs to be uncompressed so that PCBoard can insert the 
+                messages.
+
+        %2      Returns the target filename to be compressed or extracted. 
+                The actual filename will be taken from PCBSetup | 
+                Configuration Options | Messages.  If a QWK packet is being 
+                created, QWK will be added to the filename.  Likewise, if a 
+                REP packet is being uncompressed, REP will be added to the 
+                filename.
+
+        %3      Returns the work directory specified in PCBSetup | File 
+                Locations | System Files.
+
+        %4      Returns a filename that lists the files that need to be 
+                included in the QWK packet.  Most compression programs 
+                usually have some method for accepting file lists.  Check 
+                your manual for further details.
+
+
+A sample PCBQWK.BAT might resemble the following:
+
+
+if %1==COMPRESS compress %2 @%4
+if %1==EXTRACT uncompres %2 %3
+
+
+NOTE:  PCBoard ships with a PCBCMPRS.BAT that is already setup for use 
+with PKWare's PKZIP® compression program.
+
+PCBTEST.BAT
+
+One major concern of most system operators is the spread of harmful computer 
+viruses and trojans through electronic means such as bulletin board systems. 
+Another concern is to make sure that all files uploaded pass integrity tests 
+especially if the file is compressed.  If you want, you can configure PCBoard 
+to test each file that is uploaded to the system.  If you want PCBoard to do 
+this, you must enable the Verify Uploads switch in PCBSetup | Configuration 
+Options | File Transfers. When upload verification is enabled, PCBoard will 
+execute PCBTEST.BAT with three parameters.
+
+Parameters Passed
+
+        %1      Returns the complete drive, path, and filename of the file 
+                that should be tested.
+
+        %2      Returns one of three responses.  If UPLOAD is returned, the 
+                file being tested has just been uploaded and consequently is 
+                a new file to the system.  If TEST is returned, a user is 
+                using the TEST user command to verify the integrity of the 
+                file presumably before downloading it.  If ATTACH is 
+                returned, the file was uploaded to the system as a file 
+                attachment.  You can use the response to determine what type 
+                of tests (if any) should be used on the file.
+
+        %3      When %2 returns UPLOAD, this parameter will return the 
+                location of the filename that contains the description 
+                entered by the user.  Programs can modify this description 
+                file and PCBoard will import the changes back into the file 
+                directory when posting the file.
+
+Returning Status of File Tested
+
+Once PCBTEST.BAT has been executed, PCBoard checks to see if either 
+PCBPASS.TXT or PCBFAIL.TXT exists in the current directory.  The existence of 
+one of these files determines whether or not the file passed the tests.
+
+If PCBFAIL.TXT exists, PCBoard will display the contents of the file and then 
+fail the upload.  The file that was uploaded will remain in the private 
+upload directory for the conference and a FILE FAILED VERIFICATION CHECK line 
+will be added to the description of the file.  In addition, if a file 
+description is modified (%3) and the file fails verification, PCBoard will 
+not add the FILE FAILED VERICATION CHECK line to the description.
+
+If PCBPASS.TXT exists, PCBoard will display the contents of the file.  If you 
+have defined any upload or byte credits for uploads in PCBSetup | 
+Configuration Options | File Transfers, those credits will be issued.
+
+In the event that both PCBPASS.TXT and PCBFAIL.TXT exist, PCBFAIL.TXT will 
+take precedence.  In fact, any time that a PCBFAIL.TXT exists, the file will 
+be failed.
+
+NOTE:  The PCBTEST.BAT that comes with your copy of PCBoard will test the 
+integrity of ARC, ARJ, and ZIP compressed files.  If you want to do virus 
+scanning and other tasks, you will need to use a third-party program that 
+will help you do this or modify the batch file yourself.
+
+PCBVIEW.BAT
+
+In addition to testing a file before downloading it, a user may want to view 
+the contents of the file.  The user can view a file while listing file 
+descriptions or by entering F;V at the conference command prompt.
+
+When the user views a file, PCBoard executes the batch file that is specified 
+in the Batch file for viewing compressed files field of  PCBSetup | File 
+Locations | Configuration Files.  By default, this filename is called 
+PCBVIEW.BAT.  When executing this batch file, only one parameter is passed to 
+the batch file.
+
+Parameter Passed
+
+        %1      Returns the full drive, path, and filename of the filename 
+                that has been requested for viewing.
+
+After Execution of The Batch File
+
+After the batch file has been executed, PCBoard checks for the existence of 
+PCBVIEW.TXT in the current directory.  The contents of this file will be 
+displayed to the caller.  If it does not exist, it is assumed that an error 
+occurred when viewing the file.
+
+NOTE:  The PCBVIEW.BAT that has been supplied with your copy of PCBoard, will 
+list the files that are stored in ZIP, ARJ, ARC, and PAK compressed files. In 
+addition, it will view any filename that has a TXT extension to the screen.  
+If you examine the default PCBVIEW.BAT, you will notice that it uses 
+TESTFILE.EXE (also included with your copy of PCBoard) to determine the 
+extension of the filename and branch to an appropriate part in the batch 
+file.
+
+REMOTE.SYS
+
+When you request a remote drop to DOS using the 9 SysOp command, PCBoard will 
+use REMOTE.SYS as a batch file.  Therefore, you can have REMOTE.SYS load just 
+about anything you desire to drop to DOS.
+
+You will need to run some sort of program that will redirect a local DOS 
+session to a serial port because DOS does not provide this capability. 
+Included with your PCBoard package is a shareware copy of DOORWAY by TriMark 
+Engineering and a REMOTE.SYS that is pre-configured to use DOORWAY on COM1. 
+This program has the capability of redirecting text screens to a standard 
+serial or FOSSIL port.  The ASCII version of the DOORWAY documentation is 
+included in a file called DOORWAY.ZIP in your \PCB directory in case you want 
+to make any changes to the default REMOTE.SYS.
+
+In order to return back to PCBoard, your REMOTE.SYS should reload the proper 
+BOARD.BAT file.  If you do not load BOARD.BAT or if you load the wrong 
+BOARD.BAT, you could cause your entire system or a node on your system to 
+remain off-line until you get a chance to correct the mistake.
+
+$$LOGON.BAT
+
+Similar to $$LOGOFF.BAT, you can use $$LOGON.BAT to do special processing 
+after a user has logged into the system.   Once the user has properly entered 
+their name, and password, PCBoard will execute $$LOGON.BAT if it can be 
+found.  There really is no restriction on what you can run in this batch 
+file, but as a general rule, keep it short so that the callers do not have 
+excessive delays when logging in.
+
+$$LOGOFF.BAT
+
+If you need to do special processing after each caller has disconnected from 
+the system, you can use a program called $$LOGOFF.BAT.  PCBoard checks for 
+the existence of this file in the current directory and in each directory in 
+your PATH= statement.  If it is found, it will be run after the caller has 
+been disconnected and all files except PCBOARD.SYS have been closed.
+

@@ -21,7 +21,6 @@ use ratatui::{
     widgets::{block::Title, Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget},
     Frame,
 };
-use strum::IntoEnumIterator;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum EditCommandMode {
@@ -86,7 +85,7 @@ impl<'a> DoorEditor<'a> {
                 match j {
                     0 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].name)),
                     1 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].description)),
-                    2 => Line::from(format!("{:?}", cmd2.lock().unwrap()[*i].door_type)),
+                    2 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].door_type)),
                     _ => Line::from("".to_string()),
                 }
             }),
@@ -300,11 +299,11 @@ impl<'a> Editor for DoorEditor<'a> {
                                             "door_type",
                                             "Door Type".to_string(),
                                             ListValue::ComboBox(ComboBox {
-                                                cur_value: ComboBoxValue::new(format!("{:?}", action.door_type), format!("{:?}", action.door_type)),
+                                                cur_value: ComboBoxValue::new(format!("{}", action.door_type), format!("{}", action.door_type)),
                                                 first: 0,
                                                 scroll_state: ScrollbarState::default(),
                                                 values: DoorType::iter()
-                                                    .map(|x| ComboBoxValue::new(format!("{:?}", x), format!("{:?}", x)))
+                                                    .map(|x| ComboBoxValue::new(format!("{}", x), format!("{}", x)))
                                                     .collect::<Vec<ComboBoxValue>>(),
                                             }),
                                         )

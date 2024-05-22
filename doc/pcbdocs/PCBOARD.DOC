@@ -1,0 +1,1943 @@
+3
+==============================================================================
+                                                                       PCBoard
+
+
+
+
+
+
+
+
+
+Call Waiting Screen
+
+Command Line Parameters
+
+Environment Switches
+
+While A User Is Online
+
+Local Logins
+
+BOARD.BAT
+
+Errorlevels
+
+Troubleshooting
+
+
+To load PCBoard, type BOARD at the DOS command prompt.  This will 
+execute the BOARD.BAT that is installed in your \PCB directory.  When 
+PCBoard is loaded, it will present the call waiting screen to you.
+
+
+The first part of this chapter discusses the call-waiting screen.  The 
+rest of the sections in this chapter discuss the command line parameters 
+and switches you can use to load PCBoard, the status line, and potential 
+problems that you can run into while attempting to load PCBoard.
+
+Call Waiting Screen
+
+The call waiting screen is shown only to you, the SysOp.  From this 
+screen, you can access all of the important PCBoard configuration 
+utilities and modify some of the ways that PCBoard operates.  There are 
+fifteen buttons on the call-waiting screen that define the action that 
+will be taken.
+
+Navigating
+
+When the call waiting screen is displayed, you will notice that the 
+Sysop - Busy button is highlighted.  You can move the highlight bar 
+around the call-waiting screen by using the following keys:
+
+        Left    Left.  Move the highlight bar one button to the left.  
+                If the highlight bar is at the left-most button on the 
+                row, the highlight bar will not move.
+
+        Right   Right.  Move the highlight bar one button to the right.  
+                If the highlight bar is highlighting the rightmost 
+                button on the row, the bar will not move.
+
+        Down    Down.  Move the highlight bar one button down.  If the 
+                highlight bar is on the bottom button, the bar will not 
+                move.
+
+        Up      Up.  Move the highlight bar one row up.  If you are at 
+                the top of a column of buttons, the highlight bar will 
+                not move.
+
+        ENTER   Execute option.  The button that is currently 
+                highlighted will be executed.  For example, if the Sysop 
+                - Busy button is highlighted when you press R, you will 
+                log in as the SysOp and the phone will be made busy.
+
+Options Explained
+
+The following describes each of the buttons available on the 
+call-waiting screen:
+
+User - Busy
+
+Selecting this button or pressing 2 enables you to login locally as a 
+user.. The display will change to approximate what would be viewed if 
+you called in using a modem.  The only difference is that the status 
+line is visible.  In addition, the phone line for this node will be made 
+busy (if a COM port has been selected).
+
+User - Not Busy
+
+This button is identical to the User - Busy button, except that the 
+phone line will not be made busy.  If someone calls while you are logged 
+in, PCBoard will make a ringing sound and print a notice on the status 
+line to let you know that you should log off.
+
+Sysop - Busy
+
+This button allows you to log in locally to PCBoard as the SysOp.  The 
+graphics, name, and password prompts are all skipped to allow for 
+quicker logins.  PCBoard will make its best attempt to approximate the 
+display that a remote caller would see on their screen.  The only 
+difference is that the status line is visible.  In addition, the phone 
+line for this node will be made busy (if a COM port has been selected).
+
+Sysop - Not Busy
+
+This button is identical to the Sysop - Busy button, except that the 
+phone line will not be made busy.  If someone calls, while you are 
+logged in, PCBoard will make a ringing sound and print a notice on the 
+status line to let you know that you should log off.
+
+DOS - Busy
+
+Selecting this button or pressing 1 will exit PCBoard and return to DOS.  
+The phone line will be made busy preventing users from being able to 
+login to the node.
+
+DOS - Not Busy
+
+This button will exit PCBoard and return to DOS.  The phone line will 
+not be busy meaning that callers will hear the phone continually ring.  
+If you prefer to use keyboard short-cuts, you can press 0 or E instead 
+of selecting this button.
+
+Printer
+
+Selecting this button or pressing 3 will toggle the printer status.
+
+        Off     The information that is written to the caller log will 
+                not be sent to the printer port.
+
+        On      Anything that is written to the caller log will also be 
+                written to the printer port defined in PCBSetup | Node 
+                Configuration.
+
+Page Bell
+
+Selecting this button or pressing 4 will toggle your chat status to be 
+either on or off.
+
+        Off     Users will be told that the SysOp is not available for 
+                chat if they use the O user command.  Instead, they are 
+                asked if they would rather leave a comment to the SysOp.
+
+        On      When the page bell is turned on, users will be able to 
+                page you for chatting if they attempt to page between 
+                the hours defined in PCBSetup | Configuration Options | 
+                Limits.  If paged, you will be beeped for 30 seconds.  
+                You can then choose to answer the page by pressing M or 
+                to ignore the page.  If you do not answer, the user will 
+                be asked if they wish to leave a comment to the SysOp.
+
+Alarm
+
+Selecting this button or pressing 7 will toggle the alarm status to be 
+either on or off.  While a caller is online (either local or via modem), 
+PCBoard will beep when an invalid command is entered, at the beginning 
+of the call, and when the automatic logoff for inactivity is about to 
+occur.  The setting of the alarm will determine if the beeps will be 
+heard on the local computer only -- remote callers will always be sent 
+beeps.
+
+
+        Off     The beeps will not be heard on the local computer but 
+                they will be heard on the remote computer.
+
+        On      The beeps will be heard on both the local computer and 
+                the remote computer.
+
+PCBSysMgr
+
+Pressing this button or ALT-S will load System Manager.  See the System 
+Manager chapter for further details.  As long as you use BOARD.BAT to 
+load PCBoard, you will return to the call waiting screen when you exit 
+System Manager.
+
+PCBFiler
+
+Pressing this button or ALT-D will load PCBFiler.  See the PCBFiler 
+chapter for further details.  As long as you use BOARD.BAT to load 
+PCBoard, you will return to the call waiting screen when you exit 
+PCBFiler.
+
+PCBSetup
+
+This button will load PCBSetup.  As long as you use BOARD.BAT to load 
+PCBoard, you will return to the call waiting screen when you exit 
+PCBSetup.
+
+Statistics
+
+The call waiting screen keeps track of the last caller, and number of 
+calls, messages, and file transfers since being reset by the Reset Stats 
+switch.  This button toggles the statistics that are displayed on the 
+call waiting screen between local and system status.
+
+
+	Local	All statistic totals refer to the current node only.
+	System	All statistic totals refer to all of the nodes in your
+                system.
+
+NOTE:  The statistics will not be updated on local logins if the Exclude 
+Local Logins from Stats option is enabled in PCBSetup | Configuration 
+Options | Switches.
+
+PCBMoni
+
+When this button is selected or you press ALT-M, PCBMoni will be loaded.  
+See the Utilities chapter in this manual for further details.  PCBoard 
+shells to PCBMoni so you will always be returned to the call waiting 
+screen when you exit.
+
+Reset Stats
+
+Selecting this button will reset the last caller, and the number of 
+calls, messages, and file transfers.  If you are displaying LOCAL 
+statistics, only that node's statistics will be reset.  If you are 
+viewing SYSTEM statistics, all nodes will be reset.  You may want to do 
+this on a regular basis to help keep tabs of how active your system is.
+
+Additional Keyboard Commands
+
+In addition to the buttons on the call waiting screen, there are two 
+keyboard commands that are available:
+
+        F8      Recycle node.  Using this keyboard command will cause 
+                PCBoard to recycle the node and re-initialize the modem.
+
+        F9      Toggle screen display.  This keyboard command will 
+                toggle the status of the screen.  When the screen is 
+                off, no information is printed on the screen (leaving 
+                the entire screen black). Otherwise, the normal 
+                information you would see is displayed on the screen.
+
+Command Line Parameters
+
+Command line parameters give you the ability to modify certain ways that 
+PCBoard will behave.  The following is a brief listing of what some of 
+the command line parameters do:
+
+Automatically assume a local login and skip the call-waiting screen.
+
+Assume that the call has already been answered by a front-end program 
+and continue with the connection.
+
+Usually, you will modify your BOARD.BAT file to include the command line 
+parameters that you want to use.  Use a text editor to modify the 
+PCBOARD line in the batch file.  To add one or more command line 
+parameters, specify them after PCBOARD as shown in the following:
+
+
+if exist endpcb del endpcb
+PCBOARD /LOCALON /KEY:y;q^M
+if exist remote.bat remote
+
+Notice that two command line parameters were specified on this line.  To 
+separate the parameters, a space is used after PCBOARD and also after 
+the first parameter.
+
+/C:[carrier speed]
+
+If you run a front-end program that answers the call, you need to inform 
+PCBoard that the call has already been answered by using this parameter.  
+When this parameter is used, the carrier speed of the connection must be 
+supplied.  If you do not specify a valid carrier speed, PCBoard will 
+print
+
+
+Invalid use of /C: switch
+Exiting to DOS!
+
+
+and return back to DOS.  When a valid carrier speed is specified, 
+PCBoard will check the port to make sure that carrier is detected on the 
+serial port that PCBoard is defined to use before allowing the user to 
+login.  If carrier cannot be found, PCBoard will notify you and then 
+exit.
+
+Example
+
+PCBOARD /C:14400
+
+/ERR
+
+This parameter tells PCBoard that the connection that has been 
+established by a front-end program is an error-correcting session.  
+Users who have error-correcting sessions are able to select file 
+transfer protocols that require error-correcting sessions.  You must use 
+this parameter in conjunction with the /C parameter to have any effect.
+
+Example
+
+PCBOARD /C:14400 /ERR
+
+/EVENT:[minutes to event]
+
+If you have a front-end program answer all of the calls, PCBoard will 
+not be in control of running events.  Instead, it is up to your 
+front-end program to run all of your events for you.  To help insure 
+that all callers have logged off by the time your front-end program is 
+ready to run the event, PCBoard uses this parameter
+
+You must specify the number of minutes after the user has connected that 
+the event is scheduled to run.  Most front-end programs will set an 
+environment variable with this value.
+
+Example
+
+Assuming that your front-end program sets an environment
+variable called EVENTIME with the number of minutes until the
+next event occurs, you would use the following line in BOARD.BAT:
+
+PCBOARD /EVENT:%EVENTIME%
+
+NOTE:  If you are unfamiliar with using environment variables in batch 
+files, refer to your DOS manual for a detailed description.
+
+/FILE:[location of PCBOARD.DAT]
+
+By default, PCBoard will assume that its configuration file 
+(PCBOARD.DAT) is located in the current directory.  If you attempt to 
+load PCBoard from a directory that does not have a PCBOARD.DAT, you will 
+receive this message:
+
+Unable to open PCBOARD.DAT
+Exiting to DOS!
+
+In some setups, it is desirable to share the same PCBOARD.DAT file for 
+several nodes.  A good example of this would be if you have several 
+users on a network that will be logging into your nodes.  The /FILE 
+parameter, enables you to specify where the PCBOARD.DAT file can be 
+found for the node you are trying to load.  
+
+After the /FILE:, you must specify where the PCBOARD.DAT.  If you 
+specify an incorrect location or forget to specify the filename, you 
+will see the following error message:
+
+Unable to open PCBOARD.DAT
+Exiting to DOS!
+
+Example
+
+PCBOARD /FILE:C:\TEMP\PCBOARD.DAT /KEY:[text to stuff]
+
+When used in conjunction with the /LOCALON parameter, you can 
+automatically send the keys specified with the /KEY parameter. This 
+would allow you to setup a batch file that may automatically answer the 
+graphics, name, and password questions for you -- saving you from 
+entering this information each time you want to log in locally.
+
+When specifying the keys to use on the command line, you need to be 
+aware of the some special conditions:
+
+To send a carriage return, enter ^M on the command line.  See the 
+examples for this section for additional details.
+
+If you need to send a space, you must surround the entire /KEY parameter 
+in quotes to make sure that DOS treats it as one single command line 
+parameter.  See the examples for this section.
+
+If you need to send a %, you will need to enter two % characters in a 
+row.  This character has a special meaning when used in batch files and 
+it will be stripped unless you specify two of them together.
+
+If you would rather send the contents of a file instead of specifying 
+the keys to send on the command line, you would enter an @ followed by 
+the filename you want to use after the /KEY: parameter.  By sending the 
+contents of the files, you would not have to worry about the special 
+conditions outlined earlier in this section.  For a sample of using the 
+contents of a file, see Examples.
+
+Examples
+
+To automatically answer the graphics and name questions, you could 
+modify your BOARD.BAT to read:
+
+PCBOARD /LOCALON /KEY:y;q^mFirst^mLast^m
+
+Using the previous example and stacking your name (instead of answering 
+each prompt individually) would require that you use a space.  As 
+mentioned previously, you will need to surround the entire /KEY 
+parameter with quotes if you want to send a space.
+
+PCBOARD /LOCALON "/KEY:y;q^mFirst Last^m"
+
+Finally, if you want to specify that the contents of LOGIN.TXT be sent 
+to the local login session, then you would modify your BOARD.BAT to 
+read:
+
+PCBOARD /LOCALON /KEY:@LOGIN.TXT
+
+or
+
+PCBOARD /LOCALON /KEY:@C:\LOGIN\BOB.TXT
+
+/LOCALON
+
+Not all users have to connect with a modem to login to PCBoard. In fact, 
+the ability to let users login from remote with a modem or locally is 
+one of PCBoard strong points.  You could have all of your users login 
+locally from the call waiting screen using the User - Busy or User- Not 
+Busy buttons but this would introduce some serious and unnecessary risks 
+to your system.
+
+Instead, you should use this command line parameter.  When this 
+parameter is used, PCBoard bypasses the call-waiting screen and 
+automatically performs a local login similar to selecting the User - Not 
+Busy button.  The following conditions are in effect when the /LOCALON 
+parameter is used:
+
+The status line is changed to a one line status line, displaying a 
+minimal amount of information.  This status line more closely resembles 
+the status line that one might see in a regular modem terminal or 
+communications program.
+
+With the exception of ALT-F, ALT-I, ALT-P, ALT-T, and 5, all SysOp functions 
+keys are disabled to prevent potential security risks. Descriptions of 
+these function keys can be found in the While A User Is Online section 
+of this chapter.
+
+The function keys that are defined in PCBSetup | Configuration Options | 
+Function Keys still remain active.
+
+Users may upload and download files using any protocol that is internal 
+to PCBoard.
+
+For additional information about setting up local logins for multiple 
+users, please refer to the Multiple Nodes chapter in this manual.
+
+Example
+
+PCBOARD /LOCALON
+
+/NOENV
+
+Normally PCBoard will create environment variables to aid the setup of 
+doors in a multiple node environment.  If you do not want the PCBDAT, 
+PCBDRIVE, PCBDIR, and PCBNODE environment variables to be created, use 
+this parameter.
+
+Example
+
+PCBOARD /NOENV
+
+/READSYS
+
+This parameter will search the current directory for a USERS.SYS file.  
+If found, the user file will be updated with the information in the 
+file.  Once the update is completed, PCBoard will immediately exit to 
+DOS.  This parameter is useful for third party applications that want to 
+update the user file.
+
+Example
+
+PCBOARD /READSYS
+
+/USERSYS;[first];[last];PWRD:[password];TPA:[application]
+
+This command line switch is designed to be used by developers of third 
+party applications.  It generates a USERS.SYS file for the user 
+specified and then returns back to DOS.  The USERS.SYS file will be 
+found in the directory where PCBoard was run from.  The text surrounded 
+in brackets must be replaced with the following information:
+
+      first     The user's first name for whom the USERS.SYS file will be
+                generated.
+
+      last      The user's last name for whom the USERS.SYS file will be
+                generated.
+
+      password  The user's password.  If the password is incorrect,
+                the USERS.SYS file will not be generated.
+
+   application  The name of the application that TPA information should 
+                be included for. This is optional and should only be 
+                used if TPA is specified.
+
+
+NOTE:  The ;TPA:[application] is purely optional and should only be 
+specified if the USERS.SYS file should contain the information of a 
+particular TPA.
+
+Examples
+
+PCBOARD /USERSYS;John;Doe;PWRD:anyoldthing
+
+PCBOARD /USERSYS;John Doe Jr.;PWRD:anyoldthing;TPA:mail
+
+Environment Switches
+
+Environment switches are similar to command line parameters because they 
+modify the way that PCBoard behaves.  Instead of specifying the switches 
+on the command line, PCBoard will look for these switches to be 
+specified in the PCB environment variable.
+
+If you look at your BOARD.BAT file, you will notice that towards the top 
+is this line:
+
+SET PCB=
+
+It is on this line that you will specify any of the environment switches 
+that are discussed in the section.  Note that the = character 
+immediately follows PCB.  If it does not, PCBoard will not recognize the 
+environment variable.  Specifying more than one switch can be done by 
+entering them one after another on the same line as shown in this 
+example:
+
+SET PCB=/NODE:99 /COM2:
+
+This example shows each switch separated by a space.  In reality, it is 
+not necessary to sperate each switch with a space but it does make it 
+clearer to read.
+
+NOTE:  If you get an out of environment error when loading PCBoard, 
+refer to your DOS manual on how to use the Shell command in your 
+CONFIG.SYS file to increase the default environment size.
+
+/BASE:[hex address]
+
+This switch overrides the com port base address that is specified in 
+PCBSetup | Modem Information | Modem Setup with the value that you use 
+with this switch.  The base address under the same conditions that the 
+/IRQ switch would be used.  The value that you enter for the base 
+address must be in hexadecimal and may not comprise no more and no less 
+than 3 digits.
+
+Example
+
+SET PCB=/BASE:3f8
+
+/BAUD:[opening port speed]
+
+This switch overrides the opening port speed that is defined in PCBSetup 
+| Modem Information | Modem Setup.  In order for your modem and PCBoard 
+to communicate properly, you must specify a value that your modem is 
+capable of communicating at.
+
+Example
+
+SET PCB=/BAUD:57600
+
+/COLOR
+
+PCBoard attempts to automatically determine if your system is capable of 
+color display or not.  Using this switch will force PCBoard to assume 
+that your system is capable of color display.
+
+Example
+
+SET PCB=/COLOR
+
+/COM[number]:
+
+This switch will enable you to override the Comm Port that is defined in 
+PCBSetup | Modem Information | Modem Setup.  If an invalid port number 
+is specified, PCBoard will revert to the port defined in PCBSetup.
+
+Example
+
+SET PCB=/COM2:
+
+/CONNECT:[carrier speed]
+
+If you want to override the carrier speed that PCBoard uses for 
+estimating how long it will take to download a file, use this switch.  
+This switch is ideal if you are operating in a packet switching network 
+which is capable of high speeds whereas the users accessing the system 
+through the network may not be capable of the same speeds.
+
+
+NOTE:  For this switch to have any effect, you must answer Y to the 
+Packet-Switch Network question in PCBSetup | Modem Information | 
+Configuration Switches.
+
+Example
+
+SET PCB=/CONNECT:2400
+
+/IRQ:[number]
+
+If you are using a serial port which uses a non-standard IRQ setting, 
+you can use this switch to override the value defined in PCBSetup | 
+Modem Information | Modem Setup.  The only time you really need to even 
+worry about non-standard IRQs is when you are using COM3 and/or COM4 for 
+which no world-wide standards exist.
+
+Example
+
+SET PCB=/IRQ:5
+
+/MONO
+
+PCBoard attempts to automatically determine if your system is capable of 
+color display or not.  Using this switch will force PCBoard to assume 
+that your system is not capable of color display.
+
+Example
+
+SET PCB=/MONO
+
+/NMT
+
+PCBoard is capable of automatically detecting when Novell's NetWare is 
+running.  If you are running NetWare and you experience lockups when 
+attempting to load PCBoard, you may want to use this switch.  If PCBoard 
+fails to automatically detect NetWare it may think that it erroneously 
+determined that a multitasker is present.  This condition would 
+eventually cause your system to lockup.
+
+Example
+
+SET PCB=/NMT
+
+/NODE:[node number]
+
+This switch will override the node number that PCBoard finds in the 
+PCBOARD.DAT file that it uses.  If you specify a node number which 
+exceeds what you have purchased a license for, PCBoard will revert to 1 
+as the node number.
+
+Example
+
+SET PCB=/NODE:3
+
+/OLDINDEX
+
+This version of PCBoard is capable of maintaining V14.x style message 
+index (.NDX) files.  You may need to maintain these index files if you 
+are using third party programs which access the message base index files 
+but are not yet able to read the newer IDX index files.  If so, use this 
+switch which will force all of your conferences to maintain the older 
+style index files as well as the newer style.
+
+Example
+
+SET PCB=/OLDINDEX
+
+While A User Is Online
+
+Status Line
+
+When a user is logged into the system, a 2-line status bar is displayed 
+at the bottom of the screen.  You can refer to this status bar to 
+determine information about the caller that is online.  There is far too 
+much information about the user to display it all in two lines.  To 
+accommodate all of the information that is displayed, there are several 
+views of the status line that you can rotate between by pressing ALT-H.  
+The original view is referred to as the default view.
+
+Default View
+
+There is a lot of information displayed on this screen.  To help explain 
+the various components of this status line, it will be broken into two 
+segments that will be explained in detail.
+
+
+        1       Node number.  This area of the status line displays the node
+                number of the screen that you are viewing.
+
+        2       Carrier speed.  This area displays the carrier speed 
+                that the caller connected to the system at.  If there is 
+                an E after the carrier speed, the caller has established 
+                an error-correcting session.
+
+        3       Name of user.  This region of the status line displays 
+                the full name of the user.
+
+        4       City / location.  In this area, the contents of the City 
+                field in the user's record will be displayed.
+            
+        5       Graphics mode indicator.  One of four indicators will be 
+                displayed: N, A, G, or R.
+
+
+  N - CTTY mode.  Color graphics is disabled.
+
+  A - ANSI sequences are sent to speed up cursor positioning.
+
+  G - ANSI sequences are sent to color the screen and to move
+      the cursor.
+
+  R - The user has selected RIPScrip mode.
+
+
+
+        6       Last date online.  The date that the current user called the
+                system is displayed in this region of the status line.
+
+        7       Current conference.  The number between the parentheses
+                displays the current conference that the user is in.
+
+        8       Current security level.  In this area of the status 
+                line, the security level of the caller is displayed.  
+                This level will take into account any additional 
+                security that is assigned by joining the conference or 
+                other temporary security level adjustments.
+
+        9       Call waiting screen indicators.  From the call-waiting 
+                screen you can see the status of the  page bell, 
+                printer, and alarm. Between the parentheses a P, A, or B 
+                will be displayed if the printer, alarm, or page bell is 
+                turned on.
+
+       Times On This region of the status line displays the total number 
+                of times that the user has called the system.  This 
+                information can be found in each user's record too.
+
+        Up:Dn   Refer to this area of the status line to see how many 
+                files the current user has uploaded and downloaded.  The 
+                number to the left of the colon is the number of files 
+                that have been uploaded while the number to the right is 
+                the number of files that have been downloaded.
+
+
+       10       Minutes used.  In this region of the status line, the 
+                total number of minutes that the user has been online is 
+                displayed. This value is obtained by looking at the 
+                current time and comparing it with the time that the 
+                user logged in.
+
+       11       Logon time.  The time that the caller logged into the 
+                system is displayed in 24 hour format in this region.
+
+       12       Last file handle number.  The value that is displayed in 
+                the area is the last file handle number that DOS 
+                returned to PCBoard You should use this number to 
+                estimate the number of files that are open by this copy 
+                of PCBoard.  Using this number, you will know if you 
+                need to increase the number of files allocated in your 
+                CONFIG.SYS file.
+
+       13       Total free memory.  The value displayed here tells you 
+                how much memory is left.  The number is displayed in 
+                kilobytes (1024 bytes per kilobyte).
+
+       14       Minutes left.  In this region, the number of minutes 
+                that the user has left for this session or day is 
+                displayed.  Remember that it is possible for the user to 
+                achieve time credits by uploading files.
+
+       15       Current time.  In this region, the current system time 
+                is displayed in 24 hour format.
+
+
+In addition to the information shown on the status line there are 
+blinking characters that may appear at the bottom of the screen near the 
+Logon and Current time fields.  The following describes the significance 
+of the blinking characters:
+
+
+        N       This node has been marked to make the SysOp the next 
+                user to login.
+
+	X	This node is set to exit to DOS after the caller disconnects.
+
+	R	This node is set to recycle after the caller disconnects.
+
+        S       Software flow control is turned on.  The remote caller 
+                must press CTRL-Q to begin sending data again.  Unlike 
+                the other indicators, this one does not flash or blink.
+
+        p       The caller attempted to page you, but you did not answer 
+                the page.
+
+               PCBoard is scanning the USERNET.XXX file.
+
+
+View #2
+
+The second page of the status line briefly lists the SysOp function keys 
+that are available while a caller is online. Refer to Keyboard Commands 
+in this section for a detailed description of each.
+
+
+View #3
+
+In the upper left hand corner of this view, the user's business/data and 
+home/voice phone numbers are displayed.  The two numbers are separated 
+by a / character.  The following describes the rest of the fields in 
+this view:
+
+ 
+        E/D     Expiration date.  This field shows the expiration date 
+                of the user.  If 00-00-00 is displayed, then either 
+                subscription mode is not enabled, or the user has been 
+                setup to not have an expiration date.
+
+        P/W     Password.  This field displays the login password of the 
+                caller.
+
+        C1      Comment 1.  The contents of the Comment1 field in the 
+                user's record is displayed in this field.
+
+        C2      Comment 2.  The contents of the Comment2 field in the 
+                user's record is displayed in this field.
+
+View #4
+
+
+To quickly display the user statistics for file transfers and messages, 
+you should switch to this view.  The following information is available:
+
+
+Msgs Left       Displays the total number of messages that the user has 
+                entered.
+
+Msgs Read	Displays the total number of messages read by the user.
+
+Files U/L	Displays the number of files uploaded to the system.
+
+Files D/L       Displays the number of files downloaded from the system.
+
+Bytes U/L       Shows the number of bytes that the user has uploaded to 
+                the system.
+
+Bytes D/L	Shows the number of bytes that the user has downloaded.
+
+Today           Displays the total number of bytes that have been 
+                downloaded by the user today.  A negative value means 
+                that the user has uploaded files and had received byte 
+                credits.
+
+
+View #5
+
+
+This view presents information about the serial port that PCBoard uses.  
+If you have defined PCBoard to use port 0, this view will not be 
+available to you.  The following explains the fields in this view:
+
+PC-Modem        The speed that is used between the computer and the 
+                modem.  This is commonly referred to as the DTE speed.
+
+Carrier         The speed that the caller connected to the system at. 
+                This speed is also known as the DCE speed.
+
+Overrun         Displays the number of overruns you have experienced. 
+                This value should always be 0.  If it is not, then you 
+                are receiving data faster than your current system is 
+                setup to handle.
+
+Framing         Displays the number of framing errors that have 
+                occurred.  If this value is not 0, your system is having 
+                problems receiving data.
+
+Parity          Displays the number of parity errors that have occurred. 
+                If this value is not 0, your system is having problems 
+                receiving data.
+
+ErrCorr         Based on the information that the modem provides to 
+                PCBoard at login, this field will show whether or not an 
+                error-correcting session has been detected.
+
+InBuf           The total number of bytes that are currently in the 
+                input buffer.  This value should normally be 0.
+
+OutBuf          Displays the total number of bytes in the output buffer. 
+                This value you should normally be 0.
+
+CTS             Shows the status of the CTS signal on the serial port.  
+                The signal will either be up or dn.
+
+In addition to the rest of the fields in this view, PCBoard will display 
+the type of UART that it detects in the lower right hand corner of the 
+status line.  The possible value are:
+
+8250 OLD	An older 8250 UART has been detected.
+
+8250A/16450	An 8250A or 16450 UART has been detected.
+
+16550           An older 16550 UART chip has been detected.  This chip 
+                has a bug which prevents the 16 byte buffer from working 
+                correctly.
+
+16550 FIFO      An older 16550 UART chip has been detected.  PCBoard 
+                determined that this chip is capable of using the 16 
+                byte buffer.
+
+16550A FIFO     A 16550A UART chip has been detected.  PCBoard will take 
+                advantage of the 16 byte buffer of this UART chip.
+
+COMM-DRV        PCBoard is communicating with the modem using the 
+                multiport driver.
+
+FOSSIL          PCBoard is communicating with the modem using a FOSSIL
+                driver.
+
+Keyboard Commands
+
+This section details the keyboard commands that are available to you 
+while a user is online.  You may only use these from the local keyboard 
+-- not while you are logged in from remote. 
+
+
+        F1      SysOp privileges.  Use this keyboard command to 
+                temporarily upgrade a user from a non-SysOp security 
+                level to the SysOp security level defined in PCBSetup | 
+                Security Levels | Sysop Commands.  To return the caller 
+                to their original security level during the same call, 
+                press 1 again.  Once the caller logs off, their security 
+                level will be returned to the original value.
+
+        F2      Lock out.  This keyboard command will allow you to 
+                automatically lock out the current users from the 
+                system.  If you choose to lock the caller out, their 
+                security level will be dropped to 0, and they will be 
+                immediately disconnected from the system.
+
+        F3      Toggle printing caller log.  Use of this keyboard 
+                command will toggle the printer status.  Anything that 
+                is written to the caller log will also be written to the 
+                printer port defined in PCBSetup | Node Configuration.  
+                You will know that the printer status is on when a P is 
+                printed in the parentheses found on the lower right-hand 
+                corner of the status line.
+
+        F4      Toggle page bell status.  Use of this keyboard command 
+                will toggle the page bell status.  When the page bell is 
+                turned on, users will be able to page you for chatting 
+                if they attempt to page between the hours defined in 
+                PCBSetup | Configuration Options | Limits.  If paged, 
+                you will be beeped for 30 seconds. You can then choose 
+                to answer the page by pressing M or to ignore the page.  
+                If you do not answer, the user will be asked if they 
+                wish to leave a comment to the SysOp.  You will know 
+                that the page bell status is on when a B is printed in 
+                the parentheses found on the lower right-hand corner of 
+                the status line.
+
+        F5      Shell to DOS.  As long as you have not disabled local 
+                shells to DOS in PCBSetup | Configuration Options | 
+                System Control, this keyboard command will cause PCBoard 
+                to shell to DOS.
+
+        F6      Modify current user's record.  Essentially, this 
+                keyboard command will enable you to edit the same fields 
+                that you can edit by using the C subcommand of the 7 
+                SysOp command.  The difference being that the current 
+                user's record will be edited instead of you making an 
+                attempt to find the proper record.  If the user does not 
+                have a record on disk yet, this keyboard command is 
+                disabled.
+
+        F7      Toggle alarm status.  Use of this keyboard command will 
+                toggle the alarm status.  While a caller is online 
+                (either local or via modem), PCBoard will beep when an 
+                invalid command is entered, at the beginning of the 
+                call, and when the automatic logoff for inactivity is 
+                about to occur.  The setting of the alarm will determine 
+                if the beeps will be heard on the local computer.  You 
+                will know that the page bell status is on when an A is 
+                printed in the parentheses found on the lower right-hand 
+                corner of the status line.
+
+        F8      Disconnect current caller.  To force a user to 
+                immediately disconnect from the system you may use this 
+                keyboard command. Before the caller is disconnected, you 
+                are asked to confirm that you do indeed want to 
+                disconnect the caller.
+
+        F9      Toggle screen display.  This keyboard command will 
+                toggle the status of the screen.  When the screen is 
+                off, no information is printed on the screen (leaving 
+                the entire screen black). Otherwise, the normal 
+                information you would see is displayed on the screen.
+
+        F10     Chat with caller.  To break into chat with the caller, 
+                use this keyboard command.  When in chat mode, both you 
+                and the user can type interactively with one another.  
+                When you finished chatting with the user, press E to 
+                return to PCBoard.
+
+        ALT-B   Send a bell to the caller.  When this keyboard command 
+                is used, a beep will be sent to the remote caller.  This 
+                beep is useful for attempting to get their attention.  
+                For you to hear this beep locally, the alarm status must 
+                be on.
+
+        ALY-D   Run PCBFiler.  PCBoard shells  to DOS and runs PCBFiler. 
+                If a caller is online, they will be informed that you 
+                have exited to DOS and that they should remain online.
+
+        ALT-F   Capture text to a file.  Use this keyboard command to 
+                capture the text that PCBoard displays on the screen to 
+                a file on disk.  When you turn on capture mode, you will 
+                be prompted to enter the filename you wish to capture 
+                the information to.  To turn off capturing, press ALT-F 
+                again.
+
+        ALT-I   Import text from a file.  This keyboard command can be 
+                used to import a text file directly into PCBoard's 
+                buffer.  If PCBoard finds the filename that you specify, 
+                the contents of that file will be used as if you typed 
+                in the information at the keyboard.
+
+        ALT-M   Run PCBMoni.  PCBoard will shell to DOS and execute PCBMoni.
+
+        ALT-N   Reserve node for the SysOp.  After the caller 
+                disconnects, PCBoard will automatically select the Sysop 
+                - Busy button from the call waiting screen rather than 
+                wait for the next call to come in.
+
+        ALT-P   Capture text to the printer.  Use this keyboard command 
+                to capture the text that PCBoard displays on the screen 
+                to the printer defined in PCBSetup | Node Configuration.  
+                When you turn on capture mode, a P will appear next to 
+                the last file number opened on the status line.  To turn 
+                off capturing, press ALT-P again.
+
+        ALT-R   Recycle the node.  This command will mark the current 
+                node to be recycled after the caller disconnects.  For 
+                additional information on recycling a node, refer to the 
+                15 SysOp command in the PCBoard Commands chapter of this 
+                manual.
+
+        ALT-S   Run System Manager.  System Manager is executed by 
+                shelling to DOS.
+
+        ALT-T   Send a top of form to printer.  This keyboard command 
+                sends a form feed to the printer defined in PCBSetup | 
+                Node Configuration.
+
+        ALT-X   Drop to DOS after current call.  This keyboard command 
+                will automatically select the DOS - Busy button after 
+                the current caller is disconnected.  The phone will be 
+                busy, and PCBoard will exit.
+
+        ALT-F1  Decrease available time.  When this keyboard command is 
+                used, the caller's available time online will be 
+                reduced.  If the user's available time is under 10 
+                minutes, it will be decreased by one minute. Otherwise, 
+                their time will be decreased by 5 minutes.
+
+        ALT-F2  Increase available time.  When this keyboard command is 
+                used, the caller's available time online will be 
+                increased.  If the user's available time is under 10 
+                minutes, it will be increased by one minute.  Otherwise, 
+                their time will be increased by 5 minutes.
+
+        ALT-F9  Decrease security level.  Using this keyboard command 
+                will reduce the caller's current security level.  The 
+                new security level will be the next lowest entry in the 
+                PWRD file (PCBSetup | File Locations | Configuration 
+                Files).  Once the security level has been adjusted, the 
+                user will adopt the characteristics of the new security 
+                level (including the time and bytes available).
+
+        ALT-F10 Increase security level.    Using this keyboard command 
+                will increase the caller's current security level.  The 
+                new security level will be the next entry in the PWRD 
+                file (PCBSetup | File Locations | Configuration Files).  
+                Once the security level has been adjusted, the user will 
+                adopt the characteristics of the new security level 
+                (including the time and bytes available).
+
+Local Logins
+
+Anytime you access the system locally rather than through a serial 
+device, you are performing a local login.  All information is displayed 
+to you on your local machine and you are actually running PCBoard on 
+your machine.  There are several methods you can use to log into the 
+system in local mode.
+
+Methods To Login Locally
+
+Perhaps the most frequently used method of logging into the system 
+locally is via the call-waiting screen.  On the call-waiting screen, you 
+will notice the following four buttons:
+
+The two buttons on the left will log you into the system asking you for 
+your name, etc.  In essence, this is identical to accessing the system 
+via modem or serial port except everything is on your local screen.  If 
+you use the two buttons on the right, then you will be logged into the 
+system as the SysOp (as defined in record #1 of the users file).
+
+You may also use the /LOCALON command line parameter of PCBOARD.EXE.  If 
+you use this parameter on the command line, then the call-waiting screen 
+will be bypassed and the user will be immediately logged into the 
+system.  This method would be identical to selecting User - Not Busy 
+from the call-waiting screen.
+
+For example, if you wanted a node to be configured to bypass the local 
+login screen and immediately login, you could modify your PCBOARD line 
+in your BOARD.BAT file to read:
+
+PCBOARD /LOCALON
+
+Differences in Operation
+
+Normally everything behaves/displays the same whether you are logged in 
+locally or over a serial connection.  However, when you are logged in 
+locally, there are a few items that you may want to be aware of:
+
+Perhaps the most noticeable difference between remote logins and local 
+logins is when you transfer files.  PCBoard behaves differently when you 
+are logged in locally.  Refer to the File Transfers section in the 
+SysOp's Guide chapter of this manual for additional details..
+
+When a user is logged in locally, the COM port is defined as 0 in the 
+setup.  This means that if you have any door or utility applications 
+that reference PCBoard to see what COM port is being used, be sure that 
+they are able to discern that COM 0 means that the user is on locally.
+
+The speed of a caller when they are online is set to what you have 
+defined as the Opening Baud Rate in PCBSetup | Modem Information | Modem 
+Setup.
+
+Additional Features
+
+While a user is logged in locally some additional keystrokes are 
+available.  They are as follows:
+
+Scrl-Lck        Scroll-back Buffer.  Access text that has scrolled off 
+                of the screen.  The number of lines that are stored in 
+                the scroll-back buffer is defined in PCBSetup | 
+                Configuration Options | Limits.
+
+F5              Shell to DOS.  Enables you to shell to a DOS prompt 
+                while in PCBoard.  You can disable or enable this option 
+                in PCBSetup | Configuration Options | System Control 
+                with the Allow Local SHELL to DOS.
+
+ALT-I           Import a text file.  You may need to import or stuff a 
+                text file while in PCBoard.  Perhaps you need to include 
+                a file into a message.  While entering the message you 
+                can press ALT-I.  You will then be asked for the filename 
+                to import.  If the file is not found, nothing will be 
+                done.  If the file is found, the text will be imported 
+                into PCBoard just as if you had typed the information.
+
+ALT-F           Capture screen output to file.  If you would like to 
+                capture the text that PCBoard displays on your screen, 
+                you can press ALT-F.  If you do not already have a capture 
+                file open, then you will be asked for the filename you 
+                wish to capture to.  If you do have a capture file open, 
+                then pressing ALT-F will close the capture file.  You will 
+                know if a capture file is open because you will see an F 
+                on the status line.
+
+ALT-P           Capture screen output to printer.  Capturing text to the 
+                printer is almost identical to capturing text to a file 
+                however, you are never asked or a filename.  PCBoard 
+                looks at the printer port you defined in PCBSetup | Node 
+                Information.  All information that PCBoard displays 
+                (with the exception of More prompts and such) will be 
+                sent to the printer.  Like capturing to a file, you will 
+                see a P on the status line to signify that you are 
+                capturing output to the printer.
+
+ALT-T           Send a form feed to the printer.  If you need to send a 
+                form feed to the printer, you may do so by pressing ALT-T.
+
+BOARD.BAT
+
+For PCBoard to function normally, you need to use BOARD.BAT to load each 
+node on your system.  This batch file provides the logic that allows 
+PCBoard to exit out of memory, load a door application or event, and 
+return where the caller left off from.
+
+Sample
+
+The BOARD.BAT that came with your copy of PCBOARD probably resembles 
+this example:
+
+@echo off
+c:
+cd\pcb
+set PCB=
+set dszlog=pcbdsz.log
+if exist remote.bat rename remote.bat remote.sys
+if exist door.bat del door.bat
+if exist endpcb del endpcb
+pcboard
+if exist remote.bat remote
+if exist door.bat door
+if exist event.bat event
+if exist endpcb goto end
+board
+:end
+
+Detailed Explanation
+
+To help better understand the flow and structure of the BOARD.BAT file, 
+this section breaks it down into three sections. Each section shows a 
+portion of the batch file and proceeds to explain each line in detail.
+
+Preparing To Executing PCBoard
+
+@echo off
+c:
+cd\pcb
+set PCB=
+set dszlog=pcbdsz.log
+if exist remote.bat rename remote.bat remote.sys
+if exist door.bat del door.bat
+if exist endpcb del endpcb
+
+
+This DOS batch file command will prevent each line from displaying on 
+screen as it is executed.
+
+Changes to the C: drive.
+
+Changes to the PCB subdirectory.
+
+Defines the PCB environment variable.  If you want to use any of 
+PCBoard's environment switches you must add them to this line.
+
+Defines the DSZLOG environment variable.  Several external protocols 
+will read this environment variable to determine where to log the files 
+that are transferred.  Considering that PCBoard also reads this 
+environment variable on external batch transfer protocols it is very 
+important to have this variable properly defined.
+
+Checks the current directory to see if REMOTE.BAT exists.  If it does, 
+delete it to prevent it from accidentally being executed by another 
+caller.  This file is created by PCBoard from your REMOTE.SYS file.  
+Because the REMOTE.SYS file remains on disk, this file can be deleted.
+
+Checks the current directory to see if DOOR.BAT exists.  If it does, 
+delete it to prevent another caller from executing it. PCBoard creates 
+the DOOR.BAT file from your batch file for your doors.  This file is 
+used as a temporary file so that DOS can execute your door application.
+
+When PCBoard exits, it creates an ENDPCB file in the current directory.  
+This file does not contain any useful information. Instead, it is used 
+later in your BOARD.BAT to determine if PCBoard should reload, or jump 
+to the end label.
+
+Executing PCBoard
+
+
+pcboard
+
+This line serves one purpose -- to load PCBoard.  If you want to use any 
+of PCBoard's command line parameters, you need to specify them on this 
+line.
+
+After PCBoard Exits
+
+
+if exist remote.bat remote
+if exist door.bat door
+if exist event.bat event
+if exist endpcb goto end
+board
+:end
+
+Checks the current subdirectory to see if a file called REMOTE.BAT 
+exists.  If it does, execute it.  It is the responsibility of this batch 
+file to reload BOARD.BAT when finished.
+
+Checks the current subdirectory to see if a file called DOOR.BAT exists.  
+If it does, execute it.  It is the responsibility of this batch file to 
+reload BOARD.BAT when finished.
+
+Checks the current subdirectory to see if a file called EVENT.BAT 
+exists.  If it does, execute it.  It is the responsibility of this batch 
+file to reload BOARD.BAT when finished.
+
+Checks the current subdirectory for a file called ENDPCB.  If this file 
+exists, goto the end label in the batch file which returns to DOS.
+
+This line is a catch-all that will reload PCBoard if no ENDPCB file is 
+found (which should always exist when PCBoard exits).
+
+Defines a batch label called end.
+
+Errorlevels
+
+When PCBoard exits to DOS, it will set an errorlevel based on why it 
+exited to DOS.  Using DOS batch commands, you may check the errorlevel 
+that is returned from the program that was last run and take appropriate 
+actions.
+
+Checking An Errorlevel
+
+To test an errorlevel you need to use the IF batch file command. If you 
+were to insert the following line somewhere after the PCBOARD line in 
+your BOARD.BAT
+
+
+IF ERRORLEVEL 0 ECHO No Errors
+
+
+the message No Errors will be printed to the screen if PCBoard exits 
+with an errorlevel of 0.  For additional information on checking 
+errorlevels, refer to your DOS manual.
+
+NOTE: Due to the way DOS errorlevels, you should check for higher 
+numbered errorlevels first before checking lower errorlevels.  PCBoard 
+may exit with an errorlevel HIGHER than 7, yet DOS will treat an IF 
+ERRORLEVEL 7 as being true.  Therefore, if you will be using FAX 
+software you should probably write your batch file like this:
+
+
+      pcboard
+      if errorlevel 8 board    <-- test for all higher levels
+      if errorlevel 7 fax      <-- if 7 is still found, run fax
+      ... etc
+
+Errorlevel 0
+
+This errrorlevel will be returned anytime that PCBoard exits to DOS and 
+expects no other action to take place.  The only time that this will 
+really occur is by selecting DOS - Busy or DOS - Not Busy from the call 
+waiting screen.
+
+Errorlevel 1
+
+This errorlevel will be returned if PCBoard is exiting to run an event.  
+At this point, the door batch file has been copied to EVENT.BAT in the 
+current directory.  The BOARD.BAT that is included with you package uses 
+an if exist event.bat line to determine when the event should be run 
+instead of testing the errorlevel.
+
+Errorlevel 2
+
+This errorlevel will be returned if PCBoard is exiting to run a door.  
+At this point, the event file has been copied to DOOR.BAT in the current 
+directory.  The BOARD.BAT that is included with you package uses an if 
+exist door.bat line to determine when a door  should be run instead of 
+testing the errorlevel.
+
+Errorlevel 3
+
+This errorlevel will be returned if PCBoard is exiting to run a door.  
+At this point, the REMOTE.SYS file has been copied to REMOTE.BAT in the 
+current directory.  The BOARD.BAT that is included with you package uses 
+an if exist remote.bat line to determine when REMOTE.BAT should be run 
+instead of testing the errorlevel.
+
+Errorlevel 4
+
+This errorlevel is no longer used by PCBoard.
+
+Errorlevel 5
+
+If you have answered Y to the Exit to DOS After Each Call option in 
+PCBSetup | Configuration Options | Switches, PCBoard will exit with this 
+errorlevel after each disconnect.  By adding a line to your BOARD.BAT 
+that tests for this errorlevel, you can determine the difference between 
+a caller disconnecting and exiting via DOS - Busy or DOS - Not busy on 
+the call waiting screen.
+
+The following BOARD.BAT shows an example of what your BOARD.BAT might 
+look like after you have added the ability to test for errorlevel 5:
+
+
+@echo off
+c:
+cd\pcb
+set PCB=
+set dszlog=pcbdsz.log
+if exist remote.bat rename remote.bat remote.sys
+if exist door.bat del door.bat
+if exist endpcb del endpcb
+pcboard
+if errorlevel 99 board
+if errorlevel 5 loggedof.bat
+if exist remote.bat remote
+if exist door.bat door
+if exist event.bat event
+if exist endpcb goto end
+board
+:end
+
+Two lines have been added in this example.  The first line checks for 
+critical errors while the second checks to see if the caller 
+disconnected.  If the caller has disconnected, a batch file called 
+LOGGEDOF.BAT will be executed.
+
+Errorlevel 6
+
+If PCBoard is exiting because the node was marked to be recycled, this 
+errorlevel will be returned.  In your BOARD.BAT, you can add a statement 
+which checks to see if the node is recycling.  If so, run a batch file 
+which does some special processing.  The following illustrates the 
+change that would need to be made to BOARD.BAT:
+
+
+@echo off
+c:
+cd\pcb
+set PCB=
+set dszlog=pcbdsz.log
+if exist remote.bat rename remote.bat remote.sys
+if exist door.bat del door.bat
+if exist endpcb del endpcb
+pcboard
+if errorlevel 99 board
+if errorlevel 6 call c:\update.bat
+if exist remote.bat remote
+if exist door.bat door
+if exist event.bat event
+if exist endpcb goto end
+board
+:end
+
+
+The two lines that were added to the batch file are highlighted in bold.  
+The first line checks to see if the errorlevel returned by PCBoard is 
+99.  If so, a critical error has occurred and this line will cause 
+BOARD.BAT to be run again.  If a critical error did not occur, the 
+second line will run UPDATE.BAT found in the root directory of drive C.  
+Notice that the call batch command is used.  This will make sure that 
+control is returned back to PCBoard after the UPDATE.BAT runs. For more 
+information on the call command, refer to your DOS manual.
+
+Errorlevel 7
+
+If PCBoard answers the call and the modem returns FAX or +FCON instead 
+of CONNECT or CARRIER, PCBoard will immediately exit with an errorlevel 
+of 7.  A simple check for this errorlevel in your BOARD.BAT will tell 
+you if you need to load your fax software of not.  A modified BOARD.BAT 
+may resemble the following:
+
+
+@echo off
+c:
+cd\pcb
+set PCB=
+set dszlog=pcbdsz.log
+if exist remote.bat rename remote.bat remote.sys
+if exist door.bat del door.bat
+if exist endpcb del endpcb
+pcboard
+if errorlevel 99 board
+if errorlevel 7 c:\fax\recvfax [params]
+if exist remote.bat remote
+if exist door.bat door
+if exist event.bat event
+if exist endpcb goto end
+board
+
+:end
+
+
+Notice that two lines were added to the batch file.  The first checks to 
+see if PCBoard exited due to an errorlevel of 99 while the second checks 
+to see if a FAX call has been detected.  You should be aware that the 
+fax connection has already been established.  You should use a program 
+to receive the fax that assumes the connection has already been made.  
+Refer to your modem manual to see if such a utility was shipped with 
+your modem.
+
+NOTE:  Modems which require TSR software to be loaded ahead of PCBoard, 
+and which do not let PCBoard control the answering of the call, are a 
+risk to PCBoard's security and are not supported.  In addition, modems 
+that do not issue a FAX or +FCON message are not currently supported.
+
+Errorlevel 99
+
+If PCBoard is unable to load because a critical error has been detected, 
+it will exit with this errorlevel.  For a list of messages that will be 
+printed by PCBoard if it is unable to load, refer to the Trouble 
+Shooting section of this chapter. Each message is thoroughly explained.
+
+Troubleshooting
+
+PCBoard Will Not Load - Gives Error Message
+
+If PCBoard is unable to safely load, you will receive an error message 
+in the upper left portion of your screen.  This error message gives you 
+information about why PCBoard could not load. The following lists each 
+possible error that can occur as PCBoard loads and an explanation of how 
+to fix the problem.
+
+ALL NODES ARE BUSY AT THIS TIME PLEASE TRY LATER
+
+In order for you to see this message, then you must have set the Float 
+Node Number option in PCBSetup | Node Configuration to Y.
+
+A user has attempted to log into the system but there is not a free node 
+on the system for them to log into.  Remember that PCBoard will only 
+begin scanning for free nodes from the node number that is specified in 
+PCBSetup | Node Configuration up to your software license limit.  In 
+order to check if a node is free, the USERNET.XXX file is scanned.
+
+The only cure for this problem is to free up a node for new users to 
+login or to upgrade your software license limit.
+
+If you check your system and you see that PCBoard thinks people are 
+logged in locally when in reality you know that they are not (because 
+they rebooted their system from the local connection or otherwise 
+improperly exited PCBoard), you need to manually clear out their entries 
+using PCBMONI.EXE.
+
+Load PCBMONI and cursor down to the node number.  Next, press the M bar 
+to access the Edit User Net Status screen.  In the status field, enter Z 
+for Node is offline.  This will clear the entry for that node.  The node 
+will then be free for other users to log in to the system.
+
+Can't create caller log:
+
+PCBoard attempted to open the caller log.  The log file could not be 
+opened, so an attempt was made to create the file. However, the file 
+could not be created.  Since there is no way for to keep track of the 
+calls to the system, the system is not brought online.
+
+The following are all valid reasons as to why the caller log could not 
+be opened/created:
+
+The path specified in PCBSetup | File Locations | System Files does not 
+exist.  Since the path does not exist, PCBoard cannot create the caller 
+log file.
+
+If your system is on a network, you may have lost your connection to the 
+server which contains the caller log files.  This would mean that the 
+path where your files are normally stored would not exist and 
+consequently the log could not be created.
+
+You do not have enough file handles to open up the caller log. Make sure 
+that you have at least 25 files defined in your CONFIG.SYS (FILES=25) 
+for each node that the machine runs.  In addition, also make sure that 
+your server (if you are running on a network) has at least 25 file 
+handles for each node that you are running.
+
+Cannot open system PCBTEXT file
+
+PCBoard attempted to open the default PCBTEXT file defined in PCBSetup | 
+File Locations | System Files but could not open the file.  This may 
+mean that you have an invalid path specified in the PCBTEXT field or the 
+path is correct, but there is no PCBTEXT file in the directory.  It 
+could also mean that you do not have enough file handles available.  
+Make sure that each node on the computer has at least 25 file handles 
+available via CONFIG.SYS and that your server also has at least 25 file 
+handles for each node that you are running.
+
+Error initializing comm port
+
+You should only see this message if you are using the /M version of 
+PCBoard.  It means that the  communications port specified in PCBSetup | 
+Modem Information | Modem Setup could not be opened via COMMDRV.  A 
+number will be displayed after the error message.  To get more 
+information why the port could not be opened, call technical support and 
+give the technician the error message and error number.
+
+Error obtaining FOSSIL information
+
+Only the /M version of PCBoard will report this error and only if you 
+have configured PCBoard to communicate through the FOSSIL driver 
+(PCBSetup | Modem Information | Modem Setup).  PCBoard has attempted to 
+communicate via a FOSSIL driver.  However, the information that was 
+returned from the FOSSIL driver was invalid.  Make sure that your FOSSIL 
+driver is installed properly.
+
+ERROR!  Need to update User Info File Conference Allocations
+
+Anytime that you increase the Number of Highest Conference Desired in 
+PCBSetup | Configuration Options | Messages, you need to update your 
+conference allocations.  To do this, you need to load System Manager, 
+select User Info File Maintenance, and finally select Change Conference 
+Allocation. 
+
+You will be shown some information about your USERS.INF file. If you do 
+need to upgrade the file to accommodate the increased number of 
+conferences you are told that the file needs to be updated and then are 
+asked if you wish to update the file.  By updating the USERS.INF file,. 
+the size of the file on disk will be increased so that information about 
+the new conferences can be stored.
+
+ERROR!  PCBML.DAT does not contain a default (blank extension)
+entry.
+
+PCBoard uses the language that is defined without a filename extension 
+(usually the default language) to determine the text that should be 
+written to the caller log files.  If a language is defined without an 
+extension, PCBoard cannot determine the text that should be written to 
+the log files.
+
+If you receive this error, you need to modify your PCBML.DAT file 
+(PCBSetup | File Locations | Configuration Files) to include a language 
+that has a blank extension.  You may have to change the definition of 
+one of the currently defined languages or you may have to install a 
+brand new language to meet this requirement.  Until the requirement is 
+met, PCBoard will not load.
+
+ERROR!  System is setup for SHARE access...
+
+If you have answered Y to the Running a Network / Multitasker System in 
+PCBSetup | Node Configuration PCBoard checks to make sure that SHARE is 
+loaded and functioning properly before accepting calls.
+
+If you receive this error message, SHARE.EXE is either not loaded or is 
+not functioning properly.  Without SHARE, file access cannot be 
+relegated properly leading to potential corruption of files.  Rather 
+than risk data corruption, PCBoard will display this error message and 
+return to the DOS prompt.
+
+
+Check your configuration to make sure that SHARE.EXE is being
+loaded in AUTOEXEC.BAT.
+
+Error!  USERNET.XXX filename is blank.
+
+In order for PCBoard to be able to operate properly in a multinode 
+configuration it must be able to read and write to the USERNET.XXX file.  
+If you get this error, the location of this file is blank in PCBSetup | 
+File Locations | System Files. Specify a valid path and filename and the 
+error should not reoccur.
+
+HEADER ERROR IN USERS.INF - OR UNABLE TO READ USERS.INF FILE
+
+The USERS.INF file has been damaged or corrupted in some manner. This 
+may signify a possible file corruption problem on your system (e.g., 
+faulty disk cache, etc.) or a utility may that accesses the USERS.INF 
+file may have damaged the file in some fashion.
+
+About the only thing that you can do (as an immediate fix) is to 
+recreate the USERS.INF file by selecting Create User Info File from 
+System Manager | User Info File Maintenance.
+
+insufficient memory for comm buffers
+
+PCBoard determined that you did not have enough memory to create the 
+buffers that it uses for communication buffers.  You need to increase 
+the amount of conventional memory that is available before you load 
+PCBoard.
+
+insufficient memory for conference strings
+
+You do not have enough conventional memory available for PCBoard to 
+store the conference strings.  You need to increase the amount of 
+conventional memory that is available before you load PCBoard.
+
+insufficient memory for conference flags
+
+There is not enough conventional memory for PCBoard to store the 
+conference flags.  Before PCBoard can be loaded, you need to increase 
+the amount of conventional memory that is available before you load 
+PCBoard.
+
+insufficient memory for message pointers
+
+PCBoard determined that you did not have enough conventional memory 
+available to store the message pointers.  Before you can load PCBoard, 
+you must increase the amount of conventional memory that is available.
+
+Invalid comm port - COMMDRV access not found
+
+PCBoard attempted to open the communications port specified in PCBSetup 
+| Modem Information | Modem Setup but determined that you do not have 
+COMMTSR loaded.  In order for the /M version of PCBoard to run properly, 
+you must have COMMTSR loaded as per the installation instructions in the 
+Multiple Nodes chapter of this manual..
+
+Along with the error message, you will be given an error number. When 
+you call for technical support, please have the error number handy so 
+that the technician will be able to help you solve your problem faster.
+
+Invalid comm port - FOSSIL driver not found
+
+You have specified that PCBoard should communicate via the FOSSIL driver 
+that you have installed.  However, the FOSSIL driver could not be 
+identified.  Make sure that your driver is installed properly.
+
+Invalid comm port or UART not functioning
+
+The COM port that you have specified in PCBSetup | Modem Information | 
+Modem Setup does not exist, or the UART for the COM port is 
+malfunctioning.  Check the hardware for your COM port to make sure that 
+it is functioning properly and replace it if necessary.
+
+Invalid use of /C: switch
+
+You have used the /C: command line switch with PCBOARD.EXE but you have 
+not specified a valid port/connect speed for the option.  Make sure that 
+your use a valid port speed such as /C:19200, /C:14400, etc.
+
+Output buffer must be configured for at least 2048 bytes
+
+This error only occurs when using the /M version of PCBoard.  In
+the DAT file that is used to load COMMTSR, there is a setting
+for the output buffer size.  PCBoard determined that the size of
+the output buffer was less than 2K.  Re-run DRVSETUP.EXE to make
+sure that the settings are correct and save a new DAT file.
+
+PCBoard is already loaded!  Type 'EXIT' to return
+
+You have attempted to load PCBoard, but is already loaded.  This is 
+usually caused when you press 5 to shell out to DOS and then execute 
+BOARD.BAT while you are in the shell.  To return to PCBoard, type EXIT 
+at the DOS prompt.
+
+PCBTEXT is unavailable
+
+PCBoard attempted to open the PCBTEXT file but determined that it could 
+not be opened.  This could be due to any of the following reasons:
+
+The path you specified in PCBSetup | File Locations | System Files is 
+invalid or does not exist.  Therefore, the PCBTEXT file(s) could not 
+exist in that directory let alone be opened for access.
+
+If you are running in a network configuration, you may have lost your 
+connection to the server thereby making the files on the server 
+unavailable for access.  Reconnect to the server (if your PCBTEXT 
+file(s) are stored on the server) and the problem will be corrected.
+
+You may not have enough file handles available to open another file.  
+Make sure that you have allocated enough file handles in your CONFIG.SYS 
+statement.  For one node on the machine you should have FILES=25.  If 
+you are running 3 nodes on the one machine then you need to have at 
+least FILES=75.  If you are in a network configuration, make sure that 
+you have allocated at least 25 file handles for each node.
+
+PCBTEXT is the wrong version!  Run MKPCBTXT to convert it.
+
+The default PCBTEXT file that PCBoard loads at startup was determined to 
+be the wrong version.  To fix the file, load MKPCBTXT.EXE.  When 
+prompted for the filename to edit, specify the full path and filename of 
+your PCBTEXT file.  You will then be guided on the steps necessary to 
+fix the file.
+
+PCBTEXT needs to be upgraded!  Run MKPCBTXT.
+
+Your default PCBTEXT file is an older version which was not designed to 
+run with the version of PCBOARD.EXE that you are running.  If you run 
+MKPCBTXT.EXE and specify the filename of your default PCBTEXT file, it 
+will be upgraded.
+
+Unable to open PCBPROT.DAT file
+
+PCBoard attempted to open the PCBPROT.DAT file but could not locate it, 
+or it could not be opened.  The following are some reasons why the file 
+could not be opened:
+
+The file  you specified in PCBSetup | File Locations | Configuration 
+Files is invalid or does not exist.
+
+If you are running in a network configuration, you may have lost your 
+connection to the server thereby making the files on the server 
+unavailable for access.  Reconnect to the server (if your PCBPROT.DAT 
+file is stored on the server) and the problem will be corrected.
+
+You may not have enough file handles available to open another file.  
+Make sure that you have allocated enough file handles in your CONFIG.SYS 
+statement.  For one node on the machine you should have FILES=25.  If 
+you are running 3 nodes on the one machine then you need to have at 
+least FILES=75.  If you are in a network configuration, make sure that 
+you have allocated at least 25 file handles for each node.
+
+UNABLE TO OPEN USERS FILE - RUN PCBSM TO CREATE IT
+
+PCBoard attempted to load the USER file but could not do so. The file 
+may not exist or the location specified in PCBSetup | File Locations | 
+System Files is incorrect.  Other possibilities include not having 
+enough file handles specified in CONFIG.SYS to open the file or having 
+lost your connection to the server (if running a network) where the 
+USERS file exists.
+
+If you do not have a USERS file and need to create it then you should 
+use System Manager to create a new USERS file.  If you have a USERS.INF 
+file but no USERS file, then delete the USERS.INF file that remains 
+behind.
+
+Next, load System Manager, and select Users File Maintenance and then 
+select Edit Users File.  You will be informed of an error and that you 
+need to create the User Info File this is to be expected.  Next, return 
+to the Main Menu and select Users Info File Maintenance and select 
+Create User Info File.  You will be asked if you wish to create the 
+file.  Answer Y to the question and a new USERS.INF file will be 
+created.  You should now have one record in the USERS file which is the 
+SysOp record.
+
+UNABLE TO OPEN USERS.INF - RUN PCBSM TO CREATE IT
+
+The USERS.INF file could not be opened.  If you know that you have a 
+USERS.INF file then this error could be caused by any of the following 
+reasons:
+
+The location of the USERS.INF file specified in PCBSetup | File 
+Locations | System Files is incorrect or invalid.  Specify the correct 
+location of the USERS.INF file or make sure that the entry is valid.
+
+If you are using a network then make sure that you have not lost your 
+connection to the server.  If you have lost your connection then of 
+course you will not be able to access the USERS.INF file that is stored 
+there.
+
+Make sure that you have enough file handles available.  You should 
+allocate at least 25 file handles for each node on the computer and on 
+your server you should allocate 25 handles for each node on your system.  
+This can be done using the FILES= statement in your CONFIG.SYS.
+
+If you need to create a new USERS.INF file then you may do so by loading 
+System Manager, selecting User Info File Maintenance, followed by Create 
+User Info File.
+
+USERNET.XXX: create error
+
+PCBoard attempted to create the USERNET.XXX file used to maintain what 
+each user is doing on the system but was unable to.  The file location 
+in PCBSetup | File Locations | System Files may point to an invalid 
+subdirectory or if you are running under a network you may have lost 
+your connection to the server.
+
+Another possibility is that you may not have enough file handles 
+available to open the file.  Make sure that each session on your 
+computer has 20 file handles available and that your server has 20 file 
+handles allocated for each node in the system.
+
+USERNET.XXX: format error
+
+PCBoard has determined that the format of the USERNET.XXX file is 
+invalid.  It could be that you are using an older version of the 
+USERNET.XXX or it has been corrupted excessively.  If you delete the 
+file, PCBoard will recreate the file using the proper format.
+
+USERNET.XXX: memory error
+
+When PCBoard attempted to load the USERNET.XXX file into memory there 
+was not enough conventional memory to do so.  You need to increase the 
+amount of conventional memory that is available before you load PCBoard.
+
+USERNET.XXX: open error
+
+The USERNET.XXX file could not be opened.  It could be that the path to 
+your USERNET.XXX file is incorrect (PCBSetup | File Locations | System 
+Files).  Another possibility is that you have lost connection to the 
+server or you may have insufficient file handles available to open the 
+file.
+
+USERNET.XXX: read error
+
+When PCBoard attempted to read the USERNET.XXX file it could not do so 
+or encountered an error of some sort.  If you have had disk access 
+problems in the past it may cause this type of error.  You could delete 
+the USERNET.XXX file since PCBoard will recreate it and see if that 
+clears anything up.  However, it may turn out that this is a symptom of 
+hardware failure on your system.
+
+PCBoard Does Not Answer
+
+Nothing can be more frustrating than setting up your system and then 
+realizing that it is not accepting any calls.  This sections details 
+some reasons why your system may not be properly answering phone calls.  
+
+Phone Rings But PCBoard Does Not Recognize The Call
+
+Normally when a call comes in, PCBoard will display Ring
+Detected followed by a number which counts down.  When you see this 
+message you know that a call was detected and that the two modems are 
+attempting to establish a connection.  What if you do not see this 
+message but you know a phone call is coming in? There are two common 
+reasons why this may occur:
+
+Your modem is not properly configured to send RING whenever a call is 
+detected by the modem.  Without the modem returning that response code, 
+PCBoard does not know if the phone is ringing or not.  Make sure you 
+used PCBModem to configure you modem.  It will setup both your hardware 
+and your software to work as PCBoard expects it to work.
+
+You have purchased the /M version of PCBoard but you are running the 
+regular version of PCBoard.  The /M version stores the configuration in 
+PCBOARD.DAT as PORTx whereas the normal software stores it as COMx. 
+Because the normal version of PCBoard does not know how to handle the 
+PORTx, it will report No Modem Selected as the communications port.  Of 
+course, since no communications port is selected, PCBoard cannot answer 
+the phone.
+
+PCBoard Recognizes Call, Counts Down to 0 And Recycles
+
+When a call is detected, PCBoard counts down from the value you entered 
+in Seconds to wait for carrier located in PCBSetup | Modem Information | 
+Modem Setup.  As soon as you see the Ring Detected message, PCBoard 
+sends an ATA to the modem signaling that it should answer the call.  At 
+this point, it is up to your modem to answer the call properly.
+
+If your countdown goes to 0 for every phone call without getting a 
+connection established then it could be caused by the following reasons:
+
+You have not given the modem enough time to answer the phone. Increase 
+the Seconds to wait for carrier so that your modem has enough time to 
+answer the call.
+
+If your RS-232 cable is not wired correctly then the PCBoard may never 
+realize that the connection has been established.  In order for a 
+connection to be realized as valid, PCBoard waits for the CONNECT 
+message from the modem and also checks the CD (carrier detect) line to 
+make sure that connection really exists.  If your CD line is not wired 
+properly (or not wired at all) in your RS-232 cable then the connection 
+may never be considered valid.  The easiest solution to this problem is 
+to make sure that your cable has all 25 pins wired straight through.
+
+Modem Reset Errors
+
+Anytime PCBoard cannot send the initialization string at the 
+call-waiting screen you will receive a Modem Reset Error which is 
+signified by a low-tone beep and a message.  Before ever sending the 
+initialization string though, an AT is sent to the modem.  PCBoard then 
+expects an OK to be returned from the modem.  If that OK is not received 
+within approximately 25 seconds then PCBoard will report that there was 
+a modem reset error.
+
+Error Occurs When You Load PCBoard
+
+If the error occurs when you load PCBoard for the first time, this 
+usually signifies that your hardware and software are not configured 
+properly.  First, make sure  the right communications port is being 
+opened.  If that all checks out, then it may mean that you have an IRQ 
+conflict in your system which will prohibit communications with the 
+devices that are using the same IRQ.
+
+Another possibility is that your initialization string contains a 
+command which is not recognized by your modem.  Check your 
+initialization string in PCBSetup to make sure that all commands in your 
+initialization string are valid.
+
+Error Occurs When Recycling After A Call
+
+If you get modem reset errors after users have logged into your system, 
+it could be caused by any of the following reasons:
+
+You have loaded another application which access the same COM port as 
+the node that is giving you the errors.  You may have also accessed a 
+port which uses the same IRQ.  That would mean the other application 
+stole away the IRQ -- meaning  PCBoard would not be able to communicate 
+with the modem.
+
+Your modem may be malfunctioning.  It is not uncommon for modems to 
+malfunction.  One solution may be to turn your modem off and back on 
+again to see if that has any effect on the situation. Aside from that, 
+there is not much you can do but to have your modem checked.
+
+Date Not Changing
+
+A common question among SysOps is why did my date not change at midnight 
+the night before?  You may be inclined to blame PCBoard for not changing 
+the date, but in reality PCBoard has nothing to do with changing the 
+date at midnight.
+
+The responsibility of changing the system date lies with the the 
+software that reads the BIOS clock ticks.  PCBoard does not read the 
+BIOS clock ticks, therefore it is not responsible for changing the date.  
+It is quite common for some TSRs to monitor time in this fashion and to 
+not properly update the date. Therefore, you may want to begin by 
+systematically removing the TSRs on your system to see if any of them 
+may be the cause of the problem.
+
+Because something else is reading the BIOS clock ticks the CPU may be 
+too busy to change the system date.  That is the real reason your system 
+date is not changing at midnight.
+

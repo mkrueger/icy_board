@@ -13,7 +13,7 @@ pub async fn create_callinfo_bbs(state: &IcyBoardState, path: &std::path::Path, 
     let mut contents = String::new();
     contents.push_str(&format!("{}\r\n", state.session.user_name)); // User Name
     contents.push_str("5\r\n"); // Baud 300=1, 1200=2, 2400=0, 9600=3, 19200=4, Local=5
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().city_or_state)); // Calling From
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state)); // Calling From
     contents.push_str(&format!("{}\r\n", state.session.cur_security)); // User security level
     contents.push_str(&format!("{}\r\n", state.session.minutes_left())); // User Time Left
     let emulation = match state.session.disp_options.grapics_mode {
@@ -22,26 +22,29 @@ pub async fn create_callinfo_bbs(state: &IcyBoardState, path: &std::path::Path, 
     };
     contents.push_str(&format!("{}\r\n", emulation)); // Color or Mono
     contents.push_str(&format!("{}\r\n", state.door_user_password().await));
-    contents.push_str(&format!("{}\r\n", state.session.cur_user + 1)); // User Reference Number
+    contents.push_str(&format!("{}\r\n", state.session.cur_user_id + 1)); // User Reference Number
     contents.push_str("0\r\n"); // User Time On
     contents.push_str(&format!("{}\r\n", state.session.login_date.format("%H:%M"))); // Time Str
     contents.push_str(&format!("{}\r\n", state.session.login_date.format("%H:%M %m/%d%/%y"))); // Time-Date
     contents.push_str(&format!("{}\r\n", state.session.current_conference_number)); // Conference Joined
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.today_num_downloads)); // Daily Downloads
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.today_num_downloads)); // Daily Downloads
     contents.push_str(&format!("{}\r\n", 999)); // Max Downloads
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.today_dnld_bytes / 1024)); // Daily Download K
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.today_dnld_bytes / 1024)); // Daily Download K
     contents.push_str(&format!("{}\r\n", 999 * 1024)); // Max Downloads KB
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().home_voice_phone)); // Phone Number
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().home_voice_phone)); // Phone Number
     contents.push_str(&format!("{}\r\n", Local::now().format("%m/%d%/%y %H:%M"))); // Date-Time
     let emulation = if state.session.expert_mode { "EXPERT" } else { "NOVICE" };
     contents.push_str(&format!("{}\r\n", emulation)); // Novice or Expert
     contents.push_str("All\r\n"); // Transfer Method  All, Ymodem, Ymodem/G, Xmodem, Xmodem/CRC, Xmodem-1K, Xmodem-1K/G, Ascii
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.last_on.format("%m/%d%/%y"))); // Last New Date
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.num_times_on)); // Times on
+    contents.push_str(&format!(
+        "{}\r\n",
+        state.session.current_user.as_ref().unwrap().stats.last_on.format("%m/%d%/%y")
+    )); // Last New Date
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_times_on)); // Times on
     contents.push_str(&format!("{}\r\n", state.session.page_len)); // Lines per Page
     contents.push_str("42\r\n"); // Highest Message Read
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.num_uploads)); // Uploads
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.num_downloads)); // Downloads
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_uploads)); // Uploads
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_downloads)); // Downloads
     contents.push_str("8\r\n"); // Databits (7 or 8)
     if state.session.is_local {
         contents.push_str("LOCAL\r\n"); // LOCAL or REMOTE
@@ -49,7 +52,7 @@ pub async fn create_callinfo_bbs(state: &IcyBoardState, path: &std::path::Path, 
         contents.push_str("REMOTE\r\n"); // LOCAL or REMOTE
     }
     contents.push_str(&format!("COM{}\r\n", DOOR_COM_PORT)); // COM Port
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().birth_date.format("%m/%d%/%y"))); // Birth Date
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().birth_date.format("%m/%d%/%y"))); // Birth Date
     contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE)); // Com Port Speed
     contents.push_str("TRUE\r\n"); // Already Connected
     contents.push_str("Normal Connection \r\n"); // MNP/ARQ or Normal Connection

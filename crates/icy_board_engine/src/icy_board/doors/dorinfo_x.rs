@@ -20,9 +20,9 @@ pub async fn create_dorinfo(state: &IcyBoardState, path: &std::path::Path) -> Re
     contents.push_str("0\r\n"); // Reserved (always zero)
     contents.push_str(&format!("{}\r\n", state.session.get_first_name())); // User first name
     contents.push_str(&format!("{}\r\n", state.session.get_last_name())); // User last name
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().get_first_name())); // User first name
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().get_last_name())); // User last name
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().city_or_state)); // User location
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().get_first_name())); // User first name
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().get_last_name())); // User last name
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state)); // User location
     let emulation = match state.session.disp_options.grapics_mode {
         GraphicsMode::Ctty => 0,
         GraphicsMode::Avatar => 2,

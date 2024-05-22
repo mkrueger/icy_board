@@ -419,7 +419,7 @@ impl PcbBoardCommand {
             .await?;
 
         self.state.session.security_violations += 1;
-        if let Some(user) = &mut self.state.current_user {
+        if let Some(user) = &mut self.state.session.current_user {
             user.stats.num_sec_viol += 1;
         }
         if self.state.session.security_violations > 10 {

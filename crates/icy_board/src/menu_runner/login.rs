@@ -477,7 +477,7 @@ impl PcbBoardCommand {
     }
 
     async fn login_user(&mut self) -> Res<bool> {
-        let check_password = if let Some(user) = &self.state.current_user {
+        let check_password = if let Some(user) = &self.state.session.current_user {
             if user.flags.delete_flag || user.flags.disabled_flag {
                 self.state.display_text(IceText::DeniedLockedOut, display_flags::NEWLINE).await?;
                 self.state.hangup().await?;
@@ -501,7 +501,7 @@ impl PcbBoardCommand {
         }
 
         if self.state.get_board().await.config.subscription_info.is_enabled {
-            if let Some(user) = &self.state.current_user {
+            if let Some(user) = &self.state.session.current_user {
                 if user.exp_date < Utc::now() {
                     log::warn!("Login from expired user {} at {}", self.state.session.user_name, Local::now().to_rfc2822());
                     let exp_file = self.state.get_board().await.config.paths.expired.clone();
@@ -518,7 +518,7 @@ impl PcbBoardCommand {
             }
         }
 
-        if let Some(user) = &self.state.current_user {
+        if let Some(user) = &self.state.session.current_user {
             if !user.password.expire_date.year() > 0 {
                 let today = Utc::now();
                 if user.password.expire_date > today {
@@ -585,7 +585,7 @@ impl PcbBoardCommand {
 
             if pw1 == pw2 {
                 let exp_days = self.state.get_board().await.config.user_password_policy.password_expire_days;
-                if let Some(cur_user) = &mut self.state.current_user {
+                if let Some(cur_user) = &mut self.state.session.current_user {
                     cur_user.password.password = Password::PlainText(pw1);
                     if exp_days > 0 {
                         cur_user.password.expire_date = Utc::now() + chrono::Duration::days(exp_days as i64);

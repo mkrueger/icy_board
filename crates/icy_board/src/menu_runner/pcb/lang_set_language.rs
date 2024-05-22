@@ -12,7 +12,7 @@ impl PcbBoardCommand {
         if self.displaycmdfile("lang").await? {
             return Ok(());
         }
-        let cur_lang = if let Some(user) = &mut self.state.current_user {
+        let cur_lang = if let Some(user) = &mut self.state.session.current_user {
             user.language.clone()
         } else {
             String::new()
@@ -20,7 +20,7 @@ impl PcbBoardCommand {
 
         let lang = self.ask_languages(cur_lang).await?;
         if !lang.is_empty() {
-            if let Some(user) = &mut self.state.current_user {
+            if let Some(user) = &mut self.state.session.current_user {
                 user.language = lang;
             }
             self.state.save_current_user().await?;

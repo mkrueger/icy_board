@@ -1,0 +1,2193 @@
+6
+==============================================================================
+                                                              Conference Setup
+
+
+
+
+
+
+
+
+
+Main Board Configuration
+
+Conferences
+
+Conference Options Screen
+
+Sharing Files Between Conferences
+
+File Directories
+
+Doors
+
+Script Questionnaires
+
+Bulletins
+
+The PCBSetup Main Menu contains two menu items that will help you setup 
+conferences.  The first selection will allow you to modify the configuration 
+of the Main Board (conference 0) while the second option will allow you to 
+select the conference number you want to modify (1-65,535).
+
+Main Board Configuration
+
+The Main Board is a special conference.  This conference is the base 
+conference of PCBoard and it is sometimes referred to as conference 0.  When 
+a user abandons a conference they will be returned to the Main Board 
+conference.
+
+The reason that there are two different menu options on the Main Menu is 
+because the following fields that are available in other conference 
+definitions would have no effect on the Main Board Conference:
+
+	Conference Name
+	Public Conference
+	Password to Join if Private
+	Req. Security if Public
+	Auto-Register Flags
+
+The Main Board is a public conference by default and the conference that most 
+people will login to.  You can lock a user out of the Main Board if you wish, 
+by setting the L conference flag in a user's record.
+
+For information on all of the fields available in the Main Board 
+Configuration screen, please reference the Conferences | Display Files And 
+Message Locations and Conference Options Screen sections.
+
+Conferences
+
+When you select the Conferences option from the Main Menu, you will be 
+presented with a list of conferences on your system. You need to select the 
+conference that you wish to edit from this list.
+
+Selecting a Conference To Edit
+
+The screen that lists your conferences looks similar to the
+following:
+
+To edit a conference, move to the conference you want to edit and press 
+ENTER.  The keyboard commands that you can use to move the highlighted bar 
+are:
+
+   [conf. #]  Anytime that you begin typing a number you will see a field 
+              show up on your screen which enables you to go directly to a 
+              particular conference.  The field will appear towards the top 
+              of the screen as shown in the screen on the following page.
+
+      PgDn    View the next 42 conferences in your system.
+             
+      PgUp    View the previous 42 conferences in your system.
+
+      Home    Highlight the first conference on the current screen.
+
+      End     Highlight the last conference on the current screen.
+
+As you are moving the highlighted bar around, you may notice that it 
+disappears once you have passed a certain number.  When the bar disappears, 
+it is letting you know that you have passed the number that you entered as 
+Number of Highest Conference Desired in PCBSetup | Configuration Options | 
+Messages.  Another way that you will know when you have exceeded this number 
+is when PCBSetup emits a beep when attempting to edit the conference.
+
+Once you have selected the conference you want to edit, press ENTER to see 
+the first screen of fields that you may edit relating to that conference.  
+When you are editing a particular conference you can press PgDn to go to the 
+second configuration screen or press PgDn twice to go to the next available 
+conference.  To go to the previous conference, press PgUp.
+
+Conference Name / Definition
+
+Conference Name
+
+In this field, enter the name you wish to use for this conference.  This name 
+will be shown at the conference command prompt.  For example, when you are in 
+the Chit-Chat conference the conference command prompt will resemble the 
+following:
+
+
+(13 min. left) Chit-Chat Conference Command?
+
+
+This name will also be used if a user attempts to join a conference.  PCBoard 
+will search by conference name or by conference number.
+
+Public Conference
+
+A conference can be configured to be either a public conference or a private 
+conference.  A public conference can be joined by anyone if they have 
+sufficient security to do so (see the discussion about the Req. Security if 
+Public field on this screen for further information).  A private conference 
+requires that a user be registered (the R conference flag is set in their 
+user record)  in order for them to join the conference.
+
+        N       The conference will be considered a private conference. Users 
+                must be registered in the conference before they may join the 
+                conference.
+
+        Y       The conference will be a public conference.  In order to join 
+                a public conference, the user must have a security level that 
+                is greater than or equal to the value you enter in the Req. 
+                Security if Public field.
+
+Req. Security if Public
+
+If you have defined your conference to be a public conference, you should 
+enter the security level that is required to join the conference in this 
+field.  If a user attempts to join a conference and they do not have 
+sufficient security, they will not be allowed to join the conference.
+
+One exception to this rule is, PCBoard will allow the user to join the public 
+conference if the R flag has been set in their record.  This would allow you 
+to manually register users in a public conference even if the security level 
+requirements are not met.
+
+Password to Join if Private
+
+If you have defined a conference as a private conference, you can have 
+PCBoard automatically register your users in the conference if they know the 
+proper password.  This would be a good situation where you want to enable 
+only a select few individuals into a conference but do not want to manually 
+register all of the users.  If a user that is not registered in the 
+conference attempts to join the conference, they will be prompted for a 
+password.
+
+The user will be given one attempt at guessing the password each time they 
+attempt to join the private conference.  If the user gets the correct 
+password, PCBoard will register the user in the conference with an R flag.  
+By doing this, the user will not have to enter the password each time they 
+join the conference.
+
+If you decide you want to change the password, you may want to de-register 
+all users in the conference via System  Manager | Users File Maintenance | 
+Remove Group Conference.  After you do this, all users would have to re-enter 
+the correct password to become registered in the conference again.
+
+NOTE:  To help deter hackers from gaining access to a conference, PCBoard 
+will hang up on the caller if they fail to get the right password after 8 
+attempts per session.
+
+Auto-Register Flags
+
+In a public conference, you do not need to use conference registration flags 
+for a user to be able to join the conference. The ability to join a 
+conference is based on the security level of the user and the minimum 
+security level that you want joining the conference.  However, by setting the 
+conference flags, you can speed up the caller's access to the conference.  
+This is possible because PCBoard then does not have to read in the conference 
+information to determine the public/private status or the security level 
+requirements.  Valid characters in this field are:
+
+        [blank] When a user joins a conference for the first time, no changes 
+                will be made to their conference registration flags. Each 
+                time the user joins the conference, PCBoard will check to 
+                make sure that the user has sufficient security to join the 
+                conference.
+
+        R       When joining a conference for the first time, the R 
+                conference flag will be set in the user's record so that 
+                their security will not be checked each time they join the 
+                conference. This will enable the user to join the conference 
+                quicker.  If you do not also set the X flag, then the user 
+                will not be able to join the conference when their 
+                subscription expires (assuming you have subscription mode 
+                enabled).
+
+        X       When joining a conference for the first time, the X 
+                conference flag will be set in the user's record.  When this 
+                flag and the R conference flag is set, the user will have 
+                access to the conference at all times (even when their 
+                subscription has expired).  If the X flag is set, but not the 
+                R flag, the user will be locked out of the conference.
+
+        S       The S conference flag will be set if the user is joining the 
+                conference for the first time.  The S flag will mark the 
+                conference for scanning when reading mail within PCBoard.
+
+
+
+You can enter any combination of the R, X, and S conference flags in this 
+field or you may leave the field blank.  For example, you may want to enter 
+R, RX, or even RXS.
+
+Display Files And Message Locations
+
+Number of Message Blocks
+
+Versions of PCBoard prior to v15.0 used a different method of indexing the 
+message bases.  You were required to enter the number of message blocks you 
+wanted to use for this older format.  If you are running third-party software 
+which requires use of the older index files, you can have PCBoard maintain 
+these older format index files for you by using the /OLDINDEX environment 
+setting for PCBOARD.EXE or by setting the option in each conference 
+configuration regarding old index support.
+
+As mentioned previously, the old index format requires a message block 
+setting.  In this field, enter the number of message blocks that you want to 
+use for this older message index format. Each block represents a RANGE of 1K 
+in message numbers.  That is, with 1 block defined you may have a RANGE of 
+messages from a low number of 1 to a high number of 1024.  Likewise, 100,001 
+up through 101,024 is also valid with a block setting of 1.
+
+Each block requires 4 kilobytes of disk space.  Regular use of PCBPack will 
+remove numbers from the low end and this will slide the range forward.  
+Usually you will not have to increase the number of blocks for the message 
+base beyond a value of 4 or so unless you have extremely high traffic or keep 
+very old messages in the message base.
+
+NOTE:  If you are not maintaining the older index formats then the value in 
+this field will be ignored.  In addition, if you run a multi-node system this 
+number must be the same for this conference on all nodes on the system.
+
+Name/Loc of MSGS File
+
+Each conference has a message base file where messages left in the conference 
+are stored.  In this field, enter the name and location of the message file 
+that you want to use for this conference.  Normally, the filename you specify 
+in this field will be unique to any other conference but it is not absolutely 
+required to be unique.  For example, if you enter H:\PCB\MSGS\CONF001 in this 
+field, then PCBoard will think that the message base will be stored in 
+H:\PCB\MSGS\ using the filename CONF001.
+
+Name/Loc of User's Menu
+
+PCBoard, by default, has one main menu that is displayed at each conference 
+command prompt when in novice mode.  This menu is used by your callers so 
+that they know which commands are available on your system.  The menu file is 
+simply a text file so you can customize it any way that you think will make 
+it easier for your users to navigate around the system.
+
+In this field, enter the name and location of your user  menu for this 
+conference.  Remember, that several conferences can point to the same menu 
+file if you wish to reduce the complexity of your system.
+
+Editing The User Menu File
+
+If you wish to edit the user menu file, press F2 to edit the non-graphics 
+files and F3 to edit the graphics specific file.  To create security specific 
+and language specific files, you will need to do so directly from the DOS 
+prompt using the display file conventions.
+
+Name/Loc of Sysop's Menu
+
+Because the SysOp has more menu options available to them than regular users, 
+this file will be displayed as the menu for those users who have SysOp 
+security level or higher.  The SysOp security level is defined in PCBSetup | 
+Security Levels | Sysop Commands.
+
+In this field, enter the name and location of the SysOp menu you wish to use.  
+If you do not want to maintain two separate menu files (one for SysOps and 
+one for regular users), enter the filename of the user menu in this field.
+
+Editing The SysOp Menu File
+
+If you wish to edit the SysOp menu file, press F2 to edit the non-graphics 
+files and F3 to edit the graphics specific file.  To create security specific 
+and language specific files, you will need to do so directly from the DOS 
+prompt using the display file conventions.
+
+Name/Loc of NEWS File
+
+Each conference can specify a different news file.  The news file is 
+typically used to make the users aware of upcoming events, policies of the 
+board and general information that you want the users to be aware of.
+
+In this field, enter the name and location of the news file for the 
+conference.  If you leave this field blank, no conference news file will be 
+available to your callers.
+
+Editing The Conference News File
+
+If you wish to edit the news file, press F2 to edit the non-graphics files 
+and F3 to edit the graphics specific file.  To create security specific and 
+language specific files, you will need to do so directly from the DOS prompt 
+using the display file conventions.
+
+Name/Loc of Conf INTRO File
+
+Each conference may have an introduction file.  This file is typically used 
+to remind the user of any particular items of interest about this conference.  
+For example, if you want the users to know what is expected in the conference 
+each time they join it, you would use the introduction file.  Remember, this 
+file will be displayed each and every time the user joins a conference unless 
+the Q subcommand is used when joining the conference.  This file may be 
+displayed while doing mail scans as well if you have enabled the Show INTRO 
+in `R A' scan (Conference Options Screen).
+
+In this field, enter the name and location of the introduction file for the 
+conference.  If you leave this field blank, no introduction file will be 
+displayed.
+
+Editing The Conference Introduction File
+
+If you wish to edit the conference introduction file, press F2 to edit the 
+non-graphics files and F3 to edit the graphics specific file.  To create 
+security specific and language specific files, you will need to do so 
+directly from the DOS prompt using the display file conventions.
+
+Location for Attachments
+
+The drive and subdirectory that you enter in this field will determine where 
+file attachments will be stored for this conference.  If you leave this field 
+blank, you will be specifying the current directory as your directory for 
+file attachments which is not recommended.
+
+Public Uploads
+
+Sort
+
+In this field, enter the sort type to be used by PCBFiler for the public 
+upload DIR (description) file.  Valid values are:
+
+
+	0	Do not sort.
+	1	Sort by filename (ascending / A-Z)
+	2	Sort by filename (descending / Z-A)
+	3	Sort by file date (ascending)
+	4	Sort by file date (descending)
+
+Name/Loc Upload DIR File
+
+PCBoard stores the file descriptions in a separate file for each directory 
+(including upload directories).  In this field, enter the name and location 
+of the public upload DIR (description) file.  This file contains the name, 
+size, date, and file description of files uploaded to your system, when 
+uploads are public.
+
+Location of Uploads
+
+In this field, enter the drive and subdirectory where you want the actual 
+files that are uploaded as public uploads to be stored.  If you are running 
+multiple nodes, you will want to make sure this location is the same for all 
+nodes.  Otherwise, files may be available on one node, but not available on 
+another node.  For example, you may want to enter F:\PCB\UPLOADS\ in this 
+field.
+
+Private Uploads
+
+Sort
+
+In this field, enter the sort type to be used by PCBFiler for the private 
+upload DIR (description) file.  Valid values are:
+
+	0	Do not sort.
+	1	Sort by filename (ascending / A-Z)
+	2	Sort by filename (descending / Z-A)
+	3	Sort by file date (ascending)
+	4	Sort by file date (descending)
+
+Name/Loc Upload DIR File
+
+PCBoard stores the file descriptions in a separate file for each directory 
+(including upload directories).  In this field, enter the name and location 
+of the private upload DIR (description) file.  The name, size, date, and file 
+description of files that are uploaded to your system, when uploads are 
+private.
+
+Location of Uploads
+
+In this field, enter the drive and subdirectory where you want the actual 
+files that are uploaded as private uploads to be stored.  If you are running 
+multiple nodes, you will want to make sure this location is the same for all 
+nodes.  Otherwise, files may be available on one node, but not available on 
+another node.  For example, you may want to enter F:\PCB\PRIVUPLD\ in this 
+field.
+
+Doors
+
+Menu Listing
+
+When a user uses the OPEN or DOOR user commands without specifying a door 
+name or number, PCBoard will display a menu of doors that are available.  The 
+filename you enter in this field will be the file that is displayed to the 
+caller.  This file is a standard display file so you may have security, 
+graphics, and language specific versions of the menu.  Because you can have 
+different versions of the doors menu, you should not specify a filename 
+extension or you will eliminate the ability to have different menus for 
+languages on your system (if you have defined them).  For example, you may 
+enter C:\PCB\MAIN\DOORS or any other valid filename in this field.
+
+Editing The Door Menu File
+
+If you wish to edit the door menu file, press F2 to edit the
+non-graphics files and F3 to edit the graphics specific file.  To create 
+security specific and language specific files, you will need to do so 
+directly from the DOS prompt using the display file conventions.
+
+Path/Name List File
+
+The Path/Name List File, as it is called, refers to the data file that is 
+used to define the doors that are available in the conference.  This is the 
+file you will edit to define, delete, or alter the configuration of the doors 
+available in this conference.  To edit this file, press F2 while the filename 
+is highlighted.   Please refer to the Doors section in the chapter for 
+additional information on editing this file..
+
+NOTE:  Even though this file is not a display file, you may create security 
+specific versions of the Path/Name List File. For example, if the file is 
+called DOOR.LST, you can create a DOOR50.LST that would be used exclusively 
+by those with a security level of 50.
+
+Bulletins
+
+Menu Listing
+
+When a user uses the B user command without specifying a bulletin number, 
+PCBoard will display a menu of bulletins that are available.  The filename 
+you enter in this field will be the file that is displayed to the caller.  
+Even though this file is a standard display file, you cannot have a security 
+specific version of this menu.  You may create graphic and language specific 
+versions of this menu..  Because you can have different versions of the 
+bulletin menu, you should not specify a filename extension or you will 
+eliminate the ability to have different menus for languages on your system 
+(if you have defined them). For example, you may enter C:\PCB\MAIN\BLTS or 
+any other valid filename in this field.
+
+Editing The Bulletin Menu File
+
+If you wish to edit the bulletin menu file, press F2 to edit the non-graphics 
+files and F3 to edit the graphics specific file.  To create language specific 
+files, you will need to do so directly from the DOS prompt using the display 
+file conventions.
+
+Path/Name List File
+
+The Path/Name List File, as it is called, refers to the data file that is 
+used to define the bulletins that are available in the conference.  This is 
+the file you will edit to define, delete, or alter the configuration of the 
+bulletins available in this conference.  To edit this file,  press F2 while 
+the filename is highlighted.   Please refer to the Bulletins section in this 
+chapter for additional information on editing this file.
+
+NOTE:  Even though this file is not a display file, you may create security 
+specific versions of the Path/Name List File. For example, if the file is 
+called BLT.LST, you can create a BLT50.LST that would be used exclusively by 
+those with a security level of 50.
+
+Scripts
+
+Menu Listing
+
+When a user uses the S user command, PCBoard will display a menu of script 
+questionnaires that are available.  The filename you enter in this field will 
+be the file that is displayed to the caller.  Even though this file is a 
+standard display file, you cannot have a security specific version of this 
+menu.  You may create graphic and language specific versions of this menu. 
+Because you can have different versions of the script menu, you should not 
+specify a filename extension or you will eliminate the ability to have 
+different menus for languages on your system (if you have defined them).  For 
+example, you may enter C:\PCB\MAIN\SCRIPTS or any other valid filename in 
+this field.
+
+Editing The Script Questionnaire Menu File
+
+If you wish to edit the script questionnaire menu file, press 2 to edit the 
+non-graphics files and F3 to edit the graphics specific file.  To create 
+language specific files, you will need to do so directly from the DOS prompt 
+using the display file conventions.
+
+Path/Name List File
+
+The Path/Name List File, refers to the data file used to define the script 
+questionnaires that are available in the conference. This is the file you 
+will edit to define, delete, or alter the configuration of the script 
+questionnaires available in this conference.  To edit this file,  press F2 
+while the filename is highlighted.   Please refer to the Script 
+Questionnaires section in this chapter for additional information on editing 
+this file..
+
+NOTE:  Even though this file is not a display file, you may create security 
+specific versions of the Path/Name List File. For example, if the file is 
+called SCRIPT.LST, you can create a SCRIPT50.LST that would be used 
+exclusively by those with a security level of 50.
+
+Directories
+
+Menu Listing
+
+When a user uses the F user command without specifying a subcommand, PCBoard 
+will display a menu of file directories that are available.  The filename you 
+enter in this field will be the file that is displayed to the caller.  Even 
+though this file is a standard display file, you cannot have a security 
+specific version of this menu.  You may create graphic and language specific 
+versions of this menu..  Because you can have different versions of the 
+script menu, you should not specify a filename extension or you will 
+eliminate the ability to have different menus for languages on your system 
+(if you have defined them). For example, you may enter C:\PCB\MAIN\DIR or any 
+other valid filename in this field.
+
+Editing The File DIrectory Menu File
+
+If you wish to edit the file directory menu file you can press 2 to edit the 
+non-graphics files and F3 to edit the graphics specific file.  To create 
+language specific files, you will need to do so directly from the DOS prompt 
+using the display file conventions.
+
+Path/Name List File
+
+The Path/Name List File, as it is called, refers to the data file that is 
+used to define the file directories that are available in the conference.  
+This is the file you will edit to define, delete, or alter the configuration 
+of the file directories available in this conference.  To edit this file, 
+press F2 while the filename is highlighted.   Please refer to the File 
+Directories section in this chapter for additional information on editing 
+this file.
+
+NOTE:  Even though this file is not a display file, you may create security 
+specific versions of the Path/Name List File. For example, if the file is 
+called DIR.LST, you can create a DIR50.LST that would be used exclusively by 
+those with a security level of 50.
+
+Download Paths
+
+Path/Name List File
+
+The Path/Name List File, refers to the data file used to define the paths 
+that PCBoard will search to locate files that are available for downloading 
+in this conference.  This is the file you will edit to define, delete, or 
+alter the configuration of the paths that search for downloadable files.  To 
+edit this file, press F2 while the filename is highlighted.   Please refer to 
+the File Directories section in this chapter for additional information on 
+editing this file.
+
+NOTE:  Even though this file is not a display file, you may create security 
+specific versions of the Path/Name List File. For example, if the file is 
+called DLPATH.LST, you can create a DLPATH50.LST that would be used 
+exclusively by those with a security level of 50.
+
+Conference Options Screen
+
+These conference options are made available to you when you press d while in 
+the conference configuration screen.  These options give you more control 
+over how the conference will operate.
+
+Auto-Rejoin into this Conf.
+
+In certain situations it may be desirable to have the user automatically 
+re-join a conference if they logoff while in that conference.  For example, 
+you may have a conference set aside for each of several groups of users on 
+your system.  Your system may be configured so that all of the information 
+they need to obtain can be found in the conference which is dedicated for 
+their use.  You could then lock the users out of all other conferences (using 
+the L conference flag) and force them to join their conference next time they 
+logon.  Valid options for this field are:
+
+        N       When the user logs in the next time, they will be placed into 
+                the Main Board (Conference 0).
+
+        Y       The next time the user logs onto the system, they will 
+                automatically rejoin this conference if they disconnected 
+                from the system while in this conference.
+
+Allow Viewing Conf. Members
+
+This option controls whether or not a user will be asked to view a list of 
+users who are registered in the conference they are about to join.  This 
+question is asked only once per session (when the conference is joined for 
+the first time).  Valid options for this field are:
+
+        N       Users are not asked if they wish to view conference members 
+                when they join the conference.  The users may still be able 
+                to use the USERS command to see the same information.  This 
+                command, however, is controlled by security level in PCBSetup 
+                | Security Levels | User Commands.
+
+        Y       Users will be asked if they wish to view conference members 
+                when they join the conference for the first time during that 
+                session.
+
+Make All Uploads Private
+
+With the concern of virus infected or other damaging files being sent over 
+the modem, you may want to screen all  of your uploads before making them 
+available to your callers.  An additional concern would be if your callers 
+were uploading files that you deemed inappropriate for your system.  In this 
+case too, you will most likely want to make all of your uploads private.  By 
+making an upload private, you are telling PCBoard to place all files that are 
+uploaded in the conference to the private upload directory that you specified 
+on the first screen.  Valid options for this field are:
+
+        N       All uploads in the conference will be considered public 
+                uploads unless the user enters a / as the first character of 
+                their description.  Once the file is uploaded, callers will 
+                be able to download it without you screening the files.
+
+        Y       All uploads will be sent to the private upload directory even 
+                if the description the user entered does not begin with a /.  
+                It is then your responsibility to screen the uploads and move 
+                them (using PCBFiler) out of the private upload directory to 
+                one of your download directories.  If you have defined your 
+                public upload directory (even though you are making all 
+                uploads private) PCBoard will consider the public upload 
+                directory valid for your users.  This means that you could 
+                screen your uploads and then move them over to your public 
+                upload directory where your users will easily be able to find 
+                new uploads to your system.
+
+Make All Messages Private
+
+Not only can you make all uploads to a conference private, but you can also 
+make all messages in a conference private as well. While it is less likely 
+that you want to screen your messages, the conference that you are editing 
+may have a lot of one on one conversations where making all messages private 
+would be the ideal situation.  Valid options for this field are:
+
+        N       When entering a message, the user can assign the message 
+                security of their choice when prompted.  This means that they 
+                can choose to make a message private, public, group password 
+                or any other valid message security option.  If you want to 
+                make a public message private, you may do so by using the P 
+                subcommand at the End of Message Command prompt.
+
+        Y       Users will not be given the choice to assign security to a 
+                message.  Instead, all messages will be deemed RECEIVER ONLY. 
+                As you read these private messages, you can unprotect them 
+                (making them public messages) by using the U subcommand at 
+                the End of Message Command prompt.
+
+
+
+Echo Mail in Conference
+
+The primary design of a bulletin board system is to distribute information to 
+the callers of the system.   Some systems get involved with echo mail 
+networks where several bulletin board systems exchange messages with one 
+another.  Valid options for this field are:
+
+        N       You do not plan on sharing messages in this conference with 
+                other systems. Users will not be asked any questions about 
+                echoing the message they are entering.
+
+        Y       When entering a message, the user will be asked if this 
+                message should be echoed to other systems or not.  PCBoard 
+                does not actually transfer the mail (that is up to the 
+                network mail software).  Therefore, it is up to the network 
+                mail software to honor the echo flag if it is set.  If you 
+                want to force all messages to be marked as messages for 
+                echoing then you should enable the Force Echo on all Messages 
+                option on this same screen.
+
+Force Echo on All Messages
+
+If you would rather force all messages left in the conference to be marked 
+for echoing, enable this option.  When entering messages, your users will not 
+be allowed to choose whether or not the message should be marked for echoing 
+or not.  For this setting to have any effect, you must have answered Y to the 
+Echo Mail in Conference question.  Valid options for this field are:
+
+        N       Allow the user to choose whether or not the message they are 
+                entering should be mark for echoing or not.
+
+        Y       Force all messages entered in the conference to be marked for 
+                echoing.  The user is never given a choice.
+
+Allow Internet (long) TO: Names
+
+The normal limit for user names when addressing message is 25 characters.  
+However, some  networks such as the Internet can have extremely long 
+identities or addresses.  If you are echoing a conference that requires the 
+TO: field to allow input of more than 25 characters, you can choose to do so 
+based on your answer to this field.  Valid options for this field are:
+
+	N	Users are given up to 25 characters to address their message.
+        
+        Y       Users are given up to 120 characters to address their message.
+
+Make Conference Read-Only
+
+You may desire to make some conferences read-only.  Users cannot reply or 
+enter messages in conferences that are marked as read-only.  If you would 
+rather limit who can enter messages by security level, refer to the Level to 
+Enter a Message field on this screen instead.  Valid options are:
+
+	N	Users can enter and reply to messages as they read them.
+        
+        Y       Users (not even the SysOp) will be able to enter messages in
+                this conference.
+
+Disallow Private Messages
+
+Private messages are not often supported in echo mail networks. Therefore, 
+you may wish to not allow users to leave private messages in these 
+conferences.  This field controls whether or not a user can enter private 
+messages in a conference.  Valid options for this field are:
+
+
+
+        N       Users can choose to enter private messages if they are 
+                prompted for the message security.
+
+        Y       Users will not be able to enter a private message if they are 
+                prompted for the message security.  If they attempt to, 
+                PCBoard will warn them that private messages cannot be left 
+                in this conference and then prompt them again for the message 
+                security that they wish to assign to the message.
+
+Place Origin Info in Messages
+
+When you participate in an echo mail network, information that refers to 
+where the message originated from is usually appended to the end of the 
+message.  You can tell PCBoard to include this origin information directly 
+into the message if you wish.  The origin information is taken directly from 
+the Board Name field in PCBSetup | Node Information.  For most systems, it is 
+up to the echo mail software if you should have PCBoard include the origin 
+information or not.  Please refer to the documentation for your mail software 
+to see if it requests that PCBoard include this information.  Valid options 
+for this field are:
+
+        N       Do not place origin information in each message entered in
+                this conference.
+
+	Y	Include the origin information for each message entered in
+                this conference.
+
+Prompt for ROUTE Info
+
+Some mail networks will allow you to route a message directly to a particular 
+site in the echo mail network.  Check with your echo mail documentation to 
+see if it supports routing and if it knows how to extract routing information 
+directly from PCBoard. In order for a user to be prompted for routing 
+information the following must be true of the message being entered:
+
+
+The message must be marked for echoing
+The message must be a private (RECEIVER ONLY) message
+
+
+If prompted for routing information, the user will be able to enter up to 58 
+characters to identify where the message should be directed to.  The echo 
+mail software that you are using will determine the format that the routing 
+information should be entered in.  Valid options for this field are:
+
+	N	Users will not be prompted for routing information.
+
+        Y       Users will be prompted for routing information if the 
+                aforementioned conditions are met.
+
+Allow Aliases to be used
+
+Once you have installed the Alias PSA you need to determine which conferences 
+each user's alias will become active.  Each conference has this field which 
+determines if alias will be used or not.  Valid options for this field are:
+
+        N       Even if the user has defined an alias to use (using the W 
+                user command), only their real name will be used while in 
+                this conference.
+
+        Y       While in this conference, the user's alias name will be in 
+                use.
+
+Show INTRO in 'R A' Scan
+
+The conference introduction file is normally only displayed when a caller 
+uses the J user command  to join a conference. However, to help separate 
+conferences and make the transition from one conference to the next more 
+obvious you can display the introduction file more often.  When using the A 
+or ALL subcommands with the R user command,  this setting will determine if 
+the introduction file for the current conference will be displayed before the 
+conference is actually scanned for new mail.  Remember, this setting is 
+conference specific, so if you want the introduction file for all of your 
+conferences to be displayed, you will need to change this setting for all of 
+your conferences.  Valid options are:
+
+        N       Conference introduction files will only be displayed only 
+                when joining conferences and not during new mail scans.
+
+        Y       In addition to being displayed when joining a conference, the 
+                introduction file will be displayed when scanning for new 
+                mail using the A or ALL subcommands of the R user command.
+
+Maintain Old MSGS.NDX File
+
+Older (non-v15.0 compliant) software may not read the new IDX files and 
+consequently may not be able to recognize messages on your system.  This 
+setting will determine whether or not PCBoard will maintain the older NDX 
+format for this conference.  Valid options are:
+
+        N       PCBoard will continue to maintain only the IDX file (not the 
+                older NDX file) for the conference.
+
+        Y       In addition to maintaining the IDX file, PCBoard will also 
+                maintain the NDX file as well so that software designed to 
+                operate with v14.x (but not v15.0) will be able to operate 
+                properly.
+
+NOTE:  If you want to force all conferences to maintain the older NDX format, 
+use the /OLDINDEX environment switch for PCBoard.
+
+Conf-Specific CMD.LST File
+
+You will probably recall that there is what is referred to as a global 
+CMD.LST file defined in PCBSetup | File Locations | Configuration Files.  
+Normally, the commands that you define in that file will be available in all 
+conferences.  If you want a conference to use a different CMD.LST, specify 
+the CMD.LST to use in this field.  By entering a filename in this field you 
+are overriding the entire contents of your global CMD.LST file with whatever 
+commands are defined in your conference specific version.
+
+Additional Conference Security
+
+In this field, enter the amount of security that should be added to the 
+user's security level at the time they join this conference.  The value that 
+you enter may be positive or negative and can range from -99 to 999.  If the 
+value you enter is negative, then the caller's security will be lowered upon 
+joining the conference.  Also, remember that PCBoard supports security levels 
+up to 255.  Even though you can add 999 to a security level it would not be 
+practical to do so.  Try to limit all security level adjustments so that they 
+remain under 256. Entering 0 in this field will leave the security level of 
+the caller unchanged when joining this conference.
+
+NOTE:  The change in security level will only be in effect while in the 
+conference.  When the conference is abandoned or another conference is joined 
+then the user will return to their assigned security level.
+
+Additional Conference Time
+
+In this field, enter the amount of time that should be added to the user's 
+time remaining on the system at the time that the conference is joined.  You 
+may enter any value between 0 and 999 in this field.  A value of 0 will not 
+adjust the time of the caller when joining the conference.
+
+Once the time is added, it is not removed until the caller logs off of the 
+system.  This means a user could join this conference to get a additional 
+boost in time.  Perhaps the additional time could be used as some sort of 
+incentive.  The additional time is not added each time the user joins the 
+conference.  Instead, it is added the first time they join the conference 
+during each call.
+
+Level to Save File Attachment
+
+The ability to attach files to messages can be a powerful feature and at the 
+same time an annoying feature if abused.  In this field enter the security 
+level that is required to save a message with an attached file in this 
+conference.  The value you enter in this field must be between 0 and 255.  By 
+setting this value to a higher value, you can let your most trusted users 
+attach files without having to worry about it being abused.
+
+Level to Enter a Message
+
+For some conferences, you may want the primary purpose of the conference to 
+have users read messages.  You could disable the ability to enter messages 
+(or replies) by entering Y in the Make Conference Read-Only.  Enabling this 
+setting, however, would not allow you to enter messages directly into this 
+conference.  In this field, enter the security level that is required for a 
+user to leave a message in this conference.  If you did make the conference 
+Read-Only, the value you enter in this field will have no effect.
+
+Be aware that there is a global security level that can be assigned to the E 
+user command in PCBSetup | Security Levels | User Commands.  Whichever value 
+is higher (the global setting or the conference specific setting) will be the 
+controlling security level for entering messages and replies.
+
+Level to Request Return Receipt
+
+Like the file attachment feature, users can end up abusing the ability to 
+request return receipts on their messages.  If this feature is abused, your 
+message bases could quickly become full of un-necessary messages because each 
+return receipt is a message.  In this field enter the security level that is 
+required for a user to be able to request a return receipt in this 
+conference.  You may enter any value between 0 and 255. Entering a high value 
+in this field can disable the ability to request return receipts for all or 
+some of your callers.
+
+Level to Enter Carbon List Msgs
+
+To address a single message to a group of users on the system, the message 
+can be addressed to @LIST@.  Once you address the message in this manner, 
+PCBoard will prompt the user for a list of names that the message should be 
+addressed to.  You can control the security level that is required to address 
+messages in this manner.  In this field enter the security level that is 
+required for a user to address a single message to a group of users.  When a 
+user attempts to address a message to @LIST@ and either does not have 
+sufficient security or the Carbon Copy List Limit is set to 0, the message 
+will be addressed to ALL instead.
+
+Carbon Copy List Limit
+
+When addressing a message to a group of users, you can set the maximum number 
+of users that the message can be addressed to. In this field enter a value 
+between 0 and 99 that will determine the maximum number of users that can be 
+addressed.  A value of 0 disables the ability to enter @LIST@ messages.  When 
+a user attempts to address a message to @LIST@ and either does not have 
+sufficient security or the Carbon Copy List Limit is set to 0, the message 
+will be addressed to ALL instead.
+
+Sharing Files Between Conferences
+
+The conference configuration screens specify the location of several files.  
+As you know, conferences are designed to separate groups of people and or 
+common information together.
+
+You will have different message bases for every conference but you may want 
+to use the same door, script, and bulletin configurations for multiple 
+conferences.  For example, conference 1 and conference 3 on your system may 
+have separate message bases, but you may want to make the same doors 
+available in both conferences.
+
+Rather than having to maintain two separate DOORS.LST files, you can have 
+both conferences use the same DOORS.LST file.  When you make a change to the 
+file, the change will be seen in both conferences (because they are both 
+reading from the same configuration file on disk).  This would mean that 
+conference 1 and 3 may have C:\PCB\GEN\DOORS.LST entered while conference 2 
+could have C:\CONF\2\DOORS.LST  because it will have different doors defined.  
+This concept can be applied to any of the file locations in the conference 
+configuration screens.
+
+File Directories
+
+In order for users to be able to transfer files on your system, you will need 
+to have some file directories available.  Each conference can specify a 
+different set of file directories and each file directory can contain 
+virtually an unlimited number of files.  The file directories simply store 
+the filename, date, size, and description of a file that is available for 
+download.
+
+Creating
+
+To create a file directory,  you must understand how DIR, DIR.LST, and 
+DLPATH.LST interact with one another to form your file directory system.  The 
+following lists the three files that make up your file directories in each 
+conference configuration screen:
+
+Directories : C:\PCB\GEN\DIR              : C:\PCB\GEN\DIR.LST
+
+Download Paths (listing only)              :
+C:\PCB\GEN\CDLPATH.LST
+
+To help illustrate how these files interact with one another we are going to 
+go through a step by step process on how to setup some file directories.  
+First, you need to have a brief overview of DIR, DIR.LST, and DLPATH.LST.
+
+DIR is the file that gets displayed to the user when they select (F)ile 
+Directories from the menu.
+
+DIR.LST is the file that PCBoard uses to determine where the file 
+descriptions are stored, and the description for the directory contents.  
+PCBFiler uses DIR.LST to determine where the files are stored on your hard 
+drive or similar device. PCBFiler also determines what method to use when you 
+sort your directories by reading DIR.LST.
+
+DLPATH.LST is a file that contains a list of paths that PCBoard should search 
+through for files a user requests to download. Only the paths listed in this 
+file are searched when a user requests to download a file.
+
+The first thing you will want to do is to think about categories you would 
+like to define as file directories.  For example, you may have categories 
+called Printer Fonts, Adventure Games, Disk Utilities, etc.  Once you have 
+determined which file categories you wish to create, you are ready to begin 
+adding entries in DIR.LST.
+
+To edit DIR.LST, load PCBSetup by either loading PCBSETUP.EXE from your \PCB 
+directory or select the PCBSetup button from your call-waiting screen.  Once 
+you are in PCBSetup, select either I or J from the PCBSetup Main Menu to 
+enter one of the conference configuration screens.  Now you only need to move 
+your cursor over to the DIR.LST entry and press F2 to edit the file.  Your 
+screen should now resemble the following:
+
+The first field you will be editing is labeled as DIR Text File Name & Path.  
+This is the full path and filename where PCBoard will be storing descriptions 
+(not the actual files for download) for the directory number identified at 
+the left hand side of the line in this file.  You can name this file anything 
+you want, although filenames without extensions are highly recommended. The 
+descriptions in your DIR file will look like the following:
+
+PCBSHOW.ZIP     89722  02-20-91  PCBoard v14.5 Introductory SHOW dated
+                                 2/20/91.  This program gives a quick
+                                 demonstration of installing PCBoard
+                                 It's final goal being that of giving
+                                 new sysops a quick start. Other SHOWs
+                                 may follow in the future.
+                                 Uploaded by: Dan Moore
+
+The next field in your DIR.LST is Hard Disk Subdirectory.  This field should 
+contain the drive and subdirectory where a majority or all of your files are 
+stored for this file directory. PCBFiler uses this field to help determine 
+where the files are located on disk when you edit/move files and file 
+descriptions. Remember, PCBoard never uses this field to locate files 
+requested for download.
+
+It is only possible to assign one drive and subdirectory per file directory.  
+If you have files stored in more than one drive and directory, enter the 
+drive and directory where the majority of the files for this directory are 
+located.
+
+The last field on this screen asks what type of sort method you wish to use.  
+You can specify any of five choices (0-4) that are listed at the bottom of 
+your screen.  When you use PCBFiler to edit/move files and file descriptions, 
+the sort method you specify here will be used to rearrange the file 
+descriptions.
+
+There is one more screen to edit before you are finished.  If you press 2, 
+you will notice that the screen changes.  You still see the column labeled 
+DIR Text File Name & Path.  However, the Hard Disk Subdirectory and Sort 
+fields are no longer on this screen.  Instead, there is a field called 
+Description of Directory Contents.
+
+In this field, you enter a description of what type of files can be found in 
+this directory.  If one of your directories contains laser printer fonts, you 
+could enter Laser Printer Fonts in this field. When your users are doing file 
+scans using the (Z)ippy, (L)ocate, and (N)ew commands they will see these 
+descriptions to the right of the directory number.  Example:
+
+
+Scanning Directory 1  (Printer Fonts)
+Scanning Directory 2  (Adventure Games)
+Scanning Directory 3  (Disk Utilities)
+Scanning Directory 4  (Security Related Files)
+
+All of the descriptions between the parentheses were entered in DIR.LST on 
+the second screen.  If you do not enter any descriptions in the Description 
+of Directory Contents field, you will see the following when you do a 
+directory scan:
+
+Scanning Directory 1  ()
+Scanning Directory 2  ()
+Scanning Directory 3  ()
+Scanning Directory 4  ()
+
+If you have not yet defined all of your file directories in DIR.LST you 
+should do so now.  If you do not have enough lines and need more, you can use 
+ALT-I to insert a new line.  Likewise, if you have defined a file directory 
+that you do not want, you can use ALT-D to delete it.
+
+Assuming you have defined all the file directories you wish to define, it is 
+now time to move on to DLPATH.LST.  This file contains a list of paths that 
+PCBoard will search when a user requests a file to download.  This is the 
+ONLY file that PCBoard will search to determine if a file is available for 
+download. Even if the description for the file is listed in one of the file 
+directories, it will not be allowed to be downloaded unless the file is found 
+in one of the directories listed in DLPATH.LST.
+
+Because the DLPATH.LST is not directly tied into DIR.LST you can enter any 
+directories that you wish in this file.  For example, since PCBoard allows 
+callers to download bulletins, you may want to list the directory where all 
+of your bulletins are stored (e.g., C:\PCB\BLT) in the DLPATH.LST file.  You 
+might also have a special directory set aside where you allow users to 
+download files that are not listed in the directories.  These may be private 
+files that you want to make available to individuals you individually inform 
+of the specific filenames.
+
+For the most part your DLPATH.LST will contain all of the directories you 
+listed in the Hard Disk Subdirectory column in DIR.LST, the location where 
+all of you new uploads are stored.
+
+The final file you will need to edit is your DIR "Menu Listing" file and your 
+file directory setup will be finished.  See Creating Menu later in this 
+section.
+
+Adding Files To
+
+Adding files for download in your file directories can be an easy process.  
+What you need to do is copy the files to one of your directories, and use 
+PCBFiler to provide the descriptions for the files.  See the PCBFiler chapter 
+of this manual for additional information on adding files to your system.
+
+Disabling
+
+The easiest way to disable your file directories (leaving only your upload 
+directories working) is to blank out your DIR and DIR.LST fields. For 
+example, if your fields in the conference configuration screen look like the 
+following:
+
+Directories : C:\PCB\GEN\DIR               : C:\PCB\GEN\DIR.LST
+
+
+Modify them to look like this to disable your file directories:
+
+
+Directories :                              :
+
+
+When your file directories are disabled, your users will receive a message 
+stating that there are no directories whenever they try to access your file 
+areas.
+
+Creating Menu
+
+In order for your users to know what file directories are available on your 
+system (if any), you need to edit the Directory Menu Listing file.  This file 
+is commonly referred to as DIR.
+
+This is the file that is displayed to the user when they execute the F user 
+command.  This file is nothing more than a text file. Because it is a text 
+file, you can design it to look or display anything you want.  As a general 
+rule it should contain each directory number and should also list a 
+description of the contents of each file directory.   The following is a 
+sample menu text file.
+
+
+Doors
+
+When you add a door to your bulletin board system you add functionality to 
+your system.  A door application can enable your users to play on-line games, 
+access databases, and just about anything else you can imagine.
+
+When a user opens a door they temporarily exit PCBoard and run a batch file 
+called the door batch file.  This batch file will then execute some other 
+application -- be it a game, utility or other program.
+
+Usually the program that is being run is designed to be a door application, 
+or is designed to accept input and output via the serial port so that the 
+remote user can control the operation of the program.  Programs that do not 
+provide input and output through the serial port may not be able to run as a 
+door unless you use a program like DOORWAY which redirects both text screen 
+and keyboard i/o to the remote caller.
+
+Probably the most popular type of door programs are games. However, there are 
+utility type doors as well that may allow users to store additional time on 
+the system, read off-line mail, etc.  Virtually anything that communicates 
+via a serial port can be considered a door application.
+
+What Is A Door?
+
+A door is nothing more than a program which is designed to
+communicate through the serial port rather than through normal
+means (i.e., the keyboard).
+
+You may be asking yourself if there is anyway to run a non-door application 
+as a door.  You can but it means that you will have to have some sort of 
+software that will monitor what is on the screen and output it to the remote 
+users screen.  DOORWAY by TriMark Engineering does exactly this.  It will 
+monitor any 80x25 text mode application and draw it on the remote users 
+screen using ANSI codes.  Using this program you could run virtually any text 
+mode DOS application as a door.
+
+For the most part most door applications are all character-mode based. That 
+means that you cannot run Windows application or other graphical applications 
+as a door.  The primary reason you cannot run graphical applications as doors 
+is because there is no standard way to send graphical data over the modem and 
+have the majority of modem users be able to view that information.
+
+Adding A Door
+
+If you load PCBSetup, and select a conference to edit you will
+see the following fields at the bottom of your display:
+
+
+                 Menu Listing                     Path/Name List File
+
+  Doors       : C:\PCB\GEN\DOORS            : C:\PCB\GEN\DOORS.LST
+  Bulletins   : C:\PCB\GEN\BLT              : C:\PCB\GEN\BLT.LST
+  Scripts     : C:\PCB\GEN\SCRIPT           : C:\PCB\GEN\SCRIPT.LST    
+  Directories : C:\PCB\GEN\DIR              : C:\PCB\GEN\DIR.LST
+  Download Paths (listing only)             : C:\PCB\GEN\DLPATH.LST    
+
+
+
+The two fields that relate to door operation are the following:
+
+
+                 Menu Listing                     Path/Name List File
+
+  Doors       : C:\PCB\GEN\DOORS            : C:\PCB\GEN\DOORS.LST
+
+
+The following is a brief description of each of the files:
+
+
+DOORS - This is the menu file that is displayed to the user when they type 
+either OPEN or DOOR.  This file is a normal PCBoard display file.  It should 
+list all of the doors that are available on your system and their 
+corresponding numbers or names.  Creating the door menu is discussed later in 
+this section.
+
+DOORS.LST - This file stores all of the setup information about the doors you 
+have defined in this particular conference. PCBoard will read this file to 
+determine what batch file to use to execute the door, where the batch file is 
+found, and other options controlling access to the door.  To edit this file, 
+press F2 and you will see the following screen:
+
+The number at the very left of each line is the door number. The rest of the 
+fields are not always so intuitive.  The following briefly describes each 
+field in the DOORS.LST file:
+
+     Filename   This is the exact batch filename that PCBoard will look to 
+                execute.  You are given up to 8 characters for a door name 
+                and you should not put a .BAT extension in the filename 
+                field.
+
+
+
+                NOTE:  Make sure that you do not enter a filename which is 
+                the equivalent of any internal PCBoard command.  For example, 
+                if you were to enter TEST as a filename  your door batch file 
+                will never run because PCBoard has an internal command with 
+                the same name.
+
+    Password    If you want users to enter a password in order to access a 
+                particular door, enter up to 12 characters in this field. If 
+                you do not desire a password to be asked, make sure this 
+                field is blank.
+
+        Sec     Enter the security level required in order to be able to open 
+                a particular door.  A user may open the door if their 
+                security level is equal to or greater than the security level 
+                in this field. Of course, if the security level entered in 
+                this field is 0, everyone will have sufficient security to 
+                open the door.
+
+        Login   This field may contain either a Y or an N.  If you enter a Y 
+                in this field, when the user logs into the system this door 
+                will be loaded.  Note that the security level field behaves a 
+                little different when you are dealing with an auto-login 
+                door.
+
+With an auto-login door it will only open for the security level that is 
+listed in the SEC field.  If you want the door to open every time any user 
+logs in, enter a security level of 0 in the sec field.
+
+NOTE:  If you have any conferences that are defined as auto-rejoin, be aware 
+that if a user logged off of the BBS in one of these conferences, they will 
+rejoin that conference on their next login.  Consequently, you must make sure 
+that the proper doors are defined in this conference because this is the 
+conference that PCBoard will read the DOORS.LST from.
+
+    USER SYS    In this field you may enter a Y, N, or O.  The letter that 
+                you enter in this field will determine if a USERS.SYS is 
+                created and if so, what type.  If you enter a Y, PCBoard will 
+                create a USERS.SYS in the same directory that you loaded 
+                PCBoard from.  If you enter O, a USERS.SYS will also be 
+                created but it will be output so it is compatible with v14.5.  
+                Check the documentation for the door you are about to add to 
+                see if it requires a USERS.SYS file and if so, what type. If 
+                the door does not need a USERS.SYS file, you should enter N 
+                in this field.
+
+    DOOR SYS    Like the USER SYS field, this field will determine if PCBoard 
+                should create a DOOR.SYS file for the door. Again, you should 
+                check the door documentation to see if a DOOR.SYS file is 
+                required for door operation.  If not, leave this field set to 
+                N.
+
+        SHELL   This field has three possible options (Y, N, and S).
+
+                N - Do not shell to DOS to execute the door.  This means that 
+                PCBoard will unload completely and then load the door. If you 
+                use this method then you will have the same amount of memory 
+                for the door to execute as you had just before you first 
+                loaded PCBoard.
+
+                S - If you use this option, PCBoard will shell to DOS, 
+                swapping itself to XMS, EMS, or to Disk (whichever is 
+                available) and will then execute the door batch file.  Using 
+                this method means that will get about 25k of memory less than 
+                if you had used N.
+
+                Y - Shell to DOS and then execute the door rather than 
+                exiting PCBoard completely to load the door.  This means that 
+                you will have less memory available to run the door but it 
+                also means that it will be quicker loading and returning from 
+                the door. Typically you may have only 100-200k of memory 
+                available to the door if you shell to it.
+
+    Path to..   In this field, enter the path where your door batch file can 
+                be found.  For example if the batch file for this door is 
+                stored in C:\PCB\, enter C:\PCB\ in this field.
+
+Editing/Creating Your Door Batch File
+
+By far the easiest method to create or edit your DOOR batch files is while 
+you are editing DOORS.LST.  First of all you need to make sure that you have 
+defined a text editor in System Manager.  If you have, highlight the filename 
+field in DOORS.LST and press 2.  This will allow you to create or edit the 
+batch file.  If you want to edit the file manually, you will need to look at 
+your entry in DOORS.LST to determine the name and location of the batch file.  
+The following is sample entry in DOORS.LST
+
+
+                                   USER DOOR
+  Filename    Password   Sec Login SYS  SYS  Shell    Path to DOOR Files
+ ---------- ------------ --- ----- ---- ---- ----- --------------------- 
+1) TESTDOOR                0   N    N    N     N   C:\PCB\DOORS\
+
+      ³                                                  ³
+      ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿                        ³
+                                                         ³
+                 C:\PCB\DOORS\TESTDOOR                   ³
+                       ³                                 ³
+                       ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+
+
+You can see that PCBoard thinks that the DOOR batch file is 
+C:\PCB\DOORS\TESTDOOR.  Notice that there is no .BAT extension. Even though 
+it sounds strange it will still execute properly.
+
+Returning Back To PCBoard From A Door
+
+If the door you are creating the batch file for has either an S or a Y in the 
+Shell column,  you do not need to add any lines to the batch file in order to 
+return to PCBoard. Once the door batch file has completed, PCBoard will 
+automatically reload.
+
+If you answered N to the Shell column, you need to reload BOARD.BAT.  The 
+easiest way to do this is to add the following three lines to the end of your 
+door batch file: 
+
+%PCBDRIVE%
+CD %PCBDIR%
+BOARD
+
+These lines will first make sure that your system returns to the proper 
+drive, then change to the proper directory to reload, and finally reload 
+PCBoard using BOARD.BAT.
+
+Debugging
+
+Debugging a door is an easy process.  There are two commands designed for 
+batch files that you may want to keep in mind -- PAUSE, and ECHO ON.  The 
+PAUSE command can be used to delay further execution of the batch file. This 
+is useful when trying to catch errors that might be displayed as your batch 
+file is running. The pause command will ask you to strike a key when it runs.  
+Therefore you could put a PAUSE command after every command until you find 
+the offending line in the batch file.
+
+In conjunction with the PAUSE command you can put a line that says ECHO ON at 
+the beginning of the batch file. This will let you see each command of the 
+batch file as it runs.  This method is useful for checking to see if your 
+environment variables are being correctly substituted, changing to the wrong 
+directory, and for tracking other obvious errors.
+
+Using these two commands together can really help you track down some of the 
+problems you will incur as you are creating your door batch files.  If you 
+have used these techniques and you still are unable to track down the problem 
+perhaps you should consider contacting the author of the door for further 
+help.
+
+Multiple Nodes
+
+This section discusses various techniques for installing door programs on a 
+multi-node setup. All of the techniques in this section are designed to help 
+save you time both in the present setup and in the future when you add more 
+nodes. You may use these instructions for setting up door programs in a 
+multitasking or network environment.
+
+It is assumed that you already know how to setup a door under PCBoard.  If 
+you do not yet know how to setup a door please refer to the Creating a Door 
+section.  It is also assumed that you have a good grasp on how to create 
+batch files and pass parameters inside of batch files.
+
+You do not have to be a batch file wizard but you should be familiar with the 
+following topics:
+
+* What a batch file is
+* How to create and edit a batch file
+* Batch file commands (IF, GOTO, etc.)
+* Using  replaceable parameters in batch files (environment
+  variables in particular)
+
+If you are not familiar with batch files or any of the above topics, please 
+consult your DOS manual's batch file section for more information.
+
+Because door programs are written by different authors and the fact that 
+there are so many door programs available, you will find that the methods 
+required to setup a particular door program differ greatly.  Some door 
+authors may require you to pass specific information on the command line of 
+the executable file while other door authors may store the information in a 
+configuration file.  Other door programs may use a combination of 
+configuration files and command line parameters.
+
+Because setting up door programs requires a comprehensive knowledge of 
+creating batch files, setting up door programs in a multinode environment may 
+prove tricky at first. However, your efforts will pay off in the long run 
+especially if you plan on adding more nodes in the future. By using the 
+methods discussed in this section you will learn how you will be able to use 
+one batch file for each door on all of your nodes.
+
+You can set up your system so that each node has a different DOORS.LST.  
+However, this would mean that you would have to add your door configuration 
+to each node rather than making the change on one node and spreading the 
+change automatically through the entire system. It is strongly recommended 
+that you stay with one single DOORS.LST for your entire system.  See Using A 
+Different DOORS.LST For Each Node for additional information.
+
+Using One Batch File For All Nodes
+
+The first step in setting up a door is to browse the documentation included 
+with the door package. Look to see if the door requires any special hardware 
+or software. If you are using a COM port other than COM1 or COM2, you should 
+also check to see if the door will support non-standard COM port definitions. 
+Likewise, if you are using the /M version of PCBoard, check and see if the 
+program supports the FOSSIL interface.  If the door program does not support 
+your hardware configuration, you will not be able to run the door.
+
+The next step is to install the door on your system as per the instructions 
+provided by the author.  If you have questions on the installation of the 
+door, contact the author for further assistance.
+
+Test the door program and make sure that it works on at least one node.  Do 
+not proceed until you have confirmed that the door operates properly.
+
+If the door does not work correctly your best chance of getting the door 
+program to operate correctly is to contact the author of the program directly 
+since they know how their program functions.  If the author of the program is 
+no longer available, try contacting other SysOps to see if they might already 
+have it up and running.  The PCBoard technical support staff is very familiar 
+with the PCBoard program but are not very familiar with the thousands of 
+third party programs that are available for PCBoard.
+
+Now that you know that the door works you should examine the batch file you 
+use to run the door.  When looking at this batch file you should search for 
+anything that is specific to a particular node.  Look at the following 
+example:
+
+C:
+CD\DOORS\ABCGAME
+ABCGAME C:\PCB\NODE2\
+C:
+CD\PCB
+BOARD
+
+Notice how this batch file explicitly uses C:\PCB\NODE2\.  This means that if 
+you ran this door batch file on node 3, it would not work because the 
+C:\PCB\NODE2\ is hard-coded into the batch file.
+
+Not all of the node specific information is so easy to spot. Let's take a 
+look at another example:
+
+C:
+CD\DOORS\NEATDOOR
+NEATDOOR ND.CFG
+C:
+CD\PCB
+BOARD
+
+On the outside it appears this door does not reference any node-specific 
+information.  However, if you  look  in  the configuration file for this door 
+(ND.CFG) you will most likely find that it contains some node specific 
+information. This node specific information might be where to find  
+PCBOARD.SYS, DOOR.SYS, or even what serial port to use.
+
+Once you have determined where the node specific information is, you will 
+need to find a way around this problem so you can still use one batch file 
+for all of your nodes.  To help you with your door configuration, PCBoard 
+will create four environment variables.  They are as follows:
+
+    PCBNODE     Contains the number of the node that is executing the door (e.g., 3)
+
+    PCBDRIVE    Contains the drive letter that PCBOARD.EXE was run from.  
+                This is sometimes referred to the home drive for the node 
+                (e.g., D:)
+
+    PCBDIR      This variable will contain only the directory that 
+                PCBOARD.EXE was run from.  This is sometimes referred to as 
+                the home directory for the node and is also the location 
+                where, PCBOARD.SYS, USERS.SYS, and DOOR.SYS will be created 
+                (e.g., \PCB\NODE3)
+
+    PCBDAT      Contains the full drive, path and filename of the PCBOARD.DAT 
+                that is being loaded for this node.
+
+If you did not heed the previous warning regarding environment variables and 
+how to use them in batch files, consult your DOS manual for that information 
+at this time.
+
+A batch file that does not use the environment variables PCBoard provides 
+might look like the following:
+
+C:
+CD\DOORS\ABCGAME
+ABCGAME C:\PCB\NODE2\
+C:
+CD\PCB
+BOARD
+
+The same batch file using the environment variables that PCBoard provides, 
+would look like the following:
+
+C:
+CD\DOORS\ABCGAME
+ABCGAME %PCBDRIVE%%PCBDIR%\
+%PCBDRIVE%
+CD %PCBDIR%
+BOARD
+
+The following describes each line in the above example.  It will help you 
+understand how and why the environment variable were used:
+
+C:              Change to the C: drive because that is where the door is 
+                installed
+
+CD\DOORS...     Change to the \DOORS\ABCGAME subdirectory (where the door is 
+                installed)
+
+ABCGAME...      Execute the door program. Uses the PCBDRIVE and PCBDIR 
+                environment variables to tell the door where it can find 
+                specific files (e.g., PCBOARD.SYS) for the node running the 
+                program.
+
+%PCBDRIVE%      Change  to  the PCBoard drive (where  the  node subdirectory 
+                is located)
+
+CD %PCBDIR%     Change to the PCBoard directory (the node subdirectory)
+
+BOARD	Reloads your BBS batch file
+
+The variables (surrounded by % signs) will be replaced by the appropriate 
+values as they are set for each node.  At this point you may be asking 
+yourself, if this makes my node configuration easier, why are the batch files 
+larger?  What you may not be aware of is that you can use this batch file for 
+EVERY node in your system.  This makes both your maintenance and system 
+configuration less complex.  A tradeoff that is well worth the results.
+
+Consider the following two examples to really appreciate how using 
+environment variables in your DOOR batch files can help you out:
+
+You add more nodes to your system.
+You change the location or delete the door from your system.
+
+In the first example you do not really have to do anything to activate your 
+new nodes on the system.  In the second example, if you move the location of 
+the door you only need to change the one batch file to reflect the new 
+location (The first CD command in the batch file).  Can you imagine running 
+19 nodes and having to change 19 different batch files?  Having numerous 
+batch files for one door also increases your chance of making a configuration 
+mistake.
+
+Some door programs use a configuration (config) file for normal operation.  
+Some of these programs store node-specific information in these files.  
+Remember, environment variables can only be used in the batch files 
+themselves (i.e., not in config files). This may lead you to wonder how you 
+can still use environment variables and create one batch file for all of your 
+nodes. The answer is quite simple.  Create multiple config files and then use 
+the PCBNODE environment variable to load the proper one.
+
+As an example lets say you have the following batch file:
+
+C:
+CD\DOORS\NEATDOOR
+NEATDOOR ND.CFG
+C:
+CD\PCB
+BOARD
+
+Now, lets say in the ND.CFG file is the following:
+
+C:\PCB\NODE3\PCBOARD.SYS ;location of PCBOARD.SYS
+5                        ;number of times game can be played per
+day
+400                      ;points per win
+
+If you could use environment variables in other files, the solution would be 
+easy enough, you would replace the C:\PCB\NODE3\PCBOARD.SYS in the ND.CFG 
+file to say %PCBDRIVE%%PCBDIR%\PCBOARD.SYS.  However, you cannot do that 
+because environment  variables cannot  be  read  in  from configuration 
+files.  Therefore, you need another alternative.
+
+At this point you need to create a configuration file for each node.  You 
+will want to come up with some sort of naming convention. Since the original 
+config file was called ND.CFG you may want to simply tack on the node number 
+to each config file (e.g. ND1.CFG, ND2.CFG, ND3.CFG).  By naming them with 
+the node numbers in the filename we will be able to use the PCBNODE 
+environment variable. The most important thing to remember is that you should 
+remain consistent in your naming conventions. If you do not, you will not be 
+able to use environment variables.
+
+Once you have created (or copied) a config file for each node you need to 
+change the first line to reflect the location of the PCBOARD.SYS for each 
+node. Next,  you need to make the modification to the batch file. After you 
+have added the environment variables, your batch file would look like this:
+
+
+C:
+CD\DOORS\NEATDOOR
+NEATDOOR ND%PCBNODE%.CFG
+%PCBDRIVE%
+CD %PCBDIR%
+BOARD
+
+The following describes each line in the previous example:
+
+C:		Change to the C: drive (where the DOOR is installed)
+
+CD\DOORS...     Change to the \DOORS\NEATDOOR subdirectory (where the DOOR is 
+                installed)
+
+NEATDOOR...     Execute the DOOR program using a config file. Because of the 
+                PCBNODE environment variable a different file will be loaded 
+                for each node.
+
+%PCBDRIVE%      Change to the PCBoard drive (where the node subdirectory is 
+                located)
+
+CD %PCBDIR%     Change to the PCBoard directory (the node subdirectory)
+
+
+And finally, a more complex batch file might look something like
+the following:
+
+C:
+CD\DOORS\PCBMAIL
+PCBMAIL PCBM.CFG C:\PCB\NODE3\ /PORT:3E8:5
+C:
+CD \PCB\NODE2
+BOARD
+
+This batch file represents a door which points to a single config file which 
+does not contain information specific to any node (maximum plays per day, 
+points rewarded, etc.).  Also passed on the command line is the location of 
+this node and the final parameter passed on the command line is the base 
+address and IRQ for the COM port (/PORT parameter).
+
+Do not let the additional parameters worry you. Your goal should still be the 
+same. Replace the node specific information with environment variables.  What 
+makes this problem just a little different is that PCBoard does not create 
+environment variables for the base address and IRQ for COM port.  However, 
+you could easily enough create some environment variables in your BOARD.BAT 
+file which would represent your base address and IRQ for each of your COM 
+ports.  If you wish to do this, add the following lines to your BOARD.BAT:
+
+SET COMBASE=2f8
+SET COMIRQ=5
+
+Of course, your system may not use 2f8, with an IRQ of 5 so you should change 
+that information to reflect your system configuration.
+
+We have now assured ourselves that we have environment variables that we can 
+use to replace all of the node specific information in the previous batch 
+file we are ready to change the batch file.  Your final batch file should 
+resemble the following:
+
+C:
+CD\DOORS\PCBMAIL
+PCBMAIL PCBM.CFG %PCBDRIVE%%PCBDIR%\ /PORT:%COMBASE%:%COMIRQ%
+%PCBDRIVE%
+CD %PCBDIR%
+BOARD
+
+One thing that you should note about the above batch file is that the door 
+that was used for this example does use a configuration file called PCBM.CFG. 
+However, this configuration file does not contain any node specific 
+information and that is why we did not have to make any changes.  All of the 
+node specific information was passed on the command line therefore it would 
+be pointless to create multiple configuration files. This batch is a little 
+more difficult because it contains more node specific information on the 
+command line. In reality however, the technique is the same as in the 
+previous examples.
+
+By now you should have noticed that for all intents and purposes most of the 
+batch file looks the same, the only line that has changed is the line that 
+calls the program. For the most part this is the way most of your door batch 
+files will look.  You will change to the directory where the door is located, 
+run the program, change back to the PCBoard drive and directory, and finally 
+reload the BBS.
+
+Once you have replaced the node specific information with environment 
+variables, you are now ready to test the door to make sure that, with the 
+changes you have made, the door still works.  If it works on one node, try it 
+on another node and make sure everything still works correctly. As an extra 
+precaution you should try it out on every node (especially when a door uses 
+config files)  to make sure that all nodes work correctly.  If the door works 
+correctly on all nodes, you have properly setup your door for use in a 
+multi-node environment.  If you have problems with any nodes, use the 
+debugging information described previously to help locate the problem.
+
+There are about as many ways to configure a door as there are door programs 
+out there. The previous examples should be used to aid you in several of the 
+more popular types of  door configurations.  Not all of the configurations 
+could be covered in this section so remember that you may run into 
+configurations that you may not recognize.  If you do run into such a 
+configuration identify the node specific information and use environment 
+variables to create one batch file for all of your nodes
+
+Using A Different DOORS.LST For Each Node
+
+If you decided you do not want to go to the trouble of using environment 
+variables in your door batch files, you can have each node use a different 
+DOORS.LST file.  By doing that, you can specify a different location for the 
+door batch file.  For example, instead of storing the batch file in 
+C:\PCB\DOOR\, you may instead choose to locate the batch file in 
+C:\PCB\DOOR\N1\ for node 1, and C:\PCB\DOOR\N2\ for node 2.
+
+The problem with this type of setup though is that as the number of nodes on 
+your system increases, the time it takes to change the batch files also 
+increase.  If you have two nodes you may only have to edit two batch files.  
+However, if you have 20 nodes online then that means 20 files to edit and 
+consequently more lost time.
+
+If you decide that separate DOORS.LST files are the way for you, the setup 
+can be accomplished very easily.  Since all of your nodes likely share the 
+same CNAMES file you can change the location of DOORS.LST to look like the 
+following:
+
+              Menu Listing                     Path/Name List File
+Doors       : C:\PCB\GEN\DOORS             : DOORS.LST
+
+
+Notice that only the filename DOORS.LST is in this field.  That means that 
+PCBoard will search the current directory to find the file instead of an 
+absolute location like C:\PCB\GEN\DOORS.LST. Since you are in different 
+directories on every node this means each node will have a DOORS.LST file in 
+their default directory.
+
+Where to find DOOR.SYS, or USERS.SYS
+
+Because PCBoard creates DOOR.SYS and USERS.SYS before the door is run and 
+deletes them when returning there may be some confusion as to where these 
+files are created.  These files will be located in the same location as 
+PCBOARD.SYS for the nodes. The best way to determine the subdirectory is to 
+log into that node locally and then press 5.  The subdirectory you are in is 
+the subdirectory where the files will be stored.
+
+NOTE:  This subdirectory is also the subdirectory that you were in when you 
+loaded PCBOARD.EXE from.  In addition, it is also the subdirectory that is 
+specified by the PCBDRIVE and PCBDIR environment variables.
+
+Opening A DOOR
+
+There are four methods with which a door may be opened via PCBoard:
+
+* Using the OPEN command from the conference command prompt.
+* Using the DOOR command from the conference command prompt.
+* Typing the name of the door at the conference command prompt.
+* If you are using an MNU file, one of your options in the MNU
+  file can execute a door.
+
+The third and forth methods provide the most interesting possibilities 
+because you can make the door appear to be a more integrated function of your 
+bulletin board system.
+
+Accessing Parameters Passed To A Door
+
+Any text that is entered after the door name or number will be passed as 
+command line parameters.  These command line parameters are available to the 
+door application if they will read the PCBDOOR environment variable.  If you 
+open a door called MAIL by typing the following,
+
+MAIL D;Y;G
+
+PCBoard will store D;Y;G in the PCBDOOR environment variable. In order for 
+the door to see these parameters, you will most likely have to modify the 
+door batch file.  For the MAIL door mentioned previously, the batch file may 
+resemble the following:
+
+@ECHO OFF
+CD\DOORS\MAIL
+MAIL
+%PCBDRIVE%
+CD %PCBDIR%
+BOARD
+
+You must only make one change to this batch file in order to pass the command 
+line parameters to the door.  The change you must make is the line that 
+executes MAIL.   This line would change to read:
+
+MAIL %PCBDOOR%
+
+NOTE:  For more information on accessing environment variables in batch 
+files, please refer to your DOS manual.
+
+Stuffing The Keyboard Upon Return
+
+When PCBoard returns from running a door, it will check to see if a file 
+named PCBSTUFF.KBD exits in the current directory.  If it does, the contents 
+of this file will be stuffed into PCBoard's keyboard buffer.
+
+Example
+
+If you have a door which creates a file that you want to the user to 
+download, you would want PCBoard to automatically download a specific 
+filename.  The first thing that you would need to do is to create a file that 
+you want to stuff into the keyboard.  For this example, the filename created 
+by the door will be called DATA.ZIP.
+
+In your PCBoard directory create a file named. DATA.STF.  The contents of 
+this file should be the following:
+
+D;DATA.ZIP
+
+The only change you will have to make to the door batch file is to add a line 
+that will copy your DATA.STF file to the PCBSTUFF.KBD file.  In your batch 
+file, this line may appear as:
+
+COPY C:\PCB\DATA.STF %PCBDRIVE%%PCBDIR%\PCBSTUFF.KBD
+
+The %PCBDRIVE% and %PCBDIR% environment variables are used to insure the 
+PCBSTUFF.KBD file is created in the proper directory. If it is not, PCBoard 
+will not find it and nothing will be stuffed into the keyboard.
+
+NOTE:  Once the file has been read by PCBoard, it will be deleted.
+
+Displaying A File Upon Return
+
+When PCBoard returns from running a door, it will check to see if a file 
+named PCBDOOR.TXT exists in the current directory.  If it does, the contents 
+of this file will be displayed on the local and remote screens.
+
+Example
+
+After you have installed a door, you may find it has a problem which will 
+force you to take it temporarily off line.  You could delete the definition 
+of the door from the DOORS.LST file, but that will be more trouble than it is 
+worth if you are taking it off-line temporarily.
+
+Instead, try inserting a REM before each line in your door batch file except 
+BOARD (if that line is in your door batch file). When you have done this, 
+create a text file that you want to display to your callers.  The next step 
+is for you to add the following line to your door batch file (before BOARD 
+(if that line exists in your batch file):
+
+COPY C:\PCB\CLOSED.TXT %PCBDRIVE%%PCBDIR%\PCBDOOR.TXT
+
+Assuming that you name you display file CLOSED.TXT and store it in C:\PCB, 
+that file will be displayed to anyone who runs the door.  What will happen is 
+that DOS will skip all of the lines that begin with REM and then execute the 
+line that you added to your batch file.  Finally it will return to PCBoard 
+which will find the PCBDOOR.TXT and display it on the screen.
+
+NOTE:  Once the file has been read by PCBoard, it will be deleted.
+
+Disabling
+
+To disable doors in a particular conference, simply clear out the fields 
+related to door configuration as shown in the following example:
+
+              Menu Listing                     Path/Name List
+File
+Doors       :                              :
+
+
+If you do this, when a user attempts to open a door they will be informed 
+that no doors are presently available.
+
+NOTE:  Doors are always disabled for users who do not have established 
+accounts on the system.  The following lists the two possibilities for a user 
+to not establish an account on your system:
+
+The caller logged in as a new user on a node defined as a closed board and 
+you have a NEWASK questionnaire defined.
+
+A user calls for the first time.  When asked if they want to register, they 
+choose not to.  In order for the user to remain online, you must give those 
+that refuse to register a security level other than 0.
+
+Creating Menu
+
+If doors are available in a conference, when a user types OPEN or DOOR from 
+the conference command prompt they will be shown a file which lists all of 
+the doors that are available on the system.  This file is specified by the 
+following field in the conference configuration:
+
+              Menu Listing
+Doors       : C:\PCB\GEN\DOORS
+
+This file is commonly referred to as the DOORS file.  You can edit this text 
+file by pressing F2 or F3 as listed on the bottom of the screen.  When you 
+are creating this file, you should list either the door number or door name 
+(filename in DOORS.LST) and a description of the door for your users.  The 
+user can open the door by typing the door name or door number.
+
+Script Questionnaires
+
+Script questionnaires provide a method which you can ask the user questions 
+and record their responses to a text file.
+
+Creating
+
+There are two types of script questionnaires you can create. You can use the 
+regular questionnaire type which is a text file with a question on each line.  
+The second type you can create is a PPE file.  To create a PPE file, you need 
+to have purchased the optional PPL (PCBoard Programming Language) Compliler.  
+Any PCBoard v15.0 system can run a PPE file even if the owner of the system 
+did not buy the compiler.  To create the PPE files though, you will need the 
+compiler.
+
+Scripts are defined for the conference in the SCRIPT.LST file. This file 
+contains the location of the script file and where the answers for the script 
+will be stored.  When you edit the SCRIPT.LST by pressing 2, you should see a 
+screen which resembles the following:
+
+Conference Name  (#0)       : Main Board
+
+      SCRIPT Questionnaire Files      SCRIPT Answer Files
+      --------------------------      -------------------
+1)
+
+The first field specifies the location of the script questionnaire.  The 
+second field specifies the location where the response file will be stored.  
+PCBoard determines if the file is a standard questionnaire or a PPE file 
+based on the filename extension you specify.  If the filename of the 
+questionnaire ends with PPE, the questionnaire will be treated as a PPE.  
+Otherwise, the file will be treated as a standard questionnaire.
+
+Standard Questionnaires
+
+Standard questionnaires are very easy to setup because the questionnaire 
+itself is a text file.  Questions are asked one line at a time and the user 
+is given the ability to respond to each question with a 60 character 
+response.  There is no method provided to check the response of the user.  
+The question itself may be up to 79 characters in length.
+
+The easiest way to load the script questionnaire file is to press F2 when you 
+are highlighting the script to edit while in the SCRIPT.LST editor.  PCBSetup 
+will use your text editor to load the script questionnaire.
+
+The first five lines of your questionnaire file is called the script header.  
+You can use these five lines to give your users a brief overview of the 
+questionnaire.  After PCBoard displays the header to the user, they are asked 
+if they wish to continue to answer the script.  If they choose not to respond 
+to your questionnaire, they will be returned back to the system.  If they 
+choose to respond, PCBoard will continue.
+
+Anything after line five in your questionnaire file is considered a question.  
+Each line is a question.  The following is a simple example of a 
+questionnaire:
+
+-----------------------------------------------------
+
+This questionnaire will ask for your name
+
+-----------------------------------------------------
+Enter your first name?
+Enter your last name?
+
+
+If a user will executes this script then they will see the following:
+
+
+-----------------------------------------------------
+
+This questionnaire will ask for your name
+
+-----------------------------------------------------
+
+Complete the Questionnaire (Enter)=no? (y)
+
+Enter your first name?
+? (Jim                                                         )
+
+Enter your last name?
+? (Smith                                                       )
+
+As you can see, every line after the fifth line is considered as
+a question.  If you want to only display text and not ask a
+question, you would begin the line to display with a semi-colon.
+This is referred to as a comment line.
+
+If you wish, you can use comment lines to ask questions which
+use more than one line.  Look at the following questionnaire
+file:
+
+-----------------------------------------------------
+We have several items available for sale.  From
+hardware to software, we have products that fit your
+needs and wants.  If we don't have it, just ask!
+-----------------------------------------------------
+;We have the following products available for sale:
+;
+; 1.  Complete 80486 system with SVGA video system
+; 2.  Whiz-bang hard-drive
+; 3.  Plain paper bag software
+Which item would you like to order?
+
+When the user executes this script, they will see the following
+display:
+
+-----------------------------------------------------
+We have several items available for sale.  From
+hardware to software, we have products that fit your
+needs and wants.  If we don't have it, just ask!
+-----------------------------------------------------
+
+Complete the Questionnaire (Enter)=no? (y)
+
+We have the following products available for sale:
+
+ 1.  Complete 80486 system with SVGA video system
+ 2.  Whiz-bang hard-drive
+ 3.  Plain paper bag software
+
+Which item would you like to order?
+? (3                                                           )
+
+
+Notice how those lines that were prefixed with a semicolon were only 
+displayed on the screen.  Only after the items for sale were listed was the 
+user prompted for input by the line in the questionnaire that did not have a 
+semicolon in front of the line.
+
+PPE Files
+
+Because PPE files are made from the PCBoard Programming Language the actual 
+creation of these files are too complex to cover in this section.  Instead, 
+you should refer to the documentation that was included with the optional PPL 
+Compiler package for further instructions.
+
+If you are given a PPE file and need to install it on your system, simply 
+enter the PPE filename in the Script Questionnaire Files field including the 
+.PPE extension.  PCBoard will know that it is a PPE file and execute it 
+properly.
+
+Reading Responses
+
+The entire purpose behind questionnaires is to get responses from the users 
+who fill them out.  The responses to your questionnaire will be stored in the 
+filename you specified in SCRIPT.LST as the answer file.  The following is a 
+sample entry in SCRIPT.LST:
+
+      SCRIPT Questionnaire Files      SCRIPT Answer Files
+      --------------------------      -------------------
+1)    C:\PCB\MAIN\SCRIPT1             C:\PCB\MAIN\ANSWER1
+
+In this example, all answers will be written to a file called ANSWER1 located 
+in the C:\PCB\MAIN\ subdirectory.
+
+Standard Questionnaires
+
+The response or answer file for a standard questionnaire follows a very rigid 
+format.  PCBoard will begin the response with a row of asterisks (*) to help 
+separate this response from any previous responses.
+
+The next line contains the name of the user that filled out the 
+questionnaire, the date and time the questionnaire was filled out, the node 
+number the user was on, the security level of the user, and finally the 
+expiration date of the user.
+
+The rest of the lines in the response file show the question, and the 
+response of the user.  Only the question line is recorded.  If you use 
+comment lines in your script questionnaire they will not be recorded.
+
+PCBoard will continue to append responses to the file so you may want to 
+periodically delete the response file after you have reviewed the answers.
+
+PPE Files
+
+Because PPE files are created using PPL (PCBoard's Programming Language) the 
+way the responses are stored is the responsibility of the PPE author.  
+Therefore, if you do not understand the response format, contact the author 
+of the PPE file.
+
+Disabling Scripts
+
+You can disable script questionnaires simply by blanking the SCRIPT and 
+SCRIPT.LST fields in the conference configuration of PCBSetup.  If it used to 
+look like
+
+
+Scripts     : C:\PCB\GEN\SCRIPT            :
+C:\PCB\LST\SCRIPT.LST
+
+
+change it to read
+
+
+Scripts     :                              :
+
+
+By doing this, your users will be notified that no scripts currently exists 
+when they try to fill out a script questionnaire.
+
+Creating The Menu
+
+In order for your users to know what scripts are available on your system (if 
+any), you need to edit the Script Menu Listing file.  This file is commonly 
+referred to as SCRIPT.
+
+This is the file that is displayed to the user when they execute the S user 
+command.  This file is nothing more than a text file. Because it is a text 
+file, you can design it to look or display anything you want.  As a general 
+rule it should contain the script number and a description of each script 
+questionnaire. The following is a sample script questionnaire menu file:
+
+Scripts Available On This System
+------------------------------------------
+
+[1] Order a subscription to this system
+[2] Order a product we sell
+
+You can create this text file using just about any text editor.
+Better yet, if you have defined your text editor or graphics editor in PCBSM, 
+you can simply press F2 or F3 (depending on which file you want to edit).  
+Otherwise you will have to manually edit the files while at the DOS prompt.
+
+Bulletins
+
+Bulletins provide a method with which you can display text files to callers.  
+Text files can be created with text editors or even with word processors that 
+allow you to export to ASCII format. You can use bulletins to list current 
+events, rules of your system, legal information in regards to communications 
+services, etc.
+
+Creating
+
+Bulletins are very easy to setup.  To configure the bulletins that are 
+available in a particular conference, you need to highlight the following 
+field in the conference configuration screen:
+
+             Path/Name List File
+Bulletins   :C:\PCB\LST\BLT.LST
+
+Now press F2 to edit the BLT.LST file.  You should see a screen which 
+resembles the following:
+
+Conference Name  (#0)       : Main Board
+
+Enter a list of BLT Paths & Names
+------------------------------------
+ 1)   
+
+
+The number on the left hand side of the screen represents the bulletin 
+number.  In the edit field you can specify any filename you wish to display 
+when a user chooses the bulletin number that is listed to the left.  As an 
+example, you may want to have the users view C:\PCB\GEN\ORDER when they view 
+bulletin 1.  If you do, make the following entry in your BLT.LST file:
+
+
+Enter a list of BLT Paths & Names
+------------------------------------
+ 1)   C:\PCB\GEN\ORDER
+
+Adding another bulletin can be dine simply by pressing ALT-I.  You will now 
+see that there is an entry for bulletin F2 that you may fill in with the 
+filename you wish to display.
+
+Making Bulletins Available For Download
+
+Any bulletin(s) can be download as long as the location of the bulletin file 
+is included in the DLPATH.LST for the conference. The B user command provides 
+subcommands and explanations for downloading any bulletin number.
+
+If you want, you may provide compressed versions of the bulletins on your 
+system.  PCBoard will look at the Filename EXTENSION for compressed files in 
+PCBSetup | File Locations | Configuration  to find the extension for 
+compressed files on your system.
+
+NOTE:  If PCBoard can find a file with the same name as the bulletin and with 
+your compression extension, it will pick that file for download instead of 
+the uncompressed version.
+
+Disabling
+
+To disable bulletins in a conference, you simply clear out the fields that 
+relate to bulletins in a conference configuration screen.  For example, if 
+your bulletin fields contain the following information:
+
+              Menu Listing                     Path/Name List
+File
+Bulletins   : C:\PCB\GEN\BLT               : C:\PCB\GEN\BLT.LST
+
+
+then you would blank them out making them look like the
+following:
+
+              Menu Listing                     Path/Name List
+File
+Bulletins   :                              :
+
+Your bulletins would then be disabled and your users would be warned that no 
+bulletins currently are available on the system if they tried to view any of 
+the bulletins.
+
+Creating Menu
+
+Whenever a user presses B and RETURN, a list of bulletins that exist on the 
+system will be displayed.  The file that is displayed to your callers is the 
+bulletin menu listing.  The filename for this menu or the actual menu itself 
+may be changed by editing the following field in the conference configuration 
+screen:
+
+              Menu Listing
+Bulletins   : C:\BLT\BLTMENU
+

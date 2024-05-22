@@ -85,7 +85,7 @@ impl PcbBoardCommand {
 
         let mut output = Vec::new();
         output.push("**************************************************************".to_string());
-        if let Some(user) = &self.state.current_user {
+        if let Some(user) = &self.state.session.current_user {
             output.push(format!(
                 "From: {}, {} Sec {} Exp {}",
                 user.get_name(),

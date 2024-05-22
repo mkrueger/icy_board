@@ -1,13 +1,11 @@
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
 
 use crate::Res;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use strum::{EnumIter, EnumString};
-
 use super::{security::RequiredSecurity, IcyBoardSerializer, PCBoardRecordImporter};
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, Default, EnumIter, EnumString)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, Default)]
 pub enum CommandType {
     /// Do nothing
     #[default]
@@ -309,6 +307,154 @@ impl Display for CommandType {
     }
 }
 
+impl FromStr for CommandType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Disabled" => Ok(CommandType::Disabled),
+            "Menu" => Ok(CommandType::Menu),
+            "Script" => Ok(CommandType::Script),
+            "Conference" => Ok(CommandType::Conference),
+            "DisplayDir" => Ok(CommandType::DisplayDir),
+            "DisableMenuOption" => Ok(CommandType::DisableMenuOption),
+            "Door" => Ok(CommandType::Door),
+            "ExitMenus" => Ok(CommandType::ExitMenus),
+            "QuitMenu" => Ok(CommandType::QuitMenu),
+            "DisplayFile" => Ok(CommandType::DisplayFile),
+            "StuffTextAndExitMenu" => Ok(CommandType::StuffTextAndExitMenu),
+            "StuffTextAndExitMenuSilent" => Ok(CommandType::StuffTextAndExitMenuSilent),
+            "StuffText" => Ok(CommandType::StuffText),
+            "StuffTextSilent" => Ok(CommandType::StuffTextSilent),
+            "StuffFile" => Ok(CommandType::StuffFile),
+            "StuffFileSilent" => Ok(CommandType::StuffFileSilent),
+            "RedisplayCommand" => Ok(CommandType::RedisplayCommand),
+            "AbandonConference" => Ok(CommandType::AbandonConference),
+            "BulletinList" => Ok(CommandType::BulletinList),
+            "CommentToSysop" => Ok(CommandType::CommentToSysop),
+            "Download" => Ok(CommandType::Download),
+            "EnterMessage" => Ok(CommandType::EnterMessage),
+            "FileDirectory" => Ok(CommandType::FileDirectory),
+            "Goodbye" => Ok(CommandType::Goodbye),
+            "Bye" => Ok(CommandType::Bye),
+            "Help" => Ok(CommandType::Help),
+            "InitialWelcome" => Ok(CommandType::InitialWelcome),
+            "JoinConference" => Ok(CommandType::JoinConference),
+            "DeleteMessage" => Ok(CommandType::DeleteMessage),
+            "LocateFile" => Ok(CommandType::LocateFile),
+            "ToggleGraphics" => Ok(CommandType::ToggleGraphics),
+            "NewFileScan" => Ok(CommandType::NewFileScan),
+            "PageSysop" => Ok(CommandType::PageSysop),
+            "SetPageLength" => Ok(CommandType::SetPageLength),
+            "QuickMessageScan" => Ok(CommandType::QuickMessageScan),
+            "ReadMessages" => Ok(CommandType::ReadMessages),
+            "Survey" => Ok(CommandType::Survey),
+            "SetTransferProtocol" => Ok(CommandType::SetTransferProtocol),
+            "UploadFile" => Ok(CommandType::UploadFile),
+            "ViewSettings" => Ok(CommandType::ViewSettings),
+            "WriteSettings" => Ok(CommandType::WriteSettings),
+            "ExpertMode" => Ok(CommandType::ExpertMode),
+            "PersonalMail" => Ok(CommandType::PersonalMail),
+            "ZippyDirectoryScan" => Ok(CommandType::ZippyDirectoryScan),
+            "GroupChat" => Ok(CommandType::GroupChat),
+            "OpenDoor" => Ok(CommandType::OpenDoor),
+            "TestFile" => Ok(CommandType::TestFile),
+            "UserList" => Ok(CommandType::UserList),
+            "WhoIsOnline" => Ok(CommandType::WhoIsOnline),
+            "ShowMenu" => Ok(CommandType::ShowMenu),
+            "Command" => Ok(CommandType::Command),
+            "GlobalCommand" => Ok(CommandType::GlobalCommand),
+            "DisplayNews" => Ok(CommandType::DisplayNews),
+            "SetLanguage" => Ok(CommandType::SetLanguage),
+            "ReplyMessage" => Ok(CommandType::ReplyMessage),
+            "EnableAlias" => Ok(CommandType::EnableAlias),
+            "Broadcast" => Ok(CommandType::Broadcast),
+            "RestoreMessage" => Ok(CommandType::RestoreMessage),
+            "ReadEmail" => Ok(CommandType::ReadEmail),
+            "WriteEmail" => Ok(CommandType::WriteEmail),
+            "RunPPE" => Ok(CommandType::RunPPE),
+            "TextSearch" => Ok(CommandType::TextSearch),
+            "GotoXY" => Ok(CommandType::GotoXY),
+            "PrintText" => Ok(CommandType::PrintText),
+            "RefreshDisplayString" => Ok(CommandType::RefreshDisplayString),
+            _ => Err(format!("Invalid CommandType: {}", s)),
+        }
+    }
+}
+
+impl CommandType {
+    pub fn iter() -> impl Iterator<Item = CommandType> {
+        vec![
+            CommandType::Disabled,
+            CommandType::Menu,
+            CommandType::Script,
+            CommandType::Conference,
+            CommandType::DisplayDir,
+            CommandType::DisableMenuOption,
+            CommandType::Door,
+            CommandType::ExitMenus,
+            CommandType::QuitMenu,
+            CommandType::DisplayFile,
+            CommandType::StuffTextAndExitMenu,
+            CommandType::StuffTextAndExitMenuSilent,
+            CommandType::StuffText,
+            CommandType::StuffTextSilent,
+            CommandType::StuffFile,
+            CommandType::StuffFileSilent,
+            CommandType::RedisplayCommand,
+            CommandType::AbandonConference,
+            CommandType::BulletinList,
+            CommandType::CommentToSysop,
+            CommandType::Download,
+            CommandType::EnterMessage,
+            CommandType::FileDirectory,
+            CommandType::Goodbye,
+            CommandType::Bye,
+            CommandType::Help,
+            CommandType::InitialWelcome,
+            CommandType::JoinConference,
+            CommandType::DeleteMessage,
+            CommandType::LocateFile,
+            CommandType::ToggleGraphics,
+            CommandType::NewFileScan,
+            CommandType::PageSysop,
+            CommandType::SetPageLength,
+            CommandType::QuickMessageScan,
+            CommandType::ReadMessages,
+            CommandType::Survey,
+            CommandType::SetTransferProtocol,
+            CommandType::UploadFile,
+            CommandType::ViewSettings,
+            CommandType::WriteSettings,
+            CommandType::ExpertMode,
+            CommandType::PersonalMail,
+            CommandType::ZippyDirectoryScan,
+            CommandType::GroupChat,
+            CommandType::OpenDoor,
+            CommandType::TestFile,
+            CommandType::UserList,
+            CommandType::WhoIsOnline,
+            CommandType::ShowMenu,
+            CommandType::Command,
+            CommandType::GlobalCommand,
+            CommandType::DisplayNews,
+            CommandType::SetLanguage,
+            CommandType::ReplyMessage,
+            CommandType::EnableAlias,
+            CommandType::Broadcast,
+            CommandType::RestoreMessage,
+            CommandType::ReadEmail,
+            CommandType::WriteEmail,
+            CommandType::RunPPE,
+            CommandType::TextSearch,
+            CommandType::GotoXY,
+            CommandType::PrintText,
+            CommandType::RefreshDisplayString,
+        ]
+        .into_iter()
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Default)]
 pub struct Position {
     pub x: u16,
@@ -348,7 +494,7 @@ impl Display for Position {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Default, PartialEq, EnumString, EnumIter, Debug)]
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq, Debug)]
 pub enum AutoRun {
     #[default]
     Disabled,
@@ -365,6 +511,27 @@ pub enum AutoRun {
     /// Run the command after a certain timeout in a loop
     /// For example to display the current time or to update a scrolling message
     Loop,
+}
+
+impl FromStr for AutoRun {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Disabled" => Ok(AutoRun::Disabled),
+            "FirstCmd" => Ok(AutoRun::FirstCmd),
+            "Every" => Ok(AutoRun::Every),
+            "After" => Ok(AutoRun::After),
+            "Loop" => Ok(AutoRun::Loop),
+            _ => Err(format!("Invalid AutoRun: {}", s)),
+        }
+    }
+}
+
+impl AutoRun {
+    pub fn iter() -> impl Iterator<Item = AutoRun> {
+        vec![AutoRun::Disabled, AutoRun::FirstCmd, AutoRun::Every, AutoRun::After, AutoRun::Loop].into_iter()
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Default, PartialEq)]

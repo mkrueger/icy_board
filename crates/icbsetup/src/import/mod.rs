@@ -180,7 +180,7 @@ impl PCBoardImporter {
         let tcan_passwords = self.create_file(include_str!("../../data/tcan_passwords.txt"), "config/tcan_passwords.txt")?;
         let vip_users = self.create_file(include_str!("../../data/vip_users.txt"), "config/vip_users.txt")?;
 
-        let group_file = self.create_group_file("config/groups.toml")?;
+        let group_file = self.create_group_file("config/groups")?;
 
         let welcome = self.convert_display_file(&self.data.path.welcome_file.clone(), "art/welcome")?;
         let newuser = self.convert_display_file(&self.data.path.newuser_file.clone(), "art/newuser")?;
@@ -683,9 +683,8 @@ impl PCBoardImporter {
         let dest = self.output_directory.join(new_rel_name);
 
         let mut groups = GroupList::default();
-        groups.add_group("sysop", "System Operators", &["SYSOP".to_string()]);
-        groups.add_group("users", "Common Users", &[]);
-        groups.add_group("no_age", "Members override age check", &[]);
+        groups.add_group("sysop", "System Operators");
+        groups.add_group("users", "Common Users");
         groups.save(&dest)?;
         Ok(PathBuf::from(new_rel_name))
     }

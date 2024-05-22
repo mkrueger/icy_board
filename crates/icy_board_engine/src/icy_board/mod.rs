@@ -44,6 +44,7 @@ pub mod message_area;
 pub mod pcb;
 pub mod sec_levels;
 pub mod security;
+pub mod security_expr;
 pub mod state;
 pub mod statistics;
 pub mod surveys;

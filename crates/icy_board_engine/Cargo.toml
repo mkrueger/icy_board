@@ -25,15 +25,17 @@ rand = { workspace = true }
 jamjam = { workspace = true }
 bstr = { workspace = true }
 
+strum = { workspace = true }
+strum_macros = "0.26.2"
+
 async-recursion = "1.1.0"
 radix_fmt = "1"
 qfile = "3.0.1"
 byteorder = "1.5.0"
-strum = { workspace = true }
-strum_macros = "0.26.2"
 toml = { workspace = true }
 async-trait = "0.1.80"
+logos = "0.14.0"
 # interpreter deps
 [dev-dependencies]
+pretty_assertions = "1"
 stopwatch = "0.0.7"
-

@@ -19,7 +19,7 @@ impl PcbBoardCommand {
             }
         }
 
-        if let Some(user) = &mut self.state.current_user {
+        if let Some(user) = &mut self.state.session.current_user {
             user.flags.use_alias = self.state.session.use_alias;
         }
 

@@ -227,7 +227,7 @@ impl PcbBoardCommand {
         let url = format!(
             "https://games.bbslink.net/auth.php?key={}&user={}&system={}&auth={}&scheme={}&rows={}&door={}&token={}&type={}&version={}",
             x_key,
-            self.state.session.cur_user,
+            self.state.session.cur_user_id,
             bbslink.system_code,
             format!("{:x}", md5::compute(bbslink.auth_code.clone() + token.as_str())),
             format!("{:x}", md5::compute(bbslink.sheme_code.clone() + token.as_str())),

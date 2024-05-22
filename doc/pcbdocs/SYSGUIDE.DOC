@@ -1,0 +1,2140 @@
+8
+=============================================================================
+                                                                SysOp's Guide
+                                                                
+
+
+
+
+
+
+
+File Transfers
+
+Messages
+
+Conferences
+
+Events
+
+System Security
+
+Maintenance Tasks
+
+New Users
+
+User Subscriptions
+
+Modem Discussions
+
+Searching for Text
+
+File Transfers
+
+Uploading Files
+
+When you upload files you are adding files to the bulletin board system. The 
+files are posted so other users may download the files.
+
+How to Upload Files
+
+In order to upload a file, you must specify the filename(s) you will be 
+uploading and a description for each file uploaded. Once all of the files and 
+descriptions have been entered, you may begin the file transfer.
+
+As an example, we will upload a file called MNHIT110.ZIP.  Begin by entering 
+U at a conference command prompt to initiate an upload.  PCBoard will display 
+the following prompt:
+
+
+(1) Enter the Filename to Upload (Enter)=none?
+
+
+At this prompt, enter the filename which is MNHIT110.ZIP.  Now, you are asked 
+to enter a description for the filename that you just entered.  You need to 
+enter at least 5 characters for the filename.  You are told how many 45 
+character description lines you can enter.  We will enter the following:
+
+
+Before beginning, enter a description of: MNHIT110.ZIP
+Begin description with (/) to make upload `Private'.
+Enter your text. (Enter) alone to end. (45 chars/line, 12 lines maximum)
+? (MANHIT v1.10 -- Utility you can use to enhance)
+? (your computer/system security.                )
+
+
+On the next blank description line, press ENTER to finish entering the 
+description. You will now either be asked for another filename to transfer or 
+the transfer will begin.  It all depends on how you answered the Promote to 
+Batch Transfers question in PCBSetup | Configuration Options | File 
+Transfers.  If you are asked for another filename, you may enter another 
+filename to transfer or press ENTER to begin the transfer.
+
+The transfer should now begin.  There is a different method for uploading 
+from remote or locally.  The following describes each.
+
+        Remote  You need to transfer a file using your communications 
+                program. With most communication programs you can do this by 
+                pressing PgUp.    You are usually prompted for the protocol 
+                you wish to use for the transfer.  Make sure you select the 
+                same one as you did on the bulletin board system.  Once you 
+                select the protocol, you are asked for the filename(s) you 
+                wish to transfer.  Enter the location to find the files you 
+                want to upload on your disk and press ENTER.  At this point 
+                you will  see the files being transferred.
+
+        Local   Local uploads are a little different because PCBoard is in 
+                control.  To perform a local upload, you need to make sure 
+                you have selected an internal protocol to PCBoard.  At the 
+                point where you would press u from remote to begin the 
+                transfer you will see the following prompt at the top of your 
+                screen:
+
+                    Local Upload Path or Filename? (                         )
+
+                In this field, enter the filename(s) you want to upload.  For 
+                example, if you want to upload a single file called 
+                MNHIT110.ZIP that is located in D:\TEMP\, enter 
+                D:\TEMP\MNHIT110.ZIP at this prompt.  If you want to upload 
+                every file in D:\TEMP\, enter D:\TEMP\*.*.
+
+If your file transfer is aborted, it may occur for any of the following 
+reasons:
+
+  You were using an internal protocol, and one or more of the files you were 
+  transferring duplicated filenames already on the system.  The non-duplicate 
+  files (if any) will still be transferred, but you will receive the transfer 
+  aborted message to let you know one or more of your files were aborted.
+
+  You took too long to begin the transfer.  The internal protocols in PCBoard 
+  give you approximately 60 seconds to begin the transfer.  Most external 
+  protocols have a built in time-out value as well.
+
+  If you are prompted for any descriptions after the transfer has taken 
+  place, you have done an unannounced upload.  This is where you send files 
+  you did not inform PCBoard you would be sending. Because PCBoard requires 
+  each filename to have a description, it will ask you for a description if 
+  it cannot find one.
+
+  Before PCBoard asks for a description, however, it will check the file to 
+  see if it has a FILE_ID.DIZ in it.  If so, the file will be immediately 
+  tested without prompting for a description. PCBoard is able to determine if 
+  a ZIP, ARJ, LZH, PAK, or ARC file has a FILE_ID.DIZ file.  If it does, the 
+  description file will be used to describe the file.  If PCBoard is unable 
+  to find a description in the file, it will ask for a description of the 
+  file.
+
+All files that are successfully transferred will be tested via PCBTEST.BAT if 
+you have enabled the testing of uploads on your system.
+
+Testing Uploaded Files
+
+If you have configured your system to test all uploaded files, all 
+successfully uploaded files will be tested (one at a time) using PCBTEST.BAT. 
+Even if carrier is lost during the transfer, PCBoard will test all files that 
+were successfully transferred. For more information about testing files using 
+PCBTEST.BAT, see the Batch Files chapter of this manual.
+
+Disabling Uploads
+
+There are two methods you can use to disable uploads on your system.  You can 
+set the security level required to execute the U command in PCBSetup | 
+Security Levels | User Commands very high so no one can upload.  This would 
+effectively disable uploads across the entire system.
+
+If you are looking to disable uploads on a conference by conference basis, 
+you may do that as well.  To disable uploads for a particular conference, 
+clear out the field which contains the location of where uploads will be 
+stored.  The field you need to clear depends on how you answered the Make All 
+Uploads Private question.  If you answered with a Y, clear out the location 
+of private uploads.  The following is a sample display:
+
+
+             Sort   Name/Loc Upload DIR File       Location of Uploads
+Public  Upld: 0   : C:\PCB\MAIN\UPLOAD            : C:\PCB\MAIN\UPLOAD
+Private Upld: 0   : C:\PCB\MAIN\PRIVATE           : 
+
+
+If you answered with an N instead (making all uploads in the conference 
+public), clear out the Location of Uploads for the public upload directory 
+instead.
+
+Determining Duplicates
+
+PCBoard uses a semi-intelligent method to determine if the file that is about 
+to be uploaded is a duplicate of a file already on the system.  A list of the 
+filename extensions used by the most popular file compression programs is 
+stored in memory.  If it appears that the file is simply compressed with a 
+different program, the file will be rejected as a duplicate.
+
+For example, if you have a file called SPECIAL.ARJ on your system and an 
+attempt is made to upload SPECIAL.ZIP, the file will be rejected as a 
+duplicate.  However, a file such as SPECIAL.TXT could be uploaded, because 
+the TXT extension is not used by any compression programs.  Therefore, this 
+file most likely has contents that are different from SPECIAL.ARJ.
+
+NOTE:  The file extensions that are recognized as being used by compression 
+programs are:  ZIP, ARJ, LZH, LHA, ARC, PAK, ZOO, DWC, and EXE.  
+
+PCBoard checks the filename being uploaded against entries in DLPATH.LST to 
+determine what files exist on the system.  If the file already exists, a 
+message stating that the upload is a duplicate of a file already on the 
+system is displayed.  If you have a security level equal to or greater than 
+the value specified by the Level Needed to Overwrite Files on Uploads 
+(PCBSetup | Security Levels | Sysop Commands), you are given the option to 
+remove the file from disk or to continue with the upload.
+
+You may also want to use what is called an ALLPATH.LST (All-Files DLPATH.LST  
+in PCBSetup | File Locations | Configuration Files).  In this file you can 
+list all of the paths you want PCBoard to check when uploading a file.  This 
+way you could include download paths from multiple conferences so users do 
+not upload files that may be located in another conference.  Since the 
+ALLPATH.LST file is never checked for downloads, you do not compromise the 
+security of your system. If you leave this field blank, PCBoard resorts to 
+using only the DLPATH.LST method for duplicate checking.
+
+ Downloading Files
+
+When you download files, you are transferring a file which exists on the 
+bulletin board to your machine.
+
+How to Download Files
+
+In order to download a file, you must enter the filename(s) you want to 
+download.  To help find the filenames you want to download, use the L, N, Z, 
+and F user commands.  All of these commands will list files.  To actually 
+download the file(s), use the D command to download a single file or the DB 
+command to download more than one file.  If you have answered Y to the 
+Promote to Batch Transfers question, the D command will behave like the DB 
+command.
+
+You will see the following prompt:
+
+(1) Enter the filename to Download (Enter)=none?
+
+
+At this prompt enter the filename you wish to download.  You may stack 
+multiple filenames at this prompt by separating each filename by either a 
+space or a semi-colon.  For example, enter BLADAR10.ZIP to download a file 
+called BLADAR10.ZIP.
+
+If the file is found on disk, you will be shown the filename, how many bytes 
+are in the file, and an estimate of how long it will take to transfer at your 
+current speed.  You will then be asked for another filename.  If you are 
+finished entering the files you want to download, simply press ENTER.
+
+After the filenames have been entered, you will be ready to begin the 
+transfer.  As with uploads, PCBoard treats remote and local transfers 
+differently.  The following describes each method:
+
+
+        Remote  You need to transfer a file using your communications 
+                program. With most communications program you can do this by 
+                pressing PgDn.    You are usually prompted for the protocol 
+                you wish to use for the transfer.  Make sure you select the 
+                same one as you did on the bulletin board system.  Once you 
+                select the protocol, you are asked for the location where you 
+                wish to place the files you are about to download.  Enter any 
+                valid subdirectory or filename in this box as necessary for 
+                your communications program.   At this point you will see the 
+                files being transferred.
+
+                NOTE:  Some communications programs support what is called 
+                auto-downloading.  This is where the transfer automatically 
+                begins as soon as the communications program recognizes the 
+                protocol.  This is most common with protocols like Zmodem.
+
+        Local   Local downloads are a little different because PCBoard is in 
+                control.  To perform a local download, you need to make sure 
+                you have selected an internal protocol to PCBoard.  At the 
+                point where you would usually press d from remote to begin 
+                the transfer you will see the following prompt at the top of 
+                your screen:
+
+
+                  Local Download Path? (                                   )
+
+
+                In this field, enter the drive and subdirectory where you 
+                want to store the file(s) you are about to download.  For 
+                example, if you want the files to be stored in D:\TEMP\,  
+                enter D:\TEMP at this prompt.
+
+
+If your file transfer is aborted, it may mean you took too long to start it.  
+Internal protocols allow you about 90 seconds before they will abort.  Local 
+downloads will abort if you do not type anything in the box within 30 
+seconds.
+
+If your download is aborted, PCBoard will remember the filenames you typed in 
+and they will remain as flagged files.  Therefore, if you attempt to do a 
+download again, you will be asked if you wish to download flagged files.
+
+Flagging Files For Download
+
+You can mark or flag files for download while you are viewing the file 
+listings.  When you are viewing file listings, you will notice that the More? 
+prompt has a (F)lag option.  When you select this option, you will be asked 
+what filename you would like to flag for download.  If the filename you enter 
+is found, you will be shown the filename, file size, and approximate minutes 
+to download.  You can continue looking at the file listings without having to 
+begin your transfer immediately.
+
+When you are ready to begin your transfer, simply use the D or DB commands.  
+You will be asked if you wish to download the files that are flagged for 
+download.
+
+Disabling Downloads
+
+Disabling downloads is a very simple process.  To disable downloads across 
+the entire system, you would set the security level in PCBSetup | Security 
+Levels | User Commands for the D command very high.
+
+To disable downloads in a particular conference is very easy. Simply make 
+sure that the DLPATH.LST field in the conference configuration is blank.  If 
+it is blank, PCBoard will inform the user that downloads are currently 
+disabled.  Below is an example from a conference configuration screen:
+
+
+Directories : C:\PCB\MAIN\DIRMNU           : C:\PCB\MAIN\DIR.LST
+Download Paths (listing only)              : 
+
+
+Making files FREE for download
+
+A FREE file is considered a file which does not count towards the user's 
+bytes or files downloaded.  In other words, if the user has 280k of bytes 
+available for the day and a free file is downloaded,  280k of bytes will 
+still be available for downloading.
+
+To make a file free, you need to use the FSEC file which can be edited via 
+PCBSetup | File Locations | Configuration Files.  A file is considered FREE 
+if the password required for the download is FREE.  A couple of examples will 
+help illustrate the point best.  For example, all files in the G:\FORALL\ 
+subdirectory will be considered FREE files.  The entry you would make in the 
+FSEC file looks like the following:
+
+          
+          Drive \ Path              File Name    Sec     Password
+-------------------------------- -------------- ----- --------------
+ G:\FORALL\                       *.*            0     FREE
+
+
+Because almost all bulletin boards store files on the system as compressed 
+files, you may want to make the utility necessary to uncompress the files a 
+FREE download.  For example, the decompression utility may be called 
+ARJ300.EXE.  If so, you may want to make the following entry in the FSEC 
+file:
+
+          
+          Drive \ Path              File Name    Sec     Password
+-------------------------------- -------------- ----- --------------
+
+                                  ARJ*.EXE       0     FREE
+
+
+Notice how the Drive/Path field is left blank.  This means that anytime a 
+user downloads a file which begins with ARJ and has an extension of EXE it 
+will be a FREE file.
+
+Batch Versus Single File Transfers
+
+As you know, you must use a file transfer protocol to transfer any files over 
+the modem.  As it turns out, some protocols can handle sending multiple files 
+in a single transfer while others may be only capable of sending one file at 
+a time.
+
+If a protocol can send more than one file in a single transfer, it is known 
+as a batch protocol.  On the other hand, if the protocol is capable of 
+sending only one file at a time, it is sometimes termed a single file 
+protocol.
+
+If you flag or attempt to download more than one file for a single transfer, 
+PCBoard will only allow you to transfer the files using the batch protocols 
+that are available on the system.  If your default protocol is set to a 
+single file protocol, you will be prompted for the batch protocol you wish to 
+use for the transfer.
+
+Aborted Transfers
+
+An aborted file is any file which was not fully transferred. The following 
+details some reasons why files may be aborted:
+
+excessive errors:  Almost every protocol has some error-checking routines 
+built in to assure the proper transfer of information. If an error in the 
+transmission is detected the data packet will usually be re-sent.  Most 
+protocols also have a built in error limit.  For example, if 10 successive 
+errors occur, the protocol may decide to abort the transfer.
+
+line noise:  No transmission over phone lines is immune from line noise.  
+From time-to-time you may experience line noise. If you do not have an 
+error-corrected connection, this may cause transmissions errors and if bad 
+enough, could cause the transfer to be aborted.  If you do have an 
+error-corrected connection, it is quite unlikely that the transfer will be 
+aborted (because modems are doing the error correcting automatically).  
+However, if the line noise is extremely bad, your modem may decide to 
+automatically drop carrier.
+
+dropped bytes:  With the influx of high-speed modems into the market it has 
+become more important than ever to have serial port hardware that is adequate 
+enough to handle the speed of the modem.  If you plan on using a modem which 
+uses a port speed of 19200 or higher, you should plan on either using an 
+intelligent serial card supported by the /M version of PCBoard or at the very 
+least make sure all of your serial ports have NS16550AFN UARTs installed.
+
+flow control:  It is very important that you use the right flow control.  
+There are two types of flow control--software and hardware.  The former is 
+commonly referred to as XON/XOFF flow control and the latter is referred to 
+as CTS/RTS flow control. It is important that your modem and your software be 
+configured to use CTS/RTS flow control exclusively.  Protocols such as 
+Ymodem/G assume that flow control is operating properly.  If flow control is 
+not working properly, you can lose an excessive amount of characters, etc.
+
+
+NOTE:  If the connection is set to be disconnected once the file transfer has 
+completed and the file transfer aborts, PCBoard will wait 45 seconds instead 
+of the normal 10 seconds.
+
+Messages
+
+Messages are a vital part of just about any bulletin board system.  Messages 
+are used to leave messages to the SysOp or to other users.  Messages are the 
+most common way of communicating with other users on the system.
+
+Reading A Message
+
+Because reading messages is one of the most commonly used functions when on a 
+bulletin board system, PCBoard has numerous commands and subcommands dealing 
+with reading messages.  You can use the subcommands to view only those 
+messages that interest you.  For example, if you only want to see messages 
+from JIM SMITH, use the FROM subcommand.
+
+Reading new messages
+
+Bulletin board systems are basically information banks.  Because so much 
+information is stored on a bulletin board system, you most likely want to 
+view only new information that is placed online.  Viewing any new messages on 
+the system is very easy to do.  From the conference command prompt you can 
+type in the following:
+
+
+R S A
+
+
+This will Read mail Since the last time you were on in All conferences you 
+have selected for scanning.  If the bulletin board brings in a lot of mail 
+each day, you may want to read only  messages that are addressed to you.  If 
+so, you can type in the following command instead:
+
+
+R Y S A
+
+
+The only change is the addition of the Y to tell PCBoard to only read 
+messages that are addressed to You.  There are numerous other subcommands you 
+can use with the R command.  For a detailed list, see the R user command in 
+the PCBoard Commands chapter of this manual.user command section.
+
+Downloading an attached file
+
+If you are reading a message which has an attached file, you will notice that 
+you have the ability to flag the attached file for download.  At the End of 
+Message Command prompt, you simply type in FLAG -- the file will then be 
+flagged for download. When you are done reading messages, you can use either 
+the D or DB command to download the file.
+
+Entering A Message
+
+One of the most popular methods of communicating on a bulletin board system 
+is via the message system.  In order to communicate with another user or 
+group of users on the system via a message, you need to enter a message.  
+This section briefly talks about how to enter a message on the system.  For 
+more details about entering a message, you should refer to the E user command 
+in the User Command section of this manual.
+
+To begin entering a message, you need to use the E user command. This means 
+you will type in E followed by pressing ENTER.
+
+
+Addressing a Message
+
+Once you press E and then ENTER you will see the following prompt:
+
+
+To (Enter)='ALL'? (                        )
+
+
+This prompt asks to whom the message should be addressed to. Press ENTER to 
+address the message to ALL, enter any valid user name on the system, or you 
+can user some of the special addressees that are discussed in the Entering a 
+Message section of the PCBoard Commands chapter (e.g., @USER@, @LIST@, etc.).
+
+The Subject Of The Message
+
+Just as you would enter a subject on a memorandum or other correspondence, 
+you are asked to enter a subject of the message you will be entering.  You 
+are given up to 53 characters to describe the content of your message.  The 
+subject of the message is displayed when the message is read, when using the 
+Q user command, etc.  If you do not enter a subject for the message, the 
+message you are entering will be aborted.
+
+Assigning Message Security
+
+Unless the current conference is defined to make all messages private, you 
+will be asked what type of message security to use for the message you are 
+about to enter.  You may choose to make the message public so other users on 
+the system may read it or you may make the message private so only certain 
+persons can read the message.  The most popular security options are N for a 
+public message and R for a message which can be read only by the receiver of 
+the message.
+
+Requesting A Return Receipt
+
+If you are entering a RECEIVER ONLY message, you may be asked if you wish to 
+request a return-receipt.  If you request a return receipt, a message will be 
+sent to you when the recipient reads your message.
+
+Echoing a Message
+
+If you are leaving a message in a conference which has been configured to 
+allow echo-mail, you may be asked if you wish to echo the message.  If you 
+choose to not echo the message, your message will remain on the local system 
+only.
+
+Routing A Message
+
+You can configure a conference to request routing information if a message 
+will be echoed and it is a private message.  The routing information that is 
+entered allows the message to take a direct route to the recipient rather 
+than being broadcast over the entire mail network.  The routing information 
+that is entered depends on the software you are using for echoing mail as 
+each can require different types of routing information. Check with the 
+echoing software to see if message routing is allowed, and if so, the format 
+that must be used.
+
+Choosing a Message Editor
+
+PCBoard gives you the option to ask if you wish to use the full-screen editor 
+each time you enter a message.  If you have enabled this feature, you will be 
+asked this question before being allowed to enter your message.  Of course, 
+if you find you always use the full-screen editor or the line-editor, you may 
+want to go use the W user command to change the Use Full Screen Editor? 
+prompt to reflect the appropriate default response.
+
+The Message Editor
+
+Once you have answered the questions about the message you want to enter, you 
+will be placed in the message editor.  In the editor, you simply type in your 
+message as you want it to read. To perform various functions inside of the 
+editor such as deleting lines, saving the message, etc. you need to access 
+the editor commands.  To access these commands in the full-screen editor, you 
+can press ESC.  In the line-editor, you can access these commands by pressing 
+ENTER on a blank line.  There are far too many commands to discuss in this 
+section of the manual, however they are discussed in detail in the section of 
+the manual which discusses the E user command.  Once you have entered the 
+text you want for your message, you are ready to save your message.
+
+Saving the Message
+
+To save a message, simply access the editor command prompt by pressing either 
+ESC or ENTER on a blank line depending on which editor you are using.  Then 
+press S and R.  Your message is now saved to the message base on the bulletin 
+board system.
+
+Attaching A File To A Message
+
+Sometimes you need to distribute a file to a select group of users.  What you 
+can do is attach the file to a message.  That way, only users which can read 
+the message with the attached file can flag the file for download.  To attach 
+the file, select SA from the editor command prompt instead of S to save the 
+message.
+
+You will be asked for the filename you wish to upload or attach. You may 
+attach only one file to each message.  If you need to attach more than one 
+file, use a compression program which compresses the files and combines them 
+into a single file.
+
+After you have entered the filename to attach, upload the file just as you 
+would any other file to the system.  If the transfer is successful, you will 
+be notified that the message was saved. On the other hand, if the transfer is 
+aborted, or if your file was tested and failed testing, you will be returned 
+to the editor command prompt.
+
+Editing A Message
+
+Not everyone is perfect the first time around.  Sooner or later, you may need 
+to edit a message you have saved.  You may need to edit the actual text in 
+the message body, or perhaps just change who the message is addressed to.  
+The following sections describe how to edit the header and body of a message.
+
+Header information
+
+If you entered a message to the wrong name, or you would like to change the 
+subject of a message that you left, you may do so by typing E at the End of 
+Message Command prompt.  If you do not have SysOp security, you will only be 
+able to edit the header information of messages which you have left.  You may 
+edit who the message is to, the subject of the message, the message 
+security/protection, and the reference number of the message. If you have 
+SysOp security, you will also be able to change who the message is from, and 
+if it has been read or not.
+
+Body of message
+
+You can use the EDIT command at the End of Message Command prompt to edit the 
+body of the current message.  You may edit the message if it was left by you 
+or if you have SysOp security.
+
+When you edit the message you are put back into the message editor.  Make the 
+changes you want to make and then re-save the message.  The changes that you 
+make will be saved to the message.
+
+
+NOTE:  If you make numerous changes, PCBoard may have to delete the original 
+message and create a new message at the end of the message base.  Therefore, 
+if you see Message Killed when you save your message, you will know PCBoard 
+had to kill the original message and create a new message at the end of the 
+message base.
+
+Searching 
+
+PCBoard provides extensive search capabilities.  This section describes some 
+very simple searches you can use to help you find messages.
+
+For Text
+
+If you want to display any messages which contain particular text, use the TS 
+subcommand.  For example, if you enter the following:
+
+
+R;TS
+
+
+You can perform a text search on any message.  PCBoard will ask you for the 
+text you want to search for.  After you enter the text, you will be asked 
+what message number you want to begin the search at.
+
+You can stack all of this onto one line.  For example:
+
+
+R;TS;EDITOR;1+
+
+
+This command will perform a text search, looking for any message in the 
+current conference which contains the word EDITOR.
+
+If you wish, you may also span the search across all conferences you have 
+selected for scanning by using the following command:
+
+
+R;TS;EDITOR;1+;A
+
+
+Notice that only the A was added to the command.  This tells PCBoard to 
+search all conferences you have selected for reading. If you wish to search 
+all conferences you can join, use ALL instead.
+
+NOTE:  Text searches within PCBoard are not case-sensitive. Therefore, you do 
+not have to worry about matching the case of the text you will be searching 
+for.
+
+For User
+
+Sometimes you may only wish to read messages which are to or from a 
+particular user.  There is a USER subcommand you can use to read messages to 
+or from a user.  The following is an example:
+
+
+R;USER
+
+
+PCBoard will ask you for the user you wish to search for.  You may also stack 
+the user name on the command line as shown in the following example:
+
+
+R;USER;JIM BROWN
+
+
+The previous example will search for any messages in the current message base 
+which are to or from JIM BROWN.
+
+For User & Text
+
+If you need to perform an even more specific search, you can combine the USER 
+and TS commands.  This will enable you to search for any message that is to 
+or from a particular user and contains the text that you specify.  The 
+following is an example:
+
+
+R;TS;USER
+
+
+PCBoard will prompt you for the text you want to search for and the user you 
+want to restrict the search to.  As in the previous examples, you may stack 
+the information on the command line:
+
+
+R;TS;EDITOR;USER;JIM BROWN
+
+
+In this example, it is important to place the text you want to search for 
+after the TS and the user you want to search for after USER.  Otherwise, 
+PCBoard will not be able to properly discern the difference between the 
+search text and the user. Look at the following example:
+
+
+R;TS;USER;EDITOR;JIM BROWN
+
+
+If you type in the previous example, PCBoard will think the user name was 
+EDITOR;JIM BROWN and consequently prompt you for the text to search for.
+
+Capturing  A Single Message
+
+The ability to capture a message to a printer or file can be important 
+because it gives you a method to copy a message to a format which you can 
+then share or use in another manner.  You can capture messages to a file, or 
+to the printer (if you are on locally).
+
+To The Printer
+
+If you are on locally, you can capture text that is displayed by PCBoard to 
+the printer using ALT-P.  Therefore, to capture a particular message, do the 
+following:
+
+
+Read the message you want to capture.
+
+At the End of Message Command prompt, press ALT-P to turn on the
+printer.
+
+Now type / and press ENTER.  This will re-display the message. 
+Since you have printer capturing turned on, you will be
+capturing the message.
+
+Press ALT-P to turn off printer capturing and you are done.
+
+To A Text File
+
+
+You can easily capture a message to a file using the following
+steps:
+
+
+Read the message you want to capture.
+
+At the End of Message Command prompt, enter C to capture and
+download the message.
+
+Download this file like any other file on the system and you
+will have a hard-copy of the message in text file format in the
+location where you download the file.
+
+
+Capturing  Multiple Messages
+
+The ability to capture messages to a printer or file can be important because 
+it gives you a method to copy messages to a format which you can share or use 
+in another manner.  You can capture messages to a file, or to the printer (if 
+you are on locally).
+
+To The Printer
+
+If you are on locally, you can capture text displayed by PCBoard to the 
+printer using ALT-P.  Therefore, to capture several messages, do the 
+following:
+
+
+Press ALT-P to turn on printer capturing.
+
+Read the messages you want to capture.
+
+When done reading the messages, press ALT-P to turn off printer
+capturing.
+
+
+To A File
+
+The easiest way to capture messages to a file is to use the C subcommand of 
+the R user command.  Simply tack the C on to the end of your read command and 
+those messages will be sent to a file instead of being displayed on the 
+screen.  Example:
+
+
+R;S;A;C
+
+
+would read new messages in all conferences that you have selected and capture 
+them to a file.  Once the messages have been captured to the file, you will 
+be directed to download the capture file to your system.  Of course, once you 
+download it, you have an ASCII text capture of those messages.
+
+To a QWK Packet
+
+One of the most popular ways to read messages off-line is via an off-line 
+mail reader which can handle QWK packets.  PCBoard can capture messages into 
+a QWK packet you can use with an off-line mail reader.  If you want all of 
+the new messages on the system, use the QWK command from the conference 
+command prompt.  If you want to capture a certain range of messages, or 
+perhaps only messages that contain certain text, use the QWK subcommand that 
+is available with the R user command.
+
+To captures messages to a packet, simply tack on QWK to the end of your read 
+command.  For example, if you want the new messages in the current conference 
+instead of all conferences you have selected, enter the following command:
+
+
+R;S;QWK
+
+
+Taking this idea one step further, you can capture all messages that contain 
+the word INERTIA in the current message base.  To do this, enter the 
+following:
+
+
+R;TS;INERTIA;1+;QWK
+
+
+Conferences
+
+Conferences provide you a way to separate information on your bulletin board 
+system.  Each conference can have different message bases, file areas, 
+bulletins, scripts, etc.
+
+Creating
+
+Because the conference configuration screens are so extensive, it can take a 
+while to create a conference.  PCBoard does try to help you out with your 
+conference configuration when you decide to create a new conference.
+
+To create a conference, you need to first load PCBSetup, and select 
+Conferences from the Main Menu.  You will see a list of conferences on your 
+system.  To create a conference,  press ENTER on a blank conference number.  
+You will be informed that you are setting up a new conference.  You are then 
+asked if you want PCBSetup to provide the defaults for this conference.  If 
+you did not see this screen, but heard a beep instead, it means you need to 
+increase the Number of Highest Conference Desired in PCBSetup | Configuration 
+Options | Messages.
+
+If you choose not to have PCBSetup provide the defaults, you will be placed 
+in the conference screen for the conference you are creating.  All of the 
+fields will be blank and you will need to fill in the fields as described in 
+the Conference Setup chapter of this manual.
+
+If you choose to let PCBSetup enter the defaults, you will be asked some 
+additional information:
+
+Conference Name:  You may enter up to 13 characters to describe the new 
+conference.  You may use both upper and lower case letters.
+
+Number of conference to clone (leave blank to skip):  Sometimes your 
+conferences may be very similar in configuration with only a field or two in 
+the configuration screen being different.  If you enter a number in this 
+field, PCBoard will copy the conference settings for a conference and use 
+them for your new conference.  Before the conference is cloned, you are asked 
+for the Default Conference Location.  This is where your MSGS, INTRO, and 
+NEWS files will be stored for this conference.  These are the only files that 
+will change from the conference that you are cloning.  The rest of the file 
+locations and the settings will be copied from the conference you enter in 
+this field.
+
+For systems that have a lot of NetMail conferences, cloning conferences can 
+save a lot of time because the MSGS file location is about the only thing 
+that is different between each NetMail conference.
+
+Enter the Conference # on which to base the defaults:  If you decide not to 
+clone a conference, you will be asked what conference you wish to base your 
+defaults on for the new conference.  Once you enter the conference to base 
+your defaults on, you will be asked for the Default Conference Location.  
+This is the location where  all of your conference specific information will 
+be stored (message base, etc.)
+
+PCBSetup will now proceed to ask you about various file locations in the 
+conference configuration screen to see how you want them to be configured.  
+You will first be asked about your Upload definitions.  These will specify 
+information about your public and private upload directories.  The following 
+options are available at this prompt:
+
+        1       Copy the default upload paths and DIR file specifications. 
+                The sort method, name/location of the upload DIR file, and 
+                the location of uploads will be copied from the conference 
+                you are basing the defaults on.  In other words, the 
+                following fields will be copied:
+
+
+             Sort   Name/Loc Upload DIR File       Location of Uploads
+Public  Upld: 0   :                              :
+Private Upld: 0   :                              :
+
+
+        2       Create new upload paths and DIR files for this conference. 
+                PCBSetup will create defaults for your private and public 
+                upload directories based on what you entered for your Default 
+                Conference Location.  For example, if you entered C:\CONF\1\ 
+                for your default conference location, your description files 
+                will be stored in C:\CONF\1\, your private uploads will be 
+                stored in C:\CONF\1\PRIVUPLD\, and your public uploads will 
+                be stored in C:\CONF\1\UPLOAD\.
+
+        3       Leave the upload path and DIR file specifications blank.  If 
+                you select this option, your private and public uploads 
+                locations will be left blank.  You would want to select this 
+                option if you did not want to accept uploads in this new 
+                conference.
+
+Next, you will be asked about the following file locations:
+
+
+DOORS Files:  The locations of your door menu and door configuration files.  
+These are commonly referred to as DOORS and DOORS.LST.
+
+BULLETINS Files:  The locations of your bulletin menu and bulletin 
+configuration files.  These are commonly referred to as BLT and BLT.LST.
+
+SCRIPTS File:  The locations of your script menu and script configuration 
+files.  These are commonly referred to as SCRIPT and SCRIPT.LST.
+
+DIR File:  The locations of your file directory menu and file directory 
+configuration files.  These are commonly referred to as DIR and DIR.LST.
+
+Download Paths File:  The location of your download path list file.  This 
+file is sometimes referred to as DLPATH.LST.
+
+For each of these locations, you will be given the following options:
+
+
+        1       Use the default conference definitions directly.  If you make 
+                any changes it will affect all conferences sharing the same 
+                defenitions.  If you select this option, PCBSetup will store 
+                the same file locations you used in the conference you are 
+                basing the new conference on.  Because the new conference and 
+                the conference you based the defaults on will share the same 
+                file, any changes you make in one conference will also be 
+                reflected in the other conference.
+
+        2       Copy the default conference definitions into a 
+                conference-specific file which you may then add to or delete 
+                from without affecting any other conference.  PCBSetup will 
+                use new files based on your Default Conference Location, but 
+                will copy the data from the files in your base conference.  
+                This way, you can have conference specific files that you may 
+                change freely without affecting the conference you used to 
+                base your defaults on.
+
+        3       Start out with an empty conference-specific file which may be 
+                modified without affecting any other conference.  PCBSetup 
+                will create new files based on your Default Conference 
+                Location. These files will be empty so you may customize/edit 
+                them to suit your needs.
+
+Once you have answered these questions, you will be returned to the 
+conference configuration screen where you may fine-tune or edit any of the 
+fields.
+
+Registering Users In A Conference
+
+There are several methods for registering users in a particular conference.  
+Some methods will only register one user at a time. Other methods will 
+register an entire group of users.
+
+Registering A Group Of Users In A Conference
+
+You can register a group of users in a conference at the same time.  To 
+accomplish this, load System Manager.  Next, select Users File Maintenance, 
+followed by Insert Group Conference. You will see the following fields on 
+your screen:
+
+
+First number of conferences to be inserted in registrations  :    0
+Last  number of conferences to be inserted in registrations  :    0
+
+
+Adjust conferences user is normally allowed to join          : Y
+Adjust conferences user can join with expired subscription   : Y
+Adjust the user selected conferences for scanning            : Y
+Adjust conferences where user becomes a sysop when joining   : N
+Reset user's last message read to zero in these conferences  : N
+
+Adjust users with a security level greater than or equal to  : 0
+
+                                  and less than or equal to  : 110
+
+
+Begin by specifying the beginning conference number followed by the ending 
+conference number to register the users in.  If you want to register the 
+users in one conference, specify the same number for the first and last 
+conference number.
+
+Next, you need to determine the conference flags that will be set in the user 
+record.  The following lists the flag that will be set in the user record 
+based on how you answer the questions in the second section:
+
+
+        R       Adjust conferences user is normally allowed to join.  If you 
+                put a Y in this field, the R flag will be put in the 
+                conference flag section of the user record.  This flag 
+                controls if the user is able to join a particular conference 
+                or not.
+
+        X       Adjust conferences user can join with expired subscription. 
+                If you put a Y in this field, an X will be placed in the 
+                conference flag section of the user record.  When the X flag 
+                is set, the user can join the conference if their 
+                subscription has expired.
+
+        S       Adjust the user selected conferences for scanning.  If you 
+                put a Y in this field, an S will be placed in the conference 
+                flag section of the user record.  This means that conference 
+                has been selected for scanning/reading.
+
+        C       Adjust conferences where user becomes a sysop when joining. 
+                Putting a Y in this field will put the C flag in the 
+                conference flag section of the users file.  When users who 
+                have this flag join the conference, they will automatically 
+                be upgraded to the security level specified by the Sysop 
+                Level field in PCBSetup | Security Levels | Sysop Commands.
+
+Finally, you need to specify the security levels that the conference flags 
+will be altered for.  In the first field, enter the lowest security level you 
+want the flags to be altered for. In the last field, enter the highest 
+security level you want the flags altered for.  All security levels between 
+the low and high security levels will also have their flags altered.
+
+Registering A Single User Via System Manager
+
+If you need to register just one or two users in a particular conference, the 
+easiest way to do it is via System Manager. Select Users File Maintenance, 
+then Edit Users File.  You should see your record on this screen.  Now press 
+A-F and type in the name of the user that you want to register in the 
+conference. Once their record is on the screen, press 2 twice to go into 
+conference view.  You will see the conferences you have configured on the 
+system with a Flags column next to each conference.
+
+To move between the fields on the screen use the TAB key.  When you are in 
+the Flags field, you can enter any of the flags that were described 
+previously (R, X, S, and C).  To save the new information, press ESC and tell 
+System Manager that you want to save the changes made to the user record.
+
+Registering A Single User While Online
+
+If you have SysOp security level and you have sufficient security level to 
+access the 7 command, you can edit almost any user record on the system.  See 
+the SysOp Commands section in the PCBoard Commands chapter of this manual for 
+more information on the 7 command.  First, locate the user record that you 
+want to edit, then select C to change the current user record.  As you step 
+through the various items, you will see one which says Select Conferences.  
+You may then select the conference number(s) to register the user in.  Once 
+you have selected the conference(s) you will be asked which conference flags 
+you would like to set for the user.  Simply enter the flags, and press ENTER.  
+
+Restricting Access To A Conference
+
+There are five methods you can use to keep a particular user out of a 
+conference.  They are as follows:
+
+
+User does not have the R conference flag set in their user
+record for a private conference.
+
+User does not have sufficient security required to join a public
+conference or does not have the R conference flag set.
+
+User does not know the password for the conference if defined in
+the conference configuration screen and if the conference is a
+private conference.
+
+You have set the L conference flag in the user record to lock
+the user out of the conference in question.
+
+The subscription for the user has expired and the X conference
+flag is not set for the conference you are restricting them from.
+
+
+Deleting
+
+PCBSetup does not provide a method for deleting a conference. However, you 
+can have PCBSetup re-ask you the initial questions for the conference so that 
+you can re-configure it.  To do this, clear out the name of the conference in 
+the configuration screen by positioning your cursor in the name field and 
+pressing CTRL-END. Next, press ESC to get back to the conference listing.  
+Select the conference number that you just cleared the name out of. PCBSetup 
+will now think that you are configuring a new conference and you can proceed 
+to answer the questions.
+
+NOTE:  You can temporarily disable a conference by clearing out the 
+conference name or the location of the MSGS file.  If a user attempts to join 
+a conference when either of these fields are blank, they will be told the 
+conference is an invalid conference.
+
+Sharing Information Between Conferences
+
+A conference has a few fields which give the location for configuration 
+fields.  If you have more than one conference which needs to share the 
+information the easiest way to do it is to specify the same filenames in both 
+conference configuration screens.
+
+For example, let's say that you have one conference which has
+the following information stored for your BLT and BLT.LST file:
+
+
+Bulletins   : C:\PCB\GEN\BLTMENU           : C:\PCB\GEN\BLT.LST
+
+
+If you want another conference to have the same bulletins available, enter 
+the same filenames on the second conference. Because both conferences point 
+to the same configuration files, the information stored in those files will 
+be shared between the two conferences.  When you edit one of the 
+configuration files, any changes you make will be written to the 
+configuration files. Any conferences that use these configuration files will 
+see the changes because they all read from the same files.
+
+You can use this method to share data for any fields in the conference 
+configuration screens which point to files.
+
+Creating Conference Menu
+
+In order for your users to know what conferences are available on your system 
+(if any), you need to edit the Name/Loc of Conference Join Menu in PCBSetup | 
+File Locations | Display Files.  This is file is commonly referred to as 
+CNFN.
+
+This file is a text file which you may edit with the editors you have defined 
+in System Manager by pressing F2 or F3.  You may make the menu look anyway 
+you wish.  As a bare minimum, you should include the conference name and/or 
+number and a description of each conference.  The following is  a sample:
+
+ #       Name                          Description
+---  -------------  --------------------------------------------
+ 1   PARANOID       Discussions include paranoia and fears.
+
+
+The user can join a conference either by typing in the number or the name.  
+Therefore you do not necessarily have to include the conference number and 
+name.  You could instead, list the conference number or conference name.
+
+You can create this text file using just about any text editor. Better yet, 
+if you have defined your text editor or graphics editor in PCBSM, you can 
+simply press 2 or 3 (depending on which file you want to edit).  Otherwise 
+you will have to manually edit the files while at the DOS prompt.
+
+Events
+
+An event is simply a batch file that gets executed during a specific time of 
+the day.  In this event batch file you can do some of the following things:
+
+
+Pack your users and/or message bases
+
+If you are part of a mail network, you will most likely transfer
+mail packets
+
+Some third party products you use on your bulletin board may
+need to run utilities to update databases, etc.
+
+Create a list of files on your system using PCBFiler and the
+/LIST parameter.
+
+Backup your system
+
+
+The previous examples are but only a few of the things you can do in your 
+event.  Since events execute batch files, you are more or less limited by 
+your imagination as far as what you want to run in your event.
+
+Adding An Event
+
+To define the events on your system, you need to go to PCBSetup | Event 
+Setup.  Next, you need to make sure that you have answered Y to the Is a 
+Timed Event Active question.
+
+Finally, if you cursor down to the EVENT.DAT line and press F2 you will a 
+screen that resembles the following:
+
+
+The number to the left of each line is the event number that is being 
+defined.  The rest of the fields on the screen are as follows:
+
+Act           You may enter either a Y or an N in this field.  A Y signifies 
+              that the event is active and should be executed as configured.  
+              If you enter an N then the event will be considered inactive 
+              and will not be run as defined. 
+
+Mod           The mode of the event.  You may enter either an E or an S in 
+              this field.  If you enter an E, the event is a "rigid" or 
+              non-sliding event.  If you enter an S as the event type, the 
+              event is referred to as a sliding event.
+
+              If an event is an expedited or non-sliding event, PCBoard will 
+              make its best attempt to execute the event at the time you 
+              specify as the beginning time even if it means cutting users 
+              time short.
+
+Batch File    In this field, specify the batch file you wish to execute for 
+              the event you are defining.  Note that you are only given 8 
+              characters for the batch filename.  The reason for this is that 
+              by default this batch file will be run on all nodes. However, 
+              you can make node specific batch files by making the node 
+              number the filename extension.  For example, if you entered a 
+              batch file of DAILY and you want node 5 to execute a different 
+              batch file, create a DAILY.005 file in the same directory where 
+              the DAILY file is located.
+
+Begin Time    In this field, enter the earliest time that you want your event 
+              to run.  The time you enter in this field must be in 24 hour 
+              format and there must be a colon between the hour and minutes.
+
+End Time      The end time is the latest possible time you wish for the event 
+              to run.  If the event has not run by the time you enter, the 
+              event will be skipped.
+
+Days          You may also control which days the event you are defining is 
+              run on.  In this field all seven days of the week are listed 
+              beginning with Sunday and ending with Saturday.  Simply enter 
+              either a Y or N which signifies whether you want to run the 
+              event on the day listed or not.
+
+Date          This field enables you to specify the dates PCBoard will run 
+              the event.  For example, if you want the event to run on the 
+              first day of every month, enter a date of 00-01-00.  Entering a 
+              00 signifies a wildcard.  Using the previous example, this 
+              means it would run for any month, and any year, but only when 
+              the day of the month is equal to 01.  Another example would be 
+              to set the date to 07-04-00.  This means the event would run 
+              every July 4th, no matter what the year is.
+
+Last Date     Contains the date the event was last run on the node number 
+              specified in PCBSetup | Node Configuration.  Not all events run 
+              system- wide - therefore, this field only contains the last 
+              date ran for the node you are currently editing.
+
+As an example, let's say you want to have an event that runs at 3:00am every 
+morning and packs your message bases.  The first step would be to edit your 
+EVENT.DAT file in PCBSetup | Event Setup.
+
+First, place Y in the Act column, because this is an active event and you do 
+want it to run.  Next, place an S in the Mod column because you would like 
+for this event to run at 3:00am but you would not mind waiting for a caller 
+to logoff before running the event.
+
+Next, you need to enter a batch filename.  For lack of a better name you can 
+enter PACKMSGS as the batch filename.  Now you must enter the earliest time 
+that you wish for the event to run.  As outlined earlier, you want this event 
+to begin at 3:00am so you would enter 03:00 in this column.  If the latest 
+that you want the event to run is 08:00am, you would need to enter 08:00 in 
+the End Time column.
+
+Finally, you need to specify the date and days that the event will run.  If 
+you leave the Date column blank or filled with 00-00-00 it will run for every 
+day of the week that you specify in the Days columns.  Because the event will 
+pack the message bases, you probably want it to run every day of the week so 
+put a Y in every day of the Days column.  Once you have done this you will 
+have an entry which looks like the following:
+
+              Batch     Begin  End                        Last  
+    Act  Mod  File      Time   Time   SMTWTFS   Date      Date
+    ---  ---  --------  -----  -----  --------  --------  ------- 
+1)   Y    S   PACKMSGS  03:00  08:00  YYYYYYY   00-00-00  00-00-00
+
+Next, you need to create the actual batch file that will execute
+your event.  In actuality, this is very easy to do.  Simply highlight the 
+batch file field you want to edit and press F2. Your default text editor 
+defined in System Manager | Define Text & Graphics Editors will be used to 
+edit the batch file.
+
+
+For example, your batch file might look like this:
+
+
+PCBPACK /AREA:ALL /MAXMSGS:1024 /PURGE
+BOARD
+
+
+This batch file simply runs PCBPack on all message bases.  Once the message 
+bases have been packed, BOARD.BAT is reloaded which will make the system once 
+again available for callers.
+
+By default this event will run on every node of the system. Obviously this 
+would not be a good idea to have every node packing the message base at the 
+same time.  What you should do is rename your batch file to make it a node 
+specific event batch file.  For example, to make this batch file run on node 
+3 only, rename the batch file from PACKMSGS to PACKMSGS.003.  Adding the .003 
+to the end of the filename, tells PCBoard it is a node specific file and only 
+node 3 should run the event.
+
+Multiple Nodes
+
+Frequently you will need more than one node to participate in an event.  
+Whether you want each node to perform a particular task, or if you need all 
+nodes to be down, it is important to understand how to control your events.
+
+Node Specific Events
+
+Most likely you do not want all of your nodes to run the event batch file.  
+You may have one node that does all of the work while the others wait or do 
+other tasks.  In the EVENT.DAT file, specify the base event batch filename.  
+This is the batch file that will be executed for all nodes unless there is a 
+node specific event batch file.  
+
+To create a node specific event batch file, create a file with the batch 
+filename and an extension of the node number.  For example, if your event 
+batch file is called MAINT1 and if you want to make a batch file that only 
+node 6 will execute, create a batch file called MAINT1.006. 
+
+When event time rolls around, all of the nodes except node 6 will run the 
+event using the MAINT1 file.  Of course, node 6 will use the MAINT1.006 file.
+
+If you wanted only node 6 to run the event and the other nodes to not even 
+both going down for the event, create the MAINT1.006 file and then delete the 
+MAIN1 file.  Since the other nodes would not have a batch file to execute, 
+they will not execute the event.
+
+Making Sure All Nodes Are Down
+
+To perform global changes to the system such as sorting the user file, or 
+doing a total backup of your system, you will need all of your nodes to be 
+down.  Perhaps the easiest way to accomplish this is to have your nodes 
+simply run a program as they begin the event that will count for a certain 
+amount of minutes or seconds while the event is running.  When the nodes are 
+down counting, they can then reload the board.
+
+As an example, let's assume that you are operating a three node system.  You 
+want node 1 to sort the users file.  In order to do this, nodes 2, and 3 must 
+not be operating.  Quite simply, you create a node specific event file for 
+node 1.  If your event batch file is called USRSORT then you would create an 
+event file called USRSORT.001.  This batch file might look like the 
+following:
+
+@ECHO OFF
+PCBSM /SORT;SECURITY;PRIREVERSE
+BOARD
+
+In your testing, you have found out that it takes about 4 minutes to complete 
+the sorting process.  Therefore, you need to make sure that the other nodes 
+stay down for a bare minimum of 4 minutes.  Just to be safe, you could even 
+keep them down for 10 minutes or so because the time it takes to sort the 
+file will increase as the number of users on your system increases.
+
+You should be able to find several utilities will count for seconds or 
+minutes on the PCBoard Support BBS.  For example, if you found one called 
+Count which counts for the number of seconds specified, make your USRSORT 
+batch file look like the following:
+
+@ECHO OFF
+COUNT 480
+BOARD
+
+Quite simply, this would make nodes 2 and 3 (because a USRSORT.002 or 
+USRSORT.003 file was not found) count for 480 seconds and then reload the 
+bulletin board.  This should give more than ample time for the sort process 
+to be completed.
+
+There are several other methods you can use to make sure all events are down 
+and stay down.  Most of these have been addressed by third party authors and 
+are available on the PCBoard Support BBS by using the Z user command and 
+searching for EVENT.
+
+System Security
+
+An integral part in operating a bulletin board system is the security of the 
+system.  You need to be able to control what actions or commands a user can 
+execute based on their security level.  In fact, you should use security 
+levels to determine what a user can do while online.
+
+Protecting SysOp Related Commands
+
+If you allow unauthorized users to access SysOp related commands they could 
+do a great deal of damage to your system.  That is why it is so important 
+that you properly protect these commands with a security enabling only 
+authorized users access to the SysOp commands.
+
+Some commands can be more dangerous than others if put in the wrong hands.  
+Therefore, PCBoard enables you to specify the security level required to 
+execute each SysOp related function. A command like the 11 which displays 
+information about the callers currently online would not be as dangerous as 
+the 9 command which enables you to drop to DOS from remote.  Careful planning 
+of your SysOp security levels and making sure you trust the users whom you 
+give access to is the best way to prevent unauthorized users from accessing 
+sensitive commands.
+
+There are two sections in PCBSetup that you will use to determine the 
+security levels that protect SysOp commands and functions.  These sections 
+are found by selecting Security Levels from the Main Menu of PCBSetup.  From 
+there you can choose to define security levels for SysOp Functions or SysOp 
+Commands
+
+Defining Which User Is The Main SysOp
+
+The user in record #1 of the USERS file is considered to be the Main SysOp.  
+This record has certain privileges that are not associated with any other 
+record.  For example, when you select Sysop - Busy or Sysop - Not Busy from 
+the call-waiting screen the user in record #1 is logged into the system.
+
+In addition, the user in record #1 is the only user that can join a 
+conference even if they are not registered in the conference or do not have 
+sufficient security to join the conference.
+
+Protecting SysOp Accounts
+
+There are no back-doors which users can log into PCBoard and gain SysOp 
+access.  The only way a user may log in using a SysOp account is to know the 
+name of the account to log in under and the password for that account.  
+Therefore, it is very important for you to change your password frequently to 
+prevent an unauthorized user from hacking your account.
+
+To prevent users from knowing the name of the user in record #1 of the USERS 
+file, you can answer N to the User Real Name question in PCBSetup | Sysop 
+Information.  If you do this, you will simply be known as SYSOP on the BBS.  
+Any messages that you enter on the system will be from SYSOP and when a user 
+displays who is online you will be listed as SYSOP.
+
+You could then have a different name in record #1 of the USERS file which 
+means that a user attempting to hack your account would need to know two 
+items of information -- your user name and your password.  To prevent a 
+breech in security, PCBoard will not allow a user to login with a user name 
+of SYSOP.
+
+Protecting Files For Download
+
+PCBoard provides a method to protect any filename that is available for 
+download by security level, password or both. This protection is done via the 
+FSEC file which can be edited from PCBSetup | File Locations | Configuration 
+Files.  If you have sensitive files online, you should use the FSEC file to 
+protect those files.  As an example, if you want to protect the filename 
+SENS0001.ARJ so only users with a security level greater than 100 and those 
+that know the password can download it, make an entry like the following in 
+your FSEC file:
+
+          Drive \ Path              File Name    Sec     Password
+-------------------------------- -------------- ----- --------------
+                                  SENS0001.ARJ   100   ENTER_THISPW
+
+
+The FSEC file is discussed in more depth in the PCBSetup chapter of this 
+manual.
+
+Protecting Files From Being Uploaded
+
+PCBoard also provides a method to protect files from being uploaded to the 
+system.  Uploading files does not usually present a problem to system 
+security however PCBoard still provides the capability.  This protection is 
+done via the UPSEC file which can be edited from PCBSetup | File Locations | 
+Configuration Files.
+
+A good example would be if you were just informed that a file called 
+VIRALM33.LZH contained a virus and was being distributed around your area.  
+To protect this file from being uploaded, you could make the following entry 
+in your UPSEC file:
+
+          Drive \ Path              File Name    Sec     Password
+-------------------------------- -------------- ----- --------------
+                                  VIRALM33.LZH   255
+
+
+With this entry a user must have a security level of 255 or higher in order 
+to upload the VIRALM33.LZH file to your system. Since it is quite likely that 
+not many users have a security level of 255 on your system, it would be safe 
+to assume that the file could not be uploaded to your system.  The UPSEC file 
+is discussed in greater detail in the PCBSetup chapter of this manual.
+
+Maintenance Tasks
+
+Once you have more or less finished your system configuration, the majority 
+of your time will be spent maintaining your system. You will need to answer 
+questions and comments left to the SysOp, pack your message base and user 
+files, back-up your system in case of data loss, etc.   The following section 
+describes various examples of maintaining your system.
+
+File Maintenance
+
+If your bulletin board system encourages file transfers, you will most likely 
+have a lot of uploads to your system.  You may want to use PCBFiler on a 
+regular basis to move the files in the upload directories to one of the file 
+directories you have defined.  By regularly moving the new files out of the 
+upload directories, it will be easier for your users to find the files they 
+are looking for.
+
+Log Maintenance
+
+PCBoard uses two system log files to record activity on the system.
+
+The caller log files record items of interest that occur while a user was 
+logged into the system.  The time the user logged in and logged out is 
+recorded.  In addition, events such as joining a conference, transferring a 
+file, and entering a message are also recorded.  If a user tries to access a 
+command that is not available to them, it is also recorded in the log file to 
+help keep you informed of possible breeches in security.
+
+The DOWNLOAD.TXT file stores information about every transfer (both uploads 
+and downloads) on the system.  Each line in this file stores the name of the 
+file, the user who transferred the file, transfer speed, size of the file, 
+and number of errors.
+
+If you do not delete or archive these log files frequently you may find that 
+your drive space is being eaten up unnecessarily. On a daily, weekly, or even 
+monthly basis, you may want to delete or archive these log files in one of 
+your events.
+
+Packing files
+
+Both your USERS file and your message bases should be packed on a regular 
+basis to help ensure data integrity and also to physically remove any 
+unwanted entries or those which have been marked for deletion.
+
+Users File
+
+You can pack in interactive mode by loading System Manager and selecting 
+Users File Maintenance.  However, most SysOps elect to pack the users file 
+during a daily event instead.  System Manager provides command line 
+parameters that you can specify to pack the USERS file.  For example, to 
+simply pack the file and ensure data integrity you may issue the following 
+command:
+
+PCBSM /PACK
+
+You may choose to pack-out or delete any user which has not called the system 
+within the last 90 days. In this case, you would issue the following command:
+
+PCBSM /PACK;DAYS:90
+
+For more information on the command line parameters for System
+Manager see the Command Line Parameters section in the System
+Manager chapter of this manual.
+
+Message Bases
+
+If you have a lot of conferences on your system, you probably also have a lot 
+of active message bases.  In that case, it becomes essential that you pack 
+the message bases down on a regular basis to prevent your message bases from 
+taking too much space.  Like the USERS file, most SysOps elect to pack the 
+message bases in the events.  You must use a program called PCBPack to pack 
+your message bases -- this program is included with your purchase of PCBoard.
+
+To help keep the size of your message bases down, you can choose to pack all 
+of your message bases so that no message base contains more than 500 
+messages.  This is very easy to accomplish by entering the following:
+
+PCBPACK /AREA:ALL /MAXMSGS:500
+
+You may choose to pack only messages older than 45 days by entering the 
+following command:
+
+PCBPACK /AREA:ALL /DAYS:45
+
+PCBPack has several other options available as well.  See the Utilities 
+chapter of this manual for additional details. 
+
+Backing Up
+
+Most bulletin board systems will contain several megabytes or gigabytes of 
+data.  Therefore, it always wise to have some sort of backup system in place 
+so you can regularly back up your system in case of data loss, hardware 
+failure, etc.
+
+While you do not have to back up your system every day, it certainly would be 
+a good idea to do a backup every other day, or perhaps once a week.  Sooner 
+or later, you will probably experience some sort of data loss where you need 
+to access a backup to restore files.
+
+New Users
+
+Whenever users who have not established an account on your system logsinto 
+your system, they will become a new users to your system.  When the user 
+enters a name not in the current user file, PCBoard will ask to confirm if 
+their name is correct. If the name is correct, the user will be logged in as 
+a new user.  First of all, the NEWUSER will be displayed (as defined in 
+PCBSetup | File Locations | Display Files).  This file usually contains an 
+introduction to your system.
+
+Once that information is displayed, the user is asked if they wish to 
+register.  If they choose to register, they will be asked to fill out some 
+additional questions in order to become a registered user on the system.
+
+Asking Questions
+
+PCBoard begins by asking for the following information:
+
+
+Password
+City/State
+Business/Data Phone
+Home/Voice Phone
+Brand of CPU
+Clear Screen Between Messages
+Default Protocol for File Transfers
+
+The answers to these questions are stored in the user file record.  The 
+answer to the Brand of CPU question is stored in the Comment #1 field.
+
+All of the above questions are records in the PCBTEXT and may be configured 
+to ask any question you wish.  However, the location of where the answers are 
+written cannot be changed.  If you want to disable some of the questions, 
+blank out the appropriate record in your PCBTEXT file using MKPCBTXT.
+
+Defining Security Level
+
+There are two security levels whch come into play for new users to your 
+system.  The security level of the new user depends on if they choose to 
+register or not.  If you look at PCBSetup | Security Levels | User Levels you 
+will see the following fields:
+
+Level Given to Users Who Agree  to Register :
+Level Given to Users Who Refuse to Register :
+
+You can specify the security level that users get when they agree or refuse 
+to register.  When a user agrees to register, a new record in the user file 
+is created.  However, when they refuse to register, no user record is 
+created.
+
+By default the security level given to users who refuse to register is 0.  
+This means that if the user refuses to register they will be immediately 
+logged off of the system.  You may want to change this value to another 
+security if you wish to enable new users to look around the system without 
+creating an account on your system.
+
+Defining Expiration Date
+
+If you have enabled subscription mode on your system, PCBoard will assign new 
+users the value you have entered for the Default Subscription Length in 
+PCBSetup | Subscription.  If you have not enabled subscription mode, your new 
+users will have an expirate date of 00-00-00 which means their accounts will 
+never expire.
+
+The Default Subscription Length is in days and you can enter any value up to 
+9999 in that field although something like 365 may be more reasonable.
+
+Disallowing
+
+If you do not wish to allow new users to your system, there are two ways you 
+can accomplish this setup:
+
+In PCBSetup | Configuration Options | System Control set the Run System as a 
+Closed Board to Y.  If you do not have a NEWASK questionnaire defined, when 
+the user attempts to log in as a new user they will be shown the CLOSED file 
+which explains that your system is a closed system.
+
+If you do have a NEWASK questionnaire defined, the user will be allowed to 
+continue and fill out the NEWASK questionnaire.  However, no user account is 
+created.  You would want to use this type of system if you want to screen 
+your new users and manually add them to the user file after they answer some 
+questions.
+
+Modify the security level entry that you assign to new users who agree to 
+register.  Set the time limit for that security level to 0.  Any new user 
+that attempts to call the system will be displayed the CLOSED file and 
+promptly logged off.  This will occur even if you do have a NEWASK 
+questionnaire defined.
+
+User Subscriptions
+
+You may desire your users to have access to your system for a specified 
+amount of time after which their security level will be dropped.  The users 
+can then follow further instructions to gain access again.  This is called 
+subscription mode.
+
+You can assign a date in the user record after which the user will become 
+expired.  When the user is expired, their security level is dropped to their 
+expired security level.  By dropping their security level, you can perhaps 
+reduce the commands or functions they can access when they logon the system.
+
+Enabling Subscription Mode
+
+Enabling subscription mode is very easy.  Load PCBSetup, and select 
+Subscription from the Main Menu.  The first option on the screen asks if you 
+wish to enable subscription mode.
+
+If you enable subscription mode, PCBoard will pay attention to the expiration 
+date and will also assign the default expiration length to all new users who 
+call into the system.
+
+Setting Expiration Date
+
+When you enable subscription mode, new users will be assigned the default 
+expiration length.  However, you may have existing users on the system who 
+logged in before you enabled subscription mode.  This is one reason you may 
+need to manually set the expiration dates.  Another reason you may need to 
+manually set expiration date is when your users expire and follow the 
+instructions you provide them to renew their subscription
+
+Manually Entering Expiration Date
+
+If you need to manually edit the expiration date of a user so it is a 
+non-expiring account, load System Manager, select Users File Maintenance, 
+then Edit Users File.  You will now see record number one on your screen.  
+Next, locate the user name you need to update by pressing ALT-F.  Cursor down 
+to the expiration date field and type in the date the user will expire.  If 
+you enter 00-00-00, the user will be set to never expire.
+
+Group Security Levels
+
+Sometimes you may need to modify the expiration date of an entire group of 
+users.  Within System Manager there is a function which allows you to change 
+the expiration date of users based on their security level.
+
+To access this function you need to load System Manager, select Users File 
+Maintenance and then select Adjust Expiration Dates. Your screen should 
+resemble the following:
+
+If you want to adjust everyone with a security level between 20 and 30 to an 
+expiration date of 05-05-94,  modify the following fields:
+
+Base Security Level Criteria on NORMAL or EXPIRED Level (N/E) :  N
+Adjust Expiration Date if level is Greater than or equal to   : 20
+Adjust Expiration Date if level is Less than or equal to      : 30
+
+New Expiration Date (01/01/80 is ignored) : 05-05-94
+
+Current Date in record plus XXXX days     :    0
+
+
+Once you press PgDn, all users with a security level between 20 and 30 will 
+be assigned an expiration date of 05-05-93.
+
+Setting Expired Security Level
+
+If the expiration date in the user record is equal to or prior to the current 
+date, the user is considered expired and will be given the expired security 
+level as shown in the user record by the following field:
+
+Expired Sec :
+
+When a new-user logs into the system, they will be given the default expired 
+security level as defined in PCBSetup | Subscriptions.  If you would like to 
+assign a different expired security level to a user, you will need to 
+manually edit the expired security field in the user record.
+
+Warning Users Who Are About To Expire
+
+Another option you can configure within PCBSetup | Subscription is the number 
+of days prior to expiring that users will be warned.  For example, if you set 
+this value to 30 and a user is due to expire on 03-31-94 a notification of 
+expiration will be displayed from 03-01-94 all of the way up until the 
+expiration date.
+
+PCBoard provides a file called WARNING which may be edited in PCBSetup | File 
+Locations | Display Files.  This is a display file which you can customize to 
+suit your own tastes.  As described in the Customizing Your BBS chapter of 
+this manual, you can make security, language, and graphic specific versions 
+of this file because it is a normal display file.
+
+Notification Of Expiration
+
+If a user has expired, PCBoard will display the EXPIRED file. This file 
+location can be found in PCBSetup | File Locations | Display Files.  Like the 
+WARNING file, you can make security, graphic, and language specific versions 
+of this file.
+
+Modem Discussions
+
+Most likely, the majority of your logins will be via modem connection.  
+Therefore, it is to your advantage to have a general knowledge of how serial 
+ports work.  This section is dedicated to lightly cover some of the more 
+advanced serial port topics to help answer many common questions.
+
+Serial Port Hardware
+
+PCBoard supports a wide variety of serial port software.  Not only does it 
+work with standard RS-232 serial port hardware but also with many intelligent 
+and non-intelligent serial boards. Of course, to use the intelligent or 
+non-intelligent serial boards, you will need to be using the /M version of 
+PCBoard so it can properly access the serial port hardware.
+
+Standard RS-232
+
+This type of serial board is the one that is installed in most computers when 
+you originally buy them.  Until the advent of the /M version of PCBoard, 
+these were the only type of serial ports you could use with PCBoard.
+
+Non-intelligent Serial Board
+
+This type of serial board is quite similar to the standard boards except all 
+of the serial ports share the same IRQ.  With standard serial ports each has 
+to have a unique IRQ.  To use these serial ports with PCBoard you need to use 
+the /M version.
+
+Intelligent Serial Board
+
+Perhaps the most proficient and consequently most expensive serial port 
+hardware that you can buy is an intelligent serial board.  These boards 
+usually have at least 4 ports on a single card, but could easily have 16 
+ports as well.  To help off-load some of the CPU processing, the board 
+includes its own processor.  The Arnet SmartPort Plus and the DigiBoard 
+COM/xI boards are examples of intelligent serial boards that are supported by 
+the /M version of PCBoard.
+
+The Importance Of Flow Control
+
+Serial communications is a two-way street.  You send data and you also 
+receive data.  Therefore, it becomes important to have some sort of control 
+in regards to the flow of data.  This is where flow control comes into play.
+
+What Is Flow Control?
+
+Flow Control simply controls the sending or receiving of data. If one end of 
+the connection can no longer send or receive data, the proper signal should 
+be sent to signify that no more data should be received or sent.  There are 
+two types of flow control -- software and hardware.
+
+Software Versus Hardware Flow Control
+
+Software flow control is commonly referred to as XON/XOFF flow control.  With 
+software flow control, control characters are sent to signify that data 
+transfer should stop.  For example, sending a CTRL-S will stop the flow of 
+data and CTRL-Q will restart the flow.  The problem with software flow 
+control is that it is very easy for these characters to accidentally be 
+transmitted due to line noise or to be embedded inside of a perfectly valid 
+binary file.
+
+Hardware flow control, on the other hand, is handled by the RS-232 (serial 
+port) specification.  The cable between your modem and your serial port has 
+several wires inside of it.  Two of these wires are labeled CTS and RTS.  
+These wires can either be "up" or "down" (referring to their electrical 
+state).  The state of these wires, determines how the flow of data is 
+controlled.
+
+Why Hardware Flow Control Should Be Used
+
+Both your hardware and your software should be configured to use hardware 
+flow control.  In fact, hardware flow control is a necessity when you lock in 
+your port rate or transfer using Ymodem/G.  If you are not using flow control 
+or it is not working properly, it is quite possible for you to experience 
+data loss.
+
+UARTs
+
+What is a UART
+
+The UART (Universal Asynchronous Receiver Transmitter) is a chip on most 
+serial boards and is used to input and output data from the serial device.
+
+NOTE:  Intelligent serial boards do not have UART chips. Instead, the 
+multiport driver will communicate directly with the CPU on the serial board.
+
+Types of UARTs
+
+There are three basic types of UART chips with each chip being identified by 
+a unique number.  One of the first UARTs was the 8250 UART.  It was replaced 
+with the 8250A which fixed some bugs with the original 8250 UART.  Both the 
+8250 and 8250A are capable of handling one byte at a time.
+
+Around the time when the original PC AT was introduced, the 16450 UART was 
+also introduced.  This chip was better designed for the faster architecture 
+of the AT.  Each type is determined by their part number.  Although it 
+handled the speed of the AT fine, the 16450 still handled data one byte at a 
+time.
+
+In the late 1980's, the 16550 UART was introduced.  This chip, while 
+compatible with the 16450, also included the ability to handle more than one 
+byte at a time via its 16 byte buffer. This buffer helps prevent data loss 
+because more than one byte can be handled at a time.  Some bugs were 
+discovered in the original design and subsequent versions of the chip were 
+released.  If you have a 16550 UART, make sure that it is either the 16550A 
+or 16550AFN model to ensure proper operation.
+
+Determining What UART(s) You Have
+
+Most good system diagnostic utilities will have some way or reporting the 
+type of UART you have for each port.  If you do not have any diagnostic 
+utilities, PCBoard will report the UART that it finds in your system via the 
+status line.  You need to first load PCBoard, then select Sysop - Not Busy.  
+At this point, you can press ALT-H four times and you will see your status 
+line change to something like the following sample:
+
+Towards the bottom right-hand side of the status line you see the UART model 
+(next to the ErrCorr field.  You will then know what model UART PCBoard has 
+been able to determine that you have.  Typically you will see either 
+8250A/16450 or 16550A.
+
+Locking Opening Baud Rate
+
+High-speed modems (9600 bps or higher) are very popular on bulletin board 
+services.  Additionally, most of the modems being sold now have built in 
+error-correction and data-compression. To get the highest transfer rate out 
+of your connections, you must lock your port speed.  While your modem may be 
+only able to connect at 14400 bps, you can lock your port rate at 19200, 
+38400, or even 57600 bps.  As a matter of fact, PCBoard will automatically 
+lock the port for you at any speed above 9600 bps.
+
+Advantages
+
+By locking your port rate, you can give data to the modem faster rather than 
+having the modem wait on the computer to send more data.  This usually 
+translates to higher transfer rates and is most noticeable when you are 
+sending uncompressed data over the modem (such as a text file).
+
+In reality, PCBModem should configure your modem to operate properly under 
+PCBoard.  Therefore, you really do not need to worry about setting up either 
+PCBoard or your modem to work with a locked port rate, as PCBModem will do 
+that for you if your modem supports it.
+
+Troubleshooting
+
+The most common problem with locked port rates is that you have only 
+configured either the modem or the software (but not both) to use a locked 
+port rate.   What happens in this case is that users will get a line of 
+characters on their screen which looks like garbage.  In fact, the user will 
+not be able to type anything either.  If you see this type of problem, double 
+check and make sure both your modem and your software are configured to use 
+locked port rates.
+
+Line Noise
+
+Line noise will always be around as long as modems are in use. Modems convert 
+computer data into audio signals.  Anytime there is interference with the 
+audio signals it will generate line noise because the signals have been 
+modified by interference.
+
+Non-Error Correcting Modems
+
+If your modem is not an error-correcting modem, line-noise will be displayed 
+on your screen.  This happens because your modem does not know the 
+interference is line noise.  Quite simply, the modem is translating the audio 
+signals that it received back into computer data.  If something interferes 
+with these signals, you will see the interference as line noise when the 
+modem translates the audio signals back into data.
+
+Error Correcting Modems
+
+Error correcting modems packet the information they send out so when the 
+receiving modems receive the packets, they can check to insure the data is 
+the same as it was sent out.  If the data is not the same, the packet will be 
+resent until it is properly transmitted.  Of course, this means there will be 
+a delay on the receiving end until the packet is received properly.  The 
+length of this delay could be un-noticeable or it could be quite noticable 
+depending on how many times the packet must be resent.
+
+Nearly always when you see jerky screens, pauses, or your file transfer rates 
+are noticeable slower it can be attributed to line noise.  About the only 
+thing that you could do in this case is to hang up and call back hoping to 
+get a clearer line.
+
+Searching for Text
+
+Throughout this manual you have seen references to searching for text and the 
+fact that PCBoard supports Boolean operands.  This section discusses how you 
+enter the text to search for when you are at the Enter the Text to Scan for 
+(Enter)=none prompt.
+
+To begin with, you will be shown how to do some simple searches. From there, 
+you will be shown how to do some more complex searches that involve Boolean 
+operands.
+
+Simple Searches
+
+Single Word
+
+The simplest search you can perform is the single word search. You enter the 
+word to search for and PCBoard will search the criteria you have specified 
+for that word.  For example, if you are using the Z command, the file 
+directories will be searched. If you are using the TS command, the message 
+base will be searched.
+
+For example, you may wish to search all messages in the current conference 
+for the word monitor.  If so, type the following at a conference command 
+prompt:
+
+TS ENTER
+
+Enter the Text to Scan for (Enter)=none? monitor R
+Msg # to Begin Search from (1052-3904)? 1 R
+
+
+At this point, the search begins for the word monitor.  PCBoard will display 
+any message that has the word monitor in it.  While searching, PCBoard does 
+not pay attention to the case of the word so it can be either upper or lower 
+case and it will still be found.
+
+Phrase
+
+Taking the single word approach one step further, you can search for a phrase 
+that consists of one or more words.  If you find that searching for monitor 
+finds to many matches and consequently was not being effective, you may 
+decide to search for something more specific like vga monitor instead.  This 
+may help reduce the number of matches and help find the messages you are 
+after.  This time, type the following at the conference command prompt:
+
+
+TS <ENTER>
+
+
+Enter the Text to Scan for (Enter)=none? VGA monitor <ENTER>
+Msg # to Begin Search from (1052-3904)? 1 <ENTER>
+
+
+At this point the search will begin again.  However, this time, only messages 
+which have the word VGA immediately followed by the word monitor will be 
+displayed.  When the message is displayed to you, PCBoard will highlight the 
+match (f your graphics mode allows)so you can see where the match occurs.
+
+Complex (Boolean) Searches
+
+Boolean operands allow you to perform more complex searches than you would be 
+able to perform searching for a word or phrase. With Boolean operators you 
+can tell PCBoard to display a match only if it meets certain conditions you 
+specify.
+
+An expression is made up of an operator which acts on one or more operands.  
+With text searches, your operators are the Boolean operators.  The operands 
+are the word or phrases you are searching for.  Do not over-burden yourself 
+trying to remember the difference between operands and operators as you will 
+find that the examples in this section will help you better understand the 
+concept of Boolean text searching.  The following discusses each of the 
+Boolean operators.
+
+& - The And Operator
+
+The Boolean AND operator enables you to search in disjointed mode.  In other 
+words, both operands must exist in the target (message, file description, 
+etc.) but they do not have to be in consecutive order.  To help illustrate 
+this, let's say you attempt to search for text editors that may exist on the 
+system.
+
+Because you have no idea what the filename is, you decide to use the Z user 
+command to search for text in the file directories. When prompted for the 
+text to search for, you enter text editor because that is what you are 
+looking for.  From there you begin the search which may list a fewprograms 
+that may interest you.
+
+The problem with this type of search is that you may have missed some files 
+because you told PCBoard to find anything that had the text editor phrase in 
+the description.  What you may discover later when viewing file directories 
+is the following file description:
+
+
+TXED100.ZIP    168046  12-28-93  TexEdit v1.00 -- Utility you can use to
+                               | edit any text file.  Supports VGA text 
+                               | mode.  Includes mouse support.
+
+
+Obviously, this looks like a file that you would be interested in.  Why did 
+this description not show in your previous search? Quite simply, nowhere in 
+the description is the phrase text editor contained.  Obviously your previous 
+search is not catching all of the files you want to find. 
+
+This is not only where the Boolean AND operator becomes useful but also where 
+it makes sense.  If you had to sum up what you were looking for, you may say 
+any file that can edit text.  The italicized words are the key.  You want to 
+find any description which has both the word text and the word edit somewhere 
+in the description.  You do not know if the description will say something 
+like "A utility to edit text" or if it will say "a wonderful text editor".  
+Therefore, enter the following expression to search for:
+
+TEXT & EDIT
+
+The & in the search string represents the Boolean AND operator. If your 
+translate the & into the actual word and it makes even more sense.  This 
+search would mean that you are searching for text and edit to be in the same 
+description.  It does not matter in what order, just simply that they occur 
+in the description to become a match.
+
+You can have as many Boolean operands as you wish in your search string.  For 
+example, you can enter the following search:
+
+DISK & FORMAT & FLOPPY
+
+This would search for the words DISK, FORMAT, and FLOPPY must all occur in 
+order for a record to match.
+
+| - The Or Operator
+
+Like the Boolean AND operator, this operator enables you to search in 
+disjointed mode.  With this operator only one of the words or phrases need to 
+be in the target (message, file description, etc.) to be considered a match.
+
+As an example, you may wish to search the message bases using the TS user 
+command for any message which talks about hard drives.  You remember that 
+some people call them hard drives and others may call them hard disks.  In a 
+case like this, use the OR operator to find any message that matches either 
+phrase. Type the following Enter the Text to Scan for (Enter)=none prompt:
+
+HARD DISK | HARD DRIVE
+
+Any message that contains either the phrase hard disk or the phrase hard 
+drive will be displayed to you.
+
+! - The Not Operator
+
+Sometimes you may not want to display all matching records. Instead, you may 
+want to search all records which do not match the text you enter to search 
+for.  This is precisely the user of the Boolean NOT operator.
+
+For example, you may want to search a directory that contains a bunch of GIF 
+graphic images.  All of the descriptions in this directory contain the 
+resolution of the file.  You decide that you do not wish to see the 
+description of any pictures which are 320x200.  If this is the case, type the 
+following at the Enter the Text to Scan for prompt:
+
+
+! 320x200
+
+
+Any description which contains the phrase 320x200 will not be displayed to 
+you because of the Boolean NOT operator ( ! ). Continuing on with the GIF 
+examples, let's assume you want to see all pictures on the system that have a 
+resolution of 1024x768 but you do not want to see any files that have swim in 
+the description.  If so, enter the following:
+
+1024x768 &! SWIM
+
+If you read that out in English it says 1024x768 and not SWIM. This would 
+display all file descriptions that have a 1024x768 in the description 
+(denoting the resolution of the picture) and that do not have the word SWIM 
+anywhere in the description.
+
+Using Parentheses To Group
+
+Remember in mathematics how you used parentheses not only make your problems 
+clearer and easier to understand but more importantly to control the order of 
+operations to suit your needs?  With Boolean operators you can do the exact 
+same thing. If you take the example that illustrates using the AND Boolean 
+operator one step further you can easily see how parentheses help group 
+things together. 
+
+If you recall, you were using the AND operator to search for any description 
+which contains both the words TEXT and EDIT.  What happens if someone chooses 
+to use the word ASCII instead of TEXT when they enter their description?  To 
+help you find this description, you can use parentheses to group items 
+together. This may result in the following search string.
+
+
+EDIT & (TEXT | ASCII)
+
+
+This will tell PCBoard to find any description that contains the word edit, 
+and either the word text or the word ASCII.  If you don not use the 
+parentheses, PCBoard will evaluate from the left to the right.  This means 
+that it would only display files that contained both the words EDIT and TEXT 
+or the word ASCII.
+
+While it appears to be a very subtle difference, parentheses can make or 
+break your search.  Remember the easiest way to do Boolean searching is to 
+read out the search in English.  If you look at the previous example which 
+uses parentheses you could read it as follows:
+
+
+EDIT and either Text or ASCII.
+
+
+Including The Boolean Characters In Your Search
+
+If you need to include any of the following characters in your search, use 
+quote marks to prevent them from being interpreted by PCBoard's searching 
+routine:
+
+
+&
+|
+!
+(
+)
+[space]
+
+
+Obviously, these characters all have special meanings when involved in a 
+search so you need some way of specifying them. For example, you may want to 
+search for the phrase SMITH & JONES.  If you type that phrase in as-is, the 
+search will turn up anything with the word SMITH and the word JONES.  What 
+you would do in this case is to simply surround then entire search phrase 
+with quote marks as illustrated in the following:
+
+
+"SMITH & JONES"
+

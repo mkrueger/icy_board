@@ -23,7 +23,6 @@ use ratatui::{
     widgets::{block::Title, Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget},
     Frame,
 };
-use strum::IntoEnumIterator;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum EditCommandMode {

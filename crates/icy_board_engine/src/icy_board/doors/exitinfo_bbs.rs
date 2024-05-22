@@ -15,7 +15,7 @@ use std::fs;
 pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = Vec::new();
     contents.extend(u16::to_le_bytes(DOOR_BPS_RATE as u16));
-    let Some(user) = &state.current_user else {
+    let Some(user) = &state.session.current_user else {
         return Err("No current user".into());
     };
 
@@ -134,7 +134,7 @@ pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) 
     contents.extend(state.session.login_date.format("%m-%d-%y").to_string().as_bytes()); // SubDate?
     contents.extend(u16::to_le_bytes(state.session.minutes_left() as u16));
     contents.extend(u32::to_le_bytes(user.security_level as u32));
-    contents.extend(u32::to_le_bytes(state.session.cur_user as u32));
+    contents.extend(u32::to_le_bytes(state.session.cur_user_id as u32));
 
     contents.extend(u16::to_le_bytes(0)); // ReadThru
     contents.extend(u16::to_le_bytes(0)); // NumberPages

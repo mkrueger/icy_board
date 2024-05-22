@@ -14,7 +14,7 @@ impl PcbBoardCommand {
             .display_text(IceText::EnterNoChange, display_flags::LFBEFORE | display_flags::NEWLINE)
             .await?;
         let settings = self.state.get_board().await.config.new_user_settings.clone();
-        let Some(mut new_user) = self.state.current_user.clone() else {
+        let Some(mut new_user) = self.state.session.current_user.clone() else {
             return Ok(());
         };
 
@@ -330,7 +330,7 @@ impl PcbBoardCommand {
                 .await?;
             new_user.flags.use_short_filedescr = use_short == self.state.session.yes_char.to_ascii_uppercase().to_string();
         }
-        self.state.current_user = Some(new_user);
+        self.state.session.current_user = Some(new_user);
         self.state.save_current_user().await?;
 
         self.state

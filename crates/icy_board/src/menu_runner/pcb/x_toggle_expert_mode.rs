@@ -15,7 +15,7 @@ impl PcbBoardCommand {
             }
         }
         self.state.session.expert_mode = expert_mode;
-        if let Some(user) = &mut self.state.current_user {
+        if let Some(user) = &mut self.state.session.current_user {
             user.flags.expert_mode = expert_mode;
         }
         if expert_mode {

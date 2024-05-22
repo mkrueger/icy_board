@@ -35,7 +35,7 @@ fn create_pcboard_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> 
     contents.push(b'U'); // Node Chat Status unavailable
     contents.extend(b"57600"); // DTE Port Speed (5 chars)
     contents.extend(b"Local"); // Connect Speed (5 chars)
-    contents.extend(u16::to_le_bytes(state.session.cur_user as u16)); // Users record number
+    contents.extend(u16::to_le_bytes(state.session.cur_user_id as u16)); // Users record number
     contents.extend(export_cp437_string(&state.session.get_first_name(), 15, b' ')); // User's First Name (padded to 15 characters)
     contents.extend(export_cp437_string(&"SECRET", 12, b' ')); // User's Password (padded to 12 characters)
     contents.extend(u16::to_le_bytes((state.session.login_date.time().num_seconds_from_midnight() / 60) as u16)); // Time User Logged On (in minutes since midnight)
@@ -97,7 +97,7 @@ async fn create_user_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<(
 
     // HEADER
     contents.extend(u16::to_le_bytes(1530)); // PCBoard version number (i.e. 1500)
-    contents.extend(u32::to_le_bytes(state.session.cur_user as u32)); // Record number from USER's file
+    contents.extend(u32::to_le_bytes(state.session.cur_user_id as u32)); // Record number from USER's file
     contents.extend(u16::to_le_bytes(crate::icy_board::users::PcbUserRecord::RECORD_SIZE as u16)); // Size of "fixed" user record (current size)
     contents.extend(u16::to_le_bytes(5)); // SizeOfBitFields
     contents.extend(export_cp437_string("", 15, b' ')); // Name of the Third Party Application (if any)
@@ -107,7 +107,7 @@ async fn create_user_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<(
     contents.extend(u32::to_le_bytes(0)); // Offset of AppRec into USERS.INF record (if any)
     contents.push(0); //  TRUE if the USERS.SYS file has been updated
 
-    if let Some(user) = &state.current_user {
+    if let Some(user) = &state.session.current_user {
         contents.extend(export_cp437_string(&user.name, 26, 0));
         contents.extend(export_cp437_string(&user.city_or_state, 25, 0));
         contents.extend(export_cp437_string(&state.door_user_password().await, 13, 0));
@@ -165,7 +165,7 @@ async fn create_user_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<(
         contents.extend(u32::to_le_bytes(user.stats.total_dnld_bytes as u32));
         contents.extend(u32::to_le_bytes(user.stats.total_upld_bytes as u32));
         contents.push(0); //1=delete this record, 0=keep
-        contents.extend(u32::to_le_bytes(state.session.cur_user as u32)); // Record Number in USERS.INF file
+        contents.extend(u32::to_le_bytes(state.session.cur_user_id as u32)); // Record Number in USERS.INF file
         contents.push(0);
         contents.extend(&[0; 8]); // Reserved
         contents.extend(u32::to_le_bytes(user.stats.messages_read as u32));

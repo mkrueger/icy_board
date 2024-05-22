@@ -11,7 +11,7 @@ use crate::{
 /// TriBBS doorfile format
 pub async fn create_tribbs_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = String::new();
-    contents.push_str(&format!("{}\r\n", state.session.cur_user));
+    contents.push_str(&format!("{}\r\n", state.session.cur_user_id));
     contents.push_str(&format!("{}\r\n", state.session.user_name));
     contents.push_str(&format!("{}\r\n", state.door_user_password().await));
     contents.push_str(&format!("{}\r\n", state.session.cur_security));
@@ -22,8 +22,8 @@ pub async fn create_tribbs_sys(state: &IcyBoardState, path: &std::path::Path) ->
     };
     contents.push_str(&format!("{}\r\n", ansi));
     contents.push_str(&format!("{}\r\n", state.session.minutes_left()));
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().home_voice_phone));
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().city_or_state));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().home_voice_phone));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state));
     contents.push_str(&format!("{}\r\n", state.node));
     contents.push_str(&format!("{}\r\n", DOOR_COM_PORT));
     contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE));

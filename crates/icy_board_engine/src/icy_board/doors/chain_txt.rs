@@ -15,17 +15,20 @@ use crate::{
 pub async fn create_chain_txt(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = String::new();
     let board = state.get_board().await;
-    contents.push_str(&format!("{}\r\n", state.session.cur_user));
+    contents.push_str(&format!("{}\r\n", state.session.cur_user_id));
     contents.push_str(&format!("{}\r\n", state.session.alias_name));
     contents.push_str(&format!("{}\r\n", state.session.user_name));
     contents.push_str("\r\n"); // User callsign (HAM radio)
     contents.push_str(&format!(
         "{}\r\n",
-        Utc::now().years_since(state.current_user.as_ref().unwrap().birth_date).unwrap_or(0)
+        Utc::now().years_since(state.session.current_user.as_ref().unwrap().birth_date).unwrap_or(0)
     )); // Age
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().gender));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().gender));
     contents.push_str("0\r\n"); // Users Gold
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.last_on.format("%m/%d/%y"))); // User's last call date
+    contents.push_str(&format!(
+        "{}\r\n",
+        state.session.current_user.as_ref().unwrap().stats.last_on.format("%m/%d/%y")
+    )); // User's last call date
     contents.push_str(&format!("{}\r\n", state.user_screen.buffer.get_width()));
     contents.push_str(&format!("{}\r\n", state.user_screen.buffer.get_height()));
     contents.push_str(&format!("{}\r\n", state.session.cur_security));
@@ -51,10 +54,10 @@ pub async fn create_chain_txt(state: &IcyBoardState, path: &std::path::Path) -> 
     contents.push_str(&format!("{}\r\n", board.config.sysop.name));
     contents.push_str(&format!("{}\r\n", state.session.login_date.time().num_seconds_from_midnight()));
     contents.push_str(&format!("{}\r\n", (Local::now() - state.session.login_date).num_seconds()));
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.total_upld_bytes / 1024));
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.num_uploads));
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.today_dnld_bytes / 1024));
-    contents.push_str(&format!("{}\r\n", state.current_user.as_ref().unwrap().stats.num_downloads));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.total_upld_bytes / 1024));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_uploads));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.today_dnld_bytes / 1024));
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_downloads));
     contents.push_str("8N1\r\n"); // Data bits/Parity/Stop bits
     contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE)); // Com Port Speed
     contents.push_str(&format!("{}\r\n", state.node)); // Node number

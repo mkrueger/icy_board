@@ -10,43 +10,29 @@ use icy_net::{
     },
     Connection,
 };
+use tokio::time::Instant;
 
-async fn login(connection: &mut dyn Connection) -> bool {
+async fn try_connect(connection: &mut dyn Connection, pattern: Vec<&[u8]>, send: &[u8]) -> bool {
     let mut buf = [0; 1024];
 
-    let mut login_pattern = [PatternRecognizer::from(b"ogin", true), PatternRecognizer::from(b"ame", true)];
+    let mut login_pattern = pattern.iter().map(|p| PatternRecognizer::from(*p, true)).collect::<Vec<_>>();
+    let mut instant = Instant::now();
     loop {
         let size = connection.read(&mut buf).await.unwrap();
         for b in &buf[0..size] {
-            print!("{}", *b as char);
+            // print!("{}", *b as char);
             for p in &mut login_pattern {
                 if p.push_ch(*b) {
-                    connection.send(b"zconnect\r").await.unwrap();
+                    println!("got trigger string SEND {}", String::from_utf8_lossy(send));
+                    connection.send(send).await.unwrap();
                     return true;
                 }
             }
         }
 
-        if size > 0 {
+        if size > 0 && instant.elapsed() > Duration::from_secs(1) {
             connection.send(b"\r").await.unwrap();
-        }
-    }
-}
-
-async fn password(connection: &mut dyn Connection) -> bool {
-    let mut buf = [0; 1024];
-
-    let mut password_pattern = [PatternRecognizer::from(b"word", true), PatternRecognizer::from(b"wort", true)];
-    loop {
-        let size = connection.read(&mut buf).await.unwrap();
-        for b in &buf[0..size] {
-            print!("{}", *b as char);
-            for p in &mut password_pattern {
-                if p.push_ch(*b) {
-                    connection.send(b"0zconnec\r").await.unwrap();
-                    return true;
-                }
-            }
+            instant = Instant::now();
         }
     }
 }
@@ -54,6 +40,8 @@ async fn password(connection: &mut dyn Connection) -> bool {
 async fn begin_zconnect(connection: &mut dyn Connection) -> bool {
     let mut buf = [0; 1024];
     let mut password_pattern = PatternRecognizer::from(b"begin", true);
+    //  let instant = Instant::now();
+    println!("Begin ZConnect…");
     loop {
         let size = connection.read(&mut buf).await.unwrap();
         for b in &buf[0..size] {
@@ -61,6 +49,9 @@ async fn begin_zconnect(connection: &mut dyn Connection) -> bool {
             if password_pattern.push_ch(*b) {
                 return true;
             }
+        }
+        if size > 0 {
+            connection.send(b"Crazy Paradise BBS\r").await.unwrap();
         }
     }
 }
@@ -88,9 +79,12 @@ pub async fn read_string(connection: &mut dyn Connection) -> String {
 
 impl ZConnect {
     pub async fn send_block(&mut self, connection: &mut dyn Connection, block: &dyn ZConnectBlock) -> icy_net::Result<()> {
+        println!("---- sending block:\n{}", block.display());
         connection.send(block.display().as_bytes()).await.unwrap();
         loop {
             let res = read_string(connection).await;
+            println!("---- got block:");
+            println!("{}", res);
             match ZConnectCommandBlock::parse(&res) {
                 Ok(blk) => {
                     if blk.state() == ZConnectState::Ack(self.cur_block) {
@@ -117,6 +111,10 @@ impl ZConnect {
     pub async fn recv_block(&mut self, connection: &mut dyn Connection) -> icy_net::Result<ZConnectCommandBlock> {
         loop {
             let res = read_string(connection).await;
+            println!("---------------");
+            println!("Received: {}", res);
+            println!("---------------");
+
             match ZConnectCommandBlock::parse(&res) {
                 Ok(blk) => {
                     if let ZConnectState::Block(block_code) = blk.state() {
@@ -141,6 +139,17 @@ impl ZConnect {
         }
     }
 }
+/*
+async fn zconnect_login(connection: &mut dyn Connection) -> bool {
+    try_connect(connection, vec![b"ogin", b"ame"], b"zconnect\r").await &&
+    try_connect(connection, vec![b"word", b"wort"], b"0zconnec\r").await
+}*/
+
+async fn janus_login(connection: &mut dyn Connection) -> bool {
+    try_connect(connection, vec![b"Username:"], b"JANUS\r").await && try_connect(connection, vec![b"Systemname:"], b"Crazy Paradise BBS\r").await
+
+    // && try_connect(connection, vec![b"word", b"wort"], b"mypassword\r").await
+}
 
 #[tokio::main]
 async fn main() {
@@ -149,11 +158,8 @@ async fn main() {
         terminal: TerminalEmulation::Ascii,
     };
 
-    let mut connection = TelnetConnection::open(&"ADDRESS", caps, Duration::from_secs(2)).await.unwrap();
-    if !login(&mut connection).await {
-        return;
-    }
-    if !password(&mut connection).await {
+    let mut connection = TelnetConnection::open(&"1111", caps, Duration::from_secs(2)).await.unwrap();
+    if !janus_login(&mut connection).await {
         return;
     }
     if !begin_zconnect(&mut connection).await {
@@ -189,15 +195,14 @@ async fn main() {
     let execute = ZConnectCommandBlock::default().execute(Execute::Yes);
     zcon.send_block(&mut connection, &execute).await.unwrap();
 
-    let header = zcon.recv_block(&mut connection).await.unwrap();
-    println!("Received block: {}", header.display());
+    let _header = zcon.recv_block(&mut connection).await.unwrap();
 
     zcon.send_block(&mut connection, &ZConnectCommandBlock::EOT4).await.unwrap();
     zcon.send_block(&mut connection, &ZConnectCommandBlock::EOT4).await.unwrap();
     zcon.send_block(&mut connection, &ZConnectCommandBlock::EOT4).await.unwrap();
     zcon.send_block(&mut connection, &ZConnectCommandBlock::BEG5).await.unwrap();
 
-    for i in 0..3 {
+    for _ in 0..3 {
         let header = zcon.recv_block(&mut connection).await.unwrap();
         println!("Received block: {}", header.display());
         if header.state() != ZConnectState::Eot(EndTransmission::Prot5) {

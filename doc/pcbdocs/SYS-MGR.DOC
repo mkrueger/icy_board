@@ -1,0 +1,3165 @@
+10
+==============================================================================
+                                                                System Manager
+
+
+
+
+
+
+
+
+
+Users File Maintenance
+
+User Info File Maintenance
+
+Analyzing Your System Configuration
+
+Defining Printer Port
+
+Defining Your Editors
+
+Customize Colors
+
+PCBoard Supported Allocations
+
+Command Line Parameters
+
+
+System Manager, as the name implies, is a utility designed to help you manage 
+your system.  Not only can you make global changes to the users file, but you 
+can also access other frequently used utilities such as PCBSetup and 
+PCBFiler.
+
+
+There are three ways that you can access System Manager:
+
+From the call waiting screen, select PCBSysMgr.
+
+While logged in locally (not with the /LOCALON switch for PCBoard), you can 
+press ALT-S.
+
+From the DOS prompt you can load PCBSM.EXE.  If a PCBOARD.DAT file cannot be 
+found in the current directory and you have not used the /FILE command line 
+parameter, you will receive an error message stating that PCBOARD.DAT could 
+not be found.
+
+
+Once System Manager is loaded, you will see the Main Menu.  The various 
+function of system manager are available from these menu options.  To select 
+a particular option, press the letter at the beginning of the line, or move 
+the currently highlighted option using the cursor keys and press ENTER to 
+select the option.  If you make a mistake, you can always use the ESC to go 
+back to the previous menu.
+
+This section will describe each menu item in detail including any sub-menus.  
+In addition, the command line parameters for System Manager are described in 
+detailed at the end of this chapter.
+
+Users File Maintenance
+
+This is the menu option that you probably use most frequently. Once you 
+select it, you will see you have an entire new menu to select from.  These 
+new menu options give you the ability to edit an individual user record, 
+register ranges of users in conferences, sort the users file, pack the users 
+file, etc.
+
+Editing A User Record
+
+When you select this menu option, you will see user record number one on your 
+system.
+
+On the left hand screen is a limited number of fields that you can edit.  On 
+the right is a list of keyboard commands you can use to jump to another 
+record, add a new user, etc.  This is called the short form.
+
+User Record Forms
+
+PCBoard stores a lot of information about each user.  Because all of this 
+information cannot fit on one screen, PCBoard has multiple views which you 
+can switch between to edit various information about each user.  To switch 
+between views, use the F2 and F3 keys.  Pressing F2 will move forward one 
+screen or form, and pressing F3 will switch to the previous form.
+
+The default view is called the Short Form.  When this form is active, you can 
+edit the bare essential information about each user.  You can edit the 
+following information when the short form is active.
+
+
+	Security	The normal security level that is assigned to the user.
+
+        Reg Ex Date     If subscription mode is active, this is the date 
+                        which the user's subscription will expire on the 
+                        system.
+
+        Expired Sec     When subscription mode is active and a user is 
+                        expired.  The expired security level will be used in 
+                        stead of the normal security level.  This field shows 
+                        you the security level of the user when their 
+                        subscription has expired.
+
+        Delete User     Mark the current user for deletion.  You are asked to 
+                        confirm your choice before the record will be marked.  
+                        The actual record is not deleted until the next time 
+                        you pack the users file.
+
+        Comment 1       This is the response the user enters to PCBTEXT 
+                        record #2 when creating a new account on the system.
+
+        Comment 2       This comment field is for your use only.  You can 
+                        enter a brief comment about the user without having 
+                        to worry about it being viewable by the user.
+
+The next view that is available by pressing F2 is called the Long
+Form.  This is the view that you will use to edit a majority of
+the information about each user.  You can edit number of bytes
+transferred, messages left, username, password, etc.  The
+following describes each of the fields:
+
+        Name            Each person that logs into your system must use a 
+                        user name. Most commonly this will be the name of the 
+                        caller.  This name simply identifies the caller.
+
+        City            The city or location information entered when creating a new 
+                        account on the system.
+
+	B/D Phone	The business or data phone entered when creating a
+                        new account on the system.
+
+        H/V Phone       The home or voice phone number entered when creating 
+                        a new account.
+
+        Password        Stores the password selected for logging into the 
+                        system.  Each user must know their password in order 
+                        to log into the system.  If this field is blank, the 
+                        user will not be prompted for a password at login.
+
+	Security	The normal security level that is assigned to the user.
+
+        Expert          This field will contain a Y if the user wishes to 
+                        default to expert mode at login.  Otherwise, this 
+                        field will show an N which means the user will 
+                        default to novice mode.
+
+        Protocol        Stores the default protocol the user wishes to use 
+                        for file transfers.  This question is asked when a 
+                        new user logs in, but it may also be changed using 
+                        the T user command.
+
+        Page Len        In order to help control the display of information, 
+                        PCBoard will use a More? prompt when the screen fills 
+                        up on the caller's screen.  In this field, the height 
+                        of the caller's screen should be entered.  For most 
+                        users, this should be either 22 or 23.  If you set 
+                        the value in this field to 0, PCBoard will send data 
+                        in non-stop mode.  The user may change this value 
+                        with the P user command.
+
+        Reg Ex Date     If subscription mode is active, this is the date 
+                        which the user's subscription will expire on the 
+                        system.
+
+        Expired Sec     If a user's subscription has expired, the expired 
+                        security level will be assigned at login instead of 
+                        the normal security level.  This field shows the 
+                        expired security level assigned to the user.
+
+        Msg Clear       This field will contain a Y if the user wishes to 
+                        clear the screen before a new message is displayed on 
+                        the screen.  If this field contains an N, the screen 
+                        will not be cleared between messages.
+
+        Last in         The conference number the user was in when 
+                        disconnected last.  If you have any conference 
+                        defined as auto-rejoin, this field becomes of great 
+                        importance.  For example, a 3 in this field will mean 
+                        the user logged off while in conference 3.  The next 
+                        time the user logs in, PCBoard will check to see if 
+                        conference 3 is defined as an auto-rejoin conference.  
+                        If so, the user will be placed back in conference 3.
+
+        Delete User     Mark the current user for deletion.  You are asked to 
+                        confirm your choice before the record will be marked.  
+                        The actual record is not deleted until the next time 
+                        you pack the users file.
+
+        Comment 1       This is the response that the user entered to PCBTEXT 
+                        record #2 when creating a new account.
+
+        Comment 2       This comment field is for your use only.  You can 
+                        enter a brief comment about the user.  The user will 
+                        not be able to view the contents of this field.
+
+        Last DIR ListingPCBoard keeps track of the latest valid file date 
+                        that you have seen when viewing file directories.  
+                        This field is used for two purposes.  1)  For new 
+                        file scans to determine what the default scan date 
+                        should be.  2)  While viewing file directories * 
+                        (asterisks) will be placed by any files which are new 
+                        to the caller.
+
+        Last Date On    Stores the last date the user logged into the system.
+
+        Last Time On    Stores the last time the user logged into the system.
+
+        Elapsed Time On Contains the total amount of time that was spent on 
+                        the last date the user called on the system.  If the 
+                        last date the user called is equal to the current 
+                        date, this field contains how much time the user has 
+                        spent for the current day.
+
+        Number Times On The number of times this user has successfully logged 
+                        into your system.
+
+        Number Uploads  The total number of files this user has uploaded to 
+                        your system.
+
+        Number DownloadsThe total number of files this user has downloaded 
+                        from your system.
+
+        Daily Download  Contains the total number of bytes this user 
+                        downloaded the last date on the system.  If the last 
+                        date on is equal to today's date, the value of this 
+                        field will reflect the total number of bytes 
+                        downloaded today.  If you see a negative value in 
+                        this field, more bytes have been uploaded than 
+                        downloaded.  In essence, the user has a byte credit.  
+
+        Total Upload    This field displays the total number of bytes the 
+                        user has uploaded to your system.
+
+        Total Download  Displays the total number of bytes the user has 
+                        downloaded from your system.
+
+	Messages Read	The total number of messages the user has read.
+
+	Messages Left	The total number of messages the user has entered.
+
+        Full Scrn EditorThis field will contain either Y, N, or A.  A Y means 
+                        the full-screen editor will always be used for 
+                        entering messages.  An N signifies that the line 
+                        editor will be used for entering messages.  Finally, 
+                        an A means the user will be asked if they wish to use 
+                        the full-screen editor each time they leave a 
+                        message.  The user may change this default with the W 
+                        user command.
+
+        79-Column EditorIf this field contains a Y, both the line and 
+                        full-screen editor will use 79 character-wide lines 
+                        when entering messages.  If an N is specified, the 
+                        default will be 72 characters instead.
+
+        Scroll Long MsgsThis field may contain either Y or N.  If this field 
+                        contains a Y, the message header will scroll off of 
+                        the screen if the message requires more than one 
+                        screen full to display.  If this field contains an N, 
+                        the message header will be fixed at the top of the 
+                        screen with the message body being displayed 
+                        underneath it.
+
+        Long Headers    If this field contains a Y, long message headers will 
+                        be used.  Otherwise the short message headers will be 
+                        used. See the R user command for more information on 
+                        the difference between long and short message 
+                        headers.
+
+        Chat Status     PCBoard will remember the chat status of the caller.  
+                        This means that if a caller has made themselves 
+                        unavailable for group chat using the CHAT;U command, 
+                        this field will contain a U to reflect that the user 
+                        was unavailable.  When the user logs into the system 
+                        the next time, the chat status from their previous 
+                        call will be reinstated.
+
+
+You can control the conference specific information for each particular user 
+from the Conference View.  Primarily you will register users in conferences 
+from this view, but you can accomplish other tasks as well.
+
+You will notice this screen is split into two lists with 15 conferences 
+listed in each list.  Within each list is four columns.  The first column 
+displays the conference number, the next displays the name of the conference.  
+The last two columns are fields you can actually edit.  The first field you 
+can edit is the flags field, the last column in each list keeps track of the 
+last message that each user read in each conference.
+
+To move between the various fields on the screen, you can use down arrow, up 
+arrow, TAB, or SHIFT-TAB.  If you have more than 30 conferences, use PgUp, 
+and PgDn to move forward or back 30 conferences at a time.
+
+There are five possible flags you can set for each conference. Each flag will 
+specify what type of access the user has to the conference the flags are 
+being set for.  Each flag is described in detail below:
+
+        R       Register.  This flag is used to control the ability of a user 
+                to join a conference.  The main use of this flag is to 
+                control who will have access to private conferences you 
+                create.  A user may not join a private conference unless they 
+                have an R flag in that conference.  You do not need to use 
+                this flag for public conferences unless you want to give 
+                access to the conference even if the user does not have 
+                sufficient security to join the conference.
+
+        X       Expired.  When used with the R flag, the user will continue 
+                to have access to the conference even when their subscription 
+                has expired.  Subscription mode (PCBSetup | Subscriptions) 
+                must be enabled or this flag will have no effect.
+
+        S       Selected.  Even though there may be several conferences 
+                defined on your system, only a few of those conferences may 
+                interest the user.  Using the SELECT user command, users may 
+                select those conferences which are of interest to them.  
+                There are subcommands for all of the mail reading or scanning 
+                commands which permit users to scan either all conferences 
+                they can access or only those conferences selected by the 
+                user.  For example, R;S;ALL will read new mail in all 
+                conferences the user can join whereas R;S;A will read mail 
+                only in selected conferences.
+
+        C       Conference SysOp.  If you wish to give a user what you have 
+                defined as SysOp security level (PCBSetup | Security Levels | 
+                Sysop Commands) when the conference is joined, use this flag. 
+                When the user joins another conference, the security level is 
+                changed back to the original security level.
+
+        L       Locked Out.  If this flag is set, the user will not be able 
+                to join the conference under any circumstances.  When you 
+                specify the X flag without an R flag, the X flag will be 
+                translated to an L flag thereby locking the user out of the 
+                conference.
+
+
+The only other edit field on this screen is the last message read field.  In 
+this field, PCBoard keeps track of the last message the user has read in each 
+conference.  If you need to, you can edit the last message read in any 
+conference for any user.
+
+The rest of the views are only active when you install a PSA. Each PSA has a 
+separate screen which you can view information about each PSA.  The following 
+describes each of the PSA screens:
+
+
+If you have the Alias PSA installed, the next screen will contain the alias 
+the user has selected to use.  Unless you have given the user the ability to 
+edit the alias choosen (PCBSetup | Configuration Options | System Control) 
+the only way that the alias can be changed is while you are viewing the Alias 
+Form.
+
+By installing the Full Address PSA you will enable the Address Form screen.  
+From this screen, you can edit the fields that make up the user's address.  
+You will notice that this screen lists the more popular components that make 
+up a mailing address such as street address, city, state, etc.
+
+If you install the Password Changing PSA, the Password From will also be 
+active when editing a user record.  The following fields are active in this 
+form:
+
+        Previous Password       Lists the most recently used passwords.  A 
+                                password may not be used if it is listed in 
+                                one of these fields. Of course, each password 
+                                will eventually be removed as it no longer 
+                                becomes one of the three most recently used 
+                                passwords.
+
+        Last Change Date        The date when the password was last changed 
+                                by the user.
+
+        # of times Changed      Displays the total number of times the 
+                                password has been changed.  Multiple changes 
+                                on the same day will not be recorded.
+
+        Expiration Date         The date at which the current password will 
+                                expire.  If the user changes the password 
+                                before the expiration date, the date will be 
+                                adjusted for the new expiration date.
+
+
+If you have installed the Verification PSA, the Verification Form will be 
+active.  This screen is very simple in design because there is only one field 
+you cay edit.  This field contains the information that the user entered as 
+verification information when logging in as a new user.  This information can 
+be used by you as an additional piece of secret information to identify the 
+caller.  Considering that the caller may not view or edit this information 
+once it has been entered, it should be relatively safe to assume that if the 
+user knows this information that they are the original caller.
+
+
+If you have installed the Caller Statistics PSA, the Statistics Form will be 
+active.  This form stores various statistics about the caller.  The following 
+describes each field:
+
+
+        First Date On           This date will be equal to the date the user 
+                                first logged into your system or the date you 
+                                added the Caller Statistics PSA (if they 
+                                already had an account).
+
+        Last Date On            The last date the user logged into your 
+                                system. You can also see this date on the 
+                                Long Form screen.
+
+        Num Times On            The total number of times this user has 
+                                accessed your system.  This information is 
+                                also available on the Long Form screen.
+
+        # Times Paged SysOp     This field will record the total number of 
+                                times this user has paged the sysop to chat.  
+                                It does not matter if the page was answered 
+                                or not -- all attempts are recorded.
+
+        # Times Group Chat      If a user uses group chat to chat with others 
+                                on the system, the total number of chat 
+                                sessions the user has participated will be 
+                                recorded in this field.  SysOp chats are not 
+                                included in this total.
+
+        # Comments to Sysop     This field records the total number of 
+                                comments the user has left to the SysOp using 
+                                the C user command.  If the user begins a 
+                                comment, but aborts the message, it does not 
+                                count as a comment to the sysop.
+
+        # Messages Left         For those users that are more active in the 
+                                message base, this field will store the total 
+                                number of messages the user has entered.  You 
+                                should be aware that while PCBoard may update 
+                                this statistic, off-line mail reading doors 
+                                may not.
+
+        # Messages Read         Displays the total number of messages the 
+                                user has read on your system.  While PCBoard 
+                                will update this field, some off-line mail 
+                                door programs may not.
+
+        # Security Violation    You can easily see who may be trying to 
+                                access restricted functions on your system, 
+                                by watching this field.  It will total up the 
+                                number of times a user has attempted to 
+                                access a command which requires a higher 
+                                security level.
+
+        # Un-Reg Conf Atmpt.    Records the total number of attempts made to 
+                                join a conference which the user is not 
+                                registered to join.
+
+        # Password Failures     Displays the number of times the wrong 
+                                password was used at login.  If you keep tabs 
+                                on this statistic, you may be able to catch 
+                                someone who is trying to hack into an account 
+                                on your system.
+
+        # Dnld Limit Reached    Anytime a user exceeds their defined ratio, 
+                                daily bytes, or total bytes / files allotted, 
+                                the count in this field will increase by 1.
+
+        # Dnld File Not Fnd.    If the user attempts to download a file, but 
+                                the filename could not be found on disk, it 
+                                will be recorded in this field.  
+
+        # Upld Verify Failed    After uploading a file, PCBoard will test the 
+                                file via PCBTEST.BAT unless you have disabled 
+                                upload testing.  If the file uploaded fails 
+                                the integrity tests, it will be recorded in 
+                                this field.
+
+        # Times On at 300       Displays the total number of times the user 
+                                connected at 300 bps.
+
+        # Times On at 1200      Displays the total number of times the user 
+                                connected at 1200 bps.
+
+        # Times On at 2400      Displays the total number of times the user 
+                                connected at 2400 bps.
+
+        # Times On at 9600      Displays the total number of times the user 
+                                connected at 4800, 7200 or 9600 bps.  All 
+                                three speeds are shown in this field, because 
+                                they are all only possible with 9600 bps 
+                                modems.
+
+        # Times On at 14400+    Displays the total number of times the user 
+                                connected at 12000 bps or higher.  The reason 
+                                12000 bps is included in this statistic is 
+                                because it is a fall-back speed for 14400 
+                                connections.
+
+Finally, the last PSA screen is called Caller Notes and is only active when 
+the Caller Notes PSA has been installed.  You are given 5 lines of 50 
+characters which you may enter information to remember about the caller.   
+The caller is not able to edit or view the information contained in these 
+notes.
+
+Keyboard Commands
+
+While you are editing a user record, there are several keyboard commands you 
+may use to perform functions such as printing the current user record, 
+jumping to another record, deleting the current record, etc.  The following 
+details each keyboard command that is available while editing a user record.
+
+
+        PgUp    Move backward one user record.  If you are at user record 
+                number one, you will go to the last record in your users 
+                file.
+
+        PgDn    Move forward one user record.  If you are at the last record 
+                in the users file, record number one will be the new record  
+                you are editing.
+
+      CTRL-PgUp Move backward twenty user records.  When you need to move 
+                several records at a time, you can use this keyboard command 
+                which will go backwards 20 records at a time.
+
+      CTRL-PgDn Move forward twenty user records.  When you use this keyboard 
+                command you will advance 20 records at a time.
+
+        ALT-A   Add a user.  Enables you to add a new record to your users
+                file.  You can then manually fill in all of the user 
+                information.
+
+        ALT-B   Jump to the last user record.  Moves you to the last record 
+                in the users file.  Since new users are added to the end of 
+                the users file, this keyboard command provides an easy method 
+                to access the records of your newest callers.
+                        
+        ALT-D   Delete current user.  Marks the current user for deletion. 
+                You will be asked to confirm your request to delete the 
+                current record.  If you continue, the security level will be 
+                reduced to 0 and the record will be marked for deletion.  The 
+                actual record will not be deleted until you pack the users 
+                file.  To undelete the record, simply change the answer to 
+                Delete User in the Long Form.
+
+        ALT-E   Located expired security level.  Locates the first user in 
+                the users file who has an expired security level equal to the 
+                one you specify.  If you want to search for other users who 
+                have the same security level, use the ALT-R keyboard command.
+
+        ALT-F   Find a user name.  Enables you to search for a particular 
+                user record.  When prompted, enter the full name of the user 
+                you wish to search for.  If the user could not be found, you 
+                will be asked if you would like to perform a sound alike 
+                search. PCBoard will attempt to find names which sound like 
+                the name you typed in.  If no matches can be found, you will 
+                be returned to the last record you were editing.
+
+        ALT-J   Jump to a record number.  If you want to jump to a specific 
+                user record number, use this keyboard command.  You will be 
+                asked for the record number you wish to jump to.  You can see 
+                the range of users on your system by looking at the upper 
+                right hand side of the screen.  There you will find Record # 
+                of #.  If you enter a value that is out of range of your 
+                users file, your request will be ignored.
+
+        ALT-L   Locate a security level.  When you need to search for a 
+                particular security level, use this keyboard command.  You 
+                will be asked for the security level you wish to search for.  
+                Once you enter the security level to search for, PCBoard will 
+                take you to the first record in the users file that matches 
+                the security level.  You can then use ALT-R to search for 
+                additional matches throughout the users file.
+
+        ALT-O   Locate deleted user.  This keyboard command will locate the 
+                first record in your users file that is marked for deletion. 
+                This is useful when you have marked a record for deletion but 
+                then decide not to delete the record.  Of course, if you have 
+                already packed the users file, there is no way to recover the 
+                deleted user record.  As with other searches, ALT-R will find 
+                additional records that have been marked for deletion.
+
+        ALT-P   Print current user record.  The current user record will be 
+                printed.  The format of the printout is identical to the 
+                format displayed by the 7 SysOp command.  See the SysOp 
+                Commands section in the PCBoard Commands chapter of this 
+                manual for further details.
+
+        ALT-R   Repeat last search.  When you use a keyboard command that 
+                searches the users file, you can repeat the search (looking 
+                for additional matches) by using this keyboard command.  If 
+                no additional matches are found, you will be returned to the 
+                previous user record you were editing.
+
+        ALT-S   Search for text. This keyboard command allows you to search 
+                all of the data stored in the users record (and optionally 
+                the PSA information) for the text you specify, excluding 
+                dates, times, and numerical values which are stored in a 
+                special format on disk.
+                       
+        ALT-T   Goto first record.  Takes you to the first record in the 
+                users file (the SysOp record).
+
+Sorting Users
+
+If you prefer to have the users in your system sorted in a particular manner, 
+select this menu option from the Main Menu of System Manager.  For example, 
+some SysOps prefer to have their users sorted by security level in descending 
+order so users with the highest security levels are at the beginning of the 
+users file.  It all depends on your personal preference.  One thing to 
+remember is the first record in your users file will never be included in the 
+sorts you perform because it is considered to be the SysOp record and has 
+special privileges.  You can choose to do a single or a multiple field sort.
+
+Single Field Sorts
+
+Single field sorts are most useful when you want to sort users by a field 
+which does not commonly have duplicates.  For example, you can sort by user 
+name and since there cannot be duplicate names on your system.  The screen on 
+the following page shows the sorts you can perform.
+
+Once you have selected your sort method, you will be asked if you wish to 
+sort in reverse order.  Reverse order means that the sort will be done in 
+descending order.  In the case of sorting by names, those that begin with Z 
+will be at the top while names that begin with A will be at the end of the 
+users file.
+
+
+System Manager will now attempt to lock the users file for exclusive access 
+so that it may begin sorting the users file. If you do not have all nodes 
+down, you will see a sharing violation message.  This message means that 
+System Manager cannot gain exclusive access to the users file which it needs 
+in order to resort the file.  Make sure all nodes are down and no other 
+programs are accessing the users file before you continue.
+
+
+Multiple Field Sorts
+
+Multiple field sorts enable you to sort by items such as security, number of 
+times on the system, ratios, and more.  All of these fields could easily 
+contain duplicates when sorted, which presents a problem. If there are 
+duplicates, how should the duplicate files be sorted (if at all)?  You will 
+notice that with multiple field sorts, it will first sort by the primary 
+field, such as security level, and then use the user name as a secondary 
+sort.
+
+
+The following screen shows the sorts you can perform:
+
+
+Once you have selected your sort method, you will be asked if you wish to 
+sort the primary key in reverse order.  Reverse order means that the sort 
+will be done in descending order.  The primary key is the main sorting 
+method.  For example, if you select Security Level then Name from the menu, 
+the primary key is the Security Level and the secondary key is Name.  You 
+will also be asked if you wish to sort the secondary key in reverse order.
+
+As an example, if you select Security Level then Name from the menu and 
+choose to sort the primary key in reverse order but the secondary key in the 
+normal order, the following will happen:
+
+
+Your users will be sorted by security level -- those with the highest 
+security level will be at the beginning of your user file.
+
+If you have more than one user with the same security level, the order that 
+users are listed with the same security level will be determined 
+alphabetically by the user name.
+
+Once you have selected your sort criteria, System Manager will attempt to 
+lock the users file for exclusive access so it may begin sorting the users 
+file.  If you do not have all nodes down, you will see a sharing violation 
+message.  This message means that System  Manager cannot gain exclusive 
+access to the users file which it needs in order to resort the file.  Make 
+sure all nodes are down and no other programs are accessing the users file 
+before you continue.
+
+
+Packing The Users File
+
+When you pack your users file, you can accomplish the following:
+
+
+Physically remove any records marked for deletion.  Once a record has been 
+packed out, it is permanently deleted and cannot be undeleted.
+
+Remove inactive users from your system to help conserve disk space.
+
+Make sure your USERS file is correctly in-sync with your USERS.INF.
+
+
+When you select the option to pack your users, you will see the screen on the 
+following page.
+
+
+You will notice that the pack criteria screen is divided into two logical 
+sections -- removal and keep criteria.  You can set the criteria you want to 
+remove user records from and you may also set the criteria to keep a user 
+record.  The keep criteria always takes precedence over the removal criteria.
+
+If you choose to accept the default values then only the following will 
+happen:
+
+Any users marked for deletion will be physically removed from the system.
+
+The USERS.INF is checked to make sure it is in sync with the
+USERS file.
+
+
+Criteria For Removing Records
+
+This section of the screen gives you the ability to specify which users will 
+be removed from the users file when the file is packed.  There are four 
+options you may specify for removing a user record:
+
+Remove Users that are Deleted or 'LOCKED OUT':  When this field is set to Y , 
+any record that has a security level of 0 or has been marked for deletion 
+will be deleted out of your users file. Remember, there is an option to keep 
+locked out users (those with a security level of 0 but not marked for 
+deletion) and the criteria for keeping a record takes precedence.
+
+
+Remove Users who have not been on for XXXX days:  If you want to pack out 
+inactive users on a regular basis, you will most likely use this option.  If 
+you enter 45 in this field, every user who does not meet the keep criteria 
+will be deleted from the users file if they have not called your system 
+within the last 45 days.  If you do this on a regular basis, you can be sure 
+only active users are stored in your users files.  The default number of days 
+is 9999 which disables this option.
+
+Remove Users who have not been on since:  You may also choose to pack users 
+out of your system by the last date they logged into the system.  For 
+example, you can choose to delete anyone who has not called your system since 
+01-01-93 by entering that date in this field.  The default date is 01-01-80 
+(the beginning of time for the PC) which disables this option.
+
+
+Remove Users whose Reg. Exp. Date is older than:  If you run with 
+subscription mode enabled, you may find it useful to be able to remove those 
+accounts which have been expired for quite some time.  The date you enter in 
+this field will be compared against the expiration date in each user record.  
+If the expiration date in the user record is older than the date entered, the 
+user record will be removed.   The default date is 00-00-00 which disables 
+this option.
+
+Criteria For Keeping User Record
+
+This section of the screen gives you the ability to specify the criteria for 
+keeping a user record when packing.  The criteria for keeping a record takes 
+precedence over removal criteria. This means that even if a user record would 
+be removed, it will not be removed if it meets the criteria for keeping.  The 
+following two options are available:
+
+Keep Users with security greater than or equal to:  Any user who has a 
+security level equal to or greater than the security level specified will not 
+be packed out of the user file.  This is useful for making sure everyone 
+above a particular security level is not packed out.  For example, if you 
+setup your system so everyone above security level 100 are SysOps, you may 
+want to specify 100 in this field.
+
+Keep Users that are 'LOCKED OUT':  A Y in this field will retain user records 
+which have been marked as locked out (security level of 0 but not marked for 
+deletion).  As an example of why you may want to keep these records, suppose 
+you have a user who has consistently violated system rules and has been 
+locked out. Keeping the user record prevents this user from accessing your 
+system again with the same user name and information. 
+
+Performing The Pack
+
+One last option you can specify is whether you wish to print out the users 
+that are deleted during the pack.  If you choose to print deleted records, 
+you will have a record of those users who are deleted.  In each record, most 
+of the user information will be printed, so you may later re-enter a user 
+whom you have deleted.  The information is identical to the information 
+displayed by using the 7 SysOp command.  See the PCBoard Commands chapter of 
+this manual for further information.
+
+Once you have chosen whether or not to print the deleted records, press PgDn 
+to begin the packing process.  Because packing will cause a global change to 
+the users file, System Manager requires exclusive access to both your USERS 
+and USERS.INF files.  This means no other nodes should be online.  System 
+Manager does, however, provide an option which allows you to pack the users 
+file while users are online.
+
+The difference between packing offline and online is the fact that users who 
+are currently online or were online when the process began will not be 
+affected by the pack criteria you specify.  When possible, it is always best 
+to do a normal pack with no nodes online.
+
+
+NOTE:  If you have installed the Alias PSA, System Manager will not allow you 
+to perform an online pack.
+
+Print Users File
+
+Using this menu option, you can print the entire users file or only a portion 
+by specifying the starting and ending user records to print. There are three 
+fields that determine which records will be printed.
+
+Starting Record:  The starting record number to print.  The default is 1 
+which will begin printing with the first record in the users file.
+
+Ending Record:  The last record number you wish to print.  The default is the 
+last record number in your users record.  The number you enter in this field 
+must be larger than the number entered as the starting record or your print 
+request will be aborted.
+
+Exp. users Only:  Setting this option to Y means that only users in the 
+specified range whose expiration date is earlier than today's date will be 
+printed.  Setting this option to N will print all users regardless of their 
+expiration date.
+
+You may pick from three different formats for printing the users file.  The 
+information will be sent to the printer you defined in System Manager; all 
+reports will be less than 80 characters in width and will include form feed 
+codes.  Each printing form is described in detail:
+
+Short Form
+
+The short form will print one user per line.  On each line the following 
+information will be printed:
+
+
+Name
+City/State
+Security Level
+Business / Data Phone
+Home / Voice Phone
+
+Long Form
+
+Each record printed in this style will contain the same information shown via 
+the 7 SysOp command.  For information on this format, refer to the PCBoard 
+Commands chapter of this manual.
+
+Reg. Expiration Form
+
+Like the short form, this form will print one user per line. The information 
+printed in this form is designed to help you easily locate users whose 
+subscription has expired or is about to expire.  The following information 
+about each user is printed:
+
+
+Name
+Business / Data Phone
+Home / Voice Phone
+Security
+Expiration Date
+Expiration Info - If the user has expired  then (EXPIRED) will be printed.  
+If the user is within the warning period you have specified for subscriptions 
+(PCBSetup | Subscription), the number of days until the user expires will be 
+printed. Otherwise, this area of the report will be blank.
+
+
+Make Users File Index
+
+In general, both PCBoard and System Manager take care of the users index 
+files automatically.  If for some reason you suspect the indexes are out of 
+sync, use this selection to recreate all user index files.
+
+When your user index files are out of sync with the users files, you may 
+experience a problem when a user attempts to login, types in the correct 
+password, but PCBoard will report that the password is incorrect.  It does 
+not hurt to recreate the index files and it does not take very long.  If you 
+get reports such as the one described previously, re-index your users files.
+
+Adjust Security Levels
+
+This selection brings up a sub-menu allowing you to globally adjust security 
+levels in the users file according to the upload/download ratio, their number 
+of uploads or even just to convert one range of security levels to a new 
+security level.
+
+You can also initialize globally all upload/download counters and change 
+security levels a user's real security level to equal the expired security 
+level.
+
+The screen on the following page displays the security level adjustments you 
+can perform.
+
+
+Adjust by Ranges
+
+Use this menu option to assign a new security level to a group of users 
+within a specified security level range.
+
+
+For example, if you need to change every user with a security level of 35 to 
+a security level of 33, enter the following:
+
+
+Change users whose security is greater than or equal to : 35
+      and whose security level is less than or equal to : 35
+
+To a new security level of :  33
+
+You may need to consolidate a range of security levels into one single 
+security level.  This can be done with the menu option very easily.  To 
+change every user with a security level between 20 and 29 to security level 
+20, enter the following:
+
+
+Change users whose security is greater than or equal to : 20
+      and whose security level is less than or equal to : 29
+
+To a new security level of :  20
+
+
+Adjust by Ranges (Expired)
+
+This menu option is identical to Adjust by Ranges with one major exception:  
+Instead of modifying the actual security level of the user, only the expired 
+security level is modified.  
+
+As an example,  if you need to change every user who has an expired security 
+level of 45 to reflect a new expired security level of 55, enter the 
+following:
+
+
+Change users whose security is greater than or equal to : 45
+      and whose security level is less than or equal to : 45
+
+To a new security level of :  55
+
+You may need to consolidate a range of expired security levels into one 
+single expired security level.  To change every user with an expired security 
+level between 30 and 49 to an expired security level of 25, enter the 
+following:
+
+
+Change users whose security is greater than or equal to : 30
+      and whose security level is less than or equal to : 49
+
+To a new security level of :  25
+
+
+Adjust by Up/Dn File Ratio
+
+This menu option gives you the ability to globally adjust security levels of 
+users according to  file ratio of each user.
+
+System Manager will refer to the file ratio table you create to determine 
+what security level is assigned based on the user's ratio.  See Create Up/Dn 
+File Ratio Table for information about creating the table.
+
+Before you begin, you are asked if you wish to print the users who have their 
+security level changed.  If you choose to print the report, it will be sent 
+to the printer defined in System Manager.  The report includes:
+
+
+User name
+Number of files uploaded
+Number of files downloaded
+File ratio
+Old security level
+New security level
+
+
+Adjust by Up/Dn Byte Ratio
+
+This menu option gives you the ability to globally adjust security levels of 
+users according to the byte ratio of each user.  
+
+System Manager will refer to the byte ratio table you create to determine 
+what security level is assigned based on the user's ratio.  See Create Up/Dn 
+Byte Ratio Table for information about creating the table.
+
+Before you begin, you are asked if you wish to print the users who have their 
+security level changed.  If you choose to print the report, it will be sent 
+to the printer defined in System Manager.  The report includes:
+
+User name
+Number of bytes uploads
+Number of bytes downloads
+Byte ratio
+Old security level
+New security level
+
+Adjust by Number of Uploads
+
+You may also adjust the security level of users based on the number of files 
+they have uploaded to the system.  System Manager will reference the table 
+created via Create Upload Table. 
+
+Before you begin, you are asked if you wish to print the users who have their 
+security level changed.  If you choose to print the report, it will be sent 
+to the printer defined in System Manager.  The report includes:
+
+
+User name
+Number of uploads
+Old security level
+New security level
+
+
+Adjust by Number of Downloads
+
+You may also adjust the security level of users based on the number of files 
+they have downloaded from the system.  System Manager will reference the 
+table created via Create Download Table. 
+
+Before you begin, you are asked if you wish to print the users who have their 
+security level changed.  If you choose to print that report, it will be sent 
+to the printer defined in System Manager.  The report includes:
+
+
+User name
+Number of downloads
+Old security level
+New security level
+
+
+Create Up/Dn File Ratio Table
+
+This menu option is the one you want to use to create the table used for 
+adjusting security levels by the file ratio of a user.
+
+When you select this menu option, you will see the screen on the following 
+page.
+
+
+Notice that there are two columns where you edit data.  One column is titled 
+Ratio and other is titled Security.  Based on the file ratio of the user, a 
+new security level will be assigned.
+
+
+When designing your table, keep in mind how System Manager will read the 
+table.  It reads two ratio entries at a time.  If a user falls in-between the 
+two ratios, the user will get the security level listed to the right of the 
+first ratio.  The following illustrates:
+
+System Manager will continue to search through the table until a match is 
+found.  Notice that the key is the ratio.  The user will be assigned a 
+security level based on their ratio.  If you are looking to assign a ratio to 
+a particular security level, define the ratio in the PWRD file (PCBSetup | 
+File Locations | Configuration Files).
+
+Normally a ratio is specified as something like  10:1 (10 to 1). Entering a 
+ratio in that manner is cumbersome so an alternate method had to be devised. 
+System Manager determines a ratio less than 0 to be a download to upload, 
+while a positive ratio number is considered an upload to download ratio.
+
+What is the difference?  A download to upload ratio means more has been 
+downloaded than uploaded, while an upload to download ratio means more has 
+been uploaded than downloaded.
+
+Rather than limiting you to whole number ratios only (e.g., 25:1) you may 
+enter up to the tenths digits (e.g., 25.3:1).  To specify a ratio of 25.3, 
+enter either 253 to specify an upload to download ratio or -253 to specify a 
+download to upload ratio. Remember that 25 is really 25.0 so you must enter 
+it as 250 or -250.  If you enter 25, it will be interpreted as 2.5.
+
+The following are some important items you will want to remember about 
+creating your ratio table:
+
+The ratios you enter should be ordered from smallest to greatest.  This means 
+you should enter the negative ratio values at the top of your list and your 
+positive values at the end of the list.  Your ratio table will automatically 
+be sorted before it is saved to disk.
+
+The ratio you enter for the first entry is ignored because it represents the 
+absolute largest download:upload ratio.  The security level for the first 
+entry is important though, because it is the security level that used when 
+System Manager compares the first two entries in your table.
+
+The security level to the right of your last entry in the ratio table will 
+only be assigned if the user has a better ratio than the ratio defined on the 
+last line.  This means that if your last line is set for a ratio of 50 and a 
+security level of 40, the user will only get a security level of 40 if they 
+have a ratio that is better than 5 uploads for every download.
+
+A ratio of 0, 10, or -10 implies that uploads are equal to downloads.
+
+Only security levels listed in the security column will be included in ratio 
+checking.  This means you can have users that are exempt from being adjusted 
+due to their ratio by simply excluding their security in your ratio table 
+definition.
+
+As an example, let's assume you want to create a simple ratio table where if 
+a user has a download:upload ratio greater than 20:1, a security level of 20 
+will be assigned.  In addition, a ratio between 10:1 and 20:1 will result in 
+a security level of 30, and a ratio above 10:1 will get a security level of 
+40.  To accomplish this, create the following table:
+
+  Ratio       Security
+----------    --------
+  -9999999          20
+      -200          30
+      -100          40
+         0           0
+
+
+If you want to set up another ratio, it is very easy to add. Let's say you 
+want to give users that have uploaded more than they have downloaded a 
+security level of 50.  This can be done simply by adding a new line after the 
+-100 line making your table resemble the following:
+
+
+  Ratio       Security
+----------    --------
+  -9999999          20
+      -200          30
+      -100          40
+         0          50
+         0           0
+
+So you can get a feeling of how System Manager will use your table to assign 
+security levels, let's look at three sample users and see how their security 
+levels will be adjusted.
+
+Security    : 20
+Number Uploads   :     8
+Number Downloads :   523
+
+Calculation of this user's ratio reveals it to be about 65.4 downloads for 
+every upload, which is expressed in System Manager as -654.  System Manager 
+will look at the first two lines in your ratio table:
+
+
+  -9999999          20
+      -200          30
+
+As you can see, this particular user has a ratio in-between these two lines 
+so a security level of 20 will be assigned (which the user already has).  The 
+next user has the following record:
+
+Security    : 30
+Number Uploads   :   353
+Number Downloads :   751
+
+
+This particular user has a ratio that equates to approximately 2.1 downloads 
+for every file uploaded.  In System Manager terms this is expressed as -21.  
+System Manager will now analyze your ratio table from the top, down to the 
+bottom looking for a match:
+
+
+  -9999999          20
+      -200          30
+
+
+The ratio for this user does not fit between this range so the
+next two lines are analyzed.
+
+      -200          30
+      -100          40
+
+
+This user's ratio does not fit between this range either, so the
+next two lines are analyzed.
+
+      -100          40
+         0          50
+
+Finally, a match.  This user's ratio was -51, which falls within this range.  
+Now looking at the security level of the first line, we can see the user will 
+receive a security level of 40. This particular user was upgraded from a 
+security level of 30 to a new security level of 40 because of the improved 
+file ratio.
+
+
+The last user has the following information:
+
+
+Security    :  35
+Number Uploads   :     7
+Number Downloads :    43
+
+
+This user will not be affected, not because the ratio would leave him at 
+security level 35, but rather because security level 35 is not even listed in 
+the ratio table.  As stated earlier, security levels not listed in the table 
+will not be adjusted due to their ratios.
+
+Create Up/Dn Byte Ratio Table
+
+The only difference between this option and adjusting by file ratio is that 
+System Manager will determine the ratio based on bytes uploaded and 
+downloaded instead of the number of files transferred.  Everything else about 
+byte and file ratios are the same including creating the ratio table.  For 
+more information on creating the table, see the previous section.
+
+Create Upload Table
+
+This option gives you the ability to adjust the security level of a user 
+based on how many files they have uploaded to the system.  When you select 
+this option, you will notice that it looks quite similar to ratio tables.
+
+This table does not try to relate uploads and downloads to one another so you 
+may find it easier to setup.  System Manager will simply analyze two lines of 
+your table at a time.  If the number of files a user has uploaded falls 
+between two entries, the user will be given the appropriate security level as 
+shown in the following sample:
+
+As an example, let's assume you creat the following table:
+
+ 
+ Uploads      Security
+----------    --------
+         0          15
+         1          20
+        50          40
+         0           0
+
+Until a user uploads a file, the security level will remain 15. A user who 
+has uploaded more than one file, but has not yet uploaded 50 files, will 
+receive a security level of 20.  If a user has uploaded 50 or more files, a 
+security level of 40 will be given.
+
+Create Download Table
+
+The creation and use of this table is identical to the Upload table.  The 
+only exception is that the number of files downloaded are checked instead of 
+the number of files uploaded. Refer to the previous section for additional 
+information.
+
+Change Security to Expired Level
+
+When a user's subscription expires, PCBoard leaves the security level intact 
+but will give the user their expired security level at login.  By doing this, 
+a user can renew their subscription and you simply have to update their 
+expiration date to restore the old security level.
+
+Sometimes, however, you may want to make permanent the expired security level 
+of a user whose subscription has expired.  This menu option allows you to 
+make this change, adjusting the user's normal security level to match the 
+level in the expired security level field.
+
+Before you make this change, PCBoard asks if you wish to print a list of 
+users who have their security levels changed.  Answering Y at this prompt 
+will cause a report to be printed to the printer defined for System Manager 
+to use.  This report includes the following information:
+
+
+User name
+Old security level
+New permanent security level (expired security level)
+Date of expiration
+
+Before System Manager makes the change, it must verify it is the only 
+application accessing the users file.  If it cannot gain exclusive access to 
+the users file, you will receive notice that all nodes must be down before 
+you can make this change.
+
+Initialize Upld/Dnld Counters
+
+You can use this option to reset or change the upload/download byte and file 
+counters for every user on the system.  You can choose any of the following 
+options:
+
+
+Make the upload counter equal to the download counter.
+Make the download counter equal to the upload counter.
+Set both the upload and download counters to 0.
+
+
+Initialize  upload and download BYTE counters to be equal to the current 
+users file ratio.  If you select this option you are given the option to 
+specify a number to multiply the number of files transferred to store in the 
+bytes transferred fields.  For example, if a user has uploaded 3 files and 
+downloaded 10 files and you specify a multiplier of 100, the user's byte 
+counters will show 300 bytes uploaded and 1000 bytes downloaded.  The 
+multiplier is simply for cosmetic purposes.  Also, you should be aware that 
+if you select this option, your answers to the Adjust Upload / Download 
+FILE/BYTE Counters questions will be ignored.
+
+There are two other questions on this screen.  Your answer to these questions 
+determine which counters will be set.
+
+Adjust Upload / Download FILE Counters
+Adjust Upload / Download BYTE Counters 
+
+
+For example, if you select option number 3, and you set Adjust Upload / 
+Download FILE Counters to Y, the following field will be set to 0 in each 
+user's record:
+
+
+Number Uploads
+Number Downloads
+
+
+Of course, if you answer Y to both questions, both of the following fields 
+will be reset to 0 for all users:
+
+
+Number Uploads
+Number Downloads
+Total Upload
+Total Download
+Registering Users In A Conference By Security Level
+
+
+When you need to modify the conference registrations of a large number of 
+users, you certainly would not want to do so manually. System Manager gives 
+you the ability to modify a range of conference flags for users within a 
+particular security range.
+
+Selecting Conferences To Modify
+
+The following fields allow you to control the users who will have their 
+conference flags modified:
+
+
+First number of conferences to be inserted in registrations
+Last  number of conferences to be inserted in registrations
+
+Enter the beginning conference number to be modified in the first field, and 
+in the second field, enter the last conference number to be included in the 
+list of conference registrations to be modified.  For example, if you want to 
+modify the conference registrations for conferences 3 through 10, enter the 
+following:
+
+
+First number of conferences to be inserted in registrations :    3
+Last  number of conferences to be inserted in registrations :   10
+
+
+If you need to modify just one conference, enter the conference number as 
+both the first and last conference to modify.
+
+Setting Conference Flags
+
+Once you have selected the conferences to modify, you must determine how you 
+will be altering the access to the conference. The following five fields 
+control what access you can give to a conference:
+
+
+Adjust conferences user is normally allowed to join
+Adjust conferences user can join with expired subscription
+Adjust the user selected conferences for scanning
+Adjust conferences where user becomes a sysop when joining
+Reset user's last message read to zero in these conferences
+
+The first four questions are simply the conference flags you may set (R, X, 
+S, and C).  For additional information on conference flags, see Editing a 
+User Record in the Users File Maintenance section of this chapter.  If you 
+wish to reset the last message read pointer for each conference you modify, 
+answer Y to the Reset user's last message read to zero in these conferences 
+question.
+
+Selecting User Records To Modify
+
+The last thing you must determine is the range of users who will have their 
+conference registration information changed.  Simply state the lowest 
+security level you wish to modify and then the highest security level to 
+modify.  Every user with a security level between the two levels you enter 
+will have their conference information modified.
+
+Making The Change
+
+When you have finished entering the security levels, conference numbers and 
+the conference flags you wish to modify, press PgDn to begin the process.
+
+Before System Manager actually begins modifying the user file, it will 
+attempt to make sure it has exclusive access to both the USERS and USERS.INF 
+files.  If it cannot get exclusive access to these files, it will not be able 
+to modify the records for each user.  Make sure all nodes are down before you 
+attempt to make a global change such as inserting group conference 
+registrations.
+
+Examples
+
+Let's assume you just created conference #3 on your system which displays 
+community event information.  If you want to have that conference selected 
+for reading by every user on your system, enter the following into each 
+field:
+
+As another example, suppose you want to create conference #53 to be a private 
+conference for those with a security level of 90 or higher.  Since an R flag 
+is required to be able to join a private conference, you might go about 
+setting the flag manually in all user accounts with a security level of 90 or 
+higher -- this would be quite an undertaking on a system with a large user 
+base.  Instead, you can let System Manager do all of the hard work for you by 
+entering the following information:
+
+Removing Access To A Conference By Security Level
+
+When you need to modify the conference registrations for a large number of 
+users, you certainly do not want to do it manually. System Manager gives you 
+the ability to modify a range of conference flags for users within a 
+particular security range.
+
+Selecting Conferences To Modify
+
+The following fields allow you to control the users that will have their 
+conference flags modified:
+
+
+First number of conferences to be inserted in registrations
+Last  number of conferences to be inserted in registrations
+
+
+Enter the beginning conference number to be modified in the first field, and 
+in the second field, enter the last conference number to be included in the 
+list of conference registrations to be modified.  For example, if you wanted 
+to modify the conference registrations for conferences 3 through 10, enter 
+the following:
+
+
+First number of conferences to be inserted in registrations :    3
+Last  number of conferences to be inserted in registrations :   10
+
+
+If you need to modify just one conference, enter the conference number as 
+both the first and last conference to modify.
+
+Deselecting Conference Flags
+
+Once you have selected the conferences to modify, you must determine how you 
+will be altering access to the conference. The following five fields control 
+what access you can remove from a conference:
+
+
+Adjust conferences user is normally allowed to join
+Adjust conferences user can join with expired subscription
+Adjust the user selected conferences for scanning
+Adjust conferences where user becomes a sysop when joining
+Reset user's last message read to zero in these conferences
+
+
+The first four questions are simply the conference flags that you may set (R, 
+X, S, and C).  For additional information on conference flags, see Editing a 
+User Record in the Users File Maintenance section of this chapter.  If you 
+wish to reset the last message read pointer for each conference you modify, 
+answer Y to the Reset user's last message read to zero in these conferences 
+question.
+
+Selecting User Records To Modify
+
+The last thing you must determine is the range of users who will have their 
+conference registration information changed.  Simply state the lowest 
+security level you wish to modify and then the highest security level to 
+modify.  Every user with a security level between the two levels you enter 
+will have their conference information modified.
+
+Making The Change
+
+When you have finished entering the security levels, conference numbers and 
+the conference flags you wish to modify, press PgDn to begin the process.
+
+Before System Manager actually begins modifying the user file, it will 
+attempt to make sure it has exclusive access to both the USERS and USERS.INF 
+files.  If it cannot get exclusive access to these files, it will not be able 
+to modify the records for each user.  Make sure that all nodes are down 
+before you attempt to make a global change such as inserting group conference 
+registrations.
+
+Examples
+
+If you have 50 conferences on your system (conferences 0-49) and you want to 
+make sure no users have conference SysOp status (the C flag), you can enter 
+the following information:
+
+Another example may be when you want to remove everyone with a security level 
+less than 50 from conference #9 which is a private conference.  For this task 
+you may want to remove all of their conference flags and reset their last 
+message read to 0 as well.
+
+
+Moving Access From One Conference To Another
+
+From this menu option, you can move the access of users from one conference 
+to another conference.  Not only can you move the conference flags from one 
+conference to another, but you can also move the last message read to the new 
+conference.
+
+Specifying Conferences
+
+In the REMOVE user(s) from which conference field, enter the conference 
+number you wish to remove the conference access from. In the ADD to which 
+conference field enter the conference number that you will be moving 
+conference access to.
+
+Moving Conference Information
+
+The following lists which questions control the conference flags.  For a 
+detailed description of conference flags see Editing a User Record in the 
+Users File Maintenance section of this chapter.
+
+
+	R	Adjust conferences user is allowed in (all times)
+	X	Adjust conferences user is allowed in (expired)
+	S	Adjust conference user-scan preference list
+
+System Manager moves each conference flag field to the new conference exactly 
+as set in the original conference.  It is recommended that you either leave 
+all three of these questions set to Y or set to N.
+
+The next question you are asked gives you the ability to modify the user 
+record so it shows the Last Conference In field to reflect the new 
+conference.  Of course, this will not be of much use unless the new 
+conference is defined as an auto-rejoin conference.  If the new conference is 
+defined as an auto-rejoin conference, affected users will be logged into this 
+conference the next time they log in.
+
+The last question asks if you wish to also move the last message number read 
+from the old conference to the new conference.  If you answer Y in this 
+field, the last message read number will be moved to the new conference, and 
+the old conference will have the last message read set to 0.
+
+Selecting Security Levels
+
+As with other functions in System Manager, you determine what users will have 
+their records modified by a range of security levels.  Simply enter the 
+lowest and highest security level for the records you wish to modify.  Every 
+record in the indicated security level range will be affected by the change.
+
+Example
+
+The following illustrates what to do if you want to move the conference 
+information from conference 2 to conference 3 for users with a security level 
+of 50.
+
+First, while editing a user record for which you will be moving conference 
+information, look at the conference form in System Manager.  You should see 
+something similar to the following:
+
+ Num   Conference    Flags   Last Msg
+----- -------------  -----   --------
+    0 Main Board    : RXS  :    51371
+    1 OpSys         :      :        0
+    2 Admin         : RXS  :   120022
+    3 Chatter       : RX   :        0
+
+Next, enter the following after selecting Move Users BETWEEN Conferences from 
+the Users File Maintenance menu:
+
+Finally, press PgDn to begin moving the conference information. System 
+Manager is going to require exclusive access to USERS and USERS.INF, so make 
+sure no other nodes are online before you press PgDn.  Otherwise, you will 
+receive an error message and System Manager will continually try to access 
+the file that until you press E to abort the process or the file is no longer 
+in use.
+
+Once the change has been made, you will see user records have been updated.  
+Looking at the same record we reviewed before we made the change, you will 
+now see:
+
+ Num   Conference    Flags   Last Msg
+----- -------------  -----   --------
+    0 Main Board    : RXS  :    51371
+    1 OpSys         :      :        0
+    2 Admin         :      :        0
+    3 Chatter       : RXS  :   120022
+
+Notice that all of the conference information from conference 2 has been 
+moved over to conference 3.
+
+Adjusting Expiration Dates
+
+When you need to upgrade the expiration date of several users, you can let 
+System Manager's Change Expiration Date menu option do the work for you.  
+Using this menu option you can update the expiration date of users on your 
+system to a new date or add additional days to their expiration date.
+
+Security Level Criteria
+
+In order to modify the expiration date of users on your system, you need to 
+specify a range of security levels that you wish to modify.  First however, 
+you must select if you wish the security level range to be based on the 
+normal or expired security level of each user.  The following are valid 
+options for this field:
+
+        E       Expired security level.  Base the range of security levels 
+                that will be affected on the expired security level of each 
+                user instead of the normal security level.
+
+        N       Normal security level.  Base the range of security levels 
+                that will be affected on the normal security level of each 
+                user.
+
+
+Specifying Security Range
+
+Using the following field, you can specify the range of security levels 
+(normal or expired) you wish to modify.
+
+
+Adjust Expiration Date if level is Greater than or equal to
+Adjust Expiration Date if level is Less than or equal to
+
+
+For example, if you want to modify the range of security levels between 20 
+and 30, enter a 20 in the first field and a 30 in the second field.
+
+Setting New Expiration Date
+
+You can choose to either set an actual date to change all records to or you 
+may choose to simply add a certain amount of days to the expiration date of 
+the user.  If you wish to make the new expiration date uniform throughout the 
+range selected, specify the date at the following prompt:
+
+
+New Expiration Date (01/01/80 is ignored)
+
+
+If you leave the date in that field as 01-01-80, System Manager assumes you 
+want to extend their current expiration date by the amount of days specified 
+in the follwoing field:
+
+
+Current Date in record plus XXXX days
+
+
+Printing Changed Records
+
+The final question on this screen asks if you wish to print a report of users 
+who have their user records changed.  If you answer Y to this question, a 
+report will be printed to the printer you have defined in System Manager.  
+This report will contain:
+
+
+User name
+Security level
+Old expiration date
+New expiration date
+
+
+Making The Change
+
+When you have filled in all of the fields, press PgDn to begin changing the 
+records.  If System Manager can gain exclusive access to the users file, it 
+will begin modifying the records you have specified.  If System Manager 
+cannot guarantee it has exclusive access, it will print a message that states 
+LOCK FAILED.  In order to gain exclusive access to the users file, make sure 
+you do not have any nodes up and running or ready to take calls.
+
+Example
+
+To help illustrate the advantage of being able to globally change expiration 
+dates, let's use the following example:
+
+You accept subscriptions to your system where your users will pay money for 
+one year of access.
+
+Your subscribers occupy security levels 60-80.
+
+Keeping all of this in mind, let's assume you had system troubles that caused 
+you to be down for two days in a row.  To help relations with what may be 
+several angry subscribers, you decide to extend all subscription by an 
+additional week (7 days).  Rather than manually modify each record you can 
+use System Manager's Change Expiration Date menu option.  Fill in the fields 
+on the screen as follows:
+
+
+Security Level Range
+--------------------
+Base Security Level Criteria on NORMAL or EXPIRED Level (N/E) : N
+Adjust Expiration Date if level is Greater than or equal to   : 60
+Adjust Expiration Date if level is Less than or equal to      : 80
+
+
+Change Expiration Date To:
+--------------------------
+New Expiration Date (01/01/80 is ignored) : 01-01-80
+Current Date in record plus XXXX days     :    7
+
+Print Changed User Records on the Printer : N
+
+
+Standardizing Phone Formats
+
+Selecting this menu option will standardize the phone fields for every user 
+on your system.  Essentially, this option merely strips all non-numerical 
+information from the phone field and attempts to fit the phone number into 
+the following format:
+
+
+ 999 999-9999
+
+
+If the phone number is shorter than 10 digits, 1t will start building the 
+phone number from the right.  Therefore, if one of the phone numbers in the 
+user record was 323-835, System Manager will convert this phone number to 
+32-3835.  Once all of your phone numbers are standardized, you can reliably 
+sort the users file by the contents of this field.
+
+Undo Previous Change
+
+Selecting this menu option will enable you to undo any global changes you 
+have made to the users file while in System Manager. The following lists all 
+of the global changes you can make in System Manager:
+
+Sort Users File
+Pack Users File
+Pack Users File while Online
+Adjust Security Level by Ranges
+Adjust Expired Security Level by Ranges
+Adjust Up/Dn File Ratio
+Adjust Up/Dn Byte Ratio
+Change Security to Expired Level
+Initialize Upld/Dnld Counters
+Insert Group Conference
+Remove Group Conference
+Adjust Expiration Dates
+Standardize Phone Formats
+
+When you select the undo option, you will be asked to confirm that you really 
+wish to undo your most recent global change.  If you select to undo your 
+changes, System Manger will restore the last backup of the USERS and 
+USERS.INF file and then re-index your users file to make sure the index files 
+are current.
+
+User Info File Maintenance
+
+User Info File Maintenance refers to maintaining your USERS.INF file.  
+Because the USERS.INF file is so flexible there are a lot of functions you 
+can use, although not nearly so many as with the USERS file alone.  
+Everything you will need to do with the USERS.INF file will be controlled 
+from the menu that will appear after you select User Info File Maintenance 
+from the System Manager Main Menu.
+
+Change Conference Allocations
+
+The size of the USERS.INF file is dynamic.  This means it can grow or shrink 
+based on the components installed inside of the file.  For example, PCBoard 
+stores the last message read pointers in this file.  As you would expect, the 
+more conferences that you have, the bigger the file will be because you have 
+more last message read pointers to store.
+
+To make sure your USERS.INF file is properly configured for the number of 
+conferences you have installed on your system, select this menu option.  If 
+you see an error message that says Need to update User Info File Conference 
+Allocations, you need to select this menu option to properly insure that your 
+USERS.INF file is properly sized.  If you receive this previously mentioned 
+error message, you will need to load System Manager from the DOS prompt 
+because you will not be able to access it from the call-waiting screen.  
+Simply change to your PCBoard subdirectory and execute PCBSM.EXE.
+
+When you select this menu option you will see a status report about your 
+USERS.INF file.  Each section is detailed in the following sections.
+
+
+Total Conference Areas
+
+This lists the total number of conferences you have defined for your system.  
+PCBoard determines this number by reading the PCBOARD.DAT that System Manager 
+reads when it loaded and looking at what is set for the Number of Highest 
+Conference Desired in PCBSetup | Configuration Options | Messages.  System 
+Manager then adds one to this number to account for the Main Board.
+
+For this reason, it becomes important that if you increase the maximum number 
+of conferences desired, you should also update every PCBOARD.DAT you use on 
+your system.  Otherwise, you can find yourself repeatedly updating conference 
+allocations because you have a different amount of conferences available 
+depending on which PCBOARD.DAT is read.
+
+Number of EXTENDED Conferences
+
+This field will report how many extended conferences you have (or 0 for 
+none).  Any conferences above the first 40 are considered to be extended 
+conferences.  This is simply a name reference and does not signify a 
+difference between conferences. The name reference is used because earlier 
+versions of PCBoard supported 40 conferences which has long since been 
+surpassed.
+
+Total static user allocation
+
+This field will tell you how many static bytes will be allocated for each 
+record.  Static allocations are not dependent on the number of conferences.
+
+Total dynamic allocations
+
+Dynamic allocations are dependent on the number of conferences you have 
+allocated on your system.  As the number of conferences on your system 
+increases, so will the dynamic allocations on your system.
+
+Updating USERS.INF Conference Allocations
+
+After the report of allocations and total conferences on your system, you 
+will see one of the following messages:
+
+None of the above allocations require upgrading at this time...
+
+WARNING:  One or more of the above allocations requires updating
+
+If you see the former message, you do not have to worry about updating your 
+conference allocations.  However, if you see the latter message, you must 
+update your conference allocations or you will not be able to load PCBoard.
+
+List Installed PSA/TPA Areas
+
+This menu function will list all of the third party allocation (TPA) and 
+PCBoard support allocation (PSA) areas that are currently installed.  TPAs 
+are areas in your USERS.INF file reserved for specific third party 
+applications.  PSAs are specific features you can add such as full address 
+support, alias support, etc.
+
+When you choose this menu option, you will see a list of all TPA and PSA 
+areas that are installed on your system.
+
+If you have not installed any TPAs or PSAs, you will be notified that you do 
+not have any installed.  If you do have one or more installed, System Manager 
+will display information about each one.
+
+The first piece of information will display if the allocation is a PSA or a 
+TPA followed by the name of the allocation.  Even though you may not need to 
+know any additional information, you will also be shown the version number 
+and  the total static/dynamic space allocated for each user.  For TPAs, 
+System Manager will also show you the Key information which is used by each 
+third party program.
+
+Add PCBoard Supported Allocations
+
+From this menu option, you can install a PCBoard Supported Allocations (PSA).  
+These give you the ability add functionality to your system such as alias or 
+full-address support.  For more information on adding a PSA please see the 
+Adding a PSA section in this chapter.
+
+Remove PSA From User Info File
+
+Simply select the PSA you wish to remove from your system. Before System 
+Manager removes the PSA it will ask to confirm that you really wish to delete 
+it.  For additional information, please see the Removing A PSA section in 
+this chapter.
+
+Add/Update Third Party Application
+
+A TPA gives a third party application the ability to have PCBoard reserve 
+space in the USERS.INF file for its use.  Most applications will use this 
+reserved area or allocation to store information about each user.  Using this 
+method, an application does not have to create a separate data file to store 
+redundant user information, nor does it have to worry about maintaining this 
+file of active user data.  The TPA is actually part of the USERS.INF file, so 
+when a user is deleted from your system, all TPA information for that user is 
+deleted too.
+
+Normally, you will only install a TPA if the application you are installing 
+explicitly tells you to setup a TPA in System Manager.
+
+When you choose to add a TPA, you will be asked to enter the TPA name.  Enter 
+the name in this field as specified by the author of the application.  If you 
+do not, the application may error upon loading because the wrong name was 
+entered in this field.
+
+If you enter the name of a TPA which already exists, the existing information 
+will be displayed and you can edit the fields as your needs dictate.
+
+Once you have entered a new application name, you will be asked to specify 
+the version number, static allocation, dynamic allocation, and a keyword.  
+The author of the application should provide the values you should enter for 
+everything except keyword. 
+
+Version:  Just as most programs have a version number, a TPA can have a 
+version number as well.  The application which uses this TPA may use this 
+version number to verify it is indeed reading proper data.  
+
+Static Size:  There are two size types in a TPA.  Static size never changes 
+-- it is a fixed size.  You need to enter the value the author of the 
+application specifies.  If you enter a value which is too high or too low, 
+chances are the application will error upon loading or behave unpredictably.
+
+Dynamic Size:  Enter the value the author of the application specifies for 
+this field.  This determines how many bytes will be reserved for each 
+conference.  Consequently, the more conferences you have defined in your 
+system, the more space this will end up taking on your hard drive.
+
+Keyword:  In this field, enter the door name that will use this TPA.  This 
+information can be obtained from the filename field in your DOORS.LST file.  
+If you do not specify a valid door name, the information in the TPA will not 
+be available to the application requesting the information.
+
+Remove TPA From User Info File
+
+To remove a TPA, you must know the name.  If you do not know the name, you 
+can use the List Installed PSA/TPA Areas menu option for a list of installed 
+allocations.  When you enter the name of the TPA that you wish to remove, 
+System Manager will check to see if it exists.  If it does, you will be asked 
+to confirm that you wish to remove the TPA.  If you choose to remove it, all 
+data stored in the TPA will be lost as it is removed from the USERS.INF file.
+
+Create User Info File
+
+Normally you will not need to create your USERS.INF file because PCBoard will 
+take care of that for you.  However, if you lose the file or if it becomes 
+corrupt beyond repair, you may elect to recreate the file.
+
+If System Manager detects a USERS.INF file when you attempt to re-create it, 
+you will be warned that it already exists and will be asked to confirm that 
+you want to recreate the file. Recreating the file will cause all TPA 
+information to be lost as well as the loss of some conference information for 
+all conferences numbered 40 and above.
+
+Analyzing Your System Configuration
+
+This menu option will load PCBDiag which you can use to help analyze your 
+system configuration.  When you select this menu item, you will be preseneted 
+with a list of items that you can analyze.  To do a full analysis, make sure 
+you enter a Y in all of the fields.
+
+Once you determine what you want to analyze, press PgDn to begin. You will be 
+asked where the report should be printed.  In the field, you can enter any 
+printer port or filename.  Specifying a printer port such as LPT1 will send 
+the report to the printer attached to LPT1 while entering a filename will 
+print the report to the file you specify.
+
+When you are working with the technical support staff to resolve a problem 
+with your system, you may be asked to print or output your analysis to a 
+file.  In this situation you should always print the report to a file and 
+upload the file to Salt Air.  The technician assisting you will review the 
+file and continue working with you on the problem.
+
+Defining Printer Port
+
+There are several places in System  Manager that allow you to print out 
+reports or results of a particular action.  System Manager will use the 
+printer that you define using this menu option.
+
+The first thing you will notice about the printer definition is that you can 
+enter more than a simple port number.  You can enter any filename or device.  
+If your printer is on LPT1, enter LPT1 in this field.  If, instead, you wish 
+to send all printer output to a text file, you can do so by specifying a 
+filename to send the output to.
+
+The following are sample printer definitions:
+
+
+LPT1
+LPT2
+C:\PCB\PRINTER.OUT
+F:\PRN\PCBOARD.PRN
+COM1
+COM2
+
+
+Defining Your Editors
+
+When you are configuring your system in PCBSetup, there are several places 
+where you need to load an editor to edit a batch file or a display screen.  
+This menu option allows you to specify the editors you want to have available 
+while in PCBSetup.  There are two editors you may specify -- text and 
+graphics.
+
+Text Editor	
+
+Throughout PCBSetup you will notice that you can press F2 in several places 
+to edit a particular file.  If the file you are editing is a display file or 
+a batch file, PCBSetup will use the editor you define in this field to edit 
+the file.
+
+By default, the editor selected here will be PCBEdit, which is a 
+text/graphics editor which ships with PCBoard.  If you have a favorite text 
+editor, you may specify that program name instead. However, if you opt to 
+change the editor, you will want to pick a small ASCII text editor rather 
+than a word processing type program because of the memory constraints 
+involved, and because the file must be saved in DOS text format.
+
+When PCBSetup calls your editor, it will run the program and pass the 
+filename to edit as the first and only parameter. Therefore, the editor you 
+install must be capable of accepting the filename to edit on the command 
+line.
+
+Graphics Editor
+
+When a display file is highlighted in PCBSetup, you can use F2 to edit the 
+normal display file, or F3 to edit the graphics specific version of the same 
+file.  
+
+When you press F3, System Manager will use the editor you have defined as 
+your graphics editor to edit the graphics specific version of the display 
+file.  This is most useful when you need to create a plain ASCII file for 
+your non-graphic callers but then choose to make a graphics specific file 
+with animation or similar effects.
+
+You will want to use a graphics editor that will support either ANSI or 
+PCBoard @X codes.  Included with your PCBoard package you will find 
+PCBEDIT.EXE.  PCBEdit will create ASCII text files and it has the ability to 
+create colorized display screens using PCBoard @X color codes.
+
+The graphics editor is called in the same manner as the text editor.  The 
+filename to edit will be passed on the command line so you need to use a 
+graphics editor program that is capable of accepting the filename on the 
+command line.
+
+Customize Colors
+
+Everyone has their own likes and dislikes -- color is no exception.  Using 
+this menu option you can customize the colors that are used for the PCBoard 
+utilities (PCBSetup, System Manager, etc.)
+
+Using Predefined Defaults
+
+System  Manager provides you with several default color schemes you can use 
+by simply selecting the menu options on your screen. The first color set is 
+the default color set when you first receive PCBoard.  If you do not like any 
+of the default color sets you may customize the colors manually using the 
+Customize Colors menu option.
+
+Customizing Your Own Colors
+
+Upon selecting the Customize Colors menu option you will see the following 
+screen (once you have read the instructions and pressed R):
+
+
+This screen contains several objects.  You will notice part of a help window, 
+a menu listing, questions, and many other fields and borders.  The 
+instructions for colorizing this screen to your own tastes are very simple:
+
+Move the cursor (using the up, down, left, and right arrow keys) until the 
+cursor is on top of the item or object you wish to modify, and press ENTER.
+
+From the color box that pops up, use the cursor keys to select the color you 
+wish to use for the currently selected item.  It is important to remember 
+that each color selection contains a background and a foreground color.  The 
+foreground attribute for each color is represented by an X; this is the color 
+the text will be for the currently selected item.  The background attribute 
+is the color the text will be written on.
+
+Repeat steps one and two as many times as you need until you have finished 
+customizing your colors.  When you are done, press ESC.  You will be returned 
+to the Color Customization menu.  If you press ESC again to return to the 
+Main Menu you will be asked if you wish to save your color set.
+
+PCBoard Supported Allocations
+
+You can optionally install what are called PSAs (PCBoard Supported 
+Allocations).  These are features that are added into your users file.  
+
+What Are Supported Allocations
+
+A supported allocation is a module you can add to your users file which both 
+PCBoard and System Manager are able to understand and manipulate.  These 
+allocations are quite similar to TPAs you can install for doors.  The 
+difference is that PSAs are officially recognized by PCBoard and are used to 
+add new features to your system.  The following PSAs are available:
+
+Alias Support - Enables a user to use an alias in those conferences which 
+have been designated to allow aliases.
+
+Full Address Support - Gives you the ability to store street, city, state, 
+zip code, and country information for each user on your system.
+
+Password-Changing Support - Gives you the ability to force your users to 
+change their passwords over a pre-determined amount of time.
+
+Verification Support - This PSA will store the response to the question asked 
+when a new account is created on your system. You can use this response to 
+help verify the validity of the caller.
+
+Caller Statistics - Provides additional statistics about each user on your 
+system.  Records statistics such as security violations, speed of 
+connections, etc.
+
+Caller Notes - Provides you five additional comment lines which you can store 
+information about each user.  These lines may be useful for jotting down 
+general notes.
+
+Adding An Allocation
+
+First of all, you need to make sure all nodes on your system are down -- you 
+cannot add a PSA while nodes are online.
+
+To add a PSA to your system, select Add PCBoard Supported Allocations from 
+the User Info File Maintenance menu in System Manager.  Choose the PSA you 
+wish to add to your system from the menu presented to you.  Next, you will be 
+shown information about the PSA you are about to install and are asked to 
+confirm you wish to continue with the installation.
+
+If you received an error which said there was a sharing violation with 
+USERS.INF, this indicates all of your nodes are not down or something is 
+accessing your USERS.INF file.  System manager needs to have exclusive access 
+to that file before it can add a PSA.
+
+When you add a PSA, the size of your USERS.INF file will increase in size.  
+The following lists shows how many bytes the file will increase for each 
+users on your system:
+
+
+Alias - 25 bytes
+Full Address - 160 bytes
+Password Changing - 42 bytes
+Verification - 25 bytes
+Caller Statistics - 30 bytes
+Caller Notes - 300 bytes
+
+If you have 2000 users in your system, your USERS.INF will grow by 60,000 
+bytes if you add the Caller Statistics PSA.
+
+Using An Allocation
+
+The following section gives specific details as far as what you can expect 
+after you install each PSA in your system.  You will know what changes will 
+be made to your system operation and how to access the various information 
+that each PSA provides.
+
+Alias
+
+Alias support is added on a conference by conference basis. After you have 
+installed the Alias PSA in System Manager as outlined in the previous 
+section, you need to configure which conferences will enable alias support.
+
+When you are editing conference information, you can press PgDn to access 
+conference switches.  You will see an option labeled Allow Aliases to be 
+used.  If you want aliases to be used in the conference you are editing, 
+change this option to Y.
+
+In order for a user to define the alias they wish to use, the W user command 
+must be used.  Alias names can only be changed or created in conferences that 
+have been defined to allow Aliases. The name entered must be unique -- it 
+cannot duplicate any user or alias name currently in use on the system.  In 
+PCBSetup | Configuration Options | System Control there is an option which 
+reads Allow Alias Change After Chosen.  When this option is set to N, a user 
+must request any alias changes be done by you. Otherwise, the alias name can 
+be changed at will by using the W user command.
+
+At any time, you can edit or view the alias for any given user through System 
+Manager by editing the user's record.  Press F2 until you get to the Alias 
+support screen.  On this screen, you will see the alias name the user has 
+chosen.  If the field is blank, the user has not defined an alias.
+
+If you are editing the user record and you press F2 several times but do not 
+see the Alias support screen, chances are you have not installed the Alias 
+PSA.  To make sure you have installed the PSA, check the list of installed 
+TPA Areas in System Manager | User Info File Maintenance | List Installed TPA 
+Areas.  When you select this option, you should see a TPA called PCBALIAS. If 
+you do not, you have not installed the alias PSA yet.
+
+Aliases are only active when a user joins a conference that has been defined 
+to allow aliases.  In the rest of the conferences, the user's real name is 
+always used.  Of course with users switching between their real name and 
+alias name upon joining conferences, hiding the name change becomes important 
+to protect the identity change.
+
+To help protect the alias, there is an option in PCBSetup | Node 
+Configuration which asks Show ALIAS Names in WHO Display.  If you answer Y to 
+this question, PCBoard will modify the node display to show that a user is 
+logging in under that node where the name change is occurring.  This will 
+remain  for approximately one minute before it changes the actual name in the 
+node display.  On the other hand, if you answer N to this question, real 
+names will always be displayed even when a conference is joined where aliases 
+are allowed.
+
+Two other changes are made in the way PCBoard operates in order to protect 
+the alias identity.
+
+While inside a conference where aliases are allowed, the security level 
+requirement for the USERS command is changed to become equal to that which is 
+required to use the 7 SysOp function.  This enables you to still use the 
+USERS command while making it impossible for normal callers to access the 
+command. If users could access the command, they may be able to simply 
+compare logon dates/times to figure out the real name of a particular user.
+
+The City/State information normally shown by the WHO user command or the 11 
+SysOp command will not be shown when a user is using an alias.  If that 
+information were available to all callers, it would make it easier for other 
+users to figure out the true identities of those using aliases.
+
+When a user has defined an alias either the real name or alias of the user 
+can be used to login to the system.  If the user chooses to login using the 
+alias and the conference joined at login is not an alias conference, PCBoard 
+will properly use their real name instead of their alias.
+
+Address
+
+If you want to keep track of addresses for each of your users, install the 
+Address PSA.  This PSA, will store lines for the street address, city, state, 
+zip code and country.
+
+If you have the Address PSA installed, new users will be asked to provide 
+address information when the registration questions for createing a new 
+account on the system are asked.  If you have existing users on your system 
+who have not entered their address information, you can tell your users to 
+use the W user command to update their address information, or you can use a 
+PPE that is designed to assure that every user has a valid address.  On Salt 
+Air (the support BBS for Clark Development) you will find a PPE which will do 
+this under the filename GET-ADRS.ZIP.
+
+If you clear out any of the PCBTEXT records between 699 and 704 with 
+MKPCBTXT, those questions will not be asked.  This would be useful if you 
+want to eliminate a question such as Country from being asked.
+
+The address information can be edited via the W user command or by loading 
+System Manager and editing the user record (Pressing F2 to switch between 
+views).  When you use the 7 SysOp Command to edit a user record, you can view 
+the address information but you cannot change it.
+
+Password Changing
+
+When you install the Password Changing PSA, you add the capability to force 
+your callers to change their password over the period of time that you 
+specify.
+
+PCBoard will keep track of the last date the password for each user was last 
+changed, the number of times they have changed it, and the last three 
+passwords used.  By accessing the last three passwords used, the user will be 
+prevented from toggling between two or three passwords.  In addition, the 
+passwords chosen must contain the minimum number of characters as defined in 
+PCBSetup | Configuration Options | Limits and must also not contain either 
+the first or last name of the user.
+
+If you load System Manager and access a user's record, you can look at the 
+password information by pressing F2 until you get to the Password Form 
+screen.  On this screen you will see information such as the last three 
+passwords used, the last date the password was changed, etc.  The Expiration 
+Date is used to determine when this particular user needs to change their 
+password.  When the password is expired, the user cannot login to the system 
+until a new valid password is entered.  The following restrictions are in 
+place for the new password:
+
+The new password must meet the minimum length requirements specified in 
+PCBSetup |  Configuration Options | Limits.
+
+Users may not use their name as their password.  For example, a user named 
+James Brown could not use either James or Brown as his password.
+
+Of course, if you want to expire a particular user's password, edit their 
+user record so the password expiration date is equal to or earlier than 
+today's date.
+
+You can control how often a user needs to change their password by changing 
+the Number Days Before FORCED Password Change in PCBSetup | Configuration 
+Options | Limits.  If you want to temporarily disable the Password Changing 
+PSA but plan on enabling it at a later date, enter a value of 0 in this field 
+to disable the Password Changing support.
+
+You can warn callers of the upcoming need to change their password so they 
+are not caught totally off-guard by the request to change their password.  In 
+PCBSetup | Configuration Options | Limits the following field can be changed:
+
+Number Days to Warn Prior to FORCED Change
+
+Set this value to the number of days you want to warn the caller before their 
+password will expire.  When users log into the system during the warning 
+period, record number 711 in your PCBTEXT file will be displayed to let them 
+know their password is about to expire.
+
+In recent years, automated calling to pick up messages or files has become 
+very popular.  Since PCBoard normally displays a simple one-line message to 
+notify the user their password is about to expire, some of your users may 
+miss the warning.  If this becomes a problem on your system, you may want to 
+modify this PCBTEXT record so that it displays a file (which can be multiple 
+lines), or even a PPE which can leave a personal message so they could pick 
+up the notification in their automated mail or file runs.
+
+Whatever warning method you ultimately choose, it should be as obvious as 
+possible.  Otherwise, your callers who use login scripts, automated calling 
+programs, and such may wonder why they cannot log into the system properly.  
+For this very reason, it might be advantageous to give a two to three week 
+password expiration warning.
+
+Verification
+
+Verification support adds one 25 character field you can use to store 
+information to help determine the validity of a particular caller.  If you 
+have the verification PSA enabled, new users will be required to answer the 
+registration question.  By default, this question will ask for the maiden 
+name of the caller's mother.  However, you can change this to ask any 
+question you would like by using MKPCBTXT to edit record #706 in PCBTEXT.
+
+Once the new user enters the information, it cannot be modified. In fact, 
+users cannot even view the information.  The only one who can change or view 
+the verification field is you.
+
+There are a lot of things you could use this verification field for.  The 
+following is just a short list:
+
+Birth date.  You could modify record #706 in PCBTEXT so the user is asked for 
+their birth date.  When you view a user record with the 7 SysOp command you 
+would be able to quickly and easily reference what a particular user entered 
+for their birth date.
+
+Password change request.  When a user fails to enter the right password for 
+login, you have the capability of enabling the user to leave a comment.  If 
+you have that option enabled in PCBSetup | Configuration Options | System 
+Control,  you may want to use a PPE that could ask the user to enter their 
+verification information.  If they enter the right information you could use 
+that same PPE to change their password.
+
+System security.  If the information you distribute on your system requires 
+you to be conscious about system security, you can use the verification field 
+and a PPE to ask each user to enter the data in the verification field at 
+each login.  In essence, this will give the user a second password and would 
+greatly diminish the capability of hacking a user account by the brute force 
+method.
+
+Caller Statistics
+
+If you enjoy gathering statistics about your callers, you may want to enable 
+the Statistics PSA.  PCBoard will keep track of how many times a user has 
+connected to the system, what speed they connected at, and numerous other 
+pieces of information. The following is a sample of the Statistics View 
+available when you are editing a user record in System Manager:
+
+To view this information for a particular user, load System Manager, select 
+Users File Maintenance, and Edit Users File. Next, press F2 until you see the 
+Statistics Form screen.
+
+The following list describes each of the statistics that are tracked:
+
+First Date On:  This date will be equal to the date the user first logged 
+into your system or the date you added the Caller Statistics PSA if the 
+account already existed.
+
+Last Date On:  The last date the user logged into your system. You can also 
+see this date on the Long Form screen.
+
+Num Times On:  The total number of times this particular caller has accessed 
+your system.  This information is also available on the Long Form screen.
+
+
+# Times Paged Sysop:  This field will record the total number of times this 
+user has paged the SysOp to chat.  It does not matter if the page was 
+answered or not -- all attempts are recorded.
+
+# Times Group Chat:  If a user uses group chat with others on the system, the 
+total number of chat sessions the user has participated in will be recorded 
+in this field.  SysOp chats are not included in this total.
+
+# Comments to Sysop:  This field records the total number of comments the 
+user has left to the SysOp using the C user command.  If the user begins a 
+comment but aborts the message, it does not count as a comment to the sysop.
+
+# Messages Left:  This field will store the total number of messages the user 
+has entered.  You should be aware that while PCBoard may update this 
+statistic, off-line mail reading doors may not.
+
+# Messages Read:  Displays the total number of messages the user has read on 
+your system.  While PCBoard will update this field, some off-line mail door 
+programs may not.
+
+
+
+# Security Violations:  You can easily see who may be trying to access 
+restricted functions on your system, by watching this field.  It will total 
+up the number of times a user has attempted to access a command which is not 
+available to the user's security level.
+
+# Un-Reg Conf Attempts:  Records the total number of attempts to join a 
+conference the user is not registered to join.
+
+# Password Failures:  Displays the number of times the wrong password was 
+used at login.  If you keep tabs on this statistic, you may be able to catch 
+someone who is trying to hack into a given account.
+
+# Dnld Limit Reached:  Records the total number of times the user has 
+exceeded the defined download limits.  Any file that will exceed the user's 
+ratio or daily download limit is recorded as a violation.
+
+# Dnld File Not Found:  If the user attempts to download a file, but the 
+filename could not be found on disk, it will be recorded in this field.  
+
+# Upld Verify Failed:  After uploading a file, PCBoard will test the file via 
+PCBTEST.BAT unless you have disabled upload testing.  If the uploaded file 
+fails the integrity tests, it will be recorded in this field.
+
+
+
+# Times On at 300:  Displays the total number of times the user connected at 
+300 bps.
+
+# Times On at 1200:  Displays the total number of times the user connected at 
+1200 bps.
+
+# Times On at 2400:  Displays the total number of times the user connected at 
+2400 bps.
+
+# Times On at 9600:  Displays the total number of times the user connected at 
+4800, 7200 or 9600 bps.  All three speeds are shown in this field, because 
+they are all only possible with 9600 bps modems.
+
+# Times On at 14400+:  Displays the total number of times the user connected 
+at 12000 bps or higher.  The reason 12000 bps is included in this statistic 
+is because it is a fall-back speed for 14400 connections.
+
+
+All of these statistics are stored in your USERS.INF file. Therefore, if you 
+lose your USERS.INF or it becomes corrupted for some reason, you risk the 
+chance of losing your statistics. In addition, you can lose your statistics 
+if you re-create your USERS.INF file via System Manager | User Info File 
+Maintenance | Create User Info File.
+
+Caller Notes
+
+You may find the 30 characters you are allocated in Comment 2 for each user 
+may not provide enough space to enter comments about each user.  If you need 
+more room, you can install the Caller Notes PSA.  If you do, you will find 
+that you have 5 additional 60 characters lines that you can enter comments 
+about each user.
+
+As you can see there is plenty of room to leave comments about any user on 
+your system.  The notes section provides a good place where you can enter 
+things you want to remember about a particular user.  Since the user cannot 
+edit or even view these notes, you can be as frank as you wish.
+
+Viewing PSA Information
+
+There are two methods of viewing information on the various PSAs you have 
+installed. From within System Manager each PSA will have a separate screen.  
+These screens can only be viewed while you are editing a user record.  Press 
+F2 to switch between the various screen views.  Normally, the Short Form, 
+Long Form, and Conference screens are the only screens available.  However, 
+when you install a PSA, additional screens will become available when you 
+press F2. 
+
+When you are viewing PSA information in System Manager, you can also edit the 
+PSA information for each user.
+
+While inside PCBoard, you can also view selected PSA Information with the 7 
+SysOp command.  All PSA information with the exception of the Password 
+Changing, and Caller Statistics can be viewed with the 7 command.
+
+
+This is the information that will be displayed via the 7 SysOp command if you 
+have all of the PSAs installed and there is information in each PSA.  Notice, 
+that only the Alias, Address, Notes, and Verification information is 
+displayed.  To edit this information or to view the rest of the PSA 
+information, use System Manager.
+
+Removing An Installed PSA
+
+To remove a PSA you have installed, you will need to select System Manager | 
+User Info File Maintenance | Remove PSA From User Info File simply select the 
+PSA you wish to remove.  If the PSA does exist, you will be asked to confirm 
+that you really wish to delete the PSA.  If you the PSA was not installed, 
+you will receive an error message notifying you that you attempted to remove 
+a PSA which is not installed.
+
+Command Line Parameters
+
+Most of the functionality of System Manager can be accessed directly by using 
+command line parameters when you load PCBSM.EXE.
+
+Since you can access most common functions of System Manager from the command 
+line, you can setup your event or other batch files to perform these tasks 
+without actually having to move around in the menu structure or even be 
+present to fill in all of the options.
+
+To specify a command line parameter, simply add it after PCBSM.EXE when you 
+load it, as shown in this example:
+
+
+PCBSM.EXE /ADJUST;byteratio
+
+
+In this example, the /ADJUST is the command line parameter and byteratio is a 
+sub-parameter used to specify more information or to further clarify the 
+command line parameter.  As shown in the previous example, you separate 
+sub-parameters with semi-colons (;).  You will learn more about /ADJUST in 
+the detailed explanations of the command line parameters that follow.
+
+/ADJUST
+
+This command line parameter gives you the ability to adjust the security 
+level of users based on their upload and download activities.  You can adjust 
+based on their file or byte ratio, or by the number of file transfers the 
+user has completed.  To control which method you will use to adjust their 
+security levels, use the following sub-parameters.
+
+fileratio
+
+This sub-command will adjust the security levels of users by using the file 
+ratio table you have created in System Manager | Users File Maintenance | 
+Adjust Security Levels | Create Up/Dn File Ratio Table.
+
+Using this sub-parameter will perform the same action available via System 
+Manager | Users File Maintenance | Adjust Security Levels | Adjust by Up/Dn 
+File Ratio.
+
+byteratio
+
+This sub-command will adjust the security levels of users by using the byte 
+ratio table you have created in System Manager | Users File Maintenance | 
+Adjust Security Levels | Create Up/Dn Byte Ratio Table.
+
+Using this sub-parameter will perform the same action available via System 
+Manager | Users File Maintenance | Adjust Security Levels | Adjust by Up/Dn 
+Byte Ratio.
+
+uploads
+
+If you use this sub-parameter, the security levels of the users on your 
+system will be adjusted based on the table you have setup in System Manager | 
+Users File Maintenance | Adjust Security Levels | Adjust by Upload Table
+
+Using this sub-parameter is identical to System Manager | Users File 
+Maintenance | Adjust Security Levels | Adjust by Number of Uploads
+
+downloads
+
+If you use this sub-parameter, the security levels of the users on your 
+system will be adjusted based on the table you have setup in System Manager | 
+Users File Maintenance | Adjust Security Levels | Adjust by Download Table
+
+Using this sub-parameter is identical to System Manager | Users File 
+Maintenance | Adjust Security Levels | Adjust by Number of Downloads 
+
+print
+
+Use this to specify you wish to print any user that have their security level 
+changed.  The output will go to the printer defined in System Manager.  This 
+is the only sub-parameter in this section  that you can combine with others.  
+For example, the following is perfectly valid:
+
+
+PCBSM /ADJUST;byteratio;print
+
+
+However, this example is not:
+
+
+PCBSM /ADJUST;byteratio;fileratio
+
+
+
+        Example
+
+        PCBSM /ADJUST;byteratio;print
+
+        This command line would load System  Manager and adjust security 
+        levels based on the byte ratio of each user.  All users who have 
+        their security levels changed will be printed to your defined 
+        printer.
+
+
+
+/SECURITY
+
+This command line parameter will allow you to assign a new security level to 
+an existing range of security levels on your system.  For example, if you 
+wished to change the security level of everyone between 20 and 30 to simply 
+have security level of 25, use this parameter.
+
+lowsec:[security level]
+
+Specifies the lowest security level of the range you wish to adjust.  You 
+need to also use the highsec sub-parameter to specify the highest number in 
+the range of security levels.  Any user record that has a security level 
+which is either equal to or between the lowsec and highsec sub-parameters 
+will have its security level adjusted.  Replace [security level] with the 
+actual security level between 0 and 255 (e.g., 82).
+
+highsec:[security level]
+
+Specifies the lowest security level of the range you wish to adjust.  You 
+need to also use the lowsec sub-parameter to specify the lowest number in the 
+range of security levels.  Any user record that has a security level which is 
+either equal to or between the lowsec and highsec sub-parameters will have 
+its security level adjusted.  Replace [security level] with the actual 
+security level between 0 and 255 (e.g., 105).
+
+newsec:[security level]
+
+This sub-parameter defines what the new security level will be for the 
+security levels that are specified with the lowsec and highsec 
+sub-parameters.  Replace [security level] with the actual security level 
+between 0 and 255 (e.g., 35).
+
+
+        Example
+        
+        PCBSM /SECURITY;lowsec:32;highsec:42;newsec:58
+
+        Would change the security level of any user with a security level 
+        between 32 and 42 and make their new security level 58.
+
+
+
+/EXPSECURITY
+
+This parameter performs the same function as the /SECURITY parameter, but the 
+expired security level is used instead of the normal security level.  Using 
+this parameter will prove very useful if you have a bunch of users that have 
+expired security levels between 30 and 40 but you realize you can save time 
+by consolidating them into one single expired level.
+
+lowsec:[security level]
+
+Specifies the lowest expired security level of the range you wish to adjust.  
+You need to also use the highsec sub-parameter to specify the highest number 
+in the range of expired security levels.  Any user record with an expired 
+security level that is either equal to or between the lowsec and highsec 
+sub-parameters will have its security level adjusted.  Replace [security 
+level] with an expired security level between 0 and 255  (e.g., 82).
+
+highsec:[security level]
+
+Specifies the lowest security level of the range you wish to adjust.  You 
+need to also use the lowsec sub-parameter to specify the lowest number in the 
+range of expired security levels.  Any user record with an expired security 
+level that is either equal to or between the lowsec and highsec 
+sub-parameters will have its expired security level adjusted.  Replace 
+[security level] with a valid expired security level between 0 and 255 (e.g., 
+105).
+
+newsec:[security level]
+
+This sub-parameters defines what the new security level will be for the 
+security levels specified with the lowsec and highsec sub-parameters.  
+Replace [security level] with the actual security level between 0 and 255 
+(e.g., 35).
+
+
+        Example
+        
+        PCBSM /EXPSECURITY;lowsec:50;highsec:70;newsec:45
+
+        Will modify the user records of those who have an expired security 
+        level between 50 and 70.  Their old expired security level will 
+        become 45 as specified by the newsec parameter.
+
+
+
+
+
+/COPYEXPIRED
+
+This command line parameter will change the normal security level of users 
+whose subscription has expired to that of their expired security level.  This 
+type of change is most helpful when you do not plan on renewing the 
+subscription for a particular user.  Usually, the user's normal security 
+level will remain unchanged so that when they renew their subscription they 
+will retain their old access.  Using this parameter is the same as selecting 
+System Manager | Users File Maintenance | Adjust Security Levels | Change 
+Security to Expired Level.
+
+print
+
+This is the only sub-parameter you may specify.  If you use it, any users who 
+have their security levels changed will be printed to the printer defined in 
+System Manager.
+
+
+        Example
+
+        PCBSM.EXE /COPYEXPIRED;print
+        
+        This example will change the security level of any user whose 
+        subscription has expired.  The user's normal security level will be 
+        set to equal their expired security level.  In addition, because the 
+        print sub-command was specified, any user who has their record 
+        changed will be printed to the defined printer.
+
+
+
+/EXPIRE
+
+This command line parameter will allow you to change the expiration date of a 
+group of users.  The group of users who have their expiration date changed is 
+based on either a range of normal or expired security levels.
+
+normalsec
+
+If you use this sub-parameter, the security levels you specify using the 
+lowsec and highsec sub-parameters will be based on the normal security level 
+of the user.  You must select either this or the expiredsec sub-parameter to 
+tell System Manager whether it should use the regular or expired security 
+level.
+
+expiredsec
+
+If you use this sub-parameter, the security levels you specify using the 
+lowsec and highsec sub-parameters will be based on the expired security level 
+of the user.  You must select either this or the normalsec sub-parameter to 
+tell System Manager whether it should use the regular or expired security 
+level.
+
+lowsec:[security level]
+
+This sub-parameter will specify the lowest security level for which to adjust 
+the expiration date.  Remember that the security level you specify will be 
+based on the normal or expired security level, depending on whether you used 
+the normalsec or expiredsec sub-parameter.  Replace [security level] with the 
+actual security level (e.g., 38).  This sub-parameter is required.
+
+highsec:[security level]
+
+This sub-parameter will specify the highest security level for which to 
+adjust the expiration date.  Remember that the security level you specified 
+will be based on the normal or expired security level, depending on whether 
+you used the normalsec or expiredsec sub-parameter.  Replace [security level] 
+with the actual security level (e.g., 75).  This sub-parameter is required.
+
+date:[date]
+
+You can modify the expiration dates for users specified via the lowsec and 
+highsec parameters, either by a entering a specific date or by increasing the 
+current expiration date by a set amount of days.  If you use this parameter, 
+the user's expiration date will be set to the calendar date entered here. The 
+date you specify must be in the MMDDYY format where MM is the month, DD is 
+the day, and YY is the year.  You are required to use either this 
+sub-parameter or the days parameter but you may not specify both.
+
+days:[number of days]
+
+You can modify the expiration dates for users specified via the lowsec and 
+highsec parameters, either by a entering a specific date or by increasing the 
+current expiration date by a set amount of days.  If you use this parameter, 
+the user's current expiration date will be increased by the number of days 
+you specify.  You are required to use either this sub-parameter or the date 
+parameter but you may not specify both.
+
+print
+
+This parameter will print information about users whose expiration dates have 
+been  modified.  This report will be printed to the location you specified in 
+System Manager | Define Printer Port.
+
+
+        Example
+        
+        PCBSM /EXPIRE:normalsec;lowsec:30;highsec:40;days:30
+
+        This example will add 30 days to the subscription of every user who 
+        has a normal security level between 30 and 40.
+
+
+/GROUP
+
+This command line parameter will enable you to set or remove the three most 
+commonly used conference flags for a group of users in a range of conferences 
+you specify.
+
+insert
+
+Use this sub-parameter if you wish to set the flags for the conference(s) you 
+specify.  Using this parameter also requires that you use the first, last, 
+lowsec, and highsec parameters.
+
+remove
+
+Use this sub-parameter if you wish to remove the flags for the conference(s) 
+you specify.  Using this parameter also requires that you use the first, 
+last, lowsec, and highsec parameters.
+
+first:[conference number]
+
+This sub-parameter specifies the first conference number in which users will 
+have their flags modified.  This is always used in conjunction with the last 
+sub-parameter to define the range of conferences to be acted upon.
+
+last:[conference number]
+
+This sub-parameter specifies the last conference number in which users will 
+have their flags modified.  This is always used in conjunction with the first 
+sub-parameter to define the range of conferences to be acted upon.
+
+lowsec:[security level]
+
+This sub-parameter is used to define the lowest security level which will be 
+affected by the conference registration flag modifications.  When used in 
+conjunction with the first, last, and highsec sub-parameters, the group of 
+users who will have their conference registration flags modified is defined.
+
+highsec:[security level]
+
+This sub-parameter is used to define the highest security level which will be 
+affected by the conference registration flag modifications.  When used in 
+conjunction with the first, last, and highsec sub-parameters, the group of 
+users who will have their conference registration flags modified is defined.
+
+main
+
+This sub-parameter enables you to either set or remove the conference 
+registration flag (R).  Whether the flag is set or removed depends on whether 
+you use the insert or remove sub-parameter.
+
+expired
+
+This sub-parameter enables you to set or remove the expired access flag (X).  
+If you use the insert sub-parameter, the user will be given access to the 
+conferences specified even if their subscription has expired.  If you use the 
+remove sub-parameter, the users will not have access to the conference when 
+their subscription expires (assuming you have subscription mode enabled).
+
+NOTE:  Setting the X flag without having an R flag set will lock the user out 
+of a conference.  If you really wish for a user to have non-expiring access 
+to a particular conference, you should use the main sub-parameter in 
+conjunction with the expired sub-parameter.
+
+scan
+
+This sub-parameter sets the scan conference flag (S).  Setting this flag 
+selects the conference to be included in any message scans performed, and is 
+similar in effect to the user SELECT command.  If a user is unable to join a 
+conference where the S flag is set, the flag will be ignored and the 
+conference will not be included in the scan.
+
+reset
+
+If this parameter is specified, the last message read pointer will be set to 
+0 in the conferences specified by the first and last parameters.
+
+
+        Example
+                
+        PCBSM /GROUP;insert;first:0;last:2,lowsec:20;highsec:30;main;expired
+
+        This particular example will register users who have a security level 
+        between 20 and 30 in conferences 0, 1, and 2.  In addition to being 
+        registered, all users will be given access to the conference when 
+        their subscription expires because the expired sub-parameter is used.
+
+
+
+/INDEX
+
+Use this parameter to re-index the user file.  For this operation all nodes 
+do not have to be down.  Normally, you will not need to re-index the user 
+file because PCBoard takes care of maintaining it.  However, there are 
+circumstances that can occur in your system configuration (corrupt media, 
+etc.)  which may corrupt your index files.
+
+
+	Example
+
+        PCBSM /INDEX
+
+        This example will index the user file making sure that it is current.
+
+
+
+/PACK
+
+Packing your user file can do the following for you:
+
+Insure the USERS, USERS.INF and user index files are all in sync with one 
+another.
+
+Remove users from your system who have not called in a specified amount of 
+time.
+
+Delete user records that have been marked for deletion or that have been 
+locked out from the system.
+
+If you do not use any sub-parameters, System Manager will insure that the 
+USERS, USERS.INF, and user index files are in sync with one another.  Because 
+this is a global change to the user file, all nodes must be down before 
+selecting this option.  Otherwise, System Manger will continually try to open 
+the USERS file.
+
+remove
+
+When this sub-parameter is specified, any user who has been marked for 
+deletion (ALT-D when editing user records) or who has a security level of 0 
+(locked out) will be physically removed from the user file.  If you do not 
+want to remove users who are locked out from the system so as to prevent them 
+from recreating a new account, use the lockout sub-parameter.
+
+days:[number of days]
+
+To help keep the size of your user file in check, you may wish to remove 
+accounts of users who have not called in a certain number of days.  This 
+sub-parameter gives you this ability. Replace [number of days] with the 
+actual number of days to have elapsed since the user's last call to be 
+considered an inactive account which may be purged from the user file.
+
+since:[date]
+
+This sub-parameter will remove users who have not accessed the system since 
+the date you specify.  That date you specify must be in MMDDYY format where 
+MM is the month, DD is the day, and YY is the year.
+
+expdate:[date]
+
+When you use this sub-parameter, any user who has an expiration date earlier 
+than the one  you specify (MMDDYY format) will be removed from the user file.
+
+keep:[security level]
+
+This sub-parameter will prevent users who have the security level you specify 
+(or higher) from being removed regardless of any criteria specified.
+
+lockout
+
+When you use this sub-parameter it will prevent any users who have been 
+locked out of your system (security level 0) from being deleted.  Use this 
+subparameter in conjunction with the remove sub-command.
+
+print
+
+Any users who are removed from the users file will be printed to the location 
+you specified in System Manager | Define Printer Port
+
+
+        Example
+
+        PCBSM /PACK;remove;lockout;days:180
+
+        The example above will remove any user who has been marked for 
+        deletion or who has not called within the last 180 days. Because the 
+        lockout parameter is specified, users who are locked out of your 
+        system will not be deleted.
+
+
+
+/PURGE
+
+This command line parameter is identical to the /PACK parameter except the 
+entire system does not need to be down to pack the users file.  This will 
+enable you to perform an online pack of the users file without having to take 
+the entire system down, which becomes increasingly difficult as you add more 
+nodes to your system.
+
+Any user who is online when the pack is performed will not be affected.  This 
+means that even if the user would have been packed out with the criteria that 
+you specified, the record will not be deleted because the  user was currently 
+online.  This should not present much of a problem though, as you can pack 
+the file again at a later time when the user is not online.
+
+NOTE:  Online packing is disabled if you have installed the Alias PSA.
+
+
+        Example
+
+        PCBSM /PURGE;since:010194;keep:100
+
+        The example above will remove any user who has not called since 
+        January 1, 1994.  The keep parameter will insure that no users above 
+        security level 100 will be removed.
+
+
+/STANDARDIZE
+
+Use this command line parameter if you plan on sorting your users file by 
+phone number, or if you desire a more "standard" looking phone number format 
+for all of your users.  When this parameter is specified, System Manager will 
+strip all of the non-numerical data from the phone number fields and reformat 
+it into the following format:
+
+
+999 999-9999
+
+
+If a number is shorter than 10 digits, System Manager will begin formatting 
+from the right.  This means that if a user enters 5551212 for the phone 
+number, it will be formatted as:
+
+
+    555-1212
+
+
+        Example
+
+        PCBSM /STANDARDIZE
+
+        Adjust the home/voice and business/data phone number fields to a 
+        standard 999 999-9999 format.
+
+
+
+
+
+/ADDTPA
+
+This particular command line switch is designed for third party authors to 
+use so they can easily install a TPA for their software without making you do 
+all the hard work.  This is the format of the command line:
+
+	/ADDTPA;[App_Name];[Version];[Static];[Dynamic];[Keyword]
+
+
+
+  App_Name  The name of the application
+
+  Version   The version number to install (digits only)
+
+  Static    Represents the static size (in bytes) to allocate or 0 for none.
+
+  Dynamic   Represents the number of bytes to allocate for each conference or 
+            0 for none.
+
+  Keyword   The keyword for the TPA.
+
+
+For additional information on installing a TPA, please see Add/Update Third 
+Party Application earlier in this section.
+
+
+        Example
+
+        PCBSM /ADDTPA;mail;10;128;1;mail
+
+        Add a TPA with an application name of Mail and a version number "10".  
+        128 bytes will be reserved for each user on the system with an 
+        additional 1 byte per conference.  Finally, the keyword is mail.
+
+
+
+/SORT
+
+Sorting the user file gives you a quick method to access information.  For 
+example, if you want to find out who has uploaded the most to your system, 
+you can sort the user file by total number of bytes uploaded.  When a user 
+file is sorted, you have all of the users in order based on how many bytes 
+they have uploaded.  You can sort on a single field or with multiple fields.
+
+When you sort on a single field, select an item such as the number of times a 
+user has called the system.  System Manager will sort users by the total 
+number of times they have called. If two users have called the same number of 
+times, no attempt is made to put those users in any particular order.  If you 
+wish to sort these users by name, do a multi-field sort.
+
+Multi-field sorts, will sort any of the following fields:
+
+
+Security level
+Times ON
+Files download
+Files uploaded
+File ratio
+Bytes downloaded
+Bytes uploaded
+Byte ratio
+
+When using a multi-field sort by security level and two or more users have 
+the same security level, System Manager will sort these users who have the 
+same security level alphabetically by name.  Once the users are sorted by 
+name, it will move on to the next security level.  As a quick example, let's 
+assume you have 5 users in your system:
+
+
+JOHN SMITH	Security: 10
+JIM JONES	Security: 20
+SPENCER KORM	Security: 20
+BILL GATES	Security: 0
+PAUL BRAINERD	Security: 20
+
+If you were to do a single field sort, the users will most
+likely end up in this order:
+
+
+BILL GATES	Security: 0
+JOHN SMITH	Security: 10
+JIM JONES	Security: 20
+SPENCER KORM	Security: 20
+PAUL BRAINERD	Security: 20
+
+
+Notice that the security level 20 users are not sorted by name. While this 
+does not present much of a problem for 5 users, it could be very annoying if 
+you have 30,000 users on your system.
+
+If you do a multi-field sort based instead on security level then on name, 
+the five users will be sorted in the following order:
+
+BILL GATES	Security: 0
+JOHN SMITH	Security: 10
+JIM JONES	Security: 20
+PAUL BRAINERD	Security: 20
+SPENCER KORM	Security: 20
+
+With the exception of the prireverse and secreverse sub-parameters, all 
+parameters specify types of sorts you can perform.  If you want to perform a 
+multi-field sort, use name and any of the following:
+
+security - Security level
+timeson - Times on
+dlfile - Files download
+ulfile - Files uploaded
+fratio - File ratio
+dlbyte - Bytes downloaded
+ulbyte - Bytes uploaded
+bratio - Byte ratio
+
+The following is a list of the many sub-parameters you can specify for this 
+command line parameter:
+
+name            Sort by user name field.
+
+password        Sort by password field.
+
+dataphone       Sort by the business/data phone number field.
+
+homephone       Sort by the home/voice phone number field.
+
+expdate         Sort by the expiration date of each user.
+
+usercomment     Sort by the comment #1 field.
+
+sysopcomment    Sort by the comment #2 field.
+
+city            Sort by the city field.
+
+security        Sort by the security level field.
+
+timeson         Sort by the number of times the user has successfully logged 
+                in.
+
+dlfile          Sort by the number of files downloaded.
+
+upfile          Sort by the number of files uploaded.
+
+fratio          Sort by the file ratio. 
+
+dlbyte          Sort by the number of bytes downloaded. 
+
+upbyte          Sort by the number of bytes uploaded. 
+
+bratio          Sort by the byte ratio. 
+
+reverse         This sub-parameter is used when you sort by a single field.  
+                If you use it, the records will be sorted in reverse order.  
+                For example, if you sort by security level, the highest 
+                security level will be first in the user file and the lowest 
+                security level will be the last record in the file.
+
+prireverse      This sub-parameter is used in conjunction with multiple field 
+                sorts.  Normally sorts are performed in ascending order.  
+                When you use this parameter, the primary sort field will be 
+                sorted in descending order.
+
+secreverse      Since the only field you can use as a secondary field is the 
+                user name, this will cause any duplicates caught by the first 
+                sort field to be sorted by name in reverse order.  This means 
+                that William Plasger will be placed before Andrew Leaver.
+
+
+        Examples
+        
+        PCBSM /SORT:security;reverse
+
+        Sort the user file by security in reverse order placing those
+        with the highest security level at the beginning of the file.
+
+        PCBSM /SORT:dlbyte;name;prireverse
+
+        Sort the user file by the number of bytes downloaded (in reverse 
+        order) placing those who have downloaded the most towards the 
+        beginning of the user file.  If two users have the same number of 
+        bytes downloaded, they will be sorted by name to determine who should 
+        be placed first in the user file.
+
+
+
+/RETRY:[max number of retries]
+
+This command line parameter specifies the number of attempts System Manager 
+should retry on an error.  Most commonly, the error will occur when trying to 
+access the USER file when all nodes are not down.  However, it is conceivable 
+for the error to be an error reading from disk or other critical error.
+
+When you are using the command line parameters to run System Manager in your 
+event, this command line parameter can prove very useful.  With the exception 
+of the /PURGE,  /INDEX, /RETRY, and /FILE command line parameters, all others 
+require all nodes to be down before proceeding.  If all nodes are not down, 
+System Manager will make continuous attempts every 10 seconds to access the 
+USERS file until it becomes free.
+
+Of course there is a real problem if you are trying to sort the user file in 
+your 1:00 am event but one of  your nodes either failed to go down for the 
+event or was improperly configured. If you were not to catch this until 7:00 
+am the next morning, you could have lost 6 hours of dial-in time.  In a 
+situation like this, using the /RETRY parameter to make 10 retry attempts and 
+then exit to DOS (returning control to your event batch file) is very 
+advantageous.
+
+
+	Example
+
+	PCBSM /PACK;remove /RETRY:20
+
+        The example above would pack the users file removing any user   that 
+        has been marked for deletion or who has a security level of 0.  
+        Should an error occur, 20 attempts will be made before System Manager 
+        will finally abort the attempt.
+
+
+/FILE:[location of PCBOARD.DAT]
+
+System Manager needs to access the PCBOARD.DAT file so it can determine where 
+your user files (and other configuration files) are stored.  Normally, System 
+Manager will only look in the current directory for the PCBOARD.DAT file.  
+However, you can tell it where to find the file by using this command line 
+parameter.
+
+Simply replace [location of PCBOARD.DAT] with the full path and filename 
+where it can be found (e.g., C:\PCB\PCBOARD.DAT).
+
+
+        Example
+
+        PCBSM /FILE:H:\SHARE\PCBOARD.DAT
+
+        The example above will load System Manager and specify that it should 
+        use the PCBOARD.DAT located in H:\SHARE to find the information about 
+        PCBoard.
+

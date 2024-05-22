@@ -82,7 +82,7 @@ impl PcbBoardCommand {
             }
         }
 
-        let protocol_str: String = self.state.current_user.as_ref().unwrap().protocol.clone();
+        let protocol_str: String = self.state.session.current_user.as_ref().unwrap().protocol.clone();
         let mut protocol = None;
         for p in &self.state.get_board().await.protocols.protocols {
             if p.is_enabled && p.char_code == protocol_str {

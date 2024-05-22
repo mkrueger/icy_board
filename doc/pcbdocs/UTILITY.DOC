@@ -1,0 +1,2187 @@
+12
+==============================================================================
+                                                                     Utilities
+
+
+
+
+
+
+
+
+
+File Testing & Viewing Utilities
+
+MAKEIDX
+
+PCBEdit
+
+PCBModem
+
+PCBMoni
+
+PCBNum
+
+PCBPack
+
+PCBSTATS
+
+PCBText Utilities
+
+USERNET
+
+Miscellaneous Utilities
+
+
+File Testing & Viewing Utilities
+
+The utilities described in this section are used primarily in your 
+PCBTEST.BAT and PCBVIEW.BAT files.  Each section describes the utilities in 
+detail.
+
+PCBDescribe
+
+PCBDescribe (PCBDESC.EXE) checks uploaded files for FILE_ID.DIZ files 
+provided by the program author.  If the uploaded file contains a description 
+file, it will replace the description that the user supplied with the one 
+provided in the file.
+
+PCBDescribe is compatible with the following archive formats and requires the 
+specified program to uncompress the description files when found:
+
+File Extension 	Requires 
+ARC 	PKXARC 
+ARJ 	ARJ 
+LZH 	LHA 
+PAK 	PAK 
+ZIP 	PKUNZIP 
+
+
+Installing PCBDescribe
+
+PCBDescribe is used inside of the PCBTEST.BAT file, which is run to test each 
+upload to the system.  Place the PCBDESC.EXE file in your default \PCB 
+directory and insert the following line toward the top of your PCBTEST.BAT:
+
+         IF %2==UPLOAD PCBDESC %1 %3
+
+There is only one option; if you would like to have an additional line in the 
+description showing the date of the oldest and newest files in the archive, 
+use this command instead:
+
+         IF %2==UPLOAD PCBDESC /D %1 %3
+
+The word UPLOAD in the above example is case sensitive.  Make sure you type 
+it in uppercase letters.  Also, make sure that you have a copy each of the 
+required unarchive programs (PKUNZIP, ARJ, LHA, PAK, PKXARC) according to the 
+types of files you expect to receive.  These unarchive programs should be 
+placed either in your default \PCB directory, or in a subdirectory referenced 
+by your PATH.
+
+PCBDescribe can be the first thing in your PCBTEST.BAT file; it will only 
+operate on ZIP, ARJ, LZH, PAK and ARC files (as well as self-extracting 
+versions of those files).
+
+Protecting Your System From DOS Reserved Words
+
+PCBDescribe will watch for harmful DOS reserved words such as CON, AUX, PRN, 
+CLOCK$, COMx, LPTx, and, if found in the archive, will rename the file by 
+incrementing the last letter of the filename by one.  The following 
+illustrates what the filenames will be renamed to:
+
+*.ARC  ð  *.ARD
+*.ARJ  ð  *.ARK
+*.EXE  ð  *.EXF
+*.LHA  ð  *.LHB
+*.PAK  ð  *.PAL
+*.ZIP  ð  *.ZIQ
+
+Once the filename has been renamed, a line will be added to the description 
+of the file indicating the reason for the rejecting. Finally, PCBDescribe 
+will exit to DOS with an errorlevel of 5 to indicate a problem with the file 
+so further testing of the file can be avoided saving the system from a lockup 
+that could occur if you have a testing program which does not watch for DOS 
+reserved words.
+
+It is recommended that immediately after the execution of PCBDescribe, you 
+insert a line in the PCBTEST.BAT file which reads:
+
+         IF ERRORLEVEL == 5 GOTO END
+
+At the bottom of your PCBTEST.BAT file have a line which has nothing but :END 
+on it.  This will allow PCBDescribe's errorlevel 5 to signal that the rest of 
+the testing process should be skipped.  For more information on testing 
+errorlevels in batch files, refer to your DOS manual.
+
+Errorlevels Returned
+
+PCBDescribe will return errorlevels to your batch file to indicate what it 
+has done.  These errorlevels can be tested and used for your own purposes.  
+The following values are returned:
+
+	0	No processing performed
+        
+        1       File was not a supported archive or contents were damaged
+
+	2	Description was updated (found a FILE_ID.DIZ or DESC.SDI)
+
+        3       Description was updated (no description file found but the 
+                line showing the newest and oldest dates was added to the 
+                description).
+
+        4       Found description file but unable to process.  This could 
+                occur if the program to uncompress the archive is not found.
+
+        5       Found a DOS reserved word, renamed the file, modified the 
+                description.  No further actions have been taken nor should 
+                be taken by other programs.
+
+The Description File
+
+PCBDescribe will accept descriptions contained in FILE_ID.DIZ files found in 
+the archive being tested.  The FILE_ID.DIZ file is an ASCII text file, and 
+can contain up to 10 lines of 45 characters each.  The first line of this 
+file is the program name and version, and the following lines describe the 
+function of the program.  It is recommended that formatting codes (such as 
+ASCII line drawing characters) NOT be used.
+
+PCBDescribe will also detect and use descriptions contained in DESC.SDI files 
+if they are present.  No other description file formats are supported.
+
+ATTENTION!  The FILE_ID.DIZ file format is intended for the program author's 
+use in providing a coherent description of the program.  In this way, the 
+author and the SysOp can be assured that the program will be properly 
+described when uploaded to a BBS.  DO NOT use this file for BBS advertising!
+
+TESTFILE
+
+Used to determine the extension of a filename and exit with an errorlevel.
+
+Syntax
+
+TESTFILE [filename] [ext] [ext] ... [ext]
+
+Command Line Parameters
+
+[filename]      The filename you want to check to determine the extension. If 
+                you are using TESTFILE in your PCBVIEW or PCBTEST batch 
+                files, specify %1 for the filename.
+
+[ext]           These parameters reference the filename extensions you want 
+                to check for.  If the filename you specify matches one of the 
+                extensions you enter as a parameter, PCBoard will exit with a 
+                unique errorlevel.  By testing the errorlevel returned, you 
+                can determine the extension of the filename.
+
+Description
+
+When you are passing a filename as a parameter to a batch file, quite often 
+it is useful to know the extension of the file. Once you know the extension 
+of the file, you can perform special processing.  For example you may want to 
+treat files that end in .TXT different from those that end with .ZIP or .ARJ.
+
+To determine the extension of the file, you must specify the filename to test 
+and the extension that you want to test on the command line when you execute 
+TESTFILE.  The errorlevel that is returned will determine the extension of 
+the file.
+
+Errorlevels Returned
+
+The errorlevel returned by TESTFILE is based on the placement of the 
+extension on the command line.  The following example illustrates:
+
+TESTFILE FILENAME.TXT ZIP ARJ LHA TXT
+
+If you type this line at a DOS command prompt, TESTFILE will return an 
+errorlevel of 4.  Why 4?  The reason that errorlevel 4 is returned is that it 
+is the fourth extension specified on the command line.
+
+What if the extension of the file is not specified on the command line as 
+shown in the following example?
+
+
+TESTFILE CONFIG.SYS ZIP ARJ LHA TXT
+
+
+In this situation, TESTFILE will return an errorlevel of 98. You will not 
+know the file extension, but you will know that it is not one you included on 
+the command line.
+
+Example
+
+Assuming you are using the following batch file named TESTIT.BAT
+
+
+@echo off
+testfile %1 zip arj gif
+if errorlevel==98 goto notknown
+if errorlevel==3 echo GIF file specified.
+if errorlevel==2 echo ARJ file specified.
+if errorlevel==1 echo ZIP file specified.
+goto end
+
+:notknown
+echo Could not determine extension.
+
+:end
+
+
+the following table will show the response for the value you pass as %1 to 
+the batch file:
+
+%1 Parameter 	Response From Batch File 
+TEXTEDIT.ZIP 	ZIP file specified. 
+TEXTEDIT.EXE 	Could not determine extension. 
+WOODGRAN.ARJ 	ARJ file specified. 
+README.TXT 	Could not determine extension. 
+SCENE.GIF 	GIF file specified. 
+
+
+
+VIEWZIP
+
+This utility is designed to be used in PCBVIEW.BAT.  The ZIP filename you 
+specify as the first parameter will be examined. If the file is a valid ZIP, 
+a list of the files contained in the archive will be written to PCBVIEW.TXT.  
+When PCBoard returns from PCBVIEW.BAT, it checks to see if PCBVIEW.TXT 
+exists.  If it does, the contents of the file are displayed to the caller. 
+Using this method, your callers will be able to see a list of files in an 
+archive.
+
+Example
+
+In the PCBVIEW.BAT that is supplied with your copy of PCBoard, you will see 
+the following line:
+
+viewzip %1
+
+Upon returning from PCBVIEW, a report resembling the following will be 
+displayed:
+
+  Filename     Length     Method    SF   Size Now    Date    Time
+
+------------  ---------  --------  ---- ---------- --------- -----
+INSTALL.EXE       40517  DeflateX    3%     39219  15 May 92 09:29
+PCB145.EXE       134833  DeflateX    0%    133740  09 Sep 92 11:28
+PCBDISK1.EXE      43774  DeflateX    0%     43633  15 May 92 10:05
+FILE_ID.DIZ         245  DeflateX   13%       213  08 Sep 92 12:07
+                                                             
+Total       4    219369              1%    216805
+
+
+VIEWARCH
+
+This utility is designed to be used in PCBVIEW.BAT.  The ARC filename you 
+specify as the first parameter will be examined. If the file is a valid ARC 
+file, a list of the files contained in the archive will be written to 
+PCBVIEW.TXT.  When PCBoard returns from PCBVIEW.BAT, it checks to see if 
+PCBVIEW.TXT exists.  If it does, the contents of the file are displayed to 
+the caller.  Using this method, your callers will be able to see a list of 
+files in an archive.
+
+Example
+
+In the PCBVIEW.BAT that is supplied with your copy of PCBoard, you will see 
+the following line:
+
+viewarch %1
+
+Upon returning from running PCBVIEW on a file with an ARC extension, a report 
+resembling the following will be put in PCBVIEW.TXT and displayed by PCBoard:
+
+  Filename       Length     Method    SF    Size Now     Date    Time
+
+------------   ----------  --------  ----  ----------  --------- -----
+
+PC-PR.EXE          69,776  Squashed   28%      49,824  14 Jan 91 10:40
+
+Total         1    69,776             28%      49,824
+
+
+MAKEIDX
+
+If you want to speed up the time it takes PCBoard to scan the files for 
+download on your CD-ROM or hard drive, create one or more index files using 
+MAKEIDX.
+
+Syntax
+
+MAKEIDX [path file] [index file]
+
+[path file]     The path file is read by MAKEIDX to determine the filenames 
+                that should be stored in the index file.  This file is a 
+                regular ASCII file with one path listed on each line.  If you 
+                do not include an extension for this file, .PTH will be 
+                assumed.
+
+[index file]    This is the index file that will be created by MAKEIDX.  The 
+                index will contain all files stored in the paths listed in 
+                the path file.  There is a limit of 65,535 files per index.  
+                If you have more than 65,000 files available on your system, 
+                create more index files.  If you do not include an extension 
+                for this file, .IDX will be assumed.
+
+Creating the Path File
+
+Use any ASCII text editor to create the path file.  On each line, type in a 
+path that you want MAKEIDX to search for files to put in the index.  If the 
+path you specified has child subdirectories, they will automatically be 
+included in the index.  For example, if you have a CD-ROM (drive J) and want 
+to create an index file of the entire drive, create a path file which 
+contains the following line:
+
+J:\
+
+Since MAKEIDX searches paths recursively, it will search all of the files on 
+drive J.  This is much faster than having to type in all of the paths on your 
+CD-ROM into the path file.
+
+Another example may involve one of the hard drives on your system.  This 
+index may be a little more tricky because you do not want to make all of the 
+files on that drive available for download.  What you need to do is specify 
+only the paths you want MAKEIDX to search in the path file as shown in the 
+following example:
+
+D:\DL1\
+D:\DL2\
+D:\DL3\
+D:\SPECIAL\
+
+When you create the index, all files in the D:\DL1\, D:\DL2\, D:\DL3\, and 
+D:\SPECIAL\ subdirectories will be included in the index file.
+
+NOTE:  Do not include the paths to any public or private upload file 
+directories in your index files.  The index files are static and do not get 
+updated when files are uploaded to the system.  To update the index files you 
+must recreate them using MAKEIDX.
+
+Creating the Index File
+
+Once you have created a path file you can create the index file using 
+MAKEIDX.  For this example, let's assume your path file is called CDROM1.PTH 
+and the contents of the file are as follows:
+
+I:\
+
+To create the index, type the following:
+
+MAKEIDX CDROM1.PTH CDROM1.IDX
+
+On the upper lefthand corner of your screen you will see a list of the paths 
+being searched.  Once the paths have been searched, PCBoard will sort the 
+files and write the index to disk.  You will find the index file in the 
+location you specified when running MAKEIDX.  Now that the index file has 
+been created, modify the configuration of PCBoard to use the index file you 
+created.
+
+Updating PCBoard to Use Index Files
+
+The only place PCBoard will recognize index files inside of the DLPATH.LST 
+file.  Each conference has a field that specifies the DLPATH.LST file that 
+will be used.  Once you have created an index, edit DLPATH.LST and make sure 
+any paths listed in your DLPATH.LST are deleted.  For example, if your 
+original DLPATH.LST resembled the following
+
+
+D:\DL1\
+D:\DL2\
+D:\DL3\
+D:\DL4\
+D:\DL5\
+D:\UPLOAD\
+
+and you created an index which stores the filenames of the first five 
+directories, modify your DLPATH.LST file to read:
+
+D:\UPLOAD\
+
+Next, insert a line and type % followed by the location and filename of the 
+index you want PCBoard to use.  If you create your index in the C:\PCB\INDEX\ 
+subdirectory and called it CONF0.IDX, you will have the following entries in 
+your DLPATH.LST file:
+
+D:\UPLOAD\
+%C:\PCB\INDEX\CONF0.IDX
+
+If you do not put the % at the beginning of the line, PCBoard will not find 
+the index.  Instead, it will treat C:\PCB\INDEX\CONF0.IDX as a subdirectory 
+and attempt to search it for files.
+
+Using Index Files With Hard Drives
+
+Unlike a CD-ROM, the data on a hard drive can change.  Files can be deleted, 
+renamed, moved, or added to the drive.  To help accommodate the use of an 
+index file with a hard drive, PCBFiler will run REFRESH.BAT if it exists and 
+files have been moved, copied, or deleted on your system.
+
+In the REFRESH.BAT file, add the necessary lines that will run MAKEIDX to 
+re-create all of your index files.  For example, your REFRESH.BAT may 
+resemble the following:
+
+MAKEIDX C:\PCB\INDEX\CDROM1.PTH C:\PCB\INDEX\CDROM1.IDX
+MAKEIDX C:\PCB\INDEX\GIFS.PTH C:\PCB\INDEX\GIFS.IDX
+
+The REFRESH.BAT file should be put in the same directory as PCBFiler or in a 
+subdirectory that is specified by your PATH= statement.
+
+PCBEdit
+
+PCBEdit is a utility which you can use to edit text files. Support for 
+PCBoard's @X color codes and @ macros is directly integrated into PCBEdit.
+
+Starting PCBEdit
+
+There are several command line parameters or options you can specify when 
+loading PCBEdit.  These parameters will control how PCBEdit will behave.  If 
+you are not yet familiar with PCBEdit, skip the sections that discuss command 
+line parameters.
+
+The PCBEdit command line uses the following format:
+
+PCBEDIT /parameter /parameter ... /parameter [filename]
+
+The following section describes the valid command line parameters for 
+PCBEdit.
+
+Command Line Parameters
+
+/ATMAC:[@macro@]:[replacement text]
+
+When a PCBoard @ macro is displayed in PCBEdit, default text is displayed in 
+their place.  To change the text that is displayed for each @ macro, use this 
+command line parameter.  After the colon, specify the @ macro you want to 
+change the default text followed by a colon and the next text to be 
+displayed.
+
+Example usage:
+
+PCBEDIT "/ATMAC:@USER@:JIM SMITH"
+
+NOTE:  Quotes must surround any parameter which contains a space.  If no 
+quotes are used, the command line parameters will be mis-interpreted.
+
+/COLOR
+
+Forces PCBEdit to use a color display adapter card even if a monochrome card 
+was detected.
+
+/LLEND:[ASCII code(s)]
+
+Specifies a different character sequence to be appended to the last line when 
+a file is saved.  By default, the last line is written with a carriage return 
+/ line feed appended to it.  With this switch, you can change it to several 
+carriage return/line feed pairs, an end of file character, etc.  Replace 
+[ASCII code(s)] with any valid ASCII codes.
+
+Example usage:
+
+PCBEDIT /LLEND:013,010,013,010
+
+/MACRO:[filename]
+
+Loads the macro filename specified by [filename].
+
+Example usage:
+
+PCBEDIT /MACRO:C:\PCB\PCBEDIT.MAC
+
+/MONO
+
+Forces PCBEdit to use a monochrome display adapter card even if a color 
+display is detected.
+
+/NOAT
+
+Forces PCBEdit to not interpret @ macros or @X codes (regardless of  whether 
+or not /ATX is in effect).  This setting is useful for using PCBEdit as a 
+text editor.
+
+/NOATX
+
+Forces PCBEdit to ignore @X codes and to display all text in the attribute 
+specified via the /STARTATTR option.
+
+/NOBAK
+
+Forces PCBEdit to not keep backup files.
+
+/NOBUZZ
+
+Disables the buzzing sound for alerting the user about error conditions.
+
+/NODOS
+
+Forces PCBEdit to not allow shells to DOS.
+
+/NOIO
+
+Disables the ALT-I, ALT-K and ALT-L functions.  Also disables the ability to 
+specify the filename to save in the ALT-S function.
+
+/NOQUICK
+
+Displays the welcome screen when PCBEdit starts.
+
+/NOSS
+
+Tells PCBEdit to not strip trailing spaces from lines.
+
+/SET:[filename]
+
+Loads the file specified by [filename] as the function key character set 
+(available by pressing ALT-F in PCBEdit).  
+
+Example usage:
+
+PCBEDIT /SET:C:\PCB\PCBEDIT,KEY
+
+/SNOW
+
+Tells PCBEdit to test for CGA screen snow.
+
+/SS
+
+Tells PCBEdit to strip trailing spaces from lines.
+
+/STATUS:[type]
+
+Changes the default status bar type to the type specified:
+
+
+	0 = detailed status bar with code ribbon  (Default)
+	1 = function key status bar with code ribbon
+	2 = no status bar or code ribbon
+
+/STRIPG
+
+Always strip the G graphics file specification (if present) prior to 
+attempting a file load.
+
+/TRYNOG
+
+Strip the G graphics file specification (if present) if a file with the G as 
+part of the filename doesn't exist.
+
+REM [/option]
+
+Removes the command line parameter from processing (works with any parameter 
+which begins with a forward slash [/].
+
+Specifying Command Line Parameters
+
+There are three ways of specifying startup options.  The first is on the 
+PCBEdit command line.  For example:
+
+PCBEDIT /NOQUICK /MACRO:MAIN.MAC /SET:MAIN.SET NEWSG
+
+The second means of specifying startup options is through the PCBEDIT 
+environment variable, which you can SET in your AUTOEXEC.BAT file.  An 
+example line would look like this:
+
+ SET PCBEDIT=/QUICK "/ATMAC:@USER@:SCOTT ROBISON"
+
+Finally, startup options may be specified in a configuration file.  It is 
+named PCBEDIT.CFG and can be located in the same directory as PCBEDIT.EXE or 
+in the current directory.  It can be created with any text editor, may have 
+as many lines as necessary, and may have several options on one line, as long 
+as all lines are limited to 127 characters or less.  Here's an example:
+
+
+"/ATMAC:@USER@:FIRST LAST"
+/NOBAK
+/MACRO:C:\PCB\PCBEDIT.MAC
+/STATUS:1
+
+
+PCBEdit searches for startup options in the following order:
+
+PCBEDIT.CFG (first in the directory with PCBEdit, then in the current 
+directory)
+
+7PCBEDIT environment variable
+
+PCBEDIT command line.
+
+In this way, an option in the PCBEDIT.EXE directory configuration file can be 
+overridden by another option later in the same file, in the other 
+configuration file, environment variable or command line.
+
+NOTE:  Parameters specified on the command line always override any prior 
+settings.
+
+PCBEdit Macros
+
+Fifteen sets of user-defined macros are supported by PCBEdit. Each set 
+consists of ten strings that may be accessed via the F1 - F10 function keys. 
+Different sets may be accessed by utilizing the SHIFT-ALT-F1 - SHIFT-ALT-F10 
+keys for sets 1 - 10 and the SHIFT-CTRL-1 - SHIFT-CTRL-5 keys for sets 11 - 
+15.  The macros may be selected from and maintained with the ALT-G key.  Each 
+macro may consist of whatever text the user would like.  Additionally, the 
+following special sequences are recognized by PCBEdit:
+
+        \X      Stuffs the character following backslash in the keyboard 
+                buffer (\\ to stuff a literal backslash)
+
+        \       By itself at the end of a macro with nothing following it 
+                will stuff a literal backslash in the keyboard buffer
+
+	~X	Stuffs the lowercase letter X in the keyboard buffer
+
+	~#	Stuffs the code for function key F# in the keyboard buffer
+
+        ~       By itself at the end of a macro with nothing following it 
+                will stuff a literal tilde in the keyboard buffer
+
+	#X	Stuffs the uppercase letter X in the keyboard buffer
+
+        ##      Stuffs the code for function key Shift-F# in the keyboard 
+                buffer
+
+        #       By itself at the end of a macro with nothing following it 
+                will stuff a literal pound sign in the keyboard buffer
+
+        ^X      Stuffs a CTRL-X in the keyboard buffer
+        
+        ^#      Stuffs the code for function key control F# in the keyboard 
+                buffer
+
+        ^       By itself at the end of a macro with nothing following it 
+                will stuff a literal carat in the keyboard buffer
+
+        !X      Stuffs an ALT-X in the keyboard buffer
+
+        !#      Stuffs the code for function key alt F# in the keyboard 
+                buffer
+
+        !       By itself at the end of a macro with nothing following it 
+                will stuff a literal exclamation point in the keyboard buffer
+
+Using PCBEdit
+
+PCBEdit is not meant to replace screen-design programs such as TheDraw.  
+These programs are still incredibly useful for screen design. PCBEdit is 
+designed to allow you to write what we call information intensive display 
+files (such as NEWS and BLT files), as opposed to display intensive files 
+(such as WELCOME and BRDM.)
+
+PCBEDIT.EXE will exists in the same directory where you installed PCBoard.  
+In fact, if you installed a brand new PCBoard, you will notice the default 
+editor defined in System Manager | Define Text & Graphics Editors is PCBEdit.   
+Because it deals with PCBoard's @X codes and @ macros, it can be used to 
+design all files, eliminating the need for separate graphics display files.
+
+To load PCBEdit, type the following at the DOS prompt:
+
+
+PCBEDIT
+
+If you already know the filename you want to edit, specify it on the command 
+line when you load PCBEdit.  The following illustrates how to edit 
+C:\PCB\GEN\NEWS:
+
+PCBEDIT C:\PCB\GEN\NEWS
+
+When PCBEdit is loaded, you will see the following screen:
+
+This is the screen where you will do all of the editing.  For a brief 
+description and list of keyboard commands that are available in PCBEdit.  A 
+brief summary of the most commonly used keyboard commands follows:
+
+        ALT-A     Change the current color attribute.  Use this to insert a 
+                  color at the current cursor position.
+        
+        ALT-L     Load a file into the editor.  Only one file can be loaded 
+                  at a time.
+
+        ALT-S     Save the current file to disk.
+
+        ALT-X     Exit PCBEdit.
+
+        PgDn      View the next 23 lines in the file.
+
+        PgUp      View the previous 23 lines in the file.
+
+        Up        Move the cursor up one row.
+
+        Down      Move the cursor down one row.
+                
+        Left      Move the cursor to the left.
+
+        Right     Move the cursor to the right.
+
+
+Answers To Common Questions
+
+
+PCBEdit saves files with a carriage return/line feed after the last line, but 
+I need an end of file character after the last line.   Is there a way to 
+accomplish this?
+
+There are a couple of ways to do this.  One is to position yourself at the 
+end of the last line just before saving it and hit CTRL-Z or ALT-026 (on the 
+numeric keypad).  Another option, if you want it to save that way every time 
+you save the file, is to use the /LLEND option to change the last line ending 
+sequence of characters.   /LLEND:26 will save an end of file marker after the 
+last line instead of a CR-LF.
+
+When I change background colors and type spaces all the way to the end of the 
+line it displays as expected.  But sometimes if I move the cursor off of that 
+line (and always after a save and reload of the same file) the background 
+color no longer appears across the entire line.  What happened?
+
+The effect you desire is automatic when using screen oriented editors (such 
+as TheDraw and PCBDraw) because they save the entire screen (80X25), and 
+that's why you can only edit that size of display with those programs.  Since 
+PCBEdit functions more as a text editor instead of a screen editor, it 
+attempts to optimize the output of the file before saving by stripping 
+trailing spaces before writing the file to disk.  This is easily avoided by 
+including a color change at the end of the line back to the original 
+background color.  For example, to include a blue bar on a line (with nothing 
+else) on a line, type the following:
+
+@X00@X1F     @XFF
+
+Since the @XFF appears after the spaces, the spaces are treated as 
+significant and are saved with the file.  Since the @XFF only performs a 
+color change, nothing textual is displayed after the spaces, giving you the 
+desired effect.  Additionally, if you wish to have the color change affect 
+the rest of the current line you could use an @CLREOL@ macro to change the 
+color of the line.
+
+I prefer the status bar format from TheDraw and PCBDraw.  Is there any way to 
+implement this?
+
+You can use the ALT-T key to toggle status line types between the default 
+one, one that    appears more like the TheDraw/PCBDraw status line, or no 
+status line at all.  Or you can use the /STATUS configuration option to 
+select which one you want by default
+
+If I mark a block to change the color or delete, it also removes the color 
+codes and non-displayable macros to the left and right of the block.  Why 
+does this happen and is there a way around it?
+
+There are three block types:  block, line and character.  Line and character 
+are straight forward; they mark a range from the beginning to the end and 
+everything in-between.
+
+A true block (any rectangular region) is different though.  In PCBoard 
+display files, one physical character in the document does not necessarily 
+equal one displayable character.  For example, @QON@ does absolutely nothing 
+to the display, but instructs PCBoard to do something.  Alternatively, 
+@BOARDNAME@ can potentially be much longer than the physical 11 characters it 
+occupies.  PCBEdit needs to take these cases (and others) into account in a 
+true rectangular block so that it can line up correctly on the left and right 
+sides of the block.  The only way around it is to select a line or character 
+block instead of a true rectangular screen block.  Just remember that L and C 
+blocks are handled differently than B blocks.
+
+PCBModem
+
+PCBModem is the utility that you should use to make sure that your modem and 
+copy of PCBoard are properly configured to work with one another.
+
+Loading PCBModem
+
+To load PCBModem, change to the drive and subdirectory where you installed 
+PCBoard.  At the DOS prompt, type:
+
+PCBMODEM
+
+Selecting A Modem
+
+Upon loading PCBModem, you will see the following screen:
+
+Press any key to continue selecting your modem.  The next screen you are 
+shown, asks you to pick the beginning letter of your modem manufacturer.  For 
+example, to setup a modem using generic settings, select Manufacturers D-J 
+from the menu on the following page.
+
+On your screen, you will find a list of manufacturers which fit the menu 
+selection you entered previously.  Use the cursor keys to move the highlight 
+bar on your screen until your modem manufacturer is highlighted.  When it is, 
+press ENTER to view the modems of that manufacturer.  For example, to 
+configure a generic modem, select 'Generic' from the following menu:
+
+Next, pick your modem and press enter.  For the purpose of this example, we 
+will select 'Generic' 9600/14400 v.42 modem.
+
+Once your modem has been selected, you will be asked a few questions before 
+your modem is initialized.
+
+Will you be operating in a multitasking environment (Y/N)?
+
+The purpose of this question is to determine the maximum port opening speed 
+for initializing your modem.  Valid answers to this question are:
+
+        N       If you enter this for your answer, you can specify the 
+                maximum port opening rate that your modem supports.
+
+        Y       This answer will restrict your port opening speed to 9600 
+                bps.  The reason you are restricted is that running in a 
+                multitasking environment (with multiple windows open at the 
+                same time) may expose that your port rate is too high for the 
+                performance of your computer and you will lose incoming 
+                bytes. By gradually increasing the port rate from 9600 to 
+                19200, 38400 and 57600 or 115200 (if your modem supports it), 
+                you can determine the appropriate port opening speed.
+
+Enter the port opening speed
+
+In the field on your screen, enter a valid port opening speed which is less 
+than or equal to the maximum value allowed (shown on the same line as the 
+question).  Common port opening speeds are 2400, 9600, 19200, 38400, 57600, 
+and 115200.  If you enter an invalid speed or a speed that is not supported 
+by your modem, the default answer will be re-entered into the field.
+
+Will you be using external COMM-DRV support (Y/N)?
+
+Your answer to this question depends on whether or not you have the multiport 
+version of PCBoard and if you have installed the multiport driver.  Valid 
+responses to this question are:
+
+        N       Use the standard communication routines built into PCBoard. 
+                These routines can access any serial port using a standard 
+                UART. If you will be use COM1, COM2, COM3, or COM4, enter 
+                this response.  Next, you will be asked to enter the COM port 
+                you will be using.  Enter a response between 1 and 8.  If you 
+                enter a value higher than 2, you will be asked to also supply 
+                the base address and IRQ of the serial port you are using.
+
+        Y       If you have installed the multiport driver and you have the 
+                multiport version of PCBoard, select this menu option.  Next, 
+                you will be asked to enter the intelligent port that you will 
+                be using.  Enter the port number you defined using DRVSETUP 
+                (see the Multiple Nodes chapter) for the modem you are 
+                attempting to initialize.
+
+The Initialization Screen
+
+Now that you have answered all of the questions, you will be shown 
+information about your modem including the modem number, description, port, 
+and opening speed.  Any special comments about your modem will be listed in 
+this section of the screen. The next section of the screen shows the modem 
+commands which will be used to initialize the modem.
+
+When you agree with all of the information that is on the screen, answer Y to 
+the Do you want to proceed with the initialization question -- your modem 
+will be initialized.  If you answer N to this question, you will be returned 
+to the screen where you select modems from your manufacturer.
+
+PCBModem will now attempt to initialize your modem.  It will send each 
+command line to your modem and wait for an OK response.  If there is no 
+response from your modem or the response is invalid, PCBModem will report 
+there is a problem with your modem .  Refer to the next section for tips on 
+finding the problem.  If your modem successfully initializes, you will be 
+asked if the new file should be created.  Answer Y to this question to update 
+your PCBoard configuration.
+
+If There Is A Problem
+
+There are numerous reasons why PCBModem may fail to initialize your modem.  
+The list that follows, will give you a few suggestions to help find the 
+solution to the problem:
+
+Check the cabling between modem and computer.  Make sure it is plugged in 
+good and tight.
+
+Insure that the RS-232 cable between your modem and your computer has all of 
+the  necessary wires.  A DB-25 pin straight-through cable is highly 
+recommended.    Some 25-9 pin cables will not be properly wired for use with 
+modems.
+
+If PCBModem cannot communicate at all with your modem, check your system for 
+potential IRQ conflicts.  If you have two or more devices that attempt to use 
+the same IRQ, you will cause a conflict which may render both devices 
+inoperable.
+
+If PCBModem reports that no modem is present or it found a bad UART, make 
+sure that you specified the proper base address when you were asked questions 
+about your COM port.
+
+If you see the word ERROR printed on the screen with the initialization 
+string, an invalid command was sent to your modem.  Contact technical support 
+for additional guidance.
+
+PCBMoni
+
+PCBMoni enables you to view a list of who is currently online and what they 
+are doing on the system.  The list shown on your screen is updated every few 
+seconds.  In addition to viewing who is online, you can modify the 
+information that is shown on the screen; or if you have a network and a 
+spying utility, you can spy on the node number to see what is on the screen.
+
+To load PCBMoni, change to the subdirectory where you installed PCBoard.  At 
+the DOS command prompt, type PCBMONI followed by the necessary command line 
+parameters and press ENTER.
+
+Syntax
+
+PCBMONI [filename] [NumNodes] [MaxOnScreen]
+
+Command Line Parameters
+
+[filename]
+
+This parameter specifies the complete path and filename to your USERNET.XXX 
+file.  The location of this file can be found in PCBSetup | File Locations | 
+System Files.  If this parameter is not specified or the filename you specify 
+is invalid, a usage screen will be displayed showing you the correct syntax 
+for PCBMoni.  This parameter is required for PCBMoni to be loaded.
+
+[NumNodes]
+
+If you want to limit the number of nodes that will be shown on the screen, 
+use this parameter.  For example, you may have a 100 node license, but decide 
+to monitor only the first 30 nodes.  In this case, you would specify 30 for 
+the number of nodes to monitor.
+
+[MaxOnScreen]
+
+Normally the maximum number of nodes will be shown on the screen.  If you 
+need to limit the number of nodes that are shown on the screen at one time, 
+use this command line parameter. Enter the number of lines that you want to 
+view on the screen at any given time -- the default is 22.
+
+Keyboard Commands
+
+        Up      Move the highlight bar up one line.  If you are at node 1, 
+                the bar will not move.
+
+        Down    Move the highlight bar down one line.  If you are at the last
+                node number that you decide to monitor, the bar will not 
+                move.
+
+        PgUp    Move the highlight bar to the next screen.
+
+        PgDn    Move the highlihgt bar to the previous screen.
+
+        ENTER   Execute NODE.BAT passing the node numbers as parameters.  For 
+                additional information about spying on a node, see the 
+                NODE.BAT section in the Batch Files chapter of this manual.
+
+        SPACE   Edit the node record that is currently highlighted.  The Edit 
+                User Net Status screen will appear on your screen.
+
+Modifying A Node Record
+
+To edit a node's record, move the highlight bar to the node number that you 
+wish to edit and press SPACE.  When you do, the following screen will be 
+displayed to you:
+
+
+Fields You Can Edit
+
+Name            This field contains the name of the user that is currently 
+                online.  If nobody is online on this node, the field will be 
+                blank.
+
+City            In this field, the location that the user entered when 
+                creating their account will be shown.
+
+Operation       The operation field is used by PCBoard to display information 
+                about the current operation that the user is performing.  For 
+                example, if the user is answering a script questionnaire, 
+                this field will show the script number and the conference it 
+                is being answered in.  For a list of information that is 
+                displayed in this field, refer to the 11 SysOp command in the 
+                PCBoard Commands chapter of this manual.
+
+Message         Any text entered in this field will be sent to the user as a 
+                broadcast message.  You can type up to a 64 character message 
+                to send to the caller on the node.  When the message is 
+                displayed, PCBoard will send an accompanying beep to help get 
+                the attention of the caller.
+
+Status          This field contains one character that describes what the 
+                user is currently doing on the system.  A list of possible 
+                status values are listed above this field.  Pick the status 
+                value you want to assign to this node number.
+
+Saving Your Changes
+
+Once you have updated the fields that you want to update, press PgDn to save 
+the changes or ESC to abort the changes that you have made.
+
+PCBNum
+
+This utility can be used to update the number of callers to your system.  
+This number is stored in the message base file for the Main Board conference.  
+To load PCBNum, change to the subdirectory where you installed PCBoard and 
+type PCBNUM and press ENTER.  The following question will be asked:
+
+Location+Name of Main Messsage Base?
+
+Enter the drive, path, and filename of your Main Board message base.  If you 
+are unsure of the location of this message base, abort the program by 
+pressing CTRL-C and load PCBSetup to check the location of this file.  Next, 
+enter the new number of callers that have called 1your system.  Once you have 
+entered this number, the message base will be updated and your system will 
+use the new number that you entered.
+
+PCBPack
+
+This utility should be used to maintain your message bases.  You can delete 
+old or received messages and even weed out duplicate messages using PCBPack.  
+The interface for PCBoard is done strictly on a command parameter level.  To 
+pack your message bases, use the desired command line parameter(s) which are 
+described later in this section.  First, you must know the syntax to execute 
+PCBPack.
+
+Syntax
+
+PCBPACK /parameter /parameter ... /parameter
+
+
+/parameter      Refers to one or more command line parameters described later 
+                in this section.
+
+Using A Configuration File
+
+A configuration file enables you to specify the default command line 
+parameters that will be used each time PCBPack is run.  The configuration 
+file must meet the following criteria:
+
+The config file must be in the current directory and named PCBPACK.CFG
+
+PCBPACK.CFG must be a ASCII text file.
+
+Each command line parameter must be entered on a separate line in the config 
+file.
+
+
+An example PCBPACK.CFG may contain the following:
+
+
+/AREA:ALL
+/KEEP:45
+/PURGE:7
+/MAXMSGS:500
+/MINMSGS:200
+/KILLBAK
+
+Using this config file you could enter PCBPACK at the DOS
+command prompt and it will be the equivalent of typing:
+
+
+
+PCBPACK /AREA:ALL /KEEP:45 /PURGE:7 /MAXMSGS:500 /MINMSGS:200 /KILLBAK
+
+
+NOTE:  To specify a different configuration file to use when loading PCBPack, 
+use the following syntax:
+
+PCBPACK @FILENAME.CFG
+
+FILENAME.CFG is the filename you want to use for PCBPack's configuration.
+
+PCBPACK @C:\PCB\NETMAIL.CFG
+
+Miscellaneous Command Line Parameters
+
+/AREA:[conferences]
+
+This is the only required command line parameter.  Use this to specify the 
+conference number to pack.    To specify a range of conferences to pack, 
+enter the beginning conference number, followed by a dash and the ending 
+conference number to pack (e.g., 3-10).  In addition, you can separate 
+conferences and conference ranges with a semicolon.  If you enter ALL, each 
+conference on your system will have its message base packed.
+
+Example Usage:
+
+PCBPACK /AREA:ALL
+PCBPACK /AREA:3-15
+PCBPACK /AREA:1-10;12;18-35
+
+
+/CAP:[filename]
+
+Specifies the filename to use for capturing the results of packing.  Most 
+SysOps will pack during their event which may run at odd hours.  By referring 
+to a capture file, errors and other information can be monitored.  Replace 
+[filename] with the filename of the capture file to create.  If the file 
+exists, the new data will be appended to the end of the file. 
+
+The format of the capture file is shown in this example:
+
+
+*** Packing Conference (0) -- Main Board ***
+
+Memory available: 550552 bytes
+
+10149888 bytes available.
+
+Number of messages kept      = 0
+Number of messages removed   = 0
+Number of messages processed = 0
+Number of extraneous blocks  = 0
+
+The following describes the lines that are recorded for each conference:
+
+The conference number being packed.
+
+Total amount of free space on the drive where the message base is stored.
+
+The number of the messages that existed in the message base after it was 
+packed.
+
+Total number of messages that were removed of packed out of the message base.
+
+The total number of messages before the message base was packed.
+
+Total number of extraneous message blocks found in the messages being packed.
+
+
+Example Usage:
+
+PCBPACK /AREA:3 /CAP:PCBPACK.LOG
+
+
+/CRC:[days]
+
+In order to kill duplicate messages (/KILLDUP), you must maintain a CRC 
+database.  Each message will generate a unique CRC value.  If two messages 
+which generate the same CRC value are found in a conference, the latter 
+message will be packed out.  Replace [days] with the number of days that the 
+CRC database will be maintained.
+
+
+Example Usage:
+
+PCBPACK /AREA:33 /CRC:90 /KILLDUP
+
+
+/FAST
+
+Instead of displaying the normal message and packing statistics, display the 
+minimum amount of information about each conference. The following shows a 
+conference being packed in regular mode:
+
+while this shows a conference being packed using the /FAST command line 
+parameter:
+
+Example Usage:
+
+PCBPACK /AREA:ALL /FAST
+
+
+/FILE:[filename]
+
+Normally, PCBPack will look for the PCBOARD.DAT file to exist in the 
+directory that you run PCBPack from.  If you want to specify where PCBPack 
+can find the PCBOARD.DAT file, use this command line parameter.  In place of 
+[filename], specify the path and filename where the PCBOARD.DAT you want to 
+use can be found.
+
+
+Example Usage:
+
+PCBPACK /AREA:32 /FILE:C:\TEMP\PCBOARD.DAT
+
+
+/HELP
+
+This command line parameter will display brief descriptions of the command 
+line parameters for PCBPack.
+
+/INDEX
+
+If you want to generate only an index for a message base, use this command 
+line parameter.    If you suspect that an index has become corrupt, use this 
+command line parameter.
+
+NOTE:  When this parameter is used, PCBPack will ignore all command line 
+parameters that will pack the message base.  For example, you cannot use the 
+/MAXMSGS parameter with the /INDEX parameter.
+
+
+Example Usage:
+
+PCBPACK /AREA:9-12 /INDEX
+
+/KILLBAK
+
+When PCBPack processes message bases it creates backup files for each 
+conference that is processed.  Should something go wrong with a message base, 
+you may want to use these backup files to help rebuild the message base.  If 
+you have no desire to leave these backup files on your drive, use this 
+command line parameter.  When this parameter is used, the backup files will 
+be deleted after each message base is processed.
+
+
+Example Usage:
+
+
+PCBPACK /AREA:10-35;50 /KILLBAK
+
+/NOCALLER
+
+When this command line parameter is used, no information about the packed 
+message bases will be written to the caller logs. When pack information is 
+written to the caller logs, the following format is used:
+
+
+*** Packing Conference (0) -- Main Board ***
+*** Packing Conference (1) -- Chatter ***
+
+Each line written shows the conference number and name that was packed.  
+Having this information in the caller logs is most useful when you run your 
+events at hours when you are not available to watch it run. 
+
+Example Usage:
+
+PCBPACK /AREA:2-13 /NOCALLER
+
+/OLDINDEX
+
+PCBPack will check the PCB environment variable and the conference 
+information to determine if it needs to create the old index files (v14.x 
+compatible).  To force PCBPack to create the older index files, use this 
+command line parameter:
+
+Example Usage:
+
+
+PCBPACK /AREA:32-60 /OLDINDEX
+
+
+
+/QUIET
+
+This command line switch is identical to the /FAST switch.  See the 
+description of that switch for additional details.
+
+/RENUMBER:[beginning number]
+
+PCBoard allows you to enter in excess of 16 million messages before you will 
+reach a point where you must renumber the message base(s).  If you need to 
+renumber the message bases to begin with a new number, enter the new 
+beginning message number in place of [beginning number].
+
+
+NOTE:  When a message base is renumbered, the user records are not updated.  
+If you renumber you message bases, reset the last message read pointers for 
+all users affected.  If you do not, your users may miss new messages left in 
+the renumbered conference.
+
+
+Example Usage:
+
+
+PCBPACK /AREA:99 /RENUMBER:1
+
+
+/REPORT:[filename]
+
+To help you keep tabs on how active the message base in each conference on 
+your system is, use this command line parameter replacing [filename] with the 
+filename you want to output the report to.  If the filename specified exists 
+on disk, the contents of the file will be overwritten with the new report. 
+The following shows the format of the report.
+
+
+Conference             High      Low       Active
+=====================  ========  ========  ========
+(    0) Main Board          263      4264      1256
+(    1) Chatter              62       264       125
+(    2) Debate             3325      5634       896
+                                           ========
+                                               2277
+Each line shows the conference number, conference name, high message number, 
+low message number, and total active messages. The last line in the report 
+summarizes the total number of active messages in the report.
+
+If you use this command line parameter with any packing command
+line parameters, the report will be generated for each
+conference before the message base is packed.
+
+
+Example Usage:
+
+PCBPACK /AREA:ALL /REPORT:PCBPACK.RPT
+
+/TIMEOUT:[seconds]
+
+If PCBPack attempts to pack a message base that is currently in use, it will 
+normally attempt to access it for 60 seconds before skipping the message 
+base.  If you want to change the default wait time, use this command line 
+parameter.  Replace [seconds] with the number of seconds you want PCBPack to 
+attempt to access a message base.
+
+Example Usage:
+
+PCBPACK /AREA:1-10 /TIMEOUT:90
+
+/UPCASE
+
+This command line parameter will convert the subject of all messages to 
+uppercase.  Even though PCBoard is capable of handling messages with mixed 
+case subjects, it may be desirable to have all of your subjects in uppercase.
+
+Example Usage:
+
+PCBPACK /AREA:ALL /UPCASE
+
+/UPDATE
+
+PCBoard's message base format has remained the same for v14.x and v15.x.  
+Both versions of PCBoard use different index files. If you are using 
+third-party software which supports the v14.x index files (.NDX), use this 
+parameter to update the newer index files (.IDX).  For example, if you are 
+using a off-line mail door that imports mail packets but does not update the 
+newer index format, use PCBPack with the /UPDATE parameter to update the new 
+index files.
+
+Example Usage:
+
+PCBPACK /AREA:ALL /UPDATE
+
+Command Line Parameters That Delete (Pack) Messages
+
+One of the primary purposes of PCBPack is to delete or pack messages by 
+removing older messages.  The command line parameters described in this 
+section will delete messages using the criteria that is specified in the 
+description of each parameter.  Regardless of the command line parameter you 
+select, messages that have been killed on the BBS will be deleted.
+
+/DATE:[mmddyy]
+
+This command line parameter will enable you to delete any messages older than 
+the date you  specify.  The date should be specified in mmddyy where mm is 
+the month, dd is the day of the month, and yy is the year.  If you want to 
+pack all messages that are older than 05-23-94 then you would enter the 
+parameter as /DATE:052394.
+
+
+Example usage:
+
+PCBPACK /AREA:3-13;39 /DATE:041893
+
+
+/DAYS:[number of days]
+
+This command line parameter will enable you to delete any message that is 
+older than the number of days that you specify. For example, if you want to 
+delete any messages that are older than 90 days, you would enter the 
+parameter as /DAYS:90.
+
+Example usage:
+
+
+PCBPACK /AREA:4 /DAYS:60
+
+/KEEP:[days]
+
+This command line parameter does not delete messages.  Instead, it prevents 
+PCBPack from deleting any message which meet the following criteria:
+
+
+The message is newer than the number of days specified.
+The security on the message is RECEIVER ONLY.
+The message has not been read yet.
+
+
+Even if the message would normally be deleted, this parameter will take 
+precedence.
+
+Example Usage:
+
+PCBPACK /AREA:ALL /MAXMSGS:500 /KEEP:45
+
+
+/KILLALL
+
+If you want to delete every message in the message bases you process, use 
+this command line parameter.  You may find this parameter useful for 
+restarting one or more message bases.
+
+
+Example Usage:
+
+PCBPACK /AREA:100-150 /KILLALL
+
+/KILLDUPS
+
+With netmail it is quite possible that duplicate messages may get imported 
+into your system.  Rather than manually marking each duplicate message to be 
+deleted, you can use this command line parameter.  If PCBPack sees two 
+duplicate messages in a message base, the latter message will be deleted.  To 
+properly kill duplicate messages, you must use this parameter in conjunction 
+with the /CRC parameter.
+
+
+Example Usage:
+
+
+PCBPACK /AREA:ALL /KILLDUP /CRC:7
+
+/MAXMSGS:[number]
+
+To regulate the maximum number of messages in a conference, use this command 
+line parameter.  This parameter is ideal for conferences which have a lot of 
+messages entered each day.  By regulating the maximum number of messages, you 
+will have a good estimate of the disk space required to store the messages.
+
+Example Usage:
+
+
+PCBPACK /AREA:ALL /MAXMSGS:500
+
+/MINMSGS:[number]
+
+If you want to force PCBPack to keep a minimum number of messages in a 
+message base, use this command line parameter. User of this parameter is 
+ideal for message bases that do not have a lot of message traffic.  If you 
+were to pack using a date or number of days, there may be only a few message 
+left for users to read on your system.
+
+Example Usage:
+
+PCBPACK /AREA:53-69;3 /MINMSGS:100
+
+/PURGE:[days]
+
+This command line parameter will delete any message that meet the following 
+criteria:
+
+The message is older than the number of days specified.  If the number of 
+days is not specified, PCBPack will not do any date checking on the message.
+
+The security on the message is RECEIVER ONLY.
+
+The message has been read by the recipient..
+
+Example Usage:
+
+PCBPACK /AREA:ALL /PURGE
+
+PCBPACK /AREA:ALL /PURGE:14
+
+/RANGE:[low]-[high]
+
+To delete messages which fall in a given range, use this command line 
+parameter.  Any message number between the low and high message number 
+specified will be deleted.
+
+Example Usage:
+
+PCBPACK /AREA:32 /RANGE:100-200
+
+Diagnostic And Repair Command Line Parameters
+
+The command line parameters described in this section are used for 
+diagnostics and repair.  You should not use these unless instructed to do so 
+by the technical support staff.
+
+/DEBUG:[detail level]
+
+This command line parameter will produce diagnostic information for 
+diagnosing problems with PCBPack.  You should only use this parameter when 
+instructed to do so by the technical support staff.  The technician you work 
+with will provide the detail level number you should use.
+
+Example Usage:
+
+PCBPACK /AREA:ALL /DEBUG:300
+
+/FIX
+
+This command line parameter will insure that the message base header is 
+accurate.  Use of this parameter will significantly increase the time it 
+takes to pack your message base(s).
+
+/REPAIR
+
+This command line parameter is identical to /FIX.  Refer to the description 
+of the /FIX parameter for additional details.
+
+Examples
+
+To delete any message that is older than 30 days but keep unread RECEIVER 
+ONLY messages in conferences 1 through 10, enter the following:
+
+PCBPACK /AREA:1-10 /DAYS:30 /KEEP
+
+The following example demonstrates the use of several command line 
+parameters.  The actions performed are described after this sample command 
+line:
+
+PCBPACK /AREA:1-10;20-100 /MAXMSGS:250 /KEEP /UPCASE
+
+Pack the message bases of conference 1 through 10, and 20 through 100.
+
+No message base will contain more than 250 messages.  Older messages will be 
+deleted first.
+
+Keep any message that has not been read by the recipient and is RECEIVER 
+ONLY.
+
+Convert all subjects to uppercase.
+
+PCBSTATS
+
+Syntax
+
+PCBSTATS /FILE:[filename] /NODE:[number] /parameter
+
+Required Command Line Parameters
+
+These two command line parameters listed in this section are required for 
+PCBSTATS to function properly.  If you specify an invalid filename or node 
+number, the program will display an error instead of running.
+
+/FILE:[filename]
+
+In place of the [filename] shown with this command line
+parameter, enter the location and name of your Statistics Files
+(PCBSetup | File Locations | System Files).
+
+/NODE:[number]
+
+In place of the [number] shown with this command line parameter, enter the 
+node number that you want to show statistics.  Even if you use a parameter 
+that displays system statistics, you must specify this parameter for PCBStats 
+to function properly.
+
+Command Line Parameters to Update Statistics
+
+If you want to use PCBStats to update the PCBSTATS.DAT file, pick one of the 
+command line parameters listed in this section.
+
+/RESETNODE
+
+Resets the fields and statistics for the node number specified with the 
+/NODE: parameter.
+
+/RESETALL
+
+Resets the fields and statistics for all nodes in your system.
+
+/MAKELOCAL
+
+Modify all nodes so that the local statistics are shown on all call-waiting 
+screens in your system.
+
+/KEEPCALLER
+
+This parameter should only be used in conjunction with either the /RESETNODE 
+or /RESETALL parameters.  Normally these parameter will reset not only the 
+statistics, but also the last caller to each node.  If you want to keep the 
+last caller information in the file while still resetting all of the 
+statistics, use this parameter.
+
+/MSGS:[number]
+
+This parameter will add the number of new messages that you specify to the 
+statistics of the node you specify.  Replace [number] with any number between 
+-9,999,999 and 9,999,999.  If you specify a negative number, the number of 
+messages will be subtracted rather than added.
+
+/UP:[number]
+
+This parameter will add the number of new uploads that you specify to the 
+statistics of the node you specify.  Replace [number] with any number between 
+-9,999,999 and 9,999,999.  If you specify a negative number, the number of 
+uploads will be subtracted rather than added.
+
+/DOWN:[number]
+
+This parameter will add the number of new downloads that you specify to the 
+statistics of the node you specify.  Replace [number] with any number between 
+-9,999,999 and 9,999,999.  If you specify a negative number, the number of 
+downloads will be subtracted rather than added.
+
+/NAME:[name]
+
+This parameter specifies the name of the last caller to the node that you 
+specify.   Replace [name] with the user name of the caller.  This parameter 
+should only be used when you are running a third-party program that does the 
+logoff processing. Otherwise, PCBoard automatically updates this information.
+
+/CITY:[city]
+
+This parameter specifies the city of the last caller to the node that you 
+specify.   Replace [city] with the city of the caller. This parameter should 
+only be used when you are running a third-party program that does the logoff 
+processing.  Otherwise, PCBoard automatically updates this information.
+
+Command Line Parameters to View Statistics
+
+These command line parameters give the ability to print statistics about a 
+single node, the system or each of your nodes to the screen.  If you want to 
+capture one of these reports to disk, refer to redirecting command input or 
+output in your DOS manual.
+
+/SHOWSYS
+
+This parameter will show a single line that summarizes the statistics for all 
+of the nodes in your system.  The format of the report is shown by the 
+following example:
+
+
+
+SYSTEM  -> Calls:    52  Messages:    30  Downloads:    82  Uploads: 3
+
+/SHOWNODE
+
+This parameter will display that statistics for the node number specified.  
+The format of the report is as follows:
+
+
+
+Node 15 -> Calls:     0  Messages:     0  Downloads:     0  Uploads:     0
+
+/SHOWALL
+
+This parameter will produce a report for your entire system and each of the 
+nodes on your system (whether active or not).  The first 4 lines of this 
+report may resemble the following:
+
+
+
+SYSTEM  -> Calls:    52  Messages:    30  Downloads:    83 Uploads:     3
+Node  1 -> Calls:     4  Messages:     0  Downloads:     6 Uploads:     0
+Node  2 -> Calls:     8  Messages:     1  Downloads:    12 Uploads:     0
+Node  3 -> Calls:     9  Messages:     3  Downloads:     7 Uploads:     0
+
+Examples
+
+If your PCBSTATS.DAT file is located in C:\ you would type the following to 
+add one upload to node number 3:
+
+PCBSTATS /FILE:C:\PCBSTATS.DAT /NODE:3 /UP:1
+
+To reset the statistics for the same node (leaving the last caller to the 
+node intact), enter the following:
+
+PCBSTATS /FILE:C:\PCBSTATS.DAT /NODE:3 /RESETNODE /KEEPCALLER
+
+To produce a report that lists the statistics for the entire system, you 
+would enter the following:
+
+PCBSTATS /FILE:C:\PCBSTATS.DAT /NODE:3 /SHOWSYS
+
+PCBText Utilities
+
+There are two utilities that are included with your PCBoard package to modify 
+or report the contents of a PCBTEXT file.  If you have defined multiple 
+languages on your system, you will have more than one PCBTEXT file.  The 
+MKPCBTXT utility is used to edit or create a PCBTEXT file, while RDPCBTXT is 
+used to output the contents of a PCBTEXT file to an ASCII file.
+
+MKPCBTXT
+
+PCBoard stores virtually all of the text it displays during program operation 
+in a file called PCBTEXT which is normally located in the \PCB\GEN location 
+on your hard disk.  The reason for placing all program text in a separate 
+file is so that the SysOp can alter the default program displays, and also to 
+provide support for multilingual versions of PCBoard.  The program used to 
+maintain the main PCBTEXT file, as well as any additional 'language' PCBTEXT 
+files, is MKPCBTXT.EXE.
+
+The MKPCBTXT.EXE program will be found in the same directory that you 
+installed PCBoard to.  To run the program, enter MKPCBTXT at the DOS command 
+prompt.  After loading, the following screen will appear:
+
+Syntax
+
+MKPCBTXT [filename] /I:[recnum] "new text for the record"
+
+[filename]      If you want to specify the PCBTEXT file to edit on the 
+                command line, you can do so by specifying the filename to 
+                edit, right after MKPCBTXT.
+
+/I:             To automate the updating of a record in a PCBTEXT file, use 
+                this command line parameter.  After the /I:, specify the 
+                record number to replace the contents of followed by a space 
+                and the new text for the record surrounded in quotes.
+
+Choosing the PCBTEXT File to Modify
+
+If you do not specify the PCBTEXT file to edit on the command line, you will 
+be prompted to enter the file you wish to edit. In the field at the top of 
+the screen, enter the name of the PCBTEXT file that you wish to edit.  Your 
+PCBTEXT files will be stored in the subdirectory specified by PCBSetup | File 
+Locations | System Files.  Once a PCBTEXT file has been selected for editing, 
+your screen will resemble the following:
+
+
+Keyboard Commands
+
+
+        ESC     Exit the current screen or action.  If you are at the first 
+                screen, pressing ESC will exit MKPCBTXT and save any changes 
+                that you have made.
+
+        F2      Search for text.  This keyboard command will enable you to 
+                search all of the entries in MKPCBTXT for those entries that 
+                match the text you enter.  For each entry that matches, you 
+                will be given the option to edit it, or search for the next 
+                match.
+
+        F3      Go directly to a particular record.  If you know the record 
+                number that you want to edit, use this keyboard command to 
+                jump directly to that record.  For example, if you know you 
+                want to change the Do you want graphics prompt, you can press 
+                F3 and type 149 followed by ENTER to go directly to that 
+                record.
+
+        F4      If you are editing a record and decide that you would rather 
+                have it use the default text for the record (shown directly 
+                above the edit field), use this keyboard command.  Once you 
+                press F4, the text in the edit field will be changed to match 
+                the default text that is directly above it.
+
+        Up      Move to the previous record number.
+
+        Down    Move to the next record number.
+
+        PgUp    Move back 10 records.
+
+        PgDn    Move ahead 10 records
+
+     CTRL-PgUp  Go to record number 1.
+     
+     CTRL-PgDn  Go to the last record number.
+
+Editing a Record
+
+
+When a record is displayed on the screen, you will see the following:
+
+
+
+On this screen, you will notice a "header" at the top of the record that 
+shows some useful information about the record.  You cannot edit this 
+information.  The following briefly describes each piece of information:
+
+
+
+Record No	Displays the number of the record you are editing.
+Record Length	Displays the maximum length of the record.
+Justification	Displays the type of justification that the field
+                uses:  Left, Center, or Right
+
+
+To edit a record, start typing text.  The edit field is the one that is 
+highlighted on your screen.   You can change the text in the field to say 
+anything that you deem appropriate.  When you exit the program, your changes 
+will be saved to the file automatically.
+
+Special Characters In A Record
+
+When editing a record, there are two special characters that you can enter in 
+the highlighted field.  The following describes each character:
+
+
+        ~       When MKPCBTXT saves the file, it will strip any extra spaces 
+                that are to the right of the last character.  If you need 
+                extra spaces at the end of the prompt, enter a ~ for each 
+                space that you need.
+
+        _       This character only has meaning for records that prompt the 
+                caller for information.  This character signifies the end of 
+                the record and informs PCBoard not to display any question 
+                mark or guidelines for field entries.  This is particular 
+                useful when designing RIPscrip files where you want to hide 
+                the prompt.
+
+Replacing a Record With a Text File
+
+Sometimes you need to be able to enter more text than the edit field allows 
+you to enter.  In this case, you will want to replace the record and display 
+a text file instead.  In order to accomplish this, enter a % as the first 
+character followed by the filename that you want to display.
+
+For example, to replace record number 116 so that it gives a more thorough 
+explanation of why the time has been adjusted, you would go to that record 
+using F3.  Once at the record, clear the entire field by pressing CTRL-End.  
+Once the field is clear, begin by typing % followed by C:\PCB\GEN\EVENT.  
+Your record would now resemble the following:
+
+
+Whenever the your time has been adjusted for our event message would normally 
+be shown, the contents of the file C:\PCB\GEN\EVENT is displayed instead.  
+
+Because PCBoard is displaying the file, you can also create security, 
+graphics, and language specific versions of the file.
+
+NOTE:  Not all PCBTEXT records can be replaced with files.  As a general 
+rule, any record that PCBoard has to build (place text in the record as it 
+displays) will not be able to support replacement.
+
+Replacing a Record With a PPE File
+
+Replacing a record to use a PPE is very similar to using a text file as a 
+replacement.  The only difference is that instead of beginning the line with 
+a %, begin the line with an ! (exclamation point).
+
+For example, to replace record number 116 so that it uses a PPE, go to that 
+record using F3.  Once at the record, clear the entire field by pressing 
+CTRL-End.  Once the field is clear, begin by typing ! followed by 
+C:\PCB\GEN\EVENT.PPE.  Your record would now resemble the following:
+
+Whenever the your time has been adjusted for our event message would normally 
+be shown, the C:\PCB\GEN\EVENT.PPE file will be executed instead.
+
+NOTE:  Not all PCBTEXT records can be replaced with PPE files. As a general 
+rule, any record that PCBoard has to build (place text in the record as it 
+displays) will not be able to support replacement.
+
+Replacing a Record With a Menu File
+
+Replacing a record to use a MNU is very similar to using a text file or PPE 
+file as a replacement.  The only difference is that instead of beginning the 
+line with a % or !, begin the line with an $.
+
+For example, to replace record number 1 so that it uses a MNU, go to that 
+record using F3.  Once at the record, clear the entire field by pressing 
+CTRL-End.  Once the field is clear, begin by typing $ followed by 
+C:\PCB\GEN\COMMENT.MNU.  Your record would now resemble the example on the 
+following page.
+
+Whenever the leave a comment for the sysop message would normally be shown, 
+the C:\PCB\GEN\COMMENT.MNU file will be used instead.
+
+NOTE:  Not all PCBTEXT records can be replaced with menu files. As a general 
+rule, any record that PCBoard has to build (place text in the record as it 
+displays) will not be able to support replacement.
+
+RDPCBTXT
+
+This utility is designed to output each record in a PCBTEXT file into a 
+single text file.  Using the text file you can quickly and easily find the 
+record number you wish to edit.  The filename that is created will be in the 
+current subdirectory and named PCBTEXT.LST.
+
+Syntax
+
+RDPCBTXT [filename]
+
+[filename]      Specifies the PCBTEXT file that you would like to convert 
+                into ASCII text.  If the file is found, the ASCII version of 
+                the specified file will be output as PCBTEXT.LST in the 
+                current subdirectory.
+
+Interpreting the Report
+
+The report that is generated by RDPCBTXT is output in the following format:
+
+
+2 3 PCBoard Serial No. (if any)
+3 1 Access Denied - Upcoming Event Pending ...
+
+The first column shows the record number.  The second number in this report 
+shows the default color number of the prompt.  You cannot change the default 
+color -- it is printed for reference purposes only.
+
+USERNET
+
+USERNET.EXE (USERNET) is a utility which allows you to modify the contents of 
+your USERNET.DAT file.  What is your USERNET.DAT file you ask?  The 
+USERNET.DAT file is where information is stored about who is online, where 
+they are from, and what they are currently doing.  The USERNET.DAT file is 
+also the file that is used to determine if users are available for chat and 
+to display who is online via the WHO command.  An example WHO command looks 
+like this:
+
+
+(#)   Status                  User
+---   ---------------------   -----------------------------
+  1   Available for CHAT      JIM SHELBER (PLANTATION, FLORIDA)
+  2   Logging into System
+  3   Available for CHAT      KIM KARBO (SALT LAKE CITY, UT)
+
+
+As you can see it shows that the SysOp is on node 1 and unavailable for node 
+chat.  This display also shows that the SysOp is from ANYTOWN, ANYWHERE.
+
+What Can You Do With USERNET?
+
+You can do all sorts of things with USERNET.  Below are some sample uses:
+
+
+Change the name of someone in USERNET.DAT
+
+Change the city of someone in USERNET.DAT
+
+Immediately drop everyone off of the BBS if they are in PCBoard
+
+Delete names out of USERNET.DAT that are "stuck"
+
+Add nodes and users that do not really exist (up to your node
+limit)
+
+Show that a node is currently running an event
+
+As you can see there are quite a few things you can do with USERNET.  If you 
+use your imagination you can come up with several other uses.
+
+Syntax
+
+USERNET [filename] [nodenum] [status] [name] [city] [text]
+
+filename
+
+Specifies the full path and filename of the USERNET.XXX file to use.
+
+nodenum
+
+Specifies the node number you want to edit or ALL to modify all nodes.
+
+status
+
+Specifies the status the node(s) will be set to.  For a list of status 
+values, see the Status Values heading in this section.
+
+name
+
+Specifies the name of the caller (up to 25 characters) or * to leave the name 
+unchanged.
+
+city
+
+Specifies the city or location of the caller (up to 24 characters) or * for 
+no change.
+
+text
+
+Specifies the text (up to 48 characters) to place in the operational text 
+field.  This text is used to show the filename a user is transferring, the 
+door that is currently opened, etc. To leave the text unchanged, enter * for 
+the text.  For a list of status values that expect text in the operational 
+text field, refer to the 11 SysOp command in the PCBoard Commands chapter of 
+this manual.
+
+NOTE: if multiple words are entered for name or city you must enclose them 
+within quotation marks (e.g. "JOHN DOE" "NOWHERE, USA").
+
+Status values
+
+
+Letter 	As shown in PCBMoni 	As shown in PCBoard 
+------  ---------------------   ---------------------------
+A       Available for CHAT      Available for CHAT 
+B       Out to DOS              Out of Code in DOOR 
+C 	Chatting with Sysop 	Entering a Message 
+D       Inside a DOOR           Out of Code in DOOR 
+E 	Entering a Message 	Entering a Message 
+F       Viewing A File          Transferring a File 
+G 	CHATTING with Group 	CHATTING with Group 
+L 	Auto Logoff Pending 	Auto Logoff Pending 
+M 	Message 	 
+N 	Chatting w/ Node # 	CHATTING with NODE # 
+O 	Logging Into System 	Logging into System 
+P 	Paging the Sysop 	Paging the Sysop 
+R 	CHAT Request Sent 	CHAT Request Sent 
+S 	Answering Script 	Entering a Message 
+T 	Transferring a File 	Transferring a File 
+U 	Unavailable for CHAT 	Unavailable for CHAT 
+W 	Waiting for Node # 	Waiting for Node 
+X 	Drop to DOS Pending 	Drop to DOS Pending 
+Y 	No Caller this Node 	No Caller this Node 
+Z 	(Inactive Node) 	 
+
+
+NOTE:  With the Y and Z status values no name or city parameters are needed.
+
+Examples
+
+Making It Appear A Caller Is Online
+
+Sometimes as a SysOp you may want to list your name in the USERNET.DAT even 
+when you are not online.  Your display might look like this:
+
+(#)   Status                  User                          
+---   ---------------------   -----------------------------
+  1   Unavailable for CHAT    JOE USER (ANYTOWN, ANYWHERE)
+  2   Available for CHAT      JIM USER (ANYWHERE, ANYPLACE)
+  3   No Caller Online        SYSOP - NOT CURRENTLY ONLINE
+
+To accomplish a similar display you would do the following:
+
+USERNET C:\PCB\MAIN\USERNET.XXX 3 Y N3 N3 "SYSOP - GONE FISHING"
+
+The two N3s in this example are place-holders for the user name and city.  
+When there is no caller online, the text field is displayed instead of the 
+user name and city.  If you normally log into a node other than 3, you can 
+replace the 3s in this example with the node number you log into.
+
+Broadcasting All Nodes
+
+If you want to broadcast all of your nodes from a DOS prompt, you can do so 
+using USERNET.  For the example let's say that you need to take your system 
+down.  Rather than SysOp chatting with all nodes, you can run a batch file 
+which looks like the following:
+
+USERNET C:\PCB\MAIN\USERNET.XXX ALL M "PLEASE LOG OFF ASAP"
+
+This example uses the M status value to send the message.  This is quite 
+similar to the BR SysOp command in PCBoard.  One thing that is distinctly 
+different in this example is that instead of a node number, the word ALL is 
+shown.  The word ALL tells USERNET to send this message to ALL nodes. 
+
+NOTE:  If the user is not in PCBoard (i.e., they are in a door), the message 
+will not be displayed to the user even when they come back to PCBoard.  You 
+may want to pay special attention to who  is in a door when you broadcast a 
+message.
+
+Clearing A Name From The Node Display
+
+You may run into circumstances when a user name is stuck in the node display.  
+This type of scenario is most likely to happen when your bulletin board 
+system involves local nodes, floating nodes, and users who reboot their 
+system while online.  To clear a user's name out of node 11 on the system, 
+you could issue the following command at a DOS prompt:
+
+USERNET C:\PCB\MAIN\USERNET.XXX 11 Z
+
+This will make it so that node 11 will not show up on the node display (using 
+the WHO user command).
+
+Drop All Nodes to DOS
+
+In this example, we will show you how to immediately log off all nodes that 
+are currently in PCBoard.  To do this, change all of the node's status to X.  
+This action will drop the node to DOS as soon as possible.  If the user is 
+currently in a DOOR or some other application, they will be disconnected when 
+they return to PCBoard.  To mark all of your nodes to drop to DOS, use the 
+following command line:
+
+USERNET C:\PCB\MAIN\USERNET.XXX ALL X
+
+When PCBoard reads the USERNET.DAT file, it will see the X status and  will 
+disconnect the user.  Before the user is disconnected,  the Automatic Logoff 
+Completed message will be displayed.
+
+Miscellaneous Utilities
+
+ENCRYPT
+
+This utility will encrypt your user file to prevent any unauthorized persons 
+who get hold of your user file from obtaining useful information from it.  
+PCBoard and System Manager will automatically unencrypt the file when they 
+open the file.  The following fields are encrypted:
+
+password
+
+city
+
+data/business phone number
+
+home/voice phone number
+
+comment1
+
+comment2
+
+To encrypt the user file, you must first encrypt your user file
+using the ENCRYPT program using the following syntax:
+
+
+ENCRYPT [location of user file]
+
+If your user file is stored in C:\PCB\MAIN\USERS, you would
+enter the following:
+
+
+ENCRYPT C:\PCB\MAIN\USERS
+
+Once the user file has been encrypted, you must inform PCBoard that the user 
+file is encrypted.  If you skip this step, these fields will appear to be 
+filled with garbage and you can damage your user file.   To update PCBoard, 
+answer Y to the Encrypt Users File question in PCBSetup | Configuration 
+Options | System Control.
+
+The USERS.SYS and DOOR.SYS files that are created by PCBoard will have 
+decrypted values so that doors which read these files will continue to 
+operate properly.  Any third-party programs which read the user file 
+directory most likely will not work with the encrypted file and may end up 
+damaging your user file.
+
+WARNING:  You must enable encryption on all nodes that will be accessing an 
+encrypted user file.  If you do not, you may damage your user file.
+
+If you would like to decrypt the user file, use the ENCRYPT program with this 
+syntax:
+
+ENCRYPT /D [location of user file]
+
+For example, if your user file is stored in H:\PCB\MAIN\USERS,
+you would enter the following:
+
+ENCRYPT /D H:\PCB\MAIN\USERS
+
+Encrypting the user file is most useful when you operate in a large network 
+environment where users may be able to directly access the user file.  By 
+encrypting the user file, you can protect the accounts on the system because 
+they cannot be viewed using a file viewing program.
+
+OVLSIZE
+
+The main PCBoard executable file is overlaid.  This means that only a portion 
+of the executable is in memory at any given time. How much of the executable 
+can be held in memory depends on two factors:  1) How much of it is resident 
+(not in the overlay) and 2) How big the overlay buffer is.  You can determine 
+how big of an overlay buffer you want to set for each executable using this 
+utility.
+
+A setting of 16 sets up a 64K overlay buffer.  This setting allows PCBoard to 
+swap pieces of the executable file in and out of memory keeping up to 64K of 
+it in the overlay buffer.
+
+Syntax
+
+OVLSIZE [filename] [buffer size]
+
+
+
+        [filename]      This is the filename you want to update the overlay 
+                        buffers on.  Enter the location of your PCBOARD.EXE 
+                        or PCBSM.EXE.  If OVLSIZE cannot find the file you 
+                        specify, it will print unable to open file specified.
+
+        [buffer]        This parameter represents the new buffer size.  See 
+                        Buffer Sizes for a list of valid buffer values.  If 
+                        you do not specify a buffer size, the current overlay 
+                        buffer size will be printed to the screen.
+
+Buffer Sizes
+
+The following chart in this section will show you the valid
+buffer sizes that you may select:
+
+
+Value 	Size 	Value 	Size 	Value 	Size 	Value 	Size 
+-----   ----    -----   ----    -----   ----    -----   ----
+1 	4K 	9 	36K 	17 	68K 	25 	100K 
+2 	8K 	10 	40K 	18 	72K 	26 	104K 
+3 	12K 	11 	44K 	19 	 76K 	27 	108K 
+4 	16K 	12 	48K 	20 	80K 	28 	112K 
+5 	20K 	13 	52K 	21 	84K 	29 	116K 
+6 	24K 	14 	56K 	22 	88K 	30 	120K 
+7 	28K 	15 	60K 	23 	92K 	31 	124K 
+8 	32K 	16 	64K 	24 	96K 	32 	128K 
+
+
+A higher value allows more of the executable file to be held in memory.  The 
+highest possible value, of course, would simply load the entire executable 
+file into memory and would never access the hard disk.  An overlay buffer of 
+this size would be wasteful of memory.
+
+Lower values may hurt performance by causing PCBoard to continually swap code
+
+in from disk - creating more disk activity than would otherwise be necessary.
+
+You may want to use a smaller value such as 16.  This lets PCBoard pull in 
+the code that is running, when it is needed, and leave the rest of the code 
+on disk until it is needed.
+
+Allowing you to pick the buffer size allows you to tune your system to meet 
+your memory and performance needs.  If you need more memory, go for a lower 
+overlay buffer size.  If you need more performance, go for a higher buffer 
+size.
+
+NOTE:  The minimum value that you should select is 14 for PCBoard to operate 
+properly.  If you plan to execute any PPE files, the minimum value you should 
+select is 16.
