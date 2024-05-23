@@ -15,7 +15,15 @@ use crate::{
 };
 
 use super::{
-    commands::Command, doors::DoorList, file_directory::DirectoryList, is_false, is_null_16, is_null_8, is_null_i32, message_area::{AreaList, MessageArea}, pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader}, security_expr::SecurityExpression, user_base::Password, IcyBoardSerializer
+    commands::Command,
+    doors::DoorList,
+    file_directory::DirectoryList,
+    is_false, is_null_16, is_null_8, is_null_i32,
+    message_area::{AreaList, MessageArea},
+    pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader},
+    security_expr::SecurityExpression,
+    user_base::Password,
+    IcyBoardSerializer,
 };
 
 #[serde_as]

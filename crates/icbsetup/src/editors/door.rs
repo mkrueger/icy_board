@@ -3,7 +3,9 @@ use std::sync::{Arc, Mutex};
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
     icy_board::{
-        doors::{BBSLink, Door, DoorList, DoorServerAccount, DoorType}, security_expr::SecurityExpression, IcyBoardSerializer
+        doors::{BBSLink, Door, DoorList, DoorServerAccount, DoorType},
+        security_expr::SecurityExpression,
+        IcyBoardSerializer,
     },
     Res,
 };

@@ -4,7 +4,12 @@ use crate::Res;
 use async_recursion::async_recursion;
 use icy_board_engine::{
     icy_board::{
-        commands::{ActionTrigger, AutoRun, Command, CommandAction, CommandType}, icb_text::IceText, menu::{Menu, MenuType}, security_expr::SecurityExpression, state::{control_codes, functions::display_flags, IcyBoardState, UserActivity}, IcyBoardError, IcyBoardSerializer
+        commands::{ActionTrigger, AutoRun, Command, CommandAction, CommandType},
+        icb_text::IceText,
+        menu::{Menu, MenuType},
+        security_expr::SecurityExpression,
+        state::{control_codes, functions::display_flags, IcyBoardState, UserActivity},
+        IcyBoardError, IcyBoardSerializer,
     },
     vm::TerminalTarget,
 };

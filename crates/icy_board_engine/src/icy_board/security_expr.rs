@@ -1,10 +1,10 @@
 use std::{fmt::Display, iter::Peekable, str::FromStr};
 
-use chrono::{NaiveTime, Timelike};
+use chrono::{Local, NaiveTime, Timelike};
 use logos::{Lexer, Logos};
 
 use super::state::Session;
-use crate::Res;
+use crate::{datetime::IcbDate, Res};
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum UnaryOp {
@@ -106,10 +106,9 @@ impl FromStr for SecurityExpression {
 #[logos(skip r"[ \t\n\f]+")] // Ignore this regex pattern between tokens
 enum Token {
     // Tokens can be literal strings, of any length.
-    #[token("true")]
-    True,
-    #[token("false")]
-    False,
+    #[token("true", |_| true, ignore(ascii_case))]
+    #[token("false", |_| false, ignore(ascii_case))]
+    Bool(bool),
 
     #[token("!")]
     Not,
@@ -220,7 +219,8 @@ impl SecurityExpression {
             },
             SecurityExpression::Call(name, args) => match name.to_uppercase().as_str() {
                 U_SEC_FUNC => Ok(Value::Integer(session.cur_security as i64)),
-                U_AGE => {
+
+                U_AGE_FUNC => {
                     let age = if let Some(user) = &session.current_user {
                         chrono::Utc::now().years_since(user.birth_date).unwrap_or(0)
                     } else {
@@ -228,13 +228,23 @@ impl SecurityExpression {
                     };
                     Ok(Value::Integer(age as i64))
                 }
-                U_GROUP => {
+
+                U_GROUP_FUNC => {
                     if let Value::String(group) = args[0].eval(session)? {
                         Ok(Value::Bool(session.cur_groups.contains(&group)))
                     } else {
                         Err("Invalid argument for U_GROUP".into())
                     }
                 }
+
+                TIME_FUNC => {
+                    let time = Local::now().time();
+                    Ok(Value::Time(time))
+                }
+
+                TIME_LEFT_FUNC => Ok(Value::Integer(session.minutes_left() as i64)),
+
+                DOW_FUNC => Ok(Value::Integer(IcbDate::today().get_day_of_week() as i64)),
                 _ => Err(format!("Invalid function {name}").into()),
             },
             SecurityExpression::Constant(constant) => Ok(constant.clone()),
@@ -273,13 +283,16 @@ impl SecurityExpression {
 
     pub(crate) fn level(&self) -> u8 {
         // TODO
-       0
+        0
     }
 }
 
 pub const U_SEC_FUNC: &str = "U_SEC";
-pub const U_AGE: &str = "U_AGE";
-pub const U_GROUP: &str = "U_GROUP";
+pub const U_AGE_FUNC: &str = "U_AGE";
+pub const U_GROUP_FUNC: &str = "U_GROUP";
+pub const TIME_FUNC: &str = "TIME";
+pub const TIME_LEFT_FUNC: &str = "TIME_LEFT";
+pub const DOW_FUNC: &str = "DOW";
 
 fn bool_oper(lexer: &mut Peekable<Lexer<Token>>) -> Result<SecurityExpression, String> {
     let left = eq_oper(lexer)?;
@@ -353,8 +366,7 @@ fn factor(lexer: &mut Peekable<Lexer<Token>>) -> Result<SecurityExpression, Stri
             }
             SecurityExpression::Parens(Box::new(expr))
         }
-        Token::True => SecurityExpression::Constant(Value::Bool(true)),
-        Token::False => SecurityExpression::Constant(Value::Bool(false)),
+        Token::Bool(b) => SecurityExpression::Constant(Value::Bool(b)),
         Token::String(s) => {
             let mut s = s;
             s.pop();
@@ -420,6 +432,13 @@ mod test {
         assert_eq!(expr.eval(&session).unwrap(), Value::Bool(true));
         session.cur_security = 10;
         assert_eq!(expr.eval(&session).unwrap(), Value::Bool(false));
+    }
+
+    #[test]
+    fn test_eval_time() {
+        let expr = SecurityExpression::from_str("10:00 < 12:00").unwrap();
+        let session = Session::new();
+        assert_eq!(expr.eval(&session).unwrap(), Value::Bool(true));
     }
 
     #[test]

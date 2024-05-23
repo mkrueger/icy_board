@@ -12,7 +12,7 @@ use crate::{
     executable::{VariableType, VariableValue},
 };
 
-use super::{ security_expr::SecurityExpression, IcyBoardSerializer};
+use super::{security_expr::SecurityExpression, IcyBoardSerializer};
 
 #[serde_as]
 #[derive(Default, Clone, Serialize, Deserialize)]

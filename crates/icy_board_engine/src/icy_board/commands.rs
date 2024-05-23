@@ -629,8 +629,8 @@ impl PCBoardRecordImporter<Command> for CommandList {
                 parameter,
                 trigger: ActionTrigger::Activation,
             }],
-            security: SecurityExpression::from_req_security(security)
-})
+            security: SecurityExpression::from_req_security(security),
+        })
     }
 }
 
