@@ -2,8 +2,9 @@ use std::{fmt::Display, str::FromStr};
 
 use crate::Res;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_with::{serde_as, DisplayFromStr};
 
-use super::{security::RequiredSecurity, IcyBoardSerializer, PCBoardRecordImporter};
+use super::{security_expr::SecurityExpression, IcyBoardSerializer, PCBoardRecordImporter};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug, Default)]
 pub enum CommandType {
@@ -534,6 +535,7 @@ impl AutoRun {
     }
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct Command {
     #[serde(default)]
@@ -560,8 +562,9 @@ pub struct Command {
     pub help: String,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "RequiredSecurity::is_empty")]
-    pub security: RequiredSecurity,
+    #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
+    #[serde_as(as = "DisplayFromStr")]
+    pub security: SecurityExpression,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -626,8 +629,8 @@ impl PCBoardRecordImporter<Command> for CommandList {
                 parameter,
                 trigger: ActionTrigger::Activation,
             }],
-            security: RequiredSecurity::new(security),
-        })
+            security: SecurityExpression::from_req_security(security)
+})
     }
 }
 

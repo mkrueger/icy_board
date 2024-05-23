@@ -9,9 +9,10 @@ use crate::{
     Res,
 };
 
-use super::{security::RequiredSecurity, IcyBoardSerializer};
+use super::{security_expr::SecurityExpression, IcyBoardSerializer};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 
 mod callinfo_bbs;
 mod chain_txt;
@@ -107,12 +108,17 @@ pub enum DropFile {
                // INFO.BBS  Phoenix BBS
 }
 
+#[serde_as]
 #[derive(Clone, Serialize, Deserialize, Default)]
 pub struct Door {
     pub name: String,
     pub description: String,
     pub password: String,
-    pub securiy_level: RequiredSecurity,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
+    #[serde_as(as = "DisplayFromStr")]
+    pub securiy_level: SecurityExpression,
 
     pub door_type: DoorType,
     pub path: String,

@@ -3,9 +3,7 @@ use std::sync::{Arc, Mutex};
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
     icy_board::{
-        doors::{BBSLink, Door, DoorList, DoorServerAccount, DoorType},
-        security::RequiredSecurity,
-        IcyBoardSerializer,
+        doors::{BBSLink, Door, DoorList, DoorServerAccount, DoorType}, security_expr::SecurityExpression, IcyBoardSerializer
     },
     Res,
 };
@@ -258,7 +256,7 @@ impl<'a> Editor for DoorEditor<'a> {
                             name: format!("door{}", self.door_list.len() + 1),
                             description: "".to_string(),
                             password: "".to_string(),
-                            securiy_level: RequiredSecurity::new(0),
+                            securiy_level: SecurityExpression::default(),
                             use_shell_execute: false,
                             door_type: DoorType::BBSlink,
                             path: "".to_string(),

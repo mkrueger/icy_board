@@ -1,8 +1,5 @@
 use icy_board_engine::icy_board::{
-    commands::{AutoRun, CommandList, CommandType},
-    pcboard_data::PcbBoardData,
-    security::RequiredSecurity,
-    PCBoardRecordImporter,
+    commands::{AutoRun, CommandList, CommandType}, pcboard_data::PcbBoardData, security_expr::SecurityExpression, PCBoardRecordImporter
 };
 
 fn convert_cmd(name: &str, cmd_type: CommandType, security: i32) -> icy_board_engine::icy_board::commands::Command {
@@ -19,7 +16,7 @@ fn convert_cmd(name: &str, cmd_type: CommandType, security: i32) -> icy_board_en
             parameter: "".to_string(),
             trigger: Default::default(),
         }],
-        security: RequiredSecurity::new(security as u8),
+        security: SecurityExpression::from_req_security(security as u8),
     }
 }
 

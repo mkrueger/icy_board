@@ -1,4 +1,4 @@
-use std::{fmt::Display, iter::Peekable};
+use std::{fmt::Display, iter::Peekable, str::FromStr};
 
 use chrono::{NaiveTime, Timelike};
 use logos::{Lexer, Logos};
@@ -6,7 +6,7 @@ use logos::{Lexer, Logos};
 use super::state::Session;
 use crate::Res;
 
-#[derive(Copy, Clone)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum UnaryOp {
     Not,
 }
@@ -18,7 +18,7 @@ impl Display for UnaryOp {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum BinaryOp {
     And,
     Or,
@@ -63,13 +63,19 @@ impl Display for Value {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum SecurityExpression {
     UnaryExpression(UnaryOp, Box<SecurityExpression>),
     BinaryExpression(BinaryOp, Box<SecurityExpression>, Box<SecurityExpression>),
     Call(String, Vec<SecurityExpression>),
     Constant(Value),
     Parens(Box<SecurityExpression>),
+}
+
+impl Default for SecurityExpression {
+    fn default() -> Self {
+        SecurityExpression::Constant(Value::Bool(true))
+    }
 }
 
 impl Display for SecurityExpression {
@@ -81,6 +87,18 @@ impl Display for SecurityExpression {
             SecurityExpression::Constant(value) => write!(f, "{}", value),
             SecurityExpression::Parens(expr) => write!(f, "({})", expr),
         }
+    }
+}
+
+impl FromStr for SecurityExpression {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.is_empty() {
+            return Ok(SecurityExpression::default());
+        }
+        let mut a = Token::lexer(s).peekable();
+        Ok(bool_oper(&mut a)?)
     }
 }
 
@@ -201,8 +219,8 @@ impl SecurityExpression {
                 }
             },
             SecurityExpression::Call(name, args) => match name.to_uppercase().as_str() {
-                "U_SEC" => Ok(Value::Integer(session.cur_security as i64)),
-                "U_AGE" => {
+                U_SEC_FUNC => Ok(Value::Integer(session.cur_security as i64)),
+                U_AGE => {
                     let age = if let Some(user) = &session.current_user {
                         chrono::Utc::now().years_since(user.birth_date).unwrap_or(0)
                     } else {
@@ -210,7 +228,7 @@ impl SecurityExpression {
                     };
                     Ok(Value::Integer(age as i64))
                 }
-                "U_GROUP" => {
+                U_GROUP => {
                     if let Value::String(group) = args[0].eval(session)? {
                         Ok(Value::Bool(session.cur_groups.contains(&group)))
                     } else {
@@ -224,13 +242,46 @@ impl SecurityExpression {
         }
     }
 
-    pub fn parse(input: &str) -> Res<SecurityExpression> {
-        let mut a: Peekable<Lexer<Token>> = Token::lexer(input).peekable();
-        Ok(bool_oper(&mut a)?)
+    pub fn user_can_access(&self, session: &Session) -> bool {
+        match self.eval(session) {
+            Ok(Value::Bool(b)) => b,
+            Ok(_) => {
+                log::error!("expression didn't evaluate to bool ({})", self);
+                false
+            }
+            Err(err) => {
+                log::error!("Error evaluating security expression: {} ({})", err, self);
+                false
+            }
+        }
+    }
+
+    pub fn from_req_security(security: u8) -> SecurityExpression {
+        SecurityExpression::BinaryExpression(
+            BinaryOp::GreaterEqual,
+            Box::new(SecurityExpression::Call(U_SEC_FUNC.to_string(), vec![])),
+            Box::new(SecurityExpression::Constant(Value::Integer(security as i64))),
+        )
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            SecurityExpression::Constant(Value::Bool(true)) => true,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn level(&self) -> u8 {
+        // TODO
+       0
     }
 }
 
-fn bool_oper(lexer: &mut Peekable<Lexer<Token>>) -> Res<SecurityExpression> {
+pub const U_SEC_FUNC: &str = "U_SEC";
+pub const U_AGE: &str = "U_AGE";
+pub const U_GROUP: &str = "U_GROUP";
+
+fn bool_oper(lexer: &mut Peekable<Lexer<Token>>) -> Result<SecurityExpression, String> {
     let left = eq_oper(lexer)?;
     let Some(next) = lexer.peek() else {
         return Ok(left);
@@ -250,7 +301,7 @@ fn bool_oper(lexer: &mut Peekable<Lexer<Token>>) -> Res<SecurityExpression> {
     }
 }
 
-fn eq_oper(lexer: &mut Peekable<Lexer<Token>>) -> Res<SecurityExpression> {
+fn eq_oper(lexer: &mut Peekable<Lexer<Token>>) -> Result<SecurityExpression, String> {
     let left = factor(lexer)?;
     let Some(next) = lexer.peek() else {
         return Ok(left);
@@ -281,7 +332,7 @@ fn eq_oper(lexer: &mut Peekable<Lexer<Token>>) -> Res<SecurityExpression> {
     }
 }
 
-fn factor(lexer: &mut Peekable<Lexer<Token>>) -> Res<SecurityExpression> {
+fn factor(lexer: &mut Peekable<Lexer<Token>>) -> Result<SecurityExpression, String> {
     let Some(token) = lexer.next() else {
         return Err("Unexpected end of input".into());
     };
@@ -345,25 +396,25 @@ mod test {
 
     #[test]
     fn test_parse() {
-        let expr = SecurityExpression::parse("true & false").unwrap();
+        let expr = SecurityExpression::from_str("true & false").unwrap();
         assert_eq!(expr.to_string(), "true & false");
     }
 
     #[test]
     fn test_parse_func() {
-        let expr = SecurityExpression::parse("U_SEC() >= 50").unwrap();
+        let expr = SecurityExpression::from_str("U_SEC() >= 50").unwrap();
         assert_eq!(expr.to_string(), "U_SEC() >= 50");
     }
 
     #[test]
     fn test_parse_func2() {
-        let expr = SecurityExpression::parse("GROUP(\"SYSOPS\")").unwrap();
+        let expr = SecurityExpression::from_str("GROUP(\"SYSOPS\")").unwrap();
         assert_eq!(expr.to_string(), "GROUP(\"SYSOPS\")");
     }
 
     #[test]
     fn test_eval_sec() {
-        let expr = SecurityExpression::parse("U_SEC() >= 50").unwrap();
+        let expr = SecurityExpression::from_str("U_SEC() >= 50").unwrap();
         let mut session = Session::new();
         session.cur_security = 100;
         assert_eq!(expr.eval(&session).unwrap(), Value::Bool(true));
@@ -373,11 +424,11 @@ mod test {
 
     #[test]
     fn test_group_func() {
-        let expr = SecurityExpression::parse("U_GROUP(\"FOOBAR\")").unwrap();
+        let expr = SecurityExpression::from_str("U_GROUP(\"FOOBAR\")").unwrap();
         let mut session = Session::new();
         session.cur_groups = vec!["FOOBAR".to_string()];
         assert_eq!(expr.eval(&session).unwrap(), Value::Bool(true));
-        let expr = SecurityExpression::parse("U_GROUP(\"FOOBAR2\")").unwrap();
+        let expr = SecurityExpression::from_str("U_GROUP(\"FOOBAR2\")").unwrap();
         let mut session = Session::new();
         session.cur_groups = vec!["FOOBAR".to_string()];
         assert_eq!(expr.eval(&session).unwrap(), Value::Bool(false));

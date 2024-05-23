@@ -1,9 +1,11 @@
+use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::vec;
 
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
+use icy_board_engine::icy_board::security_expr::SecurityExpression;
 use icy_board_engine::icy_board::user_base::Password;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::config_menu::ConfigEntry;
@@ -185,7 +187,7 @@ impl ConferencesTab {
                         ListItem::new(
                             "req_sec",
                             "Req. Security if Public".to_string(),
-                            ListValue::U32(conf.required_security.level as u32, 0, 255),
+                            ListValue::Text(50, conf.required_security.to_string()),
                         )
                         .with_label_width(28),
                     ),
@@ -275,6 +277,7 @@ impl ConferencesTab {
             ListValue::Text(_, text) => match item.id.as_str() {
                 "name" => conf.name = text.clone(),
                 "password" => conf.password = Password::PlainText(text.clone()),
+                "req_sec" => conf.required_security = SecurityExpression::from_str(text).unwrap_or_default(),
                 _ => panic!("Unknown id: {}", item.id),
             },
             ListValue::Path(path) => match item.id.as_str() {
@@ -296,10 +299,6 @@ impl ConferencesTab {
                 "dir_file" => conf.dir_file = path.clone(),
                 "area_menu" => conf.area_menu = path.clone(),
                 "area_file" => conf.area_file = path.clone(),
-                _ => panic!("Unknown id: {}", item.id),
-            },
-            ListValue::U32(val, _, _) => match item.id.as_str() {
-                "req_sec" => conf.required_security.level = *val as u8,
                 _ => panic!("Unknown id: {}", item.id),
             },
             ListValue::Bool(b) => match item.id.as_str() {

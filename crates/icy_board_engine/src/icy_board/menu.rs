@@ -8,10 +8,7 @@ use std::{
 use crate::vm::errors::IcyError;
 
 use super::{
-    commands::{ActionTrigger, AutoRun, Command, CommandAction, CommandType},
-    is_false, path_is_empty, read_with_encoding_detection,
-    security::RequiredSecurity,
-    IcyBoardSerializer,
+    commands::{ActionTrigger, AutoRun, Command, CommandAction, CommandType}, is_false, path_is_empty, read_with_encoding_detection, security_expr::SecurityExpression, IcyBoardSerializer
 };
 
 #[derive(Clone, Serialize, Deserialize, Default, PartialEq, Debug)]
@@ -163,7 +160,7 @@ impl Menu {
                 position: Default::default(),
                 auto_run: AutoRun::Disabled,
                 autorun_time: 0,
-                security: RequiredSecurity::new(security),
+                security: SecurityExpression::from_req_security(security),
                 help: "".to_string(),
                 actions: vec![CommandAction {
                     command_type: cmd_type,

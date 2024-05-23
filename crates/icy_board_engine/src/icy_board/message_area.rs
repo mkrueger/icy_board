@@ -5,14 +5,16 @@ use std::{
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
     executable::{VariableType, VariableValue},
 };
 
-use super::{security::RequiredSecurity, IcyBoardSerializer};
+use super::{ security_expr::SecurityExpression, IcyBoardSerializer};
 
+#[serde_as]
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct MessageArea {
     pub name: String,
@@ -21,16 +23,19 @@ pub struct MessageArea {
     pub allow_aliases: bool,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "RequiredSecurity::is_empty")]
-    pub req_level_to_enter: RequiredSecurity,
+    #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
+    #[serde_as(as = "DisplayFromStr")]
+    pub req_level_to_enter: SecurityExpression,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "RequiredSecurity::is_empty")]
-    pub req_level_to_list: RequiredSecurity,
+    #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
+    #[serde_as(as = "DisplayFromStr")]
+    pub req_level_to_list: SecurityExpression,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "RequiredSecurity::is_empty")]
-    pub req_level_to_save_attach: RequiredSecurity,
+    #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
+    #[serde_as(as = "DisplayFromStr")]
+    pub req_level_to_save_attach: SecurityExpression,
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]

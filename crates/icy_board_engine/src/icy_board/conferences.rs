@@ -5,6 +5,7 @@ use std::{
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
@@ -14,17 +15,10 @@ use crate::{
 };
 
 use super::{
-    commands::Command,
-    doors::DoorList,
-    file_directory::DirectoryList,
-    is_false, is_null_16, is_null_8, is_null_i32,
-    message_area::{AreaList, MessageArea},
-    pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader},
-    security::RequiredSecurity,
-    user_base::Password,
-    IcyBoardSerializer,
+    commands::Command, doors::DoorList, file_directory::DirectoryList, is_false, is_null_16, is_null_8, is_null_i32, message_area::{AreaList, MessageArea}, pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader}, security_expr::SecurityExpression, user_base::Password, IcyBoardSerializer
 };
 
+#[serde_as]
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Conference {
     pub name: String,
@@ -42,16 +36,19 @@ pub struct Conference {
     pub password: Password,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "RequiredSecurity::is_empty")]
-    pub required_security: RequiredSecurity,
+    #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
+    #[serde_as(as = "DisplayFromStr")]
+    pub required_security: SecurityExpression,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "RequiredSecurity::is_empty")]
-    pub sec_attachments: RequiredSecurity,
+    #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
+    #[serde_as(as = "DisplayFromStr")]
+    pub sec_attachments: SecurityExpression,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "RequiredSecurity::is_empty")]
-    pub sec_write_message: RequiredSecurity,
+    #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
+    #[serde_as(as = "DisplayFromStr")]
+    pub sec_write_message: SecurityExpression,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
@@ -158,9 +155,9 @@ impl ConferenceBase {
                 filename: PathBuf::from(&c.message_file),
                 read_only: d.read_only,
                 allow_aliases: d.allow_aliases,
-                req_level_to_list: RequiredSecurity::new(d.req_level_to_enter),
-                req_level_to_enter: RequiredSecurity::new(d.req_level_to_enter),
-                req_level_to_save_attach: RequiredSecurity::new(d.attach_level),
+                req_level_to_list: SecurityExpression::from_req_security(d.req_level_to_enter),
+                req_level_to_enter: SecurityExpression::from_req_security(d.req_level_to_enter),
+                req_level_to_save_attach: SecurityExpression::from_req_security(d.attach_level),
             };
             let output = if i == 0 { "conferences/main".to_string() } else { format!("conferences/{i}") };
             let destination = output_directory.join(&output);
@@ -176,9 +173,9 @@ impl ConferenceBase {
                 use_main_commands: true,
                 commands: Vec::new(),
                 password: Password::PlainText(d.password.clone()),
-                required_security: RequiredSecurity::new(c.required_security),
-                sec_attachments: RequiredSecurity::new(d.attach_level),
-                sec_write_message: RequiredSecurity::new(d.req_level_to_enter),
+                required_security: SecurityExpression::from_req_security(c.required_security),
+                sec_attachments: SecurityExpression::from_req_security(d.attach_level),
+                sec_write_message: SecurityExpression::from_req_security(d.req_level_to_enter),
                 auto_rejoin: c.auto_rejoin,
                 view_members: c.view_members,
                 private_uploads: c.private_uploads,

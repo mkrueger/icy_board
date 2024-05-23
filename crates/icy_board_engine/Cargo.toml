@@ -17,6 +17,7 @@ log = { workspace = true }
 crossterm = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }
+serde_with = "3.8.1"
 tokio = { workspace = true }
 semver = { workspace = true }
 
