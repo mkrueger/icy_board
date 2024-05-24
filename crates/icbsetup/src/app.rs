@@ -7,7 +7,9 @@ use icy_board_tui::{
 };
 
 use crate::{
-    editors::{bullettins::BullettinsEditor, door::DoorEditor, sec_editor::SecurityLevelEditor, surveys::SurveyEditor},
+    editors::{
+        bullettins::BullettinsEditor, dirs::DirsEditor, door::DoorEditor, messages::MessageAreasEditor, sec_editor::SecurityLevelEditor, surveys::SurveyEditor,
+    },
     tabs::{AboutTab, ConferencesTab, GeneralTab, PathTab, ServerTab},
 };
 
@@ -48,11 +50,10 @@ pub fn new_main_window<'a>(icy_board: Arc<Mutex<IcyBoard>>, full_screen: bool) -
             }
 
             "dir_file" => {
-                return Ok(Some(Box::new(BullettinsEditor::new(path).unwrap())));
+                return Ok(Some(Box::new(DirsEditor::new(path).unwrap())));
             }
-
             "area_file" => {
-                return Ok(Some(Box::new(BullettinsEditor::new(path).unwrap())));
+                return Ok(Some(Box::new(MessageAreasEditor::new(path).unwrap())));
             }
 
             _ => {

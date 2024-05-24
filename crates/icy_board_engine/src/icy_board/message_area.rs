@@ -19,7 +19,7 @@ use super::{security_expr::SecurityExpression, IcyBoardSerializer};
 pub struct MessageArea {
     pub name: String,
     pub filename: PathBuf,
-    pub read_only: bool,
+    pub is_read_only: bool,
     pub allow_aliases: bool,
 
     #[serde(default)]

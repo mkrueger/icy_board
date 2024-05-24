@@ -2,6 +2,7 @@ use std::{
     fs,
     ops::{Deref, DerefMut},
     path::PathBuf,
+    str::FromStr,
 };
 
 use crate::{
@@ -16,7 +17,7 @@ use serde_with::{serde_as, DisplayFromStr};
 
 use super::{is_false, security_expr::SecurityExpression, user_base::Password, IcyBoardError, IcyBoardSerializer, PCBoardRecordImporter};
 
-#[derive(Serialize, Deserialize, Default, Clone, Copy)]
+#[derive(Serialize, Deserialize, Default, Clone, Copy, Debug)]
 pub enum SortOrder {
     NoSort,
     #[default]
@@ -24,7 +25,29 @@ pub enum SortOrder {
     FileDate,
 }
 
-#[derive(Serialize, Deserialize, Default, Clone, Copy)]
+impl SortOrder {
+    pub fn iter() -> impl Iterator<Item = SortOrder> {
+        [SortOrder::NoSort, SortOrder::FileName, SortOrder::FileDate].iter().copied()
+    }
+}
+
+impl FromStr for SortOrder {
+    type Err = IcyBoardError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "NoSort" => Ok(SortOrder::NoSort),
+            "FileName" => Ok(SortOrder::FileName),
+            "FileDate" => Ok(SortOrder::FileDate),
+            _ => {
+                log::error!("Invalid SortOrder: {}", s);
+                Ok(SortOrder::NoSort)
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Default, Clone, Copy, PartialEq)]
 pub enum SortDirection {
     #[default]
     Ascending,
@@ -37,8 +60,8 @@ pub enum SortDirection {
 #[derive(Clone, Serialize, Deserialize, Default)]
 pub struct FileDirectory {
     pub name: String,
-    pub file_base: PathBuf,
     pub path: PathBuf,
+    pub file_base: PathBuf,
 
     pub password: Password,
 
@@ -110,6 +133,10 @@ impl DirectoryList {
         }
         fs::write(dir_file, &buf)?;
         Ok(())
+    }
+
+    pub fn len(&self) -> usize {
+        self.areas.len()
     }
 }
 
