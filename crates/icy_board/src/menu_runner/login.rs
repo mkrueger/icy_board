@@ -8,6 +8,7 @@ use icy_board_engine::{
     icy_board::{
         icb_config::{IcbColor, DEFAULT_PCBOARD_DATE_FORMAT},
         icb_text::IceText,
+        security_expr::SecurityExpression,
         state::{
             functions::{display_flags, pwd_flags, MASK_ALNUM, MASK_PHONE, MASK_WEB},
             UserActivity,
@@ -464,12 +465,12 @@ impl PcbBoardCommand {
         let survey = {
             let board = self.state.get_board().await;
             Survey {
-                question_file: board.resolve_file(&board.config.paths.newask_survey),
+                survey_file: board.resolve_file(&board.config.paths.newask_survey),
                 answer_file: board.resolve_file(&board.config.paths.newask_answer),
-                required_security: 0,
+                required_security: SecurityExpression::default(),
             }
         };
-        Ok(if !self.state.session.is_sysop && survey.question_file.exists() {
+        Ok(if !self.state.session.is_sysop && survey.survey_file.exists() {
             // skip the survey question.
             self.state.session.tokens.push_front(self.state.session.yes_char.to_string());
             self.start_survey(&survey).await?;

@@ -5,23 +5,26 @@ use std::{
 
 use crate::{tables::import_cp437_string, Res};
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 
-use super::{is_null_8, IcyBoardSerializer, PCBoardRecordImporter};
+use super::{security_expr::SecurityExpression, IcyBoardSerializer, PCBoardRecordImporter};
 
-#[derive(Serialize, Deserialize, Default)]
+#[serde_as]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct Bullettin {
     pub file: PathBuf,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "is_null_8")]
-    pub required_security: u8,
+    #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
+    #[serde_as(as = "DisplayFromStr")]
+    pub required_security: SecurityExpression,
 }
 
 impl Bullettin {
     pub fn new(file: &Path) -> Self {
         Self {
             file: file.to_path_buf(),
-            required_security: 0,
+            required_security: SecurityExpression::default(),
         }
     }
 }
@@ -62,7 +65,7 @@ impl PCBoardRecordImporter<Bullettin> for BullettinList {
         let file_name = import_cp437_string(data, true);
         Ok(Bullettin {
             file: PathBuf::from(file_name),
-            required_security: 0,
+            required_security: SecurityExpression::default(),
         })
     }
 }

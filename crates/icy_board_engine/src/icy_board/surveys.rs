@@ -5,25 +5,28 @@ use std::{
 
 use crate::Res;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 
-use super::{is_null_8, IcyBoardSerializer, PCBoardRecordImporter};
+use super::{security_expr::SecurityExpression, IcyBoardSerializer, PCBoardRecordImporter};
 
 /// A survey is a question and answer pair.
 /// PCBoard calles them "Questionnairies" but we call them surveys.
-#[derive(Serialize, Deserialize, Default)]
+#[serde_as]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct Survey {
-    pub question_file: PathBuf,
+    pub survey_file: PathBuf,
     pub answer_file: PathBuf,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "is_null_8")]
-    pub required_security: u8,
+    #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
+    #[serde_as(as = "DisplayFromStr")]
+    pub required_security: SecurityExpression,
 }
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct SurveyList {
     #[serde(rename = "survey")]
-    surveys: Vec<Survey>,
+    pub surveys: Vec<Survey>,
 }
 
 impl Deref for SurveyList {
@@ -47,12 +50,12 @@ impl PCBoardRecordImporter<Survey> for SurveyList {
     }
 
     fn load_pcboard_record(data: &[u8]) -> Res<Survey> {
-        let question_file = PathBuf::from(crate::tables::import_cp437_string(&data[..Self::RECORD_SIZE / 2], true));
+        let survey_file = PathBuf::from(crate::tables::import_cp437_string(&data[..Self::RECORD_SIZE / 2], true));
         let answer_file = PathBuf::from(crate::tables::import_cp437_string(&data[Self::RECORD_SIZE / 2..], true));
         Ok(Survey {
-            question_file,
+            survey_file,
             answer_file,
-            required_security: 0,
+            required_security: SecurityExpression::default(),
         })
     }
 }

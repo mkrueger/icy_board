@@ -1070,7 +1070,7 @@ impl PCBoardImporter {
         let destination = PathBuf::from(dest_path).join(resolved_file.file_name().unwrap().to_ascii_lowercase());
 
         for entry in list.iter_mut() {
-            let new_entry = self.resolve_file(entry.question_file.to_str().unwrap());
+            let new_entry = self.resolve_file(entry.survey_file.to_str().unwrap());
             if !new_entry.exists() {
                 self.logger
                     .log(&format!("Warning, can't import questionaire  {}, doesn't exist.", new_entry.display()));
@@ -1098,7 +1098,7 @@ impl PCBoardImporter {
                         }
                     }
 
-                    entry.question_file = new_rel_name;
+                    entry.survey_file = new_rel_name;
                 }
                 Err(err) => {
                     self.logger.log_boxed_error(&*err);

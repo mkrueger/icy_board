@@ -348,11 +348,11 @@ impl TabPage for ConferencesTab {
                 }
                 KeyCode::F(2) => {
                     if let Some(item) = self.conference_config.get_item(self.state.selected) {
-                        if item.id == "doors_file" {
+                        if item.id == "doors_file" || item.id == "blt_file" || item.id == "survey_file" || item.id == "dir_file" || item.id == "area_file" {
                             if let ListValue::Path(path) = &item.value {
                                 let path = self.icy_board.lock().unwrap().resolve_file(path);
                                 return ResultState {
-                                    edit_mode: EditMode::Open("doors_file".to_string(), path.clone()),
+                                    edit_mode: EditMode::Open(item.id.to_string(), path.clone()),
                                     status_line: String::new(),
                                 };
                             }

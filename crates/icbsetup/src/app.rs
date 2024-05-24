@@ -7,7 +7,7 @@ use icy_board_tui::{
 };
 
 use crate::{
-    editors::{door::DoorEditor, sec_editor::SecurityLevelEditor},
+    editors::{bullettins::BullettinsEditor, door::DoorEditor, sec_editor::SecurityLevelEditor, surveys::SurveyEditor},
     tabs::{AboutTab, ConferencesTab, GeneralTab, PathTab, ServerTab},
 };
 
@@ -40,6 +40,21 @@ pub fn new_main_window<'a>(icy_board: Arc<Mutex<IcyBoard>>, full_screen: bool) -
             "pwrd_sec_level_file" => {
                 return Ok(Some(Box::new(SecurityLevelEditor::new(path).unwrap())));
             }
+            "blt_file" => {
+                return Ok(Some(Box::new(BullettinsEditor::new(path).unwrap())));
+            }
+            "survey_file" => {
+                return Ok(Some(Box::new(SurveyEditor::new(path).unwrap())));
+            }
+
+            "dir_file" => {
+                return Ok(Some(Box::new(BullettinsEditor::new(path).unwrap())));
+            }
+
+            "area_file" => {
+                return Ok(Some(Box::new(BullettinsEditor::new(path).unwrap())));
+            }
+
             _ => {
                 panic!("Unknown id: {}", id);
             }

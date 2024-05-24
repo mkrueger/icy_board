@@ -250,22 +250,22 @@ impl IcyBoardCreator {
 
         let mut list = SurveyList::default();
         let s = Survey {
-            question_file: PathBuf::from("conferences/main/script1.pcb"),
+            survey_file: PathBuf::from("conferences/main/script1.pcb"),
             answer_file: PathBuf::from("conferences/main/script1.answer"),
             ..Default::default()
         };
         fs::write(
-            &self.destination.join(&s.question_file).with_extension("pcb"),
+            &self.destination.join(&s.survey_file).with_extension("pcb"),
             include_str!("../../data/new_bbs/script1.pcb"),
         )?;
         list.push(s);
 
         let s = Survey {
-            question_file: PathBuf::from("conferences/main/script2.ppe"),
+            survey_file: PathBuf::from("conferences/main/script2.ppe"),
             answer_file: PathBuf::from("conferences/main/script2.answer"),
             ..Default::default()
         };
-        fs::write(&self.destination.join(&s.question_file), include_bytes!("../../../../ppe/script2.ppe"))?;
+        fs::write(&self.destination.join(&s.survey_file), include_bytes!("../../../../ppe/script2.ppe"))?;
         list.push(s);
         list.save(&self.destination.join(&conf.survey_file))?;
 
