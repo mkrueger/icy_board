@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{fs, time::Duration};
 
 use icy_net::{
     pattern_recognizer::PatternRecognizer,
@@ -37,21 +37,41 @@ async fn try_connect(connection: &mut dyn Connection, pattern: Vec<&[u8]>, send:
     }
 }
 
-async fn begin_zconnect(connection: &mut dyn Connection) -> bool {
+enum Begin {
+    ZConnect,
+    ZModemSend,
+    ZModem,
+}
+
+async fn begin_zconnect(connection: &mut dyn Connection) -> Begin {
     let mut buf = [0; 1024];
-    let mut password_pattern = PatternRecognizer::from(b"begin", true);
-    //  let instant = Instant::now();
-    println!("Begin ZConnect…");
+    let mut zconnect_pattern = PatternRecognizer::from(b"begin", true);
+    let mut zmodem_send_pattern = PatternRecognizer::from(b"B0100000023be50", false);
+    let mut zmodem_recv_pattern = PatternRecognizer::from(b"B00000000000000", false);
+
+    let mut instant = Instant::now();
+    println!("Waiting for ZConnect or ZModem");
     loop {
         let size = connection.read(&mut buf).await.unwrap();
+
         for b in &buf[0..size] {
             print!("{}", *b as char);
-            if password_pattern.push_ch(*b) {
-                return true;
+            if zconnect_pattern.push_ch(*b) {
+                println!("Begin ZConnect");
+                return Begin::ZConnect;
+            }
+            if zmodem_send_pattern.push_ch(*b) {
+                println!("Begin ZModem send");
+                return Begin::ZModemSend;
+            }
+            if zmodem_recv_pattern.push_ch(*b) {
+                println!("Begin ZModem recv");
+                return Begin::ZModem;
             }
         }
-        if size > 0 {
-            connection.send(b"Crazy Paradise BBS\r").await.unwrap();
+        if size > 0 && instant.elapsed() > Duration::from_secs(1) {
+            connection.send(b"\r").await.unwrap();
+            instant = Instant::now();
         }
     }
 }
@@ -63,11 +83,13 @@ struct ZConnect {
 pub async fn read_string(connection: &mut dyn Connection) -> String {
     let mut res = String::new();
 
+    println!("Reading string...");
     let mut buf = [0; 1024];
     let mut last = 0;
     loop {
         let size = connection.read(&mut buf).await.unwrap();
         for b in &buf[0..size] {
+            print!("{}", *b as char);
             res.push(*b as char);
             if *b == b'\r' && last == b'\r' {
                 return res;
@@ -145,10 +167,21 @@ async fn zconnect_login(connection: &mut dyn Connection) -> bool {
     try_connect(connection, vec![b"word", b"wort"], b"0zconnec\r").await
 }*/
 
-async fn janus_login(connection: &mut dyn Connection) -> bool {
-    try_connect(connection, vec![b"Username:"], b"JANUS\r").await && try_connect(connection, vec![b"Systemname:"], b"Crazy Paradise BBS\r").await
-
-    // && try_connect(connection, vec![b"word", b"wort"], b"mypassword\r").await
+async fn janus_login(connection: &mut dyn Connection, system: &str, password: &str) -> bool {
+    println!("logging in...");
+    if !try_connect(connection, vec![b"Username:"], b"JANUS\r").await {
+        return false;
+    }
+    println!("send system name...");
+    if !try_connect(connection, vec![b"Systemname:"], system.as_bytes()).await {
+        return false;
+    }
+    println!("send password...");
+    if !try_connect(connection, vec![b"word", b"wort"], password.as_bytes()).await {
+        return false;
+    }
+    println!("logged in");
+    true
 }
 
 #[tokio::main]
@@ -158,67 +191,113 @@ async fn main() {
         terminal: TerminalEmulation::Ascii,
     };
 
-    let mut connection = TelnetConnection::open(&"1111", caps, Duration::from_secs(2)).await.unwrap();
-    if !janus_login(&mut connection).await {
+    let mut connection = TelnetConnection::open(&"ip", caps, Duration::from_secs(2)).await.unwrap();
+    if !janus_login(&mut connection, "name\r", "pw\r").await {
         return;
     }
-    if !begin_zconnect(&mut connection).await {
-        return;
-    }
-    let mut header = ZConnectHeaderBlock::default();
-    header.add_acer(0, Acer::ZIP);
-    header.add_acer(0, Acer::Arj);
-    header.add_acer(0, Acer::ZOO);
-    header.add_acer(0, Acer::LHArc);
-    header.add_acer(0, Acer::LHA);
-    header.add_iso2(0, "V.32");
-    header.set_password("IcyBoardTest");
-    header.set_port(0);
-    header.add_protocol(0, TransferProtocol::ZModem);
-    header.add_protocol(0, TransferProtocol::ZModem8k);
-    header.set_system("Icy Shadow BBS");
-    header.set_sysop("SYSOP");
-    header.add_phone(0, "1234567890");
+    loop {
+        match begin_zconnect(&mut connection).await {
+            Begin::ZConnect => {
+                let mut header = ZConnectHeaderBlock::default();
+                header.add_acer(0, Acer::ZIP);
+                header.add_acer(0, Acer::Arj);
+                header.add_acer(0, Acer::ZOO);
+                header.add_acer(0, Acer::LHArc);
+                header.add_acer(0, Acer::LHA);
+                header.add_iso2(0, "V.32");
+                header.set_password("IcyBoardTest");
+                header.set_port(0);
+                header.add_protocol(0, TransferProtocol::ZModem);
+                header.add_protocol(0, TransferProtocol::ZModem8k);
+                header.set_system("Icy Shadow BBS");
+                header.set_sysop("SYSOP");
+                header.add_phone(0, "1234567890");
 
-    let mut zcon = ZConnect { cur_block: BlockCode::Block1 };
+                let mut zcon = ZConnect { cur_block: BlockCode::Block1 };
+                println!("send header...");
 
-    zcon.send_block(&mut connection, &header).await.unwrap();
-    let header = zcon.recv_block(&mut connection).await.unwrap();
-    println!("Received header: {}", header.display());
+                zcon.send_block(&mut connection, &header).await.unwrap();
+                let _header = zcon.recv_block(&mut connection).await.unwrap();
 
-    let get_mail = ZConnectCommandBlock::default().get(mails::ALL);
-    zcon.send_block(&mut connection, &get_mail).await.unwrap();
+                println!("send get request...");
+                let get_mail = ZConnectCommandBlock::default().get(mails::ALL);
+                zcon.send_block(&mut connection, &get_mail).await.unwrap();
 
-    let header = zcon.recv_block(&mut connection).await.unwrap();
-    println!("Received block: {}", header.display());
+                let _header = zcon.recv_block(&mut connection).await.unwrap();
 
-    let execute = ZConnectCommandBlock::default().execute(Execute::Yes);
-    zcon.send_block(&mut connection, &execute).await.unwrap();
+                let execute = ZConnectCommandBlock::default().execute(Execute::Yes);
+                println!("send execute now...");
+                zcon.send_block(&mut connection, &execute).await.unwrap();
 
-    let _header = zcon.recv_block(&mut connection).await.unwrap();
+                let _header = zcon.recv_block(&mut connection).await.unwrap();
 
-    zcon.send_block(&mut connection, &ZConnectCommandBlock::EOT4).await.unwrap();
-    zcon.send_block(&mut connection, &ZConnectCommandBlock::EOT4).await.unwrap();
-    zcon.send_block(&mut connection, &ZConnectCommandBlock::EOT4).await.unwrap();
-    zcon.send_block(&mut connection, &ZConnectCommandBlock::BEG5).await.unwrap();
+                println!("send eot & begin...");
+                zcon.send_block(&mut connection, &ZConnectCommandBlock::EOT4).await.unwrap();
+                zcon.send_block(&mut connection, &ZConnectCommandBlock::EOT4).await.unwrap();
+                zcon.send_block(&mut connection, &ZConnectCommandBlock::EOT4).await.unwrap();
+                zcon.send_block(&mut connection, &ZConnectCommandBlock::BEG5).await.unwrap();
 
-    for _ in 0..3 {
-        let header = zcon.recv_block(&mut connection).await.unwrap();
-        println!("Received block: {}", header.display());
-        if header.state() != ZConnectState::Eot(EndTransmission::Prot5) {
-            let execute = ZConnectCommandBlock::default().logoff();
-            zcon.send_block(&mut connection, &execute).await.unwrap();
-            return;
+                println!("wait for receive...");
+                for _ in 0..3 {
+                    let header = zcon.recv_block(&mut connection).await.unwrap();
+                    println!("Received block: {}", header.display());
+                    if header.state() != ZConnectState::Eot(EndTransmission::Prot5) {
+                        let execute = ZConnectCommandBlock::default().logoff();
+                        zcon.send_block(&mut connection, &execute).await.unwrap();
+                        return;
+                    }
+                }
+                initate_download(&mut zcon, &mut connection).await;
+                return;
+            }
+            Begin::ZModemSend => {
+                let mut zcon = ZConnect { cur_block: BlockCode::Block1 };
+                initate_upload(&mut zcon, &mut connection).await;
+                continue;
+            }
+            Begin::ZModem => {
+                let mut zcon = ZConnect { cur_block: BlockCode::Block1 };
+                initate_download(&mut zcon, &mut connection).await;
+                return;
+            }
         }
     }
+}
+
+async fn initate_download(zcon: &mut ZConnect, connection: &mut dyn Connection) {
+    println!("initiate transfer...");
+
     let mut proto = icy_net::protocol::TransferProtocolType::ZModem.create();
-    let mut ts = proto.initiate_recv(&mut connection).await.unwrap();
+    let mut ts = proto.initiate_recv(connection).await.unwrap();
 
     while !ts.is_finished {
-        proto.update_transfer(&mut connection, &mut ts).await.unwrap();
+        if let Err(err) = proto.update_transfer(connection, &mut ts).await {
+            log::error!("ZModem error: {}", err);
+        }
+        println!("transferred: {}\r", ts.recieve_state.total_bytes_transfered);
+    }
+    println!("transfer finished");
+    for (file, path) in &ts.recieve_state.finished_files {
+        println!("Copy: {} to {}", path.display(), file);
+        let _ = fs::copy(path, file);
     }
     let execute = ZConnectCommandBlock::default().logoff();
-    zcon.send_block(&mut connection, &execute).await.unwrap();
-    let header = zcon.recv_block(&mut connection).await.unwrap();
+    zcon.send_block(connection, &execute).await.unwrap();
+    let header = zcon.recv_block(connection).await.unwrap();
     println!("Received block: {}", header.display());
+}
+
+async fn initate_upload(_zcon: &mut ZConnect, connection: &mut dyn Connection) {
+    println!("initiate transfer...");
+
+    let mut proto = icy_net::protocol::TransferProtocolType::ZModem.create();
+    let mut ts = proto.initiate_send(connection, &[]).await.unwrap();
+
+    while !ts.is_finished {
+        if let Err(err) = proto.update_transfer(connection, &mut ts).await {
+            log::error!("ZModem error: {}", err);
+        }
+        println!("transferred: {}\r", ts.recieve_state.total_bytes_transfered);
+    }
+    println!("transfer finished");
 }

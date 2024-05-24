@@ -4,12 +4,11 @@ use crate::Res;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct SecurityLevel {
     #[serde(default)]
-    #[serde(rename = "enabled")]
-    #[serde(skip_serializing_if = "is_false")]
-    pub is_enabled: bool,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub description: String,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -26,23 +25,6 @@ pub struct SecurityLevel {
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_32")]
     pub calls_per_day: u32,
-
-    #[serde(default)]
-    #[serde(rename = "demo_account")]
-    #[serde(skip_serializing_if = "is_false")]
-    pub is_demo_account: bool,
-
-    #[serde(default)]
-    #[serde(skip_serializing_if = "is_false")]
-    pub allow_alias: bool,
-
-    #[serde(default)]
-    #[serde(skip_serializing_if = "is_false")]
-    pub enforce_time_limit: bool,
-
-    #[serde(default)]
-    #[serde(skip_serializing_if = "is_false")]
-    pub enforce_read_mail: bool,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_32")]
@@ -75,6 +57,28 @@ pub struct SecurityLevel {
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_64")]
     pub file_kb_credit: u64,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    pub enforce_time_limit: bool,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    pub allow_alias: bool,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    pub enforce_read_mail: bool,
+
+    #[serde(default)]
+    #[serde(rename = "demo_account")]
+    #[serde(skip_serializing_if = "is_false")]
+    pub is_demo_account: bool,
+
+    #[serde(default)]
+    #[serde(rename = "enabled")]
+    #[serde(skip_serializing_if = "is_false")]
+    pub is_enabled: bool,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -142,6 +146,7 @@ impl PCBoardTextImport for SecurityLevelDefinitions {
                 file_kb_limit,
                 file_credit,
                 file_kb_credit,
+                description: "".to_string(),
             });
         }
         Ok(res)

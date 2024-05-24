@@ -7,7 +7,7 @@ use icy_board_tui::{
 };
 
 use crate::{
-    editors::door::DoorEditor,
+    editors::{door::DoorEditor, sec_editor::SecurityLevelEditor},
     tabs::{AboutTab, ConferencesTab, GeneralTab, PathTab, ServerTab},
 };
 
@@ -36,6 +36,9 @@ pub fn new_main_window<'a>(icy_board: Arc<Mutex<IcyBoard>>, full_screen: bool) -
         get_editor: Box::new(|id, path| match id {
             "doors_file" => {
                 return Ok(Some(Box::new(DoorEditor::new(path).unwrap())));
+            }
+            "pwrd_sec_level_file" => {
+                return Ok(Some(Box::new(SecurityLevelEditor::new(path).unwrap())));
             }
             _ => {
                 panic!("Unknown id: {}", id);

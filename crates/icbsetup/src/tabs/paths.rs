@@ -407,6 +407,13 @@ impl<'a> TabPage for PathTab<'a> {
                     if let ListValue::Path(path) = &self.config.get_item(self.state.selected).unwrap().value {
                         let path = self.icy_board.lock().unwrap().resolve_file(path);
 
+                        if self.config.get_item(self.state.selected).unwrap().id == "pwrd_sec_level_file" {
+                            return ResultState {
+                                edit_mode: EditMode::Open("pwrd_sec_level_file".to_string(), path),
+                                status_line: "Editing Security Level File".to_string(),
+                            };
+                        }
+
                         if path.exists() {
                             self.edit_text = Some(path.clone());
                             let text = fs::read_to_string(path).unwrap();

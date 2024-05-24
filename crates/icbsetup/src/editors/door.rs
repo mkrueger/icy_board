@@ -137,6 +137,14 @@ impl<'a> Editor for DoorEditor<'a> {
 
         self.display_insert_table(frame, &table_area);
 
+        if self.menu_state.in_edit {
+            self.menu
+                .get_item(self.menu_state.selected)
+                .unwrap()
+                .text_field_state
+                .set_cursor_position(frame);
+        }
+
         if let Some(edit_config) = &mut self.edit_config {
             let area = area.inner(&Margin { vertical: 8, horizontal: 3 });
             Clear.render(area, frame.buffer_mut());
@@ -254,7 +262,7 @@ impl<'a> Editor for DoorEditor<'a> {
             _ => match self.mode {
                 EditCommandMode::Table => match key.code {
                     KeyCode::Insert => {
-                        self.door_list.doors.push(Door {
+                        self.command.lock().unwrap().push(Door {
                             name: format!("door{}", self.door_list.len() + 1),
                             description: "".to_string(),
                             password: "".to_string(),
@@ -264,13 +272,13 @@ impl<'a> Editor for DoorEditor<'a> {
                             path: "".to_string(),
                             drop_file: Default::default(),
                         });
-                        self.insert_table.content_length = self.door_list.doors.len();
+                        self.insert_table.content_length += 1;
                     }
                     KeyCode::Delete => {
                         if let Some(selected_item) = self.insert_table.table_state.selected() {
                             if selected_item < self.command.lock().unwrap().len() {
                                 self.command.lock().unwrap().remove(selected_item);
-                                self.insert_table.content_length = self.command.lock().unwrap().len();
+                                self.insert_table.content_length -= 1;
                             }
                         }
                     }

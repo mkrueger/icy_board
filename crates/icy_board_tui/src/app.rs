@@ -130,7 +130,6 @@ impl<'a> App<'a> {
                     self.open_editor = res;
                 }
             }
-
             self.status_line = state.status_line;
             return;
         }
@@ -161,6 +160,11 @@ impl<'a> App<'a> {
             }
             _ => {
                 let state = self.get_tab_mut().handle_key_press(key);
+                if let EditMode::Open(id, path) = &state.edit_mode {
+                    if let Ok(res) = (*self.get_editor)(id, path) {
+                        self.open_editor = res;
+                    }
+                }
                 self.status_line = state.status_line;
             }
         };
