@@ -23,6 +23,11 @@ pub struct SupportedLanguages {
     #[serde(rename = "language")]
     pub languages: Vec<Language>,
 }
+impl SupportedLanguages {
+    pub fn len(&self) -> usize {
+        self.languages.len()
+    }
+}
 
 impl Default for SupportedLanguages {
     fn default() -> Self {

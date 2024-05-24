@@ -16,6 +16,10 @@ use icy_board_tui::config_menu::ListItem;
 use icy_board_tui::config_menu::ListValue;
 use icy_board_tui::tab_page::TabPage;
 use icy_board_tui::{config_menu::ResultState, theme::THEME};
+use ratatui::widgets::Block;
+use ratatui::widgets::BorderType;
+use ratatui::widgets::Borders;
+use ratatui::widgets::Padding;
 use ratatui::{
     layout::{Constraint, Margin, Rect},
     text::Text,
@@ -317,6 +321,14 @@ impl TabPage for ConferencesTab {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         let area = area.inner(&Margin { vertical: 1, horizontal: 2 });
         Clear.render(area, frame.buffer_mut());
+
+        let block = Block::new()
+            .style(THEME.content_box)
+            .padding(Padding::new(2, 2, 1, 1))
+            .borders(Borders::ALL)
+            .border_type(BorderType::Double);
+        block.render(area, frame.buffer_mut());
+        let area = area.inner(&Margin { vertical: 1, horizontal: 1 });
 
         if self.in_edit_mode {
             self.render_editor(frame, area);

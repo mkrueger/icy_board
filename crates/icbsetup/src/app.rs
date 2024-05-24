@@ -8,7 +8,8 @@ use icy_board_tui::{
 
 use crate::{
     editors::{
-        bullettins::BullettinsEditor, dirs::DirsEditor, door::DoorEditor, messages::MessageAreasEditor, sec_editor::SecurityLevelEditor, surveys::SurveyEditor,
+        bullettins::BullettinsEditor, dirs::DirsEditor, door::DoorEditor, languages::LanguageListEditor, messages::MessageAreasEditor,
+        sec_editor::SecurityLevelEditor, surveys::SurveyEditor,
     },
     tabs::{AboutTab, ConferencesTab, GeneralTab, PathTab, ServerTab},
 };
@@ -41,6 +42,9 @@ pub fn new_main_window<'a>(icy_board: Arc<Mutex<IcyBoard>>, full_screen: bool) -
             }
             "pwrd_sec_level_file" => {
                 return Ok(Some(Box::new(SecurityLevelEditor::new(path).unwrap())));
+            }
+            "language_file" => {
+                return Ok(Some(Box::new(LanguageListEditor::new(path).unwrap())));
             }
             "blt_file" => {
                 return Ok(Some(Box::new(BullettinsEditor::new(path).unwrap())));
