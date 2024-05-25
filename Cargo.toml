@@ -15,7 +15,7 @@ members = [
 	"crates/mkicbmnu",
 	"crates/icy_net",
 	"crates/mkicbtxt", 
-	"crates/icbsetup", "crates/icbmailer", 
+	"crates/icbsetup", "crates/icbmailer", "crates/icbsysmgr", 
 ]
 [workspace.package]
 version = "0.1.0"
@@ -59,6 +59,7 @@ color-eyre = "0.6.3"
 tempfile = "3.10.1"
 substring = "1.4.5"
 strum = "0.26.2"
+itertools = "0.13.0"
 
 [profile.release]
 opt-level = 'z'     # Optimize for size

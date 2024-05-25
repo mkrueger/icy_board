@@ -32,7 +32,8 @@ tui-markdown = "0.2.3"
 ariadne = "0.4.0"
 unicase = { workspace = true }
 color-eyre = { workspace = true }
-itertools = "0.12.1"
+itertools = { workspace = true }
+
 substring = { workspace = true }
 strum = { workspace = true }
 log = { workspace = true }

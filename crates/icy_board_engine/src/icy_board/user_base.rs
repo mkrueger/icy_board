@@ -1,6 +1,6 @@
 use std::{
     fs,
-    ops::{Deref, Index, IndexMut},
+    ops::{Deref, DerefMut, Index, IndexMut},
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -252,6 +252,9 @@ pub struct UserFlags {
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct User {
+    /// Path to the user file
+    pub path: Option<PathBuf>,
+
     pub name: String,
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -494,6 +497,7 @@ impl User {
         let bank = u.inf.bank.clone();
 
         Self {
+            path: None,
             name: u.user.name.clone(),
             alias,
             verify_answer: verify,
@@ -602,6 +606,18 @@ impl User {
     pub fn set_name(&mut self, name: String) {
         self.name = name;
     }
+
+    pub fn save(&self, home_dir: &Path) -> Res<()> {
+        let user_txt = toml::to_string(self)?;
+        if let Some(path) = self.path.as_ref() {
+            fs::write(path, user_txt)?;
+        } else {
+            let home_dir = UserBase::get_user_home_dir(home_dir, self.get_name());
+            std::fs::create_dir_all(&home_dir)?;
+            fs::write(home_dir.join("user.toml"), user_txt)?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -647,8 +663,9 @@ impl UserBase {
                 log::error!("Can't read user file for {} ", name.path().display());
                 continue;
             }
-            let user_txt = fs::read_to_string(user_file)?;
-            let user: User = toml::from_str(&user_txt)?;
+            let user_txt = fs::read_to_string(&user_file)?;
+            let mut user: User = toml::from_str(&user_txt)?;
+            user.path = Some(user_file);
             self.users.push(user);
         }
         self.users.sort_by(|a, b| a.stats.first_date_on.cmp(&b.stats.first_date_on));
@@ -659,10 +676,7 @@ impl UserBase {
     pub fn save_users(&self, home_dir: &Path) -> Res<()> {
         std::fs::create_dir_all(&home_dir)?;
         for user in &self.users {
-            let home_dir = Self::get_user_home_dir(home_dir, user.get_name());
-            std::fs::create_dir_all(&home_dir)?;
-            let user_txt = toml::to_string(user)?;
-            fs::write(home_dir.join("user.toml"), user_txt)?;
+            user.save(home_dir)?;
         }
         Ok(())
     }
@@ -710,5 +724,11 @@ impl Deref for UserBase {
 
     fn deref(&self) -> &Self::Target {
         &self.users
+    }
+}
+
+impl DerefMut for UserBase {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.users
     }
 }

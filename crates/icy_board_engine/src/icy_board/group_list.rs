@@ -1,15 +1,21 @@
-use std::{fmt::Display, fs, ops::Deref, path::Path, str::FromStr};
+use std::{
+    fmt::Display,
+    fs,
+    ops::{Deref, DerefMut},
+    path::Path,
+    str::FromStr,
+};
 
 use crate::Res;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Group {
     pub name: String,
     pub description: String,
     pub members: Vec<String>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct GroupList {
     group: Vec<Group>,
 }
@@ -39,6 +45,12 @@ impl Deref for GroupList {
 
     fn deref(&self) -> &Self::Target {
         &self.group
+    }
+}
+
+impl DerefMut for GroupList {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.group
     }
 }
 

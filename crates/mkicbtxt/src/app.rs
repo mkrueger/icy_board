@@ -17,7 +17,7 @@ use ratatui::{
     prelude::*,
     widgets::{block::Title, *},
 };
-use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
+use strum::{Display, FromRepr};
 
 use crate::tabs::*;
 
@@ -53,11 +53,17 @@ enum Mode {
     Quit,
 }
 
-#[derive(Debug, Clone, Copy, Default, Display, EnumIter, FromRepr, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Display, FromRepr, PartialEq, Eq)]
 enum TabPageType {
     #[default]
     Record,
     About,
+}
+
+impl TabPageType {
+    pub fn iter() -> impl Iterator<Item = Self> {
+        vec![TabPageType::Record, TabPageType::About].into_iter()
+    }
 }
 
 #[derive(Default)]

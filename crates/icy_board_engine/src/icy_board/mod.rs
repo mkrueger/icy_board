@@ -240,6 +240,15 @@ impl IcyBoard {
                 Statistics::default()
             }
         };
+
+        let load_path = get_path(parent_path, &config.paths.group_file);
+        let groups = match GroupList::load(&load_path) {
+            Ok(stat) => stat,
+            Err(e) => {
+                log::error!("Error loading groups: {} from {}, generating default.", e, load_path.display());
+                GroupList::default()
+            }
+        };
         let mut board = IcyBoard {
             file_name: path.as_ref().to_path_buf(),
             root_path: parent_path.to_path_buf(),
@@ -252,7 +261,7 @@ impl IcyBoard {
             sec_levels,
             commands,
             statistics,
-            groups: GroupList::default(),
+            groups,
         };
 
         for conf in board.conferences.iter_mut() {

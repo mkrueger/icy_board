@@ -1,14 +1,17 @@
 [package]
-name = "mkicbtxt"
+name = "icbsysmgr"
+version.workspace = true
 edition.workspace = true
 authors.workspace = true
-version.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 icy_board_engine = { workspace = true }
 icy_board_tui = { workspace = true }
+icy_net = { workspace = true }
+dizbase = { workspace = true }
+codepages = { workspace = true }
 
 lazy_static = { workspace = true }
 thiserror = { workspace = true }
@@ -17,10 +20,21 @@ chrono = { workspace = true }
 argh = { workspace = true }
 crossterm = { workspace = true }
 ratatui = { workspace = true }
-tui-input = "0.8.0"
+bstr = { workspace = true }
+jamjam = { workspace = true}
+regex = { workspace = true}
+walkdir = { workspace = true }
+qfile = "3.0.1"
+relative-path = "1.9.2"
+ 
+tui-textarea  = "0.4.0"
+tui-markdown = "0.2.3"
 ariadne = "0.4.0"
 unicase = { workspace = true }
 color-eyre = { workspace = true }
 itertools = { workspace = true }
+
 substring = { workspace = true }
 strum = { workspace = true }
+log = { workspace = true }
+fern = "0.6.2"
