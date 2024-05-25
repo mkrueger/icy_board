@@ -44,6 +44,10 @@ mod tui;
 #[derive(FromArgs)]
 /// IcyBoard BBS
 struct Cli {
+    /// default is 80x25
+    #[argh(switch, short = 'f')]
+    full_screen: bool,
+
     #[argh(option)]
     /// path/file name of the icyboard.toml configuration file
     file: Option<PathBuf>,
@@ -55,13 +59,8 @@ struct Cli {
     #[argh(option)]
     /// execute PPE file
     ppe: Option<PathBuf>,
-    /*
-
-    */
 }
-/*
 
-*/
 lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
@@ -118,7 +117,7 @@ async fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Re
                 } else {
                     CallWaitMessage::User(false)
                 };
-                run_message(cmd, &mut terminal, &board, &mut bbs).await?;
+                run_message(cmd, &mut terminal, &board, &mut bbs, arguments.full_screen).await?;
                 restore_terminal()?;
                 return Ok(());
             }
@@ -178,9 +177,9 @@ async fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Re
             loop {
                 let mut terminal = init_terminal()?;
                 app.reset(&board).await;
-                match app.run(&mut terminal, &board).await {
+                match app.run(&mut terminal, &board, arguments.full_screen).await {
                     Ok(msg) => {
-                        if let Err(err) = run_message(msg, &mut terminal, &board, &mut bbs).await {
+                        if let Err(err) = run_message(msg, &mut terminal, &board, &mut bbs, arguments.full_screen).await {
                             restore_terminal()?;
                             log::error!("while processing call wait screen message: {}", err.to_string());
                             print_error(err.to_string());
@@ -207,6 +206,7 @@ async fn run_message(
     terminal: &mut Terminal<impl Backend>,
     board: &Arc<tokio::sync::Mutex<IcyBoard>>,
     bbs: &mut Arc<Mutex<BBS>>,
+    full_screen: bool,
 ) -> Res<()> {
     match msg {
         CallWaitMessage::User(_busy) => {
@@ -246,7 +246,7 @@ async fn run_message(
         }
         CallWaitMessage::Monitor => {
             let mut app = node_monitoring_screen::NodeMonitoringScreen::new(&board).await;
-            match app.run(terminal, &board, bbs).await {
+            match app.run(terminal, &board, bbs, full_screen).await {
                 Ok(msg) => {
                     if let NodeMonitoringScreenMessage::EnterNode(node) = msg {
                         let mut tui = Tui::sysop_mode(bbs, node).await?;

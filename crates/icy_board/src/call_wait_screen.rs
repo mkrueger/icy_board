@@ -9,6 +9,7 @@ use chrono::{Local, Timelike};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use icy_board_engine::icy_board::{statistics::Statistics, IcyBoard};
 use icy_board_tui::{
+    app::get_screen_size,
     get_text,
     theme::{DOS_BLACK, DOS_BLUE, DOS_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_WHITE, DOS_YELLOW},
 };
@@ -150,14 +151,14 @@ impl CallWaitScreen {
             get_text("call_wait_screen_alarm_off")
         };
     }
-    pub async fn run(&mut self, terminal: &mut Terminal<impl Backend>, board: &Arc<Mutex<IcyBoard>>) -> Res<CallWaitMessage> {
+    pub async fn run(&mut self, terminal: &mut Terminal<impl Backend>, board: &Arc<Mutex<IcyBoard>>, full_screen: bool) -> Res<CallWaitMessage> {
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
 
         loop {
             self.statistics = board.lock().await.statistics.clone();
 
-            terminal.draw(|frame| self.ui(frame))?;
+            terminal.draw(|frame| self.ui(frame, full_screen))?;
 
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
 
@@ -194,13 +195,14 @@ impl CallWaitScreen {
         }
     }
 
-    fn ui(&self, frame: &mut Frame) {
+    fn ui(&self, frame: &mut Frame, full_screen: bool) {
         let now = Local::now();
 
         let dt = now.format(&self.date_format);
 
         let ver = VERSION.to_string();
-        let area = frame.size();
+        let area = get_screen_size(&frame, full_screen);
+
         let b = Block::default()
             .title(Title::from(Line::from(format!(" {} ", dt)).style(Style::new().white())).alignment(Alignment::Left))
             .title_style(Style::new().fg(DOS_YELLOW))

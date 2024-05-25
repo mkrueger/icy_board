@@ -8,6 +8,7 @@ use chrono::{Local, Timelike};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use icy_board_engine::icy_board::{bbs::BBS, state::NodeState, IcyBoard};
 use icy_board_tui::{
+    app::get_screen_size,
     get_text,
     theme::{DOS_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_YELLOW},
 };
@@ -65,6 +66,7 @@ impl NodeMonitoringScreen {
         terminal: &mut Terminal<impl Backend>,
         board: &Arc<Mutex<IcyBoard>>,
         bbs: &mut Arc<Mutex<BBS>>,
+        full_screen: bool,
     ) -> Res<NodeMonitoringScreenMessage> {
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
@@ -90,7 +92,7 @@ impl NodeMonitoringScreen {
 
             terminal.draw(|frame| {
                 page_len = (frame.size().height as usize).saturating_sub(3);
-                self.ui(frame, &node_info);
+                self.ui(frame, &node_info, full_screen);
             })?;
             if event::poll(timeout)? {
                 if let Event::Key(key) = event::read()? {
@@ -148,7 +150,7 @@ impl NodeMonitoringScreen {
         }
     }
 
-    fn ui(&mut self, frame: &mut Frame, infos: &Vec<Option<Info>>) {
+    fn ui(&mut self, frame: &mut Frame, infos: &Vec<Option<Info>>, full_screen: bool) {
         let now = Local::now();
         let mut footer = get_text("icbmoni_footer");
         if let Some(i) = self.table_state.selected() {
@@ -156,6 +158,7 @@ impl NodeMonitoringScreen {
                 footer = get_text("icbmoni_on_note_footer")
             }
         }
+        let area: Rect = get_screen_size(&frame, full_screen);
 
         let b = Block::default()
             .title(Title::from(Line::from(format!(" {} ", now.date_naive())).style(Style::new().white())).alignment(Alignment::Left))
@@ -170,13 +173,12 @@ impl NodeMonitoringScreen {
             .border_type(BorderType::Double)
             .border_style(Style::new().fg(DOS_YELLOW))
             .borders(Borders::ALL);
-        b.render(frame.size(), frame.buffer_mut());
-        let area = frame.size();
+        b.render(area, frame.buffer_mut());
         self.render_table(frame, area, infos);
         self.render_scrollbar(frame, area);
     }
 
-    fn render_table(&mut self, frame: &mut Frame, _area: Rect, infos: &Vec<Option<Info>>) {
+    fn render_table(&mut self, frame: &mut Frame, area: Rect, infos: &Vec<Option<Info>>) {
         let header = [
             "#".to_string(),
             get_text("icbmoni_status_header"),
@@ -247,7 +249,8 @@ impl NodeMonitoringScreen {
         .highlight_style(Style::default().fg(DOS_BLUE).bg(DOS_LIGHT_GRAY))
         .style(Style::default().fg(DOS_YELLOW).bg(DOS_BLUE))
         .highlight_spacing(HighlightSpacing::Always);
-        let area = frame.size().inner(&Margin { vertical: 1, horizontal: 1 });
+        let mut area = area.inner(&Margin { vertical: 1, horizontal: 1 });
+        area.width -= 1;
         frame.render_stateful_widget(table, area, &mut self.table_state);
     }
 
