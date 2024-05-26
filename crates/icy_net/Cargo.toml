@@ -13,6 +13,8 @@ tempfile = { workspace = true }
 serde = { workspace = true }
 icy_engine = { workspace = true }
 tokio = { workspace = true }
+lazy_static = { workspace = true }
+semver = { workspace = true }
 tokio-util = { version = "0.7.10", features = ["codec"] }
 async-trait = "0.1.80"
 bytes = "1"

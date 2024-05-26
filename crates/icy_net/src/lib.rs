@@ -7,11 +7,14 @@ pub mod protocol;
 pub mod terminal;
 pub mod zconnect;
 
+use semver::Version;
 use thiserror::Error;
 pub mod termcap_detect;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
-
+lazy_static::lazy_static! {
+    static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
+}
 #[derive(Error, Debug)]
 pub enum NetError {
     #[error("Could not connect to any address")]
@@ -31,4 +34,10 @@ pub enum NetError {
 
     #[error("Connection closed")]
     ConnectionClosed,
+
+    #[error("Invalid EMSI packet")]
+    InvalidEmsiPacket,
+
+    #[error("Invalid CRC32 in EMSI")]
+    EmsiCRC32Error,
 }

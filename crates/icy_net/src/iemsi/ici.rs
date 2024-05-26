@@ -1,4 +1,7 @@
+use std::str::FromStr;
+
 use crate::{
+    crc::get_crc32,
     telnet::{TermCaps, TerminalEmulation},
     NetError,
 };
@@ -9,6 +12,7 @@ use super::{encode_emsi, get_crc32string, get_length_string, EMSI_2ACK};
 /// and Server-related information to the Server. It contains Server
 /// parameters, Client options, and Client capabilities.
 /// Note that the information in the `EMSI_ICI` packet may not exceed 2,048 bytes.
+#[derive(Clone)]
 pub struct ICIUserSettings {
     ///  The name of the user (Client). This must be treated case insensitively by the Server.
     pub name: String,
@@ -37,6 +41,7 @@ pub struct ICIUserSettings {
     pub birth_date: String,
 }
 
+#[derive(Clone)]
 pub struct ICITerminalSettings {
     /// Consisting of four sub-fields separated by commas, this field
     /// contains from left to right: The requested terminal emulation
@@ -124,7 +129,7 @@ impl ICITerminalSettings {
         format!("{},{},{},0", term, self.term_caps.window_size.1, self.term_caps.window_size.0)
     }
 
-    fn get_cap_string(&self) -> String {
+    pub fn get_cap_string(&self) -> String {
         let mut res = String::new();
 
         if self.can_chat {
@@ -156,6 +161,7 @@ impl ICITerminalSettings {
     }
 }
 
+#[derive(Clone)]
 pub struct ICIRequests {
     /// NEWS    Show bulletins, announcements, etc.
     pub news: bool,
@@ -194,7 +200,7 @@ impl Default for ICIRequests {
 }
 
 impl ICIRequests {
-    fn get_requests_string(&self) -> String {
+    pub fn get_requests_string(&self) -> String {
         let mut res = String::new();
 
         if self.hot_keys {
@@ -264,7 +270,37 @@ impl ICIRequests {
     }
 }
 
+impl FromStr for ICIRequests {
+    type Err = NetError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut requests = ICIRequests::default();
+        for req in s.split(',') {
+            match req {
+                "NEWS" => requests.news = true,
+                "MAIL" => requests.mail = true,
+                "FILE" => requests.file = true,
+                "HOT" => requests.hot_keys = true,
+                "CLR" => requests.clear_screen = true,
+                "HUSH" => requests.hush = true,
+                "MORE" => requests.more = true,
+                "FSED" => requests.full_screen_editor = true,
+                "XPRS" => requests.xprs = true,
+                _ => return Err(NetError::InvalidEmsiPacket),
+            }
+        }
+        Ok(requests)
+    }
+}
+
 const MAX_SIZE: usize = 2048;
+
+#[derive(Clone)]
+pub struct EmsiICI {
+    pub user: ICIUserSettings,
+    pub term: ICITerminalSettings,
+    pub requests: ICIRequests,
+}
 
 pub fn encode_ici(user_settings: &ICIUserSettings, term_settings: &ICITerminalSettings, requests: &ICIRequests) -> crate::Result<Vec<u8>> {
     // **EMSI_ICI<len><data><crc32><CR>
@@ -291,9 +327,110 @@ pub fn encode_ici(user_settings: &ICIUserSettings, term_settings: &ICITerminalSe
     result.extend_from_slice(b"**EMSI_ICI");
     result.extend_from_slice(get_length_string(data.len()).as_bytes());
     result.extend_from_slice(&data);
+
     result.extend_from_slice(get_crc32string(&result[2..]).as_bytes());
     result.push(b'\r');
     // need to send 2*ACK for the ici to be recognized - see the spec
     result.extend_from_slice(EMSI_2ACK);
     Ok(result)
+}
+
+pub fn decode_ici(ici: &[u8]) -> crate::Result<EmsiICI> {
+    let mut user_settings = ICIUserSettings::default();
+    let mut term_settings = ICITerminalSettings::default();
+    let mut requests = ICIRequests::default();
+
+    if !ici.starts_with(b"**EMSI_ICI") {
+        return Err(NetError::InvalidEmsiPacket.into());
+    }
+
+    let len = parse_hex(&ici[10..14]);
+    let emsi_body = &ici[2..len as usize + 14];
+    let calc_crc32 = !get_crc32(emsi_body);
+    let crc = parse_hex(&ici[len as usize + 14..len as usize + 14 + 8]);
+    if crc != calc_crc32 {
+        return Err(NetError::EmsiCRC32Error.into());
+    }
+    let emsi_body = &emsi_body[12..];
+
+    let mut start = 0;
+    let mut block = 0;
+    for i in 0..emsi_body.len() {
+        match emsi_body[i] {
+            b'{' => {
+                start = i + 1;
+            }
+            b'}' => {
+                let str = std::str::from_utf8(&emsi_body[start..i]).unwrap().to_string();
+                match block {
+                    0 => user_settings.name = str,
+                    1 => user_settings.alias = str,
+                    2 => user_settings.location = str,
+                    3 => user_settings.data_phone = str,
+                    4 => user_settings.voice_phone = str,
+                    5 => user_settings.password = str,
+                    6 => user_settings.birth_date = str,
+                    7 => {
+                        term_settings.term_caps = parse_emsi_term_caps(&str)?;
+                    }
+                    8 => term_settings.protocols = str,
+                    9 => {
+                        let caps = std::str::from_utf8(&emsi_body[start..i]).unwrap();
+                        term_settings.can_chat = caps.contains("CHT");
+                        term_settings.can_download_ascii = caps.contains("MNU");
+                        term_settings.can_tab_char = caps.contains("TAB");
+                        term_settings.can_ascii8 = caps.contains("ASCII8");
+                    }
+                    10 => {
+                        requests = ICIRequests::from_str(&str)?;
+                    }
+                    11 => term_settings.software = str,
+                    12 => term_settings.xlattabl = str,
+                    _ => {}
+                }
+                block += 1;
+            }
+            _ => {}
+        }
+    }
+
+    Ok(EmsiICI {
+        user: user_settings,
+        term: term_settings,
+        requests,
+    })
+}
+
+fn parse_emsi_term_caps(str: &str) -> crate::Result<TermCaps> {
+    let mut parts = str.split(',');
+    let term = match parts.next() {
+        Some("ANSI") => TerminalEmulation::Ansi,
+        Some("AVT0") => TerminalEmulation::Avatar,
+        Some("VT52") => TerminalEmulation::Ansi,
+        Some("VT100") => TerminalEmulation::Ansi,
+        Some("TTY") => TerminalEmulation::Ansi,
+        _ => return Err(NetError::InvalidEmsiPacket.into()),
+    };
+    let rows = parts.next().unwrap().parse::<u16>().unwrap();
+    let cols = parts.next().unwrap().parse::<u16>().unwrap();
+    Ok(TermCaps {
+        terminal: term,
+        window_size: (cols, rows),
+    })
+}
+
+fn parse_hex(ici: &[u8]) -> u32 {
+    let mut result = 0;
+    for c in ici {
+        if (b'0'..=b'9').contains(c) {
+            result = result * 16 + (*c - b'0') as u64;
+        }
+        if (b'a'..=b'f').contains(c) {
+            result = result * 16 + 10 + (*c - b'a') as u64;
+        }
+        if (b'A'..=b'F').contains(c) {
+            result = result * 16 + 10 + (*c - b'A') as u64;
+        }
+    }
+    result as u32
 }

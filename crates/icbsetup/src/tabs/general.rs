@@ -232,6 +232,11 @@ impl GeneralTab {
                         "Short File Descr".to_string(),
                         ListValue::Bool(icy_board.config.new_user_settings.ask_use_short_descr),
                     )),
+                    ConfigEntry::Item(ListItem::new(
+                        "allow_iemsi",
+                        "Allow IEMSI logins".to_string(),
+                        ListValue::Bool(icy_board.config.options.allow_iemsi),
+                    )),
                 ],
             ),
         ];
@@ -568,6 +573,7 @@ impl GeneralTab {
                 "ask_email" => icy_board.config.new_user_settings.ask_email = *b,
                 "ask_web_address" => icy_board.config.new_user_settings.ask_web_address = *b,
                 "ask_use_short_descr" => icy_board.config.new_user_settings.ask_use_short_descr = *b,
+                "allow_iemsi" => icy_board.config.options.allow_iemsi = *b,
                 "scan_all_mail_at_login" => icy_board.config.options.scan_all_mail_at_login = *b,
                 "prompt_to_read_mail" => icy_board.config.options.prompt_to_read_mail = *b,
                 "check_files_uploaded" => icy_board.config.options.check_files_uploaded = *b,

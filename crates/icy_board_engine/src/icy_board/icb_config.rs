@@ -373,6 +373,8 @@ pub struct BoardOptions {
     pub call_log: bool,
     pub page_bell: bool,
     pub alarm: bool,
+
+    pub allow_iemsi: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
@@ -549,6 +551,7 @@ impl IcbConfig {
                 page_bell: true,
                 alarm: false,
                 call_log: true,
+                allow_iemsi: true,
             },
         }
     }

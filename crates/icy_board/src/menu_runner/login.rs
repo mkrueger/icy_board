@@ -18,6 +18,7 @@ use icy_board_engine::{
     },
     vm::TerminalTarget,
 };
+use icy_net::iemsi::try_iemsi;
 impl PcbBoardCommand {
     pub async fn login(&mut self) -> Res<bool> {
         self.state.set_activity(UserActivity::LoggingIn).await;
@@ -45,6 +46,22 @@ impl PcbBoardCommand {
         self.state.new_line().await?;
 
         let mut tries = 0;
+        if self.state.get_board().await.config.options.allow_iemsi {
+            let (name, location, operator, notice, caps) = {
+                let board = self.state.get_board().await;
+                (
+                    board.config.board.name.clone(),
+                    board.config.board.location.clone(),
+                    board.config.board.operator.clone(),
+                    board.config.board.notice.clone(),
+                    board.config.board.capabilities.clone(),
+                )
+            };
+
+            if let Some(settings) = try_iemsi(&mut self.state.connection, name, location, operator, notice, caps).await? {
+                self.state.session.emsi = Some(settings);
+            }
+        }
 
         loop {
             tries += 1;
@@ -55,19 +72,22 @@ impl PcbBoardCommand {
                 return Ok(false);
             }
 
-            let first_name = self
-                .state
-                .input_field(
-                    IceText::YourFirstName,
-                    39,
-                    &MASK_ALNUM,
-                    "",
-                    None,
-                    display_flags::UPCASE | display_flags::NEWLINE | display_flags::STACKED,
-                )
-                .await?
-                .trim()
-                .to_string();
+            let first_name = if let Some(ici) = &self.state.session.emsi {
+                ici.user.name.clone()
+            } else {
+                self.state
+                    .input_field(
+                        IceText::YourFirstName,
+                        39,
+                        &MASK_ALNUM,
+                        "",
+                        None,
+                        display_flags::UPCASE | display_flags::NEWLINE | display_flags::STACKED,
+                    )
+                    .await?
+                    .trim()
+                    .to_string()
+            };
 
             if first_name.is_empty() {
                 continue;
@@ -164,6 +184,8 @@ impl PcbBoardCommand {
                     return Ok(false);
                 }
             }
+            // clear emsi data
+            self.state.session.emsi = None;
         }
     }
 
@@ -486,9 +508,19 @@ impl PcbBoardCommand {
             }
 
             let pw = user.password.password.clone();
-            self.state
-                .check_password(IceText::YourPassword, pwd_flags::SHOW_WRONG_PWD_MSG, |pwd| pw.is_valid(pwd))
-                .await?
+
+            let mut emsi_pw = false;
+            if let Some(emsi) = &self.state.session.emsi {
+                if emsi.user.password.eq_ignore_ascii_case(pw.to_string().as_str()) {
+                    emsi_pw = true;
+                }
+            }
+
+            emsi_pw
+                || self
+                    .state
+                    .check_password(IceText::YourPassword, pwd_flags::SHOW_WRONG_PWD_MSG, |pwd| pw.is_valid(pwd))
+                    .await?
         } else {
             log::warn!("login_user: User missing (should never happen -> bug)");
             return Ok(false);

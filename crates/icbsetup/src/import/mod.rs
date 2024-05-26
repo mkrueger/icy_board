@@ -365,6 +365,7 @@ impl PCBoardImporter {
                 page_bell: true,
                 alarm: false,
                 call_log: true,
+                allow_iemsi: true,
             },
         };
 

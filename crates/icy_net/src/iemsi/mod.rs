@@ -9,6 +9,9 @@ pub use ici::*;
 pub mod isi;
 pub use isi::*;
 
+pub mod server;
+pub use server::*;
+
 use crate::{
     crc::{get_crc16, get_crc32, update_crc32},
     NetError,

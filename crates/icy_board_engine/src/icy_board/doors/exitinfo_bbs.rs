@@ -158,13 +158,13 @@ pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) 
     contents.push(1); // ErrorFreeConnect
     contents.push(0); // SysopNext
 
-    if state.session.is_emsi_session {
+    if let Some(ici) = &state.session.emsi {
         contents.push(1); // EMSI_Session
-        contents.extend(export_cp437_string(&state.session.emsi.crtdef, 40, 0));
-        contents.extend(export_cp437_string(&state.session.emsi.protocols, 40, 0));
-        contents.extend(export_cp437_string(&state.session.emsi.capabilities, 40, 0));
-        contents.extend(export_cp437_string(&state.session.emsi.requests, 40, 0));
-        contents.extend(export_cp437_string(&state.session.emsi.software, 40, 0));
+        contents.extend(export_cp437_string(&ici.term.get_crtdef_string(), 40, 0));
+        contents.extend(export_cp437_string(&ici.term.protocols, 40, 0));
+        contents.extend(export_cp437_string(&ici.term.get_cap_string(), 40, 0));
+        contents.extend(export_cp437_string(&ici.requests.get_requests_string(), 40, 0));
+        contents.extend(export_cp437_string(&ici.term.software, 40, 0));
     } else {
         contents.push(0); // EMSI_Session
         contents.extend(export_cp437_string(&"", 40, 0));

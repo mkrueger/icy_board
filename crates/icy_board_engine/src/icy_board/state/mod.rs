@@ -15,7 +15,7 @@ use codepages::tables::UNICODE_TO_CP437;
 use icy_engine::{ansi, OutputFormat, SaveOptions, ScreenPreperation};
 use icy_engine::{ansi::constants::COLOR_OFFSETS, Position};
 use icy_engine::{TextAttribute, TextPane};
-use icy_net::{channel::ChannelConnection, terminal::virtual_screen::VirtualScreen, Connection, ConnectionType};
+use icy_net::{channel::ChannelConnection, iemsi::EmsiICI, terminal::virtual_screen::VirtualScreen, Connection, ConnectionType};
 use tokio::{sync::Mutex, time::sleep};
 
 use crate::{
@@ -194,19 +194,9 @@ pub struct Session {
     // Used in @X00 macros to save color, to restore it with @XFF
     pub saved_color: IcbColor,
 
-    pub is_emsi_session: bool,
-    pub emsi: EmsiData,
+    pub emsi: Option<EmsiICI>,
 
     pub bytes_remaining: i64,
-}
-
-#[derive(Clone, Default)]
-pub struct EmsiData {
-    pub crtdef: String,
-    pub capabilities: String,
-    pub protocols: String,
-    pub requests: String,
-    pub software: String,
 }
 
 impl Session {
@@ -253,8 +243,7 @@ impl Session {
 
             sysop_name: "SYSOP".to_string(),
             flagged_files: HashSet::new(),
-            is_emsi_session: false,
-            emsi: EmsiData::default(),
+            emsi: None,
             paged_sysop: false,
             bytes_remaining: 0,
         }
