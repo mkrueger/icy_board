@@ -35,6 +35,12 @@ pub struct Info {
     pub cur_user: Option<String>,
     pub connection_type: ConnectionType,
 }
+
+pub struct Connection {
+    pub name: String,
+    pub endpoint: String,
+}
+
 impl Info {
     fn new(board: &IcyBoard, state: &NodeState) -> Info {
         let user = if state.cur_user >= 0 {
@@ -71,7 +77,7 @@ impl NodeMonitoringScreen {
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
         let mut node_info: Vec<Option<Info>> = Vec::new();
-
+        let mut connections: Vec<Connection> = Vec::new();
         loop {
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
             let mut page_len = 0;
@@ -86,13 +92,38 @@ impl NodeMonitoringScreen {
                         node_info.push(None);
                     }
                 }
+                connections.clear();
+
+                if board.config.login_server.telnet.is_enabled {
+                    connections.push(Connection {
+                        name: "Telnet".to_string(),
+                        endpoint: format!("{}:{}", board.config.login_server.telnet.address, board.config.login_server.telnet.port),
+                    });
+                }
+
+                if board.config.login_server.ssh.is_enabled {
+                    connections.push(Connection {
+                        name: "SSH".to_string(),
+                        endpoint: format!("{}:{}", board.config.login_server.ssh.address, board.config.login_server.ssh.port),
+                    });
+                }
+
+                if board.config.login_server.secure_websocket.is_enabled {
+                    connections.push(Connection {
+                        name: "Websocket".to_string(),
+                        endpoint: format!(
+                            "{}:{}",
+                            board.config.login_server.secure_websocket.address, board.config.login_server.secure_websocket.port
+                        ),
+                    });
+                }
 
                 last_tick = Instant::now();
             }
 
             terminal.draw(|frame| {
                 page_len = (frame.size().height as usize).saturating_sub(3);
-                self.ui(frame, &node_info, full_screen);
+                self.ui(frame, &node_info, &connections, full_screen);
             })?;
             if event::poll(timeout)? {
                 if let Event::Key(key) = event::read()? {
@@ -150,7 +181,7 @@ impl NodeMonitoringScreen {
         }
     }
 
-    fn ui(&mut self, frame: &mut Frame, infos: &Vec<Option<Info>>, full_screen: bool) {
+    fn ui(&mut self, frame: &mut Frame, infos: &Vec<Option<Info>>, connections: &Vec<Connection>, full_screen: bool) {
         let now = Local::now();
         let mut footer = get_text("icbmoni_footer");
         if let Some(i) = self.table_state.selected() {
@@ -174,10 +205,29 @@ impl NodeMonitoringScreen {
             .border_style(Style::new().fg(DOS_YELLOW))
             .borders(Borders::ALL);
         b.render(area, frame.buffer_mut());
-        self.render_table(frame, area, infos);
-        self.render_scrollbar(frame, area);
+        let vertical = Layout::vertical([Constraint::Fill(1), Constraint::Length(connections.len().max(5) as u16 + 1)]);
+        let [node_area, connections_area] = vertical.areas(area);
+        self.render_table(frame, node_area, infos);
+        self.render_scrollbar(frame, node_area);
+        self.render_connections(frame, connections_area, connections);
     }
 
+    fn render_connections(&self, frame: &mut Frame, connections_area: Rect, connections: &[Connection]) {
+        let mut area = connections_area.inner(&Margin { vertical: 1, horizontal: 1 });
+        Line::from("═".repeat(area.width as usize))
+            .style(Style::new().fg(DOS_YELLOW))
+            .centered()
+            .render(area, frame.buffer_mut());
+        area.y += 1;
+
+        for con in connections {
+            let n = if con.name.is_empty() { &con.name } else { "0.0.0.0" };
+            let text = format!("{} on {}:{}", con.name, n, con.endpoint);
+            let text = Text::from(text);
+            text.render(area, frame.buffer_mut());
+            area.y += 1;
+        }
+    }
     fn render_table(&mut self, frame: &mut Frame, area: Rect, infos: &Vec<Option<Info>>) {
         let header = [
             "#".to_string(),

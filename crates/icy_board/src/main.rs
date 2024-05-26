@@ -2,7 +2,7 @@ use std::{
     fmt::Display,
     io::stdout,
     path::{Path, PathBuf},
-    process,
+    process::{self, Command},
     sync::Arc,
 };
 
@@ -276,6 +276,24 @@ async fn run_message(
         CallWaitMessage::ToggleAlarm => {
             let config = &mut board.lock().await.config;
             config.options.alarm = !config.options.alarm;
+        }
+        CallWaitMessage::SystemManager => {
+            let path = std::env::current_exe().unwrap().with_file_name("icbsysmgr");
+            let mut cmd = Command::new(path)
+                .arg("--file")
+                .arg(format!("{}", board.lock().await.file_name.display()))
+                .spawn()
+                .expect("icbsysmgr command failed to start");
+            cmd.wait().expect("icbsysmgr command failed to run");
+        }
+        CallWaitMessage::Setup => {
+            let path = std::env::current_exe().unwrap().with_file_name("icbsetup");
+            let mut cmd = Command::new(path)
+                .arg("--file")
+                .arg(format!("{}", board.lock().await.file_name.display()))
+                .spawn()
+                .expect("icbsysmgr command failed to start");
+            cmd.wait().expect("icbsysmgr command failed to run");
         }
     }
     Ok(())

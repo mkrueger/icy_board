@@ -32,6 +32,8 @@ pub enum CallWaitMessage {
     ToggleCallLog,
     TogglePageBell,
     ToggleAlarm,
+    SystemManager,
+    Setup,
 }
 
 struct Button {
@@ -114,6 +116,16 @@ impl CallWaitScreen {
                 title: get_text("call_wait_screen_monitor_button_not_busy"),
                 description: get_text("call_wait_screen_monitor_button_not_busy_descr"),
                 message: CallWaitMessage::Monitor,
+            },
+            Button {
+                title: get_text("call_wait_screen_system_manager"),
+                description: get_text("call_wait_screen_system_manager_descr"),
+                message: CallWaitMessage::SystemManager,
+            },
+            Button {
+                title: get_text("call_wait_screen_setup"),
+                description: get_text("call_wait_screen_setup_descr"),
+                message: CallWaitMessage::Setup,
             },
         ];
 

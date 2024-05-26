@@ -34,6 +34,12 @@ call_wait_screen_alarm_descr=System BEEPs as caller logs on, etc.
 call_wait_screen_monitor_button_not_busy=ICBMoni
 call_wait_screen_monitor_button_not_busy_descr=Run ICBMoni to monitor NODE activity
 
+call_wait_screen_system_manager=ICBSysMgr
+call_wait_screen_system_manager_descr=Run IcyBoard System Manager for User File maintenance.
+
+call_wait_screen_setup=ICBSetup
+call_wait_screen_setup_descr=Run ICBSetup to change Icy Board configuration.
+
 call_wait_screen_sys_ready = System is Ready For Callers
 call_wait_screen_last_caller = Last Caller:
 call_wait_screen_num_calls = Calls:
