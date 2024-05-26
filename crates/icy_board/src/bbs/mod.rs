@@ -11,12 +11,7 @@ use icy_board_engine::{
     },
     vm::TerminalTarget,
 };
-use icy_net::{
-    telnet::TelnetConnection,
-    //    websocket::{accept_websocket, accept_websocket_secure},
-    Connection,
-    ConnectionType,
-};
+use icy_net::{telnet::TelnetConnection, termcap_detect::TerminalCaps, Connection, ConnectionType};
 use tokio::{net::TcpListener, sync::Mutex};
 
 use crate::menu_runner::PcbBoardCommand;
@@ -227,14 +222,22 @@ pub async fn handle_client(
 ) -> Res<()> {
     let mut state = IcyBoardState::new(bbs, board, node_state, node, connection).await;
     let mut logged_in = false;
+    let mut local = false;
     if let Some(login_options) = &login_options {
         if login_options.login_sysop {
             logged_in = true;
             state.session.is_sysop = true;
             state.set_current_user(0).await.unwrap();
+            local = login_options.local;
         }
     }
     let mut cmd = PcbBoardCommand::new(state);
+    let caps = if local {
+        TerminalCaps::LOCAL
+    } else {
+        TerminalCaps::detect(&mut *cmd.state.connection).await?
+    };
+    log::warn!("terminal caps: {:?}", caps);
 
     if let Some(login_options) = &login_options {
         if let Some(ppe) = &login_options.ppe {
@@ -280,4 +283,5 @@ pub async fn handle_client(
 pub struct LoginOptions {
     pub login_sysop: bool,
     pub ppe: Option<PathBuf>,
+    pub local: bool,
 }

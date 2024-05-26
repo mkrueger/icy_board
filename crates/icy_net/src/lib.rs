@@ -8,6 +8,7 @@ pub mod terminal;
 pub mod zconnect;
 
 use thiserror::Error;
+pub mod termcap_detect;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 

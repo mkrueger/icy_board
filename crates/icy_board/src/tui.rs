@@ -56,7 +56,7 @@ impl Tui {
         let (ui_connection, connection) = ChannelConnection::create_pair();
         let node_state2 = node_state.clone();
 
-        let options = LoginOptions { login_sysop, ppe };
+        let options = LoginOptions { login_sysop, ppe, local: true };
         let handle = std::thread::Builder::new()
             .name("Local mode handle".to_string())
             .spawn(move || {
