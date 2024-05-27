@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::time::Duration;
+use std::{io, time::Duration};
 
 use async_trait::async_trait;
 use tokio::{
@@ -38,7 +38,11 @@ impl Connection for RawConnection {
     }
 
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
-        Ok(self.tcp_stream.read(buf).await?)
+        let result = self.tcp_stream.read(buf).await?;
+        /*     if result == 0 {
+            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "").into());
+        }*/
+        Ok(result)
     }
 
     async fn send(&mut self, buf: &[u8]) -> crate::Result<()> {

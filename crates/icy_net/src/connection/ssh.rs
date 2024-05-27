@@ -87,13 +87,13 @@ impl Connection for SSHConnection {
 
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
         match self.channel.make_reader().read(buf).await {
-            Ok(size) => Ok(size),
-            Err(e) => {
-                if e.kind() == std::io::ErrorKind::WouldBlock {
-                    return Ok(0);
-                }
-                Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into())
+            Ok(size) => {
+                /*    if size == 0 {
+                    return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "").into());
+                }*/
+                Ok(size)
             }
+            Err(e) => Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into()),
         }
     }
 

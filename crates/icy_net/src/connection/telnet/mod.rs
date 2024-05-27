@@ -250,6 +250,9 @@ impl Connection for TelnetConnection {
         match self.tcp_stream.read(buf).await {
             Ok(size) => {
                 let result = self.parse(&mut buf[0..size]).await?;
+                /* if result == 0 {
+                    return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "").into());
+                }*/
                 Ok(result)
             }
             Err(err) => {
