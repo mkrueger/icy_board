@@ -22,8 +22,8 @@ bytes = "1"
 serial2-tokio = "0.1.10"
 
 # SSH
-russh = "0.43.0"
-russh-keys = "0.43.0"
+russh = { git= "https://github.com/warp-tech/russh" }
+russh-keys =  { git= "https://github.com/warp-tech/russh" }
 
 # WEBSOCKETS
 tokio-tungstenite = { version = "0.21.0", features = [
