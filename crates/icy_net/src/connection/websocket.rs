@@ -2,6 +2,7 @@ use crate::{Connection, ConnectionType};
 use async_trait::async_trait;
 use futures_util::{SinkExt, StreamExt};
 use http::Uri;
+//use http::{Error, Uri};
 use rustls::RootCertStore;
 use std::io;
 use std::io::ErrorKind;
@@ -137,7 +138,15 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection for WebSocketConnectio
                 self.data = data;
                 Ok(len)
             }
-            Some(Err(e)) => Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into()),
+            Some(Err(e)) => match e {
+                tokio_tungstenite::tungstenite::Error::Io(e) => {
+                    if e.kind() == ErrorKind::UnexpectedEof {
+                        return Ok(0);
+                    }
+                    return Err(e.into());
+                }
+                _ => Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into()),
+            },
             None => Err(std::io::Error::new(ErrorKind::ConnectionAborted, "Connection aborted").into()),
         }
     }
@@ -156,23 +165,3 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection for WebSocketConnectio
         Ok(())
     }
 }
-
-/*
-impl<S: Read + Write> Read for WebSocketConnection<S> {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-
-    }
-}
-
-impl<S: Read + Write> Write for WebSocketConnection<S> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        if let Err(err) = self.socket.flush() {
-            return Err(io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {err}")));
-        }
-        Ok(())
-    }
-}
-*/
