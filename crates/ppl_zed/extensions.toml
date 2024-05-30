@@ -1,0 +1,11 @@
+id = "ppl-zed-extension"
+name = "PCBoard Programming Language Zed Extension"
+version = "0.0.1"
+schema_version = 1
+authors = ["Mike Krüger <mkrueger@posteo.de>"]
+description = "PCBoard Programming Language Zed Extension"
+repository = "https://github.com/mkrueger/icy_board/tree/main/crates/ppl_zed"
+
+[language_servers.ppl]
+name = "PCBoard Programming Language"
+language = "PPL"
