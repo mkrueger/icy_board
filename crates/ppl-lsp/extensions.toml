@@ -4,7 +4,7 @@ version = "0.0.1"
 schema_version = 1
 authors = ["Mike Krüger <mkrueger@posteo.de>"]
 description = "PCBoard Programming Language Zed Extension"
-repository = "https://github.com/mkrueger/icy_board/tree/main/crates/ppl_zed"
+repository = "https://github.com/mkrueger/icy_board"
 
 [language_servers.ppl]
 name = "PCBoard Programming Language"

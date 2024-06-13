@@ -1,0 +1,105 @@
+**********************************************************************
+FTSC                             FIDONET TECHNICAL STANDARDS COMMITTEE
+**********************************************************************
+
+Publication:    FTS-1028
+Revision:       1
+Title:          Binkp protocol extension Non-reliable Mode
+Authors:        Michiel Broek
+Issue Date:     1 December 2005
+Review Date:    1 December 2007
+----------------------------------------------------------------------
+Contents:
+         1. Definitions
+         2. Binkp Non-reliable Mode
+         3. Implementation
+         A. References
+         B. History
+----------------------------------------------------------------------
+
+Status of this document
+-----------------------
+
+   This document is a Fidonet Technical Standard (FTS).
+
+   This document specifies an optional Fidonet standard protocol for
+   the Fidonet community.
+
+   This document is released to the public domain, and may be used,
+   copied or modified for any purpose whatever.
+
+
+1. Definitions
+--------------
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
+   NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL"
+   in this document are to be interpreted as described in [FTA-1006].
+
+
+2. Binkp Non-reliable Mode
+--------------------------
+
+   Non-reliable mode solves the problem with frequently aborted
+   connections when the sides can not successfully complete file
+   transfer before connection is broken. In this case, if the
+   transmitting side starts retransmission from offset 0, performance
+   degrades as by the time it receives M_GET from the remote, network
+   buffers are already full and by the time they are freed for
+   retransmission from requested offset, the connection might go down
+   again.
+
+   In order to circumvent this problem, a mailer can request the
+   remote to enter non-reliable mode. If the remote supports this mode
+   it MUST switch non-reliable mode on. If the remote doesn't support
+   this mode or non-reliable mode is disabled on remote, it will
+   continue to use ordinary binkp file send mode.
+
+   Non-reliable mode short notation is "NR mode".
+
+   A mailer MAY request the remote to send files in NR mode by sending
+   a M_NUL "OPT NR" frame at any time during the session. The remote
+   MAY reply by sending an M_NUL "OPT NR" frame. If remote sends the
+   M_NUL "OPT NR" frame, a mailer MUST send files in NR mode if it
+   supports this.
+
+   When session is in non-reliable mode, the transmitting side MAY
+   send -1 for the offset value in M_FILE command. If it does so, it
+   SHOULD wait for the M_GET frame from the receiving side that
+   explicitly specifies file offset and start transmitting file data
+   from this offset. If the receiving side has indicated that it
+   supports non-reliable mode by sending M_NUL "OPT NR" frame, it MUST
+   recognize -1 as the file offset in M_FILE command as an explicit
+   request for the file offset and transmit an appropriate M_GET frame
+   as soon as possible.
+
+   It should be understood that this option degrades performance over
+   regular quality connections and it should be used only if
+   absolutely necessary.
+
+
+3. Implementation
+-----------------
+
+   The implementation of NR mode is optional for binkp/1.0 mailers.
+   In binkp/1.1 mailers NR mode MUST be implemented, see FSP-1024.
+
+
+A. References
+-------------
+
+   [FSP-1018]
+           Binkp/1.0 Protocol specification.
+
+   [FSP-1024]
+           Binkp/1.1 Protocol specification.
+
+   [FTA-1006]
+           Key words to indicate requirement levels, Fidonet Technical
+           Standards Committee administrative. FTA-1006.
+
+
+B. History
+----------
+
+   Rev.1, 20051201: Initial Release.

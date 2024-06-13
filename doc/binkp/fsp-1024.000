@@ -1,0 +1,341 @@
+ 
+**********************************************************************
+FTSC                             FIDONET TECHNICAL STANDARDS COMMITTEE
+**********************************************************************
+
+Publication:    FSP-1024
+Revision:       draft-0
+Title:          Binkp/1.1 Protocol specification
+Authors:        Michiel Broek
+Issue Date:     06 Oct 2003
+Review Date:    06 Oct 2005
+----------------------------------------------------------------------
+Contents:
+    1. Background
+    2. Definitions
+    3. Protocol Overview
+    4. Protocol details
+         1. Protocol identification string
+         2. Re-initialise session after EOB
+         3. NR mode
+         4. ND mode
+         5. Example of Frame Exchange in a Simple Binkp/1.1 Session
+
+----------------------------------------------------------------------
+
+Status of this document
+-----------------------
+
+   This document is a Fidonet Standard Proposal (FSP), issued by the
+   FTSC for the benefit of the Fidonet community.
+
+   This document specifies an optional Fidonet standard protocol for
+   the Fidonet community, and requests discussion and suggestions for
+   improvements.
+
+   This document is based on the FSP-1011 proposal by Dima Maloff
+   (maloff@corbina.net), Maxim Masiutin (max@ritlabs.com) and
+   Nick Soveiko (nsoveiko@doe.carleton.ca).
+
+   This document is released to the public domain, and may be used,
+   copied or modified for any purpose whatever.
+
+
+Abstract
+--------
+
+   This specification defines binkp/1.1 - a protocol to handle a 
+   session between two Fidonet Technology systems over a reliable 
+   connection.
+   Assumption that the connection is reliable makes possible to
+   eliminate error-checking and unnecessary synchronization steps,
+   achieving both ease of implementation and major performance
+   improvement over connections with large unpredictable delays (e.g.
+   Internet using TCP).
+   Etymology of term "binkp" is: "binkd protocol". This protocol
+   was originally developed for the TCP-FTN mailer binkd by Dima
+   Maloff.
+   New implementations are advised to implement this binkp/1.1
+   protocol, but if a connection is made with a binkp/1.0 mailer
+   the implementation must fallback to the binkp/1.0 protocol.
+   The binkp/1.0 protocol is documented in FSP-1018.
+
+
+1. background
+-------------
+
+   Blabla about the added functions.
+
+
+2. Definitions
+--------------
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
+   NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL"
+   in this document are to be interpreted as described in [FTA-1006].
+   However, for readability, these words may sometimes not appear in
+   all uppercase letters in this specification. Although it should not
+   impact minimal realization of binkp protocol, it must be noted that
+   Protocol Extensions may override, update or obsolete requirement
+   levels indicated by the above keywords in chapters from 3 to 6
+   inclusive.
+
+   Calling party in this document is referred to as the Originating
+   side and called party is referred to as the Answering side.
+   Originating side here is the party that initiates the connection
+   between two systems.
+
+   Mailer in this document is a software that implements the protocol.
+
+   Words "frame", "packet", and "block" when used in this document
+   refer to binkp's Frames, unless explicitly stated otherwise.
+
+   Other definitions that are not local to this document can be found
+   in the Glossary.
+
+   This document is organized as following:
+
+   Frames section defines binkp's frames. Binkp commands and their
+   arguments section provides detailed description of all defined
+   protocol commands together with recommendations for their usage.
+   Actual binkp implementation may match it's own diagrams provided
+   that such implementation remains fully compatible with current
+   specification. Protocol states section gives rigorous state
+   diagrams for the minimum realization of binkp. All mailers MUST
+   support this minimum realization. The License, Glossary and 
+   References sections can be found at the end of this document.
+
+
+3. Protocol Overview
+--------------------
+
+   In this document only the binkp/1.1 extensions are documented.
+   The binkd/1.1 protocol was developed and implemented in 1997 by
+   Dmitry Maloff.
+
+   The binkp/1.1 protocol defines multiple batches, this means that
+   after a batch ends (M_EOB frame sent) the mailer checks the 
+   outbound for new files and starts a new batchs if files are found.
+
+   Also the following protocols extensions are required:
+
+    1. NR mode, Non-Reliable mode. (FSP-1023)
+    2. ND mode, No Dupes mode.     (FSP-xxxx)
+
+   Because the protocol allows multiple batches, the implementation
+   can be made so to honor WaZoo file requests, ie respond to files
+   named NNNNMMMM.REQ when received.
+
+   If a implementation includes WaZoo requests and the sysop running
+   the system allows file request, the nodelist request flag to use
+   is XX if file requests and update requests are allowed, or XW if
+   only file requests are allowed.
+
+
+4. Protocol details
+-------------------
+
+ 4.1 Protocol identification string
+ ----------------------------------
+
+   In session setup stage both sides sends M_NUL frame like this:
+
+      M_NUL "VER mailer version binkp/1.1"
+
+   where "mailer version" is mailer identification string, usually
+   mailer name and version, in free form, and "binkp/1.1" is the
+   protocol identification string, case-incencitive. 
+   Mailer identification string MAY have and SHOULD consist only
+   characters in the ASCII codes range 32-126 (" ".."~").
+
+   Example:
+
+     M_NUL "VER binkd/0.9.5a/FreeBSD binkp/1.1"
+
+   Version identification frame MUST be send and may be received 
+   before autentification ends (before sending of M_PWD frame by 
+   originating side and M_OK by answering side). Otherwise mailer
+   MUST fallback to binkp 1.0.
+
+
+ 4.2 Re-initialise session after EOB
+ -----------------------------------
+
+   When a batch ends (M_EOB frame sent) a binkp 1.1 compatible mailer
+   MUST check the queue (outbound) for new files and start a new batch
+   if files are found. Mailer state resets to the begin of the File
+   transfer stage:
+
+     TxDone reset to TxGNF and RxDone reset to RxWaitF.
+
+   The session ends after sent and received empty batches: series of
+   two M_ EOB frames. Mailer state sets to session end after jump
+   sequences:
+
+     TxDone->TxGNF->TxDone and RxDone->RxWaitF->RxDone.
+
+   This allows some features, like receive and send file requests in
+   one session and send more files in the same session if some other
+   background process has added files to the queue.
+
+
+ 4.3 NR mode
+ -----------
+
+   NR mode is a needed extenstion into the core of binkp/1.1. A Mailer
+   MAY switch to NR mode at any moment without notice and may request
+   NR mode from remote by sent M_NUL "OPT NR".
+
+   A Binkp/1.1 compatible mailer MUST not be confused upon receiving
+   frame
+
+      M_FILE "filename time size -1"
+
+   and MUST reply with a corresponding M_GET with needed file offset.
+   Also the mailer MUST switch to NR mode after receiving the frame
+
+      M_NUL "OPT NR"
+
+   Non-reliable mode solves the problem with frequently aborted
+   connections when the sides can not successfully complete file
+   transfer before the connection is broken. In this case, if the
+   transmitting side starts retransmission from offset 0, performance
+   degrades as by the time it receives M_GET from the remote, network
+   buffers are already full and by the time they are freed for
+   retransmission from requested offset, the connection might go down
+   again. In order to circumvent this problem, a mailer can request
+   the remote to enter non-reliable mode. If the remote supports this
+   mode it MUST switch non-reliable mode on. If remote doesn't support
+   this mode or non-reliable mode is disabled on remote, it doesn't
+   use it to send files and uses ordinary binkp file send mode. This
+   behaviour is only allowed with connections to a binkp/1.0 mailer,
+   if both sides are binkp/1.1 then this option MUST always be
+   supported and may not be turned off.
+
+   Non-reliable mode is shortened to "NR mode".
+
+   A mailer can request the remote to send files in NR mode by sending
+   a M_NUL "OPT NR" frame at any time during the session. If the
+   remote replies by sending an M_NUL "OPT NR", the session is in
+   non-reliable mode.
+
+   When session is in non-reliable mode, the transmitting side may
+   send -1 for the offset value in M_FILE command. If it does so, it
+   should wait for the M_GET frame from the receiving side that
+   explicitly specifies file offset and start transmitting file data
+   from this offset. If the receiving side has indicated that it
+   supports non-reliable mode by sending M_NUL "OPT NR" frame, it must
+   recognize -1 as the file offset in M_FILE command as an explicit
+   request for the file offset and transmit an appropriate M_GET frame
+   as soon as possible.
+
+   It should be understood that this option degrades performance over
+   regular quality connections and it should be used only if
+   absolutely necessary.
+
+
+   Add a piece of extra parameters for the M_FILE command.
+
+   Add a piece of text about the M_NUL TRF command.
+
+   Add a piece of text how to detect an empty batch, counting the sent
+   and received messages?
+
+
+ 4.4 ND mode
+ -----------
+
+
+
+ 4.5 Example of Frame Exchange in a Simple Binkp/1.1 Session
+ -----------------------------------------------------------
+
+   Originating side (1:1/1.1@fidonet) has file1 for the answering side
+   (2:2/2.2@fidonet) and answering side has file2 for the originating
+   side.
+   During file transfer a new file named "file3" appears on the
+   originating side.
+
+
+   NOTE: Modify the table slightly to show one of the sides goes into
+   waiting after receiving M_EOB. Not showing this is confusing.
+
+   +-----------------------------------------------------------------+
+   | Originating side               | Answering side                 |
+   |--------------------------------+--------------------------------|
+   | M_NUL "SYS ..."                | M_NUL "SYS ..."                |
+   | M_NUL "ZYZ ..."                | M_NUL "ZYZ ..."                |
+   | M_NUL "LOC ..."                | M_NUL "LOC ..."                |
+   | M_NUL "VER ..."                | M_NUL "VER ..."                |
+   | M_NUL "OPT ..."                | M_NUL "OPT ..."                |
+   | M_ADR "1:1/1.1@fidonet"        | M_ADR "2:2/2.2@fidonet"        |
+   | M_PWD "password"               | (waiting for a password from   |
+   |                                | remote)                        |
+   |--------------------------------+--------------------------------|
+   | (waiting for password          | M_OK "" (or M_ERR "Bad         |
+   | acknowledgement)               | password")                     |
+   |--------------------------------+--------------------------------|
+   | (got M_OK)                     | M_FILE "file2 200 42342434 0"  |
+   |--------------------------------+--------------------------------|
+   | M_FILE "file1 100 423424244 0" | data                           |
+   |--------------------------------+--------------------------------|
+   | data                           | data                           |
+   |--------------------------------+--------------------------------|
+   | data                           | data                           |
+   |--------------------------------+--------------------------------|
+   | M_EOB                          | (got file1, acknowledging it)  |
+   |--------------------------------+--------------------------------|
+   | (got file2, acknowledging it)  | M_GOT "file1 100 423424244"    |
+   |--------------------------------+--------------------------------|
+   | M_GOT "file2 200 42342434"     | data                           |
+   |--------------------------------+--------------------------------|
+   | (Rescan outbound)              | M_EOB                          |
+   |--------------------------------+--------------------------------|
+   | M_FILE "file3 200 423424268 0" | (Rescan outbound)              |
+   |--------------------------------+--------------------------------|
+   | data                           | M_EOB                          |
+   |--------------------------------+--------------------------------|
+   | data                           | (Rescan outbound)              |
+   |--------------------------------+--------------------------------|
+   | M_EOB                          | (got file1, acknowledging it)  |
+   |--------------------------------+--------------------------------|
+   | (Rescan outbound)              | M_GOT "file3 200 423424268"    |
+   |--------------------------------+--------------------------------|
+   | M_EOB                          | M_EOB                          |
+   |--------------------------------+--------------------------------|
+   | (Rescan outbound)              | (Rescan outbound)              |
+   |--------------------------------+--------------------------------|
+   | M_EOB                          | M_EOB                          |
+   +-----------------------------------------------------------------+
+
+
+
+
+TO ADD SOMEWHERE:
+
+
+> Important note:
+> Argument format of the 'M_FILE' or other file-related command are
+> expanded in binkp 1.1:
+> after standard three parameters may be used some extras, specifyed by
+> protocol extension. And mailer must ignore extra part or string in pure
+> binkp 1.1 if 5t word are found.
+> Examples.
+> Pure binkp 1.1 (without extensions):
+>      M_FILE "name size unixtime offset"
+> Binkp 1.1 with enabled file compression (gzip format)
+>      M_FILE "name size unixtime offset gz"
+
+I saw already some things about that. This is good to add.
+
+> In another words:
+> binkp 1.1 compatible mailer should not be confused if it receive binkp
+> command with some extra word(s) in binkp command frame argument.
+>
+> This feature don't documented nowhere
+>
+
+
+ADD MODIFIED STATE TABLES RECEIVE AND TRANSMIT.
+
+

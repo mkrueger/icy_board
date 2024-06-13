@@ -15,7 +15,9 @@ members = [
 	"crates/mkicbmnu",
 	"crates/icy_net",
 	"crates/mkicbtxt", 
-	"crates/icbsetup", "crates/icbmailer", "crates/icbsysmgr", 
+	"crates/icbsetup",
+	"crates/icbmailer",
+	"crates/icbsysmgr",
 ]
 [workspace.package]
 version = "0.1.0"

@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::{io, time::Duration};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use tokio::{

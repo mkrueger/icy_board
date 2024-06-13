@@ -177,6 +177,7 @@ impl UsersTab {
         self.edit_conference = user_number;
         let ib = self.icy_board.lock().unwrap();
         let user = ib.users.get(user_number).unwrap();
+
         let items = vec![
             ConfigEntry::Group(
                 "Form".to_string(),
@@ -194,6 +195,17 @@ impl UsersTab {
                     ),
                     ConfigEntry::Item(
                         ListItem::new("security", "Security".to_string(), ListValue::U32(user.security_level as u32, 0, 255)).with_label_width(14),
+                    ),
+                    ConfigEntry::Item(
+                        ListItem::new(
+                            "verify_answer",
+                            "Verify answer".to_string(),
+                            ListValue::Text(25, user.verify_answer.to_string()),
+                        )
+                        .with_label_width(14),
+                    ),
+                    ConfigEntry::Item(
+                        ListItem::new("city_state", "City/State".to_string(), ListValue::Text(25, user.city_or_state.to_string())).with_label_width(14),
                     ),
                     ConfigEntry::Item(ListItem::new("expert_mode", "Expert".to_string(), ListValue::Bool(user.flags.expert_mode)).with_label_width(14)),
                     ConfigEntry::Item(ListItem::new("protocol", "Protocol".to_string(), ListValue::Text(2, user.protocol.to_string())).with_label_width(14)),
@@ -220,6 +232,17 @@ impl UsersTab {
                     ConfigEntry::Item(
                         ListItem::new("sysop_comment", "Comment2".to_string(), ListValue::Text(60, user.sysop_comment.to_string())).with_label_width(14),
                     ),
+                ],
+            ),
+            ConfigEntry::Group(
+                "Address Form".to_string(),
+                vec![
+                    ConfigEntry::Item(ListItem::new("street1", "Address #1".to_string(), ListValue::Text(25, user.street1.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("street2", "Address #2".to_string(), ListValue::Text(25, user.street2.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("city", "City".to_string(), ListValue::Text(25, user.city.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("state", "State".to_string(), ListValue::Text(25, user.state.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("zip_code", "Zip Code".to_string(), ListValue::Text(25, user.zip.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("country", "Country".to_string(), ListValue::Text(25, user.country.to_string())).with_label_width(14)),
                 ],
             ),
             ConfigEntry::Group(
@@ -250,9 +273,6 @@ impl UsersTab {
                         ListItem::new("birth_date", "Birthdate".to_string(), ListValue::Text(60, user.birth_date.to_string())).with_label_width(14),
                     ),
                     ConfigEntry::Item(ListItem::new("email", "Email Address".to_string(), ListValue::Text(60, user.email.to_string())).with_label_width(14)),
-                    ConfigEntry::Item(
-                        ListItem::new("custom_comment4", "Line 4".to_string(), ListValue::Text(60, user.custom_comment4.to_string())).with_label_width(14),
-                    ),
                     ConfigEntry::Item(ListItem::new("web", "Web Address".to_string(), ListValue::Text(60, user.web.to_string())).with_label_width(14)),
                 ],
             ),
@@ -286,6 +306,17 @@ impl UsersTab {
                 }
                 "email" => user.email = text.clone(),
                 "web" => user.web = text.clone(),
+
+                "verify_answer" => user.verify_answer = text.clone(),
+                "city_state" => user.city_or_state = text.clone(),
+
+                "street1" => user.street1 = text.clone(),
+                "street2" => user.street2 = text.clone(),
+                "city" => user.city = text.clone(),
+                "state" => user.state = text.clone(),
+                "zip_code" => user.zip = text.clone(),
+                "country" => user.country = text.clone(),
+
                 _ => panic!("Unknown id: {}", item.id),
             },
             ListValue::Path(_path) => match item.id.as_str() {
@@ -360,7 +391,6 @@ impl TabPage for UsersTab {
                 _ => {
                     self.conference_config.handle_key_press(key, &mut self.state);
                     let home_dir = self.icy_board.lock().unwrap().config.paths.home_dir.clone();
-
                     if let Some(user) = self.icy_board.lock().unwrap().users.get_mut(self.edit_conference) {
                         for item in self.conference_config.iter() {
                             self.write_item(item, user);
@@ -368,6 +398,7 @@ impl TabPage for UsersTab {
                         let _ = user.save(&home_dir);
                     }
                 }
+                _ => {}
             }
             return ResultState::status_line(String::new());
         }
