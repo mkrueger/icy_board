@@ -25,31 +25,31 @@ impl PcbBoardCommand {
             let token = token.to_ascii_uppercase();
 
             match token.as_str() {
-                "CT" => {
+                "CT" | "CTT" | "CTTY" => {
                     self.state.set_grapics_mode(GraphicsMode::Ctty).await;
                     self.state
                         .display_text(IceText::CTTYOn, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
                 }
-                "AN" => {
+                "AN" | "ANS" | "ANSI" => {
                     self.state.set_grapics_mode(GraphicsMode::Ansi).await;
                     self.state
                         .display_text(IceText::AnsiOn, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
                 }
-                "AV" => {
+                "AV" | "AVT" | "AVATAR" => {
                     self.state.set_grapics_mode(GraphicsMode::Avatar).await;
                     self.state
                         .display_text(IceText::AvatarOn, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
                 }
-                "GR" | "ON" | "YES" => {
+                "GR" | "GRAPH" | "ON" | "YES" => {
                     self.state.set_grapics_mode(GraphicsMode::Graphics).await;
                     self.state
                         .display_text(IceText::GraphicsOn, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
                 }
-                "RI" => {
+                "RI" | "RIP" => {
                     self.state.set_grapics_mode(GraphicsMode::Rip).await;
                     self.state
                         .display_text(IceText::RIPModeOn, display_flags::NEWLINE | display_flags::LFBEFORE)
