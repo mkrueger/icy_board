@@ -398,7 +398,6 @@ impl TabPage for UsersTab {
                         let _ = user.save(&home_dir);
                     }
                 }
-                _ => {}
             }
             return ResultState::status_line(String::new());
         }

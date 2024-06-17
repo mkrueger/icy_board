@@ -532,7 +532,8 @@ impl IcyBoardState {
         }
     }
 
-    pub async fn join_conference(&mut self, conference: u16) {
+    pub async fn join_conference(&mut self, conference: u16, _quick_join: bool) {
+        // todo: display news on join.
         if (conference as usize) < self.get_board().await.conferences.len() {
             self.session.current_conference_number = conference;
             let c = self.get_board().await.conferences[conference as usize].clone();
@@ -708,7 +709,7 @@ impl IcyBoardState {
         if self.session.language != old_language {
             self.update_language().await;
         }
-        self.join_conference(last_conference).await;
+        self.join_conference(last_conference, false).await;
         return Ok(());
     }
 

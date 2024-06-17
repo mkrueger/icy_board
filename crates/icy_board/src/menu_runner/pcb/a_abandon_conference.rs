@@ -15,7 +15,7 @@ impl PcbBoardCommand {
                 "{} ({})",
                 self.state.session.current_conference.name, self.state.session.current_conference_number
             );
-            self.state.join_conference(0).await;
+            self.state.join_conference(0, false).await;
             self.state
                 .display_text(IceText::ConferenceAbandoned, display_flags::NEWLINE | display_flags::NOTBLANK)
                 .await?;
