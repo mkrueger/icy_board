@@ -31,7 +31,7 @@ strum_macros = "0.26.2"
 
 async-recursion = "1.1.0"
 radix_fmt = "1"
-qfile = "3.0.1"
+qfile = { path = "../qfile" }
 byteorder = "1.5.0"
 toml = { workspace = true }
 async-trait = "0.1.80"

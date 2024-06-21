@@ -4,7 +4,6 @@ use std::{
 };
 
 use crate::Res;
-use qfile::{QFilePath, QTraitSync};
 
 use self::{
     pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader},
@@ -13,7 +12,7 @@ use self::{
     users::PcbUserRecord,
 };
 
-use super::{icb_text::IcbTextFile, IcyBoardError};
+use super::{case_insitive_lookup, icb_text::IcbTextFile, IcyBoardError};
 
 pub mod pcbconferences;
 pub mod pcboard_data;
@@ -92,12 +91,7 @@ impl PcbBoard {
             }
         }
 
-        if let Ok(mut file_path) = QFilePath::add_path(s.clone()) {
-            if let Ok(file) = file_path.get_path_buf() {
-                return file.to_string_lossy().to_string();
-            }
-        }
-        s
+        case_insitive_lookup(PathBuf::from(s)).to_str().unwrap().to_string()
     }
 
     pub fn load(file: &Path) -> Res<PcbBoard> {

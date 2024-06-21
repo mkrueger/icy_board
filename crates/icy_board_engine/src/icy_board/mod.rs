@@ -5,7 +5,7 @@ use std::{
 
 use crate::Res;
 use codepages::tables::write_with_bom;
-use qfile::{QFilePath, QTraitSync};
+use qfile::QTraitSync;
 use thiserror::Error;
 
 use crate::vm::errors::IcyError;
@@ -150,13 +150,7 @@ impl IcyBoard {
                 })
                 .collect();
         */
-
-        if let Ok(mut file_path) = QFilePath::add_path(s.to_string_lossy()) {
-            if let Ok(file) = file_path.get_path_buf() {
-                return file;
-            }
-        }
-        s
+        return case_insitive_lookup(s);
     }
 
     pub fn load<P: AsRef<Path>>(path: &P) -> Res<Self> {
@@ -508,6 +502,15 @@ impl IcyBoard {
         self.users[i] = new_user;
         Ok(())
     }
+}
+
+pub(crate) fn case_insitive_lookup(path: PathBuf) -> PathBuf {
+    if let Ok(mut file_path) = qfile::QFilePath::add_path(path.to_string_lossy()) {
+        if let Ok(file) = file_path.get_path_buf() {
+            return file;
+        }
+    }
+    path
 }
 
 fn get_path(parent_path: &Path, home_dir: &PathBuf) -> PathBuf {
