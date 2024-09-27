@@ -14,8 +14,8 @@ use crate::icy_engine_output::Screen;
 pub struct ConnectionThreadData {
     pub rx: mpsc::Receiver<SendData>,
     pub com: Box<dyn Connection>,
-    pub thread_is_running: bool,
-    pub is_connected: bool,
+    pub _thread_is_running: bool,
+    pub _is_connected: bool,
 }
 
 pub fn start_update_thread(com: Box<dyn Connection>, screen: Arc<Mutex<Screen>>) -> (thread::JoinHandle<()>, mpsc::Sender<SendData>) {
@@ -32,9 +32,9 @@ pub fn start_update_thread(com: Box<dyn Connection>, screen: Arc<Mutex<Screen>>)
                     let mut buffer_parser = ansi::Parser::default();
                     buffer_parser.bs_is_ctrl_char = true;
                     let mut connection = ConnectionThreadData {
-                        is_connected: false,
+                        _is_connected: false,
                         com,
-                        thread_is_running: true,
+                        _thread_is_running: true,
                         rx,
                     };
                     let mut data = [0; 1024 * 64];

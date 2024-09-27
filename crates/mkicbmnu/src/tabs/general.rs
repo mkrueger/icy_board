@@ -168,7 +168,7 @@ impl TabPage for GeneralTab {
             .border_type(BorderType::Double);
         block.render(area, frame.buffer_mut());
 
-        let area = area.inner(&Margin { vertical: 1, horizontal: 1 });
+        let area = area.inner(Margin { vertical: 1, horizontal: 1 });
         self.config.render(area, frame, &mut self.state);
         if self.state.in_edit {
             self.config.get_item(self.state.selected).unwrap().text_field_state.set_cursor_position(frame);

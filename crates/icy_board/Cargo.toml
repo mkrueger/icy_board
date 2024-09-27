@@ -26,14 +26,14 @@ serde = { workspace = true }
 bstr = { workspace = true }
 walkdir = { workspace = true }
 substring = { workspace = true }
-ariadne = "0.4.0"
+ariadne = "0.4.1"
 unicase = { workspace = true }
 fern = "0.6.2"
 qfile = "3.0.1"
 easy_reader = "0.5.2"
 toml = { workspace = true }
 md-to-tui = "0.1.2"
-relative-path = "1.9.2"
+relative-path = "1.9.3"
 regex = { workspace = true }
 rand = { workspace = true }
 tokio = { workspace = true }
@@ -44,4 +44,4 @@ reqwest = { version = "0.12", features = ["json", "blocking"] }
 
 # for file view kb/mb
 humanize-bytes = "1.0.5"
-async-recursion = "1.1.0"
+async-recursion = "1.1.1"

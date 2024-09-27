@@ -102,7 +102,7 @@ impl<'a> TabPage for CommandsTab<'a> {
             dialog.ui(frame, area);
             return;
         }
-        let area = area.inner(&Margin::new(2, 2));
+        let area = area.inner(Margin::new(2, 2));
 
         Clear.render(area, frame.buffer_mut());
 
@@ -113,7 +113,7 @@ impl<'a> TabPage for CommandsTab<'a> {
             .border_type(BorderType::Double);
         block.render(area, frame.buffer_mut());
 
-        let area = area.inner(&Margin::new(1, 1));
+        let area = area.inner(Margin::new(1, 1));
         self.insert_table.render_table(frame, area);
     }
 

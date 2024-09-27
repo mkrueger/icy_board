@@ -20,7 +20,7 @@ crossterm = { workspace = true }
 ratatui = { workspace = true }
 log = { workspace = true }
 
-tui-input = "0.8.0"
+tui-input = "0.10.1"
 ariadne = "0.4.0"
 fern = "0.6.2"
 unicase = { workspace = true }

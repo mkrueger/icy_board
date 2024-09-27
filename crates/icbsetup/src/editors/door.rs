@@ -127,7 +127,7 @@ impl<'a> Editor for DoorEditor<'a> {
         block.render(area, frame.buffer_mut());
 
         let vertical = Layout::vertical([Constraint::Length(6), Constraint::Fill(1)]);
-        let [menu_area, table_area] = vertical.areas(area.inner(&Margin { vertical: 1, horizontal: 1 }));
+        let [menu_area, table_area] = vertical.areas(area.inner(Margin { vertical: 1, horizontal: 1 }));
         let sel = self.menu_state.selected;
         if self.mode == EditCommandMode::Table {
             self.menu_state.selected = usize::MAX;
@@ -146,7 +146,7 @@ impl<'a> Editor for DoorEditor<'a> {
         }
 
         if let Some(edit_config) = &mut self.edit_config {
-            let area = area.inner(&Margin { vertical: 8, horizontal: 3 });
+            let area = area.inner(Margin { vertical: 8, horizontal: 3 });
             Clear.render(area, frame.buffer_mut());
             let block = Block::new()
                 .title(Title::from(Span::from(" Edit Door ").style(THEME.content_box_title)).alignment(Alignment::Center))
@@ -156,7 +156,7 @@ impl<'a> Editor for DoorEditor<'a> {
                 .border_type(BorderType::Double);
             //     let area =  footer.inner(&Margin { vertical: 15, horizontal: 5 });
             block.render(area, frame.buffer_mut());
-            edit_config.render(area.inner(&Margin { vertical: 1, horizontal: 1 }), frame, &mut self.edit_config_state);
+            edit_config.render(area.inner(Margin { vertical: 1, horizontal: 1 }), frame, &mut self.edit_config_state);
 
             if self.edit_config_state.in_edit {
                 edit_config

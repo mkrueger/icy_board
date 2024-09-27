@@ -619,7 +619,7 @@ impl TabPage for GeneralTab {
     }
 
     fn render(&mut self, frame: &mut Frame, area: Rect) {
-        let area = area.inner(&Margin { horizontal: 2, vertical: 1 });
+        let area = area.inner(Margin { horizontal: 2, vertical: 1 });
 
         Clear.render(area, frame.buffer_mut());
 
@@ -630,7 +630,7 @@ impl TabPage for GeneralTab {
             .border_type(BorderType::Double);
         block.render(area, frame.buffer_mut());
 
-        let area = area.inner(&Margin { vertical: 1, horizontal: 1 });
+        let area = area.inner(Margin { vertical: 1, horizontal: 1 });
         self.config.render(area, frame, &mut self.state);
 
         if self.state.in_edit {

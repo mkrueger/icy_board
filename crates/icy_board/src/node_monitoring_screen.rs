@@ -122,7 +122,7 @@ impl NodeMonitoringScreen {
             }
 
             terminal.draw(|frame| {
-                page_len = (frame.size().height as usize).saturating_sub(3);
+                page_len = (frame.area().height as usize).saturating_sub(3);
                 self.ui(frame, &node_info, &connections, full_screen);
             })?;
             if event::poll(timeout)? {
@@ -213,7 +213,7 @@ impl NodeMonitoringScreen {
     }
 
     fn render_connections(&self, frame: &mut Frame, connections_area: Rect, connections: &[Connection]) {
-        let mut area = connections_area.inner(&Margin { vertical: 1, horizontal: 1 });
+        let mut area = connections_area.inner(Margin { vertical: 1, horizontal: 1 });
         Line::from("═".repeat(area.width as usize))
             .style(Style::new().fg(DOS_YELLOW))
             .centered()
@@ -299,13 +299,13 @@ impl NodeMonitoringScreen {
         .highlight_style(Style::default().fg(DOS_BLUE).bg(DOS_LIGHT_GRAY))
         .style(Style::default().fg(DOS_YELLOW).bg(DOS_BLUE))
         .highlight_spacing(HighlightSpacing::Always);
-        let mut area = area.inner(&Margin { vertical: 1, horizontal: 1 });
+        let mut area = area.inner(Margin { vertical: 1, horizontal: 1 });
         area.width -= 1;
         frame.render_stateful_widget(table, area, &mut self.table_state);
     }
 
     fn render_scrollbar(&mut self, frame: &mut Frame, _area: Rect) {
-        let area = frame.size().inner(&Margin { vertical: 1, horizontal: 0 });
+        let area = frame.area().inner(Margin { vertical: 1, horizontal: 0 });
         let mut scroll_state = self
             .scroll_state
             .position(self.table_state.offset())

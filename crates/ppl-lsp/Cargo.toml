@@ -22,5 +22,5 @@ ropey = "1.5.0"
 serde_json = "1.0.78"
 
 tower-lsp = { version = "0.20.0", features = ["proposed"]}
-dashmap = "5.1.0"
+dashmap = "6.1.0"
 im-rc = "15.0.0"

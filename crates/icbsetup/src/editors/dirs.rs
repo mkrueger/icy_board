@@ -111,11 +111,11 @@ impl<'a> Editor for DirsEditor<'a> {
             .borders(Borders::ALL)
             .border_type(BorderType::Double);
         block.render(area, frame.buffer_mut());
-        let area = area.inner(&Margin { horizontal: 1, vertical: 1 });
+        let area = area.inner(Margin { horizontal: 1, vertical: 1 });
         self.display_insert_table(frame, &area);
 
         if let Some(edit_config) = &mut self.edit_config {
-            let area = area.inner(&Margin { vertical: 3, horizontal: 3 });
+            let area = area.inner(Margin { vertical: 3, horizontal: 3 });
             Clear.render(area, frame.buffer_mut());
             let block = Block::new()
                 .title(Title::from(Span::from(" Edit Directory ").style(THEME.content_box_title)).alignment(Alignment::Center))
@@ -125,7 +125,7 @@ impl<'a> Editor for DirsEditor<'a> {
                 .border_type(BorderType::Double);
             //     let area =  footer.inner(&Margin { vertical: 15, horizontal: 5 });
             block.render(area, frame.buffer_mut());
-            edit_config.render(area.inner(&Margin { vertical: 1, horizontal: 1 }), frame, &mut self.edit_config_state);
+            edit_config.render(area.inner(Margin { vertical: 1, horizontal: 1 }), frame, &mut self.edit_config_state);
 
             if self.edit_config_state.in_edit {
                 edit_config

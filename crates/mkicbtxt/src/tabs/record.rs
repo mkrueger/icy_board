@@ -202,7 +202,7 @@ impl<'a> TabPage for RecordTab<'a> {
         self.request_status()
     }
 
-    fn request_edit_mode(&mut self, _terminal: &mut icy_board_tui::TerminalType, _full_screen: bool) -> crate::app::ResultState {
+    fn _request_edit_mode(&mut self, _terminal: &mut icy_board_tui::TerminalType, _full_screen: bool) -> crate::app::ResultState {
         self.request_status()
     }
 
@@ -217,7 +217,7 @@ impl<'a> TabPage for RecordTab<'a> {
         } else {
             String::new()
         };
-        crate::app::ResultState { status_line, cursor: None }
+        crate::app::ResultState { status_line, _cursor: None }
     }
 }
 

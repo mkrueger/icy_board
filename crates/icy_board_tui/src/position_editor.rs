@@ -35,7 +35,7 @@ impl PositionEditor {
             }
         }
 
-        frame.set_cursor(area.x + pos.x, area.y + pos.y);
+        frame.set_cursor_position((area.x + pos.x, area.y + pos.y));
     }
 
     pub fn handle_event(&mut self, event: KeyEvent, pos: &Position) -> Position {

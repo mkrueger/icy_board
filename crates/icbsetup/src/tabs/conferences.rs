@@ -165,7 +165,7 @@ impl ConferencesTab {
     }
 
     fn render_editor(&mut self, frame: &mut Frame, area: Rect) {
-        let area = area.inner(&Margin { vertical: 1, horizontal: 1 });
+        let area = area.inner(Margin { vertical: 1, horizontal: 1 });
         self.conference_config.render(area, frame, &mut self.state);
     }
 
@@ -319,7 +319,7 @@ impl TabPage for ConferencesTab {
         "Conferences".to_string()
     }
     fn render(&mut self, frame: &mut Frame, area: Rect) {
-        let area = area.inner(&Margin { vertical: 1, horizontal: 2 });
+        let area = area.inner(Margin { vertical: 1, horizontal: 2 });
         Clear.render(area, frame.buffer_mut());
 
         let block = Block::new()
@@ -328,7 +328,7 @@ impl TabPage for ConferencesTab {
             .borders(Borders::ALL)
             .border_type(BorderType::Double);
         block.render(area, frame.buffer_mut());
-        let area = area.inner(&Margin { vertical: 1, horizontal: 1 });
+        let area = area.inner(Margin { vertical: 1, horizontal: 1 });
 
         if self.in_edit_mode {
             self.render_editor(frame, area);

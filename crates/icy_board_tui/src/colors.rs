@@ -22,7 +22,7 @@ impl Widget for RgbSwatch {
                     }
                 }
 
-                buf.get_mut(x, y).set_char('▀').set_fg(upper).set_bg(lower);
+                buf.cell_mut((x, y)).unwrap().set_char('▀').set_fg(upper).set_bg(lower);
             }
         }
     }

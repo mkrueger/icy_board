@@ -22,7 +22,7 @@ pub trait TabPage {
         ResultState::default()
     }
 
-    fn request_edit_mode(&mut self, _terminal: &mut TerminalType, _full_screen: bool) -> ResultState {
+    fn _request_edit_mode(&mut self, _terminal: &mut TerminalType, _full_screen: bool) -> ResultState {
         ResultState::default()
     }
 

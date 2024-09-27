@@ -11,7 +11,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use ratatui::prelude::*;
+use ratatui::{prelude::*, TerminalOptions, Viewport};
 
 use crate::TerminalType;
 

@@ -99,9 +99,9 @@ impl<'a> StatefulWidget for HelpView<'a> {
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .render(area, buf);
-        let area = area.inner(&Margin { horizontal: 1, vertical: 1 });
+        let area = area.inner(Margin { horizontal: 1, vertical: 1 });
         let [body, scrollbar] = Layout::horizontal([Constraint::Fill(1), Constraint::Length(1)]).areas(area);
-        let body = body.inner(&Margin { horizontal: 1, vertical: 1 });
+        let body = body.inner(Margin { horizontal: 1, vertical: 1 });
         state.view_size = body.height as usize;
         state.position = state.position.min(state.text.height().saturating_sub(state.view_size));
         let position = state.position.min(state.text.height().saturating_sub(state.view_size)) as u16;

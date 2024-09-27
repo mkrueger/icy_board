@@ -215,7 +215,7 @@ impl<'a> App<'a> {
             ]);
             save_area.y += 1;
             save_area.x += 1;
-            field.render(save_area.inner(&Margin { horizontal: 1, vertical: 0 }), frame.buffer_mut());
+            field.render(save_area.inner(Margin { horizontal: 1, vertical: 0 }), frame.buffer_mut());
         }
     }
 
@@ -225,7 +225,7 @@ impl<'a> App<'a> {
     }
 
     fn show_help(&mut self, frame: &mut Frame, screen: Rect) {
-        let area = screen.inner(&Margin { horizontal: 2, vertical: 2 });
+        let area = screen.inner(Margin { horizontal: 2, vertical: 2 });
         Clear.render(area, frame.buffer_mut());
         HelpView::default().render(area, frame.buffer_mut(), &mut self.help_state);
     }
@@ -291,13 +291,13 @@ impl<'a> App<'a> {
 
 pub fn get_screen_size(frame: &Frame, is_full_screen: bool) -> Rect {
     if is_full_screen {
-        frame.size()
+        frame.area()
     } else {
-        let width = frame.size().width.min(80);
-        let height = frame.size().height.min(25);
+        let width = frame.area().width.min(80);
+        let height = frame.area().height.min(25);
 
-        let x = frame.size().x + (frame.size().width - width) / 2;
-        let y = frame.size().y + (frame.size().height - height) / 2;
-        Rect::new(frame.size().x + x, frame.size().y + y, width, height)
+        let x = frame.area().x + (frame.area().width - width) / 2;
+        let y = frame.area().y + (frame.area().height - height) / 2;
+        Rect::new(frame.area().x + x, frame.area().y + y, width, height)
     }
 }

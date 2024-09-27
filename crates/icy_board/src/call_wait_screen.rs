@@ -241,7 +241,7 @@ impl CallWaitScreen {
             Constraint::Length(7),
         ]);
 
-        let [header, mut title, mut button_bar, footer, separator, mut stats] = vertical.areas(area.inner(&Margin { vertical: 1, horizontal: 1 }));
+        let [header, mut title, mut button_bar, footer, separator, mut stats] = vertical.areas(area.inner(Margin { vertical: 1, horizontal: 1 }));
 
         // draw node
         Line::from("https://github.com/mkrueger/icy_board")
@@ -256,7 +256,7 @@ impl CallWaitScreen {
                 text: DOS_BLACK,
                 background: DOS_LIGHT_GRAY,
             })
-            .render(title.inner(&Margin { horizontal: 2, vertical: 0 }), frame.buffer_mut());
+            .render(title.inner(Margin { horizontal: 2, vertical: 0 }), frame.buffer_mut());
 
         let horizontal = Layout::horizontal([Constraint::Percentage(33), Constraint::Percentage(33), Constraint::Percentage(33)]);
 
@@ -265,13 +265,13 @@ impl CallWaitScreen {
         let [mut row1, mut row2, mut row3] = horizontal.areas(button_bar);
 
         row1.height = 1;
-        row1 = row1.inner(&Margin { vertical: 0, horizontal: 2 });
+        row1 = row1.inner(Margin { vertical: 0, horizontal: 2 });
 
         row2.height = 1;
-        row2 = row2.inner(&Margin { vertical: 0, horizontal: 2 });
+        row2 = row2.inner(Margin { vertical: 0, horizontal: 2 });
 
         row3.height = 1;
-        row3 = row3.inner(&Margin { vertical: 0, horizontal: 2 });
+        row3 = row3.inner(Margin { vertical: 0, horizontal: 2 });
 
         for (i, b) in self.buttons.iter().enumerate() {
             if i % 3 == 0 {
@@ -293,7 +293,7 @@ impl CallWaitScreen {
         Line::from(self.buttons[selected_button].description.to_string())
             .style(Style::new().fg(DOS_WHITE))
             .centered()
-            .render(footer.inner(&Margin { horizontal: 1, vertical: 0 }), frame.buffer_mut());
+            .render(footer.inner(Margin { horizontal: 1, vertical: 0 }), frame.buffer_mut());
 
         // draw description
         Line::from("═".repeat(stats.width as usize))
@@ -304,7 +304,7 @@ impl CallWaitScreen {
         stats.y += 1;
         stats.height -= 1;
 
-        let mut area = stats.inner(&Margin { horizontal: 3, vertical: 0 });
+        let mut area = stats.inner(Margin { horizontal: 3, vertical: 0 });
         area.height = 1;
 
         let stat_teme = Theme {
@@ -317,7 +317,7 @@ impl CallWaitScreen {
         stats.y += 2;
         stats.height -= 2;
 
-        let mut area = stats.inner(&Margin { horizontal: 3, vertical: 0 });
+        let mut area = stats.inner(Margin { horizontal: 3, vertical: 0 });
         area.height = 1;
 
         PcbButton::new(format!(
@@ -337,7 +337,7 @@ impl CallWaitScreen {
             Constraint::Percentage(25),
         ]);
 
-        let [mut calls, mut msgs, mut dls, mut uls] = horizontal.areas(stats.inner(&Margin { vertical: 1, horizontal: 1 }));
+        let [mut calls, mut msgs, mut dls, mut uls] = horizontal.areas(stats.inner(Margin { vertical: 1, horizontal: 1 }));
         calls.height = 1;
         msgs.height = 1;
         dls.height = 1;
@@ -346,19 +346,19 @@ impl CallWaitScreen {
         let horizontal = 2;
         PcbButton::new(format!("{} {}", get_text("call_wait_screen_num_calls"), self.statistics.total.calls))
             .theme(stat_teme)
-            .render(calls.inner(&Margin { horizontal, vertical: 0 }), frame.buffer_mut());
+            .render(calls.inner(Margin { horizontal, vertical: 0 }), frame.buffer_mut());
 
         PcbButton::new(format!("{} {}", get_text("call_wait_screen_num_msgs"), self.statistics.total.messages))
             .theme(stat_teme)
-            .render(msgs.inner(&Margin { horizontal, vertical: 0 }), frame.buffer_mut());
+            .render(msgs.inner(Margin { horizontal, vertical: 0 }), frame.buffer_mut());
 
         PcbButton::new(format!("{} {}", get_text("call_wait_screen_num_dls"), self.statistics.total.downloads))
             .theme(stat_teme)
-            .render(dls.inner(&Margin { horizontal, vertical: 0 }), frame.buffer_mut());
+            .render(dls.inner(Margin { horizontal, vertical: 0 }), frame.buffer_mut());
 
         PcbButton::new(format!("{} {}", get_text("call_wait_screen_num_uls"), self.statistics.total.uploads))
             .theme(stat_teme)
-            .render(uls.inner(&Margin { horizontal, vertical: 0 }), frame.buffer_mut());
+            .render(uls.inner(Margin { horizontal, vertical: 0 }), frame.buffer_mut());
     }
 
     fn get_select_state(&self, button: i32) -> State {

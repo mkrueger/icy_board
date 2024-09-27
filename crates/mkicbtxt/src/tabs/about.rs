@@ -73,7 +73,7 @@ impl TabPage for AboutTab {
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
             .border_type(BorderType::Double);
-        let area2 = area.inner(&Margin { vertical: 2, horizontal: 2 });
+        let area2 = area.inner(Margin { vertical: 2, horizontal: 2 });
 
         block.render(area, frame.buffer_mut());
 

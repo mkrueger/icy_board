@@ -86,8 +86,8 @@ impl<'a> EditCommandDialog<'a> {
                         Box::new(move |frame, pos| {
                             let size = pos_ed.lock().unwrap().buffer.get_size();
                             let area = Rect::new(
-                                (frame.size().width - size.width as u16) / 2,
-                                (frame.size().height - size.height as u16) / 2,
+                                (frame.area().width - size.width as u16) / 2,
+                                (frame.area().height - size.height as u16) / 2,
                                 size.width as u16,
                                 size.height as u16,
                             );
@@ -384,7 +384,7 @@ impl<'a> EditCommandDialog<'a> {
     }
 
     pub fn ui(&mut self, frame: &mut Frame, screen: Rect) {
-        let area = screen.inner(&Margin::new(2, 2));
+        let area = screen.inner(Margin::new(2, 2));
         Clear.render(area, frame.buffer_mut());
 
         let block = Block::new()
@@ -396,7 +396,7 @@ impl<'a> EditCommandDialog<'a> {
         block.render(area, frame.buffer_mut());
 
         let vertical = Layout::vertical([Constraint::Length(9), Constraint::Fill(1)]);
-        let [header, footer] = vertical.areas(area.inner(&Margin { vertical: 1, horizontal: 1 }));
+        let [header, footer] = vertical.areas(area.inner(Margin { vertical: 1, horizontal: 1 }));
         if self.state.in_edit {
             self.display_insert_table(frame, &area, &footer);
         }
@@ -452,7 +452,7 @@ impl<'a> EditCommandDialog<'a> {
         self.insert_table.table_state.select(sel);
 
         if let Some(edit_config) = &mut self.edit_config {
-            let area = area.inner(&Margin { vertical: 6, horizontal: 3 });
+            let area = area.inner(Margin { vertical: 6, horizontal: 3 });
             Clear.render(area, frame.buffer_mut());
             let block = Block::new()
                 .title(Title::from(Span::from(" Edit Action ").style(THEME.content_box_title)).alignment(Alignment::Center))
@@ -462,7 +462,7 @@ impl<'a> EditCommandDialog<'a> {
                 .border_type(BorderType::Double);
             //     let area =  footer.inner(&Margin { vertical: 15, horizontal: 5 });
             block.render(area, frame.buffer_mut());
-            edit_config.render(area.inner(&Margin { vertical: 1, horizontal: 1 }), frame, &mut self.edit_config_state);
+            edit_config.render(area.inner(Margin { vertical: 1, horizontal: 1 }), frame, &mut self.edit_config_state);
 
             if self.edit_config_state.in_edit {
                 edit_config

@@ -355,7 +355,7 @@ impl<'a> TabPage for PathTab<'a> {
         "Paths".to_string()
     }
     fn render(&mut self, frame: &mut Frame, area: Rect) {
-        let area = area.inner(&Margin { horizontal: 2, vertical: 1 });
+        let area = area.inner(Margin { horizontal: 2, vertical: 1 });
         Clear.render(area, frame.buffer_mut());
 
         if self.edit_text.is_some() {
@@ -364,9 +364,8 @@ impl<'a> TabPage for PathTab<'a> {
                 .borders(Borders::ALL)
                 .border_type(BorderType::Double);
             block.render(area, frame.buffer_mut());
-            let area = area.inner(&Margin { vertical: 1, horizontal: 1 });
-            let widget = self.textarea.widget();
-            frame.render_widget(widget, area);
+            let area = area.inner(Margin { vertical: 1, horizontal: 1 });
+            frame.render_widget(&self.textarea, area);
             return;
         }
 
@@ -377,7 +376,7 @@ impl<'a> TabPage for PathTab<'a> {
             .border_type(BorderType::Double);
         block.render(area, frame.buffer_mut());
 
-        let area = area.inner(&Margin { vertical: 1, horizontal: 1 });
+        let area = area.inner(Margin { vertical: 1, horizontal: 1 });
         self.config.render(area, frame, &mut self.state);
         if self.state.in_edit {
             self.set_cursor_position(frame);

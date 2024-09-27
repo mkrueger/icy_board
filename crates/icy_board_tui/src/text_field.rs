@@ -15,7 +15,7 @@ pub struct TextfieldState {
 
 impl TextfieldState {
     pub fn set_cursor_position(&self, frame: &mut Frame) {
-        frame.set_cursor(self.area.x + self.cursor_position, self.area.y);
+        frame.set_cursor_position((self.area.x + self.cursor_position, self.area.y));
     }
 
     pub fn max_len(&self) -> u16 {

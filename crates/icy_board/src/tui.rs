@@ -214,10 +214,10 @@ impl Tui {
     }
 
     fn ui(&self, frame: &mut Frame, status_bar_info: StatusBarInfo) {
-        let width = frame.size().width.min(80);
-        let height = frame.size().height.min(24);
+        let width = frame.area().width.min(80);
+        let height = frame.area().height.min(24);
 
-        let mut area = Rect::new((frame.size().width - width) / 2, (frame.size().height - height) / 2, width, height);
+        let mut area = Rect::new((frame.area().width - width) / 2, (frame.area().height - height) / 2, width, height);
 
         let screen = &self.screen.lock().unwrap();
         let buffer = &screen.buffer;
@@ -244,7 +244,7 @@ impl Tui {
 
         self.draw_statusbar(frame, area, status_bar_info);
         let pos: icy_engine::Position = screen.caret.get_position();
-        frame.set_cursor(area.x + pos.x as u16, y + pos.y as u16 - buffer.get_first_visible_line() as u16);
+        frame.set_cursor_position((area.x + pos.x as u16, y + pos.y as u16 - buffer.get_first_visible_line() as u16));
     }
 
     fn draw_statusbar(&self, frame: &mut Frame, area: Rect, status_bar_info: StatusBarInfo) {
@@ -423,7 +423,7 @@ pub fn print_exit_screen() {
     stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
     terminal
         .draw(|frame| {
-            let mut r = frame.size();
+            let mut r = frame.area();
             r.height = 1;
             let white = Style::default().fg(DOS_WHITE);
             let green = Style::default().fg(DOS_LIGHT_GREEN);

@@ -68,7 +68,7 @@ impl TabPageType {
 
 #[derive(Default)]
 pub struct ResultState {
-    pub cursor: Option<(u16, u16)>,
+    pub _cursor: Option<(u16, u16)>,
     pub status_line: String,
 }
 
@@ -343,7 +343,7 @@ impl<'a> App<'a> {
 
                 let field = TextField::new().with_value(self.edit_entry.text.to_string());
 
-                let mut area = edit_area.inner(&Margin { horizontal: 1, vertical: 1 });
+                let mut area = edit_area.inner(Margin { horizontal: 1, vertical: 1 });
                 area.height = 1;
 
                 Line::from(get_text("icbtext_edit_original_text_title"))
@@ -424,7 +424,7 @@ impl<'a> App<'a> {
 
                 let field = TextField::new().with_value(self.filter.to_string());
 
-                let area = filter_area.inner(&Margin { horizontal: 2, vertical: 1 });
+                let area = filter_area.inner(Margin { horizontal: 2, vertical: 1 });
                 frame.render_stateful_widget(field, area, &mut self.filter_state);
             }
             Mode::Jump => {
@@ -444,7 +444,7 @@ impl<'a> App<'a> {
 
                 let field = TextField::new().with_value(self.edit_entry.text.to_string());
 
-                let area = jump_area.inner(&Margin { horizontal: 2, vertical: 1 });
+                let area = jump_area.inner(Margin { horizontal: 2, vertical: 1 });
                 frame.render_stateful_widget(field, area, &mut self.edit_state);
             }
             Mode::RequestQuit => {
@@ -472,7 +472,7 @@ impl<'a> App<'a> {
                 ]);
                 save_area.y += 1;
                 save_area.x += 1;
-                field.render(save_area.inner(&Margin { horizontal: 1, vertical: 0 }), frame.buffer_mut());
+                field.render(save_area.inner(Margin { horizontal: 1, vertical: 0 }), frame.buffer_mut());
             }
             _ => {}
         }
@@ -601,13 +601,13 @@ impl TabPageType {
 
 pub fn get_screen_size(frame: &Frame, is_full_screen: bool) -> Rect {
     if is_full_screen {
-        frame.size()
+        frame.area()
     } else {
-        let width = frame.size().width.min(80);
-        let height = frame.size().height.min(25);
+        let width = frame.area().width.min(80);
+        let height = frame.area().height.min(25);
 
-        let x = frame.size().x + (frame.size().width - width) / 2;
-        let y = frame.size().y + (frame.size().height - height) / 2;
-        Rect::new(frame.size().x + x, frame.size().y + y, width, height)
+        let x = frame.area().x + (frame.area().width - width) / 2;
+        let y = frame.area().y + (frame.area().height - height) / 2;
+        Rect::new(frame.area().x + x, frame.area().y + y, width, height)
     }
 }
