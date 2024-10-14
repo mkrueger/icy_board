@@ -24,7 +24,7 @@ bstr = { workspace = true }
 jamjam = { workspace = true}
 regex = { workspace = true}
 walkdir = { workspace = true }
-qfile = "3.0.1"
+qfile = { path = "../qfile" }
 relative-path = "1.9.2"
  
 tui-textarea  = "0.6.1"
