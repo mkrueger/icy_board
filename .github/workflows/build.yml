@@ -1,0 +1,53 @@
+name: Build
+on:
+  workflow_run:
+    workflows: ["Run Tests"]
+    branches: [master]
+    types: 
+      - completed
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  build_linux:
+   runs-on: ubuntu-latest
+   steps:
+   - uses: actions/checkout@v4
+   - name: Install required libraries
+     run: |
+       sudo apt-get install build-essential libasound2-dev libxcb-shape0-dev libxcb-xfixes0-dev
+   - name: Build
+     id: build
+     run: |
+       export version=$(python3 tools/prep_diz.py "icy_board" "file_id.diz")
+       echo "VERSION=$version" >> $GITHUB_ENV
+       echo "Version: $version"
+       cd crates/icy_board
+       cargo build --release
+       echo "Copy $DEB to icy_board.deb"
+       mkdir bin
+       mv target/release/icy_board bin
+       mv target/release/icbsetup bin
+       mv target/release/icbmailer bin
+       mv target/release/icbsysmgr bin
+       mv target/release/mkicbmnu bin
+       mv target/release/mkicbtxt bin
+       mv target/release/pplc bin
+       mv target/release/pppld bin
+       mv target/release/scandb bin
+       mv target/release/ppl-language-server bin
+   - name: 'Upload deb'
+     uses: actions/upload-artifact@v4
+     with:
+       name: icy_board_linux_${{ env.VERSION }}
+       path: |
+         bin/icy_board
+         bin/icbsetup
+         bin/icbmailer
+         bin/icbsysmgr
+         bin/mkicbmnu
+         bin/mkicbtxt
+         bin/pplc
+         bin/pppld
+         bin/scandb
+         bin/ppl-language-server
+         file_id.diz
