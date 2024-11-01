@@ -34,7 +34,7 @@ jobs:
        mv target/release/ppld bin
        mv target/release/scandb bin
        mv target/release/ppl-language-server bin
-   - name: 'Upload deb'
+   - name: 'Upload zip'
      uses: actions/upload-artifact@v4
      with:
        name: icy_board_linux_${{ env.VERSION }}
@@ -50,3 +50,120 @@ jobs:
          bin/scandb
          bin/ppl-language-server
          file_id.diz
+         INSTALL.txt
+  build_windows:
+   runs-on: windows-latest
+   steps:
+   - uses: actions/checkout@v4
+   - name: Build
+     id: build
+     run: |
+       $VERSION=$(python tools\prep_diz.py "file_id.diz")
+       echo "Version: $VERSION"
+       cargo build --release
+       echo "Copy $DEB to icy_board.deb"
+       mkdir bin
+       move target/release/icy_board.exe bin
+       move target/release/icbsetup.exe bin
+       move target/release/icbmailer.exe bin
+       move target/release/icbsysmgr.exe bin
+       move target/release/mkicbmnu.exe bin
+       move target/release/mkicbtxt.exe bin
+       move target/release/pplc.exe bin
+       move target/release/ppld.exe bin
+       move target/release/scandb.exe bin
+       move target/release/ppl-language-server.exe bin
+   - name: 'Upload zip'
+     uses: actions/upload-artifact@v4
+     with:
+       name: icy_board_windows_${{ env.VERSION }}
+       path: |
+         bin/icy_board.exe
+         bin/icbsetup.exe
+         bin/icbmailer.exe
+         bin/icbsysmgr.exe
+         bin/mkicbmnu.exe
+         bin/mkicbtxt.exe
+         bin/pplc.exe
+         bin/pppld.exe
+         bin/scandb.exe
+         bin/ppl-language-server.exe
+         file_id.diz
+         INSTALL.txt
+  build_mac:
+   runs-on: macos-13
+   steps:
+   - uses: actions/checkout@v4
+   - name: Build
+     id: build
+     run: |
+       rustup target add aarch64-apple-darwin
+       rustup target add x86_64-apple-darwin
+
+       cargo build --release --target aarch64-apple-darwin
+       cargo build --release --target x86_64-apple-darwin
+
+       export version=$(python3 tools/prep_diz.py "file_id.diz")
+       echo "VERSION=$version" >> $GITHUB_ENV
+       echo "Version: $version"
+       cargo build --release
+       echo "Copy $DEB to icy_board.deb"
+       mkdir -p aarch64-apple-darwin/bin
+       mv target/aarch64-apple-darwin/release/icy_board aarch64-apple-darwin/bin
+       mv target/aarch64-apple-darwin/release/icbsetup aarch64-apple-darwin/bin
+       mv target/aarch64-apple-darwin/release/icbmailer aarch64-apple-darwin/bin
+       mv target/aarch64-apple-darwin/release/icbsysmgr aarch64-apple-darwin/bin
+       mv target/aarch64-apple-darwin/release/mkicbmnu aarch64-apple-darwin/bin
+       mv target/aarch64-apple-darwin/release/mkicbtxt aarch64-apple-darwin/bin
+       mv target/aarch64-apple-darwin/release/pplc aarch64-apple-darwin/bin
+       mv target/aarch64-apple-darwin/release/ppld aarch64-apple-darwin/bin
+       mv target/aarch64-apple-darwin/release/scandb aarch64-apple-darwin/bin
+       mv target/aarch64-apple-darwin/release/ppl-language-server aarch64-apple-darwin/bin
+
+       mkdir -p x86_64-apple-darwin/bin
+       mv target/x86_64-apple-darwin/release/icy_board x86_64-apple-darwin/bin
+       mv target/x86_64-apple-darwin/release/icbsetup x86_64-apple-darwin/bin
+       mv target/x86_64-apple-darwin/release/icbmailer x86_64-apple-darwin/bin
+       mv target/x86_64-apple-darwin/release/icbsysmgr x86_64-apple-darwin/bin
+       mv target/x86_64-apple-darwin/release/mkicbmnu x86_64-apple-darwin/bin
+       mv target/x86_64-apple-darwin/release/mkicbtxt x86_64-apple-darwin/bin
+       mv target/x86_64-apple-darwin/release/pplc x86_64-apple-darwin/bin
+       mv target/x86_64-apple-darwin/release/ppld x86_64-apple-darwin/bin
+       mv target/x86_64-apple-darwin/release/scandb x86_64-apple-darwin/bin
+       mv target/x86_64-apple-darwin/release/ppl-language-server x86_64-apple-darwin/bin
+
+   - name: 'Upload zip'
+     uses: actions/upload-artifact@v4
+     with:
+       name: icy_board_osx_aarch64-apple-darwin_${{ env.VERSION }}
+       path: |
+         aarch64-apple-darwin/bin/icy_board
+         aarch64-apple-darwin/bin/icbsetup
+         aarch64-apple-darwin/bin/icbmailer
+         aarch64-apple-darwin/bin/icbsysmgr
+         aarch64-apple-darwin/bin/mkicbmnu
+         aarch64-apple-darwin/bin/mkicbtxt
+         aarch64-apple-darwin/bin/pplc
+         aarch64-apple-darwin/bin/pppld
+         aarch64-apple-darwin/bin/scandb
+         aarch64-apple-darwin/bin/ppl-language-server
+         file_id.diz
+         INSTALL.txt
+   - name: 'Upload zip'
+     uses: actions/upload-artifact@v4
+     with:
+       name: icy_board_osx_x86_64-apple-darwin_${{ env.VERSION }}
+       path: |
+         x86_64-apple-darwin/bin/icy_board
+         x86_64-apple-darwin/bin/icbsetup
+         x86_64-apple-darwin/bin/icbmailer
+         x86_64-apple-darwin/bin/icbsysmgr
+         x86_64-apple-darwin/bin/mkicbmnu
+         x86_64-apple-darwin/bin/mkicbtxt
+         x86_64-apple-darwin/bin/pplc
+         x86_64-apple-darwin/bin/pppld
+         x86_64-apple-darwin/bin/scandb
+         x86_64-apple-darwin/bin/ppl-language-server
+         file_id.diz
+         INSTALL.txt
+  

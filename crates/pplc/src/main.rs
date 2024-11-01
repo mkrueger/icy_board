@@ -179,7 +179,7 @@ fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser
         // let file_name = file_name.to_string_lossy().to_string();
         for err in &errors.lock().unwrap().errors {
             error_count += 1;
-            Report::build(ReportKind::Error,  err.span.clone())
+            Report::build(ReportKind::Error, err.span.clone())
                 .with_code(error_count)
                 .with_message(format!("{}", err.error))
                 .with_label(Label::new(err.span.clone()).with_color(ariadne::Color::Red))

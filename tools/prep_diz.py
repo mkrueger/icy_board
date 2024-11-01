@@ -22,3 +22,5 @@ new_lines = list(map(lambda line: line.replace("#VERSION", version), lines))
 f = open(sys.argv[1], "w")
 f.writelines(new_lines)
 f.close()
+
+print(version)

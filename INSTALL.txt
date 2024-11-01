@@ -1,0 +1,32 @@
+Just unzip anywhere. IcyBoard works with relative and not absolute paths.
+
+
+Create a bbs with:
+
+bin/icbsetup create bbs
+
+This creates all required files in "bbs" 
+
+Or import an existing pcboard installation with:
+
+bin/icbsetup import [PCBOARD.DAT] bbs
+
+Where PCBOARD.DAT is the pull path to the pcboard data file. Note that the original installation won't be altered at all.
+Howver it's not 100% so manual changes are likeley to be required but the output should be a good starting point. I can need test installations for improving the importer.
+
+Then just start with:
+
+bin/icy_board --file bbs
+
+It's recommended to put bin/ in path and just start icy_board etc. inside the bbs directory - it'll be picked up all automatically.
+
+Following tools are currently shipped
+
+icbsetup - setting up with a tui client - in theory the .toml files can be edited with any text editor but it's easier with a tui
+icbsysmgr - user/groups edutor.
+mkicbtxt - create & alter PCBTEXT files (compatible with old PCBoard format)
+mkicbmnu - create & change icy_board .mnu files 
+pplc - ppl compiler 
+ppl-language-server - a lsp implementation that can be used in editors that support it to get some syntax coloring, help and code completion for ppl 
+
+The other tools are work in progress and will be split up into other commands. 
