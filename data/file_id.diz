@@ -1,0 +1,11 @@
+         -* ICY BOARD #VERSION *-
+
+BBS system that aims for PCBoard compatibility.
+
+- Written in pure rust
+- PPE support (up to PCB 15.4)
+- Includes PPL development system
+- pre alpha state
+
+Development
+GitHub https://github.com/mkrueger/icy_board
