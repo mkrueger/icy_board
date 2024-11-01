@@ -13,5 +13,5 @@ thiserror = { workspace = true }
 argh = { workspace = true }
 crossterm = { workspace = true }
 
-ariadne = "0.4.0"
+ariadne = { workspace = true }
 unicase = { workspace = true }

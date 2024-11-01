@@ -26,14 +26,14 @@ serde = { workspace = true }
 bstr = { workspace = true }
 walkdir = { workspace = true }
 substring = { workspace = true }
-ariadne = "0.4.1"
+ariadne = { workspace = true }
 unicase = { workspace = true }
-fern = "0.6.2"
-qfile = "3.0.1"
+fern = { workspace = true }
+qfile = { path = "../qfile" }
 easy_reader = "0.5.2"
 toml = { workspace = true }
 md-to-tui = "0.1.2"
-relative-path = "1.9.3"
+relative-path = { workspace = true }
 regex = { workspace = true }
 rand = { workspace = true }
 tokio = { workspace = true }

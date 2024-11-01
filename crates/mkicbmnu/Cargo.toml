@@ -20,9 +20,9 @@ crossterm = { workspace = true }
 ratatui = { workspace = true }
 log = { workspace = true }
 
-tui-input = "0.10.1"
-ariadne = "0.4.0"
-fern = "0.6.2"
+tui-input = { workspace = true }
+ariadne = { workspace = true }
+fern = { workspace = true }
 unicase = { workspace = true }
 color-eyre = { workspace = true }
 itertools = { workspace = true }

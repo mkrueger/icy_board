@@ -62,6 +62,14 @@ tempfile = "3.13.0"
 substring = "1.4.5"
 strum = "0.26.3"
 itertools = "0.13.0"
+fern = "0.7.0"
+ariadne = "0.5.0"
+relative-path = "1.9.3"
+
+tui-textarea  = "0.6.1"
+tui-markdown = "0.2.12"
+tui-input = "0.10.1"
+# tui-markdown = { git = "https://github.com/joshka/tui-markdown" }
 
 [profile.release]
 opt-level = 'z'     # Optimize for size

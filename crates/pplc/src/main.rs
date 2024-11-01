@@ -172,31 +172,31 @@ fn main() {
     }
 }
 
-fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser::ErrorRepoter>>, arguments: &Cli, file_name: &PathBuf, src: &String) -> bool {
+fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser::ErrorRepoter>>, arguments: &Cli, _file_name: &PathBuf, src: &String) -> bool {
     if errors.lock().unwrap().has_errors() || (errors.lock().unwrap().has_warnings() && !arguments.nowarnings) {
         let mut error_count = 0;
         let mut warning_count = 0;
-        let file_name = file_name.to_string_lossy().to_string();
+        // let file_name = file_name.to_string_lossy().to_string();
         for err in &errors.lock().unwrap().errors {
             error_count += 1;
-            Report::build(ReportKind::Error, &file_name, err.span.start)
+            Report::build(ReportKind::Error,  err.span.clone())
                 .with_code(error_count)
                 .with_message(format!("{}", err.error))
-                .with_label(Label::new((&file_name, err.span.clone())).with_color(ariadne::Color::Red))
+                .with_label(Label::new(err.span.clone()).with_color(ariadne::Color::Red))
                 .finish()
-                .print((&file_name, Source::from(src)))
+                .print(Source::from(src))
                 .unwrap();
         }
 
         if !arguments.nowarnings {
             for err in &errors.lock().unwrap().warnings {
                 warning_count += 1;
-                Report::build(ReportKind::Warning, &file_name, err.span.start)
+                Report::build(ReportKind::Warning, err.span.clone())
                     .with_code(warning_count)
                     .with_message(format!("{}", err.error))
-                    .with_label(Label::new((&file_name, err.span.clone())).with_color(ariadne::Color::Yellow))
+                    .with_label(Label::new(err.span.clone()).with_color(ariadne::Color::Yellow))
                     .finish()
-                    .print((&file_name, Source::from(src)))
+                    .print(Source::from(src))
                     .unwrap();
             }
             println!("{} errors, {} warnings", error_count, warning_count);

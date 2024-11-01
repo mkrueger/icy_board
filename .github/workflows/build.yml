@@ -21,7 +21,6 @@ jobs:
        export version=$(python3 tools/prep_diz.py "file_id.diz")
        echo "VERSION=$version" >> $GITHUB_ENV
        echo "Version: $version"
-       cd crates/icy_board
        cargo build --release
        echo "Copy $DEB to icy_board.deb"
        mkdir bin
@@ -32,7 +31,7 @@ jobs:
        mv target/release/mkicbmnu bin
        mv target/release/mkicbtxt bin
        mv target/release/pplc bin
-       mv target/release/pppld bin
+       mv target/release/ppld bin
        mv target/release/scandb bin
        mv target/release/ppl-language-server bin
    - name: 'Upload deb'
