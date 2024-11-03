@@ -3,9 +3,7 @@ use icy_board_engine::Res;
 use icy_engine::{ansi, BufferParser, Caret};
 use icy_net::Connection;
 use std::{
-    mem,
-    sync::{Arc, Mutex},
-    thread,
+    io::Read, mem, sync::{Arc, Mutex}, thread
 };
 use tokio::sync::mpsc;
 
@@ -18,6 +16,7 @@ pub struct ConnectionThreadData {
     pub _is_connected: bool,
 }
 
+const EMSI_IRQ: &[u8; 15] = b"**EMSI_IRQ8E08\r";
 pub fn start_update_thread(com: Box<dyn Connection>, screen: Arc<Mutex<Screen>>) -> (thread::JoinHandle<()>, mpsc::Sender<SendData>) {
     let (tx, rx) = mpsc::channel(32);
     (
@@ -49,6 +48,27 @@ pub fn start_update_thread(com: Box<dyn Connection>, screen: Arc<Mutex<Screen>>)
                                     }
                                     Ok(size) => {
                                         if size > 0 {
+                                            if data.starts_with(b"\x1B[0c") {
+                                                connection.com.send(b" \x08").await.unwrap();
+                                                continue;
+                                            }
+
+                                            if data.starts_with(b"\x1B[999;999H\x1B[6n") {
+                                                connection.com.send(b" \x08").await.unwrap();
+                                                continue;
+                                            }
+
+
+                                            if data.starts_with(b"\x1B[1;1H\x01\xF6\x1C\x1B[6n") {
+                                                connection.com.send(b" \x08").await.unwrap();
+                                                continue;
+                                            }
+
+                                            if data.starts_with(EMSI_IRQ) {
+                                                connection.com.send(b" \x08").await.unwrap();
+                                                continue;
+                                            }
+
                                             let mut s = screen.lock().unwrap();
                                             let mut caret = Caret::default();
                                             mem::swap(&mut caret, &mut s.caret);

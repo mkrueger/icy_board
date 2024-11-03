@@ -58,6 +58,7 @@ pub const EMSI_2ACK: &[u8; 30] = b"**EMSI_ACKA490\r**EMSI_ACKA490\r";
 /// should only be used as a response to `EMSI_DAT` and not any other
 /// packet. Redundant `EMSI_NAK` packets should be ignored.
 pub const EMSI_NAK: &[u8; 15] = b"**EMSI_NAKEEC3\r";
+pub const EMSI_NAK_WITH_CLEAR: &[u8; 30] = b"**EMSI_NAKEEC3\r              \r";
 
 /// Similar to `EMSI_REQ` which is used by mailer software to negotiate a
 /// mail session. IRQ identifies the Server as being capable of
@@ -65,6 +66,7 @@ pub const EMSI_NAK: &[u8; 15] = b"**EMSI_NAKEEC3\r";
 /// in its inbound data stream, it attempts to negotiate an IEMSI
 /// session.
 pub const EMSI_IRQ: &[u8; 15] = b"**EMSI_IRQ8E08\r";
+pub const EMSI_IRQ_WITH_CLEAR: &[u8; 30] = b"**EMSI_IRQ8E08\r              \r";
 
 /// The IIR (Interactive Interrupt Request) sequence is used by either
 /// Client or Server to abort the current negotiation. This could be
