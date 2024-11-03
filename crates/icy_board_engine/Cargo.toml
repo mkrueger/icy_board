@@ -40,3 +40,7 @@ logos = "0.14.0"
 [dev-dependencies]
 pretty_assertions = "1"
 stopwatch = "0.0.7"
+
+[target.'cfg(not(windows))'.dependencies]
+# termion is not supported on Windows
+termion = { version = "4.0.0", optional = true }

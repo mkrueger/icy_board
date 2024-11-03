@@ -666,17 +666,20 @@ impl TabPage for GeneralTab {
     }
 
     fn get_help(&self) -> Text<'static> {
+        /*
         if let Some(item) = self.config.get_item(self.state.selected) {
             let hlp = get_help(&item.id);
             return tui_markdown::from_str(&hlp);
         }
 
         let input = include_str!("../../data/general_help.md");
-        tui_markdown::from_str(input)
+        tui_markdown::from_str(input)*/
+
+        String::new().into()
     }
 }
 
-fn get_help(help: &str) -> &'static str {
+fn _get_help(help: &str) -> &'static str {
     match help {
         "date_format" => include_str!("../../data/date_format.md"),
         _ => "TODO - please contribute me.",

@@ -81,7 +81,7 @@ impl<'a> RecordTab<'a> {
                 Constraint::Fill(0),
             ],
         )
-        .highlight_style(Style::default().fg(DOS_BLUE).bg(DOS_LIGHT_GRAY))
+        .row_highlight_style(Style::default().fg(DOS_BLUE).bg(DOS_LIGHT_GRAY))
         .style(Style::default().fg(DOS_YELLOW).bg(DOS_BLACK))
         .highlight_spacing(HighlightSpacing::Always);
         frame.render_stateful_widget(table, area, &mut self.table_state);

@@ -165,7 +165,8 @@ impl<'a> Editor for SecurityLevelEditor<'a> {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         Clear.render(area, frame.buffer_mut());
         let block = Block::new()
-            .title(Title::from(Span::from(" Edit Security Levels ").style(THEME.content_box_title)).alignment(Alignment::Center))
+            .title_alignment(Alignment::Center)
+            .title(Title::from(Span::from(" Edit Security Levels ").style(THEME.content_box_title)))
             .style(THEME.content_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
@@ -178,7 +179,8 @@ impl<'a> Editor for SecurityLevelEditor<'a> {
             let area = area.inner(Margin { vertical: 2, horizontal: 3 });
             Clear.render(area, frame.buffer_mut());
             let block = Block::new()
-                .title(Title::from(Span::from(" Edit Security Level ").style(THEME.content_box_title)).alignment(Alignment::Center))
+                .title_alignment(Alignment::Center)
+                .title(Title::from(Span::from(" Edit Security Level ").style(THEME.content_box_title)))
                 .style(THEME.content_box)
                 .padding(Padding::new(2, 2, 1, 1))
                 .borders(Borders::ALL)

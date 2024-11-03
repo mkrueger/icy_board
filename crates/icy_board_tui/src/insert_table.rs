@@ -45,7 +45,7 @@ impl<'a> InsertTable<'a> {
         widths.push(Constraint::Min(25 + 1));
         let table = Table::new(rows, widths)
             .header(header)
-            .highlight_style(THEME.selected_item)
+            .row_highlight_style(THEME.selected_item)
             .highlight_symbol(Text::from(vec!["".into(), bar.into(), bar.into(), "".into()]))
             .style(THEME.table)
             .highlight_spacing(HighlightSpacing::Always);

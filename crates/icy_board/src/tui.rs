@@ -15,7 +15,7 @@ use chrono::Utc;
 use crossterm::{
     cursor::MoveTo,
     event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
-    terminal::{disable_raw_mode, enable_raw_mode, Clear, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{disable_raw_mode, Clear},
     ExecutableCommand,
 };
 use icy_board_engine::icy_board::{
@@ -407,14 +407,11 @@ impl Tui {
 }
 
 fn init_terminal() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
-    enable_raw_mode()?;
-    stdout().execute(EnterAlternateScreen)?;
-    Terminal::new(CrosstermBackend::new(stdout()))
+    Ok(ratatui::init())
 }
 
 fn restore_terminal() -> io::Result<()> {
-    disable_raw_mode()?;
-    stdout().execute(LeaveAlternateScreen)?;
+    ratatui::restore();
     Ok(())
 }
 

@@ -246,7 +246,7 @@ impl IcyBoardState {
         };
         let old = self.session.disp_options.non_stop;
         self.session.disp_options.non_stop = true;
-        for (i, line) in converted_content.lines().enumerate() {
+        for (_i, line) in converted_content.lines().enumerate() {
             self.display_line(line).await?;
             self.write_raw(TerminalTarget::Both, &['\r', '\n']).await?;
             self.session.disp_options.non_stop = false;

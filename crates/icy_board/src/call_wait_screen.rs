@@ -14,9 +14,9 @@ use icy_board_tui::{
     theme::{DOS_BLACK, DOS_BLUE, DOS_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_WHITE, DOS_YELLOW},
 };
 use ratatui::{
-    prelude::*,
-    widgets::{block::Title, *},
+    buffer::Buffer, layout::{Alignment, Constraint, Layout, Margin, Rect}, prelude::Backend, style::{Color, Style, Styled, Stylize}, text::Line, widgets::{Block, BorderType, Borders, Widget}, Frame, Terminal
 };
+
 use tokio::sync::Mutex;
 
 use crate::VERSION;
@@ -163,6 +163,7 @@ impl CallWaitScreen {
             get_text("call_wait_screen_alarm_off")
         };
     }
+    
     pub async fn run(&mut self, terminal: &mut Terminal<impl Backend>, board: &Arc<Mutex<IcyBoard>>, full_screen: bool) -> Res<CallWaitMessage> {
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
@@ -216,22 +217,17 @@ impl CallWaitScreen {
         let area = get_screen_size(&frame, full_screen);
 
         let b = Block::default()
-            .title(Title::from(Line::from(format!(" {} ", dt)).style(Style::new().white())).alignment(Alignment::Left))
-            .title_style(Style::new().fg(DOS_YELLOW))
-            .title_alignment(Alignment::Center)
-            .title(format!("  IcyBoard v{}  ", ver))
-            .title(Title::from(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white())).alignment(Alignment::Right))
-            .title(
-                Title::from(Line::from("  (C) Copyright Mike Krüger, 2024 ").style(Style::new().white()))
-                    .alignment(Alignment::Center)
-                    .position(block::Position::Bottom),
+            .title_top(Line::from(format!(" {} ", dt)).style(Style::new().white()).left_aligned())
+            .title_top(Line::from(format!("  IcyBoard v{}  ", ver)).fg(Color::Yellow).centered())
+            .title(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white()).right_aligned())
+            .title_bottom(
+                Line::from("  (C) Copyright Mike Krüger, 2024 ").style(Style::new().white()).centered()
             )
             .style(Style::new().bg(DOS_BLUE))
             .border_type(BorderType::Double)
             .border_style(Style::new().white())
             .borders(Borders::ALL);
-        b.render(area, frame.buffer_mut());
-
+        frame.render_widget(b, area);
         let vertical: Layout = Layout::vertical([
             Constraint::Length(1),
             Constraint::Length(1),

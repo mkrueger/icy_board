@@ -327,16 +327,12 @@ impl<'a> App<'a> {
                 Block::new()
                     .borders(Borders::ALL)
                     .title(Title::from(Span::from(format!(" {} ", edit_title)).style(THEME.content_box_title)))
-                    .title(
-                        Title::from(Span::from(format!(" {} ", record_length)).style(THEME.content_box_title))
-                            .alignment(Alignment::Center)
-                            .position(block::Position::Bottom),
-                    )
-                    .title(
-                        Title::from(Span::from(format!(" {} ", justify_title)).style(THEME.content_box_title))
-                            .alignment(Alignment::Right)
-                            .position(block::Position::Top),
-                    )
+                    .title_position(block::Position::Bottom)
+                    .title_alignment(Alignment::Center)
+                    .title(Title::from(Span::from(format!(" {} ", record_length)).style(THEME.content_box_title)))
+                    .title_position(block::Position::Top)
+                    .title_alignment(Alignment::Right)
+                    .title(Title::from(Span::from(format!(" {} ", justify_title)).style(THEME.content_box_title)))
                     .style(THEME.content_box)
                     .border_type(BorderType::Double)
                     .render(edit_area, frame.buffer_mut());

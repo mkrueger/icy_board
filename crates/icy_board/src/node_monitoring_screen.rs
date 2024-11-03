@@ -192,13 +192,15 @@ impl NodeMonitoringScreen {
         let area: Rect = get_screen_size(&frame, full_screen);
 
         let b = Block::default()
-            .title(Title::from(Line::from(format!(" {} ", now.date_naive())).style(Style::new().white())).alignment(Alignment::Left))
-            .title(Title::from(Span::from(get_text("icbmoni_title")).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED).bold())).alignment(Alignment::Center))
-            .title(Title::from(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white())).alignment(Alignment::Right))
-            .title(
-                Title::from(Span::from(footer).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)))
-                    .alignment(Alignment::Center)
-                    .position(block::Position::Bottom),
+            .title_alignment(Alignment::Left)
+            .title(Title::from(Line::from(format!(" {} ", now.date_naive())).style(Style::new().white())))
+            .title_alignment(Alignment::Center)
+            .title(Title::from(Span::from(get_text("icbmoni_title")).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED).bold())))
+            .title_alignment(Alignment::Right)
+            .title(Title::from(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white())))
+            .title_alignment(Alignment::Center)
+            .title_bottom(
+                Line::from(Span::from(footer).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)))
             )
             .style(Style::new().bg(DOS_BLUE))
             .border_type(BorderType::Double)
@@ -296,7 +298,7 @@ impl NodeMonitoringScreen {
         )
         .header(header)
         .highlight_symbol(Text::from(vec!["".into(), bar.into(), bar.into(), "".into()]))
-        .highlight_style(Style::default().fg(DOS_BLUE).bg(DOS_LIGHT_GRAY))
+        .row_highlight_style(Style::default().fg(DOS_BLUE).bg(DOS_LIGHT_GRAY))
         .style(Style::default().fg(DOS_YELLOW).bg(DOS_BLUE))
         .highlight_spacing(HighlightSpacing::Always);
         let mut area = area.inner(Margin { vertical: 1, horizontal: 1 });

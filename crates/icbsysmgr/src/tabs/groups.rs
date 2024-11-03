@@ -95,7 +95,7 @@ impl GroupsTab {
             ],
         )
         .header(header)
-        .highlight_style(THEME.selected_item)
+        .row_highlight_style(THEME.selected_item)
         .highlight_symbol(Text::from(vec!["".into(), bar.into(), bar.into(), "".into()]))
         //.bg(THEME.content.bg.unwrap())
         .highlight_spacing(HighlightSpacing::Always);

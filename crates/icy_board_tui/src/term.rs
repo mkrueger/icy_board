@@ -1,52 +1,29 @@
-use std::{
-    io::{self, stdout},
-    time::Duration,
-};
+use std::
+    time::Duration
+;
 
-use color_eyre::config::HookBuilder;
-use color_eyre::{eyre::WrapErr, Result};
+use color_eyre::Result;
 
-use crossterm::{
-    event::{self, Event},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
-};
-use ratatui::{prelude::*, TerminalOptions, Viewport};
+use crossterm::event::{self, Event};
+use ratatui::{TerminalOptions, Viewport};
 
 use crate::TerminalType;
 
-pub fn init_hooks() -> Result<()> {
-    let (panic, error) = HookBuilder::default().into_hooks();
-    let panic = panic.into_panic_hook();
-    let error = error.into_eyre_hook();
-    color_eyre::eyre::set_hook(Box::new(move |e| {
-        let _ = restore();
-        error(e)
-    }))?;
-    std::panic::set_hook(Box::new(move |info| {
-        let _ = restore();
-        panic(info);
-    }));
-    Ok(())
-}
 
 pub fn init() -> Result<TerminalType> {
-    init_hooks()?;
+    color_eyre::install()?;
 
     // this size is to match the size of the terminal when running the demo
     // using vhs in a 1280x640 sized window (github social preview size)
     let options = TerminalOptions {
         viewport: Viewport::Fullscreen,
     };
-    let terminal = Terminal::with_options(CrosstermBackend::new(io::stdout()), options)?;
-    enable_raw_mode().context("enable raw mode")?;
-    stdout().execute(EnterAlternateScreen).wrap_err("enter alternate screen")?;
+    let terminal = ratatui::init_with_options(options);
     Ok(terminal)
 }
 
 pub fn restore() -> Result<()> {
-    disable_raw_mode().context("disable raw mode")?;
-    stdout().execute(LeaveAlternateScreen).wrap_err("leave alternate screen")?;
+    ratatui::restore();
     Ok(())
 }
 

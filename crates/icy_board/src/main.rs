@@ -11,10 +11,7 @@ use bbs::await_telnet_connections;
 use call_wait_screen::{CallWaitMessage, CallWaitScreen};
 use chrono::Local;
 use crossterm::{
-    execute,
-    style::{Attribute, Print, SetAttribute, SetForegroundColor},
-    terminal::{disable_raw_mode, enable_raw_mode, Clear, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
+    execute, style::{Attribute, Print, SetAttribute, SetForegroundColor}, terminal::Clear, ExecutableCommand
 };
 use icy_board_engine::{
     icy_board::{bbs::BBS, IcyBoard},
@@ -23,8 +20,7 @@ use icy_board_engine::{
 
 use node_monitoring_screen::NodeMonitoringScreenMessage;
 use ratatui::{
-    backend::{Backend, CrosstermBackend},
-    Terminal,
+    backend::Backend, Terminal
 };
 use semver::Version;
 use tokio::sync::Mutex;
@@ -70,9 +66,7 @@ lazy_static::lazy_static! {
 async fn main() -> Res<()> {
     let arguments: Cli = argh::from_env();
     let file = arguments.file.clone().unwrap_or(PathBuf::from("."));
-
     start_icy_board(&arguments, &file).await?;
-
     Ok(())
 }
 
@@ -116,7 +110,7 @@ async fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Re
                     CallWaitMessage::RunPPE(ppe.clone())
                 } else {
                     CallWaitMessage::User(false)
-                };
+                };             
                 run_message(cmd, &mut terminal, &board, &mut bbs, arguments.full_screen).await?;
                 restore_terminal()?;
                 return Ok(());
@@ -176,6 +170,7 @@ async fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Re
             let mut app = CallWaitScreen::new(&board).await?;
             loop {
                 let mut terminal = init_terminal()?;
+             
                 app.reset(&board).await;
                 match app.run(&mut terminal, &board, arguments.full_screen).await {
                     Ok(msg) => {
@@ -299,33 +294,13 @@ async fn run_message(
     Ok(())
 }
 
-fn init_error_hooks() -> Res<()> {
-    //let (panic, error) = HookBuilder::default().into_hooks();
-    //let panic = panic.into_panic_hook();
-    //let error = error.into_eyre_hook();
-    /*color_eyre::eyre::set_hook(Box::new(move |e| {
-        let _ = restore_terminal();
-        error(e)
-    }))?; */
-    std::panic::set_hook(Box::new(move |info| {
-        let _ = restore_terminal();
-        eprintln!("{}", info);
-    }));
-    Ok(())
-}
-
 fn init_terminal() -> Res<Terminal<impl Backend>> {
-    init_error_hooks()?;
-    enable_raw_mode()?;
-    stdout().execute(EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout());
-    let terminal = Terminal::new(backend)?;
-    Ok(terminal)
+    color_eyre::install()?;
+    Ok(ratatui::init())
 }
 
 pub fn restore_terminal() -> Res<()> {
-    disable_raw_mode()?;
-    stdout().execute(LeaveAlternateScreen)?;
+    ratatui::restore();
     Ok(())
 }
 
