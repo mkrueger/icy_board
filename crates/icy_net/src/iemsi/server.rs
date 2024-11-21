@@ -1,8 +1,5 @@
-use std::time::Instant;
-
 use crate::{iemsi::{EMSI_IRQ_WITH_CLEAR, EMSI_NAK_WITH_CLEAR}, Connection};
-
-use super::{decode_ici, EmsiICI, EmsiISI, EMSI_ACK, EMSI_IRQ, EMSI_NAK};
+use super::{decode_ici, EmsiICI, EmsiISI, EMSI_ACK};
 
 pub async fn try_iemsi(
     com: &mut Box<dyn Connection>,

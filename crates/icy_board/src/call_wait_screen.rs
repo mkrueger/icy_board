@@ -11,10 +11,10 @@ use icy_board_engine::icy_board::{statistics::Statistics, IcyBoard};
 use icy_board_tui::{
     app::get_screen_size,
     get_text,
-    theme::{DOS_BLACK, DOS_BLUE, DOS_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_WHITE, DOS_YELLOW},
+    theme::{DOS_BLACK, DOS_BLUE, DOS_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_WHITE},
 };
 use ratatui::{
-    buffer::Buffer, layout::{Alignment, Constraint, Layout, Margin, Rect}, prelude::Backend, style::{Color, Style, Styled, Stylize}, text::Line, widgets::{Block, BorderType, Borders, Widget}, Frame, Terminal
+    buffer::Buffer, layout::{Constraint, Layout, Margin, Rect}, prelude::Backend, style::{Color, Style, Stylize}, text::Line, widgets::{Block, BorderType, Borders, Widget}, Frame, Terminal
 };
 
 use tokio::sync::Mutex;
