@@ -34,7 +34,7 @@ radix_fmt = "1"
 qfile = { path = "../qfile" }
 byteorder = "1.5.0"
 toml = { workspace = true }
-async-trait = "0.1.80"
+async-trait = "0.1.83"
 logos = "0.14.0"
 # interpreter deps
 [dev-dependencies]
