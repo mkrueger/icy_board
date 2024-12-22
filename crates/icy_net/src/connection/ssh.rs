@@ -54,16 +54,12 @@ impl Connection for SSHConnection {
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
         match self.channel.make_reader().read(buf).await {
             Ok(size) => {
-                if size == 0 {
-                    return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "").into());
-                }
                 Ok(size)
             }
             Err(e) => match e.kind() {
                 ErrorKind::ConnectionAborted | ErrorKind::NotConnected => {
                     return Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into());
                 },
-                ErrorKind::UnexpectedEof => Ok(0),
                 ErrorKind::WouldBlock => Ok(0),
                 _ => {
                     log::error!("Error {:?} reading from SSH connection: {:?}", e.kind(), e);
