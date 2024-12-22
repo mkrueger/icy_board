@@ -62,7 +62,8 @@ impl Connection for SSHConnection {
             Err(e) => match e.kind() {
                 ErrorKind::ConnectionAborted | ErrorKind::NotConnected => {
                     return Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into());
-                }
+                },
+                ErrorKind::UnexpectedEof => Ok(0),
                 ErrorKind::WouldBlock => Ok(0),
                 _ => {
                     log::error!("Error {:?} reading from SSH connection: {:?}", e.kind(), e);
@@ -106,8 +107,8 @@ impl SshClient {
         let config = client::Config {
             inactivity_timeout: Some(Duration::from_secs(5)),
             preferred,
-            keepalive_interval: Some(Duration::from_secs(15)),
-            keepalive_max: 10,
+            keepalive_interval: Some(Duration::from_secs(60)),
+            keepalive_max: 3,
             ..<_>::default()
         };
         let config = Arc::new(config);
