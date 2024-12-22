@@ -1,5 +1,8 @@
-use crate::{iemsi::{EMSI_IRQ_WITH_CLEAR, EMSI_NAK_WITH_CLEAR}, Connection};
 use super::{decode_ici, EmsiICI, EmsiISI, EMSI_ACK};
+use crate::{
+    iemsi::{EMSI_IRQ_WITH_CLEAR, EMSI_NAK_WITH_CLEAR},
+    Connection,
+};
 
 pub async fn try_iemsi(
     com: &mut Box<dyn Connection>,
@@ -52,5 +55,4 @@ pub async fn try_iemsi(
         }
     }
     return Ok(None);
-
 }

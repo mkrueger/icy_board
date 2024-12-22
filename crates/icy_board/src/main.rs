@@ -11,7 +11,10 @@ use bbs::await_telnet_connections;
 use call_wait_screen::{CallWaitMessage, CallWaitScreen};
 use chrono::Local;
 use crossterm::{
-    execute, style::{Attribute, Print, SetAttribute, SetForegroundColor}, terminal::Clear, ExecutableCommand
+    execute,
+    style::{Attribute, Print, SetAttribute, SetForegroundColor},
+    terminal::Clear,
+    ExecutableCommand,
 };
 use icy_board_engine::{
     icy_board::{bbs::BBS, IcyBoard},
@@ -19,9 +22,7 @@ use icy_board_engine::{
 };
 
 use node_monitoring_screen::NodeMonitoringScreenMessage;
-use ratatui::{
-    backend::Backend, Terminal
-};
+use ratatui::{backend::Backend, Terminal};
 use semver::Version;
 use tokio::sync::Mutex;
 use tui::{print_exit_screen, Tui};
@@ -110,7 +111,7 @@ async fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Re
                     CallWaitMessage::RunPPE(ppe.clone())
                 } else {
                     CallWaitMessage::User(false)
-                };             
+                };
                 run_message(cmd, &mut terminal, &board, &mut bbs, arguments.full_screen).await?;
                 restore_terminal()?;
                 return Ok(());
@@ -170,7 +171,7 @@ async fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Re
             let mut app = CallWaitScreen::new(&board).await?;
             loop {
                 let mut terminal = init_terminal()?;
-             
+
                 app.reset(&board).await;
                 match app.run(&mut terminal, &board, arguments.full_screen).await {
                     Ok(msg) => {

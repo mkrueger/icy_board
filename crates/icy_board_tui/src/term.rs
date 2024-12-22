@@ -1,6 +1,4 @@
-use std::
-    time::Duration
-;
+use std::time::Duration;
 
 use color_eyre::Result;
 
@@ -8,7 +6,6 @@ use crossterm::event::{self, Event};
 use ratatui::{TerminalOptions, Viewport};
 
 use crate::TerminalType;
-
 
 pub fn init() -> Result<TerminalType> {
     color_eyre::install()?;

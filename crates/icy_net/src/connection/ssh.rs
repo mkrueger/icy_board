@@ -59,7 +59,16 @@ impl Connection for SSHConnection {
                 }
                 Ok(size)
             }
-            Err(e) => Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into()),
+            Err(e) => match e.kind() {
+                ErrorKind::ConnectionAborted | ErrorKind::NotConnected => {
+                    return Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into());
+                }
+                ErrorKind::WouldBlock => Ok(0),
+                _ => {
+                    log::error!("Error {:?} reading from SSH connection: {:?}", e.kind(), e);
+                    Ok(0)
+                }
+            },
         }
     }
 
@@ -80,10 +89,7 @@ struct Client {}
 impl client::Handler for Client {
     type Error = russh::Error;
 
-    async fn check_server_key(
-        &mut self,
-        _server_public_key: &ssh_key::PublicKey,
-    ) -> Result<bool, Self::Error> {
+    async fn check_server_key(&mut self, _server_public_key: &ssh_key::PublicKey) -> Result<bool, Self::Error> {
         Ok(true)
     }
 }
@@ -107,7 +113,7 @@ impl SshClient {
         let config = Arc::new(config);
         let sh = Client {};
         let mut session = russh::client::connect(config, addrs, sh).await?;
-        
+
         let auth_res = session.authenticate_password(user, password).await?;
         if !auth_res {
             return Err("Authentication failed".into());

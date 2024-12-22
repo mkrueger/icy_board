@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::{io, time::Duration};
+use std::{io::{self, ErrorKind}, time::Duration};
 
 use async_trait::async_trait;
 use tokio::{
@@ -255,12 +255,18 @@ impl Connection for TelnetConnection {
                 }*/
                 Ok(result)
             }
-            Err(err) => {
-                log::error!("telnet error reading from TCP stream: {}", err);
-                if err.kind() == io::ErrorKind::WouldBlock {
-                    return Ok(0);
+            Err(e) => {
+                log::error!("telnet error reading from TCP stream: {}", e);
+                match e.kind() {
+                    ErrorKind::ConnectionAborted | ErrorKind::NotConnected => {
+                        return Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into());
+                    }
+                    ErrorKind::WouldBlock => Ok(0),
+                    _ => {
+                        log::error!("Error {:?} reading from SSH connection: {:?}", e.kind(), e);
+                        Ok(0)
+                    }
                 }
-                return Err(err.into());
             }
         }
     }

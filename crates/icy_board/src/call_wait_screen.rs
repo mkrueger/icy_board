@@ -14,7 +14,13 @@ use icy_board_tui::{
     theme::{DOS_BLACK, DOS_BLUE, DOS_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_WHITE},
 };
 use ratatui::{
-    buffer::Buffer, layout::{Constraint, Layout, Margin, Rect}, prelude::Backend, style::{Color, Style, Stylize}, text::Line, widgets::{Block, BorderType, Borders, Widget}, Frame, Terminal
+    buffer::Buffer,
+    layout::{Constraint, Layout, Margin, Rect},
+    prelude::Backend,
+    style::{Color, Style, Stylize},
+    text::Line,
+    widgets::{Block, BorderType, Borders, Widget},
+    Frame, Terminal,
 };
 
 use tokio::sync::Mutex;
@@ -163,7 +169,7 @@ impl CallWaitScreen {
             get_text("call_wait_screen_alarm_off")
         };
     }
-    
+
     pub async fn run(&mut self, terminal: &mut Terminal<impl Backend>, board: &Arc<Mutex<IcyBoard>>, full_screen: bool) -> Res<CallWaitMessage> {
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
@@ -219,10 +225,12 @@ impl CallWaitScreen {
         let b = Block::default()
             .title_top(Line::from(format!(" {} ", dt)).style(Style::new().white()).left_aligned())
             .title_top(Line::from(format!("  IcyBoard v{}  ", ver)).fg(Color::Yellow).centered())
-            .title(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white()).right_aligned())
-            .title_bottom(
-                Line::from("  (C) Copyright Mike Krüger, 2024 ").style(Style::new().white()).centered()
+            .title(
+                Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap()))
+                    .style(Style::new().white())
+                    .right_aligned(),
             )
+            .title_bottom(Line::from("  (C) Copyright Mike Krüger, 2024 ").style(Style::new().white()).centered())
             .style(Style::new().bg(DOS_BLUE))
             .border_type(BorderType::Double)
             .border_style(Style::new().white())
