@@ -100,19 +100,18 @@ impl SshClient {
         let config = client::Config {
             inactivity_timeout: Some(Duration::from_secs(5)),
             preferred,
+            keepalive_interval: Some(Duration::from_secs(15)),
+            keepalive_max: 10,
             ..<_>::default()
         };
         let config = Arc::new(config);
         let sh = Client {};
-        println!("Connecting to SSH server");
         let mut session = russh::client::connect(config, addrs, sh).await?;
-        println!("Connected to SSH server");
+        
         let auth_res = session.authenticate_password(user, password).await?;
         if !auth_res {
             return Err("Authentication failed".into());
         }
-
-        println!("Authenticated");
 
         Ok(Self { session })
     }
