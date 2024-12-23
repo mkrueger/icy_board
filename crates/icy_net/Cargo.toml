@@ -26,14 +26,14 @@ russh = { git= "https://github.com/warp-tech/russh" }
 russh-keys =  { git= "https://github.com/warp-tech/russh" }
 
 # WEBSOCKETS
-tokio-tungstenite = { version = "0.24.0", features = [
+tokio-tungstenite = { version = "0.26.1", features = [
     "rustls-tls-webpki-roots", # webpki root CAs
     "__rustls-tls",            # use Rustls
 ]}
 
 http = "1.1.0"
 url = "2.5.0"
-rustls = { version = "0.23.13", features = [
+rustls = { version = "0.23.0", features = [
     "tls12",
  #   "dangerous_configuration"  # Allow invalid certs/etc.
 ]}

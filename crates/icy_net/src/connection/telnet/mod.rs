@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 
-use std::{io::{self, ErrorKind}, time::Duration};
+use std::{
+    io::{self, ErrorKind},
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use tokio::{
