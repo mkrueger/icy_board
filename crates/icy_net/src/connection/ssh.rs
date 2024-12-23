@@ -99,9 +99,9 @@ impl SshClient {
         preferred.kex = Cow::Owned(kex::ALL_KEX_ALGORITHMS.iter().map(|k| **k).collect());
         preferred.cipher = Cow::Owned(cipher::ALL_CIPHERS.iter().map(|k| **k).collect());
         let config = client::Config {
-            inactivity_timeout: Some(Duration::from_secs(5)),
+            inactivity_timeout: None,
             preferred,
-            keepalive_interval: Some(Duration::from_secs(5)),
+            keepalive_interval: Some(Duration::from_secs(30)),
             keepalive_max: 3,
             ..<_>::default()
         };
