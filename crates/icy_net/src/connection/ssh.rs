@@ -101,7 +101,7 @@ impl SshClient {
         let config = client::Config {
             inactivity_timeout: Some(Duration::from_secs(5)),
             preferred,
-            keepalive_interval: Some(Duration::from_secs(60)),
+            keepalive_interval: Some(Duration::from_secs(5)),
             keepalive_max: 3,
             ..<_>::default()
         };
