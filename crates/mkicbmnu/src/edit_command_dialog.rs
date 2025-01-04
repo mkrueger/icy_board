@@ -53,7 +53,7 @@ impl<'a> EditCommandDialog<'a> {
         let file = icy_board.lock().unwrap().resolve_file(&menu.lock().unwrap().display_file);
 
         let buffer = if file.exists() {
-            icy_engine::Buffer::load_buffer(&file, true).unwrap()
+            icy_engine::Buffer::load_buffer(&file, true, None).unwrap()
         } else {
             icy_engine::Buffer::new((80, 25))
         };

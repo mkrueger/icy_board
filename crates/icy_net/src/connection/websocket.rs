@@ -3,14 +3,13 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
 use http::Uri;
-use rustls::RootCertStore;
 use std::io;
 use std::io::ErrorKind;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::Message;
-use tokio_tungstenite::{Connector, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
 pub struct WebSocketConnection<S: AsyncRead + AsyncWrite + Unpin> {
     is_secure: bool,
@@ -95,7 +94,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection for WebSocketConnectio
         }
         match self.socket.next().await {
             Some(Ok(msg)) => {
-                let mut data = msg.into_data();
+                let data = msg.into_data();
                 let len = buf.len().min(data.len());
                 buf[..len].copy_from_slice(&data[..len]);
                 self.data = data.slice(len..);
