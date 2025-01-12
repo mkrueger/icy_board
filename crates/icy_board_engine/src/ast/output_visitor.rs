@@ -33,6 +33,14 @@ impl OutputVisitor {
         };
     }
 
+    fn output_function(&mut self, str: &str) {
+        match self.output_func {
+            OutputFunc::Upper => self.output.push_str(&str.to_uppercase()),
+            OutputFunc::Lower => self.output.push_str(&str.to_lowercase()),
+            OutputFunc::CamelCase => self.output.push_str(str),
+        };
+    }
+
     fn indent(&mut self) {
         for _ in 0..self.indent {
             self.output.push_str("    ");
@@ -97,7 +105,15 @@ impl AstVisitor<()> for OutputVisitor {
     }
 
     fn visit_function_call_expression(&mut self, call: &super::FunctionCallExpression) {
-        call.get_expression().visit(self);
+
+        match call.get_expression() {
+            super::Expression::Identifier(id) => {
+                self.output_function(id.get_identifier());
+            }
+            _ => {
+                call.get_expression().visit(self);
+            }
+        }
         self.output.push('(');
         for (i, arg) in call.get_arguments().iter().enumerate() {
             arg.visit(self);
@@ -405,7 +421,7 @@ impl AstVisitor<()> for OutputVisitor {
     }
 
     fn visit_procedure_call_statement(&mut self, call: &super::ProcedureCallStatement) {
-        self.output(call.get_identifier());
+        self.output_function(call.get_identifier());
         self.output.push('(');
         for (i, arg) in call.get_arguments().iter().enumerate() {
             arg.visit(self);
@@ -417,7 +433,7 @@ impl AstVisitor<()> for OutputVisitor {
     }
 
     fn visit_predefined_call_statement(&mut self, call: &super::PredefinedCallStatement) {
-        self.output_keyword(call.get_func().name);
+        self.output_function(call.get_func().name);
         self.output.push(' ');
         for (i, arg) in call.get_arguments().iter().enumerate() {
             arg.visit(self);
@@ -454,7 +470,7 @@ impl AstVisitor<()> for OutputVisitor {
 
     fn visit_procedure_declaration(&mut self, proc_decl: &super::ProcedureDeclarationAstNode) {
         self.output_keyword("Declare Procedure ");
-        self.output(proc_decl.get_identifier());
+        self.output_function(proc_decl.get_identifier());
         self.output.push('(');
         for (i, arg) in proc_decl.get_parameters().iter().enumerate() {
             if arg.is_var() {
@@ -485,7 +501,7 @@ impl AstVisitor<()> for OutputVisitor {
 
     fn visit_function_declaration(&mut self, func_decl: &super::FunctionDeclarationAstNode) {
         self.output_keyword("Declare Function ");
-        self.output(func_decl.get_identifier());
+        self.output_function(func_decl.get_identifier());
         self.output.push('(');
         for (i, arg) in func_decl.get_parameters().iter().enumerate() {
             if arg.is_var() {
@@ -517,7 +533,7 @@ impl AstVisitor<()> for OutputVisitor {
 
     fn visit_function_implementation(&mut self, function: &super::FunctionImplementation) {
         self.output_keyword("Function ");
-        self.output(function.get_identifier());
+        self.output_function(function.get_identifier());
         self.output.push('(');
         for (i, arg) in function.get_parameters().iter().enumerate() {
             if arg.is_var() {
@@ -558,7 +574,7 @@ impl AstVisitor<()> for OutputVisitor {
 
     fn visit_procedure_implementation(&mut self, procedure: &super::ProcedureImplementation) {
         self.output_keyword("Procedure ");
-        self.output(procedure.get_identifier());
+        self.output_function(procedure.get_identifier());
         self.output.push('(');
         for (i, arg) in procedure.get_parameters().iter().enumerate() {
             if arg.is_var() {

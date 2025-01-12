@@ -10,14 +10,22 @@ use crate::{
     parser::lexer::{Spanned, Token},
 };
 
-#[derive(Default)]
 pub struct AstTransformationVisitor {
     labels: usize,
     continue_break_labels: Vec<(unicase::Ascii<String>, unicase::Ascii<String>)>,
     cur_function: Option<unicase::Ascii<String>>,
+    optimize_output: bool,
 }
 
 impl AstTransformationVisitor {
+    pub fn new(optimize_output: bool) -> Self {
+        Self {
+            labels: 0,
+            continue_break_labels: Vec::new(),
+            cur_function: None,
+            optimize_output
+        }
+    }
     pub fn next_label(&mut self) -> unicase::Ascii<String> {
         let label = unicase::Ascii::new(format!("*(label{}", self.labels));
         self.labels += 1;
@@ -251,9 +259,8 @@ impl AstVisitorMut for AstTransformationVisitor {
         );
 
         let condition = BinaryExpression::create_empty_expression(crate::ast::BinOp::And, lower_bound, upper_bound);
-
         statements.push(IfStatement::create_empty_statement(
-            condition.visit_mut(&mut OptimizationVisitor::default()),
+            if self.optimize_output { condition.visit_mut(&mut OptimizationVisitor::default()) } else { condition },
             GotoStatement::create_empty_statement(break_label.clone()),
         ));
 

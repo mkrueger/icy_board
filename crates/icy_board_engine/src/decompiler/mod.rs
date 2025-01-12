@@ -37,6 +37,7 @@ pub struct Decompiler {
     function_lookup: HashMap<usize, usize>,
     cur_ptr: usize,
     issues: Vec<DecompilerIssue>,
+    optimize_output: bool,
 }
 
 impl Decompiler {
@@ -45,7 +46,7 @@ impl Decompiler {
     /// # Errors
     ///
     /// This function will return an error if .
-    pub fn new(executable: Executable) -> Result<Self, DeserializationError> {
+    pub fn new(executable: Executable, optimize_output: bool) -> Result<Self, DeserializationError> {
         let script = PPEScript::from_ppe_file(&executable)?;
         Ok(Self {
             executable,
@@ -55,6 +56,7 @@ impl Decompiler {
             functions: Vec::new(),
             cur_ptr: 0,
             issues: Vec::new(),
+            optimize_output
         })
     }
 
@@ -249,14 +251,22 @@ impl Decompiler {
                 }
 
                 let expr = UnaryExpression::create_empty_expression(*op, expr);
-                expr.visit_mut(&mut OptimizationVisitor::default())
+                if self.optimize_output { 
+                    expr.visit_mut(&mut OptimizationVisitor::default())
+                } else {
+                    expr
+                }
             }
             PPEExpr::BinaryExpression(op, left, right) => {
                 let left = add_parens_if_required(*op, self.decompile_expression(left));
                 let right = add_parens_if_required(*op, self.decompile_expression(right));
 
                 let expr = BinaryExpression::create_empty_expression(*op, left, right);
-                expr.visit_mut(&mut OptimizationVisitor::default())
+                if self.optimize_output { 
+                    expr.visit_mut(&mut OptimizationVisitor::default())
+                } else {
+                    expr
+                }
             }
             PPEExpr::Dim(id, dims) => {
                 IndexerExpression::create_empty_expression(self.get_variable_name(*id), dims.iter().map(|e| self.decompile_expression(e)).collect())
@@ -485,7 +495,7 @@ fn generate_variable_declaration(var: &TableEntry) -> Statement {
 ///
 /// Panics if .
 pub fn decompile(executable: Executable, raw: bool) -> Res<(Ast, Vec<DecompilerIssue>)> {
-    match Decompiler::new(executable) {
+    match Decompiler::new(executable, !raw) {
         Ok(mut d) => {
             let mut ast = d.decompile()?;
 

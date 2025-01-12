@@ -65,7 +65,6 @@ fn test_decompiler() {
         let file_name = cur_entry.as_os_str();
         println!("File: {}...", cur_entry.file_name().unwrap().to_str().unwrap());
         if [
-            "for_next.ppe",
             "select_case.ppe",
             "while_break_continue.ppe",
             "if_else_loop_bug.ppe",
@@ -88,7 +87,6 @@ fn test_decompiler() {
         let (d, _) = decompile(executable, false).unwrap();
         let source_file = cur_entry.with_extension("pps");
         let orig_text = fs::read_to_string(source_file).unwrap();
-
         let mut output_visitor = output_visitor::OutputVisitor::default();
         output_visitor.output_func = OutputFunc::Upper;
         output_visitor.skip_comments = true;
