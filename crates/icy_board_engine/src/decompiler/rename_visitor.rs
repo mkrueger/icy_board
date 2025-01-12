@@ -5,24 +5,22 @@ use crate::ast::AstVisitor;
 #[derive(Default)]
 pub struct RenameScanVistitor {
     pub rename_map: HashMap<unicase::Ascii<String>, unicase::Ascii<String>>,
-    _cur_index_var: usize,
+    cur_index_var: usize,
     _file_names: usize,
     _x_coords: usize,
     _y_coords: usize,
 }
 
-const _INDEX_VARS: [&str; 4] = ["i", "j", "k", "l"];
+const INDEX_VARS: [&str; 4] = ["i", "j", "k", "l"];
 
 impl AstVisitor<()> for RenameScanVistitor {
-    fn visit_for_statement(&mut self, _for_stmt: &crate::ast::ForStatement) {
-        /*
+    fn visit_for_statement(&mut self, for_stmt: &crate::ast::ForStatement) {
         let var_name = for_stmt.get_identifier();
         if !self.rename_map.contains_key(var_name) && self.cur_index_var < INDEX_VARS.len() {
             self.rename_map
                 .insert(var_name.clone(), unicase::Ascii::new(INDEX_VARS[self.cur_index_var].to_string()));
             self.cur_index_var += 1;
         }
-        walk_for_stmt(self, for_stmt);*/
     }
 
     fn visit_predefined_call_statement(&mut self, _call: &crate::ast::PredefinedCallStatement) {
