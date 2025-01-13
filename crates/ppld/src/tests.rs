@@ -61,7 +61,6 @@ fn test_decompiler() {
         }
 
         let file_name = cur_entry.as_os_str();
-        println!("File: {}...", cur_entry.file_name().unwrap().to_str().unwrap());
         /*
         if ["select_case.ppe"].contains(&cur_entry.file_name().unwrap().to_str().unwrap()) {
             //skipped += 1;

@@ -32,15 +32,14 @@ pub fn optimize_loops(statements: &mut Vec<Statement>) {
 
 fn optimize_block(statements: &mut Vec<Statement>) {
     optimize_loops(statements);
-    scan_if_else(statements);
-    scan_if(statements);
+    optimize_ifs(statements);
     scan_select_statements(statements);
     strip_unused_labels(statements);
 }
 
 fn optimize_ifs(statements: &mut Vec<Statement>) {
-    scan_if_else(statements);
     scan_if(statements);
+    scan_if_else(statements);
 }
 
 fn scan_label(statements: &[Statement], from: usize, label: &unicase::Ascii<String>) -> Option<usize> {

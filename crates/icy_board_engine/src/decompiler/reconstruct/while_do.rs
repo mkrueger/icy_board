@@ -40,6 +40,10 @@ pub fn scan_do_while(statements: &mut Vec<Statement>) {
             continue;
         };
 
+        if matching_goto + 1 >= statements.len() {
+            i += 1;
+            continue;
+        }
         let Statement::Label(break_label) = &statements[matching_goto + 1] else {
             i += 1;
             continue;
@@ -117,7 +121,10 @@ fn scan_do_while_case2(statements: &mut Vec<Statement>) {
             i += 1;
             continue;
         };
-
+        if matching_goto + 1 >= statements.len() {
+            i += 1;
+            continue;
+        }
         let Statement::Label(break_label) = &statements[matching_goto + 1] else {
             i += 1;
             continue;

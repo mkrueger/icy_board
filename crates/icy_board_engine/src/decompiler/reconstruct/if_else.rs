@@ -1,51 +1,47 @@
-use crate::ast::{ElseBlock, ElseIfBlock, Expression, IfThenStatement, Statement};
-use std::ops::Range;
-
-use super::scan_label;
+use crate::ast::{ElseBlock, ElseIfBlock, Statement};
 
 /*
 
 Simple:
 
-IF (BOOL001) GOTO LABEL001
-GOTO LABEL002
+BOOLEAN BOOL001
+BOOLEAN BOOL002
+    BOOL001 = FALSE
+    BOOL002 = TRUE
+    IF (BOOL001) THEN
+        PRINT "TRUE"
+        GOTO LABEL001
+    ENDIF
+
+    IF (BOOL002 | BOOL001) THEN
+        PRINT "ELSEIF1"
+        GOTO LABEL001
+    ENDIF
+
+    IF (!BOOL002 & !BOOL001) THEN
+        PRINT "ELSEIF2"
+        GOTO LABEL001
+    ENDIF
+
+    PRINT "ELSE"
 :LABEL001
-PRINT "Hello World!"
+    IF (BOOL001) THEN
+        PRINT "TRUE"
+        GOTO LABEL002
+    ENDIF
+
+    IF (BOOL002 | BOOL001) THEN
+        PRINT "ELSEIF1"
+    ENDIF
+
 :LABEL002
 
-
-Complex:
-
-IF (BOOL001) GOTO LABEL008
-GOTO LABEL001
-
-:LABEL008
-PRINT "TRUE"
-GOTO LABEL006
-
-:LABEL001
-IF (BOOL002 | BOOL001) GOTO LABEL005
-GOTO LABEL009
-
-:LABEL005
-PRINT "ELSEIF1"
-GOTO LABEL006
-
-:LABEL009
-IF (!BOOL002 & !BOOL001) GOTO LABEL011
-GOTO LABEL003
-
-:LABEL011
-PRINT "ELSEIF2"
-GOTO LABEL006
-
-:LABEL003
-PRINT "ELSE"
-
-:LABEL006
-
-
 Was:
+BOOLEAN BOOL001
+BOOLEAN BOOL002
+BOOL001 = FALSE
+BOOL002 = TRUE
+
 IF (BOOL001) THEN
   PRINT "TRUE"
 ELSEIF (BOOL002 | BOOL001) THEN
@@ -55,116 +51,72 @@ ELSEIF (!BOOL002 & !BOOL001) THEN
 ELSE
   PRINT "ELSE"
 ENDIF
+
+IF (BOOL001) THEN
+  PRINT "TRUE"
+ELSEIF (BOOL002 | BOOL001) THEN
+  PRINT "ELSEIF1"
+ENDIF
 */
 
 pub fn scan_if_else(statements: &mut Vec<Statement>) {
+    super::strip_unused_labels(statements);
     let mut i = 0;
-    let mut start_if = usize::MAX;
-    let mut conditions: Vec<Expression> = Vec::new();
-    let mut if_blocks: Vec<Range<usize>> = Vec::new();
-    let mut scan_next = false;
-    if statements.len() < 3 {
+    if statements.len() < 1 {
         return;
     }
-    while !if_blocks.is_empty() || i < statements.len() - 2 {
-        if !scan_next && !if_blocks.is_empty() {
-            let mut else_if_blocks = Vec::new();
-            for i in 1..if_blocks.len() {
-                let rng = if_blocks[i].clone();
-                let else_if_block: ElseIfBlock = ElseIfBlock::empty(conditions[i].clone(), statements[rng.start..rng.end].iter().cloned().collect());
-                else_if_blocks.push(else_if_block);
-            }
-            let end = if_blocks.last().unwrap().end;
-            let else_block = if let Statement::Goto(exit_goto) = statements[end].clone() {
-                if let Some(label_idx) = scan_label(statements, i, exit_goto.get_label()) {
-                    let rng = i..label_idx;
-                    i = label_idx;
-                    if rng.start < rng.end {
-                        Some(ElseBlock::empty(statements[rng].iter().cloned().collect()))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            let rng = if_blocks[0].clone();
-            let stmt = IfThenStatement::create_empty_statement(
-                conditions[0].clone(),
-                statements[rng.start..rng.end].iter().cloned().collect(),
-                else_if_blocks,
-                else_block,
-            );
-            conditions.clear();
-            if_blocks.clear();
-            statements.drain(start_if + 1..i);
-            statements[start_if] = stmt;
-            i = start_if + 1;
-            start_if = usize::MAX;
+    while i < statements.len() - 1 {
+        let start = i;
+        if let Statement::Empty = statements[i] {
+            i += 1;
             continue;
         }
-
-        let Statement::If(if_stmt) = statements[i].clone() else {
-            if scan_next {
-                scan_next = false;
-            } else {
-                i += 1;
-            }
-            continue;
-        };
-        let Statement::Goto(false_goto) = &if_stmt.get_statement() else {
-            if scan_next {
-                scan_next = false;
-            } else {
-                i += 1;
-            }
-            continue;
-        };
-        let Statement::Goto(true_goto) = statements[i + 1].clone() else {
-            if scan_next {
-                scan_next = false;
-            } else {
-                i += 1;
-            }
-            continue;
-        };
-        let Statement::Label(false_label) = statements[i + 2].clone() else {
-            if scan_next {
-                scan_next = false;
-            } else {
-                i += 1;
-            }
-            continue;
-        };
-        if false_goto.get_label() != false_label.get_label() {
-            if scan_next {
-                scan_next = false;
-            } else {
-                i += 1;
-            }
-            continue;
-        }
-        if start_if > i {
-            start_if = i;
-        }
-
-        let Some(true_goto) = scan_label(&statements, i + 3, true_goto.get_label()) else {
-            scan_next = false;
+        let Statement::IfThen(if_stmt) = &statements[i] else {
             i += 1;
             continue;
         };
-        conditions.push(if_stmt.get_condition().clone());
+        let Some(Statement::Goto(breakout_goto_stmt)) = if_stmt.get_statements().last().cloned() else {
+            i += 1;
+            continue;
+        };
+        let Some(idx) = super::scan_label(statements, i, breakout_goto_stmt.get_label()) else {
+            i += 1;
+            continue;
+        };
+        let mut if_stmt = if_stmt.clone();
+        if_stmt.get_statements_mut().pop(); // pop goto
 
-        if let Statement::Goto(_exit_goto_stmt) = statements[true_goto - 1].clone() {
-            scan_next = true;
-            if_blocks.push(i + 3..true_goto - 1);
-        } else {
-            scan_next = false;
-            if_blocks.push(i + 3..true_goto);
+        let mut j = i + 1;
+        let mut has_else = true;
+        while j < statements.len() - 1 {
+            if let Statement::Empty = statements[j] {
+                j += 1;
+                continue;
+            }
+            let Statement::IfThen(else_if_stmt) = &statements[j] else {
+                break;
+            };
+            if let Some(Statement::Goto(goto_stmt)) = else_if_stmt.get_statements().last().cloned() {
+                has_else = goto_stmt.get_label() == breakout_goto_stmt.get_label();
+            } else {
+                has_else = false;
+            };
+            let mut else_if_block = else_if_stmt.get_statements().clone();
+            if has_else {
+                else_if_block.pop(); // pop goto
+            }
+            if_stmt
+                .get_else_if_blocks_mut()
+                .push(ElseIfBlock::empty(else_if_stmt.get_condition().clone(), else_if_block));
+            j += 1;
         }
-        i = true_goto + 1;
+
+        if has_else && j < idx {
+            let stmts = statements.drain(j..idx).collect();
+            *if_stmt.get_else_block_mut() = Some(ElseBlock::empty(stmts));
+        }
+        statements.drain(start + 1..idx);
+        statements[i] = Statement::IfThen(if_stmt);
+        i += 1;
     }
 }
