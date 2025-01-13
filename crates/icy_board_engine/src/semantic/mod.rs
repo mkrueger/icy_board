@@ -95,12 +95,23 @@ impl References {
 
     fn create_table_entry(&self) -> TableEntry {
         if let Some(header) = &self.header {
-            TableEntry::new(
-                self.declaration.as_ref().unwrap().token.to_string(),
-                header.clone(),
-                self.variable_type.create_empty_value(),
-                EntryType::Variable,
-            )
+            if let Some(decl) = self.declaration.as_ref() {
+                TableEntry::new(
+                    decl.token.to_string(),
+                    header.clone(),
+                    self.variable_type.create_empty_value(),
+                    EntryType::Variable,
+                )
+            } else if !self.usages.is_empty() {
+                TableEntry::new(
+                    self.usages.first().unwrap().token.to_string(),
+                    header.clone(),
+                    self.variable_type.create_empty_value(),
+                    EntryType::Variable,
+                )
+            } else {
+                panic!("Can't find declaration for {self:?}")
+            }
         } else {
             panic!("Header not set for {self:?}")
         }

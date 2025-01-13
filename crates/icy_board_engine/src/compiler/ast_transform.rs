@@ -108,6 +108,20 @@ impl AstVisitorMut for AstTransformationVisitor {
         Statement::Block(BlockStatement::empty(statements))
     }
 
+    fn visit_while_statement(&mut self, while_stmt: &crate::ast::WhileStatement) -> Statement {
+        let mut statements = Vec::new();
+        let break_label = self.next_label();
+
+        statements.push(IfStatement::create_empty_statement(
+            while_stmt.get_condition().negate_expression(),
+            GotoStatement::create_empty_statement(break_label.clone()),
+        ));
+        statements.push(while_stmt.get_statement().visit_mut(self));
+        statements.push(LabelStatement::create_empty_statement(break_label.clone()));
+        self.continue_break_labels.pop();
+        Statement::Block(BlockStatement::empty(statements))
+    }
+
     fn visit_while_do_statement(&mut self, while_do: &crate::ast::WhileDoStatement) -> Statement {
         let mut statements = Vec::new();
 
