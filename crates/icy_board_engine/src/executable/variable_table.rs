@@ -455,12 +455,14 @@ impl VariableTable {
                 VariableType::Function => unsafe {
                     let ret = (cur.value.data.function_value.return_var as usize).saturating_sub(1);
                     let last = cur.value.data.function_value.local_variables as usize + ret;
-                    for (j, i) in (cur.value.data.function_value.first_var_id as usize..last).enumerate() {
-                        let fvar = &mut result[i];
-                        if i == ret {
-                            fvar.set_type(EntryType::FunctionResult);
-                        } else if j < cur.value.data.function_value.parameters as usize {
-                            fvar.set_type(EntryType::Parameter);
+                    if cur.value.data.function_value.start_offset > 0 {
+                        for (j, i) in (cur.value.data.function_value.first_var_id as usize..last).enumerate() {
+                            let fvar = &mut result[i];
+                            if i == ret {
+                                fvar.set_type(EntryType::FunctionResult);
+                            } else if j < cur.value.data.function_value.parameters as usize {
+                                fvar.set_type(EntryType::Parameter);
+                            }
                         }
                     }
                 },
@@ -469,14 +471,15 @@ impl VariableTable {
                     let last = cur.value.data.procedure_value.local_variables as usize
                         + cur.value.data.procedure_value.parameters as usize
                         + cur.value.data.procedure_value.first_var_id as usize;
-
-                    (cur.value.data.procedure_value.first_var_id as usize..last).for_each(|i| {
-                        let fvar = &mut result[i];
-                        if j < cur.value.data.procedure_value.parameters as usize {
-                            fvar.set_type(EntryType::Parameter);
-                        }
-                        j += 1;
-                    });
+                    if cur.value.data.procedure_value.start_offset > 0 {
+                        (cur.value.data.procedure_value.first_var_id as usize..last).for_each(|i| {
+                            let fvar = &mut result[i];
+                            if j < cur.value.data.procedure_value.parameters as usize {
+                                fvar.set_type(EntryType::Parameter);
+                            }
+                            j += 1;
+                        });
+                    }
                 },
                 _ => {}
             }

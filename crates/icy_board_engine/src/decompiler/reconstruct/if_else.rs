@@ -79,7 +79,7 @@ pub fn scan_if_else(statements: &mut Vec<Statement>) {
             i += 1;
             continue;
         };
-        let Some(idx) = super::scan_label(statements, i, breakout_goto_stmt.get_label()) else {
+        let Some(mut idx) = super::scan_label(statements, i, breakout_goto_stmt.get_label()) else {
             i += 1;
             continue;
         };
@@ -114,9 +114,10 @@ pub fn scan_if_else(statements: &mut Vec<Statement>) {
         if has_else && j < idx {
             let stmts = statements.drain(j..idx).collect();
             *if_stmt.get_else_block_mut() = Some(ElseBlock::empty(stmts));
+            idx = j;
         }
         statements.drain(start + 1..idx);
-        statements[i] = Statement::IfThen(if_stmt);
+        statements[start] = Statement::IfThen(if_stmt);
         i += 1;
     }
 }
