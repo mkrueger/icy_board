@@ -55,7 +55,6 @@ pub fn scan_do_while(statements: &mut Vec<Statement>) {
         statements.drain(i + 1..i + 3);
         let continue_label = super::get_last_label(&statements[i..i + 1]);
         super::handle_break_continue(break_label, continue_label, statements);
-        println!("111111");
         reconstruct_block(&mut while_block);
 
         if while_block.len() == 1 {

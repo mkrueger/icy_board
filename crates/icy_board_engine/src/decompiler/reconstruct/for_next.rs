@@ -74,7 +74,6 @@ pub fn scan_for_next(statements: &mut Vec<Statement>) {
                 let var_name = outer_let.get_identifier().clone();
 
                 let mut for_block: Vec<Statement> = statements.drain(i..matching_goto as usize + 2).collect();
-                println!("i: {i} matching_goto: {matching_goto}");
                 // pop for header
                 for_block.drain(0..5);
 
@@ -84,9 +83,7 @@ pub fn scan_for_next(statements: &mut Vec<Statement>) {
                 for_block.pop();
                 let continue_label = super::get_last_label(&for_block);
                 super::reconstruct_block(&mut for_block);
-                for s in for_block.iter() {
-                    println!("stmt:{:?}", s);
-                }
+
                 super::handle_break_continue(skip_label, continue_label, &mut for_block);
                 if step_expr.to_string() == "1" {
                     statements.insert(i, ForStatement::create_empty_statement(var_name, from_expr, to_expr, None, for_block));

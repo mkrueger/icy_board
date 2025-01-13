@@ -1,4 +1,5 @@
 use for_next::scan_for_next;
+use select_case::scan_select_statements;
 use unicase::Ascii;
 
 use crate::ast::{AstVisitorMut, BreakStatement, ContinueStatement, IfStatement, IfThenStatement, RenameVisitor};
@@ -10,6 +11,7 @@ use super::{constant_scan_visitor::ConstantScanVisitor, rename_visitor::RenameSc
 pub mod for_next;
 mod if_else;
 mod remove_label_visitor;
+mod select_case;
 mod unused_label_visitor;
 mod while_do;
 
@@ -32,8 +34,7 @@ fn optimize_block(statements: &mut Vec<Statement>) {
     optimize_loops(statements);
     scan_if_else(statements);
     scan_if(statements);
-
-    //    scan_select_statements(statements);
+    scan_select_statements(statements);
     strip_unused_labels(statements);
 }
 
@@ -112,169 +113,6 @@ fn get_label_index(statements: &[Statement], from: i32, to: i32, label: &String)
     None
 }
 
-/*
-fn get_first(s: &[Statement]) -> Option<&Statement> {
-    if s.is_empty() {
-        return None;
-    }
-    if let Statement::If(_) = s[0] {
-        return Some(&s[0]);
-    }
-    if s.len() < 2 {
-        return None;
-    }
-
-    Some(&s[1])
-}*/
-/*
-fn scan_select_statements(statements: &mut [Statement]) {
-    let mut i = 0;
-    while i < statements.len() {
-        if let Statement::IfThen(if_then_stmt) = statements[i].clone() {
-            if if_then_stmt.get_else_block().is_none() {
-                i += 1;
-                continue;
-            }
-            let Expression::Binary(bin_expr) =
-                Statement::try_boolean_conversion(if_then_stmt.get_condition())
-            else {
-                i += 1;
-                continue;
-            };
-            if bin_expr.get_op() != BinOp::Eq {
-                i += 1;
-                continue;
-            }
-
-            let mut skip = false;
-            for if_else_block in if_then_stmt.get_else_if_blocks() {
-                let Expression::Binary(bin_expr2) =
-                    Statement::try_boolean_conversion(if_else_block.get_condition())
-                else {
-                    skip = true;
-                    break;
-                };
-                if bin_expr2.get_op() != BinOp::Eq {
-                    skip = true;
-                    break;
-                }
-                if bin_expr.get_left_expression() != bin_expr2.get_left_expression() {
-                    skip = true;
-                    break;
-                }
-            }
-
-            if skip {
-                i += 1;
-                continue;
-            }
-
-            let mut case_blocks = Vec::new();
-
-            if !if_then_stmt.get_statements().is_empty() {
-                case_blocks.push(CaseBlock::empty(
-                    vec![CaseSpecifier::Expression(Box::new(
-                        bin_expr.get_right_expression().clone(),
-                    ))],
-                    if_then_stmt.get_statements().clone(),
-                ));
-            }
-
-            for if_else_block in if_then_stmt.get_else_if_blocks() {
-                let Expression::Binary(bin_expr2) =
-                    Statement::try_boolean_conversion(if_else_block.get_condition())
-                else {
-                    i += 1;
-                    continue;
-                };
-
-                if bin_expr2.get_op() != BinOp::Eq {
-                    i += 1;
-                    continue;
-                }
-                case_blocks.push(CaseBlock::empty(
-                    vec![CaseSpecifier::Expression(Box::new(
-                        bin_expr2.get_right_expression().clone(),
-                    ))],
-                    if_else_block.get_statements().clone(),
-                ));
-            }
-            let default_statements = if let Some(smts) = if_then_stmt.get_else_block() {
-                smts.get_statements().clone()
-            } else {
-                Vec::new()
-            };
-            statements[i] = SelectStatement::create_empty_statement(
-                bin_expr.get_left_expression().clone(),
-                case_blocks,
-                default_statements,
-            );
-        }
-        i += 1;
-    }
-}
-*/
-
-/*
-fn gather_labels(stmt: &Statement, used_labels: &mut HashSet<unicase::Ascii<String>>) {
-    match stmt {
-        Statement::If(if_stmt) => {
-            gather_labels(if_stmt.get_statement(), used_labels);
-        }
-        Statement::While(while_stmt) => {
-            gather_labels(while_stmt.get_statement(), used_labels);
-        }
-        Statement::IfThen(if_then_stmt) => {
-            for stmt in if_then_stmt.get_statements() {
-                gather_labels(stmt, used_labels);
-            }
-            for block in if_then_stmt.get_else_if_blocks() {
-                for stmt in block.get_statements() {
-                    gather_labels(stmt, used_labels);
-                }
-            }
-            if let Some(stmts) = if_then_stmt.get_else_block() {
-                for stmt in stmts.get_statements() {
-                    gather_labels(stmt, used_labels);
-                }
-            }
-        }
-        Statement::Select(select_stmt) => {
-            for block in select_stmt.get_case_blocks() {
-                for stmt in block.get_statements() {
-                    gather_labels(stmt, used_labels);
-                }
-            }
-            for stmt in select_stmt.get_default_statements() {
-                gather_labels(stmt, used_labels);
-            }
-        }
-        Statement::Block(block_stmt) => {
-            for stmt in block_stmt.get_statements() {
-                gather_labels(stmt, used_labels);
-            }
-        }
-        Statement::WhileDo(while_do_stmt) => {
-            for stmt in while_do_stmt.get_statements() {
-                gather_labels(stmt, used_labels);
-            }
-        }
-        Statement::For(for_stmt) => {
-            for stmt in for_stmt.get_statements() {
-                gather_labels(stmt, used_labels);
-            }
-        }
-        Statement::Goto(goto_stmt) => {
-            used_labels.insert(goto_stmt.get_label().clone());
-        }
-        Statement::Gosub(gosub_stmt) => {
-            used_labels.insert(gosub_stmt.get_label().clone());
-        }
-        _ => {}
-    }
-}
-*/
-
 pub fn strip_unused_labels(statements: &mut Vec<Statement>) {
     let mut visitor = unused_label_visitor::UnusedLabelVisitor::default();
     for stmt in statements.clone() {
@@ -310,7 +148,6 @@ pub fn handle_break_continue(break_label: Ascii<String>, continue_label: Ascii<S
         *stmt = stmt.visit_mut(&mut break_continue_visitor);
     }
 }
-
 struct BreakContinueVisitor {
     break_label: unicase::Ascii<String>,
     continue_label: unicase::Ascii<String>,
@@ -323,7 +160,6 @@ impl BreakContinueVisitor {
 
 impl AstVisitorMut for BreakContinueVisitor {
     fn visit_goto_statement(&mut self, goto: &crate::ast::GotoStatement) -> Statement {
-        println!("goto: {} break:{}  continue:{}", goto.get_label(), self.break_label, self.continue_label);
         if self.break_label.len() > 0 && goto.get_label() == &self.break_label {
             BreakStatement::create_empty_statement()
         } else if self.continue_label.len() > 0 && goto.get_label() == &self.continue_label {
