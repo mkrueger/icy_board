@@ -105,7 +105,7 @@ fn main() {
                                 .unwrap()
                                 .flush()
                                 .unwrap();
-                            return;
+                            std::process::exit(1);
                         }
                         execute!(
                             stdout(),
@@ -139,6 +139,7 @@ fn main() {
                         )
                         .unwrap();
                         println!();
+                        std::process::exit(1);
                     }
                     if !issues.is_empty() {
                         println!("{0} issues found during decompilation", issues.len());
@@ -157,6 +158,7 @@ fn main() {
                     )
                     .unwrap();
                     println!();
+                    std::process::exit(1);
                 }
             }
         }
@@ -174,6 +176,7 @@ fn main() {
             .unwrap();
             println!();
             println!();
+            std::process::exit(1);
         }
     }
 }

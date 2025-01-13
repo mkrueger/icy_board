@@ -754,6 +754,7 @@ impl<'a> SemanticVisitor<'a> {
         if let Expression::Identifier(_) = expr {
             return;
         }
+
         if let Expression::FunctionCall(a) = expr {
             if let Some(SemanticInfo::VariableReference(_)) = self.function_type_lookup.get(&a.get_expression().get_span().start) {
                 return;
@@ -1217,7 +1218,6 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
                     let arg_count = arg_count.min(par_len);
                     let pass_flags = f.get_pass_flags();
                     self.check_arg_count(par_len, arg_count, call.get_identifier_token());
-
                     for i in 0..arg_count {
                         if pass_flags & (1 << i) != 0 {
                             self.check_argument_is_variable(i, &call.get_arguments()[i]);

@@ -107,12 +107,12 @@ fn main() {
             println!("Compiling...");
 
             if check_errors(errors.clone(), &arguments, &file_name, &src) {
-                return;
+                std::process::exit(1);
             }
             let mut compiler = PPECompiler::new(ppl_version, &reg, errors.clone());
             compiler.compile(&ast);
             if check_errors(errors.clone(), &arguments, &file_name, &src) {
-                return;
+                std::process::exit(1);
             }
             match compiler.create_executable(runtime_version) {
                 Ok(executable) => {
@@ -151,6 +151,7 @@ fn main() {
                     .unwrap();
                     println!();
                     println!();
+                    std::process::exit(1);
                 }
             }
         }
@@ -168,6 +169,7 @@ fn main() {
             .unwrap();
             println!();
             println!();
+            std::process::exit(1);
         }
     }
 }

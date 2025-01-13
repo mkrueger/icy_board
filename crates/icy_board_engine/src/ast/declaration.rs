@@ -417,9 +417,9 @@ impl ProcedureDeclarationAstNode {
 
     pub fn get_pass_flags(&self) -> u16 {
         let mut flags = 0;
-        for param in &self.parameters {
+        for (i, param) in self.parameters.iter().enumerate() {
             if param.is_var() {
-                flags |= 1;
+                flags |= 1 << i;
             }
         }
         flags
