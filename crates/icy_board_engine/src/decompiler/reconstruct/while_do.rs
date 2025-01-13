@@ -137,14 +137,16 @@ fn scan_do_while_case2(statements: &mut Vec<Statement>) {
         // reconstruct while…do block
         let mut while_block: Vec<Statement> = statements.drain((i + 4)..matching_goto as usize).collect();
         let continue_label = super::get_last_label(&while_block);
-        statements.drain(i + 1..i + 4);
+        statements.remove(i + 4);
+        statements.drain(i + 1..i + 3);
+
         reconstruct_block(&mut while_block);
         super::handle_break_continue(break_label, continue_label, &mut while_block);
 
         if while_block.len() == 1 {
-            statements[i + 1] = WhileStatement::create_empty_statement(next_loop_if.get_condition().clone(), while_block.pop().unwrap());
+            statements.insert(i + 1, WhileStatement::create_empty_statement(next_loop_if.get_condition().clone(), while_block.pop().unwrap()));
         } else {
-            statements[i + 1] = WhileDoStatement::create_empty_statement(next_loop_if.get_condition().clone(), while_block);
+            statements.insert(i + 1,WhileDoStatement::create_empty_statement(next_loop_if.get_condition().clone(), while_block));
         }
 
         break;
