@@ -183,7 +183,6 @@ fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser
         for err in &errors.lock().unwrap().errors {
             error_count += 1;
             Report::build(ReportKind::Error, (file_name.to_string_lossy().to_string(), err.span.clone()))
-                .with_code(error_count)
                 .with_message(format!("{}", err.error))
                 .with_label(Label::new((file_name.to_string_lossy().to_string(), err.span.clone())).with_color(ariadne::Color::Red))
                 .finish()
@@ -195,7 +194,6 @@ fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser
             for err in &errors.lock().unwrap().warnings {
                 warning_count += 1;
                 Report::build(ReportKind::Warning, (file_name.to_string_lossy().to_string(), err.span.clone()))
-                    .with_code(warning_count)
                     .with_message(format!("{}", err.error))
                     .with_label(Label::new((file_name.to_string_lossy().to_string(), err.span.clone())).with_color(ariadne::Color::Yellow))
                     .finish()
