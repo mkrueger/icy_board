@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::ast::AstVisitor;
 
 #[derive(Default)]
-pub struct RenameScanVistitor {
+pub struct RenameScanVisitor {
     pub rename_map: HashMap<unicase::Ascii<String>, unicase::Ascii<String>>,
     cur_index_var: usize,
     _file_names: usize,
@@ -13,7 +13,7 @@ pub struct RenameScanVistitor {
 
 const INDEX_VARS: [&str; 4] = ["i", "j", "k", "l"];
 
-impl AstVisitor<()> for RenameScanVistitor {
+impl AstVisitor<()> for RenameScanVisitor {
     fn visit_for_statement(&mut self, for_stmt: &crate::ast::ForStatement) {
         let var_name = for_stmt.get_identifier();
         if !self.rename_map.contains_key(var_name) && self.cur_index_var < INDEX_VARS.len() {
@@ -21,6 +21,7 @@ impl AstVisitor<()> for RenameScanVistitor {
                 .insert(var_name.clone(), unicase::Ascii::new(INDEX_VARS[self.cur_index_var].to_string()));
             self.cur_index_var += 1;
         }
+        crate::ast::walk_for_stmt(self, for_stmt);
     }
 
     fn visit_predefined_call_statement(&mut self, _call: &crate::ast::PredefinedCallStatement) {

@@ -1,4 +1,4 @@
-use crate::ast::{BinOp, BreakStatement, ContinueStatement, Expression, ForStatement, IfStatement, Statement};
+use crate::ast::{BinOp, Expression, ForStatement, Statement};
 
 pub fn scan_for_next(statements: &mut Vec<Statement>) {
     // FOR Header:
@@ -12,13 +12,10 @@ pub fn scan_for_next(statements: &mut Vec<Statement>) {
     if statements.len() < 4 {
         return;
     }
-
     for i in 0..statements.len() - 4 {
         if let Statement::Let(outer_let) = &statements[i] {
-            let Statement::Label(for_loop_label) = &statements[i + 1] else {
-                continue
-            };
-            let for_loop_label = for_loop_label.get_label().clone();   
+            let Statement::Label(for_loop_label) = &statements[i + 1] else { continue };
+            let for_loop_label = for_loop_label.get_label().clone();
             let if_statement = &statements[i + 2];
             let m: Option<(String, unicase::Ascii<String>, Expression)> = match_for_header(if_statement);
 
@@ -26,11 +23,13 @@ pub fn scan_for_next(statements: &mut Vec<Statement>) {
                 let Statement::Goto(skip_label_stmt) = &statements[i + 3] else {
                     continue;
                 };
-                let Statement::Label(body_label) = &statements[i + 4] else {
+                let Statement::Label(body_label_stmt) = &statements[i + 4] else {
                     continue;
                 };
 
-                if body_label.get_label() != &for_body_label {
+                let skip_label = skip_label_stmt.get_label().clone();
+
+                if body_label_stmt.get_label() != &for_body_label {
                     continue;
                 }
                 let mut matching_goto = -1;
@@ -41,7 +40,7 @@ pub fn scan_for_next(statements: &mut Vec<Statement>) {
                     let Statement::Label(label) = &statements[j + 1] else {
                         continue;
                     };
-                    if goto_label.get_label() == &for_loop_label && label.get_label() == skip_label_stmt.get_label() {
+                    if goto_label.get_label() == &for_loop_label && label.get_label() == &skip_label {
                         matching_goto = j as i32;
                         break;
                     }
@@ -54,7 +53,7 @@ pub fn scan_for_next(statements: &mut Vec<Statement>) {
                 let Statement::Let(inner_let) = &statements[matching_goto as usize - 1] else {
                     continue;
                 };
-                let Expression::Binary(bin_expr) = inner_let.get_value_expression() else  {
+                let Expression::Binary(bin_expr) = inner_let.get_value_expression() else {
                     continue;
                 };
                 // todo: match expression as string
@@ -74,42 +73,29 @@ pub fn scan_for_next(statements: &mut Vec<Statement>) {
                 let from_expr: Expression = outer_let.get_value_expression().clone();
                 let var_name = outer_let.get_identifier().clone();
 
-                let mut statements2: Vec<Statement> = statements
-                    .drain(i..matching_goto as usize + 2)
-                    .collect();
+                let mut for_block: Vec<Statement> = statements.drain(i..matching_goto as usize + 2).collect();
+                println!("i: {i} matching_goto: {matching_goto}");
+                // pop for header
+                for_block.drain(0..5);
 
-                statements2.drain(0..6);
-                statements2.pop();
-                statements2.pop();
-
-                super::optimize_loops(&mut statements2);
-                scan_possible_breaks(&mut statements2, &for_body_label);
-                // there needs to be a better way to handle that
-                if !statements2.is_empty() {
-                    if let Statement::Label(lbl) = statements2.last().unwrap().clone() {
-                        scan_possible_continues(&mut statements2, lbl.get_label());
-                    }
+                // pop goto and label and step stmt
+                for_block.pop();
+                for_block.pop();
+                for_block.pop();
+                let continue_label = super::get_last_label(&for_block);
+                super::reconstruct_block(&mut for_block);
+                for s in for_block.iter() {
+                    println!("stmt:{:?}", s);
                 }
-                // super::optimize_ifs(&mut statements2);
-
+                super::handle_break_continue(skip_label, continue_label, &mut for_block);
                 if step_expr.to_string() == "1" {
-                    statements.insert(i, ForStatement::create_empty_statement(
-                        var_name,
-                        from_expr,
-                        to_expr,
-                        None,
-                        statements2,
-                    ));
+                    statements.insert(i, ForStatement::create_empty_statement(var_name, from_expr, to_expr, None, for_block));
                 } else {
-                    statements.insert(i, ForStatement::create_empty_statement(
-                        var_name,
-                        from_expr,
-                        to_expr,
-                        Some(Box::new(step_expr)),
-                        statements2,
-                    ));
+                    statements.insert(
+                        i,
+                        ForStatement::create_empty_statement(var_name, from_expr, to_expr, Some(Box::new(step_expr)), for_block),
+                    );
                 }
-                scan_for_next(statements);
                 break;
             }
         }
@@ -119,81 +105,30 @@ pub fn scan_for_next(statements: &mut Vec<Statement>) {
 fn match_for_header(
     if_statement: &Statement,
 ) -> Option<(
-    String,                // indexName
+    String,                 // indexName
     unicase::Ascii<String>, // for_label
-    Expression, // to_expr
-)>
-{
+    Expression,             // to_expr
+)> {
     match if_statement {
         Statement::If(if_stmt) => {
             if let Expression::Binary(bin_op) = if_stmt.get_condition() {
-                if bin_op.get_op() != BinOp::LowerEq {
+                if bin_op.get_op() != BinOp::LowerEq && bin_op.get_op() != BinOp::GreaterEq {
                     return None;
                 }
                 let Expression::Identifier(index_variable) = bin_op.get_left_expression() else {
                     return None;
                 };
                 let to_expr: Expression = bin_op.get_right_expression().clone();
-            
+
                 let Statement::Goto(for_label) = if_stmt.get_statement() else {
                     return None;
                 };
 
-                return Some((
-                    index_variable.get_identifier().to_string(),
-                    for_label.get_label().clone(), 
-                    to_expr));
+                return Some((index_variable.get_identifier().to_string(), for_label.get_label().clone(), to_expr));
             }
         }
         _ => return None,
     }
 
     None
-}
-
-fn scan_possible_breaks(block: &mut [Statement], break_label: &unicase::Ascii<String>) {
-    for cur_stmt in block {
-        match cur_stmt {
-            Statement::If(if_stmt) => {
-                if let Statement::Goto(label) = if_stmt.get_statement() {
-                    if label.get_label() == break_label {
-                        *cur_stmt = IfStatement::create_empty_statement(
-                            if_stmt.get_condition().clone(),
-                            BreakStatement::create_empty_statement(),
-                        );
-                    }
-                }
-            }
-            Statement::Goto(label) => {
-                if label.get_label() == break_label {
-                    *cur_stmt = BreakStatement::create_empty_statement();
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-#[allow(clippy::needless_range_loop)]
-fn scan_possible_continues(block: &mut [Statement], continue_label: &unicase::Ascii<String>) {
-    for cur_stmt in block {
-        match cur_stmt {
-            Statement::If(if_stmt) => {
-                if let Statement::Goto(label) = if_stmt.get_statement() {
-                    if label.get_label() == continue_label {
-                        *cur_stmt = IfStatement::create_empty_statement(
-                            if_stmt.get_condition().clone(),
-                            ContinueStatement::create_empty_statement(),
-                        );
-                    }
-                }
-            }
-            Statement::Goto(label) => {
-                if *label.get_label() == continue_label {
-                    *cur_stmt = ContinueStatement::create_empty_statement();
-                }
-            }
-            _ => {}
-        }
-    }
 }

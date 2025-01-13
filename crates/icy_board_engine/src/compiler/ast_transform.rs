@@ -23,7 +23,7 @@ impl AstTransformationVisitor {
             labels: 0,
             continue_break_labels: Vec::new(),
             cur_function: None,
-            optimize_output
+            optimize_output,
         }
     }
     pub fn next_label(&mut self) -> unicase::Ascii<String> {
@@ -260,7 +260,11 @@ impl AstVisitorMut for AstTransformationVisitor {
 
         let condition = BinaryExpression::create_empty_expression(crate::ast::BinOp::And, lower_bound, upper_bound);
         statements.push(IfStatement::create_empty_statement(
-            if self.optimize_output { condition.visit_mut(&mut OptimizationVisitor::default()) } else { condition },
+            if self.optimize_output {
+                condition.visit_mut(&mut OptimizationVisitor::default())
+            } else {
+                condition
+            },
             GotoStatement::create_empty_statement(break_label.clone()),
         ));
 

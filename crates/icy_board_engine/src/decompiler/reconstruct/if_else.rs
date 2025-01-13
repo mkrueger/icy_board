@@ -1,6 +1,5 @@
-use std::ops::Range;
-
 use crate::ast::{ElseBlock, ElseIfBlock, Expression, IfThenStatement, Statement};
+use std::ops::Range;
 
 use super::scan_label;
 
@@ -56,7 +55,6 @@ ELSEIF (!BOOL002 & !BOOL001) THEN
 ELSE
   PRINT "ELSE"
 ENDIF
-
 */
 
 pub fn scan_if_else(statements: &mut Vec<Statement>) {
@@ -65,21 +63,27 @@ pub fn scan_if_else(statements: &mut Vec<Statement>) {
     let mut conditions: Vec<Expression> = Vec::new();
     let mut if_blocks: Vec<Range<usize>> = Vec::new();
     let mut scan_next = false;
-    let mut exit_goto = None;
-    while !if_blocks.is_empty() || i < statements.len() {
+    if statements.len() < 3 {
+        return;
+    }
+    while !if_blocks.is_empty() || i < statements.len() - 2 {
         if !scan_next && !if_blocks.is_empty() {
             let mut else_if_blocks = Vec::new();
             for i in 1..if_blocks.len() {
                 let rng = if_blocks[i].clone();
-
-                let else_if_block = ElseIfBlock::empty(conditions[i].clone(), statements[rng.start..rng.end].iter().cloned().collect());
+                let else_if_block: ElseIfBlock = ElseIfBlock::empty(conditions[i].clone(), statements[rng.start..rng.end].iter().cloned().collect());
                 else_if_blocks.push(else_if_block);
             }
             let end = if_blocks.last().unwrap().end;
-            let else_block = if let Some(_exit_goto) = exit_goto {
-                let rng = end + 2..i;
-                if rng.start < rng.end {
-                    Some(ElseBlock::empty(statements[rng].iter().cloned().collect()))
+            let else_block = if let Statement::Goto(exit_goto) = statements[end].clone() {
+                if let Some(label_idx) = scan_label(statements, i, exit_goto.get_label()) {
+                    let rng = i..label_idx;
+                    i = label_idx;
+                    if rng.start < rng.end {
+                        Some(ElseBlock::empty(statements[rng].iter().cloned().collect()))
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
@@ -94,50 +98,58 @@ pub fn scan_if_else(statements: &mut Vec<Statement>) {
                 else_if_blocks,
                 else_block,
             );
-
             conditions.clear();
             if_blocks.clear();
             statements.drain(start_if + 1..i);
             statements[start_if] = stmt;
             i = start_if + 1;
             start_if = usize::MAX;
-            exit_goto = None;
             continue;
-        }
-
-        if i + 2 >= statements.len() {
-            break;
         }
 
         let Statement::If(if_stmt) = statements[i].clone() else {
-            scan_next = false;
-            i += 1;
+            if scan_next {
+                scan_next = false;
+            } else {
+                i += 1;
+            }
             continue;
         };
         let Statement::Goto(false_goto) = &if_stmt.get_statement() else {
-            scan_next = false;
-            i += 1;
+            if scan_next {
+                scan_next = false;
+            } else {
+                i += 1;
+            }
             continue;
         };
         let Statement::Goto(true_goto) = statements[i + 1].clone() else {
-            scan_next = false;
-            i += 1;
+            if scan_next {
+                scan_next = false;
+            } else {
+                i += 1;
+            }
             continue;
         };
         let Statement::Label(false_label) = statements[i + 2].clone() else {
-            scan_next = false;
-            i += 1;
+            if scan_next {
+                scan_next = false;
+            } else {
+                i += 1;
+            }
             continue;
         };
         if false_goto.get_label() != false_label.get_label() {
-            scan_next = false;
-            i += 1;
+            if scan_next {
+                scan_next = false;
+            } else {
+                i += 1;
+            }
             continue;
         }
         if start_if > i {
             start_if = i;
         }
-        println!("IF TRUE: {:?}/{}", true_goto.get_label(), if_stmt.get_condition());
 
         let Some(true_goto) = scan_label(&statements, i + 3, true_goto.get_label()) else {
             scan_next = false;
@@ -146,8 +158,7 @@ pub fn scan_if_else(statements: &mut Vec<Statement>) {
         };
         conditions.push(if_stmt.get_condition().clone());
 
-        if let Statement::Goto(exit_goto_stmt) = statements[true_goto - 1].clone() {
-            exit_goto = scan_label(&statements, true_goto + 1, exit_goto_stmt.get_label());
+        if let Statement::Goto(_exit_goto_stmt) = statements[true_goto - 1].clone() {
             scan_next = true;
             if_blocks.push(i + 3..true_goto - 1);
         } else {

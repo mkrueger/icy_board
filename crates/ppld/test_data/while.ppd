@@ -1,16 +1,11 @@
-:LABEL001
-    IF (!1) GOTO LABEL002
+    WHILE (1) DO
+        PRINT "Hello"
+    ENDWHILE
 
-    PRINT "Hello"
-    GOTO LABEL001
-:LABEL002
-    IF (TRUE) GOTO LABEL004
+    WHILE (TRUE) DO
+        PRINT "Hello"
+        PRINTLN "World!"
+    ENDWHILE
 
-    GOTO LABEL003
-:LABEL004
-    PRINT "Hello"
-    PRINTLN "World!"
-    GOTO LABEL002
-:LABEL003
 
 

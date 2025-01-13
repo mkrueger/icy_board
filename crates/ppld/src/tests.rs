@@ -50,38 +50,24 @@ fn is_match(output: &str, original: &str) -> bool {
 #[test]
 fn test_decompiler() {
     use std::fs::{self};
-
     let mut data_path = env::current_dir().unwrap();
     data_path.push("test_data");
     //let mut success = 0;
     //let mut skipped = 0;
     for entry in fs::read_dir(data_path).expect("Error reading test_data directory.") {
         let cur_entry = entry.unwrap().path();
-
         if cur_entry.extension().unwrap() != "ppe" {
             continue;
         }
 
         let file_name = cur_entry.as_os_str();
         println!("File: {}...", cur_entry.file_name().unwrap().to_str().unwrap());
-        if [
-            "select_case.ppe",
-            "while_break_continue.ppe",
-            "if_else_loop_bug.ppe",
-            "for_break_continue.ppe",
-            "99bottles.ppe",
-            "if_elseif_else_endif_end.ppe",
-            "if_then_else.ppe",
-            "if_then.ppe",
-            "while.ppe",
-            "abort.ppe",
-            "loggedon.ppe",
-        ]
-        .contains(&cur_entry.file_name().unwrap().to_str().unwrap())
-        {
+        /*
+        if ["select_case.ppe"].contains(&cur_entry.file_name().unwrap().to_str().unwrap()) {
             //skipped += 1;
             continue;
         }
+        */
 
         let executable = Executable::read_file(&file_name, false).unwrap();
         let (d, _) = decompile(executable, false).unwrap();

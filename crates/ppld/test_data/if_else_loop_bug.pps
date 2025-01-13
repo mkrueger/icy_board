@@ -1,19 +1,18 @@
 BYTE i
+    FOR i = 1 TO 10 
+        IF (i = 5) GOTO LABEL001
 
-FOR i = 1 TO 10
-  IF (i = 5) GOTO LABEL002
-NEXT
+    NEXT
 
-PRINT "Hello"
+    PRINT "Hello"
+:LABEL001
+    PRINT "World"
+    WHILE (i < 20) DO
+        IF (i = 5) GOTO LABEL002
+
+        i = i + 1
+    ENDWHILE
+
+    PRINT "Hello"
 :LABEL002
-PRINT "World"
-
-
-WHILE (i < 20) DO
-  IF (i = 5) GOTO LABEL005
-  i = i + 1
-END WHILE
-
-PRINT "Hello"
-:LABEL005
-PRINT "World"
+    PRINT "World"

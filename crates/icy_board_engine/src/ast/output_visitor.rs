@@ -53,6 +53,9 @@ impl OutputVisitor {
 
     fn output_statements(&mut self, get_statements: &[Statement]) {
         for stmt in get_statements {
+            if matches!(stmt, Statement::Empty) {
+                continue;
+            }
             if !matches!(stmt, Statement::Label(_)) {
                 self.indent();
             }
@@ -105,7 +108,6 @@ impl AstVisitor<()> for OutputVisitor {
     }
 
     fn visit_function_call_expression(&mut self, call: &super::FunctionCallExpression) {
-
         match call.get_expression() {
             super::Expression::Identifier(id) => {
                 self.output_function(id.get_identifier());

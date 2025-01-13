@@ -203,6 +203,7 @@ impl<'a> PPECompiler<'a> {
 
     fn compile_statement(&mut self, s: &Statement) -> Option<PPECommand> {
         match s {
+            Statement::Empty => None,
             Statement::Comment(_) => None,
             Statement::Return(_) => Some(PPECommand::Return),
             Statement::Gosub(gosub_stmt) => Some(PPECommand::Gosub(self.get_label_index(gosub_stmt.get_label()))),

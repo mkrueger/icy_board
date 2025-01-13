@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Statement, WhileDoStatement},
+    ast::{Statement, WhileDoStatement, WhileStatement},
     decompiler::reconstruct::scan_goto,
 };
 
@@ -44,7 +44,8 @@ pub fn scan_do_while(statements: &mut Vec<Statement>) {
             i += 1;
             continue;
         };
-        if break_label.get_label() != break_goto.get_label() {
+        let break_label = break_label.get_label().clone();
+        if break_label != break_goto.get_label() {
             i += 1;
             continue;
         }
@@ -52,8 +53,16 @@ pub fn scan_do_while(statements: &mut Vec<Statement>) {
         // reconstruct while…do block
         let mut while_block = statements.drain((i + 2)..matching_goto as usize).collect();
         statements.drain(i + 1..i + 3);
+        let continue_label = super::get_last_label(&statements[i..i + 1]);
+        super::handle_break_continue(break_label, continue_label, statements);
+        println!("111111");
         reconstruct_block(&mut while_block);
-        statements[i + 1] = WhileDoStatement::create_empty_statement(next_loop_if.get_condition().negate_expression(), while_block);
+
+        if while_block.len() == 1 {
+            statements[i + 1] = WhileStatement::create_empty_statement(next_loop_if.get_condition().negate_expression().clone(), while_block.pop().unwrap());
+        } else {
+            statements[i + 1] = WhileDoStatement::create_empty_statement(next_loop_if.get_condition().negate_expression().clone(), while_block);
+        }
         i += 1;
     }
 }
@@ -77,7 +86,6 @@ ENDWHILE
 */
 fn scan_do_while_case2(statements: &mut Vec<Statement>) {
     let mut i = 0;
-
     while i + 4 < statements.len() {
         let Statement::Label(while_continue_label) = statements[i].clone() else {
             i += 1;
@@ -99,13 +107,14 @@ fn scan_do_while_case2(statements: &mut Vec<Statement>) {
             i += 1;
             continue;
         };
-
-        if next_loop_goto.get_label() != next_loop_label.get_label() {
+        let while_continue_label = while_continue_label.get_label().clone();
+        let next_loop_label = next_loop_label.get_label().clone();
+        if next_loop_goto.get_label() != &next_loop_label {
             i += 1;
             continue;
         }
         // search "loop" goto
-        let Some(matching_goto) = scan_goto(&statements, i + 4, while_continue_label.get_label()) else {
+        let Some(matching_goto) = scan_goto(&statements, i + 4, &while_continue_label) else {
             i += 1;
             continue;
         };
@@ -114,18 +123,24 @@ fn scan_do_while_case2(statements: &mut Vec<Statement>) {
             i += 1;
             continue;
         };
-        if break_label.get_label() != break_goto.get_label() {
+        let break_label = break_label.get_label().clone();
+        if break_label != break_goto.get_label() {
             i += 1;
             continue;
         }
         // reconstruct while…do block
-        let mut while_block = statements.drain((i + 4)..matching_goto as usize).collect();
-
+        let mut while_block: Vec<Statement> = statements.drain((i + 4)..matching_goto as usize).collect();
+        let continue_label = super::get_last_label(&while_block);
         statements.drain(i + 1..i + 4);
-
         reconstruct_block(&mut while_block);
+        super::handle_break_continue(break_label, continue_label, &mut while_block);
 
-        statements[i + 1] = WhileDoStatement::create_empty_statement(next_loop_if.get_condition().clone(), while_block);
-        i += 1;
+        if while_block.len() == 1 {
+            statements[i + 1] = WhileStatement::create_empty_statement(next_loop_if.get_condition().clone(), while_block.pop().unwrap());
+        } else {
+            statements[i + 1] = WhileDoStatement::create_empty_statement(next_loop_if.get_condition().clone(), while_block);
+        }
+
+        break;
     }
 }

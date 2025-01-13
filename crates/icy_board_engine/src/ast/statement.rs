@@ -9,6 +9,8 @@ use super::{AstVisitor, AstVisitorMut, Constant, ConstantExpression, Expression,
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
+    /// Used for Ast tranformation to remove a statement.
+    Empty,
     Comment(CommentAstNode),
     Block(BlockStatement),
 
@@ -38,6 +40,7 @@ pub enum Statement {
 impl Statement {
     pub fn get_span(&self) -> core::ops::Range<usize> {
         match self {
+            Statement::Empty => 0..0,
             Statement::Comment(c) => c.get_comment_token().span.clone(),
             Statement::Block(b) => b.get_begin_token().span.clone(),
             Statement::If(i) => i.get_if_token().span.clone(),
@@ -63,6 +66,7 @@ impl Statement {
 
     pub fn visit<T: Default, V: AstVisitor<T>>(&self, visitor: &mut V) -> T {
         match self {
+            Statement::Empty => T::default(),
             Statement::Comment(s) => visitor.visit_comment(s),
             Statement::Block(s) => visitor.visit_block_statement(s),
             Statement::If(s) => visitor.visit_if_statement(s),
@@ -90,6 +94,7 @@ impl Statement {
     #[must_use]
     pub fn visit_mut<V: AstVisitorMut>(&self, visitor: &mut V) -> Self {
         match self {
+            Statement::Empty => Statement::Empty,
             Statement::Comment(s) => visitor.visit_comment_statement(s),
             Statement::Block(s) => Statement::Block(visitor.visit_block(s)),
             Statement::If(s) => visitor.visit_if_statement(s),

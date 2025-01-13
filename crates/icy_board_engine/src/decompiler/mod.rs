@@ -17,6 +17,7 @@ use self::evaluation_visitor::OptimizationVisitor;
 pub mod constant_scan_visitor;
 pub mod evaluation_visitor;
 pub mod reconstruct;
+pub mod relabel_visitor;
 pub mod rename_visitor;
 
 #[cfg(test)]
@@ -56,7 +57,7 @@ impl Decompiler {
             functions: Vec::new(),
             cur_ptr: 0,
             issues: Vec::new(),
-            optimize_output
+            optimize_output,
         })
     }
 
@@ -251,7 +252,7 @@ impl Decompiler {
                 }
 
                 let expr = UnaryExpression::create_empty_expression(*op, expr);
-                if self.optimize_output { 
+                if self.optimize_output {
                     expr.visit_mut(&mut OptimizationVisitor::default())
                 } else {
                     expr
@@ -262,7 +263,7 @@ impl Decompiler {
                 let right = add_parens_if_required(*op, self.decompile_expression(right));
 
                 let expr = BinaryExpression::create_empty_expression(*op, left, right);
-                if self.optimize_output { 
+                if self.optimize_output {
                     expr.visit_mut(&mut OptimizationVisitor::default())
                 } else {
                     expr
@@ -294,7 +295,7 @@ impl Decompiler {
 
             PPECommand::IfNot(expr, label) => {
                 let expr = self.decompile_expression(expr);
-
+                let expr = Statement::try_boolean_conversion(&expr);
                 IfStatement::create_empty_statement(expr.negate_expression(), GotoStatement::create_empty_statement(self.get_label_name(*label)))
             }
             PPECommand::ProcedureCall(p, args) => {
@@ -515,6 +516,7 @@ pub fn decompile(executable: Executable, raw: bool) -> Res<(Ast, Vec<DecompilerI
                     }
                 }
                 ast = reconstruct::finish_ast(&mut ast);
+                ast = relabel_visitor::relabel_ast(&mut ast);
             }
 
             Ok((ast, d.issues))
