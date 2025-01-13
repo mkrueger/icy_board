@@ -364,7 +364,7 @@ impl Backend {
         let uri = params.uri.to_string();
         self.document_map.insert(uri.clone(), rope.clone());
         let reg = UserTypeRegistry::default();
-        let (ast, errors) = parse_ast(PathBuf::from(uri), &params.text, &reg, Encoding::Utf8, LAST_PPLC);
+        let (ast, errors) = parse_ast(PathBuf::from(uri.clone()), &params.text, &reg, Encoding::Utf8, LAST_PPLC);
 
         let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, errors, &reg);
 
@@ -385,6 +385,7 @@ impl Backend {
             let start_position = offset_to_position(err.span.start, &rope).unwrap_or(Position::new(0, 0));
             let end_position = offset_to_position(err.span.end, &rope).unwrap_or(Position::new(0, 0));
             let mut diag = Diagnostic::new_simple(Range::new(start_position, end_position), format!("{}", err.error));
+            diag.source = Some(uri.clone());
             diag.severity = Some(DiagnosticSeverity::WARNING);
             diagnostics.push(diag);
         }
