@@ -82,13 +82,17 @@ pub enum CompilationWarningType {
     UnusedLabel(String),
 }
 
+struct LabelDescriptor {
+    pub offset: usize,
+}
+
 pub struct PPECompiler<'a> {
     lookup_table: LookupVariabeleTable,
     semantic_visitor: SemanticVisitor<'a>,
 
     cur_offset: usize,
 
-    label_table: Vec<i32>,
+    label_table: Vec<LabelDescriptor>,
     label_lookup_table: HashMap<unicase::Ascii<String>, usize>,
 
     commands: PPEScript,
@@ -206,8 +210,8 @@ impl<'a> PPECompiler<'a> {
             Statement::Empty => None,
             Statement::Comment(_) => None,
             Statement::Return(_) => Some(PPECommand::Return),
-            Statement::Gosub(gosub_stmt) => Some(PPECommand::Gosub(self.get_label_index(gosub_stmt.get_label()))),
-            Statement::Goto(goto_stmt) => Some(PPECommand::Goto(self.get_label_index(goto_stmt.get_label()))),
+            Statement::Gosub(gosub_stmt) => Some(PPECommand::Gosub(self.get_label_index(gosub_stmt.get_label_token()))),
+            Statement::Goto(goto_stmt) => Some(PPECommand::Goto(self.get_label_index(goto_stmt.get_label_token()))),
             Statement::Label(label) => {
                 self.set_label_offset(label.get_label_token());
                 None
@@ -218,7 +222,7 @@ impl<'a> PPECompiler<'a> {
                 };
 
                 let cond_buffer = self.comp_expr(if_stmt.get_condition()).visit_mut(&mut ExpressionNegator::default());
-                Some(PPECommand::IfNot(Box::new(cond_buffer), self.get_label_index(goto_stmt.get_label())))
+                Some(PPECommand::IfNot(Box::new(cond_buffer), self.get_label_index(goto_stmt.get_label_token())))
             }
 
             Statement::VariableDeclaration(_) => None,
@@ -353,13 +357,17 @@ impl<'a> PPECompiler<'a> {
         expr.visit(&mut ExpressionCompiler { compiler: self })
     }
 
-    fn get_label_index(&mut self, label: &unicase::Ascii<String>) -> usize {
-        if let Some(idx) = self.label_lookup_table.get(label) {
+    fn get_label_index(&mut self, label_token: &Spanned<Token>) -> usize {
+        let Token::Identifier(label) = &label_token.token else {
+            panic!("Invalid label token {:?}", label_token);
+        };
+
+        if let Some(idx) = self.label_lookup_table.get(&label) {
             *idx
         } else {
             let idx = self.label_table.len();
             self.label_lookup_table.insert(label.clone(), idx);
-            self.label_table.push(-1);
+            self.label_table.push(LabelDescriptor { offset: self.cur_offset });
             idx
         }
     }
@@ -370,15 +378,15 @@ impl<'a> PPECompiler<'a> {
             return;
         };
         if let Some(idx) = self.label_lookup_table.get_mut(identifier) {
-            if self.label_table[*idx] >= 0 {
+            let label_descr = &mut self.label_table[*idx];
+            if label_descr.offset > 0 {
                 log::error!("Label already defined: {}", identifier);
                 return;
             }
-            self.label_table[*idx] = self.cur_offset as i32;
+            label_descr.offset = self.cur_offset;
         } else {
-            let idx = self.label_table.len();
-            self.label_lookup_table.insert(identifier.clone(), idx);
-            self.label_table.push(self.cur_offset as i32);
+            self.label_lookup_table.insert(identifier.clone(), self.label_table.len());
+            self.label_table.push(LabelDescriptor { offset: self.cur_offset });
         }
     }
 
@@ -391,11 +399,14 @@ impl<'a> PPECompiler<'a> {
         for stmt in &mut self.commands.statements {
             match &mut stmt.command {
                 PPECommand::IfNot(_, idx) | PPECommand::Goto(idx) | PPECommand::Gosub(idx) => {
-                    let label_idx = self.label_table[*idx];
-                    if label_idx < 0 {
-                        *idx = last;
+                    if let Some(label_descr) = self.label_table.get(*idx) {
+                        if label_descr.offset == 0 {
+                            *idx = last;
+                        } else {
+                            *idx = label_descr.offset as usize * 2;
+                        }
                     } else {
-                        *idx = label_idx as usize * 2;
+                        panic!("Label {idx} not found only {} labels defined.", self.label_table.len());
                     }
                 }
                 _ => {}

@@ -11,7 +11,7 @@ use crate::{
         ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation,
         VariableDeclarationStatement,
     },
-    compiler::{user_data::UserDataMemberRegistry, CompilationErrorType},
+    compiler::{user_data::UserDataMemberRegistry, CompilationErrorType, CompilationWarningType},
     executable::{
         EntryType, FuncOpCode, FunctionDefinition, FunctionValue, GenericVariableData, OpCode, ProcedureValue, TableEntry, VarHeader, VariableData,
         VariableTable, VariableType, VariableValue, FUNCTION_DEFINITIONS, USER_VARIABLES,
@@ -604,9 +604,7 @@ impl<'a> SemanticVisitor<'a> {
             self.label_lookup_table.insert(identifier.clone(), self.label_count);
             self.label_count
         };
-
         log::info!("Label declaration {:?} -> {:?}", identifier, label_token.span);
-
         let reftype = ReferenceType::Label(idx);
 
         for (_i, r) in &mut self.references.iter_mut().enumerate() {
@@ -1401,13 +1399,22 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
         }
 
         for (rt, r) in &mut self.references.iter() {
-            let Some(decl) = &r.declaration else {
-                if matches!(rt, ReferenceType::Label(_)) {
+            if matches!(rt, ReferenceType::Label(_)) {
+                if r.declaration.is_none() {
                     self.errors.lock().unwrap().report_error(
                         r.usages.first().unwrap().span.clone(),
                         CompilationErrorType::LabelNotFound(r.usages.first().unwrap().token.to_string()),
                     );
+                } else if r.usages.is_empty() {
+                    self.errors.lock().unwrap().report_warning(
+                        r.declaration.as_ref().unwrap().span.clone(),
+                        CompilationWarningType::UnusedLabel(r.declaration.as_ref().unwrap().token.to_string()),
+                    );
                 }
+                continue;
+            }
+
+            let Some(decl) = &r.declaration else {
                 continue;
             };
 
