@@ -587,8 +587,8 @@ impl<'a> Parser<'a> {
                 let mut leftpar_token = None;
                 let mut rightpar_token = None;
                 let mut params = Vec::new();
-
-                if self.get_cur_token() == Some(Token::LPar) {
+                let is_lpar = self.get_cur_token() == Some(Token::LPar);
+                if is_lpar || self.get_cur_token() == Some(Token::LBracket) {
                     leftpar_token = Some(self.save_spanned_token());
                     self.next_token();
 
@@ -598,7 +598,7 @@ impl<'a> Parser<'a> {
                             return None;
                         };
 
-                        if token == Token::RPar {
+                        if is_lpar && token == Token::RPar || !is_lpar && token == Token::RBracket {
                             break;
                         }
                         let Some(expr) = self.parse_expression() else {
@@ -608,7 +608,7 @@ impl<'a> Parser<'a> {
                         params.push(expr);
                         self.skip_eol();
 
-                        if self.get_cur_token() == Some(Token::RPar) {
+                        if is_lpar && self.get_cur_token() == Some(Token::RPar) || !is_lpar && self.get_cur_token() == Some(Token::RBracket) {
                             break;
                         }
                         if self.get_cur_token() == Some(Token::Comma) {

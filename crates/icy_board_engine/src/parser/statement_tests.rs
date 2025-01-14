@@ -633,6 +633,20 @@ fn check_let_statement() {
             ConstantExpression::create_empty_expression(Constant::Integer(5)),
         ),
     );
+
+    check_statement(
+        "LET A[1, 2, 3] = 5",
+        &LetStatement::create_empty_statement(
+            unicase::Ascii::new("A".to_string()),
+            Token::Eq,
+            vec![
+                ConstantExpression::create_empty_expression(Constant::Integer(1)),
+                ConstantExpression::create_empty_expression(Constant::Integer(2)),
+                ConstantExpression::create_empty_expression(Constant::Integer(3)),
+            ],
+            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+        ),
+    );
 }
 
 #[test]
