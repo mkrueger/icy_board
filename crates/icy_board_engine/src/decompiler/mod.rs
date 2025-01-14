@@ -136,13 +136,15 @@ impl Decompiler {
             }
             statements.pop();
         }
-        /*
-        statements.push(LabelStatement::create_empty_statement(unicase::Ascii::new(
-            "EXIT_LABEL".to_string(),
-        )));*/
+
         if !self.functions.is_empty() {
             statements.push(PredefinedCallStatement::create_empty_statement(OpCode::END.get_definition(), Vec::new()));
         }
+
+        // Generate exit label - there is a case where this is needed
+        // Gets removed if not used
+        statements.push(LabelStatement::create_empty_statement(unicase::Ascii::new("EXIT_LABEL".to_string())));
+
         ast.nodes.push(AstNode::Main(BlockStatement::empty(statements)));
 
         ast.nodes.append(&mut self.functions);
@@ -170,6 +172,7 @@ impl Decompiler {
                 "Search for 'PPLC bug' and look out for !!!<expr> or !<expr>*!<expr> cases.".to_string(),
             )));
         }
+
         Ok(ast)
     }
 

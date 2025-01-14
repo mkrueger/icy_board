@@ -144,9 +144,15 @@ fn scan_do_while_case2(statements: &mut Vec<Statement>) {
         super::handle_break_continue(break_label, continue_label, &mut while_block);
 
         if while_block.len() == 1 {
-            statements.insert(i + 1, WhileStatement::create_empty_statement(next_loop_if.get_condition().clone(), while_block.pop().unwrap()));
+            statements.insert(
+                i + 1,
+                WhileStatement::create_empty_statement(next_loop_if.get_condition().clone(), while_block.pop().unwrap()),
+            );
         } else {
-            statements.insert(i + 1,WhileDoStatement::create_empty_statement(next_loop_if.get_condition().clone(), while_block));
+            statements.insert(
+                i + 1,
+                WhileDoStatement::create_empty_statement(next_loop_if.get_condition().clone(), while_block),
+            );
         }
 
         break;

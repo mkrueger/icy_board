@@ -81,6 +81,7 @@ impl AstVisitor<()> for OutputVisitor {
                 self.output_keyword(b.name);
             }
             super::Constant::String(s) => {
+                let s = s.replace("\"", "\"\"");
                 self.output.push_str(&format!("\"{s}\""));
             }
             super::Constant::Boolean(b) => {
