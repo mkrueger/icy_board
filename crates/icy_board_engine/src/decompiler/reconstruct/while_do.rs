@@ -3,7 +3,7 @@ use crate::{
     decompiler::reconstruct::scan_goto,
 };
 
-use super::reconstruct_block;
+use super::optimize_block;
 
 /* Compiled Example:
 
@@ -59,7 +59,7 @@ pub fn scan_do_while(statements: &mut Vec<Statement>) {
         statements.drain(i + 1..i + 3);
         let continue_label = super::get_last_label(&statements[i..i + 1]);
         super::handle_break_continue(break_label, continue_label, statements);
-        reconstruct_block(&mut while_block);
+        optimize_block(&mut while_block);
 
         if while_block.len() == 1 {
             statements[i + 1] = WhileStatement::create_empty_statement(next_loop_if.get_condition().negate_expression().clone(), while_block.pop().unwrap());
@@ -140,7 +140,7 @@ fn scan_do_while_case2(statements: &mut Vec<Statement>) {
         statements.remove(i + 4);
         statements.drain(i + 1..i + 3);
 
-        reconstruct_block(&mut while_block);
+        optimize_block(&mut while_block);
         super::handle_break_continue(break_label, continue_label, &mut while_block);
 
         if while_block.len() == 1 {

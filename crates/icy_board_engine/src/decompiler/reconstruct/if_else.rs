@@ -1,5 +1,7 @@
 use crate::ast::{ElseBlock, ElseIfBlock, Statement};
 
+use super::optimize_block;
+
 /*
 
 Simple:
@@ -112,7 +114,8 @@ pub fn scan_if_else(statements: &mut Vec<Statement>) {
         }
 
         if has_else && j < idx {
-            let stmts = statements.drain(j..idx).collect();
+            let mut stmts = statements.drain(j..idx).collect();
+            optimize_block(&mut stmts);
             *if_stmt.get_else_block_mut() = Some(ElseBlock::empty(stmts));
             idx = j;
         }
