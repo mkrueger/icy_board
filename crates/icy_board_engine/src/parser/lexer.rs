@@ -469,12 +469,19 @@ impl Lexer {
                         return None;
                     };
                     if sch == '"'  {
-                        if let Some('"') = self.next_ch() {
-                            string_result.push('"');
-                            continue;
-                        };
-                        self.put_back();
-                        break;
+                        match self.next_ch() {
+                            Some('"') => {
+                                string_result.push('"');
+                                continue;
+                            }
+                            None => {
+                                break;
+                            }
+                            _ => {
+                                self.put_back();
+                                break;
+                            }
+                        }
                     }
                     string_result.push(sch);
                 }
