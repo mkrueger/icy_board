@@ -837,14 +837,14 @@ impl<'a> Parser<'a> {
             }
             return Some(Statement::PredifinedCall(PredefinedCallStatement::new(id_token, def, params)));
         }
-
-        if self.get_cur_token() == Some(Token::LPar) {
+        let is_lpar = self.get_cur_token() == Some(Token::LPar);
+        if is_lpar || self.get_cur_token() == Some(Token::LBracket) {
             let lpar_token = self.save_spanned_token();
 
             self.next_token();
             let mut params = Vec::new();
 
-            while self.get_cur_token() != Some(Token::RPar) {
+            while is_lpar && self.get_cur_token() != Some(Token::RPar) || !is_lpar && self.get_cur_token() != Some(Token::RBracket) {
                 let Some(right) = self.parse_expression() else {
                     self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
 
@@ -855,7 +855,7 @@ impl<'a> Parser<'a> {
                     self.next_token();
                 }
             }
-            if self.get_cur_token() != Some(Token::RPar) {
+            if is_lpar && self.get_cur_token() != Some(Token::RPar) || !is_lpar && self.get_cur_token() != Some(Token::RBracket) {
                 self.report_error(self.save_token_span(), ParserErrorType::MissingCloseParens(self.save_token()));
 
                 return None;

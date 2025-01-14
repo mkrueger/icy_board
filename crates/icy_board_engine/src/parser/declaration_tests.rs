@@ -77,14 +77,10 @@ fn test_proc_declarations() {
 fn test_variable_declariton() {
     check_ast_node(
         "STRING FOO[5]",
-        &AstNode::TopLevelStatement(crate::ast::Statement::VariableDeclaration(
-            VariableDeclarationStatement::empty(
-                VariableType::String,
-                vec![
-                    VariableSpecifier::empty(unicase::Ascii::new("FOO".to_string()), vec![5]),
-                ]
-            )
-        ))
+        &AstNode::TopLevelStatement(crate::ast::Statement::VariableDeclaration(VariableDeclarationStatement::empty(
+            VariableType::String,
+            vec![VariableSpecifier::empty(unicase::Ascii::new("FOO".to_string()), vec![5])],
+        ))),
     );
 }
 
@@ -107,7 +103,6 @@ fn test_func_declarations() {
         ),
     );
 }
-
 
 /*  use super::*;
 
