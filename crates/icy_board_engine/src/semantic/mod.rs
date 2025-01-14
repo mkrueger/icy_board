@@ -1128,7 +1128,7 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
                 self.errors
                     .lock()
                     .unwrap()
-                    .report_error(let_stmt.get_identifier_token().span.clone(), CompilationErrorType::InvalidLetVariable);
+                    .report_warning(let_stmt.get_identifier_token().span.clone(), CompilationWarningType::CannotAssignToProcedure);
             } else if self.references[idx].1.variable_type == VariableType::Function {
                 self.references[idx].1.return_types.push(Spanned::new(
                     let_stmt.get_identifier().to_string(),
