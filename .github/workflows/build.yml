@@ -59,6 +59,7 @@ jobs:
      id: build
      run: |
        $VERSION=$(python tools\prep_diz.py "file_id.diz")
+       Add-Content -Path $env:GITHUB_ENV -Value "VERSION=$VERSION"
        echo "Version: $VERSION"
        cargo build --release
        echo "Copy $DEB to icy_board.deb"
@@ -180,6 +181,7 @@ jobs:
        cd crates/ppl-lsp
        export version=$(python3 ../../tools/get_version.py)
        echo "Version: $VERSION"
+       echo "VERSION=$version" >> $GITHUB_ENV
    - name: Install required libraries
      run: |
        cd crates/ppl-lsp
