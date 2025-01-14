@@ -166,4 +166,26 @@ jobs:
          x86_64-apple-darwin/bin/ppl-language-server
          file_id.diz
          INSTALL.txt
-  
+  build_vs_extension:
+   runs-on: ubuntu-latest
+   steps:
+   - uses: actions/checkout@v4
+   - name: Install required libraries
+     run: |
+       cd crates/ppl-lsp/
+       $VERSION=$(python ../../tools/get_version.py)
+       echo "Version: $VERSION"
+       npm install -g pnpm@latest-10
+       pnpm i
+   - name: Build
+     id: build
+     run: |
+       cd crates/ppl-lsp/
+       tsc -b
+       npm run compile
+       pnpm run package
+   - name: 'Upload zip'
+     uses: actions/upload-artifact@v4
+     with:
+       name: ppl-language-server-${{ env.VERSION }}.vsix
+       path: ppl-language-server-${{ env.VERSION }}.vsix
