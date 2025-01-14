@@ -37,7 +37,10 @@ pub struct Decompiler {
     script: PPEScript,
 
     functions: Vec<AstNode>,
+
     label_lookup: HashMap<usize, usize>,
+    used_labels: HashSet<usize>,
+
     function_lookup: HashMap<usize, usize>,
     cur_ptr: usize,
     issues: Vec<DecompilerIssue>,
@@ -57,6 +60,7 @@ impl Decompiler {
             script,
             label_lookup: HashMap::new(),
             function_lookup: HashMap::new(),
+            used_labels: HashSet::new(),
             functions: Vec::new(),
             cur_ptr: 0,
             issues: Vec::new(),
@@ -75,22 +79,13 @@ impl Decompiler {
                 _ => {}
             }
         }
-
-        let label_list = labels.into_iter().collect::<Vec<usize>>();
-        let mut cur_label = 0;
+        let mut label_list = labels.into_iter().collect::<Vec<usize>>();
+        label_list.sort();
 
         let mut label_offsets = HashMap::new();
-
-        for label in label_list {
-            for statement in &self.script.statements {
-                if statement.span.start * 2 == label {
-                    label_offsets.insert(label, cur_label);
-                    cur_label += 1;
-                    break;
-                }
-            }
+        for (i, label) in label_list.iter().enumerate() {
+            label_offsets.insert(*label, i);
         }
-
         label_offsets
     }
 
@@ -128,6 +123,7 @@ impl Decompiler {
 
             if self.label_lookup.contains_key(&(byte_offset)) {
                 let label = self.get_label_name(byte_offset);
+                self.used_labels.insert(byte_offset);
                 statements.push(LabelStatement::create_empty_statement(label));
             }
             if let Some(bugs) = self.script.bugged_offsets.get_mut(&statement.span.start) {
@@ -155,7 +151,11 @@ impl Decompiler {
         // Generate exit label - there is a case where this is needed
         // Gets removed if not used
         statements.push(LabelStatement::create_empty_statement(unicase::Ascii::new("EXIT_LABEL".to_string())));
-
+        for (offset, _i) in &self.label_lookup {
+            if !self.used_labels.contains(offset) {
+                statements.push(LabelStatement::create_empty_statement(self.get_label_name(*offset)));
+            }
+        }
         ast.nodes.push(AstNode::Main(BlockStatement::empty(statements)));
 
         ast.nodes.append(&mut self.functions);
@@ -357,6 +357,7 @@ impl Decompiler {
             let statement = &self.script.statements[self.cur_ptr];
             let byte_offset = statement.span.start * 2;
             if self.label_lookup.contains_key(&(byte_offset)) {
+                self.used_labels.insert(byte_offset);
                 func_body.push(LabelStatement::create_empty_statement(self.get_label_name(byte_offset)));
             }
 
