@@ -170,12 +170,14 @@ jobs:
    runs-on: ubuntu-latest
    steps:
    - uses: actions/checkout@v4
-   - name: Install required libraries
+   - name: Install pnpm
      run: |
        cd crates/ppl-lsp/
        $VERSION=$(python ../../tools/get_version.py)
        echo "Version: $VERSION"
        npm install -g pnpm@latest-10
+   - name: Install required libraries
+     run: |
        pnpm i
    - name: Build
      id: build
