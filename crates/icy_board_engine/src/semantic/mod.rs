@@ -727,7 +727,7 @@ impl<'a> SemanticVisitor<'a> {
             self.add_declaration(
                 ReferenceType::Variable(id),
                 param.get_variable_type(),
-                param.get_variable().get_identifier_token(),
+                param.get_variable().as_ref().unwrap().get_identifier_token(),
             );
             self.references[id].1.header = Some(VarHeader {
                 id,
@@ -743,7 +743,7 @@ impl<'a> SemanticVisitor<'a> {
                 .as_mut()
                 .unwrap()
                 .variable_lookup
-                .insert(unicase::Ascii::new(param.get_variable().get_identifier().to_string()), id);
+                .insert(unicase::Ascii::new(param.get_variable().as_ref().unwrap().get_identifier().to_string()), id);
         }
     }
 

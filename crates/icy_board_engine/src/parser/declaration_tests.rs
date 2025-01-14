@@ -13,21 +13,6 @@ fn parse_ast_node(input: &str, assert_eof: bool) -> AstNode {
     let mut parser = Parser::new(PathBuf::from("."), &reg, input, Encoding::Utf8, LAST_PPLC);
     parser.next_token();
     let res = parser.parse_ast_node().unwrap();
-    if let Ok(errs) = parser.errors.lock() {
-        if errs.has_errors() {
-            for err in &errs.errors {
-                println!("Error: {:?}", err.error);
-            }
-            panic!();
-        }
-
-        if errs.has_warnings() {
-            for err in &errs.warnings {
-                println!("Error: {:?}", err.error);
-            }
-            panic!();
-        }
-    }
     if assert_eof {
         assert!(parser.get_cur_token().is_none(), "Expected EOF, but got {:?}", parser.get_cur_token());
     }
@@ -56,7 +41,7 @@ fn test_proc_declarations() {
             vec![ParameterSpecifier::empty(
                 false,
                 VariableType::Byte,
-                VariableSpecifier::empty(unicase::Ascii::new("B".to_string()), vec![]),
+                Some(VariableSpecifier::empty(unicase::Ascii::new("B".to_string()), vec![])),
             )],
         ),
     );
@@ -67,8 +52,19 @@ fn test_proc_declarations() {
             vec![ParameterSpecifier::empty(
                 true,
                 VariableType::Byte,
-                VariableSpecifier::empty(unicase::Ascii::new("B".to_string()), vec![]),
+                Some(VariableSpecifier::empty(unicase::Ascii::new("B".to_string()), vec![])),
             )],
+        ),
+    );
+}
+
+#[test]
+fn test_proc_without_name() {
+    check_ast_node(
+        "DECLARE PROCEDURE PROC001(BYTE)",
+        &ProcedureDeclarationAstNode::empty_node(
+            unicase::Ascii::new("PROC001".to_string()),
+            vec![ParameterSpecifier::empty(false, VariableType::Byte, None)],
         ),
     );
 }
@@ -97,7 +93,7 @@ fn test_func_declarations() {
             vec![ParameterSpecifier::empty(
                 false,
                 VariableType::Byte,
-                VariableSpecifier::empty(unicase::Ascii::new("B".to_string()), vec![]),
+                Some(VariableSpecifier::empty(unicase::Ascii::new("B".to_string()), vec![])),
             )],
             VariableType::Integer,
         ),

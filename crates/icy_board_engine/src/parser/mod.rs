@@ -544,7 +544,12 @@ impl<'a> Parser<'a> {
     /// # Panics
     ///
     /// Panics if .
-    pub fn parse_var_info(&mut self) -> Option<VariableSpecifier> {
+    pub fn parse_var_info(&mut self, can_be_empty: bool) -> Option<VariableSpecifier> {
+        if can_be_empty {
+            if matches!(self.get_cur_token(), Some(Token::Comma)) || matches!(self.get_cur_token(), Some(Token::RPar)) {
+                return None;
+            }
+        }
         let Some(Token::Identifier(_)) = self.get_cur_token() else {
             self.report_error(self.lex.span(), ParserErrorType::IdentifierExpected(self.save_token()));
             return None;
@@ -655,11 +660,12 @@ impl<'a> Parser<'a> {
                     self.next_token();
                 }
             }
-
+            println!("----------------------");
             if let Some(var_type) = self.get_variable_type() {
                 let type_token = self.save_spanned_token();
                 self.next_token();
-                let info = self.parse_var_info()?;
+                let info = self.parse_var_info(true);
+                println!("token: {:?}", self.get_cur_token());
                 parameters.push(ParameterSpecifier::new(var_token, type_token, var_type, info));
             } else {
                 self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
@@ -767,7 +773,7 @@ impl<'a> Parser<'a> {
                     let type_token = self.save_spanned_token();
                     self.next_token();
 
-                    let info = self.parse_var_info()?;
+                    let info = self.parse_var_info(false);
                     parameters.push(ParameterSpecifier::new(var_token, type_token, var_type, info));
                 } else {
                     self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
@@ -860,7 +866,7 @@ impl<'a> Parser<'a> {
                     let type_token = self.save_spanned_token();
                     self.next_token();
 
-                    let info = self.parse_var_info()?;
+                    let info = self.parse_var_info(false);
                     parameters.push(ParameterSpecifier::new(None, type_token, var_type, info));
                 } else {
                     self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));

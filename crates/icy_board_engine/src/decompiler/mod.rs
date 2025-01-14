@@ -463,7 +463,7 @@ impl Decompiler {
                 parameters.push(ParameterSpecifier::empty(
                     is_var,
                     param.header.variable_type,
-                    VariableSpecifier::empty(unicase::Ascii::new(param.name.clone()), dimensions),
+                    Some(VariableSpecifier::empty(unicase::Ascii::new(param.name.clone()), dimensions)),
                 ));
             }
 

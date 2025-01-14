@@ -481,18 +481,20 @@ impl AstVisitor<()> for OutputVisitor {
                 self.output.push(' ');
             }
             self.output_keyword(arg.get_variable_type().to_string().as_str());
-            self.output.push(' ');
-            self.output(arg.get_variable().get_identifier());
+            if let Some(variable) = arg.get_variable() {
+                self.output.push(' ');
+                self.output(variable.get_identifier());
 
-            if !arg.get_variable().get_dimensions().is_empty() {
-                self.output.push('(');
-                for (j, dim) in arg.get_variable().get_dimensions().iter().enumerate() {
-                    self.output.push_str(dim.get_dimension().to_string().as_str());
-                    if j < arg.get_variable().get_dimensions().len() - 1 {
-                        self.output.push_str(", ");
+                if !variable.get_dimensions().is_empty() {
+                    self.output.push('(');
+                    for (j, dim) in variable.get_dimensions().iter().enumerate() {
+                        self.output.push_str(dim.get_dimension().to_string().as_str());
+                        if j < variable.get_dimensions().len() - 1 {
+                            self.output.push_str(", ");
+                        }
                     }
+                    self.output.push(')');
                 }
-                self.output.push(')');
             }
 
             if i < proc_decl.get_parameters().len() - 1 {
@@ -512,20 +514,21 @@ impl AstVisitor<()> for OutputVisitor {
                 self.output.push(' ');
             }
             self.output_keyword(arg.get_variable_type().to_string().as_str());
-            self.output.push(' ');
-            self.output(arg.get_variable().get_identifier());
+            if let Some(variable) = arg.get_variable() {
+                self.output.push(' ');
+                self.output(variable.get_identifier());
 
-            if !arg.get_variable().get_dimensions().is_empty() {
-                self.output.push('(');
-                for (j, dim) in arg.get_variable().get_dimensions().iter().enumerate() {
-                    self.output.push_str(dim.get_dimension().to_string().as_str());
-                    if j < arg.get_variable().get_dimensions().len() - 1 {
-                        self.output.push_str(", ");
+                if !variable.get_dimensions().is_empty() {
+                    self.output.push('(');
+                    for (j, dim) in variable.get_dimensions().iter().enumerate() {
+                        self.output.push_str(dim.get_dimension().to_string().as_str());
+                        if j < variable.get_dimensions().len() - 1 {
+                            self.output.push_str(", ");
+                        }
                     }
+                    self.output.push(')');
                 }
-                self.output.push(')');
             }
-
             if i < func_decl.get_parameters().len() - 1 {
                 self.output.push_str(", ");
             }
@@ -544,18 +547,20 @@ impl AstVisitor<()> for OutputVisitor {
                 self.output.push(' ');
             }
             self.output_keyword(arg.get_variable_type().to_string().as_str());
-            self.output.push(' ');
-            self.output(arg.get_variable().get_identifier());
+            if let Some(variable) = arg.get_variable() {
+                self.output.push(' ');
+                self.output(variable.get_identifier());
 
-            if !arg.get_variable().get_dimensions().is_empty() {
-                self.output.push('(');
-                for (j, dim) in arg.get_variable().get_dimensions().iter().enumerate() {
-                    self.output.push_str(dim.get_dimension().to_string().as_str());
-                    if j < arg.get_variable().get_dimensions().len() - 1 {
-                        self.output.push_str(", ");
+                if !variable.get_dimensions().is_empty() {
+                    self.output.push('(');
+                    for (j, dim) in variable.get_dimensions().iter().enumerate() {
+                        self.output.push_str(dim.get_dimension().to_string().as_str());
+                        if j < variable.get_dimensions().len() - 1 {
+                            self.output.push_str(", ");
+                        }
                     }
+                    self.output.push(')');
                 }
-                self.output.push(')');
             }
 
             if i < function.get_parameters().len() - 1 {
@@ -585,18 +590,20 @@ impl AstVisitor<()> for OutputVisitor {
                 self.output.push(' ');
             }
             self.output_keyword(arg.get_variable_type().to_string().as_str());
-            self.output.push(' ');
-            self.output(arg.get_variable().get_identifier());
+            if let Some(variable) = arg.get_variable() {
+                self.output.push(' ');
+                self.output(variable.get_identifier());
 
-            if !arg.get_variable().get_dimensions().is_empty() {
-                self.output.push('(');
-                for (j, dim) in arg.get_variable().get_dimensions().iter().enumerate() {
-                    self.output.push_str(dim.get_dimension().to_string().as_str());
-                    if j < arg.get_variable().get_dimensions().len() - 1 {
-                        self.output.push_str(", ");
+                if !variable.get_dimensions().is_empty() {
+                    self.output.push('(');
+                    for (j, dim) in variable.get_dimensions().iter().enumerate() {
+                        self.output.push_str(dim.get_dimension().to_string().as_str());
+                        if j < variable.get_dimensions().len() - 1 {
+                            self.output.push_str(", ");
+                        }
                     }
+                    self.output.push(')');
                 }
-                self.output.push(')');
             }
 
             if i < procedure.get_parameters().len() - 1 {

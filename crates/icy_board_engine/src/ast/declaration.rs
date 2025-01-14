@@ -261,11 +261,11 @@ pub struct ParameterSpecifier {
     var_token: Option<Spanned<Token>>,
     type_token: Spanned<Token>,
     variable_type: VariableType,
-    variable: VariableSpecifier,
+    variable: Option<VariableSpecifier>,
 }
 
 impl ParameterSpecifier {
-    pub fn new(var_token: Option<Spanned<Token>>, type_token: Spanned<Token>, variable_type: VariableType, variable: VariableSpecifier) -> Self {
+    pub fn new(var_token: Option<Spanned<Token>>, type_token: Spanned<Token>, variable_type: VariableType, variable: Option<VariableSpecifier>) -> Self {
         Self {
             var_token,
             type_token,
@@ -274,7 +274,7 @@ impl ParameterSpecifier {
         }
     }
 
-    pub fn empty(is_var: bool, variable_type: VariableType, variable: VariableSpecifier) -> Self {
+    pub fn empty(is_var: bool, variable_type: VariableType, variable: Option<VariableSpecifier>) -> Self {
         Self {
             var_token: if is_var {
                 Some(Spanned::create_empty(Token::Identifier(unicase::Ascii::new("VAR".to_string()))))
@@ -303,11 +303,11 @@ impl ParameterSpecifier {
         self.variable_type
     }
 
-    pub fn get_variable(&self) -> &VariableSpecifier {
+    pub fn get_variable(&self) -> &Option<VariableSpecifier> {
         &self.variable
     }
 
-    pub fn get_variable_mut(&mut self) -> &mut VariableSpecifier {
+    pub fn get_variable_mut(&mut self) -> &mut Option<VariableSpecifier> {
         &mut self.variable
     }
 

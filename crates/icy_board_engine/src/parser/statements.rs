@@ -718,14 +718,14 @@ impl<'a> Parser<'a> {
                     let type_token = self.save_spanned_token();
                     self.next_token();
                     let mut vars = Vec::new();
-                    if let Some(v) = self.parse_var_info() {
+                    if let Some(v) = self.parse_var_info(false) {
                         vars.push(v);
                     } else {
                         return None;
                     }
                     while self.get_cur_token() == Some(Token::Comma) {
                         self.next_token();
-                        if let Some(v) = self.parse_var_info() {
+                        if let Some(v) = self.parse_var_info(false) {
                             vars.push(v);
                         } else {
                             return None;

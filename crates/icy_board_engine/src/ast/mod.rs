@@ -92,7 +92,15 @@ impl AstNode {
                     if p1.get_variable_type() != p2.get_variable_type() {
                         return false;
                     }
-                    if !p1.get_variable().is_similar(p2.get_variable()) {
+                    if let Some(p1) = p1.get_variable() {
+                        if let Some(p2) = p2.get_variable() {
+                            if !p1.is_similar(p2) {
+                                return false;
+                            }
+                        } else {
+                            return false;
+                        }
+                    } else if p2.get_variable().is_some() {
                         return false;
                     }
                 }
@@ -111,7 +119,15 @@ impl AstNode {
                     if p1.get_variable_type() != p2.get_variable_type() {
                         return false;
                     }
-                    if !p1.get_variable().is_similar(p2.get_variable()) {
+                    if let Some(p1) = p1.get_variable() {
+                        if let Some(p2) = p2.get_variable() {
+                            if !p1.is_similar(p2) {
+                                return false;
+                            }
+                        } else {
+                            return false;
+                        }
+                    } else if p2.get_variable().is_some() {
                         return false;
                     }
                 }
@@ -130,7 +146,15 @@ impl AstNode {
                     if p1.get_variable_type() != p2.get_variable_type() {
                         return false;
                     }
-                    if !p1.get_variable().is_similar(p2.get_variable()) {
+                    if let Some(p1) = p1.get_variable() {
+                        if let Some(p2) = p2.get_variable() {
+                            if !p1.is_similar(p2) {
+                                return false;
+                            }
+                        } else {
+                            return false;
+                        }
+                    } else if p2.get_variable().is_some() {
                         return false;
                     }
                 }
@@ -155,7 +179,15 @@ impl AstNode {
                     if p1.get_variable_type() != p2.get_variable_type() {
                         return false;
                     }
-                    if !p1.get_variable().is_similar(p2.get_variable()) {
+                    if let Some(p1) = p1.get_variable() {
+                        if let Some(p2) = p2.get_variable() {
+                            if !p1.is_similar(p2) {
+                                return false;
+                            }
+                        } else {
+                            return false;
+                        }
+                    } else if p2.get_variable().is_some() {
                         return false;
                     }
                 }
