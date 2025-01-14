@@ -170,19 +170,24 @@ jobs:
    runs-on: ubuntu-latest
    steps:
    - uses: actions/checkout@v4
-   - name: Install pnpm
+   - uses: pnpm/action-setup@v2
+     name: Install pnpm
+     with:
+       version: 10
+       run_install: false
+   - name: Get version
      run: |
-       cd crates/ppl-lsp/
-       $VERSION=$(python ../../tools/get_version.py)
+       cd crates/ppl-lsp
+       export version=$(python3 ../../tools/get_version.py)
        echo "Version: $VERSION"
-       curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=10.0.0 sh -
    - name: Install required libraries
      run: |
+       cd crates/ppl-lsp
        pnpm i
    - name: Build
      id: build
      run: |
-       cd crates/ppl-lsp/
+       cd crates/ppl-lsp
        tsc -b
        npm run compile
        pnpm run package
@@ -190,4 +195,4 @@ jobs:
      uses: actions/upload-artifact@v4
      with:
        name: ppl-language-server-${{ env.VERSION }}.vsix
-       path: ppl-language-server-${{ env.VERSION }}.vsix
+       path: crates/ppl-lsp/ppl-language-server-${{ env.VERSION }}.vsix

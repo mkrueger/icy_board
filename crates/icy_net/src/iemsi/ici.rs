@@ -65,11 +65,11 @@ pub struct ICITerminalSettings {
     /// direction. The Client presents all transfer protocols it is capable
     /// of supporting and the Server chooses the most appropriate protocol.
     ///
-    ///     DZA*    DirectZAP (Zmodem variant)
-    ///     ZAP     ZedZap (Zmodem variant)
-    ///     ZMO     Zmodem w/1,024 byte data packets
-    ///     SLK     SEAlink
-    ///     KER     Kermit
+    /// DZA*    DirectZAP (Zmodem variant)
+    /// ZAP     ZedZap (Zmodem variant)
+    /// ZMO     Zmodem w/1,024 byte data packets
+    /// SLK     SEAlink
+    /// KER     Kermit
     ///
     /// (*) DirectZAP is a variant of ZedZap. The difference is that the
     /// transmitter only escapes CAN (18H). It is not recommended to use the
@@ -81,10 +81,10 @@ pub struct ICITerminalSettings {
     /// The capabilities of the user's software. If more than one capability
     /// is listed, each capability is separated by a comma.
     /// The following capability codes are defined:
-    ///     CHT     Can do full-screen on-line conversation (CHAT).
-    ///     MNU     Can do ASCII image download (see ISM packet).
-    ///     TAB     Can handle TAB (ASCII 09H) characters.
-    ///     ASCII8  Can handle 8-bit IBM PC ASCII characters.
+    /// CHT     Can do full-screen on-line conversation (CHAT).
+    /// MNU     Can do ASCII image download (see ISM packet).
+    /// TAB     Can handle TAB (ASCII 09H) characters.
+    /// ASCII8  Can handle 8-bit IBM PC ASCII characters.
     pub can_chat: bool,
     pub can_download_ascii: bool,
     pub can_tab_char: bool,
