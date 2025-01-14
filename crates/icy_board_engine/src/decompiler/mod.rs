@@ -593,7 +593,24 @@ impl<'a> PPEVisitor<()> for VariableConstantVisitor<'a> {
             arg.visit(self);
         }
     }
-    fn visit_predefined_call(&mut self, _def: &StatementDefinition, arguments: &[PPEExpr]) -> () {
+    fn visit_predefined_call(&mut self, def: &StatementDefinition, arguments: &[PPEExpr]) -> () {
+        match def.sig {
+            crate::executable::StatementSignature::Invalid => {}
+            crate::executable::StatementSignature::ArgumentsWithVariable(_, _) => {}
+            crate::executable::StatementSignature::VariableArguments(_) => {}
+            crate::executable::StatementSignature::SpecialCaseDlockg => {}
+            crate::executable::StatementSignature::SpecialCaseDcreate => {}
+            crate::executable::StatementSignature::SpecialCaseSort => {
+                // Ensure that #1 sort argument is a variable
+                if let PPEExpr::Value(id) = &arguments[0] {
+                    if self.executable.variable_table.get_var_entry(*id).entry_type == EntryType::Constant {
+                        self.executable.variable_table.get_var_entry_mut(*id).entry_type = EntryType::Variable;
+                    }
+                }
+            }
+            crate::executable::StatementSignature::SpecialCaseVarSeg => {}
+            crate::executable::StatementSignature::SpecialCasePop => {}
+        }
         for arg in arguments {
             arg.visit(self);
         }

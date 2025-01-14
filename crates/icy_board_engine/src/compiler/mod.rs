@@ -80,6 +80,9 @@ pub enum CompilationErrorType {
 pub enum CompilationWarningType {
     #[error("Unused label {0}")]
     UnusedLabel(String),
+
+    #[error("Assigning to procdure has no effect.")]
+    CannotAssignToProcedure,
 }
 
 struct LabelDescriptor {
