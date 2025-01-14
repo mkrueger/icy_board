@@ -65,38 +65,39 @@ fn scan_goto(statements: &[Statement], from: usize, label: &unicase::Ascii<Strin
 }
 
 fn scan_if(statements: &mut Vec<Statement>) {
-    if statements.len() < 3 {
-        return;
-    }
     // scan:
     // IF (COND) GOTO SKIP
     // STATEMENTS
     // :SKIP
-    for i in 0..statements.len() - 2 {
+    if statements.len() < 2 {
+        return;
+    }
+    let mut i = 0;
+    while i < statements.len() - 2 {
         let Statement::If(if_stmt) = statements[i].clone() else {
+            i += 1;
             continue;
         };
         let Statement::Goto(endif_label) = if_stmt.get_statement() else {
+            i += 1;
             continue;
         };
 
         // check skip label
-        let endif_label_index = get_label_index(statements, i as i32 + 1, statements.len() as i32, endif_label.get_label());
-        if endif_label_index.is_none() {
+        let Some(endif_label_index) = get_label_index(statements, i as i32 + 1, statements.len() as i32, endif_label.get_label()) else {
+            i += 1;
             continue;
-        }
+        };
 
         // replace if with if…then
         // do not remove labels they may be needed to analyze other constructs
-        let mut statements2: Vec<Statement> = statements.drain((i + 1)..(endif_label_index.unwrap() as usize)).collect();
+        let mut statements2: Vec<Statement> = statements.drain((i + 1)..endif_label_index).collect();
+        optimize_block(&mut statements2);
         if statements2.len() == 1 {
             statements[i] = IfStatement::create_empty_statement(if_stmt.get_condition().negate_expression(), statements2.pop().unwrap());
         } else {
             statements[i] = IfThenStatement::create_empty_statement(if_stmt.get_condition().negate_expression(), statements2, Vec::new(), None);
         }
-        optimize_block(statements);
-
-        break;
     }
 }
 
