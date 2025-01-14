@@ -12,7 +12,7 @@ use super::SemanticVisitor;
 fn find_label_references() {
     find_references(
         r#"
-@:mylabel@
+:@mylabel@
 PRINT "Hello World"
 goto $mylabel$
 gosub $MyLabel$
@@ -30,7 +30,7 @@ PRINT "Hello World"
 procedure foo()
 goto $mylabel$
 gosub $MyLabel$
-@:mylabel@
+:@mylabel@
 endproc
 
 "#,
@@ -154,9 +154,10 @@ fn find_references(arg: &str) {
             if let Some(decl) = &refs.declaration {
                 if decl.span == declaration_span {
                     assert_eq!(declaration_span, decl.span);
-                } else {
-                    let decl = refs.implementation.as_ref().unwrap();
+                } else if let Some(decl) = &refs.implementation {
                     assert_eq!(declaration_span, decl.span);
+                } else {
+                    panic!("declaration {:?} not found was: {:?}", declaration_span, decl.span);
                 }
             }
 

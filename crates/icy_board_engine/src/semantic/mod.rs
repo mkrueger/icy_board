@@ -607,10 +607,11 @@ impl<'a> SemanticVisitor<'a> {
         };
         log::info!("Label declaration {:?} -> {:?}", identifier, label_token.span);
         let reftype = ReferenceType::Label(idx);
+        let span = label_token.span.start + 1..label_token.span.end;
 
         for (_i, r) in &mut self.references.iter_mut().enumerate() {
             if r.0 == reftype {
-                r.1.declaration = Some(Spanned::new(label_token.token.to_string(), label_token.span.clone()));
+                r.1.declaration = Some(Spanned::new(label_token.token.to_string(), span));
                 return;
             }
         }
@@ -623,7 +624,7 @@ impl<'a> SemanticVisitor<'a> {
                 implementation: None,
                 header: None,
                 return_types: vec![],
-                declaration: Some(Spanned::new(label_token.token.to_string(), label_token.span.clone())),
+                declaration: Some(Spanned::new(label_token.token.to_string(), span)),
                 usages: vec![],
             },
         ));
