@@ -391,21 +391,21 @@ impl<'a> SemanticVisitor<'a> {
         }
 
         for f in &self.function_containers {
-            let (_rt, r) = &mut self.references[f.id];
-            if r.usages.is_empty() {
-                continue;
+            {
+                let (_rt, r) = &mut self.references[f.id];
+                if r.usages.is_empty() {
+                    continue;
+                }
+                r.variable_table_index = variable_table.variable_table.len() + 1;
             }
-            r.variable_table_index = variable_table.variable_table.len() + 1;
-
             let mut locals = 0;
             for idx in f.local_variables.clone() {
-                let (rt, _r) = &mut self.references[idx];
+                let (rt, _r) = &self.references[idx];
                 if !matches!(rt, ReferenceType::Variable(_)) {
                     continue;
                 }
                 locals += 1;
             }
-
             let id = variable_table.variable_table.len() + 1;
 
             if let FunctionDeclaration::Function(func) = &f.functions {
@@ -423,7 +423,7 @@ impl<'a> SemanticVisitor<'a> {
                     local_variables: locals + 1,
                     start_offset: 0,
                     first_var_id: id as i16,
-                    return_var: (id + f.parameters.len() + f.local_variables.len() - 1) as i16,
+                    return_var: id as i16 + locals as i16 + f.parameters.len() as i16 + 1,
                 };
                 variable_table.push(TableEntry::new(
                     f.name.to_string(),
@@ -464,24 +464,24 @@ impl<'a> SemanticVisitor<'a> {
                     EntryType::Procedure,
                 ));
                 variable_table.start_define_function_body(proc.get_identifier().clone());
+            };
+
+            for idx in f.local_variables.clone() {
+                let (rt, r) = &self.references[idx];
+                if !matches!(rt, ReferenceType::Variable(_)) {
+                    continue;
+                }
+                variable_table.push(r.create_table_entry());
             }
 
             for idx in f.parameters.clone() {
-                let (rt, r) = &mut self.references[idx];
+                let (rt, r) = &self.references[idx];
                 if !matches!(rt, ReferenceType::Variable(_)) {
                     continue;
                 }
                 let mut h = r.create_table_entry();
                 h.entry_type = EntryType::Parameter;
                 variable_table.push(h);
-            }
-
-            for idx in f.local_variables.clone() {
-                let (rt, r) = &mut self.references[idx];
-                if !matches!(rt, ReferenceType::Variable(_)) {
-                    continue;
-                }
-                variable_table.push(r.create_table_entry());
             }
 
             if let FunctionDeclaration::Function(f) = &f.functions {
@@ -502,6 +502,7 @@ impl<'a> SemanticVisitor<'a> {
                     EntryType::Variable,
                 ));
             }
+
             variable_table.end_compile_function_body();
         }
 

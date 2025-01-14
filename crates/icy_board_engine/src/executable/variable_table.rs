@@ -509,7 +509,7 @@ impl VariableTable {
             if var_type == VariableType::Function {
                 let id = unsafe { self.entries[i].value.data.function_value.return_var as usize };
                 let name = self.entries[i].get_name().clone();
-                self.entries[id - 1].set_name(name);
+                self.get_var_entry_mut(id).set_name(name);
             }
             if var_type == VariableType::Function || var_type == VariableType::Procedure {
                 let first_var = unsafe { self.entries[i].value.data.procedure_value.first_var_id as usize };
@@ -590,37 +590,48 @@ impl VariableTable {
     }
 
     pub fn set_value(&mut self, id: usize, value: VariableValue) {
-        self.entries[id - 1].value = value.convert_to(self.entries[id - 1].value.vtype);
+        self.get_var_entry_mut(id).value = value.convert_to(self.entries[id - 1].value.vtype);
     }
 
     pub fn get_value(&self, id: usize) -> &VariableValue {
-        &self.entries[id - 1].value
+        &self.get_var_entry(id).value
     }
 
     pub fn get_value_mut(&mut self, id: usize) -> &mut VariableValue {
-        &mut self.entries[id - 1].value
+        &mut self.get_var_entry_mut(id).value
     }
 
     pub fn try_get_value(&self, id: usize) -> Option<&VariableValue> {
         if id > self.entries.len() {
             return None;
         }
-        Some(&self.entries[id - 1].value)
+        Some(self.get_value(id))
     }
 
     pub fn get_var_entry(&self, id: usize) -> &TableEntry {
+        assert!(
+            id > 0 && id <= self.entries.len(),
+            "Invalid variable id: {} #entries: {}",
+            id,
+            self.entries.len()
+        );
         &self.entries[id - 1]
     }
 
+    pub fn get_var_entry_mut(&mut self, id: usize) -> &mut TableEntry {
+        assert!(
+            id > 0 && id <= self.entries.len(),
+            "Invalid variable id: {} #entries: {}",
+            id,
+            self.entries.len()
+        );
+        &mut self.entries[id - 1]
+    }
     pub fn try_get_entry(&self, id: usize) -> Option<&TableEntry> {
         if id == 0 || id > self.entries.len() {
             return None;
         }
-        Some(&self.entries[id - 1])
-    }
-
-    pub fn get_var_entry_mut(&mut self, id: usize) -> &mut TableEntry {
-        &mut self.entries[id - 1]
+        Some(self.get_var_entry(id))
     }
 
     pub fn scan_user_variables_version(&self) -> u16 {

@@ -254,7 +254,11 @@ impl<'a> PPECompiler<'a> {
                     log::error!("Invalid dimensions for variable: {}", var_name.to_string());
                     return None;
                 }
-                let decl_id = decl.header.id;
+                let decl_id = if decl.header.variable_type == VariableType::Function {
+                    unsafe { decl.value.data.function_value.return_var as usize }
+                } else {
+                    decl.header.id
+                };
                 let variable = if decl.header.dim == 0 {
                     PPEExpr::Value(decl_id)
                 } else {
