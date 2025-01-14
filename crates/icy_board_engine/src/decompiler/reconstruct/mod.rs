@@ -94,7 +94,8 @@ fn scan_if(statements: &mut Vec<Statement>) {
         } else {
             statements[i] = IfThenStatement::create_empty_statement(if_stmt.get_condition().negate_expression(), statements2, Vec::new(), None);
         }
-        scan_if(statements);
+        optimize_block(statements);
+
         break;
     }
 }

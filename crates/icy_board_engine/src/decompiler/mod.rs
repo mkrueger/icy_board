@@ -5,9 +5,12 @@ use crate::{
         Ast, AstNode, BinOp, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression, FunctionCallExpression,
         FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IndexerExpression,
         LabelStatement, LetStatement, ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode,
-        ProcedureImplementation, Statement, UnaryExpression, VariableDeclarationStatement, VariableSpecifier,
+        ProcedureImplementation, Statement, UnaryExpression, UnaryOp, VariableDeclarationStatement, VariableSpecifier,
     },
-    executable::{DeserializationError, DeserializationErrorType, EntryType, Executable, OpCode, PPECommand, PPEExpr, PPEScript, TableEntry, VariableType},
+    executable::{
+        DeserializationError, DeserializationErrorType, EntryType, Executable, OpCode, PPECommand, PPEExpr, PPEScript, PPEVisitor, StatementDefinition,
+        TableEntry, VariableType,
+    },
     parser::lexer::Token,
     Res,
 };
@@ -97,6 +100,14 @@ impl Decompiler {
     /// This function will return an error if .
     pub fn decompile(&mut self) -> Res<Ast> {
         self.label_lookup = self.analyze_labels();
+
+        {
+            let mut visitor = VariableConstantVisitor {
+                executable: &mut self.executable,
+            };
+            self.script.visit(&mut visitor);
+        }
+
         self.executable.variable_table.analyze_usage(&self.script);
         self.executable.variable_table.generate_names();
 
@@ -525,5 +536,75 @@ pub fn decompile(executable: Executable, raw: bool) -> Res<(Ast, Vec<DecompilerI
             Ok((ast, d.issues))
         }
         Err(err) => Err(Box::new(err.error_type)),
+    }
+}
+
+struct VariableConstantVisitor<'a> {
+    executable: &'a mut Executable,
+}
+
+impl<'a> PPEVisitor<()> for VariableConstantVisitor<'a> {
+    fn visit_dim_expression(&mut self, id: usize, dim: &[PPEExpr]) -> () {
+        // Changes CONST[expr] to VAR[expr]
+        // There are some files out there that try to change the entry typ to constant for DIM variables
+        if self.executable.variable_table.get_var_entry(id).entry_type == EntryType::Constant {
+            self.executable.variable_table.get_var_entry_mut(id).entry_type = EntryType::Variable;
+        }
+        for d in dim {
+            d.visit(self);
+        }
+    }
+
+    fn visit_value(&mut self, _id: usize) -> () {}
+    fn visit_member(&mut self, expr: &PPEExpr, _id: usize) -> () {
+        expr.visit(self)
+    }
+    fn visit_unary_expression(&mut self, _op: UnaryOp, expr: &PPEExpr) -> () {
+        expr.visit(self)
+    }
+    fn visit_binary_expression(&mut self, _op: BinOp, left: &PPEExpr, right: &PPEExpr) -> () {
+        left.visit(self);
+        right.visit(self);
+    }
+
+    fn visit_predefined_function_call(&mut self, _def: &crate::executable::FunctionDefinition, arguments: &[PPEExpr]) -> () {
+        for arg in arguments {
+            arg.visit(self);
+        }
+    }
+    fn visit_function_call(&mut self, _id: usize, arguments: &[PPEExpr]) -> () {
+        for arg in arguments {
+            arg.visit(self);
+        }
+    }
+    fn visit_member_function_call(&mut self, _expr: &PPEExpr, arguments: &[PPEExpr], _id: usize) -> () {
+        for arg in arguments {
+            arg.visit(self);
+        }
+    }
+
+    fn visit_end(&mut self) -> () {}
+    fn visit_return(&mut self) -> () {}
+    fn visit_if(&mut self, cond: &PPEExpr, _label: &usize) -> () {
+        cond.visit(self);
+    }
+    fn visit_proc_call(&mut self, _id: usize, arguments: &[PPEExpr]) -> () {
+        for arg in arguments {
+            arg.visit(self);
+        }
+    }
+    fn visit_predefined_call(&mut self, _def: &StatementDefinition, arguments: &[PPEExpr]) -> () {
+        for arg in arguments {
+            arg.visit(self);
+        }
+    }
+    fn visit_goto(&mut self, _label: &usize) -> () {}
+    fn visit_gosub(&mut self, _label: &usize) -> () {}
+    fn visit_end_func(&mut self) -> () {}
+    fn visit_end_proc(&mut self) -> () {}
+    fn visit_stop(&mut self) -> () {}
+    fn visit_let(&mut self, target: &PPEExpr, value: &PPEExpr) -> () {
+        target.visit(self);
+        value.visit(self)
     }
 }
