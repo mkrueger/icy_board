@@ -554,7 +554,8 @@ impl<'a> Parser<'a> {
         let mut dimensions = Vec::new();
         let mut leftpar_token = None;
         let mut rightpar_token = None;
-        if let Some(Token::LPar) = &self.get_cur_token() {
+        let is_lpar = matches!(self.get_cur_token(), Some(Token::LPar));
+        if is_lpar || matches!(self.get_cur_token(), Some(Token::LBracket)) {
             leftpar_token = Some(self.save_spanned_token());
             self.next_token();
             let Some(Token::Const(Constant::Integer(_))) = self.get_cur_token() else {
@@ -581,7 +582,7 @@ impl<'a> Parser<'a> {
                 return None;
             }
 
-            if !matches!(self.get_cur_token(), Some(Token::RPar)) {
+            if is_lpar && !matches!(self.get_cur_token(), Some(Token::RPar)) || !is_lpar && !matches!(self.get_cur_token(), Some(Token::RBracket)) {
                 self.report_error(self.lex.span(), ParserErrorType::MissingCloseParens(self.save_token()));
                 return None;
             }

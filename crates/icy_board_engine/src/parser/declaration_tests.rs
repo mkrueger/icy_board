@@ -1,7 +1,7 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, vec};
 
 use crate::{
-    ast::{AstNode, FunctionDeclarationAstNode, ParameterSpecifier, ProcedureDeclarationAstNode, VariableSpecifier},
+    ast::{AstNode, FunctionDeclarationAstNode, ParameterSpecifier, ProcedureDeclarationAstNode, VariableDeclarationStatement, VariableSpecifier},
     executable::{VariableType, LAST_PPLC},
 };
 
@@ -13,8 +13,23 @@ fn parse_ast_node(input: &str, assert_eof: bool) -> AstNode {
     let mut parser = Parser::new(PathBuf::from("."), &reg, input, Encoding::Utf8, LAST_PPLC);
     parser.next_token();
     let res = parser.parse_ast_node().unwrap();
+    if let Ok(errs) = parser.errors.lock() {
+        if errs.has_errors() {
+            for err in &errs.errors {
+                println!("Error: {:?}", err.error);
+            }
+            panic!();
+        }
+
+        if errs.has_warnings() {
+            for err in &errs.warnings {
+                println!("Error: {:?}", err.error);
+            }
+            panic!();
+        }
+    }
     if assert_eof {
-        assert!(parser.get_cur_token().is_none());
+        assert!(parser.get_cur_token().is_none(), "Expected EOF, but got {:?}", parser.get_cur_token());
     }
     res
 }
@@ -59,6 +74,21 @@ fn test_proc_declarations() {
 }
 
 #[test]
+fn test_variable_declariton() {
+    check_ast_node(
+        "STRING FOO[5]",
+        &AstNode::TopLevelStatement(crate::ast::Statement::VariableDeclaration(
+            VariableDeclarationStatement::empty(
+                VariableType::String,
+                vec![
+                    VariableSpecifier::empty(unicase::Ascii::new("FOO".to_string()), vec![5]),
+                ]
+            )
+        ))
+    );
+}
+
+#[test]
 fn test_func_declarations() {
     check_ast_node(
         "DECLARE FUNCTION FUNC001() INTEGER",
@@ -77,6 +107,7 @@ fn test_func_declarations() {
         ),
     );
 }
+
 
 /*  use super::*;
 
