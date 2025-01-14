@@ -812,7 +812,6 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
             let (rt, r) = &mut self.references[idx];
             let identifier = identifier.get_identifier_token();
             if let ReferenceType::Function(func_idx) = rt {
-                r.return_types.push(Spanned::new(identifier.token.to_string(), identifier.span.clone()));
                 self.function_type_lookup
                     .insert(identifier.span.start, SemanticInfo::FunctionReference(*func_idx));
             } else if let ReferenceType::Variable(func_idx) = rt {

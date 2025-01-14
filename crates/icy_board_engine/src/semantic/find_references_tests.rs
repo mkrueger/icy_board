@@ -179,7 +179,7 @@ fn find_references(arg: &str) {
         println!("decl:{:?}", refs.declaration);
         println!("impl:{:?}", refs.implementation);
         for r in &refs.usages {
-            println!("ref:{r:?}");
+            println!("usage:{r:?}");
         }
         for r in &refs.return_types {
             println!("ret:{r:?}");

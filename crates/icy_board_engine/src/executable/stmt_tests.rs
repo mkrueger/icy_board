@@ -109,11 +109,15 @@ fn test_procedure_call() {
 
 #[test]
 fn test_condition_serialize_bug() {
-    // HICONFNUM doesn't take parameters - ifNot appended an invalid '0' after the hiconf opcode
-    let i = -(FuncOpCode::HICONFNUM as i32);
+    let i: i32 = -(FuncOpCode::HICONFNUM as i32);
     let val = PPEExpr::PredefinedFunctionCall(&FUNCTION_DEFINITIONS[i as usize], vec![]);
     let stmt = PPECommand::IfNot(Box::new(val), 0x0C);
-    test_serialize(&stmt, &[0x0B, FuncOpCode::HICONFNUM as i16, 0x0C]);
+
+    // From original PPLC:
+    // [000B FF31 FFF0 0000 000E ]
+    // 00000: 0B IFNOT       (!((FF31'HiConfNum'))) GOTO {000E}
+    // Note: FFF0 == NOT
+    test_serialize(&stmt, &[0x0B, FuncOpCode::HICONFNUM as i16, 0x0, 0x0C]);
 }
 
 fn test_serialize(val: &PPECommand, expected: &[i16]) {
