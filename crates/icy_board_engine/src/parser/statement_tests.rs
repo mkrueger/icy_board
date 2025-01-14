@@ -40,9 +40,7 @@ fn check_statement(input: &str, check: &Statement) {
 
     if !stmt.is_similar(check) {
         println!("Statement {stmt:?} is not similar to {check:?}");
-
         println!("was:\n{stmt}\nShould be:\n{check}");
-
         panic!();
     }
 }
@@ -52,9 +50,7 @@ fn check_statement_without_eol(input: &str, check: &Statement) {
 
     if !stmt.is_similar(check) {
         println!("Statement {stmt:?} is not similar to {check:?}");
-
         println!("was:\n{stmt}\nShould be:\n{check}");
-
         panic!();
     }
 }
