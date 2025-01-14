@@ -1406,6 +1406,11 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
                         CompilationErrorType::LabelNotFound(r.usages.first().unwrap().token.to_string()),
                     );
                 } else if r.usages.is_empty() {
+                    if let Some(declaration) = &r.declaration {
+                        if ":~BEGIN~" == declaration.token || declaration.token.starts_with(":*(") {
+                            continue;
+                        }
+                    }
                     self.errors.lock().unwrap().report_warning(
                         r.declaration.as_ref().unwrap().span.clone(),
                         CompilationWarningType::UnusedLabel(r.declaration.as_ref().unwrap().token.to_string()),

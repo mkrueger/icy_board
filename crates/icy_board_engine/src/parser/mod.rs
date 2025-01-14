@@ -22,7 +22,7 @@ use unicase::Ascii;
 
 mod expression;
 pub mod lexer;
-mod statements;
+pub mod statements;
 
 #[cfg(test)]
 mod declaration_tests;
@@ -432,6 +432,10 @@ impl<'a> Parser<'a> {
                     }
 
                     if self.use_funcs && !self.parsed_begin {
+                        if matches!(stmt, Statement::Comment(_)) || matches!(stmt, Statement::VariableDeclaration(_)) {
+                            return Some(AstNode::TopLevelStatement(stmt));
+                        }
+
                         self.report_error(self.lex.span(), ParserErrorType::NoStatementsAllowedOutsideBlock);
                         return None;
                     }
