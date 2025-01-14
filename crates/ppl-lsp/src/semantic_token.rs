@@ -110,7 +110,6 @@ impl AstVisitor<()> for SemanticTokenVisitor {
     fn visit_if_then_statement(&mut self, if_then: &icy_board_engine::ast::IfThenStatement) {
         self.highlight_token(if_then.get_if_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(if_then.get_then_token(), SemanticTokenType::KEYWORD);
-        self.highlight_token(if_then.get_endif_token(), SemanticTokenType::KEYWORD);
         for else_if_block in if_then.get_else_if_blocks() {
             self.highlight_token(else_if_block.get_elseif_token(), SemanticTokenType::KEYWORD);
         }
@@ -118,6 +117,7 @@ impl AstVisitor<()> for SemanticTokenVisitor {
             self.highlight_token(else_block.get_else_token(), SemanticTokenType::KEYWORD);
         }
         walk_if_then_stmt(self, if_then);
+        self.highlight_token(if_then.get_endif_token(), SemanticTokenType::KEYWORD);
     }
 
     fn visit_gosub_statement(&mut self, gosub: &icy_board_engine::ast::GosubStatement) {
@@ -199,15 +199,14 @@ impl AstVisitor<()> for SemanticTokenVisitor {
 
     fn visit_while_statement(&mut self, while_stmt: &icy_board_engine::ast::WhileStatement) {
         self.highlight_token(while_stmt.get_while_token(), SemanticTokenType::KEYWORD);
-
         walk_while_stmt(self, while_stmt);
     }
 
     fn visit_while_do_statement(&mut self, while_do: &icy_board_engine::ast::WhileDoStatement) {
         self.highlight_token(while_do.get_while_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(while_do.get_do_token(), SemanticTokenType::KEYWORD);
-        self.highlight_token(while_do.get_endwhile_token(), SemanticTokenType::KEYWORD);
         walk_while_do_stmt(self, while_do);
+        self.highlight_token(while_do.get_endwhile_token(), SemanticTokenType::KEYWORD);
     }
 
     fn visit_repeat_until_statement(&mut self, repeat_until_stmt: &icy_board_engine::ast::RepeatUntilStatement) {

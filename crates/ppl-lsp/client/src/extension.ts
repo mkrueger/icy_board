@@ -35,23 +35,8 @@ let client: LanguageClient;
 // type a = Parameters<>;
 
 export async function activate(context: ExtensionContext) {
-  let disposable = commands.registerCommand("helloworld.helloWorld", async uri => {
-    // The code you place here will be executed every time your command is executed
-    // Display a message box to the user
-    const url = Uri.parse('/home/victor/Documents/test-dir/ppl/another.ppl')
-    let document = await workspace.openTextDocument(uri);
-    await window.showTextDocument(document);
-    
-    // console.log(uri)
-    window.activeTextEditor.document
-    let editor = window.activeTextEditor;
-    let range = new Range(1, 1, 1, 1)
-    editor.selection = new Selection(range.start, range.end);
-  });
 
-  context.subscriptions.push(disposable);
-
-  const traceOutputChannel = window.createOutputChannel("ppl Language Server trace");
+  const traceOutputChannel = window.createOutputChannel("PPL Language Server trace");
   const command = process.env.SERVER_PATH || "ppl-language-server";
   const run: Executable = {
     command,
@@ -103,7 +88,7 @@ export function activateInlayHints(ctx: ExtensionContext) {
 
       const event = this.updateHintsEventEmitter.event;
       // this.hintsProvider = languages.registerInlayHintsProvider(
-      //   { scheme: "file", language: "ppl" },
+      //   { scheme: "file", language: "nrs" },
       //   // new (class implements InlayHintsProvider {
       //   //   onDidChangeInlayHints = event;
       //   //   resolveInlayHint(hint: InlayHint, token: CancellationToken): ProviderResult<InlayHint> {

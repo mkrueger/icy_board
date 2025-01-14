@@ -1,9 +1,9 @@
 use crate::{
     ast::{
-        BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, Constant, ContinueStatement, ElseBlock, ElseIfBlock, ForStatement,
-        GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement, LoopStatement,
-        PredefinedCallStatement, ProcedureCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement,
-        WhileDoStatement, WhileStatement,
+        BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, Constant, ContinueStatement, ElseBlock, ElseIfBlock, ForStatement, GosubStatement,
+        GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement, LoopStatement, PredefinedCallStatement,
+        ProcedureCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement, WhileDoStatement,
+        WhileStatement,
     },
     executable::{OpCode, StatementDefinition},
     parser::ParserErrorType,
@@ -60,7 +60,6 @@ impl<'a> Parser<'a> {
 
             let mut statements = Vec::new();
             self.skip_eol();
-            let mut end_while_token = None;
             while self.get_cur_token() != Some(Token::EndWhile) {
                 if self.get_cur_token().is_none() {
                     self.report_error(self.lex.span(), ParserErrorType::EndExpected);
@@ -69,9 +68,7 @@ impl<'a> Parser<'a> {
                 statements.push(self.parse_statement());
                 self.skip_eol();
             }
-            if end_while_token.is_none() {
-                end_while_token = Some(self.save_spanned_token());
-            }
+            let end_while_token = self.save_spanned_token();
             self.next_token(); // skip ENDWHILE
 
             Some(Statement::WhileDo(WhileDoStatement::new(
@@ -81,7 +78,7 @@ impl<'a> Parser<'a> {
                 rightpar_token,
                 do_token,
                 statements.into_iter().flatten().collect(),
-                end_while_token.unwrap(),
+                end_while_token,
             )))
         } else {
             self.skip_eol();
@@ -101,7 +98,6 @@ impl<'a> Parser<'a> {
 
         let mut statements = Vec::new();
         self.skip_eol();
-        let mut until_token = None;
         while self.get_cur_token() != Some(Token::Until) {
             if self.get_cur_token().is_none() {
                 self.report_error(self.lex.span(), ParserErrorType::EndExpected);
@@ -110,9 +106,7 @@ impl<'a> Parser<'a> {
             statements.push(self.parse_statement());
             self.skip_eol();
         }
-        if until_token.is_none() {
-            until_token = Some(self.save_spanned_token());
-        }
+        let until_token = self.save_spanned_token();
         self.next_token(); // skip UNTIL
 
         let condition = self.parse_expression();
@@ -124,7 +118,7 @@ impl<'a> Parser<'a> {
         Some(Statement::RepeatUntil(RepeatUntilStatement::new(
             repeat_token,
             statements.into_iter().flatten().collect(),
-            until_token.unwrap(),
+            until_token,
             condition.unwrap(),
         )))
     }
@@ -135,7 +129,6 @@ impl<'a> Parser<'a> {
 
         let mut statements = Vec::new();
         self.skip_eol();
-        let mut endloop_token = None;
         while self.get_cur_token() != Some(Token::EndLoop) {
             if self.get_cur_token().is_none() {
                 self.report_error(self.lex.span(), ParserErrorType::EndExpected);
@@ -144,38 +137,13 @@ impl<'a> Parser<'a> {
             statements.push(self.parse_statement());
             self.skip_eol();
         }
-        if endloop_token.is_none() {
-            endloop_token = Some(self.save_spanned_token());
-        }
+        let endloop_token = self.save_spanned_token();
         self.next_token(); // skip ENDLOOP
 
         Some(Statement::Loop(LoopStatement::new(
             loop_token,
             statements.into_iter().flatten().collect(),
-            endloop_token.unwrap(),
-        )))
-    }
-
-    fn _parse_block(&mut self, begin_token: Spanned<Token>) -> Option<Statement> {
-        self.next_token();
-        self.skip_eol();
-        let mut statements = Vec::new();
-        loop {
-            let Some(token) = self.get_cur_token() else {
-                self.report_error(self.lex.span(), ParserErrorType::EndExpected);
-                return None;
-            };
-            if token == Token::Identifier(unicase::Ascii::new("END".to_string())) {
-                break;
-            }
-            statements.push(self.parse_statement());
-            self.skip_eol();
-        }
-        let end_token = self.save_spanned_token();
-        Some(Statement::Block(BlockStatement::new(
-            begin_token,
-            statements.into_iter().flatten().collect(),
-            end_token,
+            endloop_token,
         )))
     }
 
@@ -315,7 +283,6 @@ impl<'a> Parser<'a> {
         self.next_token();
         let mut statements = Vec::new();
         self.skip_eol_and_comments();
-        let mut end_if_token = None;
 
         while self.get_cur_token() != Some(Token::EndIf) && self.get_cur_token() != Some(Token::Else) && self.get_cur_token() != Some(Token::ElseIf) {
             if self.get_cur_token().is_none() {
@@ -353,12 +320,14 @@ impl<'a> Parser<'a> {
             }
             let else_if_rightpar_token = self.save_spanned_token();
             self.next_token();
-            if !is_do_then(&self.cur_token) && self.get_cur_token() != Some(Token::Eol) && !matches!(self.get_cur_token(), Some(Token::Comment(_, _))) {
-                self.report_error(self.lex.span(), ParserErrorType::ThenExpected(self.save_token()));
-                return None;
-            }
             let then_token = if is_do_then(&self.cur_token) { Some(self.save_spanned_token()) } else { None };
-            self.next_token();
+            if then_token.is_some() {
+                if !is_do_then(&self.cur_token) && self.get_cur_token() != Some(Token::Eol) && !matches!(self.get_cur_token(), Some(Token::Comment(_, _))) {
+                    self.report_error(self.lex.span(), ParserErrorType::ThenExpected(self.save_token()));
+                    return None;
+                }
+                self.next_token();
+            }
 
             let mut statements = Vec::new();
             while self.get_cur_token() != Some(Token::EndIf) && self.get_cur_token() != Some(Token::Else) && self.get_cur_token() != Some(Token::ElseIf) {
@@ -407,12 +376,9 @@ impl<'a> Parser<'a> {
             self.report_error(self.lex.span(), ParserErrorType::InvalidToken(self.save_token()));
             return None;
         }
+        let end_if_token = self.save_spanned_token();
         // skip endif token
         self.next_token();
-
-        if end_if_token.is_none() {
-            end_if_token = Some(self.save_spanned_token());
-        }
 
         Some(Statement::IfThen(IfThenStatement::new(
             if_token,
@@ -423,7 +389,7 @@ impl<'a> Parser<'a> {
             statements.into_iter().flatten().collect(),
             else_if_blocks,
             else_block,
-            end_if_token.unwrap(),
+            end_if_token,
         )))
     }
 
@@ -449,7 +415,6 @@ impl<'a> Parser<'a> {
 
         let mut case_blocks = Vec::new();
         let mut default_token = None;
-        let mut end_select_token = None;
         let mut default_statements = Vec::new();
 
         while self.get_cur_token() == Some(Token::Case) {
@@ -491,11 +456,12 @@ impl<'a> Parser<'a> {
             self.parse_default_block(&mut default_statements);
         }
         // skip Default
-        self.next_token();
-
-        if end_select_token.is_none() {
-            end_select_token = Some(self.save_spanned_token());
+        if self.get_cur_token() != Some(Token::EndSelect) {
+            self.report_error(self.lex.span(), ParserErrorType::InvalidToken(self.save_token()));
+            return None;
         }
+        let end_select_token = self.save_spanned_token();
+        self.next_token();
 
         Some(Statement::Select(SelectStatement::new(
             select_token,
@@ -504,7 +470,7 @@ impl<'a> Parser<'a> {
             case_blocks,
             default_token,
             default_statements,
-            end_select_token.unwrap(),
+            end_select_token,
         )))
     }
 
