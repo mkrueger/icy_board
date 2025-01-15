@@ -51,7 +51,117 @@
 					"description": "Traces the communication between VS Code and the language server."
 				}
 			}
-		}
+		},
+		"debuggers": [
+			{
+				"type": "ppl",
+				"languages": [
+					"ppl"
+				],
+				"label": "PPL Debug",
+				"program": "./dist/debugAdapter.js",
+				"runtime": "ppl",
+				"configurationAttributes": {
+					"launch": {
+						"required": [
+							"program"
+						],
+						"properties": {
+							"program": {
+								"type": "string",
+								"description": "Absolute path to a text file.",
+								"default": "${workspaceFolder}/${command:AskForProgramName}"
+							},
+							"stopOnEntry": {
+								"type": "boolean",
+								"description": "Automatically stop after launch.",
+								"default": true
+							},
+							"trace": {
+								"type": "boolean",
+								"description": "Enable logging of the Debug Adapter Protocol.",
+								"default": true
+							},
+							"compileError": {
+								"type": "string",
+								"description": "Simulates a compile error in 'launch' request.",
+								"enum": [
+									"default",
+									"show",
+									"hide"
+								],
+								"enumDescriptions": [
+									"default: show fake compile error to user",
+									"show fake compile error to user",
+									"do not show fake compile error to user"
+								]
+							}
+						}
+					},
+					"attach": {
+						"required": [
+							"program"
+						],
+						"properties": {
+							"program": {
+								"type": "string",
+								"description": "Absolute path to a text file.",
+								"default": "${workspaceFolder}/${command:AskForProgramName}"
+							},
+							"stopOnEntry": {
+								"type": "boolean",
+								"description": "Automatically stop after attach.",
+								"default": true
+							},
+							"trace": {
+								"type": "boolean",
+								"description": "Enable logging of the Debug Adapter Protocol.",
+								"default": true
+							},
+							"compileError": {
+								"type": "string",
+								"description": "Simulates a compile error in 'attach' request.",
+								"enum": [
+									"default",
+									"show",
+									"hide"
+								],
+								"enumDescriptions": [
+									"default: show fake compile error to user",
+									"show fake compile error to user",
+									"do not show fake compile error to user"
+								]
+							}
+						}
+					}
+				},
+				"initialConfigurations": [
+					{
+						"type": "ppl",
+						"request": "launch",
+						"name": "Ask for file name",
+						"program": "icy_board --ppe",
+						"stopOnEntry": true
+					}
+				],
+				"configurationSnippets": [
+					{
+						"label": "PPL Debug: Launch",
+						"description": "A new configuration for 'debugging' a user selected markdown file.",
+						"body": {
+							"type": "ppl",
+							"request": "launch",
+							"name": "Ask for file name",
+							"program": "^\"icy_board --ppe",
+							"stopOnEntry": true
+						}
+					}
+				],
+				"variables": {
+					"AskForProgramName": "extension.mock-debug.getProgramName"
+				}
+			}
+		]
 	},
 	"scripts": {
 		"postinstall": "cd client && pnpm i",
@@ -68,19 +178,28 @@
 		"@types/node": "22.10.2",
 		"@typescript-eslint/eslint-plugin": "^3.8.0",
 		"@typescript-eslint/parser": "^3.8.0",
+		"@vscode/debugadapter": "^1.56.0",
+	    "@vscode/debugadapter-testsupport": "^1.56.0",
+		"@vscode/debugprotocol": "^1.56.0",
 		"@vscode/vsce": "^3.2.1",
+		"await-notify": "^1.0.1",
+		"base64-js": "^1.5.1",
 		"cross-env": "^7.0.2",
 		"esbuild": "^0.24.2",
 		"eslint": "9.17.0",
+		"events": "^3.3.0",
 		"glob": "11.0.0",
 		"mocha": "11.0.2",
+		"path-browserify": "^1.0.1",
+		"rimraf": "^3.0.2",
 		"npm-run-all": "^4.1.5",
 		"ts-loader": "^9.5.1",
 		"typescript": "5.4.5",
+		"url": "^0.11.0",
+		"vsce": "^2.7.0",
 		"vscode-test": "^1.4.0",
 		"vscode-uri": "^3.0.2"
 	},
-	"dependencies": {
-	},
+	"dependencies": {},
 	"packageManager": "pnpm@8.15.7"
 }

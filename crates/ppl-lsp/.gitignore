@@ -1,4 +1,4 @@
 node_modules/**
 dist/**
-client/**
+client/node_modules/**
 node_modules/**
