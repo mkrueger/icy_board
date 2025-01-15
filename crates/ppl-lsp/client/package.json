@@ -1,8 +1,8 @@
 {
 	"name": "ppl-language-client",
 	"description": "VSCode part of a language server",
-	"license": "MIT",
-	"version": "0.3.0",
+	"license": "Apache-2.0",
+	"version": "0.1.1",
 	"engines": {
 		"vscode": "^1.85.0"
 	},

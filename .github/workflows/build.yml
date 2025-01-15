@@ -178,8 +178,7 @@ jobs:
        run_install: false
    - name: Get version
      run: |
-       cd crates/ppl-lsp
-       export version=$(python3 ../../tools/get_version.py)
+       export version=$(python3 ./tools/get_version.py)
        echo "Version: $VERSION"
        echo "VERSION=$version" >> $GITHUB_ENV
    - name: Install required libraries
