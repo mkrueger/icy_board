@@ -1,6 +1,6 @@
 [package]
 name = "ppl-language-server"
-version.workspace = true
+version = '0.1.1'
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -16,17 +16,17 @@ rust-embed = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 unicase = { workspace = true }
+thiserror = { workspace = true }
 
 chumsky = "0.9.3"
-env_logger = "0.11.5"
-ropey = "1.5.0"
-serde_json = "1.0.78"
+env_logger = "0.11.6"
+ropey = "1.6.1"
+serde_json = "1.0.135"
 tower-lsp = { version = "0.20.0", features = ["proposed"]}
 dashmap = "6.1.0"
 im-rc = "15.0.0"
 oxc_index = "0.36.0"
-anyhow = "1.0.93"
-thiserror = "2.0.3"
+anyhow = "1.0.95"
 rust-lapper = "1.1.0"
 
 

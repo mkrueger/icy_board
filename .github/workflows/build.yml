@@ -12,15 +12,17 @@ jobs:
    runs-on: ubuntu-latest
    steps:
    - uses: actions/checkout@v4
+   - name: Get version
+     run: |
+       export version=$(python3 tools/prep_diz.py "file_id.diz")
+       echo "VERSION=$version" >> $GITHUB_ENV
+       echo "Version: $version"
    - name: Install required libraries
      run: |
        sudo apt-get install build-essential libasound2-dev libxcb-shape0-dev libxcb-xfixes0-dev
    - name: Build
      id: build
      run: |
-       export version=$(python3 tools/prep_diz.py "file_id.diz")
-       echo "VERSION=$version" >> $GITHUB_ENV
-       echo "Version: $version"
        cargo build --release
        echo "Copy $DEB to icy_board.deb"
        mkdir bin
@@ -55,12 +57,14 @@ jobs:
    runs-on: windows-latest
    steps:
    - uses: actions/checkout@v4
+   - name: Get version
+     run: |
+       $VERSION=$(python tools\prep_diz.py "file_id.diz")
+       Add-Content -Path $env:GITHUB_ENV -Value "VERSION=$VERSION" 
+       echo "Version $VERSION"
    - name: Build
      id: build
      run: |
-       $VERSION=$(python tools\prep_diz.py "file_id.diz")
-       Add-Content -Path $env:GITHUB_ENV -Value "VERSION=$VERSION"
-       echo "Version: $VERSION"
        cargo build --release
        echo "Copy $DEB to icy_board.deb"
        mkdir bin
@@ -95,19 +99,21 @@ jobs:
    runs-on: macos-13
    steps:
    - uses: actions/checkout@v4
-   - name: Build
-     id: build
+   - name: Get version
      run: |
-       rustup target add aarch64-apple-darwin
-       rustup target add x86_64-apple-darwin
-
-       cargo build --release --target aarch64-apple-darwin
-       cargo build --release --target x86_64-apple-darwin
-
        export version=$(python3 tools/prep_diz.py "file_id.diz")
        echo "VERSION=$version" >> $GITHUB_ENV
        echo "Version: $version"
-       cargo build --release
+   - name: Install rust compilation targets
+     run: |
+       rustup target add aarch64-apple-darwin
+       rustup target add x86_64-apple-darwin
+   - name: Build
+     id: build
+     run: |
+       cargo build --release --target aarch64-apple-darwin
+       cargo build --release --target x86_64-apple-darwin
+
        echo "Copy $DEB to icy_board.deb"
        mkdir -p aarch64-apple-darwin/bin
        mv target/aarch64-apple-darwin/release/icy_board aarch64-apple-darwin/bin

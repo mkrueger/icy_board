@@ -40,7 +40,7 @@ thiserror = "2.0.11"
 argh = "0.1.12"
 crossterm = "0.28.1"
 ratatui = "0.29.0"
-log = "0.4.22"
+log = "0.4.25"
 chrono = { version = "0.4.37", features = ["serde"] }
 bstr = "1.10.0"
 serde = "1.0.210"
