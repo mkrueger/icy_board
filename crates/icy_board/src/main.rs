@@ -169,9 +169,9 @@ async fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Re
             }
 
             let mut app = CallWaitScreen::new(&board).await?;
+            let mut terminal = init_terminal()?;
             loop {
-                let mut terminal = init_terminal()?;
-
+                terminal.clear()?;
                 app.reset(&board).await;
                 match app.run(&mut terminal, &board, arguments.full_screen).await {
                     Ok(msg) => {
@@ -179,12 +179,14 @@ async fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Re
                             restore_terminal()?;
                             log::error!("while processing call wait screen message: {}", err.to_string());
                             print_error(err.to_string());
+                            return Err(err);
                         }
                     }
                     Err(err) => {
                         restore_terminal()?;
                         log::error!("while running call wait screen: {}", err.to_string());
                         print_error(err.to_string());
+                        return Err(err);
                     }
                 }
             }
@@ -258,6 +260,7 @@ async fn run_message(
                     restore_terminal()?;
                     log::error!("while running node monitoring screen: {}", err.to_string());
                     print_error(err.to_string());
+                    process::exit(1);
                 }
             }
         }

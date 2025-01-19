@@ -2,12 +2,19 @@ use std::time::Duration;
 
 use color_eyre::Result;
 
-use crossterm::event::{self, Event};
+use crossterm::{
+    event::{self, Event},
+    execute,
+    terminal::{self, Clear, EnterAlternateScreen},
+};
 use ratatui::{TerminalOptions, Viewport};
 
 use crate::TerminalType;
 
 pub fn init() -> Result<TerminalType> {
+    let mut stdout = std::io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+
     color_eyre::install()?;
 
     // this size is to match the size of the terminal when running the demo
@@ -20,6 +27,8 @@ pub fn init() -> Result<TerminalType> {
 }
 
 pub fn restore() -> Result<()> {
+    let mut stdout = std::io::stdout();
+    execute!(stdout, Clear(terminal::ClearType::All))?;
     ratatui::restore();
     Ok(())
 }

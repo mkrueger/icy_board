@@ -127,7 +127,6 @@ impl Tui {
             if let Some(Some(node_state)) = self.handle.lock().await.get_mut(self.node) {
                 if let Some(handle) = node_state.handle.as_ref() {
                     if handle.is_finished() {
-                        restore_terminal()?;
                         let handle = node_state.handle.take().unwrap();
                         if let Err(_err) = handle.join() {
                             return Err(Box::new(IcyBoardError::ThreadCrashed));
@@ -158,9 +157,7 @@ impl Tui {
                                     //redraw = true;
                                 }
                                 KeyCode::Char('x') => {
-                                    let _ = restore_terminal();
                                     self.logoff_sysop(bbs).await?;
-
                                     return Ok(());
                                 }
                                 _ => {}
@@ -170,7 +167,6 @@ impl Tui {
                                 KeyCode::Char(c) => {
                                     if c == 'x' || c == 'c' {
                                         self.logoff_sysop(bbs).await?;
-                                        let _ = disable_raw_mode();
                                         return Ok(());
                                     }
                                     if ('a'..='z').contains(&c) {
