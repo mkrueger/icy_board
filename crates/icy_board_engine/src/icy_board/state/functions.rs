@@ -410,6 +410,15 @@ impl IcyBoardState {
     }
 
     pub async fn show_help(&mut self, help: &str) -> Res<()> {
+        // hardcoded help file.
+        if help == "HLPMORE" {
+            self.display_text(IceText::MorehelpEnter, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            self.display_text(IceText::MorehelpYes, display_flags::NEWLINE).await?;
+            self.display_text(IceText::MorehelpNo, display_flags::NEWLINE).await?;
+            self.display_text(IceText::MorehelpNonstop, display_flags::NEWLINE).await?;
+            return Ok(());
+        }
         let help_loc = self.get_board().await.config.paths.help_path.clone();
         let help_loc = help_loc.join(help);
         let am = self.session.disable_auto_more;

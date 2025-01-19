@@ -15,7 +15,7 @@ use chrono::Utc;
 use crossterm::{
     cursor::MoveTo,
     event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
-    terminal::{disable_raw_mode, Clear},
+    terminal::Clear,
     ExecutableCommand,
 };
 use icy_board_engine::icy_board::{

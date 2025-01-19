@@ -998,7 +998,7 @@ pub enum Encoding {
 /// # Errors
 ///
 /// This function will return an error if .
-pub fn load_with_encoding(file_name: &Path, encoding: Encoding) -> std::io::Result<String> {
+pub fn load_with_encoding<P: AsRef<Path>>(file_name: &P, encoding: Encoding) -> std::io::Result<String> {
     if encoding == Encoding::Detect {
         let src_data = fs::read(file_name)?;
         let src = codepages::tables::get_utf8(&src_data);

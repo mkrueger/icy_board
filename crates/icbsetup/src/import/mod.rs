@@ -7,7 +7,14 @@ use std::{
 
 use codepages::tables::write_with_bom;
 use dizbase::file_base_scanner::scan_file_directory;
-use icy_board_engine::{datetime::IcbTime, icy_board::PCBoardRecordImporter};
+use icy_board_engine::{
+    datetime::IcbTime,
+    icy_board::{
+        doors::DoorList,
+        user_base::{PasswordInfo, User},
+        PCBoardRecordImporter,
+    },
+};
 use icy_board_engine::{
     icy_board::{
         bulletins::BullettinList,
@@ -426,7 +433,7 @@ impl PCBoardImporter {
             conf.private_upload_dir_file = PathBuf::from(output.to_string() + "/private");
             conf.private_upload_location = PathBuf::from(output.to_string() + "/pr");
             conf.doors_menu = self.convert_conference_display_file(&output, &conf.doors_menu)?;
-            conf.doors_file = self.convert_conference_display_file(&output, &conf.doors_file)?;
+            conf.doors_file = self.convert_doors_file(&destination, &output, &conf.doors_file)?;
 
             conf.blt_menu = self.convert_conference_display_file(&output, &conf.blt_menu)?;
             conf.blt_file = self.convert_bullettin_file(&destination, &output, &conf.blt_file)?;
@@ -795,29 +802,46 @@ impl PCBoardImporter {
     fn convert_user_base(&mut self, usr_file: &str, inf_file: &str, new_rel_name: &str) -> Res<PathBuf> {
         self.output.start_action("Convert user base…".into());
         let usr_file = self.resolve_file(usr_file);
-        let inf_file = self.resolve_file(inf_file);
-        if !usr_file.exists() {
+
+        let mut user_base = if !usr_file.exists() {
             self.logger.log(&format!("Can't find user file {}", usr_file.display()));
-            return Ok(PathBuf::new());
-        }
-        if !inf_file.exists() {
-            self.logger.log(&format!("Can't find user information file {}", inf_file.display()));
-            return Ok(PathBuf::new());
-        }
-        let users = PcbUserRecord::read_users(&PathBuf::from(&usr_file))?;
-        let user_inf = PcbUserInf::read_users(&PathBuf::from(&inf_file))?;
+            UserBase::default()
+        } else {
+            let inf_file = self.resolve_file(inf_file);
+            if !inf_file.exists() {
+                self.logger.log(&format!("Can't find user information file {}", inf_file.display()));
+                return Ok(PathBuf::new());
+            }
+            let users = PcbUserRecord::read_users(&PathBuf::from(&usr_file))?;
+            let user_inf = PcbUserInf::read_users(&PathBuf::from(&inf_file))?;
 
-        let user_base = UserBase::import_pcboard(
-            &users
-                .iter()
-                .map(|u| PcbUser {
-                    user: u.clone(),
-                    inf: user_inf[u.rec_num as usize].clone(),
-                })
-                .collect::<Vec<PcbUser>>(),
-        );
-        let destination = self.output_directory.join(new_rel_name);
+            UserBase::import_pcboard(
+                &users
+                    .iter()
+                    .map(|u| PcbUser {
+                        user: u.clone(),
+                        inf: user_inf[u.rec_num as usize].clone(),
+                    })
+                    .collect::<Vec<PcbUser>>(),
+            )
+        };
+        let destination: PathBuf = self.output_directory.join(new_rel_name);
+        if user_base.is_empty() {
+            self.logger.log(&format!("User base empty, generating sysop."));
 
+            let mut user = User {
+                name: "SYSOP".to_string(),
+                password: PasswordInfo {
+                    password: Password::PlainText("".to_string()),
+                    ..Default::default()
+                },
+                page_len: 23,
+                security_level: 110,
+                ..Default::default()
+            };
+            user.stats.first_date_on = chrono::Utc::now();
+            user_base.new_user(user);
+        }
         user_base.save_users(&destination)?;
 
         Ok(PathBuf::from(new_rel_name))
@@ -1194,6 +1218,37 @@ impl PCBoardImporter {
         Ok(new_name)
     }
 
+    fn convert_doors_file(&mut self, dest_path: &Path, output: &str, src_file: &Path) -> Res<PathBuf> {
+        self.logger.log(&format!("\n=== Converting DOORS.LST {} ===", src_file.display()));
+
+        if src_file.to_str().unwrap().is_empty() {
+            return Ok(PathBuf::new());
+        }
+        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
+        let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
+        if let Some(file) = self.converted_files.get(&upper_file_name) {
+            return Ok(PathBuf::from(file));
+        }
+
+        let Ok(list) = DoorList::import_pcboard(&resolved_file) else {
+            self.logger.log(&format!("Warning, can't import bulletin  {}", resolved_file.display()));
+            self.output.warning(format!("Warning, can't import bulletin {}", resolved_file.display()));
+            return Ok(resolved_file);
+        };
+        let resolved_file = resolved_file.with_extension("toml");
+
+        let destination = PathBuf::from(dest_path).join(resolved_file.file_name().unwrap().to_ascii_lowercase());
+        if destination.exists() {
+            fs::remove_file(&destination)?;
+        }
+        list.save(&destination)?;
+        self.logger.log(&format!("Wrote bulletin to {}", destination.display()));
+
+        let name = resolved_file.file_name().unwrap().to_str().unwrap().to_string().to_ascii_lowercase();
+        let new_name = PathBuf::from(format!("{}/{}", output, &name));
+        self.converted_files.insert(upper_file_name.clone(), new_name.to_string_lossy().to_string());
+        Ok(new_name)
+    }
     fn create_file(&self, include_str: &str, new_name: &str) -> Res<PathBuf> {
         fs::write(self.output_directory.join(new_name), include_str)?;
         Ok(PathBuf::from(new_name))

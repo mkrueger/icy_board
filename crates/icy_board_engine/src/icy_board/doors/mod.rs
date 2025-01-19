@@ -1,11 +1,13 @@
 use std::{
     ops::{Deref, DerefMut},
+    path::Path,
     str::FromStr,
 };
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
     executable::{VariableType, VariableValue},
+    parser::load_with_encoding,
     Res,
 };
 
@@ -214,6 +216,52 @@ pub struct DoorList {
 
     #[serde(rename = "door")]
     pub doors: Vec<Door>,
+}
+
+impl DoorList {
+    pub fn import_pcboard<P: AsRef<Path>>(path: &P) -> Res<Self> {
+        let text = load_with_encoding(path, crate::parser::Encoding::CP437)?;
+
+        let mut result = Self::default();
+        for (nr, line) in text.lines().enumerate() {
+            let split: Vec<&str> = line.split(',').collect();
+            if split.len() < 8 {
+                log::error!("Invalid DOOR.LST {} line: {}:{}", path.as_ref().display(), nr + 1, line);
+                continue;
+            }
+            let file = split[0];
+            let password = split[1];
+            let security = split[2];
+            let user_sys = split[3] != "0";
+            let door_sys = split[4] != "0";
+            let path = split[5];
+            // let _login= split[6] != "0";
+            let use_shell = split[7] != "N";
+            // let per_use=  split[8].parse::<f32>().unwrap_or_default();
+            // let charges_minute=  split[9].parse::<f32>().unwrap_or_default();
+            // let os_2= split[10] != "0";
+
+            let door = Door {
+                name: file.to_string(),
+                description: file.to_string(),
+                password: password.to_string(),
+                securiy_level: SecurityExpression::from_str(security)?,
+                door_type: DoorType::Local,
+                path: path.to_string(),
+                use_shell_execute: use_shell,
+                drop_file: if door_sys {
+                    DropFile::DoorSys
+                } else if user_sys {
+                    DropFile::CurruserBBS
+                } else {
+                    DropFile::None
+                },
+            };
+            result.doors.push(door);
+        }
+
+        Ok(result)
+    }
 }
 
 impl Deref for DoorList {

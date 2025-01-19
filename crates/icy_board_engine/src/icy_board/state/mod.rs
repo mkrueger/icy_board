@@ -1793,17 +1793,31 @@ impl IcyBoardState {
             self.session.more_requested = true;
             return Ok(true);
         }
-        let result = self
-            .input_field(
-                IceText::MorePrompt,
-                12,
-                "",
-                "HLPMORE",
-                None,
-                display_flags::YESNO | display_flags::UPCASE | display_flags::STACKED | display_flags::ERASELINE,
-            )
-            .await?;
-        Ok(result != "N")
+        loop {
+            let result = self
+                .input_field(
+                    IceText::MorePrompt,
+                    12,
+                    "YyNnHhSs",
+                    "HLPMORE",
+                    None,
+                    display_flags::UPCASE | display_flags::STACKED | display_flags::ERASELINE,
+                )
+                .await?;
+            match result.as_str() {
+                "Y" | "" => {
+                    return Ok(true);
+                }
+                "NS" => {
+                    self.session.disable_auto_more = true;
+                    return Ok(true);
+                }
+                "N" => {
+                    return Ok(true);
+                }
+                _ => {}
+            }
+        }
     }
 
     pub async fn press_enter(&mut self) -> Res<()> {
