@@ -34,7 +34,6 @@ fn optimize_block(statements: &mut Vec<Statement>) {
     optimize_loops(statements);
     optimize_ifs(statements);
     scan_select_statements(statements);
-    strip_unused_labels(statements);
 }
 
 fn optimize_ifs(statements: &mut Vec<Statement>) {
@@ -112,16 +111,12 @@ fn get_label_index(statements: &[Statement], from: i32, to: i32, label: &String)
     None
 }
 
-pub fn strip_unused_labels(statements: &mut Vec<Statement>) {
+pub fn strip_unused_labels(ast: &mut Ast) -> Ast {
     let mut visitor = unused_label_visitor::UnusedLabelVisitor::default();
-    for stmt in statements.clone() {
-        stmt.visit(&mut visitor);
-    }
+    ast.visit(&mut visitor);
     let unused_labels = visitor.get_unused_labels();
     let mut visitor = remove_label_visitor::RemoveLabelVisitor::new(unused_labels.clone());
-    for stmt in statements {
-        *stmt = stmt.visit_mut(&mut visitor);
-    }
+    ast.visit_mut(&mut visitor)
 }
 
 #[must_use]

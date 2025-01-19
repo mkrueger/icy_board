@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use reconstruct::strip_unused_labels;
+
 use crate::{
     ast::{
         Ast, AstNode, BinOp, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression, FunctionCallExpression,
@@ -531,6 +533,7 @@ pub fn decompile(executable: Executable, raw: bool) -> Res<(Ast, Vec<DecompilerI
                     }
                 }
                 ast = reconstruct::finish_ast(&mut ast);
+                ast = strip_unused_labels(&mut ast);
                 ast = relabel_visitor::relabel_ast(&mut ast);
             }
 

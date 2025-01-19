@@ -62,14 +62,13 @@ ENDIF
 */
 
 pub fn scan_if_else(statements: &mut Vec<Statement>) {
-    super::strip_unused_labels(statements);
     let mut i = 0;
     if statements.len() < 1 {
         return;
     }
     while i < statements.len() - 1 {
         let start = i;
-        if let Statement::Empty = statements[i] {
+        if let Statement::Label(_) = statements[i] {
             i += 1;
             continue;
         }
@@ -91,7 +90,7 @@ pub fn scan_if_else(statements: &mut Vec<Statement>) {
         let mut j = i + 1;
         let mut has_else = true;
         while j < statements.len() - 1 {
-            if let Statement::Empty = statements[j] {
+            if let Statement::Label(_) = statements[j] {
                 j += 1;
                 continue;
             }
