@@ -73,12 +73,11 @@ pub fn scan_for_next(statements: &mut Vec<Statement>) {
                 let from_expr: Expression = outer_let.get_value_expression().clone();
                 let var_name = outer_let.get_identifier().clone();
 
-                let mut for_block: Vec<Statement> = statements.drain(i..matching_goto as usize + 2).collect();
+                let mut for_block: Vec<Statement> = statements.drain(i..matching_goto as usize + 1).collect();
                 // pop for header
                 for_block.drain(0..5);
 
                 // pop goto and label and step stmt
-                for_block.pop();
                 for_block.pop();
                 for_block.pop();
                 let continue_label = super::get_last_label(&for_block);
