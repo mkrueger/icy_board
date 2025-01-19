@@ -295,7 +295,7 @@ impl PCBoardImporter {
                 help_path: PathBuf::from("art/help"),
                 security_file_path: PathBuf::from("art/secmsgs"),
                 command_display_path: PathBuf::from("art/cmd_display"),
-                tmp_work_path: PathBuf::from("work/"),
+                tmp_work_path: PathBuf::from("tmp/"),
                 home_dir: PathBuf::from("home/"),
                 icbtext,
                 conferences,

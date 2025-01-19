@@ -473,7 +473,7 @@ impl IcbConfig {
             },
             paths: ConfigPaths {
                 help_path: PathBuf::from("art/help/"),
-                tmp_work_path: PathBuf::from("work/"),
+                tmp_work_path: PathBuf::from("tmp/"),
                 icbtext: PathBuf::from("config/icbtext.toml"),
                 conferences: PathBuf::from("config/conferences.toml"),
                 security_file_path: PathBuf::from("art/secmsgs/"),

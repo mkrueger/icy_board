@@ -361,7 +361,10 @@ impl IcyBoard {
         pcb_dat.path.conf_menu = self.resolve_file(&self.config.paths.conf_join_menu).to_string_lossy().to_string();
         pcb_dat.path.group_chat = self.resolve_file(&self.config.paths.group_chat).to_string_lossy().to_string();
         pcb_dat.path.no_ansi = self.resolve_file(&self.config.paths.no_ansi).to_string_lossy().to_string();
-
+        pcb_dat.path.login_script = self.resolve_file(&self.config.paths.logon_survey).to_string_lossy().to_string();
+        pcb_dat.path.login_answer = self.resolve_file(&self.config.paths.logon_answer).to_string_lossy().to_string();
+        pcb_dat.path.logoff_script = self.resolve_file(&self.config.paths.logoff_survey).to_string_lossy().to_string();
+        pcb_dat.path.logoff_answer = self.resolve_file(&self.config.paths.logoff_answer).to_string_lossy().to_string();
         let res = pcb_dat.serialize(crate::parser::Encoding::CP437);
         fs::write(file, res)?;
 
