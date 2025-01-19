@@ -1002,7 +1002,7 @@ impl IcyBoardState {
         let mut user_bytes = Vec::new();
         let mut sysop_bytes = Vec::new();
         for c in data {
-            if target != TerminalTarget::Sysop || self.session.is_sysop || self.session.current_user.is_none()  {
+            if target != TerminalTarget::Sysop || self.session.is_sysop || self.session.current_user.is_none() {
                 let _ = self.user_screen.print_char(*c);
                 if *c == '\n' {
                     self.next_line().await?;

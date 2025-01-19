@@ -406,7 +406,6 @@ fn init_terminal() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
     Ok(ratatui::init())
 }
 
-
 pub fn print_exit_screen() {
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout())).unwrap();
     stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();

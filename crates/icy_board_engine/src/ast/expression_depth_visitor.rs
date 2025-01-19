@@ -5,7 +5,7 @@ pub struct ExpressionDepthVisitor {}
 
 impl AstVisitor<usize> for ExpressionDepthVisitor {
     fn visit_identifier_expression(&mut self, _: &super::IdentifierExpression) -> usize {
-        1
+        0
     }
 
     fn visit_member_reference_expression(&mut self, _: &super::MemberReferenceExpression) -> usize {
@@ -17,7 +17,7 @@ impl AstVisitor<usize> for ExpressionDepthVisitor {
     }
 
     fn visit_binary_expression(&mut self, binary: &BinaryExpression) -> usize {
-        1 + binary.get_left_expression().visit(self).max(binary.get_right_expression().visit(self))
+        1 + binary.get_left_expression().visit(self) + binary.get_right_expression().visit(self)
     }
 
     fn visit_unary_expression(&mut self, unary: &UnaryExpression) -> usize {
@@ -33,6 +33,6 @@ impl AstVisitor<usize> for ExpressionDepthVisitor {
     }
 
     fn visit_parens_expression(&mut self, parens: &ParensExpression) -> usize {
-        1 + parens.get_expression().visit(self)
+        parens.get_expression().visit(self)
     }
 }

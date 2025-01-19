@@ -382,7 +382,7 @@ impl<'a> PPECompiler<'a> {
         self.label_table.push(LabelDescriptor { offset: 0 });
         idx
     }
-    
+
     fn set_label_offset(&mut self, label_token: &Spanned<Token>) {
         let Token::Label(identifier) = &label_token.token else {
             log::error!("Invalid label token {:?}", label_token);
