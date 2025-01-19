@@ -1033,7 +1033,7 @@ pub async fn mkdate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 }
 
 pub async fn curcolor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let attr = vm.icy_board_state.user_screen.caret.get_attribute().as_u8(icy_engine::IceMode::Blink);
+    let attr = vm.icy_board_state.display_screen().caret.get_attribute().as_u8(icy_engine::IceMode::Blink);
     Ok(VariableValue::new_int(attr as i32))
 }
 
@@ -1119,7 +1119,7 @@ pub async fn scrtext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 
     let mut cur_color = -1;
     for i in 0..len {
-        let ch = vm.icy_board_state.user_screen.buffer.get_char(Position::new(col + i, row));
+        let ch = vm.icy_board_state.display_screen().buffer.get_char(Position::new(col + i, row));
         if code {
             let col = ch.attribute.as_u8(icy_engine::IceMode::Blink) as i32;
             if cur_color != col && (!ch.is_transparent() || cur_color & 0b0111_0000 != col & 0b0111_0000) {
@@ -1127,7 +1127,6 @@ pub async fn scrtext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
                 cur_color = col;
             }
         }
-
         res.push(ch.ch);
     }
     Ok(VariableValue::new_string(res))

@@ -329,42 +329,87 @@ impl IcyBoard {
 
     pub fn export_pcboard(&self, file: &Path) -> Res<()> {
         let mut pcb_dat = PcbBoardData::default();
-
-        pcb_dat.sysop_info.sysop = self.config.sysop.name.to_string();
-        pcb_dat.sysop_info.password = self.config.sysop.password.to_string();
         pcb_dat.sysop_info.require_pwrd_to_exit = self.config.sysop.require_password_to_exit;
+
+        // Line 2 Sysop Display Name (if answered NO to "Use Real Name")
+        pcb_dat.sysop_info.sysop = self.config.sysop.name.to_string();
+        // Line 3 Sysop Password (from call waiting screen)
+        pcb_dat.sysop_info.password = self.config.sysop.password.to_string();
+        // Line 4
         pcb_dat.sysop_info.use_real_name = self.config.sysop.use_real_name;
+        // Line 5
+        pcb_dat.sysop_info.use_local_graphics = true;
 
+        // Line 8 Sysop Level
         pcb_dat.sysop_security.sysop = self.config.sysop_security_level.sysop as i32;
-        pcb_dat.board_name = self.config.board.name.to_string();
 
+        // Line 24
         pcb_dat.path.help_loc = self.resolve_file(&self.config.paths.help_path).to_string_lossy().to_string();
+        // Line 25
+        pcb_dat.path.sec_loc = self.resolve_file(&self.config.paths.pwrd_sec_level_file).to_string_lossy().to_string();
 
+        // Line 31
         let base_loc = file.parent().unwrap();
-
         let cnames = base_loc.join("cnames");
         self.export_conference_files(&base_loc, &cnames)?;
         pcb_dat.path.conference_file = cnames.to_string_lossy().to_string();
 
+        // Line 35
+        pcb_dat.path.tcan_file = self.resolve_file(&self.config.paths.trashcan_user).to_string_lossy().to_string();
+        // Line 36
+        pcb_dat.path.welcome_file = self.resolve_file(&self.config.paths.welcome).to_string_lossy().to_string();
+        // Line 37
+        pcb_dat.path.newuser_file = self.resolve_file(&self.config.paths.newuser).to_string_lossy().to_string();
+        // Line 38
+        pcb_dat.path.closed_file = self.resolve_file(&self.config.paths.closed).to_string_lossy().to_string();
+        // Line 39
+        pcb_dat.path.warning_file = self.resolve_file(&self.config.paths.expire_warning).to_string_lossy().to_string();
+        // Line 40
+        pcb_dat.path.expired_file = self.resolve_file(&self.config.paths.expired).to_string_lossy().to_string();
+        // Line 42
+        pcb_dat.path.conf_menu = self.resolve_file(&self.config.paths.conf_join_menu).to_string_lossy().to_string();
+        // Line 45
         let protocol_data_file = base_loc.join("pcbprot.dat");
         self.protocols.export_data(&protocol_data_file)?;
         pcb_dat.path.protocol_data_file = protocol_data_file.to_string_lossy().to_string();
-
-        pcb_dat.num_conf = self.conferences.len() as i32 - 1;
-        pcb_dat.path.sec_loc = self.resolve_file(&self.config.paths.pwrd_sec_level_file).to_string_lossy().to_string();
-        pcb_dat.path.cmd_display_files_loc = self.resolve_file(&self.config.paths.command_display_path).to_string_lossy().to_string();
-        pcb_dat.path.welcome_file = self.resolve_file(&self.config.paths.welcome).to_string_lossy().to_string();
-        pcb_dat.path.newuser_file = self.resolve_file(&self.config.paths.newuser).to_string_lossy().to_string();
-        pcb_dat.path.closed_file = self.resolve_file(&self.config.paths.closed).to_string_lossy().to_string();
-        pcb_dat.path.warning_file = self.resolve_file(&self.config.paths.expire_warning).to_string_lossy().to_string();
-        pcb_dat.path.expired_file = self.resolve_file(&self.config.paths.expired).to_string_lossy().to_string();
-        pcb_dat.path.conf_menu = self.resolve_file(&self.config.paths.conf_join_menu).to_string_lossy().to_string();
-        pcb_dat.path.group_chat = self.resolve_file(&self.config.paths.group_chat).to_string_lossy().to_string();
-        pcb_dat.path.no_ansi = self.resolve_file(&self.config.paths.no_ansi).to_string_lossy().to_string();
-        pcb_dat.path.login_script = self.resolve_file(&self.config.paths.logon_survey).to_string_lossy().to_string();
-        pcb_dat.path.login_answer = self.resolve_file(&self.config.paths.logon_answer).to_string_lossy().to_string();
+        // Line 47
         pcb_dat.path.logoff_script = self.resolve_file(&self.config.paths.logoff_survey).to_string_lossy().to_string();
+        // Line 48
         pcb_dat.path.logoff_answer = self.resolve_file(&self.config.paths.logoff_answer).to_string_lossy().to_string();
+        // Line 50
+        pcb_dat.path.group_chat = self.resolve_file(&self.config.paths.group_chat).to_string_lossy().to_string();
+
+        // Line 76
+        pcb_dat.closed_board = self.config.options.is_closed_board;
+
+        // Line 94
+        pcb_dat.board_name = self.config.board.name.to_string();
+
+        // Line 108
+        pcb_dat.num_conf = self.conferences.len() as i32 - 1;
+
+        // Line 149
+        pcb_dat.user_levels.agree_to_register = self.config.new_user_settings.sec_level as i32;
+
+        // Line 202
+        pcb_dat.path.no_ansi = self.resolve_file(&self.config.paths.no_ansi).to_string_lossy().to_string();
+
+        // Line 249 Name/Location of LOGON Script Questionnaire
+        pcb_dat.path.login_script = self.resolve_file(&self.config.paths.logon_survey).to_string_lossy().to_string();
+        // Line 250 Name/Location of LOGON Script Questionnaire ANSWER File
+        pcb_dat.path.login_answer = self.resolve_file(&self.config.paths.logon_answer).to_string_lossy().to_string();
+
+        // Line 267
+        pcb_dat.path.cmd_display_files_loc = self.resolve_file(&self.config.paths.command_display_path).to_string_lossy().to_string();
+
+        // Line 265
+        pcb_dat.min_pwrd_len = self.config.user_password_policy.min_length as i32;
+
+        // Line 269
+        pcb_dat.skip_protocol = !self.config.new_user_settings.ask_xfer_protocol;
+        // Line 270
+        pcb_dat.skip_alias = !self.config.new_user_settings.ask_alias;
+
         let res = pcb_dat.serialize(crate::parser::Encoding::CP437);
         fs::write(file, res)?;
 

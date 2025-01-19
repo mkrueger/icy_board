@@ -307,7 +307,7 @@ impl PartialEq for VariableValue {
     fn eq(&self, other: &Self) -> bool {
         let dest_type: VariableType = promote_to(self.vtype, other.vtype);
         unsafe {
-            log::info!("Comparing : {} == {}", self.data.int_value, other.data.int_value);
+            // log::info!("Comparing : {} == {}", self.data.int_value, other.data.int_value);
 
             match dest_type {
                 VariableType::Boolean => self.data.bool_value == other.data.bool_value,
@@ -319,14 +319,14 @@ impl PartialEq for VariableValue {
                 VariableType::Integer => self.as_int() == other.as_int(),
                 VariableType::Money => self.data.money_value == other.data.money_value,
                 VariableType::String | VariableType::BigStr => {
-                    log::info!(
+                    /*log::info!(
                         "Comparing strings: '{}'({}) == '{}'({}) -> {}",
                         self.as_string(),
                         self.as_string().len(),
                         other.as_string(),
                         other.as_string().len(),
                         self.as_string() == other.as_string()
-                    );
+                    );*/
                     self.as_string() == other.as_string()
                 }
 

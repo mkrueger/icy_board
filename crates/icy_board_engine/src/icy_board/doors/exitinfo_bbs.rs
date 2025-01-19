@@ -95,7 +95,7 @@ pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) 
     contents.extend(user.stats.first_date_on.format("%m-%d-%y").to_string().as_bytes());
     contents.extend(user.birth_date.format("%m-%d-%y").to_string().as_bytes());
     contents.extend(user.stats.first_date_on.format("%m-%d-%y").to_string().as_bytes()); // SubDate?
-    contents.push(state.user_screen.buffer.get_width() as u8);
+    contents.push(state.display_screen().buffer.get_width() as u8);
     contents.push(0); // Language
     contents.push(2); // DateFormat // MM-DD-YY - see below
     contents.extend(export_cp437_string("", 35, 0)); // ForwardTo

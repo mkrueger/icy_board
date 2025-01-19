@@ -398,13 +398,20 @@ pub struct IcyBoardState {
     pub debug_level: i32,
     pub env_vars: HashMap<String, String>,
 
-    pub user_screen: VirtualScreen,
+    user_screen: VirtualScreen,
     sysop_screen: VirtualScreen,
 
     char_buffer: VecDeque<KeyChar>,
 }
 
 impl IcyBoardState {
+    pub fn display_screen(&self) -> &VirtualScreen {
+        if self.session.is_sysop || self.session.cur_user_id < 0 {
+            &self.sysop_screen
+        } else {
+            &self.user_screen
+        }
+    }
     pub async fn new(
         bbs: Arc<Mutex<BBS>>,
         board: Arc<tokio::sync::Mutex<IcyBoard>>,
@@ -994,9 +1001,8 @@ impl IcyBoardState {
     async fn write_chars(&mut self, target: TerminalTarget, data: &[char]) -> Res<()> {
         let mut user_bytes = Vec::new();
         let mut sysop_bytes = Vec::new();
-
         for c in data {
-            if target != TerminalTarget::Sysop || self.session.is_sysop {
+            if target != TerminalTarget::Sysop || self.session.is_sysop || self.session.current_user.is_none()  {
                 let _ = self.user_screen.print_char(*c);
                 if *c == '\n' {
                     self.next_line().await?;

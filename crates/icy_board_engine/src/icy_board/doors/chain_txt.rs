@@ -29,8 +29,8 @@ pub async fn create_chain_txt(state: &IcyBoardState, path: &std::path::Path) -> 
         "{}\r\n",
         state.session.current_user.as_ref().unwrap().stats.last_on.format("%m/%d/%y")
     )); // User's last call date
-    contents.push_str(&format!("{}\r\n", state.user_screen.buffer.get_width()));
-    contents.push_str(&format!("{}\r\n", state.user_screen.buffer.get_height()));
+    contents.push_str(&format!("{}\r\n", state.display_screen().buffer.get_width()));
+    contents.push_str(&format!("{}\r\n", state.display_screen().buffer.get_height()));
     contents.push_str(&format!("{}\r\n", state.session.cur_security));
     contents.push_str("0\r\n");
     if state.session.is_sysop {

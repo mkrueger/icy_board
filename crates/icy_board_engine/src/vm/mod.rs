@@ -44,7 +44,7 @@ pub enum VMError {
     #[error("Internal VM error")]
     InternalVMError,
 
-    #[error("Label not found ({0})")]
+    #[error("Label not found (0x{0})")]
     LabelNotFound(usize),
 
     #[error("Tried to pop from empty value stack.")]

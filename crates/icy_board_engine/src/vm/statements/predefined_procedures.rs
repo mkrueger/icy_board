@@ -226,7 +226,9 @@ pub async fn delete(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let file = &vm.eval_expr(&args[0]).await?.as_string();
     let file = vm.resolve_file(&file).await.to_string_lossy().to_string();
     if let Err(err) = vm.io.delete(&file) {
-        log::error!("Error deleting file'{}': {}", file, err);
+        if err.kind() != std::io::ErrorKind::NotFound {
+            log::error!("Error deleting file'{}': {}", file, err);
+        }
     }
     Ok(())
 }
@@ -816,7 +818,7 @@ pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn savescrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let mut buf = vm.icy_board_state.user_screen.buffer.flat_clone(false);
+    let mut buf = vm.icy_board_state.display_screen().buffer.flat_clone(false);
     buf.buffer_type = BufferType::Unicode;
     vm.stored_screen = Some(buf);
     Ok(())

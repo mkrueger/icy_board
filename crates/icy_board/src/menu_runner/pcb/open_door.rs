@@ -231,7 +231,7 @@ impl PcbBoardCommand {
             bbslink.system_code,
             format!("{:x}", md5::compute(bbslink.auth_code.clone() + token.as_str())),
             format!("{:x}", md5::compute(bbslink.sheme_code.clone() + token.as_str())),
-            self.state.user_screen.buffer.get_height(),
+            self.state.display_screen().buffer.get_height(),
             door.path,
             token,
             "icy_board",

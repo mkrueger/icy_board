@@ -372,13 +372,17 @@ impl<'a> PPECompiler<'a> {
         if let Some(idx) = self.label_lookup_table.get(&label) {
             *idx
         } else {
-            let idx = self.label_table.len();
-            self.label_lookup_table.insert(label.clone(), idx);
-            self.label_table.push(LabelDescriptor { offset: self.cur_offset });
-            idx
+            self.define_label_at_cur_pos(label)
         }
     }
 
+    fn define_label_at_cur_pos(&mut self, label: &unicase::Ascii<String>) -> usize {
+        let idx: usize = self.label_table.len();
+        self.label_lookup_table.insert(label.clone(), idx);
+        self.label_table.push(LabelDescriptor { offset: 0 });
+        idx
+    }
+    
     fn set_label_offset(&mut self, label_token: &Spanned<Token>) {
         let Token::Label(identifier) = &label_token.token else {
             log::error!("Invalid label token {:?}", label_token);
@@ -392,8 +396,8 @@ impl<'a> PPECompiler<'a> {
             }
             label_descr.offset = self.cur_offset;
         } else {
-            self.label_lookup_table.insert(identifier.clone(), self.label_table.len());
-            self.label_table.push(LabelDescriptor { offset: self.cur_offset });
+            let idx = self.define_label_at_cur_pos(identifier);
+            self.label_table[idx].offset = self.cur_offset;
         }
     }
 

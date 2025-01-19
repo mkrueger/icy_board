@@ -125,7 +125,7 @@ impl PcbBoardCommand {
             let mut x = current_item + 1;
             self.move_lightbar(mnu, &mut x, current_item).await?;
 
-            self.state.session.last_new_line_y = self.state.user_screen.caret.get_position().y;
+            self.state.session.last_new_line_y = self.state.display_screen().caret.get_position().y;
             self.state.session.num_lines_printed = 0;
             let pos = self.state.get_caret_position();
             for (i, command) in mnu.commands.iter().enumerate() {
@@ -143,7 +143,7 @@ impl PcbBoardCommand {
             }
             if command.is_empty() {
                 if !mnu.commands[current_item].lighbar_display.is_empty() {
-                    self.state.session.last_new_line_y = self.state.user_screen.caret.get_position().y;
+                    self.state.session.last_new_line_y = self.state.display_screen().caret.get_position().y;
                     self.state.session.num_lines_printed = 0;
                     self.dispatch_command(&command, &mnu.commands[current_item]).await?;
                     continue;
@@ -153,7 +153,7 @@ impl PcbBoardCommand {
             if let Some(command_str) = self.state.session.tokens.pop_front() {
                 let cmd = mnu.commands.iter().find(|cmd| cmd.keyword.eq_ignore_ascii_case(&command_str));
                 if let Some(cmd) = cmd {
-                    self.state.session.last_new_line_y = self.state.user_screen.caret.get_position().y;
+                    self.state.session.last_new_line_y = self.state.display_screen().caret.get_position().y;
                     self.state.session.num_lines_printed = 0;
                     self.dispatch_command(&command_str, &cmd).await?;
                     self.state.session.tokens.clear();
@@ -161,7 +161,7 @@ impl PcbBoardCommand {
                 }
 
                 if let Some(command) = self.state.try_find_command(&command_str).await {
-                    self.state.session.last_new_line_y = self.state.user_screen.caret.get_position().y;
+                    self.state.session.last_new_line_y = self.state.display_screen().caret.get_position().y;
                     self.state.session.num_lines_printed = 0;
                     self.dispatch_command(&command_str, &command).await?;
                     self.state.session.tokens.clear();
