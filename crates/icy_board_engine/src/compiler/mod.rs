@@ -125,6 +125,7 @@ impl<'a> PPECompiler<'a> {
     /// Panics if .
     pub fn compile(&mut self, prg: &Ast) {
         let prg = prg.visit_mut(&mut AstTransformationVisitor::new(true));
+        // println!("{}", prg);
         prg.visit(&mut self.semantic_visitor);
         self.lookup_table = self.semantic_visitor.generate_variable_table();
         for d in &prg.nodes {

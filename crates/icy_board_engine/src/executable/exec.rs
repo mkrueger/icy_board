@@ -37,7 +37,6 @@ pub enum ExecutableError {
     BufferTooShort(usize),
 }
 
-
 #[derive(Clone)]
 pub struct Executable {
     pub version: u16,

@@ -399,10 +399,10 @@ impl Decompiler {
             let mut decl = Vec::new();
 
             let (start, end) = if entry.header.variable_type == VariableType::Function {
-                let start = entry.value.data.function_value.first_var_id as usize + entry.value.data.function_value.parameters as usize + 1; 
+                let start = entry.value.data.function_value.first_var_id as usize + entry.value.data.function_value.parameters as usize + 1;
                 (start, start + entry.value.data.function_value.local_variables as usize - 1)
             } else {
-                let start = entry.value.data.function_value.first_var_id as usize + entry.value.data.function_value.parameters as usize + 1; 
+                let start = entry.value.data.function_value.first_var_id as usize + entry.value.data.function_value.parameters as usize + 1;
                 (start, start + entry.value.data.function_value.local_variables as usize)
             };
 

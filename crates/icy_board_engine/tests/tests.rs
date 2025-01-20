@@ -1,17 +1,9 @@
-use std::{
-    env,
-    path::PathBuf,
-    sync::Arc,
-    thread,
-};
+use std::{env, path::PathBuf, sync::Arc, thread};
 
 use icy_board_engine::{
     compiler::PPECompiler,
     executable::{Executable, LAST_PPLC},
-    icy_board::{
-        bbs::BBS,
-        state::IcyBoardState,
-    },
+    icy_board::{bbs::BBS, state::IcyBoardState},
     parser::{Encoding, UserTypeRegistry},
 };
 use icy_net::{channel::ChannelConnection, Connection, ConnectionType};

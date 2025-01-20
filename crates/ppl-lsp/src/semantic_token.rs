@@ -114,7 +114,7 @@ impl AstVisitor<()> for SemanticTokenVisitor {
             self.highlight_token(else_if_block.get_elseif_token(), SemanticTokenType::KEYWORD);
             if let Some(token) = else_if_block.get_then_token() {
                 self.highlight_token(token, SemanticTokenType::KEYWORD);
-            }   
+            }
         }
         if let Some(else_block) = if_then.get_else_block() {
             self.highlight_token(else_block.get_else_token(), SemanticTokenType::KEYWORD);

@@ -194,16 +194,16 @@ impl AstVisitorMut for AstTransformationVisitor {
                 match spec {
                     crate::ast::CaseSpecifier::Expression(spec_expr) => {
                         statements.push(IfStatement::create_empty_statement(
-                            BinaryExpression::create_empty_expression(crate::ast::BinOp::Eq, expr.clone(), *spec_expr.clone()),
+                            BinaryExpression::create_empty_expression(crate::ast::BinOp::NotEq, expr.clone(), *spec_expr.clone()),
                             GotoStatement::create_empty_statement(next_case_label.clone()),
                         ));
                     }
                     crate::ast::CaseSpecifier::FromTo(from_expr, to_expr) => {
                         statements.push(IfStatement::create_empty_statement(
                             BinaryExpression::create_empty_expression(
-                                crate::ast::BinOp::And,
-                                BinaryExpression::create_empty_expression(crate::ast::BinOp::LowerEq, *from_expr.clone(), expr.clone()),
-                                BinaryExpression::create_empty_expression(crate::ast::BinOp::LowerEq, expr.clone(), *to_expr.clone()),
+                                crate::ast::BinOp::Or,
+                                BinaryExpression::create_empty_expression(crate::ast::BinOp::Greater, *from_expr.clone(), expr.clone()),
+                                BinaryExpression::create_empty_expression(crate::ast::BinOp::Greater, expr.clone(), *to_expr.clone()),
                             ),
                             GotoStatement::create_empty_statement(next_case_label.clone()),
                         ));

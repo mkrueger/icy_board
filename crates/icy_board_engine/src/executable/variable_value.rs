@@ -1139,7 +1139,6 @@ impl VariableValue {
     }
 
     pub fn set_array_value(&mut self, dim1: usize, dim2: usize, dim3: usize, val: VariableValue) {
-        
         match &mut self.generic_data {
             GenericVariableData::None => {
                 log::error!("generic data not set - array expected.");
@@ -1155,7 +1154,7 @@ impl VariableValue {
                 if dim1 < data.len() && dim2 < data[dim1].len() {
                     data[dim1][dim2] = val.convert_to(self.vtype);
                 } else {
-                    if dim1 < data.len()  {
+                    if dim1 < data.len() {
                         log::error!("dim2 out of bounds: {} > {}", dim2, data[dim1].len());
                     } else {
                         log::error!("dim1 out of bounds: {} > {}", dim1, data.len());

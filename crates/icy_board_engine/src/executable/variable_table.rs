@@ -806,18 +806,18 @@ impl VariableTable {
     pub fn get_entries(&self) -> &[TableEntry] {
         &self.entries
     }
-    
+
     pub(crate) fn analyze_locals(&mut self) {
         for t in self.entries.clone().iter() {
             if t.header.variable_type == VariableType::Function {
-                unsafe  {
-                    let start = t.value.data.function_value.first_var_id as usize + t.value.data.function_value.parameters as usize + 1; 
+                unsafe {
+                    let start = t.value.data.function_value.first_var_id as usize + t.value.data.function_value.parameters as usize + 1;
                     for i in 0..t.value.data.function_value.local_variables {
                         let idx = start + i as usize;
                         if idx == t.value.data.function_value.return_var as usize {
                             continue;
                         }
-                        
+
                         let var = self.get_var_entry_mut(idx);
                         if var.header.flags != 0 {
                             continue;
@@ -838,7 +838,6 @@ impl VariableTable {
                 }
             }
         }
-
     }
 }
 

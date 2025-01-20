@@ -476,8 +476,6 @@ impl<'a> SemanticVisitor<'a> {
                 variable_table.push(new_entry);
             }
 
-
-
             for idx in f.local_variables.clone() {
                 let (rt, r) = &self.references[idx];
                 if !matches!(rt, ReferenceType::Variable(_)) {
@@ -1180,7 +1178,6 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
         crate::ast::walk_for_stmt(self, for_stmt);
         VariableType::None
     }
-
 
     fn visit_variable_declaration_statement(&mut self, var_decl: &VariableDeclarationStatement) -> VariableType {
         for v in var_decl.get_variables() {
