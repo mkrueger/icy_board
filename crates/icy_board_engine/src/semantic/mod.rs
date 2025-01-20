@@ -1166,6 +1166,22 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
         VariableType::None
     }
 
+    fn visit_for_statement(&mut self, for_stmt: &crate::ast::ForStatement) -> VariableType {
+        if let Some(idx) = self.lookup_variable(for_stmt.get_identifier()) {
+            let (_rt, r) = &mut self.references[idx];
+            let identifier = for_stmt.get_identifier_token();
+            r.usages.push(Spanned::new(identifier.token.to_string(), identifier.span.clone()));
+        } else {
+            self.errors.lock().unwrap().report_error(
+                for_stmt.get_identifier_token().span.clone(),
+                CompilationErrorType::VariableNotFound(for_stmt.get_identifier().to_string()),
+            );
+        };
+        crate::ast::walk_for_stmt(self, for_stmt);
+        VariableType::None
+    }
+
+
     fn visit_variable_declaration_statement(&mut self, var_decl: &VariableDeclarationStatement) -> VariableType {
         for v in var_decl.get_variables() {
             if self.has_variable_defined(v.get_identifier()) {
