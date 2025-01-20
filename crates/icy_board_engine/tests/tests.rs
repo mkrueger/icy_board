@@ -3,7 +3,7 @@ use std::{env, path::PathBuf, sync::Arc, thread};
 use icy_board_engine::{
     compiler::PPECompiler,
     executable::{Executable, LAST_PPLC},
-    icy_board::{bbs::BBS, state::IcyBoardState},
+    icy_board::{bbs::BBS, read_data_with_encoding_detection, state::IcyBoardState},
     parser::{Encoding, UserTypeRegistry},
 };
 use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
@@ -25,14 +25,14 @@ fn test_compiler() {
         let executable = fs::read_to_string(&cur_entry).unwrap();
         let mut out_path = cur_entry.clone();
         out_path.set_extension("out");
-        let expected_output = fs::read_to_string(&out_path).unwrap();
+        let expected_output = unsafe { String::from_utf8_unchecked(fs::read(&out_path).unwrap()) };
 
         let file_name = cur_entry.file_name().unwrap().to_str().unwrap();
         run_test(file_name, &executable, &expected_output);
     }
 }
 
-fn run_test(file_name: &str, input: &str, output: &str) {
+fn run_test(file_name: &str, input: &str, expected_output: &str) {
     println!("Test {}...", file_name);
     let reg = UserTypeRegistry::default();
     let (ast, errors) = icy_board_engine::parser::parse_ast(PathBuf::from(&file_name), input, &reg, Encoding::Utf8, LAST_PPLC);
@@ -56,7 +56,7 @@ fn run_test(file_name: &str, input: &str, output: &str) {
                 let (mut ui_connection, connection) = ChannelConnection::create_pair();
 
                 let mut state = IcyBoardState::new(bbs, board, node_states, node, Box::new(connection)).await;
-                let result = Arc::new(tokio::sync::Mutex::new(String::new()));
+                let result = Arc::new(tokio::sync::Mutex::new(Vec::new()));
 
                 let res = result.clone();
                 let _ = std::thread::Builder::new().name("Terminal update".to_string()).spawn(move || {
@@ -67,27 +67,28 @@ fn run_test(file_name: &str, input: &str, output: &str) {
                                 break;
                             };
                             if size == 0 {
-                                continue;
+                                break;
                             }
-                            let s = std::str::from_utf8(&buffer[0..size]).unwrap();
-                            res.lock().await.push_str(s);
+                            res.lock().await.extend(&buffer[0..size]);
                         }
                     });
                 });
                 state.run_executable(&file_name, None, executable.clone()).await.unwrap();
-                thread::sleep(std::time::Duration::from_millis(10));
+                thread::sleep(std::time::Duration::from_millis(50));
                 let x = result.as_ref().lock().await.clone();
                 x
             });
+
+            let result = read_data_with_encoding_detection(&result).unwrap();
             let result = result.replace("\r\n", "\n");
-            /*
-            if result != output {
+            if result != expected_output {
                 println!("Input: {}", input);
-                println!("------");
-                executable.print_variable_table();
-                executable.print_disassembler();
-            }*/
-            assert_eq!(result, output);
+                println!("------ Result:");
+                println!("{}", result);
+                println!("------ Expected:");
+                println!("{}", expected_output);
+            }
+            assert_eq!(result, expected_output);
         }
         Err(err) => {
             panic!("Error creating executable: {}", err);

@@ -774,7 +774,7 @@ pub async fn closecap(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 }
 
 pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let conf = vm.eval_expr(&args[0]).await?.as_int() as u16;
+    let conf = vm.eval_expr(&args[0]).await?.as_int();
     let to = vm.eval_expr(&args[1]).await?.as_string();
     let from = vm.eval_expr(&args[2]).await?.as_string();
     let subject = vm.eval_expr(&args[3]).await?.as_string();
@@ -788,31 +788,35 @@ pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         log::error!("PPE function 'message': Message text file not found {}", file.display());
         return Err(Box::new(IcyError::FileNotFound("MESSAGE".to_string(), file.display().to_string())));
     }
+    let mut message = JamMessage::default()
+        .with_from(BString::from(from))
+        .with_to(BString::from(to))
+        .with_subject(BString::from(subject))
+        .with_date_time(Utc::now())
+        .with_text(BString::from(fs::read_to_string(file)?));
+    // TODO: Message Security
+    if pack_out_date > 0 {
+        message = message.with_packout_date(IcbDate::from_pcboard(pack_out_date).to_utc_date_time());
+    }
 
-    if let Ok(area_opt) = vm.icy_board_state.show_message_areas(conf, "").await {
-        match area_opt {
-            Some(area) => {
-                let mut message = JamMessage::default()
-                    .with_from(BString::from(from))
-                    .with_to(BString::from(to))
-                    .with_subject(BString::from(subject))
-                    .with_date_time(Utc::now())
-                    .with_text(BString::from(fs::read_to_string(file)?));
-                // TODO: Message Security
-                if pack_out_date > 0 {
-                    message = message.with_packout_date(IcbDate::from_pcboard(pack_out_date).to_utc_date_time());
+    if conf >= 0 {
+        if let Ok(area_opt) = vm.icy_board_state.show_message_areas(conf as u16, "").await {
+            match area_opt {
+                Some(area) => {
+                    vm.icy_board_state
+                        .send_message(conf as i32, area as i32, message, IceText::SavingMessage)
+                        .await?;
                 }
-                vm.icy_board_state
-                    .send_message(conf as i32, area as i32, message, IceText::SavingMessage)
-                    .await?;
-            }
-            None => {
-                vm.icy_board_state
-                    .display_text(IceText::MessageAborted, display_flags::LFBEFORE | display_flags::NEWLINE)
-                    .await?;
-                log::error!("Message area not found: {}", conf);
+                None => {
+                    vm.icy_board_state
+                        .display_text(IceText::MessageAborted, display_flags::LFBEFORE | display_flags::NEWLINE)
+                        .await?;
+                    log::error!("Message area not found: {}", conf);
+                }
             }
         }
+    } else {
+        vm.icy_board_state.send_message(-1, 0, message, IceText::SavingMessage).await?;
     }
     Ok(())
 }
@@ -1366,8 +1370,10 @@ pub async fn brag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     panic!("TODO")
 }
 pub async fn frealtuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!(" frealtuser not implemented statement!");
-    panic!("TODO")
+    if let Some(user) = &vm.icy_board_state.session.current_user.clone() {
+        vm.set_user_variables(user);
+    }
+    Ok(())
 }
 pub async fn setlmr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!(" setlmr not implemented statement!");

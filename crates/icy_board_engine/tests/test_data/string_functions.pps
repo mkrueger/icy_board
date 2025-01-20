@@ -1,0 +1,17 @@
+STRING S
+INTEGER I, L
+
+S = "*"
+PRINTLN INSTR(S, "*")
+S = "██*"
+PRINTLN INSTR(S, "*")
+PRINTLN INSTR(S, "A")
+
+S = "F█o*B█r"
+L = LEN(S)
+PRINTLN L
+
+I = INSTR(S, "*")
+PRINT LEFT(S, I - 1)
+PRINTLN MID(S, I + 1, L-I)
+PRINTLN MID("12345", 3, 2)

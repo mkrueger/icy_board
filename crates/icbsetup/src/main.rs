@@ -8,7 +8,6 @@ use icy_board_engine::icy_board::{read_with_encoding_detection, IcyBoard};
 use icy_board_tui::{get_text_args, print_error, term};
 use import::{console_logger::ConsoleLogger, PCBoardImporter};
 use semver::Version;
-use walkdir::WalkDir;
 use std::{
     collections::HashMap,
     fs,
@@ -16,6 +15,7 @@ use std::{
     process::{self, exit},
     sync::{Arc, Mutex},
 };
+use walkdir::WalkDir;
 
 pub mod app;
 mod create;
@@ -142,14 +142,14 @@ fn main() -> Result<()> {
         Some(Commands::PPEConvert(PPEConvert { path })) => {
             println!("Converting PPE data files in {}", path.display());
             println!("Caution - this command is used for converting CP437 to UTF-8 in a directory.");
-            
+
             println!("Converting directories to lower case...");
             for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
                 if !entry.path().is_dir() {
                     continue;
                 }
                 let lower_case = entry.path().to_string_lossy().to_string().to_lowercase();
-                if lower_case == "." || lower_case == ".."  {
+                if lower_case == "." || lower_case == ".." {
                     continue;
                 }
                 println!("Rename directory {} to {}", entry.path().display(), lower_case);

@@ -626,6 +626,15 @@ pub fn read_with_encoding_detection<P: AsRef<Path>>(path: &P) -> Res<String> {
     }
 }
 
+pub fn read_data_with_encoding_detection(data: &[u8]) -> Res<String> {
+    let import = if data.starts_with(&UTF8_BOM) {
+        String::from_utf8_lossy(&data[UTF8_BOM.len()..]).to_string()
+    } else {
+        crate::tables::import_cp437_string(&data, false)
+    };
+    Ok(import)
+}
+
 pub fn convert_to_utf8<P: AsRef<Path>, Q: AsRef<Path>>(from: &P, to: &Q) -> Res<()> {
     let import = read_with_encoding_detection(from)?;
     write_with_bom(to, &import)?;

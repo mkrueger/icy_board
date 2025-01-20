@@ -1,11 +1,11 @@
 use std::{
     fs::{self, File, OpenOptions},
-    io::{BufRead, BufReader, Read, Result, Seek, SeekFrom, Write},
+    io::{BufRead, Cursor, Read, Result, Seek, SeekFrom, Write},
     path::Path,
     time::SystemTime,
 };
 
-use crate::Res;
+use crate::{icy_board::read_data_with_encoding_detection, Res};
 
 use crate::vm::VMError;
 
@@ -126,7 +126,7 @@ pub trait PCBoardIO: Send {
 
 struct FileChannel {
     file: Option<Box<File>>,
-    reader: Option<BufReader<File>>,
+    reader: Option<Cursor<String>>,
     _content: Vec<u8>,
     err: bool,
 }
@@ -231,6 +231,12 @@ impl PCBoardIO for DiskIO {
         };
 
         if let Some(f) = &mut chan.file {
+            if let Ok(md) = f.metadata() {
+                if md.len() == 0 {
+                    const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
+                    let _ = f.write(&UTF8_BOM);
+                }
+            }
             let _ = f.write(text.as_bytes());
             chan.err = false;
         } else {
@@ -245,8 +251,13 @@ impl PCBoardIO for DiskIO {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
         };
 
-        if let Some(f) = chan.file.take() {
-            chan.reader = Some(BufReader::new(*f));
+        if let Some(mut f) = chan.file.take() {
+            let mut buf = Vec::new();
+            let _ = f.read_to_end(&mut buf);
+            let str = read_data_with_encoding_detection(&buf).unwrap();
+            let c = Cursor::new(str);
+
+            chan.reader = Some(c);
         }
         if let Some(reader) = &mut chan.reader {
             let mut line = String::new();

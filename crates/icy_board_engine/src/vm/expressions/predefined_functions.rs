@@ -188,9 +188,11 @@ pub async fn instr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     if sub.is_empty() {
         return Ok(VariableValue::new_int(0));
     }
-
     match str.find(&sub) {
-        Some(x) => Ok(VariableValue::new_int(1 + x as i32)),
+        Some(x) => {
+            let x = str[0..x].chars().count();
+            Ok(VariableValue::new_int(1 + x as i32))
+        }
         _ => Ok(VariableValue::new_int(0)),
     }
 }

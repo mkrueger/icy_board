@@ -1,0 +1,2 @@
+AnsiPos 2,2
+PrintLn GetX(), "x", GetY()
