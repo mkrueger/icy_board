@@ -471,9 +471,9 @@ impl<'a> SemanticVisitor<'a> {
                 if !matches!(rt, ReferenceType::Variable(_)) {
                     continue;
                 }
-                let mut h = r.create_table_entry();
-                h.entry_type = EntryType::Parameter;
-                variable_table.push(h);
+                let mut new_entry = r.create_table_entry();
+                new_entry.entry_type = EntryType::Parameter;
+                variable_table.push(new_entry);
             }
 
 
@@ -483,7 +483,9 @@ impl<'a> SemanticVisitor<'a> {
                 if !matches!(rt, ReferenceType::Variable(_)) {
                     continue;
                 }
-                variable_table.push(r.create_table_entry());
+                let mut new_entry = r.create_table_entry();
+                new_entry.entry_type = EntryType::LocalVariable;
+                variable_table.push(new_entry);
             }
 
             if let FunctionDeclaration::Function(f) = &f.functions {

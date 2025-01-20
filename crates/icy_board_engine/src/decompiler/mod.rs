@@ -106,12 +106,13 @@ impl Decompiler {
         }
 
         self.executable.variable_table.analyze_usage(&self.script);
+        self.executable.variable_table.analyze_locals();
         self.executable.variable_table.generate_names();
 
         let mut ast = Ast::default();
 
         self.generate_function_declarations(&mut ast);
-        self.generate_variable_declarations(&mut ast);
+        self.generate_global_variable_declarations(&mut ast);
 
         let mut statements = Vec::new();
         while self.cur_ptr < self.script.statements.len() {
@@ -189,12 +190,9 @@ impl Decompiler {
         Ok(ast)
     }
 
-    fn generate_variable_declarations(&mut self, ast: &mut Ast) {
+    fn generate_global_variable_declarations(&mut self, ast: &mut Ast) {
         for var in self.executable.variable_table.get_entries() {
             if let EntryType::Variable = var.entry_type {
-                if var.header.flags & 0x1 != 0 {
-                    continue;
-                }
                 let var_decl = generate_variable_declaration(var);
                 ast.nodes.push(AstNode::TopLevelStatement(var_decl));
             }
@@ -400,23 +398,17 @@ impl Decompiler {
         unsafe {
             let mut decl = Vec::new();
 
-            let parameters;
-            let first_var;
-            let locals;
-
-            if entry.header.variable_type == VariableType::Function {
-                parameters = entry.value.data.function_value.parameters as usize;
-                first_var = entry.value.data.function_value.first_var_id as usize;
-                locals = entry.value.data.function_value.local_variables as usize;
+            let (start, end) = if entry.header.variable_type == VariableType::Function {
+                let start = entry.value.data.function_value.first_var_id as usize + entry.value.data.function_value.parameters as usize + 1; 
+                (start, start + entry.value.data.function_value.local_variables as usize - 1)
             } else {
-                parameters = entry.value.data.procedure_value.parameters as usize;
-                first_var = entry.value.data.procedure_value.first_var_id as usize;
-                locals = entry.value.data.procedure_value.local_variables as usize;
-            }
+                let start = entry.value.data.function_value.first_var_id as usize + entry.value.data.function_value.parameters as usize + 1; 
+                (start, start + entry.value.data.function_value.local_variables as usize)
+            };
 
-            for i in parameters..locals {
-                let local_var = self.executable.variable_table.get_var_entry(first_var + 1 + i);
-                if local_var.entry_type == EntryType::Variable {
+            for i in start..end {
+                let local_var = self.executable.variable_table.get_var_entry(i);
+                if local_var.entry_type == EntryType::LocalVariable {
                     decl.push(generate_variable_declaration(local_var));
                 }
             }

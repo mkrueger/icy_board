@@ -177,6 +177,7 @@ pub enum EntryType {
     Constant,
     UserVariable,
     Variable,
+    LocalVariable,
     FunctionResult,
     Parameter,
     Function,
@@ -486,6 +487,7 @@ impl VariableTable {
         }
 
         let mut table = VariableTable { version, entries: result };
+        table.analyze_locals();
         table.generate_names();
         Ok((i, table))
     }
@@ -502,6 +504,7 @@ impl VariableTable {
             res.set_name(name);
         }
         let mut par = 1;
+        let mut vars = 1;
         let mut loc = 1;
 
         for i in 0..self.entries.len() {
@@ -524,6 +527,9 @@ impl VariableTable {
                         self.entries[i].set_name(format!("PAR{par:03}"));
                         par += 1;
                     } else if self.entries[i].get_type() == EntryType::Variable {
+                        self.entries[i].set_name(format!("VAR{vars:03}"));
+                        vars += 1;
+                    } else if self.entries[i].get_type() == EntryType::LocalVariable {
                         self.entries[i].set_name(format!("LOC{loc:03}"));
                         loc += 1;
                     }
@@ -799,6 +805,40 @@ impl VariableTable {
 
     pub fn get_entries(&self) -> &[TableEntry] {
         &self.entries
+    }
+    
+    pub(crate) fn analyze_locals(&mut self) {
+        for t in self.entries.clone().iter() {
+            if t.header.variable_type == VariableType::Function {
+                unsafe  {
+                    let start = t.value.data.function_value.first_var_id as usize + t.value.data.function_value.parameters as usize + 1; 
+                    for i in 0..t.value.data.function_value.local_variables {
+                        let idx = start + i as usize;
+                        if idx == t.value.data.function_value.return_var as usize {
+                            continue;
+                        }
+                        
+                        let var = self.get_var_entry_mut(idx);
+                        if var.header.flags != 0 {
+                            continue;
+                        }
+                        var.set_type(EntryType::LocalVariable);
+                    }
+                }
+            } else if t.header.variable_type == VariableType::Procedure {
+                unsafe {
+                    let start = t.value.data.procedure_value.first_var_id as usize + t.value.data.procedure_value.parameters as usize + 1;
+                    for i in 0..t.value.data.procedure_value.local_variables {
+                        let var = self.get_var_entry_mut(start + i as usize);
+                        if var.header.flags != 0 {
+                            continue;
+                        }
+                        var.set_type(EntryType::LocalVariable);
+                    }
+                }
+            }
+        }
+
     }
 }
 
