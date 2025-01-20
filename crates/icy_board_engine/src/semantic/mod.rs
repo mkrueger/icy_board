@@ -466,14 +466,6 @@ impl<'a> SemanticVisitor<'a> {
                 variable_table.start_define_function_body(proc.get_identifier().clone());
             };
 
-            for idx in f.local_variables.clone() {
-                let (rt, r) = &self.references[idx];
-                if !matches!(rt, ReferenceType::Variable(_)) {
-                    continue;
-                }
-                variable_table.push(r.create_table_entry());
-            }
-
             for idx in f.parameters.clone() {
                 let (rt, r) = &self.references[idx];
                 if !matches!(rt, ReferenceType::Variable(_)) {
@@ -482,6 +474,16 @@ impl<'a> SemanticVisitor<'a> {
                 let mut h = r.create_table_entry();
                 h.entry_type = EntryType::Parameter;
                 variable_table.push(h);
+            }
+
+
+
+            for idx in f.local_variables.clone() {
+                let (rt, r) = &self.references[idx];
+                if !matches!(rt, ReferenceType::Variable(_)) {
+                    continue;
+                }
+                variable_table.push(r.create_table_entry());
             }
 
             if let FunctionDeclaration::Function(f) = &f.functions {
