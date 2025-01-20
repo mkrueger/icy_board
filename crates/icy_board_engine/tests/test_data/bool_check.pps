@@ -5,5 +5,3 @@ B = !B
 PRINT B, ","
 B = !B
 PRINT B
-;;
-1,0,1

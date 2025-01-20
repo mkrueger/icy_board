@@ -24,13 +24,12 @@ gosub $MyLabel$
 fn find_local_references() {
     find_references(
         r#"declare procedure foo()
-    :mylabel
+    :@mylabel@
 PRINT "Hello World"
 
 procedure foo()
 goto $mylabel$
 gosub $MyLabel$
-:@mylabel@
 endproc
 
 "#,

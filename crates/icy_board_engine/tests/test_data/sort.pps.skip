@@ -14,12 +14,3 @@ NEXT
 FOR i = 0 TO 3
 PRINTLN FOO(p(i))
 NEXT
-;;
-z
-A
-e
-4
-4
-A
-e
-z

@@ -13,5 +13,3 @@ Function Available(Integer iConf) Boolean
     Available = FALSE
     Available = TRUE
 EndFunc
-;;
-1-0=A=A

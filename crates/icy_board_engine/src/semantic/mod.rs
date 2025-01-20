@@ -632,7 +632,7 @@ impl<'a> SemanticVisitor<'a> {
 
     fn start_parse_function_body(&mut self) {
         self.local_variable_lookup = Some(VariableLookups::default());
-        
+
         // TODO: clear the local label lookup on each new functions for future language versions?
         // self.label_lookup_table.clear();
     }

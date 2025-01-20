@@ -6,4 +6,3 @@ Function AvailableRet(Integer iConf) Boolean
     AvailableRet = FALSE
     RETURN
 EndFunc
-;;

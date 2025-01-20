@@ -6,5 +6,3 @@ ENDPROC
 BEGIN
     PROC()
 END
-;;
-Hello

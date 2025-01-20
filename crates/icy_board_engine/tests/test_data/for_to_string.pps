@@ -4,5 +4,3 @@ B = "3"
 FOR I = 0  TO B 
 PRINT I, ","
 NEXT
-;;
-0,1,2,3,

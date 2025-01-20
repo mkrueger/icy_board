@@ -572,16 +572,7 @@ impl IcyBoardState {
     pub async fn run_ppe<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>) -> Res<()> {
         match Executable::read_file(&file_name, false) {
             Ok(executable) => {
-                let path = PathBuf::from(file_name.as_ref());
-                let parent = path.parent().unwrap().to_str().unwrap().to_string();
-
-                let mut io = DiskIO::new(&parent, answer_file);
-                if let Err(err) = run(file_name, &executable, &mut io, self).await {
-                    log::error!("Error executing PPE {}: {}", file_name.as_ref().display(), err);
-                    self.session.op_text = format!("{}", err);
-                    self.display_text(IceText::ErrorExecPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
-                        .await?;
-                }
+                self.run_executable(file_name, answer_file, executable).await?;
             }
             Err(err) => {
                 log::error!("Error loading PPE {}: {}", file_name.as_ref().display(), err);
@@ -590,8 +581,19 @@ impl IcyBoardState {
                     .await?;
             }
         }
-
         Ok(())
+    }
+
+    pub async fn run_executable<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>, executable: Executable) -> Res<()> {
+        let path = PathBuf::from(file_name.as_ref());
+        let parent = path.parent().unwrap().to_str().unwrap().to_string();
+        let mut io = DiskIO::new(&parent, answer_file);
+        Ok(if let Err(err) = run(file_name, &executable, &mut io, self).await {
+            log::error!("Error executing PPE {}: {}", file_name.as_ref().display(), err);
+            self.session.op_text = format!("{}", err);
+            self.display_text(IceText::ErrorExecPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
+                .await?;
+        })
     }
 
     pub fn put_keyboard_buffer(&mut self, value: &str, is_visible: bool) -> Res<()> {
@@ -1030,8 +1032,15 @@ impl IcyBoardState {
         if target != TerminalTarget::User {
             // Send user only not to other connections
             let mut node_state = self.node_state.lock().await;
-            if let Some(sysop_connection) = &mut node_state[self.node].as_mut().unwrap().sysop_connection {
-                let _ = sysop_connection.send(&sysop_bytes).await;
+            match node_state[self.node].as_mut() {
+                Some(ns) => {
+                    if let Some(sysop_connection) = &mut ns.sysop_connection {
+                        let _ = sysop_connection.send(&sysop_bytes).await;
+                    }
+                }
+                None => {
+                    log::error!("Node {} was empty", self.node);
+                }
             }
         }
         match target {

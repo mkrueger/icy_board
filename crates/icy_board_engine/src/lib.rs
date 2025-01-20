@@ -28,10 +28,6 @@ pub mod parser;
 pub mod semantic;
 pub mod tables;
 
-/*
-#[cfg(test)]
-pub mod tests;
-*/
 pub type Res<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
 lazy_static::lazy_static! {
