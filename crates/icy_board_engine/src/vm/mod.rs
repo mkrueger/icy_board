@@ -84,7 +84,7 @@ pub enum VMError {
     NoObjectFound(u8),
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum TerminalTarget {
     Both,
     User,

@@ -1,12 +1,14 @@
 use app::new_main_window;
 use argh::FromArgs;
 use chrono::Local;
+use codepages::tables::write_with_bom;
 use color_eyre::Result;
 use create::IcyBoardCreator;
-use icy_board_engine::icy_board::IcyBoard;
+use icy_board_engine::icy_board::{read_with_encoding_detection, IcyBoard};
 use icy_board_tui::{get_text_args, print_error, term};
 use import::{console_logger::ConsoleLogger, PCBoardImporter};
 use semver::Version;
+use walkdir::WalkDir;
 use std::{
     collections::HashMap,
     fs,
@@ -45,6 +47,7 @@ struct Cli {
 enum Commands {
     Import(Import),
     Create(Create),
+    PPEConvert(PPEConvert),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -67,6 +70,15 @@ struct Create {
     /// output directory
     #[argh(positional)]
     file: PathBuf,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Converts a path to UTF-8
+#[argh(subcommand, name = "ppe-convert")]
+struct PPEConvert {
+    /// directory to convert
+    #[argh(positional)]
+    path: PathBuf,
 }
 
 fn main() -> Result<()> {
@@ -123,6 +135,52 @@ fn main() -> Result<()> {
             if let Err(err) = creator.create() {
                 print_error(err.to_string());
                 process::exit(1);
+            }
+            return Ok(());
+        }
+
+        Some(Commands::PPEConvert(PPEConvert { path })) => {
+            println!("Converting PPE data files in {}", path.display());
+            println!("Caution - this command is used for converting CP437 to UTF-8 in a directory.");
+            
+            println!("Converting directories to lower case...");
+            for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+                if !entry.path().is_dir() {
+                    continue;
+                }
+                let lower_case = entry.path().to_string_lossy().to_string().to_lowercase();
+                if lower_case == "." || lower_case == ".."  {
+                    continue;
+                }
+                println!("Rename directory {} to {}", entry.path().display(), lower_case);
+                if fs::rename(entry.path(), lower_case).is_err() {
+                    println!("Error renaming directory {}", entry.path().display());
+                }
+            }
+            println!("Converting files...");
+            let convert_ext = ["ANS", "PCB", "CFG", "DOC", "NFO", "ASC", "TXT", "PPX", "PPS", "PPD", "LST", "XXX"];
+            for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+                if !entry.path().is_file() {
+                    continue;
+                }
+                let lower_case = entry.path().to_string_lossy().to_string().to_lowercase();
+                if lower_case == entry.path().to_string_lossy().to_string() {
+                    continue;
+                }
+                if let Some(extension) = entry.path().extension() {
+                    if convert_ext.contains(&extension.to_str().unwrap()) {
+                        println!("Converting {} to utf8...", entry.path().display());
+                        if let Ok(data) = read_with_encoding_detection(&entry.path()) {
+                            if write_with_bom(&entry.path(), &data).is_err() {
+                                println!("Error writing {}", entry.path().display());
+                            }
+                        }
+                    }
+                }
+                println!("Rename {} to {}", entry.path().display(), lower_case);
+                if fs::rename(entry.path(), lower_case).is_err() {
+                    println!("Error renaming {}", entry.path().display());
+                }
             }
             return Ok(());
         }
