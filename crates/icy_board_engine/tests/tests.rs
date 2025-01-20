@@ -1,20 +1,18 @@
-use core::error;
 use std::{
     env,
-    fs::read_to_string,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::Arc,
     thread,
 };
 
 use icy_board_engine::{
     compiler::PPECompiler,
-    executable::LAST_PPLC,
+    executable::{Executable, LAST_PPLC},
     icy_board::{
         bbs::BBS,
-        state::{IcyBoardState, NodeState},
+        state::IcyBoardState,
     },
-    parser::{Encoding, Parser, UserTypeRegistry},
+    parser::{Encoding, UserTypeRegistry},
 };
 use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
 
@@ -43,16 +41,20 @@ fn test_compiler() {
 }
 
 fn run_test(file_name: &str, input: &str, output: &str) {
-    let reg = UserTypeRegistry::default();
-    let (mut ast, errors) = icy_board_engine::parser::parse_ast(PathBuf::from(&file_name), input, &reg, Encoding::Utf8, LAST_PPLC);
-    check_errors(errors.clone(), file_name, input);
     println!("Test {}...", file_name);
+    let reg = UserTypeRegistry::default();
+    let (ast, errors) = icy_board_engine::parser::parse_ast(PathBuf::from(&file_name), input, &reg, Encoding::Utf8, LAST_PPLC);
+    check_errors(errors.clone());
     let mut compiler = PPECompiler::new(LAST_PPLC, &reg, errors.clone());
     compiler.compile(&ast);
-    check_errors(errors.clone(), file_name, input);
+    check_errors(errors.clone());
 
     match compiler.create_executable(LAST_PPLC) {
         Ok(executable) => {
+            // Save & load the executable this ensures that the vtable is correctly initialized.
+            let mut bin = executable.to_buffer().unwrap();
+            let executable = Executable::from_buffer(&mut bin, false).unwrap();
+
             let result = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
                 let bbs = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
                 let icy_board = icy_board_engine::icy_board::IcyBoard::new();
@@ -80,12 +82,19 @@ fn run_test(file_name: &str, input: &str, output: &str) {
                         }
                     });
                 });
-                state.run_executable(&file_name, None, executable).await.unwrap();
+                state.run_executable(&file_name, None, executable.clone()).await.unwrap();
                 thread::sleep(std::time::Duration::from_millis(10));
                 let x = result.as_ref().lock().await.clone();
                 x
             });
             let result = result.replace("\r\n", "\n");
+            /*
+            if result != output {
+                println!("Input: {}", input);
+                println!("------");
+                executable.print_variable_table();
+                executable.print_disassembler();
+            }*/
             assert_eq!(result, output);
         }
         Err(err) => {
@@ -94,7 +103,7 @@ fn run_test(file_name: &str, input: &str, output: &str) {
     }
 }
 
-fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser::ErrorRepoter>>, file_name: &str, src: &str) {
+fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser::ErrorRepoter>>) {
     if errors.lock().unwrap().has_errors() {
         for err in &errors.lock().unwrap().errors {
             println!("ERROR: {}", err.error);

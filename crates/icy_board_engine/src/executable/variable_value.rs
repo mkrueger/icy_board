@@ -1139,20 +1139,42 @@ impl VariableValue {
     }
 
     pub fn set_array_value(&mut self, dim1: usize, dim2: usize, dim3: usize, val: VariableValue) {
+        
         match &mut self.generic_data {
+            GenericVariableData::None => {
+                log::error!("generic data not set - array expected.");
+            }
             GenericVariableData::Dim1(data) => {
                 if dim1 < data.len() {
                     data[dim1] = val.convert_to(self.vtype);
+                } else {
+                    log::error!("dim1 out of bounds: {} > {}", dim1, data.len());
                 }
             }
             GenericVariableData::Dim2(data) => {
                 if dim1 < data.len() && dim2 < data[dim1].len() {
                     data[dim1][dim2] = val.convert_to(self.vtype);
+                } else {
+                    if dim1 < data.len()  {
+                        log::error!("dim2 out of bounds: {} > {}", dim2, data[dim1].len());
+                    } else {
+                        log::error!("dim1 out of bounds: {} > {}", dim1, data.len());
+                    }
                 }
             }
             GenericVariableData::Dim3(data) => {
                 if dim1 < data.len() && dim2 < data[dim1].len() && dim3 < data[dim1][dim2].len() {
                     data[dim1][dim2][dim3] = val.convert_to(self.vtype);
+                } else {
+                    if dim1 < data.len() {
+                        if dim2 < data[dim1].len() {
+                            log::error!("dim3 out of bounds: {} > {}", dim3, data[dim1][dim2].len());
+                        } else {
+                            log::error!("dim2 out of bounds: {} > {}", dim2, data[dim1].len());
+                        }
+                    } else {
+                        log::error!("dim1 out of bounds: {} > {}", dim1, data.len());
+                    }
                 }
             }
             _ => {

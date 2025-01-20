@@ -409,6 +409,7 @@ impl VariableTable {
                         variable = VariableValue {
                             vtype,
                             data,
+                            generic_data: header.create_generic_data(),
                             ..Default::default()
                         };
                         i += 4;
@@ -444,7 +445,6 @@ impl VariableTable {
                     entry_type = EntryType::Constant;
                 }
             }
-
             result[var_count as usize] = TableEntry::new("", header, variable, entry_type);
             var_count -= 1;
         }
