@@ -12,7 +12,7 @@ use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
 fn test_compiler() {
     use std::fs::{self};
 
-    let mut data_path = env::current_dir().unwrap();
+    let mut data_path: PathBuf = env::current_dir().unwrap();
     data_path.push("src/test_data");
     //let mut success = 0;
     //let mut skipped = 0;

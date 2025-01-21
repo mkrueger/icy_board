@@ -1,6 +1,9 @@
-use crate::ast::{BinOp, Expression, ForStatement, Statement};
+use crate::{
+    ast::{BinOp, Expression, ForStatement, Statement},
+    semantic::SemanticVisitor,
+};
 
-pub fn scan_for_next(statements: &mut Vec<Statement>) {
+pub fn scan_for_next<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
     // FOR Header:
     // LET VAR001 = [START]
     // :LABEL002
@@ -83,7 +86,7 @@ pub fn scan_for_next(statements: &mut Vec<Statement>) {
                 };
                 for_block.pop();
                 let continue_label = continue_label_stmt.get_label().clone();
-                super::optimize_block(&mut for_block);
+                super::optimize_block(visitor, &mut for_block);
                 super::handle_break_continue(skip_label, continue_label, &mut for_block);
                 if step_expr.to_string() == "1" {
                     statements.insert(i, ForStatement::create_empty_statement(var_name, from_expr, to_expr, None, for_block));

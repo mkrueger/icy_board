@@ -138,7 +138,6 @@ fn find_references(arg: &str) {
     }
     let reg = UserTypeRegistry::default();
     let (ast, errors) = parse_ast(PathBuf::from("."), &txt, &reg, Encoding::Utf8, LAST_PPLC);
-
     let mut visitor = SemanticVisitor::new(LAST_PPLC, errors.clone(), &reg);
     ast.visit(&mut visitor);
 

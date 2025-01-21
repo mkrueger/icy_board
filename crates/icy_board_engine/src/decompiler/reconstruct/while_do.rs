@@ -1,9 +1,10 @@
 use crate::{
     ast::{Statement, WhileDoStatement, WhileStatement},
     decompiler::reconstruct::scan_goto,
+    semantic::SemanticVisitor,
 };
 
-use super::optimize_block;
+use super::{is_simple_statement, optimize_block};
 
 /* Compiled Example:
 
@@ -18,8 +19,9 @@ WHILE (1) DO
   PRINT "Hello World!"
 ENDWHILE
 */
-pub fn scan_do_while(statements: &mut Vec<Statement>) {
-    scan_do_while_case2(statements);
+pub fn scan_do_while<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
+    scan_do_while_case2(visitor, statements);
+
     let mut i = 0;
     while i + 3 < statements.len() {
         let Statement::Label(while_continue_label) = statements[i].clone() else {
@@ -56,16 +58,22 @@ pub fn scan_do_while(statements: &mut Vec<Statement>) {
 
         // reconstruct while…do block
         let mut while_block = statements.drain((i + 2)..matching_goto as usize).collect();
-
         statements.drain(i + 1..i + 3);
+
         let continue_label = super::get_last_label(&statements[i..i + 1]);
         super::handle_break_continue(break_label, continue_label, &mut while_block);
-        optimize_block(&mut while_block);
+        optimize_block(visitor, &mut while_block);
 
-        if while_block.len() == 1 {
-            statements[i + 1] = WhileStatement::create_empty_statement(next_loop_if.get_condition().negate_expression().clone(), while_block.pop().unwrap());
+        if while_block.len() == 1 && is_simple_statement(&while_block[0]) {
+            statements.insert(
+                i + 1,
+                WhileStatement::create_empty_statement(next_loop_if.get_condition().negate_expression().clone(), while_block.pop().unwrap()),
+            );
         } else {
-            statements[i + 1] = WhileDoStatement::create_empty_statement(next_loop_if.get_condition().negate_expression().clone(), while_block);
+            statements.insert(
+                i + 1,
+                WhileDoStatement::create_empty_statement(next_loop_if.get_condition().negate_expression().clone(), while_block),
+            );
         }
         i += 1;
     }
@@ -88,7 +96,7 @@ WHILE (TRUE) DO
   PRINT "Hello World!"
 ENDWHILE
 */
-fn scan_do_while_case2(statements: &mut Vec<Statement>) {
+fn scan_do_while_case2<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
     let mut i = 0;
     while i + 4 < statements.len() {
         let Statement::Label(while_continue_label) = statements[i].clone() else {
@@ -141,7 +149,7 @@ fn scan_do_while_case2(statements: &mut Vec<Statement>) {
         statements.remove(i + 4);
         statements.drain(i + 1..i + 3);
 
-        optimize_block(&mut while_block);
+        optimize_block(visitor, &mut while_block);
         super::handle_break_continue(break_label, continue_label, &mut while_block);
 
         if while_block.len() == 1 {

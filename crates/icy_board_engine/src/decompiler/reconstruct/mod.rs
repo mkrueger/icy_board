@@ -2,7 +2,11 @@ use for_next::scan_for_next;
 use select_case::scan_select_statements;
 use unicase::Ascii;
 
-use crate::ast::{AstVisitorMut, BreakStatement, ContinueStatement, IfStatement, IfThenStatement, RenameVisitor};
+use crate::{
+    ast::{AstVisitorMut, BreakStatement, ContinueStatement, IfStatement, IfThenStatement, RenameVisitor},
+    executable::OpCode,
+    semantic::{ReferenceType, SemanticVisitor},
+};
 
 use self::while_do::scan_do_while;
 
@@ -15,8 +19,8 @@ mod select_case;
 mod unused_label_visitor;
 mod while_do;
 
-pub fn reconstruct_block(statements: &mut Vec<Statement>) {
-    optimize_block(statements);
+pub fn reconstruct_block<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
+    optimize_block(visitor, statements);
 }
 
 fn _optimize_argument(arg: &mut Expression) {
@@ -25,20 +29,21 @@ fn _optimize_argument(arg: &mut Expression) {
     }
 }
 
-pub fn optimize_loops(statements: &mut Vec<Statement>) {
-    scan_for_next(statements);
-    scan_do_while(statements);
+pub fn optimize_loops<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
+    scan_for_next(visitor, statements);
+    scan_do_while(visitor, statements);
 }
 
-fn optimize_block(statements: &mut Vec<Statement>) {
-    optimize_loops(statements);
-    optimize_ifs(statements);
+fn optimize_block<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
+    optimize_loops(visitor, statements);
+    optimize_ifs(visitor, statements);
     scan_select_statements(statements);
 }
 
-fn optimize_ifs(statements: &mut Vec<Statement>) {
-    scan_if(statements);
-    //scan_if_else(statements);
+fn optimize_ifs<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
+    scan_negated_if(visitor, statements);
+    scan_if(visitor, statements);
+    if_else::scan_if_else(visitor, statements);
 }
 
 fn scan_label(statements: &[Statement], from: usize, label: &unicase::Ascii<String>) -> Option<usize> {
@@ -63,16 +68,53 @@ fn scan_goto(statements: &[Statement], from: usize, label: &unicase::Ascii<Strin
     None
 }
 
-fn scan_if(statements: &mut Vec<Statement>) {
+// scan:
+// IF (COND) GOTO SKIP
+// STMT
+// :SKIP
+//
+// replace with:
+// IF !COND STMT
+// :SKIP
+fn scan_negated_if<'a>(_visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
     // scan:
     // IF (COND) GOTO SKIP
-    // STATEMENTS
+    // STATEMENTS..
     // :SKIP
-    if statements.len() < 2 {
-        return;
+    let mut i: usize = 0;
+    while i + 2 < statements.len() {
+        let label = if let Statement::Label(label_stmt) = &statements[i + 2] {
+            label_stmt.get_label().clone()
+        } else {
+            i += 1;
+            continue;
+        };
+        let Statement::If(mut if_stmt) = statements[i].clone() else {
+            i += 1;
+            continue;
+        };
+
+        if let Statement::Goto(endif_label) = if_stmt.get_statement() {
+            if *endif_label.get_label() == label {
+                let statement = statements.remove(i + 1);
+                if_stmt.set_condition(if_stmt.get_condition().negate_expression());
+                if_stmt.set_statement(statement);
+                statements[i] = Statement::If(if_stmt);
+            }
+        } else {
+            i += 1;
+            continue;
+        }
     }
-    let mut i = 0;
-    while i < statements.len() - 2 {
+}
+
+fn scan_if<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
+    // scan:
+    // IF (COND) GOTO SKIP
+    // STATEMENTS..
+    // :SKIP
+    let mut i: usize = 0;
+    while i + 2 < statements.len() {
         let Statement::If(if_stmt) = statements[i].clone() else {
             i += 1;
             continue;
@@ -87,16 +129,55 @@ fn scan_if(statements: &mut Vec<Statement>) {
             i += 1;
             continue;
         };
+        let remove_goto = visitor
+            .references
+            .iter()
+            .find(|&(t, r)| {
+                if !matches!(t, ReferenceType::Label(_)) {
+                    return false;
+                }
+                let end_label = format!(":{}", endif_label.get_label());
+                if let Some(decl) = &r.declaration {
+                    if decl.token == end_label {
+                        return r.usages.len() == 1;
+                    }
+                }
+                false
+            })
+            .is_some();
+        if i + 1 >= endif_label_index {
+            // don't generate if…then for empty if…then
+            i += 1;
+            continue;
+        }
+        if remove_goto {
+            statements.remove(endif_label_index);
+        }
 
         // replace if with if…then
-        // do not remove labels they may be needed to analyze other constructs
         let mut statements2: Vec<Statement> = statements.drain((i + 1)..endif_label_index).collect();
-        optimize_block(&mut statements2);
-        if statements2.len() == 1 {
+        optimize_block(visitor, &mut statements2);
+        if statements2.len() == 1 && is_simple_statement(&statements[0]) {
             statements[i] = IfStatement::create_empty_statement(if_stmt.get_condition().negate_expression(), statements2.pop().unwrap());
         } else {
             statements[i] = IfThenStatement::create_empty_statement(if_stmt.get_condition().negate_expression(), statements2, Vec::new(), None);
         }
+    }
+}
+
+fn is_simple_statement(statements: &Statement) -> bool {
+    match statements {
+        Statement::Gosub(_) => true,
+        Statement::Goto(_) => true,
+        Statement::PredifinedCall(pcall) => match pcall.get_func().opcode {
+            OpCode::RETURN => true,
+            OpCode::END => true,
+            OpCode::STOP => true,
+            OpCode::PRINT => true,
+            OpCode::PRINTLN => true,
+            _ => false,
+        },
+        _ => false,
     }
 }
 

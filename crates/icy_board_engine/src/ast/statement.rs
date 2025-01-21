@@ -569,6 +569,9 @@ impl IfStatement {
     pub fn set_statement(&mut self, statement: Statement) {
         self.statement = Box::new(statement);
     }
+    pub fn set_condition(&mut self, condition: Expression) {
+        self.condition = Box::new(condition);
+    }
 
     pub fn create_empty_statement(condition: Expression, statement: Statement) -> Statement {
         Statement::If(IfStatement::empty(condition, statement))

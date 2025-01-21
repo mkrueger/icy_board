@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, Mutex},
+};
 
 use reconstruct::strip_unused_labels;
 
@@ -11,9 +14,10 @@ use crate::{
     },
     executable::{
         DeserializationError, DeserializationErrorType, EntryType, Executable, OpCode, PPECommand, PPEExpr, PPEScript, PPEVisitor, StatementDefinition,
-        TableEntry, VariableType,
+        TableEntry, VariableType, LAST_PPLC,
     },
-    parser::lexer::Token,
+    parser::{lexer::Token, ErrorRepoter, UserTypeRegistry},
+    semantic::SemanticVisitor,
     Res,
 };
 
@@ -509,17 +513,22 @@ pub fn decompile(executable: Executable, raw: bool) -> Res<(Ast, Vec<DecompilerI
         Ok(mut d) => {
             let mut ast = d.decompile()?;
 
+            let reg = UserTypeRegistry::default();
+            let errors: Arc<std::sync::Mutex<crate::parser::ErrorRepoter>> = Arc::new(Mutex::new(ErrorRepoter::default()));
+            let mut visitor = SemanticVisitor::new(LAST_PPLC, errors.clone(), &reg);
+            ast.visit(&mut visitor);
+
             if !raw {
                 for node in &mut ast.nodes {
                     match node {
                         AstNode::Function(f) => {
-                            reconstruct::reconstruct_block(f.get_statements_mut());
+                            reconstruct::reconstruct_block(&visitor, f.get_statements_mut());
                         }
                         AstNode::Procedure(p) => {
-                            reconstruct::reconstruct_block(p.get_statements_mut());
+                            reconstruct::reconstruct_block(&visitor, p.get_statements_mut());
                         }
                         AstNode::Main(block) => {
-                            reconstruct::reconstruct_block(block.get_statements_mut());
+                            reconstruct::reconstruct_block(&visitor, block.get_statements_mut());
                         }
                         _ => {}
                     }

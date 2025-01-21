@@ -1,4 +1,7 @@
-use crate::ast::{ElseBlock, ElseIfBlock, Statement};
+use crate::{
+    ast::{ElseBlock, ElseIfBlock, Statement},
+    semantic::SemanticVisitor,
+};
 
 use super::optimize_block;
 
@@ -41,37 +44,41 @@ BOOLEAN BOOL002
 Was:
 BOOLEAN BOOL001
 BOOLEAN BOOL002
-BOOL001 = FALSE
-BOOL002 = TRUE
+    BOOL001 = FALSE
+    BOOL002 = TRUE
+    IF (BOOL001) THEN
+        PRINT "TRUE"
+        GOTO LABEL001
+    ENDIF
 
-IF (BOOL001) THEN
-  PRINT "TRUE"
-ELSEIF (BOOL002 | BOOL001) THEN
-  PRINT "ELSEIF1"
-ELSEIF (!BOOL002 & !BOOL001) THEN
-  PRINT "ELSEIF2"
-ELSE
-  PRINT "ELSE"
-ENDIF
+    IF (BOOL002 | BOOL001) THEN
+        PRINT "ELSEIF1"
+        GOTO LABEL001
+    ENDIF
 
-IF (BOOL001) THEN
-  PRINT "TRUE"
-ELSEIF (BOOL002 | BOOL001) THEN
-  PRINT "ELSEIF1"
-ENDIF
+    IF (!(BOOL002 | BOOL001)) THEN
+        PRINT "ELSEIF2"
+        GOTO LABEL001
+    ENDIF
+
+    PRINT "ELSE"
+:LABEL001
+    IF (BOOL001) THEN
+        PRINT "TRUE"
+        GOTO LABEL002
+    ENDIF
+
+    IF (BOOL002 | BOOL001) THEN
+        PRINT "ELSEIF1"
+    ENDIF
+
+:LABEL002
 */
 
-pub fn scan_if_else(statements: &mut Vec<Statement>) {
+pub fn scan_if_else<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
     let mut i = 0;
-    if statements.len() < 1 {
-        return;
-    }
-    while i < statements.len() - 1 {
+    while i + 1 < statements.len() {
         let start = i;
-        if let Statement::Label(_) = statements[i] {
-            i += 1;
-            continue;
-        }
         let Statement::IfThen(if_stmt) = &statements[i] else {
             i += 1;
             continue;
@@ -80,50 +87,59 @@ pub fn scan_if_else(statements: &mut Vec<Statement>) {
             i += 1;
             continue;
         };
-        let Some(mut idx) = super::scan_label(statements, i, breakout_goto_stmt.get_label()) else {
+        let Some(mut end_label_idx) = super::scan_label(statements, i, breakout_goto_stmt.get_label()) else {
             i += 1;
             continue;
         };
         let mut if_stmt = if_stmt.clone();
         if_stmt.get_statements_mut().pop(); // pop goto
 
-        println!("breakout goto: {}", breakout_goto_stmt.get_label());
-        let mut j = i + 1;
-        let mut has_else = true;
+        let j: usize = i + 1;
         while j < statements.len() - 1 {
-            if let Statement::Label(_) = statements[j] {
-                j += 1;
-                continue;
-            }
             let Statement::IfThen(else_if_stmt) = &statements[j] else {
                 break;
             };
             if let Some(Statement::Goto(goto_stmt)) = else_if_stmt.get_statements().last().cloned() {
-                println!("goto goto: {}", goto_stmt.get_label());
-                has_else = goto_stmt.get_label() == breakout_goto_stmt.get_label();
-            } else {
-                has_else = false;
-            };
-            let mut else_if_block = else_if_stmt.get_statements().clone();
-            if has_else {
-                else_if_block.pop(); // pop goto
+                if goto_stmt.get_label() == breakout_goto_stmt.get_label() {
+                    let mut else_if_block = else_if_stmt.get_statements().clone();
+                    else_if_block.pop(); // pop goto
+                    if_stmt
+                        .get_else_if_blocks_mut()
+                        .push(ElseIfBlock::empty(else_if_stmt.get_condition().clone(), else_if_block));
+
+                    statements.remove(j);
+                    end_label_idx -= 1;
+
+                    continue;
+                }
             }
-            if_stmt
-                .get_else_if_blocks_mut()
-                .push(ElseIfBlock::empty(else_if_stmt.get_condition().clone(), else_if_block));
-            j += 1;
+            break;
         }
 
-        if has_else && j < idx {
-            let mut stmts = statements.drain(j..idx).collect();
-            optimize_block(&mut stmts);
-            *if_stmt.get_else_block_mut() = Some(ElseBlock::empty(stmts));
-            idx = j;
+        if j < end_label_idx {
+            let mut stmts = statements.drain(j..end_label_idx).collect();
+            optimize_block(visitor, &mut stmts);
+            let mut is_else_if = false;
+            if stmts.len() == 1 {
+                if let Statement::IfThen(if_then_stmt) = &stmts[0] {
+                    is_else_if = true;
+                    if_stmt
+                        .get_else_if_blocks_mut()
+                        .push(ElseIfBlock::empty(if_then_stmt.get_condition().clone(), if_then_stmt.get_statements().clone()));
+                } else if let Statement::If(if_then_stmt) = &stmts[0] {
+                    is_else_if = true;
+                    if_stmt.get_else_if_blocks_mut().push(ElseIfBlock::empty(
+                        if_then_stmt.get_condition().clone(),
+                        vec![if_then_stmt.get_statement().clone()],
+                    ));
+                }
+            }
+
+            if !is_else_if {
+                *if_stmt.get_else_block_mut() = Some(ElseBlock::empty(stmts));
+            }
         }
-        for s in statements.drain(start + 1..idx) {
-            println!("dropping {}", s);
-        }
-        println!("----------");
+
         statements[start] = Statement::IfThen(if_stmt);
         i += 1;
     }
