@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, str::FromStr};
 
 use bstr::BString;
 use chrono::Utc;
@@ -24,6 +24,7 @@ use icy_board_engine::{
     },
     Res,
 };
+use icy_engine::{Buffer, SaveOptions};
 use icy_net::protocol::TransferProtocolType;
 use jamjam::{jam::JamMessageBase, util::echmoail::EchomailAddress};
 
@@ -32,6 +33,57 @@ use crate::import::{console_logger::ConsoleLogger, default_commands::add_default
 pub struct IcyBoardCreator {
     destination: PathBuf,
     logger: ConsoleLogger,
+}
+
+lazy_static::lazy_static! {
+    static ref HELP_FILES: Vec<(&'static str, Vec<u8>)> = vec![
+        ("hlpa", include_bytes!("../../data/new_bbs/help/hlpa.icy").to_vec()),
+        ("hlpalias", include_bytes!("../../data/new_bbs/help/hlpalias.icy").to_vec()),
+        ("hlpb", include_bytes!("../../data/new_bbs/help/hlpb.icy").to_vec()),
+        ("hlpbrd", include_bytes!("../../data/new_bbs/help/hlpbrd.icy").to_vec()),
+        ("hlpchat", include_bytes!("../../data/new_bbs/help/hlpchat.icy").to_vec()),
+        ("hlpc", include_bytes!("../../data/new_bbs/help/hlpc.icy").to_vec()),
+        ("hlpcmenu", include_bytes!("../../data/new_bbs/help/hlpcmenu.icy").to_vec()),
+        ("hlpd", include_bytes!("../../data/new_bbs/help/hlpd.icy").to_vec()),
+        ("hlpe", include_bytes!("../../data/new_bbs/help/hlpe.icy").to_vec()),
+        ("hlpendr", include_bytes!("../../data/new_bbs/help/hlpendr.icy").to_vec()),
+        ("hlpf", include_bytes!("../../data/new_bbs/help/hlpf.icy").to_vec()),
+        ("hlpflag", include_bytes!("../../data/new_bbs/help/hlpflag.icy").to_vec()),
+        ("hlpfscrn", include_bytes!("../../data/new_bbs/help/hlpfscrn.icy").to_vec()),
+        ("hlpg", include_bytes!("../../data/new_bbs/help/hlpg.icy").to_vec()),
+        ("hlph", include_bytes!("../../data/new_bbs/help/hlph.icy").to_vec()),
+        ("hlp!", include_bytes!("../../data/new_bbs/help/hlp!.icy").to_vec()),
+        ("hlpi", include_bytes!("../../data/new_bbs/help/hlpi.icy").to_vec()),
+        ("hlpj", include_bytes!("../../data/new_bbs/help/hlpj.icy").to_vec()),
+        ("hlpk", include_bytes!("../../data/new_bbs/help/hlpk.icy").to_vec()),
+        ("hlplang", include_bytes!("../../data/new_bbs/help/hlplang.icy").to_vec()),
+        ("hlpm", include_bytes!("../../data/new_bbs/help/hlpm.icy").to_vec()),
+        ("hlpnews", include_bytes!("../../data/new_bbs/help/hlpnews.icy").to_vec()),
+        ("hlpn", include_bytes!("../../data/new_bbs/help/hlpn.icy").to_vec()),
+        ("hlpo", include_bytes!("../../data/new_bbs/help/hlpo.icy").to_vec()),
+        ("hlpopen", include_bytes!("../../data/new_bbs/help/hlpopen.icy").to_vec()),
+        ("hlpp", include_bytes!("../../data/new_bbs/help/hlpp.icy").to_vec()),
+        ("hlpq", include_bytes!("../../data/new_bbs/help/hlpq.icy").to_vec()),
+        ("hlpqwk", include_bytes!("../../data/new_bbs/help/hlpqwk.icy").to_vec()),
+        ("hlpreg", include_bytes!("../../data/new_bbs/help/hlpreg.icy").to_vec()),
+        ("hlprep", include_bytes!("../../data/new_bbs/help/hlprep.icy").to_vec()),
+        ("hlpr", include_bytes!("../../data/new_bbs/help/hlpr.icy").to_vec()),
+        ("hlprm", include_bytes!("../../data/new_bbs/help/hlprm.icy").to_vec()),
+        ("hlpsec", include_bytes!("../../data/new_bbs/help/hlpsec.icy").to_vec()),
+        ("hlps", include_bytes!("../../data/new_bbs/help/hlps.icy").to_vec()),
+        ("hlpsrch", include_bytes!("../../data/new_bbs/help/hlpsrch.icy").to_vec()),
+        ("hlptest", include_bytes!("../../data/new_bbs/help/hlptest.icy").to_vec()),
+        ("hlpt", include_bytes!("../../data/new_bbs/help/hlpt.icy").to_vec()),
+        ("hlpts", include_bytes!("../../data/new_bbs/help/hlpts.icy").to_vec()),
+        ("hlpu", include_bytes!("../../data/new_bbs/help/hlpu.icy").to_vec()),
+        ("hlpusers", include_bytes!("../../data/new_bbs/help/hlpusers.icy").to_vec()),
+        ("hlpv", include_bytes!("../../data/new_bbs/help/hlpv.icy").to_vec()),
+        ("hlpwho", include_bytes!("../../data/new_bbs/help/hlpwho.icy").to_vec()),
+        ("hlpw", include_bytes!("../../data/new_bbs/help/hlpw.icy").to_vec()),
+        ("hlpx", include_bytes!("../../data/new_bbs/help/hlpx.icy").to_vec()),
+        ("hlpy", include_bytes!("../../data/new_bbs/help/hlpy.icy").to_vec()),
+        ("hlpz", include_bytes!("../../data/new_bbs/help/hlpz.icy").to_vec()),
+    ];
 }
 
 impl IcyBoardCreator {
@@ -54,6 +106,17 @@ impl IcyBoardCreator {
 
         self.logger.start_action("Creating required paths.".to_string());
         fs::create_dir_all(&self.destination.join(&config.paths.help_path))?;
+        
+        let path = PathBuf::from_str("in.icy").unwrap();
+        let mut options = SaveOptions::default();
+        options.modern_terminal_output = true;
+
+        for hlp in HELP_FILES.iter() {
+            let buffer = Buffer::from_bytes(&path, true, &hlp.1, None, None).unwrap();
+            let bytes = buffer.to_bytes("pcb", &options).unwrap();
+            fs::write(&self.destination.join(&config.paths.help_path).join(hlp.0), &bytes)?;
+        }
+
         fs::create_dir_all(&self.destination.join(&config.paths.tmp_work_path))?;
         fs::create_dir_all(&self.destination.join(&config.paths.security_file_path))?;
         fs::create_dir_all(&self.destination.join(&config.paths.command_display_path))?;

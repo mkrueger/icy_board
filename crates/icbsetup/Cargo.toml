@@ -7,6 +7,7 @@ version.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+icy_engine = { workspace = true }
 icy_board_engine = { workspace = true }
 icy_board_tui = { workspace = true }
 icy_net = { workspace = true }
