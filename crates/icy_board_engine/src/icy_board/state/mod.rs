@@ -1,5 +1,4 @@
 use std::{
-    backtrace,
     collections::{HashMap, HashSet, VecDeque},
     fmt::Alignment,
     fs,
@@ -846,6 +845,9 @@ impl IcyBoardState {
 
     pub async fn broadcast(&self, lonode: u16, hinode: u16, message: &str) -> Res<()> {
         for i in lonode..=hinode {
+            if i == self.node as u16 {
+                continue;
+            }
             if let Some(Some(channel)) = self.bbs.lock().await.bbs_channels.get(i as usize) {
                 let _ = channel.send(BBSMessage::Broadcast(message.to_string())).await;
             }
@@ -995,10 +997,6 @@ impl IcyBoardState {
 
     /// # Errors
     pub async fn print(&mut self, target: TerminalTarget, str: &str) -> Res<()> {
-        if str == " " {
-            log::info!("Printing to '{}'", str);
-            log::info!("{}", backtrace::Backtrace::force_capture());
-        }
         self.write_raw(target, str.chars().collect::<Vec<char>>().as_slice()).await
     }
 

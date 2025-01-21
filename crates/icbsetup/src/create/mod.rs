@@ -106,7 +106,7 @@ impl IcyBoardCreator {
 
         self.logger.start_action("Creating required paths.".to_string());
         fs::create_dir_all(&self.destination.join(&config.paths.help_path))?;
-        
+
         let path = PathBuf::from_str("in.icy").unwrap();
         let mut options = SaveOptions::default();
         options.modern_terminal_output = true;

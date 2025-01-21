@@ -80,6 +80,11 @@ impl IcyBoardState {
         let question = self.resolve_path(&survey.survey_file);
         let answer_file = self.resolve_path(&survey.answer_file);
 
+        if !answer_file.exists() || !answer_file.is_file() {
+            self.display_file(&question).await?;
+            return Ok(());
+        }
+
         let mut output = Vec::new();
         output.push("**************************************************************".to_string());
         if let Some(user) = &self.session.current_user {

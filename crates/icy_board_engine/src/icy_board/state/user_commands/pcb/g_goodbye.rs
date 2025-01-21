@@ -49,8 +49,8 @@ impl IcyBoardState {
         let survey = {
             let board = self.get_board().await;
             Survey {
-                survey_file: board.resolve_file(&board.config.paths.logon_survey),
-                answer_file: board.resolve_file(&board.config.paths.logon_answer),
+                survey_file: board.resolve_file(&board.config.paths.logoff_survey),
+                answer_file: board.resolve_file(&board.config.paths.logoff_answer),
                 required_security: SecurityExpression::default(),
             }
         };

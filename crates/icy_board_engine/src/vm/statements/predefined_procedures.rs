@@ -121,7 +121,7 @@ pub async fn fappend(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let am = vm.eval_expr(&args[2]).await?.as_int();
     let sm = vm.eval_expr(&args[3]).await?.as_int();
     let file = vm.resolve_file(&file).await.to_string_lossy().to_string();
-    vm.io.fappend(channel, &file, am, sm);
+    vm.io.fappend(channel, &file);
     Ok(())
 }
 
@@ -130,9 +130,6 @@ pub async fn fclose(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     if channel == -1 {
         // READLINE uses -1 as a special value
         return Ok(());
-    }
-    if !(0..=7).contains(&channel) {
-        return Err(Box::new(IcyError::FileChannelOutOfBounds(channel)));
     }
     vm.io.fclose(channel as usize)?;
     Ok(())
@@ -244,8 +241,11 @@ pub async fn adjtime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn log(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let msg = vm.eval_expr(&args[0]).await?.as_string();
-    // let left = &vm.eval_expr(&args[0]).await?;
+    let mut msg = vm.eval_expr(&args[0]).await?.as_string();
+    let left_justify = vm.eval_expr(&args[1]).await?.as_bool();
+    if left_justify {
+        msg = msg.trim_start().to_string();
+    }
     log::info!("{}", msg);
     Ok(())
 }
@@ -590,7 +590,6 @@ pub async fn dir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 pub async fn kbdstuff(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let value = vm.eval_expr(&args[0]).await?.as_string();
-    log::info!("kbdstuff: {}", value);
     vm.icy_board_state.put_keyboard_buffer(&value, false)?;
     Ok(())
 }
@@ -663,16 +662,16 @@ pub async fn dispstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn rdunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let value = vm.eval_expr(&args[0]).await?.as_int();
+    let node = vm.eval_expr(&args[0]).await?.as_int() - 1;
 
-    if let Some(node) = vm.icy_board_state.nodes.get(value as usize) {
+    if let Some(node) = vm.icy_board_state.nodes.get(node as usize) {
         vm.pcb_node = Some(node.clone());
     }
     Ok(())
 }
 
 pub async fn wrunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let node = vm.eval_expr(&args[0]).await?.as_int();
+    let node = vm.eval_expr(&args[0]).await?.as_int() - 1;
     let stat = vm.eval_expr(&args[1]).await?.as_string();
     let name = vm.eval_expr(&args[2]).await?.as_string();
     let city = vm.eval_expr(&args[3]).await?.as_string();
@@ -1141,9 +1140,13 @@ pub async fn redim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 pub async fn append(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("append not implemented statement!");
-    panic!("TODO")
+    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let file = vm.eval_expr(&args[1]).await?.as_string();
+    let file = vm.resolve_file(&file).await.to_string_lossy().to_string();
+    vm.io.fappend(channel, &file);
+    Ok(())
 }
+
 pub async fn copy(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let old = &vm.eval_expr(&args[0]).await?.as_string();
     let new = &vm.eval_expr(&args[1]).await?.as_string();
@@ -1358,6 +1361,7 @@ pub async fn tpacwrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     log::error!("not implemented statement!");
     panic!("TODO")
 }
+
 pub async fn bitset(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("bitset not implemented statement!");
     panic!("TODO")

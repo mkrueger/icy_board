@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs::{self, File, OpenOptions},
     io::{BufRead, Cursor, Read, Result, Seek, SeekFrom, Write},
     path::Path,
@@ -20,7 +21,7 @@ pub trait PCBoardIO: Send {
     /// file - file name to open
     /// am - desired access mode for the file
     /// sm - desired share mode for the file
-    fn fappend(&mut self, channel: usize, file: &str, am: i32, sm: i32);
+    fn fappend(&mut self, channel: usize, file: &str);
 
     /// Creates a new file
     /// channel - integer expression with the channel to use for the file
@@ -143,8 +144,8 @@ impl FileChannel {
 }
 
 pub struct DiskIO {
-    _path: String, // use that as root
-    channels: [FileChannel; 8],
+    _path: String, // use that as
+    channels: HashMap<usize, FileChannel>,
 }
 
 impl DiskIO {
@@ -155,30 +156,27 @@ impl DiskIO {
         if let Some(answer_file) = answer_file {
             let _ = first_chan.file.replace(Box::new(File::create(answer_file).unwrap()));
         }
+        let mut channels = HashMap::new();
+        channels.insert(0, first_chan);
 
         DiskIO {
             _path: path.to_string(),
-            channels: [
-                first_chan,
-                FileChannel::new(),
-                FileChannel::new(),
-                FileChannel::new(),
-                FileChannel::new(),
-                FileChannel::new(),
-                FileChannel::new(),
-                FileChannel::new(),
-            ],
+            channels,
         }
     }
 }
 
 impl PCBoardIO for DiskIO {
-    fn fappend(&mut self, channel: usize, file: &str, _am: i32, sm: i32) {
-        let _ = self.fopen(channel, file, O_APPEND, sm);
+    fn fappend(&mut self, channel: usize, file: &str) {
+        if let Err(err) = self.fopen(channel, file, O_APPEND, 0) {
+            log::error!("error appending file: {}", err);
+        }
     }
 
     fn fcreate(&mut self, channel: usize, file: &str, _am: i32, sm: i32) {
-        let _ = self.fopen(channel, file, O_WR, sm);
+        if let Err(err) = self.fopen(channel, file, O_WR, sm) {
+            log::error!("error creating file: {}", err);
+        }
     }
 
     fn delete(&mut self, file: &str) -> std::io::Result<()> {
@@ -195,7 +193,6 @@ impl PCBoardIO for DiskIO {
 
     fn fopen(&mut self, channel: usize, file_name: &str, mode: i32, _sm: i32) -> Res<()> {
         log::info!("FOPEN: {}, {}, mode : {}", channel, file_name, mode);
-
         let file = match mode {
             O_RD => File::open(file_name),
             O_WR => File::create(file_name),
@@ -205,12 +202,15 @@ impl PCBoardIO for DiskIO {
         };
         match file {
             Ok(handle) => {
-                self.channels[channel] = FileChannel {
-                    file: Some(Box::new(handle)),
-                    reader: None,
-                    _content: Vec::new(),
-                    err: false,
-                };
+                self.channels.insert(
+                    channel,
+                    FileChannel {
+                        file: Some(Box::new(handle)),
+                        reader: None,
+                        _content: Vec::new(),
+                        err: false,
+                    },
+                );
             }
             Err(err) => {
                 log::error!("error opening file: {}", err);
@@ -222,11 +222,15 @@ impl PCBoardIO for DiskIO {
     }
 
     fn ferr(&self, channel: usize) -> bool {
-        self.channels[channel].err
+        if let Some(channel) = self.channels.get(&channel) {
+            channel.err
+        } else {
+            true
+        }
     }
 
     fn fput(&mut self, channel: usize, text: String) -> Res<()> {
-        let Some(chan) = self.channels.get_mut(channel) else {
+        let Some(chan) = self.channels.get_mut(&channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
         };
 
@@ -247,7 +251,7 @@ impl PCBoardIO for DiskIO {
     }
 
     fn fget(&mut self, channel: usize) -> Res<String> {
-        let Some(chan) = self.channels.get_mut(channel) else {
+        let Some(chan) = self.channels.get_mut(&channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
         };
 
@@ -280,7 +284,7 @@ impl PCBoardIO for DiskIO {
     }
 
     fn fread(&mut self, channel: usize, size: usize) -> Res<Vec<u8>> {
-        let Some(chan) = self.channels.get_mut(channel) else {
+        let Some(chan) = self.channels.get_mut(&channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
         };
         if let Some(f) = &mut chan.file {
@@ -298,7 +302,7 @@ impl PCBoardIO for DiskIO {
         }
     }
     fn fwrite(&mut self, channel: usize, data: &[u8]) -> Res<()> {
-        let Some(chan) = self.channels.get_mut(channel) else {
+        let Some(chan) = self.channels.get_mut(&channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
         };
 
@@ -313,7 +317,7 @@ impl PCBoardIO for DiskIO {
     }
 
     fn fseek(&mut self, channel: usize, pos: i32, seek_pos: i32) -> Res<()> {
-        let Some(chan) = self.channels.get_mut(channel) else {
+        let Some(chan) = self.channels.get_mut(&channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
         };
 
@@ -354,7 +358,7 @@ impl PCBoardIO for DiskIO {
     }
 
     fn frewind(&mut self, channel: usize) -> Res<()> {
-        let Some(chan) = self.channels.get_mut(channel) else {
+        let Some(chan) = self.channels.get_mut(&channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
         };
 
@@ -371,23 +375,8 @@ impl PCBoardIO for DiskIO {
     }
 
     fn fclose(&mut self, channel: usize) -> Res<()> {
-        let Some(chan) = self.channels.get_mut(channel) else {
-            return Err(Box::new(VMError::FileChannelNotOpen(channel)));
-        };
+        self.channels.remove(&channel);
 
-        match &mut chan.file {
-            Some(_) => {
-                self.channels[channel] = FileChannel {
-                    file: None,
-                    reader: None,
-                    _content: Vec::new(),
-                    err: false,
-                };
-            }
-            _ => {
-                chan.err = true;
-            }
-        }
         Ok(())
     }
 

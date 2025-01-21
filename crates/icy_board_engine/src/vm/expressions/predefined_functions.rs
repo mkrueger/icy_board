@@ -927,20 +927,166 @@ pub async fn bnot(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variable
 }
 
 pub async fn u_pwdhist(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let hist = vm.eval_expr(&args[0]).await?.as_int();
+    match hist {
+        1..3 => {
+            if let Some(user) = &vm.icy_board_state.session.current_user {
+                if let Some(pwd) = user.password.prev_pwd.get(hist as usize - 1) {
+                    return Ok(VariableValue::new_string(format!("{}", pwd)));
+                }
+                Ok(VariableValue::new_string(String::new()))
+            } else {
+                Ok(VariableValue::new_string(String::new()))
+            }
+        }
+        _ => Ok(VariableValue::new_string(String::new())),
+    }
 }
+
 pub async fn u_pwdlc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    if let Some(user) = &vm.icy_board_state.session.current_user {
+        Ok(VariableValue::new(
+            VariableType::Date,
+            VariableData::from_int(IcbDate::from_utc(user.password.last_change).to_pcboard_date()),
+        ))
+    } else {
+        Ok(VariableValue::new(VariableType::Date, VariableData::default()))
+    }
 }
+
 pub async fn u_pwdtc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    if let Some(user) = &vm.icy_board_state.session.current_user {
+        Ok(VariableValue::new(
+            VariableType::Integer,
+            VariableData::from_int(user.password.times_changed as i32),
+        ))
+    } else {
+        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+    }
 }
 pub async fn u_stat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let option = vm.eval_expr(&args[0]).await?.as_int();
+    match option {
+        1 => {
+            //  first date the user called the system
+            if let Some(user) = &vm.icy_board_state.session.current_user {
+                Ok(VariableValue::new(
+                    VariableType::Date,
+                    VariableData::from_int(IcbDate::from_utc(user.stats.first_date_on).to_pcboard_date()),
+                ))
+            } else {
+                Ok(VariableValue::new(VariableType::Date, VariableData::default()))
+            }
+        }
+        2 => {
+            //  number of SysOp pages the user has requested
+            if let Some(user) = &vm.icy_board_state.session.current_user {
+                Ok(VariableValue::new(
+                    VariableType::Integer,
+                    VariableData::from_int(user.stats.num_sysop_pages as i32),
+                ))
+            } else {
+                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+            }
+        }
+        3 => {
+            //  number of group chats the user has participated in
+            if let Some(user) = &vm.icy_board_state.session.current_user {
+                Ok(VariableValue::new(
+                    VariableType::Integer,
+                    VariableData::from_int(user.stats.num_group_chats as i32),
+                ))
+            } else {
+                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+            }
+        }
+        4 => {
+            //  number of comments the user has left
+            if let Some(user) = &vm.icy_board_state.session.current_user {
+                Ok(VariableValue::new(
+                    VariableType::Integer,
+                    VariableData::from_int(user.stats.num_comments as i32),
+                ))
+            } else {
+                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+            }
+        }
+        5..=9 => {
+            // Number of x bps connects
+            if let Some(user) = &vm.icy_board_state.session.current_user {
+                Ok(VariableValue::new(
+                    VariableType::Integer,
+                    VariableData::from_int(user.stats.num_times_on as i32),
+                ))
+            } else {
+                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+            }
+        }
+        10 => {
+            // number of security violations
+            if let Some(user) = &vm.icy_board_state.session.current_user {
+                Ok(VariableValue::new(
+                    VariableType::Integer,
+                    VariableData::from_int(user.stats.num_sec_viol as i32),
+                ))
+            } else {
+                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+            }
+        }
+        11 => {
+            // number of “not registered in conference” warnings
+            if let Some(user) = &vm.icy_board_state.session.current_user {
+                Ok(VariableValue::new(VariableType::Integer, VariableData::from_int(user.stats.num_not_reg as i32)))
+            } else {
+                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+            }
+        }
+        12 => {
+            // number of times the users download limit has been reached
+            if let Some(user) = &vm.icy_board_state.session.current_user {
+                Ok(VariableValue::new(
+                    VariableType::Integer,
+                    VariableData::from_int(user.stats.num_reach_dnld_lim as i32),
+                ))
+            } else {
+                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+            }
+        }
+        13 => {
+            // number of “file not found” warnings
+            if let Some(user) = &vm.icy_board_state.session.current_user {
+                Ok(VariableValue::new(
+                    VariableType::Integer,
+                    VariableData::from_int(user.stats.num_file_not_found as i32),
+                ))
+            } else {
+                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+            }
+        }
+        14 => {
+            // number of password errors the user has had
+            if let Some(user) = &vm.icy_board_state.session.current_user {
+                Ok(VariableValue::new(
+                    VariableType::Integer,
+                    VariableData::from_int(user.stats.num_password_failures as i32),
+                ))
+            } else {
+                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+            }
+        }
+        15 => {
+            //  number of verify errors the user has had
+            if let Some(user) = &vm.icy_board_state.session.current_user {
+                Ok(VariableValue::new(
+                    VariableType::Integer,
+                    VariableData::from_int(user.stats.num_verify_errors as i32),
+                ))
+            } else {
+                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
+            }
+        }
+        _ => Ok(VariableValue::new_int(0)),
+    }
 }
 pub async fn defcolor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let color = vm.icy_board_state.get_board().await.config.color_configuration.default.clone();
@@ -968,9 +1114,42 @@ pub async fn grafmode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     }
 }
 
+// psa stands for "pcboard supported allocations"
+// pcboard supported allocations are:
+// 1 - Alias support (PCBALIAS)
+// 2 - Verification support (PCBVERIFY)
+// 3 - Address support (PCBADDRESS)
+// 4 - Password-Changing support (PCBPASSWORD)
+// 5 - Caller Statistics support (PCBSTATS)
+// 6 - Caller Notes support (PCBNOTES)
+// 7 - Accounting Support (PCBACCOUNT)
+// 8 - QWK/Net Support (PCBQWKNET)
+// 9 - Personal Info Support (PCBPERSONAL)
+// 10 - Time/Byte Bank Support (PCBBANK)
+//
+// IcyBoard supports most of these, however I pretend it's not if the feature isn't used.
 pub async fn psa(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let var = vm.eval_expr(&args[0]).await?.as_int();
+    let res = match var {
+        1 => vm.icy_board_state.session.use_alias,
+        2 => vm.icy_board_state.board.lock().await.config.new_user_settings.ask_verification,
+        3 => vm.icy_board_state.board.lock().await.config.new_user_settings.ask_address,
+        4 => {
+            // Password support
+            true
+        }
+        5 => {
+            // Statistics support
+            true
+        }
+        6 => {
+            // Notes support
+            vm.icy_board_state.board.lock().await.config.new_user_settings.ask_comment
+        }
+        _ => false,
+    };
+
+    Ok(VariableValue::new_bool(res))
 }
 
 #[allow(clippy::unnecessary_wraps)]

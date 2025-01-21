@@ -499,6 +499,22 @@ impl PcbBoardCommand {
         })
     }
 
+    async fn logon_questions(&mut self) -> Res<()> {
+        let survey: Survey = {
+            let board = self.state.get_board().await;
+            Survey {
+                survey_file: board.resolve_file(&board.config.paths.logon_survey),
+                answer_file: board.resolve_file(&board.config.paths.logon_answer),
+                required_security: SecurityExpression::default(),
+            }
+        };
+        Ok(if survey.survey_file.exists() {
+            // skip the survey question.
+            self.state.session.tokens.push_front(self.state.session.yes_char.to_string());
+            self.state.start_survey(&survey).await?;
+        })
+    }
+
     async fn login_user(&mut self) -> Res<bool> {
         let check_password = if let Some(user) = &self.state.session.current_user {
             if user.flags.delete_flag || user.flags.disabled_flag {
@@ -576,6 +592,7 @@ impl PcbBoardCommand {
         }
 
         log::warn!("Login from {} at {}", self.state.session.user_name, Local::now().to_rfc2822());
+        self.logon_questions().await?;
         return Ok(true);
     }
 
