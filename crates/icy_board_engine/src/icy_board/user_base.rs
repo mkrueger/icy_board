@@ -44,7 +44,7 @@ impl Password {
 
     pub fn is_valid(&self, pwd: &str) -> bool {
         match self {
-            Password::PlainText(s) => !pwd.is_empty() && s.eq_ignore_ascii_case(pwd),
+            Password::PlainText(s) => s.eq_ignore_ascii_case(pwd),
         }
     }
 }

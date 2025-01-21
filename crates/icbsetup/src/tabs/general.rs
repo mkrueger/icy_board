@@ -143,6 +143,14 @@ impl GeneralTab {
             ),
             ConfigEntry::Item(
                 ListItem::new(
+                    "allow_one_name_users",
+                    "Allow One Name Users".to_string(),
+                    ListValue::Bool(icy_board.config.new_user_settings.allow_one_name_users),
+                )
+                .with_label_width(new_user_info_width),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
                     "new_user_groups",
                     "Groups".to_string(),
                     ListValue::Text(40, icy_board.config.new_user_settings.new_user_groups.clone()),
@@ -557,6 +565,7 @@ impl GeneralTab {
             ListValue::Bool(b) => match item.id.as_str() {
                 "local_pass_exit" => icy_board.config.sysop.require_password_to_exit = *b,
                 "use_real_name" => icy_board.config.sysop.use_real_name = *b,
+                "allow_one_name_users" => icy_board.config.new_user_settings.allow_one_name_users = *b,
                 "ask_city_or_state" => icy_board.config.new_user_settings.ask_city_or_state = *b,
                 "ask_address" => icy_board.config.new_user_settings.ask_address = *b,
                 "ask_verification" => icy_board.config.new_user_settings.ask_verification = *b,

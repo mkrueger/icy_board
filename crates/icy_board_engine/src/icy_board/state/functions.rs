@@ -310,17 +310,7 @@ impl IcyBoardState {
             self.set_color(TerminalTarget::Both, color.clone()).await?;
         }
         self.display_line(&prompt).await?;
-        // we've data from a PPE here, so take that input and return it.
-        // ignoring all other settings.
-        if let Some(front) = self.char_buffer.front() {
-            if front.source == KeySource::StuffedHidden {
-                let mut result = String::new();
-                while let Some(key) = self.char_buffer.pop_front() {
-                    result.push(key.ch);
-                }
-                return Ok(result);
-            }
-        }
+       
 
         if display_question {
             self.print(TerminalTarget::Both, "?").await?;
