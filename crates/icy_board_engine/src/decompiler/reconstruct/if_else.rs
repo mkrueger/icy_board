@@ -87,6 +87,7 @@ pub fn scan_if_else(statements: &mut Vec<Statement>) {
         let mut if_stmt = if_stmt.clone();
         if_stmt.get_statements_mut().pop(); // pop goto
 
+        println!("breakout goto: {}", breakout_goto_stmt.get_label());
         let mut j = i + 1;
         let mut has_else = true;
         while j < statements.len() - 1 {
@@ -98,6 +99,7 @@ pub fn scan_if_else(statements: &mut Vec<Statement>) {
                 break;
             };
             if let Some(Statement::Goto(goto_stmt)) = else_if_stmt.get_statements().last().cloned() {
+                println!("goto goto: {}", goto_stmt.get_label());
                 has_else = goto_stmt.get_label() == breakout_goto_stmt.get_label();
             } else {
                 has_else = false;
@@ -118,7 +120,10 @@ pub fn scan_if_else(statements: &mut Vec<Statement>) {
             *if_stmt.get_else_block_mut() = Some(ElseBlock::empty(stmts));
             idx = j;
         }
-        statements.drain(start + 1..idx);
+        for s in statements.drain(start + 1..idx) {
+            println!("dropping {}", s);
+        }
+        println!("----------");
         statements[start] = Statement::IfThen(if_stmt);
         i += 1;
     }

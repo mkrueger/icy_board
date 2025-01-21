@@ -143,6 +143,17 @@ fn main() -> Result<()> {
             println!("Converting PPE data files in {}", path.display());
             println!("Caution - this command is used for converting CP437 to UTF-8 in a directory.");
 
+            if fs::metadata(path).is_err() {
+                println!("Path does not exist");
+                return Ok(());
+            }
+
+            if fs::metadata(path).unwrap().is_file() {
+                println!("Converting file to utf-8...");
+                convert_file(path.clone());
+                return Ok(());
+            }
+
             println!("Converting directories to lower case...");
             for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
                 if !entry.path().is_dir() {
@@ -170,11 +181,7 @@ fn main() -> Result<()> {
                 if let Some(extension) = entry.path().extension() {
                     if convert_ext.contains(&extension.to_str().unwrap()) {
                         println!("Converting {} to utf8...", entry.path().display());
-                        if let Ok(data) = read_with_encoding_detection(&entry.path()) {
-                            if write_with_bom(&entry.path(), &data).is_err() {
-                                println!("Error writing {}", entry.path().display());
-                            }
-                        }
+                        convert_file(entry.path().to_path_buf());
                     }
                 }
                 println!("Rename {} to {}", entry.path().display(), lower_case);
@@ -214,6 +221,14 @@ fn main() -> Result<()> {
         Err(err) => {
             print_error(format!("Error loading main config file: {}", err));
             exit(1);
+        }
+    }
+}
+
+fn convert_file(entry: PathBuf) {
+    if let Ok(data) = read_with_encoding_detection(&entry) {
+        if write_with_bom(&entry, &data).is_err() {
+            println!("Error writing {}", entry.display());
         }
     }
 }

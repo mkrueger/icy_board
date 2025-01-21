@@ -76,6 +76,8 @@ lazy_static::lazy_static! {
 
 }
 
+pub const MASK_COMMAND: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;':,.<>?/\\\" ";
+
 #[derive(Debug)]
 pub enum PPECallType {
     PPE,
@@ -310,12 +312,24 @@ impl IcyBoardState {
             self.set_color(TerminalTarget::Both, color.clone()).await?;
         }
         self.display_line(&prompt).await?;
-       
-
-        if display_question {
-            self.print(TerminalTarget::Both, "?").await?;
+        // we've data from a PPE here, so take that input and return it.
+        // ignoring all other settings.
+        if let Some(front) = self.char_buffer.front() {
+            if front.source == KeySource::StuffedHidden {
+                let mut result = String::new();
+                while let Some(key) = self.char_buffer.pop_front() {
+                    if key.ch == '\n' || key.ch == '\r' {
+                        break;
+                    }
+                    result.push(key.ch);
+                }
+                log::info!("stuffed input_string: {}", result);
+                return Ok(result);
+            }
         }
-        self.print(TerminalTarget::Both, " ").await?;
+        if display_question {
+            self.print(TerminalTarget::Both, "? ").await?;
+        }
 
         if display_flags & display_flags::FIELDLEN != 0 {
             self.print(TerminalTarget::Both, "(").await?;
@@ -411,10 +425,10 @@ impl IcyBoardState {
         }
         let help_loc = self.get_board().await.config.paths.help_path.clone();
         let help_loc = help_loc.join(help);
-        let am = self.session.disable_auto_more;
-        self.session.disable_auto_more = false;
+        let am = self.session.is_non_stop;
+        self.session.is_non_stop = false;
         self.display_file(&help_loc).await?;
-        self.session.disable_auto_more = am;
+        self.session.is_non_stop = am;
         Ok(())
     }
 
@@ -464,7 +478,7 @@ impl IcyBoardState {
         let areas = self.get_board().await.conferences[conference as usize].areas.clone();
 
         self.set_activity(UserActivity::EnterMessage).await;
-        self.session.disable_auto_more = false;
+        self.session.is_non_stop = false;
         self.session.more_requested = false;
 
         if areas.is_empty() {

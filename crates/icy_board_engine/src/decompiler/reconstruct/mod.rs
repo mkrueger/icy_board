@@ -4,7 +4,7 @@ use unicase::Ascii;
 
 use crate::ast::{AstVisitorMut, BreakStatement, ContinueStatement, IfStatement, IfThenStatement, RenameVisitor};
 
-use self::{if_else::scan_if_else, while_do::scan_do_while};
+use self::while_do::scan_do_while;
 
 use super::{constant_scan_visitor::ConstantScanVisitor, rename_visitor::RenameScanVisitor, Ast, Expression, Statement};
 
@@ -38,7 +38,7 @@ fn optimize_block(statements: &mut Vec<Statement>) {
 
 fn optimize_ifs(statements: &mut Vec<Statement>) {
     scan_if(statements);
-    scan_if_else(statements);
+    //scan_if_else(statements);
 }
 
 fn scan_label(statements: &[Statement], from: usize, label: &unicase::Ascii<String>) -> Option<usize> {

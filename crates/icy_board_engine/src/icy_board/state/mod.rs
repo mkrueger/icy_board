@@ -1,4 +1,5 @@
 use std::{
+    backtrace,
     collections::{HashMap, HashSet, VecDeque},
     fmt::Alignment,
     fs,
@@ -23,7 +24,8 @@ use crate::{
     vm::{run, DiskIO, TerminalTarget},
 };
 pub mod functions;
-
+pub mod menu_runner;
+pub mod user_commands;
 use self::functions::display_flags;
 
 use super::{
@@ -169,8 +171,9 @@ pub struct Session {
     /// Store last password used so that the user doesn't need to re-enter it.
     pub last_password: String,
 
-    // Used for dir listing
-    pub disable_auto_more: bool,
+    /// Return whether or not the display is currently in non-stop mode (ie, did the user type NS as part of their command line)
+    pub is_non_stop: bool,
+
     pub more_requested: bool,
     pub cancel_batch: bool,
 
@@ -227,7 +230,7 @@ impl Session {
             request_logoff: false,
             tokens: VecDeque::new(),
             last_password: String::new(),
-            disable_auto_more: false,
+            is_non_stop: false,
             more_requested: false,
             cancel_batch: false,
             fse_mode: FSEMode::Yes,
@@ -250,14 +253,8 @@ impl Session {
     }
 
     pub fn push_tokens(&mut self, command: &str) {
-        let cmds = command.split(' ');
-        for cmd in cmds {
-            for cmd in cmd.split(';') {
-                let cmd = cmd.trim();
-                if !cmd.is_empty() {
-                    self.tokens.push_back(cmd.to_string());
-                }
-            }
+        for cmd in crate::tokens::tokenize(command) {
+            self.tokens.push_back(cmd.to_string());
         }
     }
 
@@ -402,6 +399,10 @@ pub struct IcyBoardState {
     sysop_screen: VirtualScreen,
 
     char_buffer: VecDeque<KeyChar>,
+
+    pub display_current_menu: bool,
+    pub autorun_times: HashMap<usize, u64>,
+    pub saved_cmd: String,
 }
 
 impl IcyBoardState {
@@ -448,6 +449,10 @@ impl IcyBoardState {
             user_screen: VirtualScreen::new(p1),
             sysop_screen: VirtualScreen::new(p2),
             char_buffer: VecDeque::new(),
+
+            display_current_menu: true,
+            saved_cmd: String::new(),
+            autorun_times: HashMap::new(),
         }
     }
     async fn update_language(&mut self) {
@@ -753,7 +758,7 @@ impl IcyBoardState {
     }
 
     fn find_more_specific_file(&self, base_name: String) -> PathBuf {
-        if let Some(result) = self.find_more_specific_file_with_graphics(base_name.clone() + &self.session.cur_security.to_string()) {
+        if let Some(result) = self.find_more_specific_file_with_graphics(base_name.clone() + self.session.cur_security.to_string().as_str()) {
             return result;
         }
         if let Some(result) = self.find_more_specific_file_with_graphics(base_name.clone()) {
@@ -785,7 +790,7 @@ impl IcyBoardState {
 
     fn find_more_specific_file_with_language(&self, base_name: String) -> Option<PathBuf> {
         if !self.session.language.is_empty() {
-            let lang_file = base_name.clone() + "." + &self.session.language;
+            let lang_file = base_name.clone() + "." + self.session.language.as_str();
             if let Some(result) = self.find_file_with_extension(&lang_file) {
                 return Some(result);
             }
@@ -990,6 +995,10 @@ impl IcyBoardState {
 
     /// # Errors
     pub async fn print(&mut self, target: TerminalTarget, str: &str) -> Res<()> {
+        if str == " " {
+            log::info!("Printing to '{}'", str);
+            log::info!("{}", backtrace::Backtrace::force_capture());
+        }
         self.write_raw(target, str.chars().collect::<Vec<char>>().as_slice()).await
     }
 
@@ -1099,7 +1108,7 @@ impl IcyBoardState {
                                 }
                             }
                         } else {
-                            state = PcbState::ReadAtSequence(s + &c.to_string());
+                            state = PcbState::ReadAtSequence(s + c.to_string().as_str());
                         }
                     }
                     PcbState::ReadColor1 => {
@@ -1804,7 +1813,7 @@ impl IcyBoardState {
     }
 
     pub async fn more_promt(&mut self) -> Res<bool> {
-        if self.session.disable_auto_more {
+        if self.session.is_non_stop {
             self.session.more_requested = true;
             return Ok(true);
         }
@@ -1824,7 +1833,7 @@ impl IcyBoardState {
                     return Ok(true);
                 }
                 "NS" => {
-                    self.session.disable_auto_more = true;
+                    self.session.is_non_stop = true;
                     return Ok(true);
                 }
                 "N" => {
@@ -1836,7 +1845,7 @@ impl IcyBoardState {
     }
 
     pub async fn press_enter(&mut self) -> Res<()> {
-        self.session.disable_auto_more = true;
+        self.session.is_non_stop = true;
         self.session.more_requested = false;
         self.input_field(IceText::PressEnter, 0, "", "", None, display_flags::ERASELINE).await?;
         Ok(())

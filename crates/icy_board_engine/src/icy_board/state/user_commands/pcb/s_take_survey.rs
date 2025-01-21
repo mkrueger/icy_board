@@ -1,0 +1,205 @@
+use std::{
+    fs::{self, OpenOptions},
+    io::Write,
+};
+
+use crate::{icy_board::state::IcyBoardState, Res};
+
+use crate::{
+    icy_board::{
+        bulletins::MASK_BULLETINS,
+        icb_config::IcbColor,
+        icb_text::IceText,
+        read_with_encoding_detection,
+        state::{
+            functions::{display_flags, MASK_ALNUM},
+            UserActivity,
+        },
+    },
+    vm::TerminalTarget,
+};
+use chrono::Local;
+
+impl IcyBoardState {
+    pub async fn take_survey(&mut self, help: &str) -> Res<()> {
+        self.set_activity(UserActivity::TakeSurvey).await;
+
+        let surveys = self.load_surveys().await?;
+        if surveys.is_empty() {
+            self.display_text(
+                IceText::NoSurveysAvailable,
+                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER | display_flags::BELL,
+            )
+            .await?;
+            return Ok(());
+        }
+        let mut display_current_menu = self.session.tokens.is_empty();
+        loop {
+            if display_current_menu {
+                let file = self.session.current_conference.survey_menu.clone();
+                self.display_file(&file).await?;
+                display_current_menu = false;
+            }
+            let text = if let Some(token) = self.session.tokens.pop_front() {
+                token
+            } else {
+                self.input_field(
+                    IceText::QuestionNumberToAnswer,
+                    12,
+                    MASK_BULLETINS,
+                    help,
+                    None,
+                    display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
+                )
+                .await?
+            };
+            if text.is_empty() {
+                break;
+            }
+            if let Ok(number) = text.parse::<usize>() {
+                if number > 0 {
+                    if let Some(survey) = surveys.get(number - 1) {
+                        self.start_survey(&survey).await?;
+                        self.press_enter().await?;
+                        self.display_current_menu = true;
+                        break;
+                    } else {
+                        self.display_text(
+                            IceText::InvalidSelection,
+                            display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
+                        )
+                        .await?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn start_survey(&mut self, survey: &crate::icy_board::surveys::Survey) -> Res<()> {
+        let question = self.resolve_path(&survey.survey_file);
+        let answer_file = self.resolve_path(&survey.answer_file);
+
+        let mut output = Vec::new();
+        output.push("**************************************************************".to_string());
+        if let Some(user) = &self.session.current_user {
+            output.push(format!(
+                "From: {}, {} Sec {} Exp {}",
+                user.get_name(),
+                format!(
+                    "{} {}",
+                    Local::now().format(&self.get_board().await.config.board.date_format),
+                    Local::now().format("(%H:%M)")
+                ),
+                self.session.cur_security,
+                user.exp_date
+            ));
+        } else {
+            output.push(format!(
+                "From: {}, {} Sec {}",
+                self.session.user_name,
+                format!(
+                    "{} {}",
+                    Local::now().format(&self.get_board().await.config.board.date_format),
+                    Local::now().format("(%H:%M)")
+                ),
+                self.session.cur_security,
+            ));
+        }
+
+        if let Some(ext) = question.extension() {
+            if ext == "ppe" {
+                let answer = answer_file.to_string_lossy().to_string();
+                if !answer.is_empty() {
+                    self.session.tokens.push_back(answer);
+                }
+                let t = temp_file::empty();
+                self.run_ppe(&question, Some(t.path())).await?;
+                output.push(fs::read_to_string(t.path())?);
+
+                match OpenOptions::new().create(true).append(true).open(&answer_file) {
+                    Ok(mut file) => {
+                        for line in output {
+                            writeln!(file, "{}", line)?;
+                        }
+                    }
+                    Err(err) => {
+                        log::error!("Error opening answer file {} : {}", answer_file.display(), err);
+                        return Err(err.into());
+                    }
+                }
+                return Ok(());
+            }
+        }
+
+        match read_with_encoding_detection(&question) {
+            Ok(question) => {
+                let lines: Vec<&str> = question.lines().collect();
+                self.reset_color(TerminalTarget::Both).await?;
+                let mut start_line = 0;
+                for line in &lines {
+                    start_line += 1;
+                    if line.starts_with("*****") {
+                        break;
+                    }
+                    self.print(crate::vm::TerminalTarget::Both, line).await?;
+                    self.new_line().await?;
+                }
+                let txt = if let Some(text) = self.session.tokens.pop_front() {
+                    text
+                } else {
+                    self.input_field(
+                        IceText::CompleteQuestion,
+                        1,
+                        "",
+                        "",
+                        Some(self.session.no_char.to_string()),
+                        display_flags::YESNO | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::UPCASE,
+                    )
+                    .await?
+                };
+                if txt.eq_ignore_ascii_case(&self.session.yes_char.to_string()) {
+                    for question in &lines[start_line..] {
+                        self.set_color(TerminalTarget::Both, IcbColor::Dos(14)).await?;
+                        self.print(TerminalTarget::Both, question).await?;
+                        self.new_line().await?;
+                        self.reset_color(TerminalTarget::Both).await?;
+                        let answer = self
+                            .input_string(
+                                IcbColor::None,
+                                String::new(),
+                                60,
+                                &MASK_ALNUM,
+                                "",
+                                None,
+                                display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::GUIDE | display_flags::LFAFTER,
+                            )
+                            .await?;
+                        output.push(format!("Q: {}", question));
+                        output.push(format!("A: {}", answer));
+                    }
+                    match OpenOptions::new().create(true).append(true).open(&answer_file) {
+                        Ok(mut file) => {
+                            for line in output {
+                                writeln!(file, "{}", line)?;
+                            }
+                        }
+                        Err(err) => {
+                            log::error!("Error opening answer file {} : {}", answer_file.display(), err);
+                            return Err(err.into());
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("Error reading survey question: {} ({})", e, question.display());
+                self.display_text(
+                    IceText::ErrorReadingSurvey,
+                    display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
+                )
+                .await?;
+            }
+        }
+        Ok(())
+    }
+}

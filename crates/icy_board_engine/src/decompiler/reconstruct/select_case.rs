@@ -67,7 +67,9 @@ pub fn scan_select_statements(statements: &mut [Statement]) {
             } else {
                 Vec::new()
             };
-            statements[i] = SelectStatement::create_empty_statement(bin_expr.get_left_expression().clone(), case_blocks, default_statements);
+            if case_blocks.len() > 1 {
+                statements[i] = SelectStatement::create_empty_statement(bin_expr.get_left_expression().clone(), case_blocks, default_statements);
+            }
         }
         i += 1;
     }

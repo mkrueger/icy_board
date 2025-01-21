@@ -27,6 +27,7 @@ pub mod executable;
 pub mod parser;
 pub mod semantic;
 pub mod tables;
+pub mod tokens;
 
 pub type Res<T> = Result<T, Box<dyn Error + Send + Sync>>;
 

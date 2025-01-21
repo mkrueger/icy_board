@@ -131,15 +131,11 @@ pub async fn right(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 }
 
 pub async fn space(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let mut chars = vm.eval_expr(&args[0]).await?.as_int();
+    let chars = vm.eval_expr(&args[0]).await?.as_int();
     if chars <= 0 {
         return Ok(VariableValue::new_string(String::new()));
     }
-    let mut res = String::new();
-    while chars > 0 {
-        res.push(' ');
-        chars -= 1;
-    }
+    let res = " ".repeat(chars as usize);
     Ok(VariableValue::new_string(res))
 }
 
@@ -671,8 +667,7 @@ pub async fn sysopsec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     ))
 }
 pub async fn onlocal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    // TODO: OnLocal should return true if the user is local, false otherwise
-    Ok(VariableValue::new_bool(true))
+    Ok(VariableValue::new_bool(vm.icy_board_state.session.is_local))
 }
 
 pub async fn un_stat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1217,12 +1212,11 @@ pub async fn lprinted(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     panic!("TODO")
 }
 pub async fn isnonstop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_bool(vm.icy_board_state.session.is_non_stop))
 }
 pub async fn errcorrect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    // No longer an issue:
+    Ok(VariableValue::new_bool(true))
 }
 pub async fn confalias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");

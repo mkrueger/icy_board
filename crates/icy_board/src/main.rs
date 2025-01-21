@@ -33,7 +33,6 @@ mod bbs;
 mod call_wait_screen;
 mod icy_engine_output;
 pub mod menu_runner;
-pub mod mods;
 mod node_monitoring_screen;
 mod terminal_thread;
 mod tui;

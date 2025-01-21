@@ -504,8 +504,7 @@ pub async fn newlines(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 /// Errors if the variable is not found.
 pub async fn tokenize(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let str = vm.eval_expr(&args[0]).await?.to_string();
-    let split = str.split(&[' ', ';'][..]).map(std::string::ToString::to_string);
-    vm.icy_board_state.session.tokens.extend(split);
+    vm.icy_board_state.session.push_tokens(&str);
     Ok(())
 }
 
@@ -591,6 +590,7 @@ pub async fn dir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 pub async fn kbdstuff(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let value = vm.eval_expr(&args[0]).await?.as_string();
+    log::info!("kbdstuff: {}", value);
     vm.icy_board_state.put_keyboard_buffer(&value, false)?;
     Ok(())
 }
@@ -874,6 +874,7 @@ pub async fn print(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         let txt = &vm.eval_expr(value).await?.as_string();
         vm.icy_board_state.print(TerminalTarget::Both, txt).await?;
     }
+
     Ok(())
 }
 
@@ -1543,9 +1544,11 @@ pub async fn qwklimits(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     panic!("TODO")
 }
 pub async fn command(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("command not implemented statement!");
-    panic!("TODO")
+    let via_cmd_list = vm.eval_expr(&args[0]).await?.as_bool();
+    let command_line = vm.eval_expr(&args[1]).await?.as_string();
+    vm.icy_board_state.run_single_command(via_cmd_list, command_line).await
 }
+
 pub async fn uselmrs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("uselmrs not implemented statement!");
     panic!("TODO")

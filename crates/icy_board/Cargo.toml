@@ -38,11 +38,7 @@ relative-path = { workspace = true }
 regex = { workspace = true }
 rand = { workspace = true }
 tokio = { workspace = true }
-temp-file = "0.1.9"
 http = "1.1.0"
-md5 = "0.7.0"
-reqwest = { version = "0.12", features = ["json", "blocking"] }
 
 # for file view kb/mb
-humanize-bytes = "1.0.5"
 async-recursion = "1.1.1"
