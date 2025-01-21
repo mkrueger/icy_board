@@ -202,7 +202,7 @@ impl IcyBoardState {
                     prompt,
                     40,
                     MASK_COMMAND,
-                    help,
+                    "hlpendr",
                     None,
                     display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
                 )
