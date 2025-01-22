@@ -79,11 +79,11 @@ impl VarHeader {
         match self.dim {
             0 => GenericVariableData::None,
             1..=3 => GenericVariableData::create_array(
-                self.variable_type.create_empty_value(),
-                self.dim,
-                self.vector_size,
-                self.matrix_size,
-                self.cube_size,
+                    self.variable_type.create_empty_value(),
+                    self.dim,
+                    self.vector_size,
+                    self.matrix_size,
+                    self.cube_size,
             ),
             _ => panic!("Invalid dimension: {}", self.dim),
         }
@@ -287,8 +287,12 @@ impl TableEntry {
             buffer.push(self.header.variable_type.into());
             buffer.push(0);
 
-            buffer.extend_from_slice(&u64::to_le_bytes(self.value.get_u64_value()));
-            encrypt(&mut buffer[b..], version);
+            if version <= 100 {
+                buffer.extend_from_slice(&u32::to_le_bytes(self.value.get_u64_value() as u32));
+            } else {
+                buffer.extend_from_slice(&u64::to_le_bytes(self.value.get_u64_value()));
+                encrypt(&mut buffer[b..], version);
+            }
         }
         Ok(buffer)
     }
@@ -395,6 +399,17 @@ impl VariableTable {
                 _ => {
                     if version <= 100 {
                         i += 2; // SKIP VTABLE - seems to get stored by accident.
+                        let vtype: VariableType = VariableType::from_byte(buf[i]);
+                        if vtype != header.variable_type {
+                            log::error!(
+                                "Encountered anomaly in variable table: {} variable type and variable value {} are not matching.",
+                                header.variable_type,
+                                vtype
+                            );
+                            log::error!("File is potentially damaged.");
+                        }
+                        
+                        // check variable type
                         let vtype = VariableType::from_byte(buf[i]);
                         if vtype != header.variable_type {
                             log::error!(
@@ -404,9 +419,10 @@ impl VariableTable {
                             );
                             log::error!("File is potentially damaged.");
                         }
-                        i += 2; // what's stored here ?
-                        let mut data = VariableData::default();
-                        data.unsigned_value = u64::from_le_bytes((buf[i..i + 8]).try_into()?);
+                        i += 2;
+
+                        let mut data: VariableData = VariableData::default();
+                        data.int_value = i32::from_le_bytes((buf[i..i + 4]).try_into()?);
                         variable = VariableValue {
                             vtype,
                             data,
@@ -422,6 +438,7 @@ impl VariableTable {
                             decrypt(&mut buf[i..(i + 10)], version);
                         }
 
+                        // check variable type
                         let vtype = VariableType::from_byte(buf[i]);
                         if vtype != header.variable_type {
                             log::error!(
@@ -431,7 +448,8 @@ impl VariableTable {
                             );
                             log::error!("File is potentially damaged.");
                         }
-                        i += 2; // what's stored here ?
+                        i += 2;
+
                         let mut data = VariableData::default();
                         data.u64_value = u64::from_le_bytes((buf[i..i + 8]).try_into()?);
 

@@ -6,6 +6,7 @@ use thiserror::Error;
 
 use crate::crypt::{decode_rle, decrypt, encode_rle, encrypt};
 use crate::executable::disassembler::DisassembleVisitor;
+use crate::vm::print;
 use crate::Res;
 
 use super::{VariableTable, VariableType, LAST_PPLC};
@@ -78,7 +79,6 @@ impl Executable {
 
         let buffer = &mut buffer[HEADER_SIZE..];
         let (mut i, variable_table) = VariableTable::deserialize(version, buffer)?;
-
         let code_size = u16::from_le_bytes(buffer[i..=(i + 1)].try_into()?) as usize;
         i += 2;
         let real_size = buffer.len() - i;
