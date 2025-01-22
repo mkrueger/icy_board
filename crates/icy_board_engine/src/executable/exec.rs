@@ -6,7 +6,6 @@ use thiserror::Error;
 
 use crate::crypt::{decode_rle, decrypt, encode_rle, encrypt};
 use crate::executable::disassembler::DisassembleVisitor;
-use crate::vm::print;
 use crate::Res;
 
 use super::{VariableTable, VariableType, LAST_PPLC};

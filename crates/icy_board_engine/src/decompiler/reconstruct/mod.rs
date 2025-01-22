@@ -101,6 +101,7 @@ fn scan_negated_if<'a>(_visitor: &SemanticVisitor<'a>, statements: &mut Vec<Stat
                 if_stmt.set_statement(statement);
                 statements[i] = Statement::If(if_stmt);
             }
+            i += 1;
         } else {
             i += 1;
             continue;

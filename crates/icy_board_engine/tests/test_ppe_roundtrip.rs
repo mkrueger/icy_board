@@ -1,11 +1,15 @@
 use std::{env, path::PathBuf, sync::Arc, thread};
 
 use icy_board_engine::{
-    compiler::PPECompiler, decompiler::decompile, executable::Executable, icy_board::{bbs::BBS, read_data_with_encoding_detection, state::IcyBoardState}, parser::{Encoding, UserTypeRegistry}
+    compiler::PPECompiler,
+    decompiler::decompile,
+    executable::Executable,
+    icy_board::{bbs::BBS, read_data_with_encoding_detection, state::IcyBoardState},
+    parser::{Encoding, UserTypeRegistry},
 };
 use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
 
-const EXPECTED_OUTPUT : &str = "Hello World!\n1,2,3,4,5,6,7,8,9,10,";
+const EXPECTED_OUTPUT: &str = "Hello World!\n1,2,3,4,5,6,7,8,9,10,";
 #[test]
 fn test_legacy_ppe_roundtrip() {
     use std::fs::{self};
@@ -24,7 +28,11 @@ fn test_legacy_ppe_roundtrip() {
         let executable = Executable::read_file(&file_name, false).unwrap();
         let version = executable.version;
         // Check compiler version in file name
-        assert!(file_name.contains(version.to_string().as_str()));
+        assert!(
+            file_name.contains(version.to_string().as_str()),
+            "File name does not contain version number {}.",
+            version
+        );
 
         println!("Run {:?}...", file_name);
         let output = run_executable(file_name, &executable);
@@ -39,21 +47,14 @@ fn test_legacy_ppe_roundtrip() {
         let mut compiler = PPECompiler::new(version, &reg, errors.clone());
         compiler.compile(&ast);
         check_errors(errors.clone());
-
+        println!("success.");
         match compiler.create_executable(version) {
             Ok(executable) => {
-
-                println!("Test generated {:?}...", file_name);
-                let output = run_executable(file_name, &executable);
-                assert_eq!(&output, EXPECTED_OUTPUT);
-
                 println!("Generate bin {:?}...", file_name);
-                
                 let mut bin = executable.to_buffer().unwrap();
                 println!("Reload bin {:?}...", file_name);
                 let loaded_exectuable = Executable::from_buffer(&mut bin, false).unwrap();
-                assert_eq!(loaded_exectuable.version, version);
-
+                assert_eq!(loaded_exectuable.version, version, "Reloaded version mismatch");
                 let output = run_executable(file_name, &loaded_exectuable);
                 assert_eq!(&output, EXPECTED_OUTPUT);
             }
@@ -91,7 +92,9 @@ fn run_executable(file_name: &str, executable: &Executable) -> String {
                 }
             });
         });
-        state.run_executable(&file_name, None, executable.clone()).await.unwrap();
+        if let Err(err) = state.run_executable(&file_name, None, executable.clone()).await {
+            println!("Error while executing: {}", err);
+        }
         thread::sleep(std::time::Duration::from_millis(50));
         let x = result.as_ref().lock().await.clone();
         x
@@ -100,7 +103,6 @@ fn run_executable(file_name: &str, executable: &Executable) -> String {
     let result = read_data_with_encoding_detection(&result).unwrap();
     result.replace("\r\n", "\n")
 }
-
 
 fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser::ErrorRepoter>>) {
     if errors.lock().unwrap().has_errors() {

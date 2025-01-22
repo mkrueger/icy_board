@@ -12,6 +12,7 @@ pub mod func_op_codes;
 pub use func_op_codes::*;
 
 pub mod variable_value;
+use thiserror::Error;
 pub use variable_value::*;
 
 pub mod variable_table;
@@ -114,4 +115,16 @@ impl VariableNameGenerator {
             ..Default::default()
         }
     }
+}
+
+#[derive(Error, Debug, Clone, PartialEq)]
+pub enum VMError {
+    #[error("Array not initialized")]
+    GenericDataNotSet,
+
+    #[error("Array index out of bounds - dimension({0}) {1} >= {2}")]
+    ArrayIndexOutOfBounds(i32, usize, usize),
+
+    #[error("Tried to set a string variable to a non-string value")]
+    NoStringVariable,
 }

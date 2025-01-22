@@ -79,11 +79,11 @@ impl VarHeader {
         match self.dim {
             0 => GenericVariableData::None,
             1..=3 => GenericVariableData::create_array(
-                    self.variable_type.create_empty_value(),
-                    self.dim,
-                    self.vector_size,
-                    self.matrix_size,
-                    self.cube_size,
+                self.variable_type.create_empty_value(),
+                self.dim,
+                self.vector_size,
+                self.matrix_size,
+                self.cube_size,
             ),
             _ => panic!("Invalid dimension: {}", self.dim),
         }
@@ -411,7 +411,7 @@ impl VariableTable {
                             );
                             log::error!("File is potentially damaged.");
                         }
-                        
+
                         // check variable type
                         let vtype = VariableType::from_byte(buf[i]);
                         if vtype != header.variable_type {

@@ -164,7 +164,7 @@ pub struct VirtualMachine<'a> {
 }
 
 impl<'a> VirtualMachine<'a> {
-    fn set_user_variables(&mut self, cur_user: &User) {
+    fn set_user_variables(&mut self, cur_user: &User) -> Res<()> {
         self.variable_table.set_value(U_EXPERT, VariableValue::new_bool(cur_user.flags.expert_mode));
         match cur_user.flags.fse_mode {
             FSEMode::Yes => {
@@ -219,61 +219,61 @@ impl<'a> VirtualMachine<'a> {
         self.variable_table
             .get_var_entry_mut(U_ADDR)
             .value
-            .set_array_value(2, 0, 0, VariableValue::new_string(cur_user.city_or_state.clone()));
+            .set_array_value(2, 0, 0, VariableValue::new_string(cur_user.city_or_state.clone()))?;
 
         self.variable_table
             .get_var_entry_mut(U_ADDR)
             .value
-            .set_array_value(0, 0, 0, VariableValue::new_string(cur_user.street1.clone()));
+            .set_array_value(0, 0, 0, VariableValue::new_string(cur_user.street1.clone()))?;
         self.variable_table
             .get_var_entry_mut(U_ADDR)
             .value
-            .set_array_value(1, 0, 0, VariableValue::new_string(cur_user.street2.clone()));
+            .set_array_value(1, 0, 0, VariableValue::new_string(cur_user.street2.clone()))?;
 
         self.variable_table
             .get_var_entry_mut(U_ADDR)
             .value
-            .set_array_value(3, 0, 0, VariableValue::new_string(cur_user.state.clone()));
+            .set_array_value(3, 0, 0, VariableValue::new_string(cur_user.state.clone()))?;
         self.variable_table
             .get_var_entry_mut(U_ADDR)
             .value
-            .set_array_value(4, 0, 0, VariableValue::new_string(cur_user.zip.clone()));
+            .set_array_value(4, 0, 0, VariableValue::new_string(cur_user.zip.clone()))?;
         self.variable_table
             .get_var_entry_mut(U_ADDR)
             .value
-            .set_array_value(5, 0, 0, VariableValue::new_string(cur_user.country.clone()));
+            .set_array_value(5, 0, 0, VariableValue::new_string(cur_user.country.clone()))?;
 
         self.variable_table
             .get_var_entry_mut(U_NOTES)
             .value
-            .set_array_value(0, 0, 0, VariableValue::new_string(cur_user.custom_comment1.to_string()));
+            .set_array_value(0, 0, 0, VariableValue::new_string(cur_user.custom_comment1.to_string()))?;
 
         self.variable_table
             .get_var_entry_mut(U_NOTES)
             .value
-            .set_array_value(1, 0, 0, VariableValue::new_string(cur_user.custom_comment2.to_string()));
+            .set_array_value(1, 0, 0, VariableValue::new_string(cur_user.custom_comment2.to_string()))?;
 
         self.variable_table
             .get_var_entry_mut(U_NOTES)
             .value
-            .set_array_value(2, 0, 0, VariableValue::new_string(cur_user.custom_comment3.to_string()));
+            .set_array_value(2, 0, 0, VariableValue::new_string(cur_user.custom_comment3.to_string()))?;
 
         self.variable_table
             .get_var_entry_mut(U_NOTES)
             .value
-            .set_array_value(3, 0, 0, VariableValue::new_string(cur_user.custom_comment4.to_string()));
+            .set_array_value(3, 0, 0, VariableValue::new_string(cur_user.custom_comment4.to_string()))?;
 
         self.variable_table
             .get_var_entry_mut(U_NOTES)
             .value
-            .set_array_value(4, 0, 0, VariableValue::new_string(cur_user.custom_comment5.to_string()));
+            .set_array_value(4, 0, 0, VariableValue::new_string(cur_user.custom_comment5.to_string()))?;
 
         let mut i = 0;
         while i < 5 {
             self.variable_table
                 .get_var_entry_mut(U_NOTES)
                 .value
-                .set_array_value(i, 0, 0, VariableValue::new_string(String::new()));
+                .set_array_value(i, 0, 0, VariableValue::new_string(String::new()))?;
             i += 1;
         }
 
@@ -295,6 +295,7 @@ impl<'a> VirtualMachine<'a> {
             self.variable_table.set_value(U_EMAIL, VariableValue::new_string(cur_user.email.clone()));
             self.variable_table.set_value(U_WEB, VariableValue::new_string(cur_user.web.clone()));
         }
+        Ok(())
     }
 
     pub fn put_user_variables(&self, cur_user: &mut User) {
@@ -485,6 +486,14 @@ impl<'a> VirtualMachine<'a> {
                 } else {
                     0
                 };
+                println!(
+                    "Dim({}): {} {} {} = {}",
+                    *id,
+                    dim_1,
+                    dim_2,
+                    dim_3,
+                    self.variable_table.get_value(*id).get_array_value(dim_1, dim_2, dim_3)
+                );
 
                 Ok(self.variable_table.get_value(*id).get_array_value(dim_1, dim_2, dim_3))
             }
@@ -549,7 +558,7 @@ impl<'a> VirtualMachine<'a> {
                 } else {
                     0
                 };
-                self.variable_table.get_var_entry_mut(*id).value.set_array_value(dim_1, dim_2, dim_3, value);
+                self.variable_table.get_var_entry_mut(*id).value.set_array_value(dim_1, dim_2, dim_3, value)?;
             }
             _ => {
                 return Err(VMError::InternalVMError.into());

@@ -7,7 +7,8 @@ use std::{
 
 use crate::{
     datetime::{IcbDate, IcbTime},
-    executable::{FunctionValue, ProcedureValue},
+    executable::{FunctionValue, ProcedureValue, VMError},
+    Res,
 };
 
 #[derive(Clone, Copy, PartialEq, Debug, Default, Eq, Hash)]
@@ -243,10 +244,7 @@ impl GenericVariableData {
         match dim {
             1 => {
                 if vector_size > MAX_ARRAY_SIZE {
-                    panic!(
-                        "Creating a large array of size: {} elements - probably file is corrupt.",
-                        vector_size,
-                    );
+                    panic!("Creating a large array of size: {} elements - probably file is corrupt.", vector_size,);
                 }
                 GenericVariableData::Dim1(vec![base_value; vector_size + 1])
             }
@@ -256,7 +254,7 @@ impl GenericVariableData {
                         "Creating a large array of size: {}x{}={} elements - probably file is corrupt.",
                         vector_size,
                         matrix_size,
-                        vector_size * matrix_size 
+                        vector_size * matrix_size
                     );
                 }
                 GenericVariableData::Dim2(vec![vec![base_value; matrix_size + 1]; vector_size + 1])
@@ -1134,18 +1132,33 @@ impl VariableValue {
             if dim_1 < data.len() {
                 data[dim_1].clone()
             } else {
+                log::error!("dim1 out of bounds: {} > {}", dim_1, data.len());
                 self.vtype.create_empty_value()
             }
         } else if let GenericVariableData::Dim2(data) = &self.generic_data {
             if dim_1 < data.len() && dim_2 < data[dim_1].len() {
                 data[dim_1][dim_2].clone()
             } else {
+                if dim_1 < data.len() {
+                    log::error!("dim1 out of bounds: {} > {}", dim_1, data.len());
+                } else {
+                    log::error!("dim2 out of bounds: {} > {}", dim_2, data[dim_1].len());
+                }
                 self.vtype.create_empty_value()
             }
         } else if let GenericVariableData::Dim3(data) = &self.generic_data {
             if dim_1 < data.len() && dim_2 < data[dim_1].len() && dim_3 < data[dim_1][dim_2].len() {
                 data[dim_1][dim_2][dim_3].clone()
             } else {
+                if dim_1 < data.len() {
+                    if dim_2 < data[dim_1].len() {
+                        log::error!("dim3 out of bounds: {} > {}", dim_3, data[dim_1][dim_2].len());
+                    } else {
+                        log::error!("dim2 out of bounds: {} > {}", dim_2, data[dim_1].len());
+                    }
+                } else {
+                    log::error!("dim1 out of bounds: {} > {}", dim_1, data.len());
+                }
                 self.vtype.create_empty_value()
             }
         } else {
@@ -1157,16 +1170,16 @@ impl VariableValue {
         self.generic_data = GenericVariableData::create_array(self.vtype.create_empty_value(), dim, vs, ms, cs);
     }
 
-    pub fn set_array_value(&mut self, dim1: usize, dim2: usize, dim3: usize, val: VariableValue) {
+    pub fn set_array_value(&mut self, dim1: usize, dim2: usize, dim3: usize, val: VariableValue) -> Res<()> {
         match &mut self.generic_data {
             GenericVariableData::None => {
-                log::error!("generic data not set - array expected.");
+                return Err(Box::new(VMError::GenericDataNotSet));
             }
             GenericVariableData::Dim1(data) => {
                 if dim1 < data.len() {
                     data[dim1] = val.convert_to(self.vtype);
                 } else {
-                    log::error!("dim1 out of bounds: {} > {}", dim1, data.len());
+                    return Err(Box::new(VMError::ArrayIndexOutOfBounds(1, dim1, data.len())));
                 }
             }
             GenericVariableData::Dim2(data) => {
@@ -1174,9 +1187,9 @@ impl VariableValue {
                     data[dim1][dim2] = val.convert_to(self.vtype);
                 } else {
                     if dim1 < data.len() {
-                        log::error!("dim2 out of bounds: {} > {}", dim2, data[dim1].len());
+                        return Err(Box::new(VMError::ArrayIndexOutOfBounds(2, dim2, data[dim1].len())));
                     } else {
-                        log::error!("dim1 out of bounds: {} > {}", dim1, data.len());
+                        return Err(Box::new(VMError::ArrayIndexOutOfBounds(1, dim1, data.len())));
                     }
                 }
             }
@@ -1186,12 +1199,12 @@ impl VariableValue {
                 } else {
                     if dim1 < data.len() {
                         if dim2 < data[dim1].len() {
-                            log::error!("dim3 out of bounds: {} > {}", dim3, data[dim1][dim2].len());
+                            return Err(Box::new(VMError::ArrayIndexOutOfBounds(3, dim3, data[dim1][dim2].len())));
                         } else {
-                            log::error!("dim2 out of bounds: {} > {}", dim2, data[dim1].len());
+                            return Err(Box::new(VMError::ArrayIndexOutOfBounds(2, dim2, data[dim1].len())));
                         }
                     } else {
-                        log::error!("dim1 out of bounds: {} > {}", dim1, data.len());
+                        return Err(Box::new(VMError::ArrayIndexOutOfBounds(1, dim1, data.len())));
                     }
                 }
             }
@@ -1204,14 +1217,15 @@ impl VariableValue {
                             v[dim1] = ch;
                             *s = v.iter().collect();
                         } else {
-                            log::error!("no string variable: {}", self.vtype);
+                            return Err(Box::new(VMError::NoStringVariable));
                         }
                     }
-                    return;
+                    return Ok(());
                 }
-                log::error!("no array variable: {}", self.vtype);
+                return Err(Box::new(VMError::NoStringVariable));
             }
         }
+        Ok(())
     }
 
     /// .

@@ -200,7 +200,7 @@ pub async fn getuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> 
     } else {
         return Err(Box::new(IcyError::UserNotFound(String::new())));
     };
-    vm.set_user_variables(&user);
+    vm.set_user_variables(&user)?;
 
     Ok(())
 }
@@ -1199,7 +1199,7 @@ pub async fn getaltuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
     }
     let user = vm.icy_board_state.get_board().await.users[user_record].clone();
 
-    vm.set_user_variables(&user);
+    vm.set_user_variables(&user)?;
     Ok(())
 }
 
@@ -1284,7 +1284,7 @@ pub async fn sort(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let indices = vm.variable_table.get_value_mut(indices_idx);
     indices.redim(dim, vs, 0, 0);
     for (i, target_index) in target_indices.iter().enumerate() {
-        indices.set_array_value(i, 0, 0, VariableValue::new_int(*target_index as i32));
+        indices.set_array_value(i, 0, 0, VariableValue::new_int(*target_index as i32))?;
     }
     Ok(())
 }
@@ -1376,7 +1376,7 @@ pub async fn brag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 pub async fn frealtuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     if let Some(user) = &vm.icy_board_state.session.current_user.clone() {
-        vm.set_user_variables(user);
+        vm.set_user_variables(user)?;
     }
     Ok(())
 }
