@@ -39,11 +39,7 @@ struct Cli {
 
     /// version number for the compiler, valid: 100, 200, 300, 310, 330 (default), 340
     #[argh(option)]
-    ppl_version: Option<u16>,
-
-    /// version number for the runtime, valid: 100, 200, 300, 310, 330 (default), 340
-    #[argh(option)]
-    runtime_version: Option<u16>,
+    version: Option<u16>,
 
     /// specify the encoding of the file, defaults to autodetection
     #[argh(option)]
@@ -61,17 +57,13 @@ lazy_static::lazy_static! {
 fn main() {
     let arguments: Cli = argh::from_env();
 
-    let ppl_version = if let Some(v) = arguments.ppl_version { v } else { 400 };
-    let runtime_version = if let Some(v) = arguments.runtime_version { v } else { 400 };
-    let valid_versions: Vec<u16> = vec![100, 200, 300, 310, 330, 340, 400];
-    if !valid_versions.contains(&ppl_version) {
+    let version = if let Some(v) = arguments.version { v } else { 400 };
+    let valid_versions: Vec<u16> = vec![100, 200, 300, 301, 310, 320, 330, 340, 400];
+    if !valid_versions.contains(&version) {
         println!("Invalid version number valid values {valid_versions:?}");
         return;
     }
-    if !valid_versions.contains(&runtime_version) {
-        println!("Invalid version number valid values {valid_versions:?}");
-        return;
-    }
+
     if arguments.nouvar && arguments.forceuvar {
         println!("--nouvar can't be used in conjunction with --forceuvar");
         return;
@@ -97,7 +89,7 @@ fn main() {
             println!();
             println!("Parsing...");
             let reg = UserTypeRegistry::icy_board_registry();
-            let (mut ast, errors) = parse_ast(PathBuf::from(&file_name), &src, &reg, encoding, ppl_version);
+            let (mut ast, errors) = parse_ast(PathBuf::from(&file_name), &src, &reg, encoding, version);
             if arguments.nouvar {
                 ast.require_user_variables = false;
             }
@@ -109,12 +101,12 @@ fn main() {
             if check_errors(errors.clone(), &arguments, &file_name, &src) {
                 std::process::exit(1);
             }
-            let mut compiler = PPECompiler::new(ppl_version, &reg, errors.clone());
+            let mut compiler = PPECompiler::new(version, &reg, errors.clone());
             compiler.compile(&ast);
             if check_errors(errors.clone(), &arguments, &file_name, &src) {
                 std::process::exit(1);
             }
-            match compiler.create_executable(runtime_version) {
+            match compiler.create_executable(version) {
                 Ok(executable) => {
                     if arguments.disassemble {
                         println!();

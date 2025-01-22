@@ -25,7 +25,7 @@ pub mod tests;
 /// PCBoard Programming Language Decompiler
 struct Cli {
     /// raw ppe without reconstruction control structures
-    #[argh(switch)]
+    #[argh(switch, short = 'r')]
     raw: bool,
 
     /// output the disassembly instead of ppl
@@ -33,7 +33,7 @@ struct Cli {
     disassemble: bool,
 
     /// output to console instead of writing to file
-    #[argh(switch)]
+    #[argh(switch, short = 'o')]
     output: bool,
 
     #[argh(option)]
