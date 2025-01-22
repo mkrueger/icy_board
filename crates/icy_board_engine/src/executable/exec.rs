@@ -36,6 +36,9 @@ pub enum ExecutableError {
 
     #[error("Buffer too short: {0}")]
     BufferTooShort(usize),
+
+    #[error("Function/Procedure is not supported in ppe version ({0})")]
+    FunctionsNotSupported(u16),
 }
 
 #[derive(Clone)]

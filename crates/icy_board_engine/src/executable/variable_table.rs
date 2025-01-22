@@ -367,9 +367,12 @@ impl VariableTable {
                 }
 
                 VariableType::Function | VariableType::Procedure => {
+                    if version <= 100 {
+                        return Err(Box::new(ExecutableError::FunctionsNotSupported(version)));
+                    }
                     if version < 340 {
                         decrypt(&mut buf[i..(i + 12)], version);
-                        i += 2; // SKIP VTABLE - seems to get stored by accident.
+                        i += 2; // SKIP VTABLE - seems ot get stored by accident.
                     } else {
                         decrypt(&mut buf[i..(i + 10)], version);
                     }
