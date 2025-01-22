@@ -110,7 +110,7 @@ impl Executable {
 
         let code_data: &mut [u8] = &mut buffer[i..];
         let decrypted_data;
-        let data: &[u8] = if version > 300 && version < 400 {
+        let data: &[u8] = if version > 300 {
             let use_rle = real_size != code_size;
             decrypt_chunks(code_data, version, use_rle);
             if use_rle {
