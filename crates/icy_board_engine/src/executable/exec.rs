@@ -4,7 +4,7 @@ use crossterm::execute;
 use crossterm::style::{Attribute, Print, SetAttribute};
 use thiserror::Error;
 
-use crate::crypt::{decode_rle, decrypt, encode_rle, encrypt};
+use crate::crypt::{decode_rle, decrypt_chunks, encode_rle};
 use crate::executable::disassembler::DisassembleVisitor;
 use crate::Res;
 
@@ -109,34 +109,16 @@ impl Executable {
         }
 
         let code_data: &mut [u8] = &mut buffer[i..];
-        let mut decrypted_data: Vec<u8> = Vec::new();
-
-        let mut offset = 0;
-        let data: &[u8] = if version > 300 {
+        let decrypted_data;
+        let data: &[u8] = if version > 300 && version < 400 {
             let use_rle = real_size != code_size;
-            let code_data_len = code_data.len();
-
-            while offset < code_data_len {
-                let mut chunk_size = 2047;
-                let end = (offset + chunk_size).min(code_data_len);
-                let mut chunk = &mut code_data[offset..end];
-                decrypt(chunk, version);
-
-                if use_rle && offset + chunk_size < code_data_len && chunk[chunk_size - 1] == 0 {
-                    chunk = &mut code_data[offset..=end];
-                    chunk_size += 1;
-                }
-
-                offset += chunk_size;
-
-                if use_rle {
-                    let decoded = decode_rle(chunk);
-                    decrypted_data.extend_from_slice(&decoded);
-                } else {
-                    decrypted_data.extend_from_slice(chunk);
-                }
+            decrypt_chunks(code_data, version, use_rle);
+            if use_rle {
+                decrypted_data = decode_rle(&code_data);
+                &decrypted_data
+            } else {
+                code_data
             }
-            &decrypted_data
         } else {
             code_data
         };
@@ -193,25 +175,8 @@ impl Executable {
         if !use_rle {
             code_data = script_buffer;
         }
-
-        let mut offset = 0;
-        while offset < code_data.len() {
-            let chunk_size = 2027;
-            let add_byte = use_rle && offset + chunk_size < code_data.len() && code_data[offset + chunk_size] == 0;
-
-            let end = (offset + chunk_size).min(code_data.len());
-            let chunk = &mut code_data[offset..end];
-
-            offset += chunk_size;
-
-            encrypt(chunk, self.version);
-            buffer.extend_from_slice(chunk);
-
-            if add_byte {
-                buffer.push(code_data[end]);
-                offset += 1;
-            }
-        }
+        crate::crypt::encrypt_chunks(&mut code_data, self.version, use_rle);
+        buffer.extend_from_slice(&code_data);
         Ok(buffer)
     }
 

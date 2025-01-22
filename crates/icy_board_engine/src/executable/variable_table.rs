@@ -7,7 +7,7 @@ use crossterm::{
 };
 
 use crate::{
-    crypt::{decrypt, encrypt},
+    crypt::{decrypt_chunks, encrypt_chunks},
     Res,
 };
 
@@ -238,7 +238,7 @@ impl TableEntry {
     /// This function will return an error if .
     pub fn to_buffer(&self, version: u16) -> Result<Vec<u8>, ExecutableError> {
         let mut buffer = self.header.to_bytes();
-        encrypt(&mut buffer, version);
+        encrypt_chunks(&mut buffer, version, false);
 
         let b = buffer.len();
         if self.header.variable_type == VariableType::Procedure || self.header.variable_type == VariableType::Function {
@@ -251,7 +251,7 @@ impl TableEntry {
             unsafe {
                 self.value.data.function_value.append(&mut buffer);
             }
-            encrypt(&mut buffer[b..], version);
+            encrypt_chunks(&mut buffer[b..], version, false);
         } else if self.header.variable_type == VariableType::String {
             if self.header.dim == 0 {
                 let GenericVariableData::String(s) = &self.value.generic_data else {
@@ -271,7 +271,7 @@ impl TableEntry {
                 string_buffer.push(0);
 
                 buffer.extend_from_slice(&u16::to_le_bytes(string_buffer.len() as u16));
-                encrypt(&mut string_buffer, version);
+                encrypt_chunks(&mut string_buffer, version, false);
                 buffer.extend(string_buffer);
             } else {
                 buffer.extend_from_slice(&[0, 0]);
@@ -291,7 +291,7 @@ impl TableEntry {
                 buffer.extend_from_slice(&u32::to_le_bytes(self.value.get_u64_value() as u32));
             } else {
                 buffer.extend_from_slice(&u64::to_le_bytes(self.value.get_u64_value()));
-                encrypt(&mut buffer[b..], version);
+                encrypt_chunks(&mut buffer[b..], version, false);
             }
         }
         Ok(buffer)
@@ -330,7 +330,7 @@ impl VariableTable {
         let mut var_count = max_var as i32 - 1;
 
         while var_count >= 0 {
-            decrypt(&mut (buf[i..(i + 11)]), version);
+            decrypt_chunks(&mut (buf[i..(i + 11)]), version, false);
             let cur_block = &buf[i..(i + 11)];
             let header = VarHeader::from_bytes(cur_block)?;
             if header.id > max_var {
@@ -347,7 +347,7 @@ impl VariableTable {
                 VariableType::String => {
                     let string_length = u16::from_le_bytes((buf[i..=i + 1]).try_into()?) as usize;
                     i += 2;
-                    decrypt(&mut (buf[i..(i + string_length)]), version);
+                    decrypt_chunks(&mut (buf[i..(i + string_length)]), version, false);
                     let generic_data = if header.dim > 0 {
                         header.create_generic_data()
                     } else {
@@ -371,10 +371,10 @@ impl VariableTable {
                         return Err(Box::new(ExecutableError::FunctionsNotSupported(version)));
                     }
                     if version < 340 {
-                        decrypt(&mut buf[i..(i + 12)], version);
+                        decrypt_chunks(&mut buf[i..(i + 12)], version, false);
                         i += 2; // SKIP VTABLE - seems ot get stored by accident.
                     } else {
-                        decrypt(&mut buf[i..(i + 10)], version);
+                        decrypt_chunks(&mut buf[i..(i + 10)], version, false);
                     }
 
                     let cur_buf = &buf[i..(i + 10)];
@@ -435,10 +435,10 @@ impl VariableTable {
                         i += 4;
                     } else {
                         if version < 340 {
-                            decrypt(&mut buf[i..(i + 12)], version);
+                            decrypt_chunks(&mut buf[i..(i + 12)], version, false);
                             i += 2; // SKIP VTABLE - seems to get stored by accident.
                         } else {
-                            decrypt(&mut buf[i..(i + 10)], version);
+                            decrypt_chunks(&mut buf[i..(i + 10)], version, false);
                         }
 
                         // check variable type

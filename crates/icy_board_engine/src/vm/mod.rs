@@ -486,15 +486,6 @@ impl<'a> VirtualMachine<'a> {
                 } else {
                     0
                 };
-                println!(
-                    "Dim({}): {} {} {} = {}",
-                    *id,
-                    dim_1,
-                    dim_2,
-                    dim_3,
-                    self.variable_table.get_value(*id).get_array_value(dim_1, dim_2, dim_3)
-                );
-
                 Ok(self.variable_table.get_value(*id).get_array_value(dim_1, dim_2, dim_3))
             }
 

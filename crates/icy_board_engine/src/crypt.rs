@@ -14,93 +14,63 @@ fn crypt3(block: &mut [u8]) {
     }
 }
 
-pub fn decrypt2(block: &mut [u8]) {
-    let mut full_size = block.len() as i32;
+fn decrypt2(block: &mut [u8]) {
+    if block.len() > CHUNK_SIZE {
+        panic!("Block size is too large.");
+    }
+    let size = block.len() as i32;
     let mut i = 0;
-    loop {
-        let size;
-        if full_size < 0x0800 {
-            size = full_size;
-            full_size = 0;
-        } else {
-            size = 0x7ff;
-            full_size -= 0x7ff;
-        }
-        let mut seed = 0xDB24;
-        let mut rotate_count = 0;
-        let mut dx = size >> 1;
-        while dx > 0 {
-            let cur_word = (block[i + 1] as u16) << 8 | block[i] as u16;
-            let dl = dx as u8;
-            rotate_count = ((seed & 0xFF) + (dl as u16)) & 0xFF;
-            let outx = u16::rotate_right(cur_word, rotate_count as u32) ^ seed;
-            block[i] = (outx as u8) ^ dl;
-            i += 1;
-            block[i] = (outx >> 8) as u8 ^ dl;
-            i += 1;
-            seed = cur_word;
-            dx -= 1;
-        }
+    let mut seed = 0xDB24;
+    let mut rotate_count = 0;
+    let mut dx = size >> 1;
+    while dx > 0 {
+        let cur_word = (block[i + 1] as u16) << 8 | block[i] as u16;
+        let dl = dx as u8;
+        rotate_count = ((seed & 0xFF) + (dl as u16)) & 0xFF;
+        let outx = u16::rotate_right(cur_word, rotate_count as u32) ^ seed;
+        block[i] = (outx as u8) ^ dl;
+        i += 1;
+        block[i] = (outx >> 8) as u8 ^ dl;
+        i += 1;
+        seed = cur_word;
+        dx -= 1;
+    }
 
-        if size % 2 == 1 {
-            block[i] = u8::rotate_right(block[i] ^ (seed as u8), (rotate_count & 0xFF) as u32);
-            i += 1;
-        }
-        if size == 0x7ff && block[i - 1] == 0 {
-            i += 1;
-            full_size -= 1;
-        }
-        if full_size <= 0 {
-            break;
-        }
+    if size % 2 == 1 {
+        block[i] = u8::rotate_right(block[i] ^ (seed as u8), (rotate_count & 0xFF) as u32);
     }
 }
 
-pub fn encrypt2(block: &mut [u8]) {
-    let mut full_size = block.len() as i32;
+fn encrypt2(block: &mut [u8]) {
+    if block.len() > CHUNK_SIZE {
+        panic!("Block size is too large.");
+    }
+    let size = block.len() as i32;
+    let mut seed = 0xDB24;
+    let mut rotate_count = 0;
+    let mut dx = size >> 1;
     let mut i = 0;
-    loop {
-        let size;
-        if full_size < 0x0800 {
-            size = full_size;
-            full_size = 0;
-        } else {
-            size = 0x7ff;
-            full_size -= 0x7ff;
-        }
-        let mut seed = 0xDB24;
-        let mut rotate_count = 0;
-        let mut dx = size >> 1;
-        while dx > 0 {
-            let cur_word = (block[i + 1] as u16) << 8 | block[i] as u16;
-            let dl = dx as u16 & 0xFF;
-            rotate_count = (seed & 0xFF) + (dl & 0xFF);
-            let tmp = dl | dl << 8;
-            let outx = u16::rotate_left(cur_word ^ seed ^ tmp, rotate_count as u32);
-            block[i] = outx as u8;
-            i += 1;
-            block[i] = (outx >> 8) as u8;
-            i += 1;
-            seed = outx;
-            dx -= 1;
-        }
+    while dx > 0 {
+        let cur_word = (block[i + 1] as u16) << 8 | block[i] as u16;
+        let dl = dx as u16 & 0xFF;
+        rotate_count = (seed & 0xFF) + (dl & 0xFF);
+        let tmp = dl | dl << 8;
+        let outx = u16::rotate_left(cur_word ^ seed ^ tmp, rotate_count as u32);
+        block[i] = outx as u8;
+        i += 1;
+        block[i] = (outx >> 8) as u8;
+        i += 1;
+        seed = outx;
+        dx -= 1;
+    }
 
-        if size % 2 == 1 {
-            block[i] = u8::rotate_left(block[i], (rotate_count & 0xFF) as u32) ^ (seed as u8);
-            i += 1;
-        }
-        if size == 0x7ff && block[i - 1] == 0 {
-            i += 1;
-            full_size -= 1;
-        }
-        if full_size <= 0 {
-            break;
-        }
+    if size % 2 == 1 {
+        block[i] = u8::rotate_left(block[i], (rotate_count & 0xFF) as u32) ^ (seed as u8);
     }
 }
 
 #[allow(clippy::pedantic)]
-pub fn decrypt(block: &mut [u8], version: u16) {
+fn decrypt(block: &mut [u8], version: u16) {
     if version < 300 || version >= 400 {
         return;
     }
@@ -116,7 +86,7 @@ pub fn decrypt(block: &mut [u8], version: u16) {
 }
 
 #[allow(clippy::pedantic)]
-pub fn encrypt(block: &mut [u8], version: u16) {
+fn encrypt(block: &mut [u8], version: u16) {
     if version < 300 || version >= 400 {
         return;
     }
@@ -168,6 +138,37 @@ pub fn decode_rle(src: &[u8]) -> Vec<u8> {
         }
     }
     result
+}
+
+const CHUNK_SIZE: usize = 2027;
+
+pub fn encrypt_chunks(buffer: &mut [u8], version: u16, use_rle: bool) {
+    let mut offset: usize = 0;
+    while offset < buffer.len() {
+        let add_byte = use_rle && offset + CHUNK_SIZE - 1 < buffer.len() && buffer[offset + CHUNK_SIZE - 1] == 0;
+        let end = (offset + CHUNK_SIZE).min(buffer.len());
+        let chunk = &mut buffer[offset..end];
+        encrypt(chunk, version);
+        offset += CHUNK_SIZE;
+        if add_byte {
+            offset += 1;
+        }
+    }
+}
+
+pub fn decrypt_chunks(buffer: &mut [u8], version: u16, use_rle: bool) {
+    let code_data_len = buffer.len();
+    let mut offset = 0;
+
+    while offset < code_data_len {
+        let end = (offset + CHUNK_SIZE).min(code_data_len);
+        let chunk = &mut buffer[offset..end];
+        decrypt(chunk, version);
+        if use_rle && offset + CHUNK_SIZE < code_data_len && chunk[CHUNK_SIZE - 1] == 0 {
+            offset += 1;
+        }
+        offset += CHUNK_SIZE;
+    }
 }
 
 #[cfg(test)]
@@ -226,5 +227,137 @@ mod tests {
         assert_ne!(buffer, *o_buffer);
         decrypt2(&mut buffer);
         assert_eq!(buffer, *o_buffer);
+    }
+
+    #[test]
+    fn test_large_crypt3() {
+        let mut data = vec![0u8; CHUNK_SIZE];
+        for i in 0..data.len() {
+            if is_prime(i) {
+                data[i] = i as u8;
+            }
+        }
+
+        crypt3(&mut data);
+        crypt3(&mut data);
+
+        for i in 0..data.len() {
+            if is_prime(i) {
+                assert_eq!(data[i], i as u8);
+            } else {
+                assert_eq!(data[i], 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_large_crypt2() {
+        let mut data = vec![0u8; CHUNK_SIZE];
+        for i in 0..data.len() {
+            if is_prime(i) {
+                data[i] = i as u8;
+            }
+        }
+
+        encrypt2(&mut data);
+        decrypt2(&mut data);
+
+        for i in 0..data.len() {
+            if is_prime(i) {
+                assert_eq!(data[i], i as u8);
+            } else {
+                assert_eq!(data[i], 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_chunks_with_rle_330() {
+        let mut data = vec![0u8; CHUNK_SIZE * 16];
+        for i in 0..data.len() {
+            if is_prime(i) {
+                data[i] = i as u8;
+            }
+        }
+        encrypt_chunks(&mut data, 330, true);
+        decrypt_chunks(&mut data, 330, true);
+        for i in 0..data.len() {
+            if is_prime(i) {
+                assert_eq!(data[i], i as u8);
+            } else {
+                assert_eq!(data[i], 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_chunks_with_rle_300() {
+        let mut data = vec![0u8; CHUNK_SIZE * 16];
+        for i in 0..data.len() {
+            if is_prime(i) {
+                data[i] = i as u8;
+            }
+        }
+        encrypt_chunks(&mut data, 300, true);
+        decrypt_chunks(&mut data, 300, true);
+        for i in 0..data.len() {
+            if is_prime(i) {
+                assert_eq!(data[i], i as u8);
+            } else {
+                assert_eq!(data[i], 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_chunks_with_rle_340() {
+        let mut data = vec![0u8; CHUNK_SIZE * 16];
+        for i in 0..data.len() {
+            if is_prime(i) {
+                data[i] = i as u8;
+            }
+        }
+        encrypt_chunks(&mut data, 340, true);
+        decrypt_chunks(&mut data, 340, true);
+        for i in 0..data.len() {
+            if is_prime(i) {
+                assert_eq!(data[i], i as u8);
+            } else {
+                assert_eq!(data[i], 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_chunks_without_rle() {
+        let mut data = vec![0u8; CHUNK_SIZE * 16];
+        for i in 0..data.len() {
+            if is_prime(i) {
+                data[i] = i as u8;
+            }
+        }
+        encrypt_chunks(&mut data, 330, false);
+        decrypt_chunks(&mut data, 330, false);
+        for i in 0..data.len() {
+            if is_prime(i) {
+                assert_eq!(data[i], i as u8);
+            } else {
+                assert_eq!(data[i], 0);
+            }
+        }
+    }
+
+    fn is_prime(num: usize) -> bool {
+        if num <= 1 {
+            return false;
+        }
+
+        for i in 2..=(num as f64).sqrt() as usize {
+            if num % i == 0 {
+                return false;
+            }
+        }
+
+        true
     }
 }

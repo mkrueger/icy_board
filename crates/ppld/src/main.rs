@@ -88,7 +88,7 @@ fn main() {
 
             match decompile(executable, arguments.raw) {
                 Ok((decompilation, issues)) => {
-                    let mut output_visitor = output_visitor::OutputVisitor::default();
+                    let mut output_visitor: output_visitor::OutputVisitor = output_visitor::OutputVisitor::default();
                     output_visitor.output_func = output_func;
                     decompilation.visit(&mut output_visitor);
                     if arguments.output {
