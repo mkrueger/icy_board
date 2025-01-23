@@ -456,7 +456,6 @@ impl<'a> VirtualMachine<'a> {
             PPEExpr::BinaryExpression(op, left, right) => {
                 let left_value = self.eval_expr(left).await?;
                 let right_value = self.eval_expr(right).await?;
-
                 match op {
                     BinOp::Add => Ok(left_value + right_value),
                     BinOp::Sub => Ok(left_value - right_value),

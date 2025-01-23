@@ -368,7 +368,7 @@ fn promote_to(l: VariableType, r: VariableType) -> VariableType {
     if (l == VariableType::String || l == VariableType::BigStr) && (r == VariableType::String || r == VariableType::BigStr) {
         return VariableType::BigStr;
     }
-    if (l == VariableType::Float || l == VariableType::Double) && (r == VariableType::Float || r == VariableType::Double) {
+    if l == VariableType::Float || l == VariableType::Double || r == VariableType::Float || r == VariableType::Double {
         return VariableType::Double;
     }
     VariableType::Integer
@@ -559,6 +559,7 @@ impl Div<VariableValue> for VariableValue {
 
     fn div(self, other: VariableValue) -> VariableValue {
         let mut dest_type: VariableType = promote_to(self.vtype, other.vtype);
+
         match dest_type {
             VariableType::Boolean | VariableType::Date | VariableType::EDate | VariableType::Money | VariableType::Time | VariableType::DDate => {
                 dest_type = VariableType::Integer;
@@ -585,10 +586,10 @@ impl Div<VariableValue> for VariableValue {
                     data.int_value = self.as_int().wrapping_div(other.as_int());
                 }
                 VariableType::Float => {
-                    data.float_value = self.data.float_value / other.data.float_value;
+                    data.float_value = self.convert_to(VariableType::Float).data.float_value / other.convert_to(VariableType::Float).data.float_value;
                 }
                 VariableType::Double => {
-                    data.double_value = self.data.double_value / other.data.double_value;
+                    data.double_value = self.convert_to(VariableType::Double).data.double_value / other.convert_to(VariableType::Double).data.double_value;
                 }
                 VariableType::Byte => {
                     data.byte_value = self.data.byte_value.wrapping_div(other.data.byte_value);
@@ -1041,7 +1042,48 @@ impl VariableValue {
         if let GenericVariableData::String(s) = &self.generic_data {
             return s.parse::<i32>().unwrap_or_default();
         }
-        unsafe { self.data.int_value }
+
+        match self.vtype {
+            VariableType::Boolean => {
+                if unsafe { self.data.bool_value } {
+                    return 1;
+                }
+                return 0;
+            }
+            VariableType::Unsigned => {
+                return unsafe { self.data.unsigned_value as i32 };
+            }
+            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => {
+                return unsafe { self.data.int_value };
+            }
+            VariableType::Money => {
+                return unsafe { self.data.money_value as i32 };
+            }
+            VariableType::Float => {
+                return unsafe { self.data.float_value as i32 };
+            }
+            VariableType::Double => {
+                return unsafe { self.data.double_value as i32 };
+            }
+            VariableType::Time => {
+                return unsafe { self.data.time_value };
+            }
+            VariableType::Byte => {
+                return unsafe { self.data.byte_value as i32 };
+            }
+            VariableType::Word => {
+                return unsafe { self.data.word_value as i32 };
+            }
+            VariableType::SByte => {
+                return unsafe { self.data.sbyte_value as i32 };
+            }
+            VariableType::SWord => {
+                return unsafe { self.data.sword_value as i32 };
+            }
+            _ => {
+                panic!("Unsupported type: {:?}", self.vtype);
+            }
+        }
     }
 
     /// .
@@ -1287,10 +1329,20 @@ impl VariableValue {
                 data.sword_value = self.as_int() as i16;
             }
             VariableType::Float => {
-                data.float_value = self.as_string().parse().unwrap();
+                if let Ok(res) = self.as_string().parse() {
+                    data.float_value = res;
+                } else {
+                    log::error!("can't convert {} to float", self.as_string());
+                    data.float_value = 0.0;
+                }
             }
             VariableType::Double => {
-                data.double_value = self.as_string().parse().unwrap();
+                if let Ok(res) = self.as_string().parse() {
+                    data.double_value = res;
+                } else {
+                    log::error!("can't convert {} to double", self.as_string());
+                    data.double_value = 0.0;
+                }
             }
             VariableType::DDate => {
                 data.ddate_value = self.as_int();
@@ -1312,7 +1364,6 @@ impl VariableValue {
                 panic!("Unknown variable type")
             }
         }
-
         VariableValue::new(convert_to_type, data)
     }
 }

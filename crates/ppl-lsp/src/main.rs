@@ -1037,15 +1037,13 @@ fn get_function_hover(opcode: FuncOpCode) -> Option<Hover> {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use icy_board_engine::executable::FUNCTION_DEFINITIONS;
 
     #[test]
-    fn test_function_translations()
-    {
-        for f in &FUNCTION_DEFINITIONS  {
+    fn test_function_translations() {
+        for f in &FUNCTION_DEFINITIONS {
             if f.args < 0 || f.args >= 0x10 {
                 continue;
             }

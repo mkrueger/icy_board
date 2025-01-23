@@ -230,9 +230,25 @@ hint-statement-varoff=todo
 hint-statement-pokeb=todo
 hint-statement-pokew=todo
 hint-statement-varaddr=todo
-hint-statement-ansipos=todo
+hint-statement-ansipos=
+    ### Statement
+    `ANSIPOS col:integer, row:integer`
+    
+    Move the cursor to column `col` and row `row`
+
+    ### Remarks
+    ```
+    1 <= col <= 80  
+    1 <= row <= 23 (Because of the status lines)  
+    ```
+    (1,1) is the top left corner of the screen
 hint-statement-backup=todo
-hint-statement-forward=todo
+hint-statement-forward=
+    ### Statement
+    `FORWARD var:integer`
+    
+    ### Remarks
+    Move the cursor forward `var` columns without going past column 80
 hint-statement-freshline=todo
 hint-statement-wrusys=todo
 hint-statement-rdusys=todo
@@ -418,7 +434,12 @@ hint-function-space=
     ### Remarks
     Returns a string of `length` spaces
 hint-function-ferr=todo
-hint-function-chr=todo
+hint-function-chr=
+    ### Function
+    `CHR(var1:integer) : BIGSTR`
+
+    ### Remarks
+    Returns a single character long string of the character represented by ASCII code var (0-255)
 hint-function-asc=
     ### Function
     `ASC(var1:bigstr) :INTEGER`
@@ -559,7 +580,13 @@ hint-function-u_recnum=todo
 hint-function-u_inconf=todo
 hint-function-peekdw=todo
 hint-function-dbglevel=todo
-hint-function-scrtext=todo
+hint-function-scrtext=
+    ### Function
+    `SCRTEXT(col:integer, row:integer, len:integer, code:boolean) : STRING`
+
+    ### Remarks
+    Returns a string of `len` characters from the screen at `col`, `row`. 
+    If `code` is `TRUE` then the string will be returned with all @ codes intact.
 hint-function-showstat=todo
 hint-function-pagestat=todo
 hint-function-replacestr=todo

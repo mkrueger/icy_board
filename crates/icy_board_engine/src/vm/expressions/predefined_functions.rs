@@ -153,11 +153,8 @@ pub async fn chr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     if c > 255 {
         return Ok(VariableValue::new_string(" ".to_string()));
     }
-    let mut res = String::new();
-    unsafe {
-        res.push(char::from_u32_unchecked(c as u32));
-    }
-    Ok(VariableValue::new_string(res))
+    let ch = codepages::tables::CP437_TO_UNICODE[c as usize].to_string();
+    Ok(VariableValue::new_string(ch))
 }
 
 pub async fn asc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
