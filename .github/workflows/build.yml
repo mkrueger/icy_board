@@ -17,9 +17,6 @@ jobs:
        export version=$(python3 tools/prep_diz.py "file_id.diz")
        echo "VERSION=$version" >> $GITHUB_ENV
        echo "Version: $version"
-   - name: Install required libraries
-     run: |
-       sudo apt-get install build-essential libasound2-dev libxcb-shape0-dev libxcb-xfixes0-dev
    - name: Build
      id: build
      run: |

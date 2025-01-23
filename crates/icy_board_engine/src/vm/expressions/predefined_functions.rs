@@ -6,13 +6,13 @@ use std::path::PathBuf;
 use crate::ast::constant::STACK_LIMIT;
 use crate::datetime::{IcbDate, IcbTime};
 use crate::executable::{GenericVariableData, PPEExpr, VariableData, VariableType, VariableValue};
+use crate::icy_board::read_with_encoding_detection;
 use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_NUM, MASK_PATH, MASK_PWD};
 use crate::icy_board::state::GraphicsMode;
 use crate::parser::CONFERENCE_ID;
 use crate::vm::{TerminalTarget, VirtualMachine};
 use crate::Res;
 use chrono::Local;
-use codepages::tables::{CP437_TO_UNICODE, UNICODE_TO_CP437};
 use icy_engine::{update_crc32, Position, TextPane};
 use radix_fmt::radix;
 use rand::Rng; // 0.8.5
@@ -24,7 +24,7 @@ use rand::Rng; // 0.8.5
 ///
 /// Always
 pub async fn invalid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
+    log::error!("invalid function call (should never happen)!");
     panic!("Invalid function call")
 }
 
@@ -166,7 +166,7 @@ pub async fn asc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
         return Ok(VariableValue::new_int(0));
     }
     let ch = c.chars().next().unwrap_or('\0');
-    if let Some(cp437) = UNICODE_TO_CP437.get(&ch) {
+    if let Some(cp437) = codepages::tables::UNICODE_TO_CP437.get(&ch) {
         return Ok(VariableValue::new_int(*cp437 as i32));
     }
     Ok(VariableValue::new_int(ch as i32))
@@ -650,9 +650,7 @@ pub async fn readline(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     let line = vm.eval_expr(&args[1]).await?.as_int();
     let file_name = vm.resolve_file(&file_name).await;
 
-    if let Ok(file) = fs::read(&file_name) {
-        let file = file.iter().map(|x| CP437_TO_UNICODE[*x as usize]).collect::<String>();
-
+    if let Ok(file) = read_with_encoding_detection(&file_name) {
         let line_text = file.lines().nth(line as usize - 1).unwrap_or_default();
         Ok(VariableValue::new_string(line_text.to_string()))
     } else {
@@ -853,8 +851,11 @@ pub async fn s2i(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     if src.is_empty() {
         return Ok(VariableValue::new_int(0));
     }
-    let i = i32::from_str_radix(&src, base as u32)?;
-    Ok(VariableValue::new_int(i))
+    if let Ok(i) = i32::from_str_radix(&src, base as u32) {
+        return Ok(VariableValue::new_int(i));
+    };
+    log::error!("s2i: invalid number: '{}' for base {}", src, base);
+    Ok(VariableValue::new_int(0))
 }
 pub async fn carrier(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.icy_board_state.get_bps()))

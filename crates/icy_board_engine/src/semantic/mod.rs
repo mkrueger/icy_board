@@ -1068,6 +1068,9 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
                             return res;
                         }
                         self.function_type_lookup.insert(start, SemanticInfo::PredefinedFunc(def.opcode));
+                        if let Expression::Identifier(id) = call.get_expression() {
+                            self.add_reference(ReferenceType::PredefinedFunc(def.opcode), VariableType::Function, id.get_identifier_token());
+                        }
                         return def.return_type;
                     }
                 }

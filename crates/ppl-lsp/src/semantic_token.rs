@@ -2,8 +2,9 @@ use icy_board_engine::{
     ast::{
         walk_binary_expression, walk_block_stmt, walk_for_stmt, walk_function_call_expression, walk_function_implementation, walk_if_stmt, walk_if_then_stmt,
         walk_let_stmt, walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation, walk_repeat_until_stmt, walk_select_stmt,
-        walk_while_do_stmt, walk_while_stmt, Ast, AstVisitor, Constant, ConstantExpression, IdentifierExpression, ParameterSpecifier,
+        walk_while_do_stmt, walk_while_stmt, Ast, AstVisitor, Constant, ConstantExpression, Expression, IdentifierExpression, ParameterSpecifier,
     },
+    executable::FunctionDefinition,
     parser::lexer::{Spanned, Token},
 };
 use tower_lsp::lsp_types::SemanticTokenType;
@@ -84,8 +85,14 @@ impl AstVisitor<()> for SemanticTokenVisitor {
 
     fn visit_function_call_expression(&mut self, call: &icy_board_engine::ast::FunctionCallExpression) {
         walk_function_call_expression(self, call);
-    }
 
+        if let Expression::Identifier(identifier) = call.get_expression() {
+            let predef = FunctionDefinition::get_function_definitions(identifier.get_identifier());
+            if predef.len() > 0 {
+                self.highlight_token(identifier.get_identifier_token(), SemanticTokenType::VARIABLE);
+            }
+        }
+    }
     fn visit_parens_expression(&mut self, parens: &icy_board_engine::ast::ParensExpression) {
         parens.get_expression().visit(self)
     }

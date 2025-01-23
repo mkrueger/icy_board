@@ -3,8 +3,8 @@ use std::path::PathBuf;
 
 use dashmap::DashMap;
 use i18n_embed_fl::fl;
-use icy_board_engine::ast::{walk_function_declaration, walk_function_implementation, Ast, AstVisitor};
-use icy_board_engine::executable::{OpCode, VariableType, LAST_PPLC};
+use icy_board_engine::ast::{walk_function_declaration, walk_function_implementation, walk_predefined_call_statement, Ast, AstVisitor, Expression};
+use icy_board_engine::executable::{FuncOpCode, FunctionDefinition, OpCode, VariableType, FUNCTION_DEFINITIONS, LAST_PPLC};
 use icy_board_engine::parser::{parse_ast, Encoding, UserTypeRegistry};
 use icy_board_engine::semantic::SemanticVisitor;
 use ppl_language_server::completion::get_completion;
@@ -118,8 +118,12 @@ impl LanguageServer for Backend {
     async fn did_save(&self, _: DidSaveTextDocumentParams) {
         self.client.log_message(MessageType::INFO, "file saved!").await;
     }
-    async fn did_close(&self, _: DidCloseTextDocumentParams) {
-        self.client.log_message(MessageType::INFO, "file closed!").await;
+    async fn did_close(&self, params: DidCloseTextDocumentParams) {
+        let uri = params.text_document.uri;
+
+        self.client.publish_diagnostics(uri.clone(), Vec::new(), None).await;
+        self.ast_map.remove(uri.as_str());
+        self.semantic_token_map.remove(uri.to_string().as_str());
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
@@ -448,13 +452,28 @@ impl AstVisitor<()> for TooltipVisitor {
         if function.get_return_type_token().span.contains(&self.offset) {
             self.tooltip = get_type_hover(function.get_return_type());
         }
-
         walk_function_implementation(self, function);
     }
 
     fn visit_predefined_call_statement(&mut self, call: &icy_board_engine::ast::PredefinedCallStatement) {
         if call.get_identifier_token().span.contains(&self.offset) {
             self.tooltip = get_statement_hover(call.get_func().opcode);
+        }
+        walk_predefined_call_statement(self, call);
+    }
+
+    fn visit_function_call_expression(&mut self, call: &icy_board_engine::ast::FunctionCallExpression) {
+        icy_board_engine::ast::walk_function_call_expression(self, call);
+        if let Expression::Identifier(identifier) = call.get_expression() {
+            if identifier.get_identifier_token().span.contains(&self.offset) {
+                let predef = FunctionDefinition::get_function_definitions(identifier.get_identifier());
+                for p in predef {
+                    if FUNCTION_DEFINITIONS[p].args as usize == call.get_arguments().len() {
+                        self.tooltip = get_function_hover(FUNCTION_DEFINITIONS[p].opcode);
+                        return;
+                    }
+                }
+            }
         }
     }
 }
@@ -736,4 +755,301 @@ fn get_hint(arg: String) -> Option<Hover> {
         }),
         range: None,
     })
+}
+
+fn get_function_hover(opcode: FuncOpCode) -> Option<Hover> {
+    match opcode {
+        FuncOpCode::LEN => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-len")),
+        FuncOpCode::LOWER => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-lower")),
+        FuncOpCode::UPPER => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-upper")),
+        FuncOpCode::MID => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-mid")),
+        FuncOpCode::LEFT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-left")),
+        FuncOpCode::RIGHT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-right")),
+        FuncOpCode::SPACE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-space")),
+        FuncOpCode::FERR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-ferr")),
+        FuncOpCode::CHR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-chr")),
+        FuncOpCode::ASC => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-asc")),
+        FuncOpCode::INSTR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-instr")),
+        FuncOpCode::ABORT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-abort")),
+        FuncOpCode::LTRIM => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-ltrim")),
+        FuncOpCode::RTRIM => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-rtrim")),
+        FuncOpCode::TRIM => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-trim")),
+        FuncOpCode::RANDOM => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-random")),
+        FuncOpCode::DATE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-date")),
+        FuncOpCode::TIME => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-time")),
+        FuncOpCode::U_NAME => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_name")),
+        FuncOpCode::U_LDATE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_ldate")),
+        FuncOpCode::U_LTIME => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_ltime")),
+        FuncOpCode::U_LDIR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_ldir")),
+        FuncOpCode::U_LOGONS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_logons")),
+        FuncOpCode::U_FUL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_ful")),
+        FuncOpCode::U_FDL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_fdl")),
+        FuncOpCode::U_BDLDAY => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_bdlday")),
+        FuncOpCode::U_TIMEON => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_timeon")),
+        FuncOpCode::U_BDL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_bdl")),
+        FuncOpCode::U_BUL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_bul")),
+        FuncOpCode::YEAR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-year")),
+        FuncOpCode::MONTH => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-month")),
+        FuncOpCode::DAY => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-day")),
+        FuncOpCode::DOW => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dow")),
+        FuncOpCode::HOUR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-hour")),
+        FuncOpCode::MIN => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-min")),
+        FuncOpCode::SEC => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-sec")),
+        FuncOpCode::TIMEAP => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-timeap")),
+        FuncOpCode::VER => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-ver")),
+        FuncOpCode::NOCHAR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-nochar")),
+        FuncOpCode::YESCHAR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-yeschar")),
+        FuncOpCode::STRIPATX => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-stripatx")),
+        FuncOpCode::REPLACE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-replace")),
+        FuncOpCode::STRIP => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-strip")),
+        FuncOpCode::INKEY => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-inkey")),
+        FuncOpCode::TOSTRING => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-tostring")),
+        FuncOpCode::MASK_PWD => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-mask_pwd")),
+        FuncOpCode::MASK_ALPHA => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-mask_alpha")),
+        FuncOpCode::MASK_NUM => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-mask_num")),
+        FuncOpCode::MASK_ALNUM => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-mask_alnum")),
+        FuncOpCode::MASK_FILE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-mask_file")),
+        FuncOpCode::MASK_PATH => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-mask_path")),
+        FuncOpCode::MASK_ASCII => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-mask_ascii")),
+        FuncOpCode::CURCONF => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-curconf")),
+        FuncOpCode::PCBDAT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-pcbdat")),
+        FuncOpCode::PPEPATH => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-ppepath")),
+        FuncOpCode::VALDATE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-valdate")),
+        FuncOpCode::VALTIME => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-valtime")),
+        FuncOpCode::U_MSGRD => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_msgrd")),
+        FuncOpCode::U_MSGWR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_msgwr")),
+        FuncOpCode::PCBNODE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-pcbnode")),
+        FuncOpCode::READLINE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-readline")),
+        FuncOpCode::SYSOPSEC => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-sysopsec")),
+        FuncOpCode::ONLOCAL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-onlocal")),
+        FuncOpCode::UN_STAT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-un_stat")),
+        FuncOpCode::UN_NAME => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-un_name")),
+        FuncOpCode::UN_CITY => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-un_city")),
+        FuncOpCode::UN_OPER => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-un_oper")),
+        FuncOpCode::CURSEC => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-cursec")),
+        FuncOpCode::GETTOKEN => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-gettoken")),
+        FuncOpCode::MINLEFT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-minleft")),
+        FuncOpCode::MINON => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-minon")),
+        FuncOpCode::GETENV => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-getenv")),
+        FuncOpCode::CALLID => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-callid")),
+        FuncOpCode::REGAL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regal")),
+        FuncOpCode::REGAH => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regah")),
+        FuncOpCode::REGBL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regbl")),
+        FuncOpCode::REGBH => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regbh")),
+        FuncOpCode::REGCL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regcl")),
+        FuncOpCode::REGCH => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regch")),
+        FuncOpCode::REGDL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regdl")),
+        FuncOpCode::REGDH => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regdh")),
+        FuncOpCode::REGAX => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regax")),
+        FuncOpCode::REGBX => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regbx")),
+        FuncOpCode::REGCX => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regcx")),
+        FuncOpCode::REGDX => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regdx")),
+        FuncOpCode::REGSI => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regsi")),
+        FuncOpCode::REGDI => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regdi")),
+        FuncOpCode::REGF => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regf")),
+        FuncOpCode::REGCF => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regcf")),
+        FuncOpCode::REGDS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-regds")),
+        FuncOpCode::REGES => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-reges")),
+        FuncOpCode::B2W => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-b2w")),
+        FuncOpCode::PEEKB => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-peekb")),
+        FuncOpCode::PEEKW => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-peekw")),
+        FuncOpCode::MKADDR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-mkaddr")),
+        FuncOpCode::EXIST => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-exist")),
+        FuncOpCode::I2S => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-i2s")),
+        FuncOpCode::S2I => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-s2i")),
+        FuncOpCode::CARRIER => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-carrier")),
+        FuncOpCode::TOKENSTR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-tokenstr")),
+        FuncOpCode::CDON => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-cdon")),
+        FuncOpCode::LANGEXT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-langext")),
+        FuncOpCode::ANSION => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-ansion")),
+        FuncOpCode::VALCC => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-valcc")),
+        FuncOpCode::FMTCC => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-fmtcc")),
+        FuncOpCode::CCTYPE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-cctype")),
+        FuncOpCode::GETX => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-getx")),
+        FuncOpCode::GETY => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-gety")),
+        FuncOpCode::BAND => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-band")),
+        FuncOpCode::BOR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-bor")),
+        FuncOpCode::BXOR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-bxor")),
+        FuncOpCode::BNOT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-bnot")),
+        FuncOpCode::U_PWDHIST => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_pwdhist")),
+        FuncOpCode::U_PWDLC => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_pwdlc")),
+        FuncOpCode::U_PWDTC => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_pwdtc")),
+        FuncOpCode::U_STAT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_stat")),
+        FuncOpCode::DEFCOLOR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-defcolor")),
+        FuncOpCode::ABS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-abs")),
+        FuncOpCode::GRAFMODE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-grafmode")),
+        FuncOpCode::PSA => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-psa")),
+        FuncOpCode::FILEINF => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-fileinf")),
+        FuncOpCode::PPENAME => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-ppename")),
+        FuncOpCode::MKDATE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-mkdate")),
+        FuncOpCode::CURCOLOR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-curcolor")),
+        FuncOpCode::KINKEY => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-kinkey")),
+        FuncOpCode::MINKEY => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-minkey")),
+        FuncOpCode::MAXNODE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-maxnode")),
+        FuncOpCode::SLPATH => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-slpath")),
+        FuncOpCode::HELPPATH => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-helppath")),
+        FuncOpCode::TEMPPATH => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-temppath")),
+        FuncOpCode::MODEM => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-modem")),
+        FuncOpCode::LOGGEDON => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-loggedon")),
+        FuncOpCode::CALLNUM => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-callnum")),
+        FuncOpCode::MGETBYTE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-mgetbyte")),
+        FuncOpCode::TOKCOUNT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-tokcount")),
+        FuncOpCode::U_RECNUM => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_recnum")),
+        FuncOpCode::U_INCONF => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_inconf")),
+        FuncOpCode::PEEKDW => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-peekdw")),
+        FuncOpCode::DBGLEVEL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dbglevel")),
+        FuncOpCode::SCRTEXT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-scrtext")),
+        FuncOpCode::SHOWSTAT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-showstat")),
+        FuncOpCode::PAGESTAT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-pagestat")),
+        FuncOpCode::REPLACESTR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-replacestr")),
+        FuncOpCode::STRIPSTR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-stripstr")),
+        FuncOpCode::TOBIGSTR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-tobigstr")),
+        FuncOpCode::TOBOOLEAN => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-toboolean")),
+        FuncOpCode::TOBYTE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-tobyte")),
+        FuncOpCode::TODATE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-todate")),
+        FuncOpCode::TODREAL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-todreal")),
+        FuncOpCode::TOEDATE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-toedate")),
+        FuncOpCode::TOINTEGER => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-tointeger")),
+        FuncOpCode::TOMONEY => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-tomoney")),
+        FuncOpCode::TOREAL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-toreal")),
+        FuncOpCode::TOSBYTE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-tosbyte")),
+        FuncOpCode::TOSWORD => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-tosword")),
+        FuncOpCode::TOTIME => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-totime")),
+        FuncOpCode::TOUNSIGNED => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-tounsigned")),
+        FuncOpCode::TOWORD => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-toword")),
+        FuncOpCode::MIXED => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-mixed")),
+        FuncOpCode::ALIAS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-alias")),
+        FuncOpCode::CONFREG => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-confreg")),
+        FuncOpCode::CONFEXP => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-confexp")),
+        FuncOpCode::CONFSEL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-confsel")),
+        FuncOpCode::CONFSYS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-confsys")),
+        FuncOpCode::CONFMW => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-confmw")),
+        FuncOpCode::LPRINTED => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-lprinted")),
+        FuncOpCode::ISNONSTOP => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-isnonstop")),
+        FuncOpCode::ERRCORRECT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-errcorrect")),
+        FuncOpCode::CONFALIAS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-confalias")),
+        FuncOpCode::USERALIAS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-useralias")),
+        FuncOpCode::CURUSER => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-curuser")),
+        FuncOpCode::U_LMR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-u_lmr")),
+        FuncOpCode::CHATSTAT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-chatstat")),
+        FuncOpCode::DEFANS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-defans")),
+        FuncOpCode::LASTANS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-lastans")),
+        FuncOpCode::MEGANUM => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-meganum")),
+        FuncOpCode::EVTTIMEADJ => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-evttimeadj")),
+        FuncOpCode::ISBITSET => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-isbitset")),
+        FuncOpCode::FMTREAL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-fmtreal")),
+        FuncOpCode::FLAGCNT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-flagcnt")),
+        FuncOpCode::KBDBUFSIZE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-kbdbufsize")),
+        FuncOpCode::PPLBUFSIZE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-pplbufsize")),
+        FuncOpCode::KBDFILUSED => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-kbdfilused")),
+        FuncOpCode::LOMSGNUM => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-lomsgnum")),
+        FuncOpCode::HIMSGNUM => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-himsgnum")),
+        FuncOpCode::DRIVESPACE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-drivespace")),
+        FuncOpCode::OUTBYTES => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-outbytes")),
+        FuncOpCode::HICONFNUM => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-hiconfnum")),
+        FuncOpCode::INBYTES => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-inbytes")),
+        FuncOpCode::CRC32 => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-crc32")),
+        FuncOpCode::PCBMAC => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-pcbmac")),
+        FuncOpCode::ACTMSGNUM => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-actmsgnum")),
+        FuncOpCode::STACKLEFT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-stackleft")),
+        FuncOpCode::STACKERR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-stackerr")),
+        FuncOpCode::DGETALIAS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dgetalias")),
+        FuncOpCode::DBOF => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dbof")),
+        FuncOpCode::DCHANGED => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dchanged")),
+        FuncOpCode::DDECIMALS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-ddecimals")),
+        FuncOpCode::DDELETED => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-ddeleted")),
+        FuncOpCode::DEOF => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-deof")),
+        FuncOpCode::DERR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-derr")),
+        FuncOpCode::DFIELDS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dfields")),
+        FuncOpCode::DLENGTH => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dlength")),
+        FuncOpCode::DNAME => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dname")),
+        FuncOpCode::DRECCOUNT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dreccount")),
+        FuncOpCode::DRECNO => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-drecno")),
+        FuncOpCode::DTYPE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dtype")),
+        FuncOpCode::FNEXT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-fnext")),
+        FuncOpCode::DNEXT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dnext")),
+        FuncOpCode::TODDATE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-toddate")),
+        FuncOpCode::DCLOSEALL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dcloseall")),
+        FuncOpCode::DOPEN => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dopen")),
+        FuncOpCode::DCLOSE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dclose")),
+        FuncOpCode::DSETALIAS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dsetalias")),
+        FuncOpCode::DPACK => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dpack")),
+        FuncOpCode::DLOCKF => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dlockf")),
+        FuncOpCode::DLOCK => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dlock")),
+        FuncOpCode::DLOCKR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dlockr")),
+        FuncOpCode::DUNLOCK => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dunlock")),
+        FuncOpCode::DNOPEN => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dnopen")),
+        FuncOpCode::DNCLOSE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dnclose")),
+        FuncOpCode::DNCLOSEALL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dncloseall")),
+        FuncOpCode::DNEW => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dnew")),
+        FuncOpCode::DADD => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dadd")),
+        FuncOpCode::DAPPEND => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dappend")),
+        FuncOpCode::DTOP => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dtop")),
+        FuncOpCode::DGO => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dgo")),
+        FuncOpCode::DBOTTOM => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dbottom")),
+        FuncOpCode::DSKIP => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dskip")),
+        FuncOpCode::DBLANK => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dblank")),
+        FuncOpCode::DDELETE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-ddelete")),
+        FuncOpCode::DRECALL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-drecall")),
+        FuncOpCode::DTAG => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dtag")),
+        FuncOpCode::DSEEK => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dseek")),
+        FuncOpCode::DFBLANK => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dfblank")),
+        FuncOpCode::DGET => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dget")),
+        FuncOpCode::DPUT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dput")),
+        FuncOpCode::DFCOPY => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dfcopy")),
+        FuncOpCode::DSELECT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dselect")),
+        FuncOpCode::DCHKSTAT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-dchkstat")),
+        FuncOpCode::PCBACCOUNT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-pcbaccount")),
+        FuncOpCode::PCBACCSTAT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-pcbaccstat")),
+        FuncOpCode::DERRMSG => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-derrmsg")),
+        FuncOpCode::ACCOUNT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-account")),
+        FuncOpCode::SCANMSGHDR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-scanmsghdr")),
+        FuncOpCode::CHECKRIP => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-checkrip")),
+        FuncOpCode::RIPVER => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-ripver")),
+        FuncOpCode::QWKLIMITS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-qwklimits")),
+        FuncOpCode::FINDFIRST => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-findfirst")),
+        FuncOpCode::FINDNEXT => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-findnext")),
+        FuncOpCode::USELMRS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-uselmrs")),
+        FuncOpCode::CONFINFO => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-confinfo")),
+        FuncOpCode::TINKEY => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-tinkey")),
+        FuncOpCode::CWD => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-cwd")),
+        FuncOpCode::INSTRR => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-instrr")),
+        FuncOpCode::FDORDAKA => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-fdordaka")),
+        FuncOpCode::FDORDORG => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-fdordorg")),
+        FuncOpCode::FDORDAREA => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-fdordarea")),
+        FuncOpCode::FDOQRD => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-fdoqrd")),
+        FuncOpCode::GETDRIVE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-getdrive")),
+        FuncOpCode::SETDRIVE => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-setdrive")),
+        FuncOpCode::BS2I => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-bs2i")),
+        FuncOpCode::BD2I => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-bd2i")),
+        FuncOpCode::I2BS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-i2bs")),
+        FuncOpCode::I2BD => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-i2bd")),
+        FuncOpCode::FTELL => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-ftell")),
+        FuncOpCode::OS => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-os")),
+        FuncOpCode::SHORT_DESC => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-short_desc")),
+        FuncOpCode::GetBankBal => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-getbankbal")),
+        FuncOpCode::GetMsgHdr => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-getmsghdr")),
+        FuncOpCode::SetMsgHdr => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-setmsghdr")),
+        FuncOpCode::MemberReference => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-memberreference")),
+        FuncOpCode::MemberCall => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-membercall")),
+        FuncOpCode::NewConfInfo => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-newconfinfo")),
+        _ => None,
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use icy_board_engine::executable::FUNCTION_DEFINITIONS;
+
+    #[test]
+    fn test_function_translations()
+    {
+        for f in &FUNCTION_DEFINITIONS  {
+            if f.args < 0 || f.args >= 0x10 {
+                continue;
+            }
+            super::get_function_hover(f.opcode).unwrap();
+        }
+    }
 }

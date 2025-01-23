@@ -152,6 +152,7 @@ export function activateInlayHints(ctx: ExtensionContext) {
 
   workspace.onDidChangeConfiguration(maybeUpdater.onConfigChange, maybeUpdater, ctx.subscriptions);
   workspace.onDidChangeTextDocument(maybeUpdater.onDidChangeTextDocument, maybeUpdater, ctx.subscriptions);
+  workspace.onDidCloseTextDocument(maybeUpdater.onConfigChange, maybeUpdater, ctx.subscriptions);
 
   maybeUpdater.onConfigChange().catch(console.error);
 }
