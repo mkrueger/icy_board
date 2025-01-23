@@ -1,401 +1,405 @@
-; AnsiGal v0.1
-; (C)opyright 2019 by Philipp Giebel <stimpy@kuehlbox.wtf>
-;
-; Licensed under MIT License:
-; https://opensource.org/licenses/MIT
-;
-; Repository:
-; https://gitlab.ambhost.net/stimpy/ppe_ansigal
-;
-; See README.md for more information...
-;
+DECLARE PROCEDURE PROC001()
+DECLARE PROCEDURE PROC002(INTEGER PAR001, INTEGER PAR002)
+DECLARE PROCEDURE PROC003(STRING PAR003)
+DECLARE PROCEDURE PROC004(INTEGER PAR004)
+DECLARE PROCEDURE PROC005(INTEGER PAR005, INTEGER PAR006, STRING PAR007, STRING PAR008)
+DECLARE PROCEDURE PROC006(STRING PAR009)
+DECLARE PROCEDURE PROC007(STRING PAR010)
+DECLARE PROCEDURE PROC008(INTEGER PAR011)
+DECLARE FUNCTION FUNC001(STRING PAR012) BOOLEAN
+INTEGER INT001
+INTEGER INT002
+INTEGER INT003
+INTEGER INT004
+INTEGER INT005
+STRING STR001
+STRING STR002(99)
+STRING STR003
+STRING STR004
+STRING STR005
+STRING STR006
+STRING STR007
+BOOLEAN BOOL001
+    PROC001()
+    PROC007(STR001)
+    CLS 
+    ANSIPOS 1, 1
+    PRINT "@POFF@"
+    DISPFILE PPEPATH() + "ansigal.pcb", 0
+    PROC002(1, 1)
+    PROC004(1)
+    END 
 
-declare procedure ReadConfig()
-declare procedure DrawFiles( integer folder, integer lstart )
-declare procedure ReadFiles( string folder )
-declare procedure LightBarFiles( integer folder )
-declare procedure PrintLBLine( integer xpos, integer ypos, string col, string line )
-declare procedure AnsiViewer( string ansifile )
-declare procedure ReadFolders( string folder )
-declare procedure ClearList( integer start )
-declare function BlackList( string filename ) boolean
+FUNCTION FUNC001(STRING PAR012) BOOLEAN
+    STRING LOC021
+    FUNC001 = FALSE
+    LOC021 = RIGHT(UPPER(PAR012), 3)
+    IF (LOC021 = "EXE") THEN
+        FUNC001 = TRUE
+    ELSEIF (LOC021 = "COM") THEN
+        FUNC001 = TRUE
+    ELSEIF (LOC021 = "BAT") THEN
+        FUNC001 = TRUE
+    ELSEIF (LOC021 = "ZIP") THEN
+        FUNC001 = TRUE
+    ELSEIF (LOC021 = "RAR") THEN
+        FUNC001 = TRUE
+    ELSEIF (LOC021 = "ARJ") THEN
+        FUNC001 = TRUE
+    ELSEIF (LOC021 = "BZ2") THEN
+        FUNC001 = TRUE
+    ELSEIF (LOC021 = "TAR") THEN
+        FUNC001 = TRUE
+    ELSEIF (LOC021 = "MOD") THEN
+        FUNC001 = TRUE
+    ELSEIF (LOC021 = "SM3") THEN
+        FUNC001 = TRUE
+    ELSEIF (LOC021 = "BIN") THEN
+        FUNC001 = TRUE
+    ENDIF
 
-integer xpos
-integer ypos
-integer width
-integer height
-integer fnum
-string bp
-string found
-string files(99)
-string hlcol
-string locol
-string viewer
-string cfolder
-string lfolder
-boolean ftype
+ENDFUNC
 
-begin
-  ReadConfig()
-  ReadFolders( bp )
-  cls
-  AnsiPos 1, 1
-  print "@POFF@"
-  DispFile PPEPath() + "ansigal.pcb", DEFS
-  DrawFiles( 1, 1 )
-  LightBarFiles( 1 )
-end
+PROCEDURE PROC006(STRING PAR009)
+    IF (UPPER(STR005) = "NONE") THEN
+        ANSIPOS 1, 1
+        PRINT "@X07"
+        CLS 
+        DISPFILE PAR009, GRAPH
+        WAIT 
+    ELSE
+        PRINT "@POFF@@X07"
+        CLS 
+        DISPSTR "!" + STR005 + " " + PAR009
+        WAIT 
+    ENDIF
 
-function BlackList( string filename ) boolean
-begin
-  string ext
-  
-  BlackList = 0
-  ext = right( Upper( filename ), 3 )
-  Select Case ext
-    case "EXE"
-      BlackList = 1
-    case "COM"
-      BlackList = 1
-    case "BAT"
-      BlackList = 1
-    case "ZIP"
-      BlackList = 1
-    case "RAR"
-      BlackList = 1
-    case "ARJ"
-      BlackList = 1
-    case "BZ2"
-      BlackList = 1
-    case "TAR"
-      BlackList = 1
-    case "MOD"
-      BlackList = 1
-    case "SM3"
-      BlackList = 1
-    case "BIN"
-      BlackList = 1
-  end select
-endfunc
+ENDPROC
 
-procedure AnsiViewer( string ansifile )
-begin
-  if ( Upper( viewer ) == "NONE" ) then
-    AnsiPos 1,1
-    print "@X07"
-    cls
-    DispFile ansifile, GRAPH
-    Wait
-  else
-    print "@POFF@@X07"
-    cls
-    DispStr "!"+ viewer +" "+ansifile
-    Wait
-  endif
-endproc
+PROCEDURE PROC005(INTEGER PAR005, INTEGER PAR006, STRING PAR007, STRING PAR008)
+    ANSIPOS PAR005, PAR006
+    PRINT PAR007 + " " + PAR008
+    PRINT SPACE(INT003 - LEN(PAR008) - 1)
+    IF (PAR007 <> STR004) PRINT STR004
 
-procedure PrintLBLine( integer xpos, integer ypos, string col, string line )
-begin
-  ansipos xpos, ypos
-  print col +" "+ line
-  print space( width - len( line ) - 1 )
-  if ( col != locol ) print locol
-endproc
+ENDPROC
 
-procedure LightBarFiles( integer folder )
-begin
-  integer pos
-  integer opos
-  integer lpos
-  integer olpos
-  integer lstart
-  integer olstart
-  boolean finished
-  boolean keypress
-  string key
-  
-  pos = 1
-  opos = 1
-  lpos = 1
-  olpos = 1
-  lstart = 1
-  olstart = 1
-  finished = 0
-  keypress = 1
+PROCEDURE PROC004(INTEGER PAR004)
+    INTEGER LOC008
+    INTEGER LOC009
+    INTEGER LOC010
+    INTEGER LOC011
+    INTEGER LOC012
+    INTEGER LOC013
+    BOOLEAN LOC014
+    BOOLEAN LOC015
+    STRING LOC016
+    LOC008 = 1
+    LOC009 = 1
+    LOC010 = 1
+    LOC011 = 1
+    LOC012 = 1
+    LOC013 = 1
+    LOC014 = FALSE
+    LOC015 = TRUE
+    WHILE (!LOC014) DO
+        LOC016 = UPPER(INKEY())
+        IF (LOC016 = "HOME" | LOC016 = "H" | LOC016 = "1") THEN
+            LOC009 = LOC008
+            LOC008 = 1
+            LOC011 = LOC010
+            LOC010 = 1
+            LOC012 = 1
+            LOC015 = TRUE
+        ELSEIF (LOC016 = "END" | LOC016 = "E") THEN
+            LOC009 = LOC008
+            LOC008 = INT005
+            IF (INT004 > INT005) THEN
+                LOC011 = LOC010
+                LOC010 = INT005
+                LOC012 = 1
+            ELSE
+                LOC010 = INT004
+                LOC011 = INT004
+                LOC012 = INT005 - INT004 + 1
+            ENDIF
 
-  while ( !finished ) do
-    key = Upper( InKey() )
-   
-    select case ( key )
-      case "HOME", "H", "1"
-	    opos = pos
-        pos = 1
-        olpos = lpos
-        lpos = 1
-        lstart = 1
-        keypress = 1
-      case "END", "E"
-	    opos = pos
-        pos = fnum
-		if ( height > fnum ) then
-		  olpos = lpos
-		  lpos = fnum
-		  lstart = 1
-		else
-          lpos = height
-          olpos = height
-		  lstart = fnum-height+1
-		endif 
-        keypress = 1
-      case "PGUP", "-", "[", "LEFT", "4"
-        if ( lpos > 1 ) then
-          pos = pos-lpos+1
-          lpos = 1
-        else
-          if ( pos-height > 1 ) then
-            pos = pos-height
-          else
-            pos = 1
-          endif
-          if ( lstart-height > 1 ) then
-            lstart = lstart - height
-          else
-            lstart = 1
-          endif
-        endif
-        keypress = 1
-      case "PGDN", "+", "]", "RIGHT", "6"
-        if ( lpos < height ) then
-          pos = pos+height-lpos
-          lpos = height
-        else
-          if ( pos+height < fnum ) then
-            pos = pos+height
-          else
-            pos = fnum
-          endif
-          if ( lstart+height <= fnum-height ) then
-            lstart = lstart + height
-          else
-            lstart = fnum-height+1
-          endif
-        endif
-        keypress = 1
-      case "UP", "8"
-        if ( pos > 1 ) then
-          Dec pos
-          if ( lpos > 1 ) Dec lpos
-          if ( pos < lstart ) Dec lstart
-        else
-          opos = pos
-          pos = fnum
-          if ( height > pos ) then
-            lpos = pos
-          else
-            lpos = height
-          endif
-          lstart = fnum-height+1
-          if ( lstart < 0 ) lstart = 1
-        endif
-        keypress = 1
-      case "DOWN", "2"
-        if ( pos < fnum ) then
-          Inc pos
-          if ( pos > height ) then
-            if ( lpos == height ) Inc lstart
-          endif
-          if ( lpos < height ) Inc lpos
-        else
-          opos = pos
-          pos = 1
-          lstart = 1
-          lpos = 1
-        endif
-        keypress = 1
-      case chr(13)
-        finished = 1
-      case chr(27)
-        finished = 1
-        pos = 0
-    end select
+            LOC015 = TRUE
+        ELSEIF (LOC016 = "PGUP" | LOC016 = "-" | LOC016 = "[" | LOC016 = "LEFT" | LOC016 = "4") THEN
+            IF (LOC010 > 1) THEN
+                LOC008 = LOC008 - LOC010 + 1
+                LOC010 = 1
+            ELSE
+                IF (LOC008 - INT004 > 1) THEN
+                    LOC008 = LOC008 - INT004
+                ELSE
+                    LOC008 = 1
+                ENDIF
 
-    if ( olstart <> lstart ) then
-      DrawFiles( folder, lstart )
-      olstart = lstart
-    endif
-    
-    if ( keypress ) then
-      PrintLBLine( xpos, ypos+lpos-1, hlcol, files(pos) )
-      keypress = 0
-    endif
-    if ( opos <> pos ) then
-      if ( olpos < height ) then
-        if ( olpos > 0 ) then
-          PrintLBLine( xpos, ypos+olpos-1, locol, files(opos) )
-        elseif ( lpos == 2 ) then
-          PrintLBLine( xpos, ypos+olpos-1, locol, files(opos) )
-        elseif ( lpos == height ) then
-          PrintLBLine( xpos, ypos+olpos-1, locol, files(opos) )
-        endif
-      elseif ( lpos == height-1 ) then
-        PrintLBLine( xpos, ypos+olpos-1, locol, files(opos) )
-      elseif ( lpos == 1 ) then
-        PrintLBLine( xpos, ypos+olpos-1, locol, files(opos) )
-      endif
-      olpos = lpos
-      opos = pos
-    endif
-  endwhile
-  ansipos 1,23
-  if ( pos > 0 ) then
-    if ( ftype == 0 ) then
-	  if ( exist( cfolder + files(pos)+"dir.lst" ) ) then
-	    ReadFolders( bp + files(pos) )
-	  elseif ( files(pos) == ".." ) then
-	    ReadFolders( lfolder )
-	  else
-	    ReadFiles( cfolder + files(pos) )  
-	  endif
-	  DrawFiles( pos, 1 )
-	  LightBarFiles( pos )
-	else
-      if ( files(pos) == ".." ) then
-	    ReadFolders( lfolder )
-		lfolder = bp
-	    DrawFiles( pos, 1 )
-	    LightBarFiles( pos )
-      else
-        AnsiViewer( cfolder + files(pos) )
-        print "@X07"
-        cls
-        DispFile PPEPath() + "ansigal.pcb", DEFS
-        DrawFiles( folder, 1 )
-        LightBarFiles( folder )
-	  endif
-	endif
-  else
-    cfolder = lfolder
-    pos = 1
-    lpos = 1
-  endif
-endproc
+                IF (LOC012 - INT004 > 1) THEN
+                    LOC012 = LOC012 - INT004
+                    GOTO LABEL001
+                ENDIF
 
-procedure DrawFiles( integer folder, integer lstart )
-begin
-  integer c
-  integer l
-  boolean runit
-  
-  l = lstart
-  c = 1
-  runit = 1
+                LOC012 = 1
+            ENDIF
 
-  while ( runit ) do
-    if ( files(l) != "" ) then
-      if ( c <= height ) then
-        ansipos xpos, ypos-1+c
-        print locol +" "+ files(l)
-        print space( width - len( StripAtX( files(l) ) )-1 )
-        inc c
-        inc l
-      else
-        runit = 0
-      endif
-    else
-      runit = 0
-    endif
-  endwhile
-  ClearList( c )  
-endproc
+:LABEL001
+            LOC015 = TRUE
+        ELSEIF (LOC016 = "PGDN" | LOC016 = "+" | LOC016 = "]" | LOC016 = "RIGHT" | LOC016 = "6") THEN
+            IF (LOC010 < INT004) THEN
+                LOC008 = LOC008 + INT004 - LOC010
+                LOC010 = INT004
+            ELSE
+                IF (LOC008 + INT004 < INT005) THEN
+                    LOC008 = LOC008 + INT004
+                ELSE
+                    LOC008 = INT005
+                ENDIF
 
-procedure ReadFiles( string folder )
-begin
-  boolean runit
-  integer c
-  lfolder = cfolder
-  cfolder = folder  
-  runit = 1
-  c = 2
-  ftype = 1
-  files(1) = ".."
-  files(c) = FindFirst( folder +"*.*" )
-  while ( runit ) do
-    if ( BlackList( files(c) ) == 0 ) inc c
-    files(c) = FindNext()
-    if ( files(c) == "" ) runit = 0
-  endwhile
-  fnum = c-1
-endproc
+                IF (LOC012 + INT004 <= INT005 - INT004) THEN
+                    LOC012 = LOC012 + INT004
+                    GOTO LABEL002
+                ENDIF
 
-procedure ClearList( integer start )
-begin
-  integer i
-  for i = start to height
-    ansipos xpos, ypos-1+i
-    print locol+space( width )
-  next
-endproc
+                LOC012 = INT005 - INT004 + 1
+            ENDIF
 
-procedure ReadFolders( string folder )
-begin
-  integer c
-  integer l
-  boolean runit
+:LABEL002
+            LOC015 = TRUE
+        ELSEIF (LOC016 = "UP" | LOC016 = "8") THEN
+            IF (LOC008 > 1) THEN
+                DEC LOC008
+                IF (LOC010 > 1) DEC LOC010
 
-  ftype = 0
-  runit = 1
-  lfolder = cfolder
-  cfolder = folder
-  c = 1
-  if ( bp != folder ) then
-    files(1) = ".."
-    c = 2
-  endif
+                IF (LOC008 < LOC012) DEC LOC012
 
-  if ( exist( folder +"dir.lst" ) ) then
-    while ( runit ) do
-      files(c) = trim( left( readline( folder +"dir.lst", c ), 12 ), " " )
-      if ( files(c) == "" ) then
-        runit = 0
-      else
-        if ( right( files(c), 1 ) != "\" ) files(c) = files(c) +"\"
-        Inc c
-      endif
-    endwhile
-    fnum = c-1
-  else
-    files(1) = "Error"
-    fnum = 1
-  endif
-endproc
+            ELSE
+                LOC009 = LOC008
+                LOC008 = INT005
+                IF (INT004 > LOC008) THEN
+                    LOC010 = LOC008
+                ELSE
+                    LOC010 = INT004
+                ENDIF
 
-procedure ReadConfig()
-begin
-  integer c
-  integer l
-  
-  c = 1
-  l = 8
-  xpos = 50
-  ypos = 4
-  width = 20
-  height = 5
-  locol = "@X70"
-  hlcol = "@X1F"
-  viewer = "NONE"
-  bp = PPEPath()+"gallery"
-  cfolder = bp
-  lfolder = bp
-  
-  if ( exist( PPEPath()+"ansigal.cfg" ) ) then
-    xpos = s2i( trim( left( readline( PPEPath()+"ansigal.cfg", 1 ), 2 ), " " ), 10 )
-    ypos = s2i( trim( left( readline( PPEPath()+"ansigal.cfg", 2 ), 2 ), " " ), 10 )
-    width = s2i( trim( left( readline( PPEPath()+"ansigal.cfg", 3 ), 2 ), " " ), 10 )
-    height = s2i( trim( left( readline( PPEPath()+"ansigal.cfg", 4 ), 2 ), " " ), 10 )
-    locol = trim( left( readline( PPEPath()+"ansigal.cfg", 5 ), 4 ), " " )
-    hlcol = trim( left( readline( PPEPath()+"ansigal.cfg", 6 ), 4 ), " " )
-    viewer = trim( left( readline( PPEPath()+"ansigal.cfg", 7 ), 46 ), " " )
-    bp = trim( left( readline( PPEPath()+"ansigal.cfg", 8 ), 46 ), " " )
-    if ( right( bp, 1 ) != "\" ) bp = bp + "\"
-  endif
-endproc
+                LOC012 = INT005 - INT004 + 1
+                IF (LOC012 < 0) LOC012 = 1
+
+            ENDIF
+
+            LOC015 = TRUE
+        ELSEIF (LOC016 = "DOWN" | LOC016 = "2") THEN
+            IF (LOC008 < INT005) THEN
+                INC LOC008
+                IF (LOC008 > INT004) THEN
+                    IF (LOC010 = INT004) INC LOC012
+
+                ENDIF
+
+                IF (LOC010 < INT004) INC LOC010
+
+            ELSE
+                LOC009 = LOC008
+                LOC008 = 1
+                LOC012 = 1
+                LOC010 = 1
+            ENDIF
+
+            LOC015 = TRUE
+        ELSEIF (LOC016 = CHR(13)) THEN
+            LOC014 = TRUE
+        ELSEIF (LOC016 = CHR(27)) THEN
+            LOC014 = TRUE
+            LOC008 = 0
+        ENDIF
+
+        IF (LOC013 <> LOC012) THEN
+            PROC002(PAR004, LOC012)
+            LOC013 = LOC012
+        ENDIF
+
+        IF (LOC015) THEN
+            PROC005(INT001, INT002 + LOC010 - 1, STR003, STR002[LOC008])
+            LOC015 = FALSE
+        ENDIF
+
+        IF (LOC009 <> LOC008) THEN
+            IF (LOC011 < INT004) THEN
+                IF (LOC011 > 0) THEN
+                    PROC005(INT001, INT002 + LOC011 - 1, STR004, STR002[LOC009])
+                ELSEIF (LOC010 = 2) THEN
+                    PROC005(INT001, INT002 + LOC011 - 1, STR004, STR002[LOC009])
+                ELSEIF (LOC010 = INT004) THEN
+                    PROC005(INT001, INT002 + LOC011 - 1, STR004, STR002[LOC009])
+                ENDIF
+
+            ELSEIF (LOC010 = INT004 - 1) THEN
+                PROC005(INT001, INT002 + LOC011 - 1, STR004, STR002[LOC009])
+            ELSEIF (LOC010 = 1) THEN
+                PROC005(INT001, INT002 + LOC011 - 1, STR004, STR002[LOC009])
+            ENDIF
+
+            LOC011 = LOC010
+            LOC009 = LOC008
+        ENDIF
+
+    ENDWHILE
+
+    ANSIPOS 1, 23
+    IF (LOC008 > 0) THEN
+        IF (BOOL001 = 0) THEN
+            IF (EXIST(STR006 + STR002[LOC008] + "dir.lst")) THEN
+                PROC007(STR001 + STR002[LOC008])
+            ELSEIF (STR002[LOC008] = "..") THEN
+                PROC007(STR007)
+            ELSE
+                PROC003(STR006 + STR002[LOC008])
+            ENDIF
+
+            PROC002(LOC008, 1)
+            PROC004(LOC008)
+        ELSEIF (STR002[LOC008] = "..") THEN
+            PROC007(STR007)
+            STR007 = STR001
+            PROC002(LOC008, 1)
+            PROC004(LOC008)
+        ELSE
+            PROC006(STR006 + STR002[LOC008])
+            PRINT "@X07"
+            CLS 
+            DISPFILE PPEPATH() + "ansigal.pcb", 0
+            PROC002(PAR004, 1)
+            PROC004(PAR004)
+        ENDIF
+
+    ELSE
+        STR006 = STR007
+        LOC008 = 1
+        LOC010 = 1
+    ENDIF
+
+ENDPROC
+
+PROCEDURE PROC002(INTEGER PAR001, INTEGER PAR002)
+    INTEGER LOC003
+    INTEGER LOC004
+    BOOLEAN LOC005
+    LOC004 = PAR002
+    LOC003 = 1
+    LOC005 = TRUE
+    WHILE (LOC005) DO
+        IF (STR002[LOC004] <> "") THEN
+            IF (LOC003 <= INT004) THEN
+                ANSIPOS INT001, INT002 - 1 + LOC003
+                PRINT STR004 + " " + STR002[LOC004]
+                PRINT SPACE(INT003 - LEN(STRIPATX(STR002[LOC004])) - 1)
+                INC LOC003
+                INC LOC004
+            ELSE
+                LOC005 = FALSE
+            ENDIF
+
+        ELSE
+            LOC005 = FALSE
+        ENDIF
+
+    ENDWHILE
+
+    PROC008(LOC003)
+ENDPROC
+
+PROCEDURE PROC003(STRING PAR003)
+    BOOLEAN LOC006
+    INTEGER LOC007
+    STR007 = STR006
+    STR006 = PAR003
+    LOC006 = TRUE
+    LOC007 = 2
+    BOOL001 = TRUE
+    STR002(1) = ".."
+    STR002(LOC007) = FINDFIRST(PAR003 + "*.*")
+    WHILE (LOC006) DO
+        IF (FUNC001(STR002[LOC007]) = 0) INC LOC007
+
+        STR002(LOC007) = FINDNEXT()
+        IF (STR002[LOC007] = "") LOC006 = FALSE
+
+    ENDWHILE
+
+    INT005 = LOC007 - 1
+ENDPROC
+
+PROCEDURE PROC008(INTEGER PAR011)
+    INTEGER i
+    FOR i = PAR011 TO INT004 
+        ANSIPOS INT001, INT002 - 1 + i
+        PRINT STR004 + SPACE(INT003)
+    NEXT
+
+ENDPROC
+
+PROCEDURE PROC007(STRING PAR010)
+    INTEGER LOC017
+    INTEGER LOC018
+    BOOLEAN LOC019
+    BOOL001 = FALSE
+    LOC019 = TRUE
+    STR007 = STR006
+    STR006 = PAR010
+    LOC017 = 1
+    IF (STR001 <> PAR010) THEN
+        STR002(1) = ".."
+        LOC017 = 2
+    ENDIF
+
+    IF (EXIST(PAR010 + "dir.lst")) THEN
+        WHILE (LOC019) DO
+            STR002(LOC017) = TRIM(LEFT(READLINE(PAR010 + "dir.lst", LOC017), 12), " ")
+            IF (STR002[LOC017] = "") THEN
+                LOC019 = FALSE
+            ELSE
+                IF (RIGHT(STR002[LOC017], 1) <> "\") STR002(LOC017) = STR002[LOC017] + "\"
+
+                INC LOC017
+            ENDIF
+
+        ENDWHILE
+
+        INT005 = LOC017 - 1
+    ELSE
+        STR002(1) = "Error"
+        INT005 = 1
+    ENDIF
+
+ENDPROC
+
+PROCEDURE PROC001()
+    INTEGER LOC001
+    INTEGER LOC002
+    LOC001 = 1
+    LOC002 = 8
+    INT001 = 50
+    INT002 = 4
+    INT003 = 20
+    INT004 = 5
+    STR004 = "@X70"
+    STR003 = "@X1F"
+    STR005 = "NONE"
+    STR001 = PPEPATH() + "gallery"
+    STR006 = STR001
+    STR007 = STR001
+    IF (EXIST(PPEPATH() + "ansigal.cfg")) THEN
+        INT001 = S2I(TRIM(LEFT(READLINE(PPEPATH() + "ansigal.cfg", 1), 2), " "), 10)
+        INT002 = S2I(TRIM(LEFT(READLINE(PPEPATH() + "ansigal.cfg", 2), 2), " "), 10)
+        INT003 = S2I(TRIM(LEFT(READLINE(PPEPATH() + "ansigal.cfg", 3), 2), " "), 10)
+        INT004 = S2I(TRIM(LEFT(READLINE(PPEPATH() + "ansigal.cfg", 4), 2), " "), 10)
+        STR004 = TRIM(LEFT(READLINE(PPEPATH() + "ansigal.cfg", 5), 4), " ")
+        STR003 = TRIM(LEFT(READLINE(PPEPATH() + "ansigal.cfg", 6), 4), " ")
+        STR005 = TRIM(LEFT(READLINE(PPEPATH() + "ansigal.cfg", 7), 46), " ")
+        STR001 = TRIM(LEFT(READLINE(PPEPATH() + "ansigal.cfg", 8), 46), " ")
+        IF (RIGHT(STR001, 1) <> "\") STR001 = STR001 + "\"
+
+    ENDIF
+
+ENDPROC

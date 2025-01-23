@@ -61,13 +61,13 @@ pub enum DeserializationErrorType {
 
     #[error("Invalid statement signature.")]
     InvalidStatementSignature,
-    
+
     #[error("Invalid let target expression ({0:04X})")]
     LetTargetInvalid(usize),
-    
+
     #[error("Invalid let value expression ({0:04X})")]
     LetValueInvalid(usize),
-    
+
     #[error("Invalid if condition expression ({0:04X})")]
     IfConditionInvalid(usize),
 }

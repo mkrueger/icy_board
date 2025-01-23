@@ -591,8 +591,8 @@ impl<'a> SemanticVisitor<'a> {
             log::error!("Invalid label token {:?}", label_token);
             return;
         };
-        
-        // begin is a pseudo label 
+
+        // begin is a pseudo label
         if *identifier == "~BEGIN~" {
             return;
         }

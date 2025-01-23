@@ -21,9 +21,8 @@ fn decrypt2(block: &mut [u8]) {
     let size = block.len() as i32;
     let mut seed = 0xDB24;
     let mut rotate_count = 0;
-    println!("size:{}", size);
     unsafe {
-        let mut p =  block.as_mut_ptr() as *mut u16;
+        let mut p = block.as_mut_ptr() as *mut u16;
         let mut x = size >> 1;
         while x > 0 {
             let mut dx = (x & 0xFF) as u16;
@@ -33,7 +32,7 @@ fn decrypt2(block: &mut [u8]) {
             let tmp = p.read_unaligned();
             p.write_unaligned(u16::rotate_right(tmp, rotate_count as u32) ^ seed ^ dx);
             seed = tmp;
-            x-=1;
+            x -= 1;
             p = p.add(1);
         }
     }
@@ -161,7 +160,7 @@ pub fn decode_rle(src: &[u8]) -> Vec<u8> {
     result
 }
 
-const CHUNK_SIZE: usize = 2027;
+const CHUNK_SIZE: usize = 2047;
 
 pub fn encrypt_chunks(buffer: &mut [u8], version: u16, use_rle: bool) {
     let mut offset: usize = 0;
@@ -180,7 +179,6 @@ pub fn encrypt_chunks(buffer: &mut [u8], version: u16, use_rle: bool) {
 pub fn decrypt_chunks(buffer: &mut [u8], version: u16, use_rle: bool) {
     let code_data_len = buffer.len();
     let mut offset = 0;
-    println!("decrypt:{}", version);
     while offset < code_data_len {
         let end = (offset + CHUNK_SIZE).min(code_data_len);
         let chunk = &mut buffer[offset..end];
