@@ -591,6 +591,12 @@ impl<'a> SemanticVisitor<'a> {
             log::error!("Invalid label token {:?}", label_token);
             return;
         };
+        
+        // begin is a pseudo label 
+        if *identifier == "~BEGIN~" {
+            return;
+        }
+
         let idx = if let Some(idx) = self.label_lookup_table.get_mut(identifier) {
             for r in &mut self.references {
                 if r.0 == ReferenceType::Label(*idx) && r.1.declaration.is_some() {
