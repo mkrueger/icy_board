@@ -746,41 +746,46 @@ impl<'a> VirtualMachine<'a> {
 /// .
 /// # Errors
 pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn PCBoardIO, icy_board_state: &mut IcyBoardState) -> Res<bool> {
-    let Ok(script) = PPEScript::from_ppe_file(prg) else {
-        return Ok(false);
-    };
-    let mut label_table = HashMap::new();
-    for (i, stmt) in script.statements.iter().enumerate() {
-        label_table.insert(stmt.span.start * 2, i);
+    match PPEScript::from_ppe_file(prg) {
+        Ok(script) => {
+            let mut label_table = HashMap::new();
+            for (i, stmt) in script.statements.iter().enumerate() {
+                label_table.insert(stmt.span.start * 2, i);
+            }
+            let file_name = file_name.as_ref().to_path_buf();
+            let reg = UserTypeRegistry::icy_board_registry();
+            log::info!("Run PPE {}", file_name.display());
+
+            let mut vm = VirtualMachine {
+                file_name,
+                type_registry: &reg,
+                return_addresses: Vec::new(),
+                script,
+                io,
+                is_running: true,
+                fpclear: false,
+                icy_board_state,
+                pcb_node: None,
+                variable_table: prg.variable_table.clone(),
+                cur_ptr: 0,
+                label_table,
+                call_local_value_stack: Vec::new(),
+                write_back_stack: Vec::new(),
+                push_pop_stack: Vec::new(),
+                user_data: Vec::new(),
+                stored_screen: None,
+                fd_default_in: 0,
+                fd_default_out: 0,
+            };
+
+            vm.run().await?;
+            Ok(true)
+        }
+        Err(e) => {
+            log::error!("Error loading PPE file '{}': {}", file_name.as_ref().display(), e);
+            Err(Box::new(VMError::InternalVMError))
+        }
     }
-    let file_name = file_name.as_ref().to_path_buf();
-    let reg = UserTypeRegistry::icy_board_registry();
-    log::info!("Run PPE {}", file_name.display());
-
-    let mut vm = VirtualMachine {
-        file_name,
-        type_registry: &reg,
-        return_addresses: Vec::new(),
-        script,
-        io,
-        is_running: true,
-        fpclear: false,
-        icy_board_state,
-        pcb_node: None,
-        variable_table: prg.variable_table.clone(),
-        cur_ptr: 0,
-        label_table,
-        call_local_value_stack: Vec::new(),
-        write_back_stack: Vec::new(),
-        push_pop_stack: Vec::new(),
-        user_data: Vec::new(),
-        stored_screen: None,
-        fd_default_in: 0,
-        fd_default_out: 0,
-    };
-
-    vm.run().await?;
-    Ok(true)
 }
 
 pub const U_EXPERT: usize = 1;

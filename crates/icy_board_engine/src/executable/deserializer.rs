@@ -58,6 +58,18 @@ pub enum DeserializationErrorType {
 
     #[error("Invalid dimensonized expression ({0:04X}:{1:02X})")]
     InvalidDimensonizedExpression(i16, i16),
+
+    #[error("Invalid statement signature.")]
+    InvalidStatementSignature,
+    
+    #[error("Invalid let target expression ({0:04X})")]
+    LetTargetInvalid(usize),
+    
+    #[error("Invalid let value expression ({0:04X})")]
+    LetValueInvalid(usize),
+    
+    #[error("Invalid if condition expression ({0:04X})")]
+    IfConditionInvalid(usize),
 }
 
 #[derive(Default)]
@@ -97,7 +109,7 @@ impl PPEDeserializer {
         }
         if !(0..LAST_STMT).contains(&cur_stmt) {
             self.report_bug(DeserializationErrorType::InvalidStatement(cur_stmt));
-            return Ok(None);
+            return Err(DeserializationErrorType::InvalidStatement(cur_stmt));
         }
 
         let op: OpCode = unsafe { transmute(cur_stmt) };
@@ -110,17 +122,17 @@ impl PPEDeserializer {
             OpCode::STOP => Ok(Some(PPECommand::Stop)),
             OpCode::LET => {
                 let Some(target) = self.read_variable_expression(executable) else {
-                    return Ok(None);
+                    return Err(DeserializationErrorType::LetTargetInvalid(self.offset));
                 };
                 let Some(value) = self.deserialize_expression(executable)? else {
-                    return Ok(None);
+                    return Err(DeserializationErrorType::LetValueInvalid(self.offset));
                 };
 
                 Ok(Some(PPECommand::Let(Box::new(target), Box::new(value))))
             }
             OpCode::IFNOT => {
                 let Some(expr) = self.deserialize_expression(executable)? else {
-                    return Ok(None);
+                    return Err(DeserializationErrorType::IfConditionInvalid(self.offset));
                 };
                 let label = executable.script_buffer[self.offset] as usize;
                 self.offset += 1;
@@ -166,7 +178,7 @@ impl PPEDeserializer {
 
                 if def.sig == StatementSignature::Invalid {
                     self.report_bug(DeserializationErrorType::InvalidStatement(cur_stmt));
-                    return Ok(None);
+                    return Err(DeserializationErrorType::InvalidStatement(cur_stmt));
                 }
 
                 let (var_idx, argument_count) = match def.sig {
@@ -234,7 +246,7 @@ impl PPEDeserializer {
                         return Ok(Some(PPECommand::PredefinedCall(def, arguments)));
                     }
                     crate::executable::smt_op_codes::StatementSignature::Invalid => {
-                        panic!("unhandled statement signature {:?}", def.sig);
+                        return Err(DeserializationErrorType::InvalidStatementSignature);
                     }
                 };
 
