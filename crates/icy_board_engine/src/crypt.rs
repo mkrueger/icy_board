@@ -19,6 +19,26 @@ fn decrypt2(block: &mut [u8]) {
         panic!("Block size is too large.");
     }
     let size = block.len() as i32;
+    let mut seed = 0xDB24;
+    let mut rotate_count = 0;
+    println!("size:{}", size);
+    unsafe {
+        let mut p =  block.as_mut_ptr() as *mut u16;
+        let mut x = size >> 1;
+        while x > 0 {
+            let mut dx = (x & 0xFF) as u16;
+            rotate_count = (seed & 0xFF) + dx;
+            dx |= dx << 8;
+
+            let tmp = p.read_unaligned();
+            p.write_unaligned(u16::rotate_right(tmp, rotate_count as u32) ^ seed ^ dx);
+            seed = tmp;
+            x-=1;
+            p = p.add(1);
+        }
+    }
+
+    /*
     let mut i = 0;
     let mut seed = 0xDB24;
     let mut rotate_count = 0;
@@ -34,9 +54,10 @@ fn decrypt2(block: &mut [u8]) {
         i += 1;
         seed = cur_word;
         dx -= 1;
-    }
+    }*/
 
     if size % 2 == 1 {
+        let i = block.len() - 1;
         block[i] = u8::rotate_right(block[i] ^ (seed as u8), (rotate_count & 0xFF) as u32);
     }
 }
@@ -159,12 +180,12 @@ pub fn encrypt_chunks(buffer: &mut [u8], version: u16, use_rle: bool) {
 pub fn decrypt_chunks(buffer: &mut [u8], version: u16, use_rle: bool) {
     let code_data_len = buffer.len();
     let mut offset = 0;
-
+    println!("decrypt:{}", version);
     while offset < code_data_len {
         let end = (offset + CHUNK_SIZE).min(code_data_len);
         let chunk = &mut buffer[offset..end];
         decrypt(chunk, version);
-        if use_rle && offset + CHUNK_SIZE < code_data_len && chunk[CHUNK_SIZE - 1] == 0 {
+        if use_rle && chunk[chunk.len() - 1] == 0 {
             offset += 1;
         }
         offset += CHUNK_SIZE;

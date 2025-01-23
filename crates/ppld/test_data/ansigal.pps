@@ -1,0 +1,401 @@
+; AnsiGal v0.1
+; (C)opyright 2019 by Philipp Giebel <stimpy@kuehlbox.wtf>
+;
+; Licensed under MIT License:
+; https://opensource.org/licenses/MIT
+;
+; Repository:
+; https://gitlab.ambhost.net/stimpy/ppe_ansigal
+;
+; See README.md for more information...
+;
+
+declare procedure ReadConfig()
+declare procedure DrawFiles( integer folder, integer lstart )
+declare procedure ReadFiles( string folder )
+declare procedure LightBarFiles( integer folder )
+declare procedure PrintLBLine( integer xpos, integer ypos, string col, string line )
+declare procedure AnsiViewer( string ansifile )
+declare procedure ReadFolders( string folder )
+declare procedure ClearList( integer start )
+declare function BlackList( string filename ) boolean
+
+integer xpos
+integer ypos
+integer width
+integer height
+integer fnum
+string bp
+string found
+string files(99)
+string hlcol
+string locol
+string viewer
+string cfolder
+string lfolder
+boolean ftype
+
+begin
+  ReadConfig()
+  ReadFolders( bp )
+  cls
+  AnsiPos 1, 1
+  print "@POFF@"
+  DispFile PPEPath() + "ansigal.pcb", DEFS
+  DrawFiles( 1, 1 )
+  LightBarFiles( 1 )
+end
+
+function BlackList( string filename ) boolean
+begin
+  string ext
+  
+  BlackList = 0
+  ext = right( Upper( filename ), 3 )
+  Select Case ext
+    case "EXE"
+      BlackList = 1
+    case "COM"
+      BlackList = 1
+    case "BAT"
+      BlackList = 1
+    case "ZIP"
+      BlackList = 1
+    case "RAR"
+      BlackList = 1
+    case "ARJ"
+      BlackList = 1
+    case "BZ2"
+      BlackList = 1
+    case "TAR"
+      BlackList = 1
+    case "MOD"
+      BlackList = 1
+    case "SM3"
+      BlackList = 1
+    case "BIN"
+      BlackList = 1
+  end select
+endfunc
+
+procedure AnsiViewer( string ansifile )
+begin
+  if ( Upper( viewer ) == "NONE" ) then
+    AnsiPos 1,1
+    print "@X07"
+    cls
+    DispFile ansifile, GRAPH
+    Wait
+  else
+    print "@POFF@@X07"
+    cls
+    DispStr "!"+ viewer +" "+ansifile
+    Wait
+  endif
+endproc
+
+procedure PrintLBLine( integer xpos, integer ypos, string col, string line )
+begin
+  ansipos xpos, ypos
+  print col +" "+ line
+  print space( width - len( line ) - 1 )
+  if ( col != locol ) print locol
+endproc
+
+procedure LightBarFiles( integer folder )
+begin
+  integer pos
+  integer opos
+  integer lpos
+  integer olpos
+  integer lstart
+  integer olstart
+  boolean finished
+  boolean keypress
+  string key
+  
+  pos = 1
+  opos = 1
+  lpos = 1
+  olpos = 1
+  lstart = 1
+  olstart = 1
+  finished = 0
+  keypress = 1
+
+  while ( !finished ) do
+    key = Upper( InKey() )
+   
+    select case ( key )
+      case "HOME", "H", "1"
+	    opos = pos
+        pos = 1
+        olpos = lpos
+        lpos = 1
+        lstart = 1
+        keypress = 1
+      case "END", "E"
+	    opos = pos
+        pos = fnum
+		if ( height > fnum ) then
+		  olpos = lpos
+		  lpos = fnum
+		  lstart = 1
+		else
+          lpos = height
+          olpos = height
+		  lstart = fnum-height+1
+		endif 
+        keypress = 1
+      case "PGUP", "-", "[", "LEFT", "4"
+        if ( lpos > 1 ) then
+          pos = pos-lpos+1
+          lpos = 1
+        else
+          if ( pos-height > 1 ) then
+            pos = pos-height
+          else
+            pos = 1
+          endif
+          if ( lstart-height > 1 ) then
+            lstart = lstart - height
+          else
+            lstart = 1
+          endif
+        endif
+        keypress = 1
+      case "PGDN", "+", "]", "RIGHT", "6"
+        if ( lpos < height ) then
+          pos = pos+height-lpos
+          lpos = height
+        else
+          if ( pos+height < fnum ) then
+            pos = pos+height
+          else
+            pos = fnum
+          endif
+          if ( lstart+height <= fnum-height ) then
+            lstart = lstart + height
+          else
+            lstart = fnum-height+1
+          endif
+        endif
+        keypress = 1
+      case "UP", "8"
+        if ( pos > 1 ) then
+          Dec pos
+          if ( lpos > 1 ) Dec lpos
+          if ( pos < lstart ) Dec lstart
+        else
+          opos = pos
+          pos = fnum
+          if ( height > pos ) then
+            lpos = pos
+          else
+            lpos = height
+          endif
+          lstart = fnum-height+1
+          if ( lstart < 0 ) lstart = 1
+        endif
+        keypress = 1
+      case "DOWN", "2"
+        if ( pos < fnum ) then
+          Inc pos
+          if ( pos > height ) then
+            if ( lpos == height ) Inc lstart
+          endif
+          if ( lpos < height ) Inc lpos
+        else
+          opos = pos
+          pos = 1
+          lstart = 1
+          lpos = 1
+        endif
+        keypress = 1
+      case chr(13)
+        finished = 1
+      case chr(27)
+        finished = 1
+        pos = 0
+    end select
+
+    if ( olstart <> lstart ) then
+      DrawFiles( folder, lstart )
+      olstart = lstart
+    endif
+    
+    if ( keypress ) then
+      PrintLBLine( xpos, ypos+lpos-1, hlcol, files(pos) )
+      keypress = 0
+    endif
+    if ( opos <> pos ) then
+      if ( olpos < height ) then
+        if ( olpos > 0 ) then
+          PrintLBLine( xpos, ypos+olpos-1, locol, files(opos) )
+        elseif ( lpos == 2 ) then
+          PrintLBLine( xpos, ypos+olpos-1, locol, files(opos) )
+        elseif ( lpos == height ) then
+          PrintLBLine( xpos, ypos+olpos-1, locol, files(opos) )
+        endif
+      elseif ( lpos == height-1 ) then
+        PrintLBLine( xpos, ypos+olpos-1, locol, files(opos) )
+      elseif ( lpos == 1 ) then
+        PrintLBLine( xpos, ypos+olpos-1, locol, files(opos) )
+      endif
+      olpos = lpos
+      opos = pos
+    endif
+  endwhile
+  ansipos 1,23
+  if ( pos > 0 ) then
+    if ( ftype == 0 ) then
+	  if ( exist( cfolder + files(pos)+"dir.lst" ) ) then
+	    ReadFolders( bp + files(pos) )
+	  elseif ( files(pos) == ".." ) then
+	    ReadFolders( lfolder )
+	  else
+	    ReadFiles( cfolder + files(pos) )  
+	  endif
+	  DrawFiles( pos, 1 )
+	  LightBarFiles( pos )
+	else
+      if ( files(pos) == ".." ) then
+	    ReadFolders( lfolder )
+		lfolder = bp
+	    DrawFiles( pos, 1 )
+	    LightBarFiles( pos )
+      else
+        AnsiViewer( cfolder + files(pos) )
+        print "@X07"
+        cls
+        DispFile PPEPath() + "ansigal.pcb", DEFS
+        DrawFiles( folder, 1 )
+        LightBarFiles( folder )
+	  endif
+	endif
+  else
+    cfolder = lfolder
+    pos = 1
+    lpos = 1
+  endif
+endproc
+
+procedure DrawFiles( integer folder, integer lstart )
+begin
+  integer c
+  integer l
+  boolean runit
+  
+  l = lstart
+  c = 1
+  runit = 1
+
+  while ( runit ) do
+    if ( files(l) != "" ) then
+      if ( c <= height ) then
+        ansipos xpos, ypos-1+c
+        print locol +" "+ files(l)
+        print space( width - len( StripAtX( files(l) ) )-1 )
+        inc c
+        inc l
+      else
+        runit = 0
+      endif
+    else
+      runit = 0
+    endif
+  endwhile
+  ClearList( c )  
+endproc
+
+procedure ReadFiles( string folder )
+begin
+  boolean runit
+  integer c
+  lfolder = cfolder
+  cfolder = folder  
+  runit = 1
+  c = 2
+  ftype = 1
+  files(1) = ".."
+  files(c) = FindFirst( folder +"*.*" )
+  while ( runit ) do
+    if ( BlackList( files(c) ) == 0 ) inc c
+    files(c) = FindNext()
+    if ( files(c) == "" ) runit = 0
+  endwhile
+  fnum = c-1
+endproc
+
+procedure ClearList( integer start )
+begin
+  integer i
+  for i = start to height
+    ansipos xpos, ypos-1+i
+    print locol+space( width )
+  next
+endproc
+
+procedure ReadFolders( string folder )
+begin
+  integer c
+  integer l
+  boolean runit
+
+  ftype = 0
+  runit = 1
+  lfolder = cfolder
+  cfolder = folder
+  c = 1
+  if ( bp != folder ) then
+    files(1) = ".."
+    c = 2
+  endif
+
+  if ( exist( folder +"dir.lst" ) ) then
+    while ( runit ) do
+      files(c) = trim( left( readline( folder +"dir.lst", c ), 12 ), " " )
+      if ( files(c) == "" ) then
+        runit = 0
+      else
+        if ( right( files(c), 1 ) != "\" ) files(c) = files(c) +"\"
+        Inc c
+      endif
+    endwhile
+    fnum = c-1
+  else
+    files(1) = "Error"
+    fnum = 1
+  endif
+endproc
+
+procedure ReadConfig()
+begin
+  integer c
+  integer l
+  
+  c = 1
+  l = 8
+  xpos = 50
+  ypos = 4
+  width = 20
+  height = 5
+  locol = "@X70"
+  hlcol = "@X1F"
+  viewer = "NONE"
+  bp = PPEPath()+"gallery"
+  cfolder = bp
+  lfolder = bp
+  
+  if ( exist( PPEPath()+"ansigal.cfg" ) ) then
+    xpos = s2i( trim( left( readline( PPEPath()+"ansigal.cfg", 1 ), 2 ), " " ), 10 )
+    ypos = s2i( trim( left( readline( PPEPath()+"ansigal.cfg", 2 ), 2 ), " " ), 10 )
+    width = s2i( trim( left( readline( PPEPath()+"ansigal.cfg", 3 ), 2 ), " " ), 10 )
+    height = s2i( trim( left( readline( PPEPath()+"ansigal.cfg", 4 ), 2 ), " " ), 10 )
+    locol = trim( left( readline( PPEPath()+"ansigal.cfg", 5 ), 4 ), " " )
+    hlcol = trim( left( readline( PPEPath()+"ansigal.cfg", 6 ), 4 ), " " )
+    viewer = trim( left( readline( PPEPath()+"ansigal.cfg", 7 ), 46 ), " " )
+    bp = trim( left( readline( PPEPath()+"ansigal.cfg", 8 ), 46 ), " " )
+    if ( right( bp, 1 ) != "\" ) bp = bp + "\"
+  endif
+endproc
