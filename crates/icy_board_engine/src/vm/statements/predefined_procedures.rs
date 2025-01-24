@@ -283,6 +283,25 @@ pub async fn inputstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     Ok(())
 }
 
+pub async fn inputtext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let prompt = vm.eval_expr(&args[0]).await?.as_string();
+    let color = vm.eval_expr(&args[2]).await?.as_int() as u8;
+    let len = vm.eval_expr(&args[3]).await?.as_int();
+    let output = vm
+        .icy_board_state
+        .input_string(
+            color.into(),
+            prompt,
+            len,
+            &MASK_ALNUM,
+            "",
+            None,
+            display_flags::FIELDLEN | display_flags::GUIDE | display_flags::HIGHASCII,
+        )
+        .await?;
+    vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
+    Ok(())
+}
 pub async fn inputyn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let prompt = vm.eval_expr(&args[0]).await?.as_string();
     let color = vm.eval_expr(&args[2]).await?.as_int() as u8;
@@ -537,11 +556,6 @@ pub async fn disptext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 pub async fn stop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     vm.is_running = false;
     Ok(())
-}
-
-pub async fn inputtext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("inputtext not implemented statement!");
-    panic!("TODO")
 }
 
 pub async fn beep(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -1326,8 +1340,19 @@ pub async fn mousereg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     // invert = A boolean flag (TRUE to invert the region when clicked)
     // clear  = A boolean flag (TRUE to clear and full screen the text window)
     // text   = Text that the remote terminal should transmit when the region is clicked
-    log::error!("mousereg not implemented statement!");
-    panic!("TODO")
+
+    let num = vm.eval_expr(&args[0]).await?.as_int();
+    let x1 = vm.eval_expr(&args[1]).await?.as_int();
+    let y1 = vm.eval_expr(&args[2]).await?.as_int();
+    let x2 = vm.eval_expr(&args[3]).await?.as_int();
+    let y2 = vm.eval_expr(&args[4]).await?.as_int();
+    let font_x = vm.eval_expr(&args[5]).await?.as_int();
+    let font_y = vm.eval_expr(&args[6]).await?.as_int();
+    let invert = vm.eval_expr(&args[7]).await?.as_bool();
+    let clear = vm.eval_expr(&args[8]).await?.as_bool();
+    let text = vm.eval_expr(&args[9]).await?.as_string();
+
+    vm.set_rip_mouseregion(num, x1, y1, x2, y2, font_x, font_y, invert, clear, text).await
 }
 
 pub async fn scrfile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {

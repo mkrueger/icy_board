@@ -53,7 +53,7 @@ impl EditState {
             self.print_divider(state).await?;
         }
         loop {
-            state.session.disp_options.non_stop = true;
+            state.session.non_stop_on();
             if self.use_fse {
                 self.full_screen_edit(state).await?;
             } else {
@@ -107,7 +107,7 @@ impl EditState {
                             state
                                 .display_text(IceText::MessageAborted, display_flags::NEWLINE | display_flags::LFBEFORE)
                                 .await?;
-                            state.session.disp_options.non_stop = false;
+                            state.session.non_stop_off();
                             return Ok(EditResult::Abort);
                         }
                     }
@@ -173,7 +173,7 @@ impl EditState {
                     }
                     "S" => {
                         // send message
-                        state.session.disp_options.non_stop = false;
+                        state.session.non_stop_off();
                         return Ok(EditResult::SendMessage);
                     }
                     "Q" => { // quote message
@@ -298,10 +298,10 @@ impl EditState {
                     }
                 }
                 control_codes::CTRL_Z => {
-                    state.session.disp_options.non_stop = false;
+                    state.session.non_stop_off();
                     state.clear_screen(TerminalTarget::Both).await?;
                     state.show_help("hlpfscrn").await?;
-                    state.session.disp_options.non_stop = true;
+                    state.session.non_stop_on();
                     state.press_enter().await?;
                     self.redraw_fse(state).await?;
                 }

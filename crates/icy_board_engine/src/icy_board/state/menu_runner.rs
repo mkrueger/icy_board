@@ -362,7 +362,9 @@ impl IcyBoardState {
             }
             CommandType::RunPPE => {
                 // PPE
-                self.session.push_tokens(&cmd_action.parameter);
+                if !cmd_action.parameter.is_empty() {
+                    self.session.push_tokens(&cmd_action.parameter);
+                }
                 self.ppe_run().await?;
             }
 

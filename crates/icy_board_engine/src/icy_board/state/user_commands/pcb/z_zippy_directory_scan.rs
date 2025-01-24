@@ -122,7 +122,7 @@ impl IcyBoardState {
         let mut list = FileList { base: &base, files, help };
         list.display_file_list(self).await?;
 
-        self.session.is_non_stop = false;
+        self.session.non_stop_off();
         self.session.more_requested = false;
         Ok(())
     }

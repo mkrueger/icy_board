@@ -58,7 +58,7 @@ pub struct DisplayOptions {
     pub auto_more: bool,
 
     /// If true, the output is not paused by the more prompt.
-    pub non_stop: bool,
+    is_non_stop: bool,
 
     pub grapics_mode: GraphicsMode,
 
@@ -70,9 +70,13 @@ pub struct DisplayOptions {
 }
 impl DisplayOptions {
     pub fn reset_printout(&mut self) {
-        self.non_stop = false;
+        self.is_non_stop = false;
         self.abort_printout = false;
         self.auto_more = false;
+    }
+
+    pub fn non_stop(&self) -> bool {
+        self.is_non_stop
     }
 }
 
@@ -82,7 +86,7 @@ impl Default for DisplayOptions {
             auto_more: false,
             abort_printout: false,
             grapics_mode: GraphicsMode::Graphics,
-            non_stop: false,
+            is_non_stop: false,
             display_text: true,
             show_on_screen: true,
         }
@@ -169,9 +173,6 @@ pub struct Session {
     /// Store last password used so that the user doesn't need to re-enter it.
     pub last_password: String,
 
-    /// Return whether or not the display is currently in non-stop mode (ie, did the user type NS as part of their command line)
-    pub is_non_stop: bool,
-
     pub more_requested: bool,
     pub cancel_batch: bool,
 
@@ -228,7 +229,6 @@ impl Session {
             request_logoff: false,
             tokens: VecDeque::new(),
             last_password: String::new(),
-            is_non_stop: false,
             more_requested: false,
             cancel_batch: false,
             fse_mode: FSEMode::Yes,
@@ -248,6 +248,18 @@ impl Session {
             paged_sysop: false,
             bytes_remaining: 0,
         }
+    }
+
+    pub fn non_stop_on(&mut self) {
+        self.disp_options.is_non_stop = true;
+        self.num_lines_printed = 0;
+        self.last_new_line_y = i32::MAX;
+    }
+
+    pub fn non_stop_off(&mut self) {
+        self.disp_options.is_non_stop = false;
+        self.num_lines_printed = 0;
+        self.last_new_line_y = i32::MAX;
     }
 
     pub fn push_tokens(&mut self, command: &str) {
@@ -604,23 +616,20 @@ impl IcyBoardState {
     }
 
     #[async_recursion(?Send)]
-    async fn next_line(&mut self) -> Res<bool> {
-        if self.session.disp_options.non_stop {
-            return Ok(true);
+    async fn next_line(&mut self) -> Res<()> {
+        if self.session.disp_options.non_stop() {
+            return Ok(());
         }
-        let cur_y = self.user_screen.caret.get_position().y;
-        if cur_y > self.session.last_new_line_y {
-            self.session.num_lines_printed += (cur_y - self.session.last_new_line_y) as usize;
-        } else {
-            self.session.num_lines_printed = cur_y as usize;
-        }
-        self.session.last_new_line_y = cur_y;
-
+        self.session.num_lines_printed += 1;
         if self.session.page_len > 0 && self.session.num_lines_printed >= self.session.page_len as usize {
-            self.more_promt().await
-        } else {
-            Ok(true)
+            log::info!("Page length reached: {} --- {}", self.session.page_len, self.session.num_lines_printed);
+            if self.session.disp_options.non_stop() {
+                self.session.more_requested = true;
+                return Ok(());
+            }
+            self.more_promt().await?;
         }
+        Ok(())
     }
 
     pub async fn run_ppe<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>) -> Res<()> {
@@ -1092,9 +1101,6 @@ impl IcyBoardState {
         for c in data {
             if target != TerminalTarget::Sysop || self.session.is_sysop || self.session.current_user.is_none() {
                 let _ = self.user_screen.print_char(*c);
-                if *c == '\n' {
-                    self.next_line().await?;
-                }
                 if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
                     user_bytes.push(cp437);
                 } else {
@@ -1108,6 +1114,9 @@ impl IcyBoardState {
                 } else {
                     sysop_bytes.push(b'.');
                 }
+            }
+            if *c == '\n' {
+                self.next_line().await?;
             }
         }
 
@@ -1414,12 +1423,12 @@ impl IcyBoardState {
 
             "POFF" => {
                 self.session.num_lines_printed = 0;
-                self.session.disp_options.non_stop = true;
+                self.session.non_stop_on();
                 return None;
             }
             "PON" => {
                 self.session.num_lines_printed = 0;
-                self.session.disp_options.non_stop = false;
+                self.session.non_stop_off();
                 return None;
             }
             "PROLTR" | "PRODESC" | "PWXDATE" | "PWXDAYS" | "QOFF" | "QON" | "RATIOBYTES" | "RATIOFILES" => {}
@@ -1889,11 +1898,7 @@ impl IcyBoardState {
         self.write_raw(TerminalTarget::Both, &['\x07']).await
     }
 
-    pub async fn more_promt(&mut self) -> Res<bool> {
-        if self.session.is_non_stop {
-            self.session.more_requested = true;
-            return Ok(true);
-        }
+    pub async fn more_promt(&mut self) -> Res<()> {
         loop {
             let result = self
                 .input_field(
@@ -1907,14 +1912,15 @@ impl IcyBoardState {
                 .await?;
             match result.as_str() {
                 "Y" | "" => {
-                    return Ok(true);
+                    return Ok(());
                 }
                 "NS" => {
-                    self.session.is_non_stop = true;
-                    return Ok(true);
+                    self.session.non_stop_on();
+                    return Ok(());
                 }
                 "N" => {
-                    return Ok(true);
+                    self.session.disp_options.abort_printout = true;
+                    return Ok(());
                 }
                 _ => {}
             }
@@ -1922,7 +1928,7 @@ impl IcyBoardState {
     }
 
     pub async fn press_enter(&mut self) -> Res<()> {
-        self.session.is_non_stop = true;
+        self.session.non_stop_on();
         self.session.more_requested = false;
         self.input_field(IceText::PressEnter, 0, "", "", None, display_flags::ERASELINE).await?;
         Ok(())

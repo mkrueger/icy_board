@@ -16,6 +16,7 @@ use crate::icy_board::user_base::FSEMode;
 use crate::parser::UserTypeRegistry;
 use crate::Res;
 use async_recursion::async_recursion;
+use icy_engine::rip::to_base_36;
 use icy_engine::Buffer;
 use std::collections::HashMap;
 use std::mem;
@@ -740,6 +741,36 @@ impl<'a> VirtualMachine<'a> {
         } else {
             self.icy_board_state.get_board().await.resolve_file(&file)
         }
+    }
+
+    async fn set_rip_mouseregion(
+        &mut self,
+        num: i32,
+        x1: i32,
+        y1: i32,
+        x2: i32,
+        y2: i32,
+        font_x: i32,
+        font_y: i32,
+        invert: bool,
+        clear: bool,
+        text: String,
+    ) -> Res<()> {
+        let rip_cmd = format!(
+            "|M{}{}{}{}{}{}{}{}{}",
+            to_base_36(2, num),
+            to_base_36(2, (x1 - 1) * font_x),
+            to_base_36(2, (y1 - 1) * font_y),
+            to_base_36(2, (x2 - 1) * font_x),
+            to_base_36(2, (y2 - 1) * font_y),
+            if invert { 1 } else { 0 },
+            if clear { 1 } else { 0 },
+            "00000", // unused
+            text
+        );
+        self.icy_board_state
+            .write_raw(TerminalTarget::Both, rip_cmd.chars().collect::<Vec<char>>().as_slice())
+            .await
     }
 }
 /// .

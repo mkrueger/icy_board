@@ -252,6 +252,11 @@ impl<'a> Editor for DirsEditor<'a> {
 
         match key.code {
             KeyCode::Esc => {
+                if let Some(parent) = self.path.parent() {
+                    if !parent.exists() {
+                        std::fs::create_dir_all(parent).unwrap();
+                    }
+                }
                 self.dir_list.lock().unwrap().save(&self.path).unwrap();
                 return false;
             }

@@ -683,11 +683,12 @@ pub async fn un_name(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 pub async fn un_city(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     if let Some(node) = &vm.pcb_node {
-        let city = vm.icy_board_state.board.lock().await.users[node.cur_user as usize].city_or_state.clone();
-        Ok(VariableValue::new_string(city))
-    } else {
-        Ok(VariableValue::new_string(String::new()))
+        if let Some(user) = vm.icy_board_state.board.lock().await.users.get(node.cur_user as usize) {
+            let city = user.city_or_state.clone();
+            return Ok(VariableValue::new_string(city));
+        }
     }
+    Ok(VariableValue::new_string(String::new()))
 }
 pub async fn un_oper(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     if let Some(node) = &vm.pcb_node {
@@ -1398,7 +1399,7 @@ pub async fn lprinted(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     panic!("TODO")
 }
 pub async fn isnonstop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_bool(vm.icy_board_state.session.is_non_stop))
+    Ok(VariableValue::new_bool(vm.icy_board_state.session.disp_options.non_stop()))
 }
 pub async fn errcorrect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     // No longer an issue:

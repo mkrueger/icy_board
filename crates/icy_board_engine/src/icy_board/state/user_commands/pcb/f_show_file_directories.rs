@@ -18,7 +18,7 @@ impl IcyBoardState {
     pub async fn show_file_directories(&mut self, help: &str) -> Res<()> {
         self.set_activity(NodeStatus::Available).await;
 
-        self.session.is_non_stop = false;
+        self.session.non_stop_off();
         self.session.more_requested = false;
 
         if self.session.current_conference.directories.is_empty() {
@@ -109,7 +109,7 @@ impl IcyBoardState {
         if self.session.num_lines_printed > 0 {
             list.filebase_more(self).await?;
         }
-        self.session.is_non_stop = false;
+        self.session.non_stop_off();
         self.session.more_requested = false;
         Ok(())
     }

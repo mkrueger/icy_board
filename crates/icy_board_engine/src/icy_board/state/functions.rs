@@ -224,6 +224,8 @@ impl IcyBoardState {
     }
 
     pub async fn display_file_with_error<P: AsRef<Path>>(&mut self, file_name: &P, display_error: bool) -> Res<bool> {
+        self.session.num_lines_printed = 0;
+        self.session.disp_options.abort_printout = false;
         let resolved_name = self.get_board().await.resolve_file(file_name);
         // lookup language/security/graphics mode
         let resolved_name = self.find_more_specific_file(resolved_name.to_string_lossy().to_string());
@@ -246,20 +248,13 @@ impl IcyBoardState {
             }
             s
         };
-        let old = self.session.disp_options.non_stop;
-        self.session.disp_options.non_stop = true;
         for (_i, line) in converted_content.lines().enumerate() {
             self.display_line(line).await?;
             self.write_raw(TerminalTarget::Both, &['\r', '\n']).await?;
-            self.session.disp_options.non_stop = false;
-            let next = self.next_line().await?;
-            self.session.disp_options.non_stop = true;
-            if !next {
-                return Ok(false);
+            if self.session.disp_options.abort_printout {
+                break;
             }
         }
-        self.session.disp_options.non_stop = old;
-
         Ok(true)
     }
 
@@ -291,6 +286,22 @@ impl IcyBoardState {
     ) -> Res<String> {
         self.session.num_lines_printed = 0;
 
+        // we've data from a PPE here, so take that input and return it.
+        // ignoring all other settings.
+        if let Some(front) = self.char_buffer.front() {
+            if front.source == KeySource::StuffedHidden {
+                let mut result = String::new();
+                while let Some(key) = self.char_buffer.pop_front() {
+                    if key.ch == '\n' || key.ch == '\r' {
+                        break;
+                    }
+                    result.push(key.ch);
+                }
+                log::info!("PPE stuffed input: {}", result);
+                return Ok(result);
+            }
+        }
+
         let mut prompt = prompt;
 
         let display_question = if prompt.ends_with(TXT_STOPCHAR) {
@@ -312,6 +323,7 @@ impl IcyBoardState {
             self.set_color(TerminalTarget::Both, color.clone()).await?;
         }
         self.display_line(&prompt).await?;
+
         // we've data from a PPE here, so take that input and return it.
         // ignoring all other settings.
         if let Some(front) = self.char_buffer.front() {
@@ -323,10 +335,11 @@ impl IcyBoardState {
                     }
                     result.push(key.ch);
                 }
-                log::info!("stuffed input_string: {}", result);
+                log::info!("PPE stuffed input: {}", result);
                 return Ok(result);
             }
         }
+
         if display_question {
             self.print(TerminalTarget::Both, "? ").await?;
         }
@@ -425,10 +438,14 @@ impl IcyBoardState {
         }
         let help_loc = self.get_board().await.config.paths.help_path.clone();
         let help_loc = help_loc.join(help);
-        let am = self.session.is_non_stop;
-        self.session.is_non_stop = false;
+        let am = self.session.disp_options.non_stop();
+        self.session.non_stop_off();
         self.display_file(&help_loc).await?;
-        self.session.is_non_stop = am;
+        if am {
+            self.session.non_stop_on();
+        } else {
+            self.session.non_stop_off();
+        }
         Ok(())
     }
 
@@ -478,7 +495,7 @@ impl IcyBoardState {
         let areas = self.get_board().await.conferences[conference as usize].areas.clone();
 
         self.set_activity(NodeStatus::EnterMessage).await;
-        self.session.is_non_stop = false;
+        self.session.non_stop_off();
         self.session.more_requested = false;
 
         if areas.is_empty() {

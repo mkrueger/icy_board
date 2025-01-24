@@ -35,7 +35,7 @@ struct Cli {
     full_screen: bool,
 
     #[argh(option)]
-    /// file[.toml] to edit/create
+    /// path/file name of the icyboard.toml configuration file
     file: Option<PathBuf>,
 
     #[argh(subcommand)]

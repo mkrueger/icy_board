@@ -137,7 +137,7 @@ pub struct FileList<'a> {
 
 impl<'a> FileList<'a> {
     pub async fn display_file_list(&mut self, cmd: &mut IcyBoardState) -> Res<()> {
-        cmd.session.is_non_stop = true;
+        cmd.session.non_stop_on();
         let short_header = if let Some(user) = &cmd.session.current_user {
             user.flags.use_short_filedescr
         } else {

@@ -33,12 +33,14 @@ impl IcyBoardState {
             if !found {
                 help_loc = help_loc.join(format!("hlp{}", help_cmd).as_str());
             }
-            let am = self.session.is_non_stop;
-            self.session.is_non_stop = false;
-            self.session.disp_options.non_stop = false;
+            let am = self.session.disp_options.non_stop();
+            self.session.non_stop_off();
             let res = self.display_file(&help_loc).await?;
-            self.session.is_non_stop = am;
-
+            if am {
+                self.session.non_stop_on();
+            } else {
+                self.session.non_stop_off();
+            }
             if res {
                 self.press_enter().await?;
             }

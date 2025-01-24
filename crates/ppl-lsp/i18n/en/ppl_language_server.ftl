@@ -303,7 +303,20 @@ hint-statement-adjtbytes=todo
 hint-statement-adjtfiles=todo
 hint-statement-lang=todo
 hint-statement-sort=todo
-hint-statement-mousereg=todo
+hint-statement-mousereg=
+    ### Statement
+    `MOUSEREG num,x1,y1,x2,y2,fontX,fontY,invert,clear,text`
+
+    Set up a RIP mouse region on the remote terminal.
+
+    `num`    = Is the RIP region number  
+    `x1`,y1  = The (X,Y) coordinates of the upper-left of the region  
+    `x2`,y2  = The (X,Y) coordinates of the lower-right of the region  
+    `fontX`  = The width of each character in pixels  
+    `fontY`  = The height of each character in pixels  
+    `invert` = A boolean flag (TRUE to invert the region when clicked)  
+    `clear`  = A boolean flag (TRUE to clear and full screen the text window)  
+    `text`   = Text that the remote terminal should transmit when the region is clicked  
 hint-statement-scrfile=todo
 hint-statement-searchinit=todo
 hint-statement-searchfind=todo
