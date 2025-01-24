@@ -3,3 +3,16 @@ INTEGER B
 B = 5
 A = B
 PRINTLN STRING(A/2)
+
+B = 5 
+IF (TOREAL(B) / 2 = B / 2) THEN
+    PRINTLN "Even 1"
+ENDIF
+
+B = 6
+IF (TOREAL(B) / 2 = B / 2) THEN
+    PRINTLN "Even 2"
+ENDIF
+PRINTLN S2I("123", 10), " ", S2I("12FOO", 10), " ", S2I("_I", 10), " ", S2I("0FOOBAR", 10), " ", S2I("0.0", 10)
+
+PRINTLN !"0", !"43423", !"0000", !"0.0", !"0FOOBAR", !"1.1", !"_I", !32768, !32767

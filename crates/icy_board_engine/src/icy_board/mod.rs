@@ -346,13 +346,22 @@ impl IcyBoard {
         // Line 24
         pcb_dat.path.help_loc = self.resolve_file(&self.config.paths.help_path).to_string_lossy().to_string();
         // Line 25
-        pcb_dat.path.sec_loc = self.resolve_file(&self.config.paths.pwrd_sec_level_file).to_string_lossy().to_string();
+        pcb_dat.path.sec_loc = self.resolve_file(&self.config.paths.home_dir).to_string_lossy().to_string();
 
         // Line 31
         let base_loc = file.parent().unwrap();
         let cnames = base_loc.join("cnames");
         self.export_conference_files(&base_loc, &cnames)?;
         pcb_dat.path.conference_file = cnames.to_string_lossy().to_string();
+
+        // Line 32 - PWRD File
+        let pwrd_file = base_loc.join("pwrd");
+        if let Ok(defs) = SecurityLevelDefinitions::load(&self.resolve_file(&self.config.paths.pwrd_sec_level_file)) {
+            defs.export_pcboard(&pwrd_file)?;
+        } else {
+            fs::write(&pwrd_file, "")?;
+        }
+        pcb_dat.path.pwrd_file = pwrd_file.to_string_lossy().to_string();
 
         // Line 35
         pcb_dat.path.tcan_file = self.resolve_file(&self.config.paths.trashcan_user).to_string_lossy().to_string();

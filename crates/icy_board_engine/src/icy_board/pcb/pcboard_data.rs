@@ -604,7 +604,7 @@ pub struct FileLocations {
     /// name and location of conference data file
     pub conference_file: String,
     /// name and location of pwrd file
-    pub pwd_file: String,
+    pub pwrd_file: String,
     /// name and location of fsec file
     pub fsec_file: String,
     /// name and location of upsec file
@@ -785,7 +785,7 @@ impl PcbBoardData {
         ret.path.usr_file = read_line(&mut reader, encoding)?;
         ret.path.clr_file = read_line(&mut reader, encoding)?;
         ret.path.conference_file = read_line(&mut reader, encoding)?;
-        ret.path.pwd_file = read_line(&mut reader, encoding)?;
+        ret.path.pwrd_file = read_line(&mut reader, encoding)?;
         ret.path.fsec_file = read_line(&mut reader, encoding)?;
         ret.path.upsec_file = read_line(&mut reader, encoding)?;
         ret.path.tcan_file = read_line(&mut reader, encoding)?;
@@ -1187,7 +1187,7 @@ impl PcbBoardData {
         append_line(&mut res, encoding, &self.path.usr_file);
         append_line(&mut res, encoding, &self.path.clr_file);
         append_line(&mut res, encoding, &self.path.conference_file);
-        append_line(&mut res, encoding, &self.path.pwd_file);
+        append_line(&mut res, encoding, &self.path.pwrd_file);
         append_line(&mut res, encoding, &self.path.fsec_file);
         append_line(&mut res, encoding, &self.path.upsec_file);
         append_line(&mut res, encoding, &self.path.tcan_file);

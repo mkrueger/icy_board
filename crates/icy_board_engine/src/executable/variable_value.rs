@@ -172,7 +172,6 @@ pub struct StdStruct {
 
 #[derive(Clone, Copy)]
 pub union VariableData {
-    pub bool_value: bool,
     pub unsigned_value: u64,
     pub date_value: u32,
     pub ddate_value: i32,
@@ -204,7 +203,7 @@ impl VariableData {
 
     pub fn from_bool(b: bool) -> VariableData {
         let mut res = VariableData::default();
-        res.bool_value = b;
+        res.unsigned_value = if b { 1 } else { 0 };
         res
     }
 }
@@ -290,7 +289,7 @@ impl fmt::Display for VariableValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         unsafe {
             match self.vtype {
-                VariableType::Boolean => write!(f, "{}", self.data.bool_value),
+                VariableType::Boolean => write!(f, "{}", self.as_bool()),
                 VariableType::Unsigned => write!(f, "{}", self.data.unsigned_value),
                 VariableType::Date | VariableType::DDate | VariableType::EDate => {
                     write!(f, "{}", IcbDate::from_pcboard(self.data.date_value))
@@ -324,10 +323,8 @@ impl PartialEq for VariableValue {
     fn eq(&self, other: &Self) -> bool {
         let dest_type: VariableType = promote_to(self.vtype, other.vtype);
         unsafe {
-            // log::info!("Comparing : {} == {}", self.data.int_value, other.data.int_value);
-
             match dest_type {
-                VariableType::Boolean => self.data.bool_value == other.data.bool_value,
+                VariableType::Boolean => self.as_bool() == other.as_bool(),
                 VariableType::Unsigned => self.data.unsigned_value == other.data.unsigned_value,
                 VariableType::Date => self.data.date_value == other.data.date_value,
                 VariableType::DDate => self.data.ddate_value == other.data.ddate_value,
@@ -348,12 +345,10 @@ impl PartialEq for VariableValue {
                 }
 
                 VariableType::Time => self.data.time_value == other.data.time_value,
-                VariableType::Float => self.data.float_value == other.data.float_value,
-                VariableType::Double => self.data.double_value == other.data.double_value,
-                VariableType::Byte => self.data.byte_value == other.data.byte_value,
-                VariableType::SByte => self.data.sbyte_value == other.data.sbyte_value,
-                VariableType::Word => self.data.word_value == other.data.word_value,
-                VariableType::SWord => self.data.sword_value == other.data.sword_value,
+                VariableType::Float => self.as_float() == other.as_float(),
+                VariableType::Double => self.as_double() == other.as_double(),
+                VariableType::Byte | VariableType::SByte => self.as_byte() == other.as_byte(),
+                VariableType::Word | VariableType::SWord => self.as_word() == other.as_word(),
 
                 _ => false,
             }
@@ -396,10 +391,10 @@ impl Add<VariableValue> for VariableValue {
                     data.int_value = self.as_int().wrapping_add(other.as_int());
                 }
                 VariableType::Float => {
-                    data.float_value = self.data.float_value + other.data.float_value;
+                    data.float_value = self.as_float() + other.as_float();
                 }
                 VariableType::Double => {
-                    data.double_value = self.data.double_value + other.data.double_value;
+                    data.double_value = self.as_double() + other.as_double();
                 }
 
                 VariableType::String | VariableType::BigStr => {
@@ -407,16 +402,16 @@ impl Add<VariableValue> for VariableValue {
                 }
 
                 VariableType::Byte => {
-                    data.byte_value = self.data.byte_value.wrapping_add(other.data.byte_value);
+                    data.byte_value = self.as_byte().wrapping_add(other.as_byte());
                 }
                 VariableType::SByte => {
-                    data.sbyte_value = self.data.sbyte_value.wrapping_add(other.data.sbyte_value);
+                    data.sbyte_value = self.as_sbyte().wrapping_add(other.as_sbyte());
                 }
                 VariableType::Word => {
-                    data.word_value = self.data.word_value.wrapping_add(other.data.word_value);
+                    data.word_value = self.as_word().wrapping_add(other.as_word());
                 }
                 VariableType::SWord => {
-                    data.sword_value = self.data.sword_value.wrapping_add(other.data.sword_value);
+                    data.sword_value = self.as_sword().wrapping_add(other.as_sword());
                 }
 
                 _ => {
@@ -463,22 +458,22 @@ impl Sub<VariableValue> for VariableValue {
                     data.int_value = self.as_int().wrapping_sub(other.as_int());
                 }
                 VariableType::Float => {
-                    data.float_value = self.data.float_value - other.data.float_value;
+                    data.float_value = self.as_float() - other.as_float();
                 }
                 VariableType::Double => {
-                    data.double_value = self.data.double_value - other.data.double_value;
+                    data.double_value = self.as_double() - other.as_double();
                 }
                 VariableType::Byte => {
-                    data.byte_value = self.data.byte_value.wrapping_sub(other.data.byte_value);
+                    data.byte_value = self.as_byte().wrapping_sub(other.as_byte());
                 }
                 VariableType::SByte => {
-                    data.sbyte_value = self.data.sbyte_value.wrapping_sub(other.data.sbyte_value);
+                    data.sbyte_value = self.as_sbyte().wrapping_sub(other.as_sbyte());
                 }
                 VariableType::Word => {
-                    data.word_value = self.data.word_value.wrapping_sub(other.data.word_value);
+                    data.word_value = self.as_word().wrapping_sub(other.as_word());
                 }
                 VariableType::SWord => {
-                    data.sword_value = self.data.sword_value.wrapping_sub(other.data.sword_value);
+                    data.sword_value = self.as_sword().wrapping_sub(other.as_sword());
                 }
                 _ => {
                     panic!("unsupported lvalue for add {self:?}");
@@ -524,22 +519,22 @@ impl Mul<VariableValue> for VariableValue {
                     data.int_value = self.as_int().wrapping_mul(other.as_int());
                 }
                 VariableType::Float => {
-                    data.float_value = self.data.float_value * other.data.float_value;
+                    data.float_value = self.as_float() * other.as_float();
                 }
                 VariableType::Double => {
-                    data.double_value = self.data.double_value * other.data.double_value;
+                    data.double_value = self.as_double() * other.as_double();
                 }
                 VariableType::Byte => {
-                    data.byte_value = self.data.byte_value.wrapping_mul(other.data.byte_value);
+                    data.byte_value = self.as_byte().wrapping_mul(other.as_byte());
                 }
                 VariableType::SByte => {
-                    data.sbyte_value = self.data.sbyte_value.wrapping_mul(other.data.sbyte_value);
+                    data.sbyte_value = self.as_sbyte().wrapping_mul(other.as_sbyte());
                 }
                 VariableType::Word => {
-                    data.word_value = self.data.word_value.wrapping_mul(other.data.word_value);
+                    data.word_value = self.as_word().wrapping_mul(other.as_word());
                 }
                 VariableType::SWord => {
-                    data.sword_value = self.data.sword_value.wrapping_mul(other.data.sword_value);
+                    data.sword_value = self.as_sword().wrapping_mul(other.as_sword());
                 }
                 _ => {
                     panic!("unsupported lvalue for add {self:?}");
@@ -589,19 +584,19 @@ impl Div<VariableValue> for VariableValue {
                     data.float_value = self.convert_to(VariableType::Float).data.float_value / other.convert_to(VariableType::Float).data.float_value;
                 }
                 VariableType::Double => {
-                    data.double_value = self.convert_to(VariableType::Double).data.double_value / other.convert_to(VariableType::Double).data.double_value;
+                    data.double_value = self.as_double() / other.as_double();
                 }
                 VariableType::Byte => {
-                    data.byte_value = self.data.byte_value.wrapping_div(other.data.byte_value);
+                    data.byte_value = self.as_byte().wrapping_div(other.as_byte());
                 }
                 VariableType::SByte => {
-                    data.sbyte_value = self.data.sbyte_value.wrapping_div(other.data.sbyte_value);
+                    data.sbyte_value = self.as_sbyte().wrapping_div(other.as_sbyte());
                 }
                 VariableType::Word => {
-                    data.word_value = self.data.word_value.wrapping_div(other.data.word_value);
+                    data.word_value = self.as_word().wrapping_div(other.as_word());
                 }
                 VariableType::SWord => {
-                    data.sword_value = self.data.sword_value.wrapping_div(other.data.sword_value);
+                    data.sword_value = self.as_sword().wrapping_div(other.as_sword());
                 }
                 _ => {
                     panic!("unsupported lvalue for add {self:?}");
@@ -655,16 +650,16 @@ impl Rem<VariableValue> for VariableValue {
                     data.int_value = self.as_int().wrapping_rem(other.as_int());
                 }
                 VariableType::Byte => {
-                    data.byte_value = self.data.byte_value.wrapping_rem(other.data.byte_value);
+                    data.byte_value = self.as_byte().wrapping_rem(other.as_byte());
                 }
                 VariableType::SByte => {
-                    data.sbyte_value = self.data.sbyte_value.wrapping_rem(other.data.sbyte_value);
+                    data.sbyte_value = self.as_sbyte().wrapping_rem(other.as_sbyte());
                 }
                 VariableType::Word => {
-                    data.word_value = self.data.word_value.wrapping_rem(other.data.word_value);
+                    data.word_value = self.as_word().wrapping_rem(other.as_word());
                 }
                 VariableType::SWord => {
-                    data.sword_value = self.data.sword_value.wrapping_rem(other.data.sword_value);
+                    data.sword_value = self.as_sword().wrapping_rem(other.as_sword());
                 }
                 _ => {
                     panic!("unsupported lvalue for add {self:?}");
@@ -684,7 +679,7 @@ impl PartialOrd for VariableValue {
         let dest_type: VariableType = promote_to(self.vtype, other.vtype);
         unsafe {
             match dest_type {
-                VariableType::Boolean => Some(self.data.bool_value.cmp(&other.data.bool_value)),
+                VariableType::Boolean => Some(self.as_bool().cmp(&other.as_bool())),
                 VariableType::Unsigned => Some(self.data.unsigned_value.cmp(&other.data.unsigned_value)),
                 VariableType::Date => Some(self.data.date_value.cmp(&other.data.date_value)),
                 VariableType::DDate => Some(self.data.ddate_value.cmp(&other.data.ddate_value)),
@@ -695,12 +690,10 @@ impl PartialOrd for VariableValue {
                 VariableType::String | VariableType::BigStr => Some(self.as_string().cmp(&other.as_string())),
 
                 VariableType::Time => Some(self.data.time_value.cmp(&other.data.time_value)),
-                VariableType::Float => self.data.float_value.partial_cmp(&other.data.float_value),
-                VariableType::Double => self.data.double_value.partial_cmp(&other.data.double_value),
-                VariableType::Byte => Some(self.data.byte_value.cmp(&other.data.byte_value)),
-                VariableType::SByte => Some(self.data.sbyte_value.cmp(&other.data.sbyte_value)),
-                VariableType::Word => Some(self.data.word_value.cmp(&other.data.word_value)),
-                VariableType::SWord => Some(self.data.sword_value.cmp(&other.data.sword_value)),
+                VariableType::Float => self.as_float().partial_cmp(&other.as_float()),
+                VariableType::Double => self.as_double().partial_cmp(&other.as_double()),
+                VariableType::Byte | VariableType::SByte => Some(self.as_byte().cmp(&other.as_byte())),
+                VariableType::Word | VariableType::SWord => Some(self.as_word().cmp(&other.as_word())),
 
                 _ => None,
             }
@@ -714,8 +707,7 @@ impl Neg for VariableValue {
     fn neg(self) -> VariableValue {
         let mut dest_type = self.vtype;
         match dest_type {
-            VariableType::Boolean
-            | VariableType::Unsigned
+            VariableType::Unsigned
             | VariableType::Date
             | VariableType::EDate
             | VariableType::Money
@@ -737,16 +729,23 @@ impl Neg for VariableValue {
         }
         let mut data = VariableData::default();
         let generic_data = GenericVariableData::None;
-        unsafe {
-            match dest_type {
-                VariableType::Integer => data.int_value = -self.as_int(),
-                VariableType::SByte => data.sbyte_value = -self.data.sbyte_value,
-                VariableType::SWord => data.sword_value = -self.data.sword_value,
-                VariableType::Float => data.float_value = -self.data.float_value,
-                VariableType::Double => data.double_value = -self.data.double_value,
-                _ => {
-                    panic!("unsupported lvalue for add {self:?}");
+        match dest_type {
+            VariableType::Boolean => {
+                data.unsigned_value = unsafe {
+                    if self.data.unsigned_value == 0 {
+                        1
+                    } else {
+                        0
+                    }
                 }
+            }
+            VariableType::Integer => data.int_value = -self.as_int(),
+            VariableType::SByte => data.sbyte_value = -self.as_sbyte(),
+            VariableType::SWord => data.sword_value = -self.as_sword(),
+            VariableType::Float => data.float_value = -self.as_float(),
+            VariableType::Double => data.double_value = -self.as_double(),
+            _ => {
+                panic!("unsupported lvalue for add {self:?}");
             }
         }
         Self {
@@ -963,12 +962,10 @@ impl VariableValue {
     /// Panics if .
     #[must_use]
     pub fn not(&self) -> VariableValue {
-        unsafe {
-            Self {
-                vtype: VariableType::Boolean,
-                data: VariableData::from_bool(!self.data.bool_value),
-                generic_data: GenericVariableData::None,
-            }
+        Self {
+            vtype: VariableType::Boolean,
+            data: VariableData::from_bool(!self.as_bool()),
+            generic_data: GenericVariableData::None,
         }
     }
 
@@ -1030,7 +1027,10 @@ impl VariableValue {
     ///
     /// Panics if .
     pub fn as_bool(&self) -> bool {
-        unsafe { self.data.bool_value }
+        if self.vtype == VariableType::String || self.vtype == VariableType::BigStr {
+            return self.as_int() != 0;
+        }
+        unsafe { self.data.unsigned_value != 0 }
     }
 
     /// .
@@ -1040,12 +1040,22 @@ impl VariableValue {
     /// Panics if .
     pub fn as_int(&self) -> i32 {
         if let GenericVariableData::String(s) = &self.generic_data {
-            return s.parse::<i32>().unwrap_or_default();
+            let mut res = 0;
+            for c in s.chars() {
+                if c.is_digit(10) {
+                    if let Some(c) = c.to_digit(10) {
+                        res = res * 10 + c as i32;
+                    } else {
+                        break;
+                    }
+                }
+            }
+            return res;
         }
 
         match self.vtype {
             VariableType::Boolean => {
-                if unsafe { self.data.bool_value } {
+                if self.as_bool() {
                     return 1;
                 }
                 return 0;
@@ -1086,6 +1096,206 @@ impl VariableValue {
         }
     }
 
+    pub fn as_double(&self) -> f64 {
+        if let GenericVariableData::String(s) = &self.generic_data {
+            return s.parse::<f64>().unwrap_or_default();
+        }
+
+        match self.vtype {
+            VariableType::Boolean => {
+                if self.as_bool() {
+                    return 1.0;
+                }
+                return 0.0;
+            }
+            VariableType::Unsigned => {
+                return unsafe { self.data.unsigned_value as f64 };
+            }
+            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => {
+                return unsafe { self.data.int_value as f64 };
+            }
+            VariableType::Money => {
+                return unsafe { self.data.money_value as f64 };
+            }
+            VariableType::Float => {
+                return unsafe { self.data.float_value as f64 };
+            }
+            VariableType::Double => {
+                return unsafe { self.data.double_value as f64 };
+            }
+            VariableType::Time => {
+                return unsafe { self.data.time_value as f64 };
+            }
+            VariableType::Byte => {
+                return unsafe { self.data.byte_value as f64 };
+            }
+            VariableType::Word => {
+                return unsafe { self.data.word_value as f64 };
+            }
+            VariableType::SByte => {
+                return unsafe { self.data.sbyte_value as f64 };
+            }
+            VariableType::SWord => {
+                return unsafe { self.data.sword_value as f64 };
+            }
+            _ => {
+                panic!("Unsupported type: {:?}", self.vtype);
+            }
+        }
+    }
+
+    pub fn as_float(&self) -> f32 {
+        if let GenericVariableData::String(s) = &self.generic_data {
+            return s.parse::<f32>().unwrap_or_default();
+        }
+
+        match self.vtype {
+            VariableType::Boolean => {
+                if self.as_bool() {
+                    return 1.0;
+                }
+                return 0.0;
+            }
+            VariableType::Unsigned => {
+                return unsafe { self.data.unsigned_value as f32 };
+            }
+            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => {
+                return unsafe { self.data.int_value as f32 };
+            }
+            VariableType::Money => {
+                return unsafe { self.data.money_value as f32 };
+            }
+            VariableType::Float => {
+                return unsafe { self.data.float_value };
+            }
+            VariableType::Double => {
+                return unsafe { self.data.double_value as f32 };
+            }
+            VariableType::Time => {
+                return unsafe { self.data.time_value as f32 };
+            }
+            VariableType::Byte => {
+                return unsafe { self.data.byte_value as f32 };
+            }
+            VariableType::Word => {
+                return unsafe { self.data.word_value as f32 };
+            }
+            VariableType::SByte => {
+                return unsafe { self.data.sbyte_value as f32 };
+            }
+            VariableType::SWord => {
+                return unsafe { self.data.sword_value as f32 };
+            }
+            _ => {
+                panic!("Unsupported type: {:?}", self.vtype);
+            }
+        }
+    }
+
+    pub fn as_byte(&self) -> u8 {
+        if let GenericVariableData::String(s) = &self.generic_data {
+            return s.parse::<u8>().unwrap_or_default();
+        }
+
+        match self.vtype {
+            VariableType::Boolean => {
+                if self.as_bool() {
+                    return 1;
+                }
+                return 0;
+            }
+            VariableType::Unsigned => {
+                return unsafe { self.data.unsigned_value as u8 };
+            }
+            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => {
+                return unsafe { self.data.int_value as u8 };
+            }
+            VariableType::Money => {
+                return unsafe { self.data.money_value as u8 };
+            }
+            VariableType::Float => {
+                return unsafe { self.data.float_value as u8 };
+            }
+            VariableType::Double => {
+                return unsafe { self.data.double_value as u8 };
+            }
+            VariableType::Time => {
+                return unsafe { self.data.time_value as u8 };
+            }
+            VariableType::Byte => {
+                return unsafe { self.data.byte_value as u8 };
+            }
+            VariableType::Word => {
+                return unsafe { self.data.word_value as u8 };
+            }
+            VariableType::SByte => {
+                return unsafe { self.data.sbyte_value as u8 };
+            }
+            VariableType::SWord => {
+                return unsafe { self.data.sword_value as u8 };
+            }
+            _ => {
+                panic!("Unsupported type: {:?}", self.vtype);
+            }
+        }
+    }
+
+    pub fn as_sbyte(&self) -> i8 {
+        self.as_byte() as i8
+    }
+
+    pub fn as_word(&self) -> u16 {
+        if let GenericVariableData::String(s) = &self.generic_data {
+            return s.parse::<u16>().unwrap_or_default();
+        }
+
+        match self.vtype {
+            VariableType::Boolean => {
+                if self.as_bool() {
+                    return 1;
+                }
+                return 0;
+            }
+            VariableType::Unsigned => {
+                return unsafe { self.data.unsigned_value as u16 };
+            }
+            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => {
+                return unsafe { self.data.word_value };
+            }
+            VariableType::Money => {
+                return unsafe { self.data.money_value as u16 };
+            }
+            VariableType::Float => {
+                return unsafe { self.data.float_value as u16 };
+            }
+            VariableType::Double => {
+                return unsafe { self.data.double_value as u16 };
+            }
+            VariableType::Time => {
+                return unsafe { self.data.time_value as u16 };
+            }
+            VariableType::Byte => {
+                return unsafe { self.data.byte_value as u16 };
+            }
+            VariableType::Word => {
+                return unsafe { self.data.word_value as u16 };
+            }
+            VariableType::SByte => {
+                return unsafe { self.data.sbyte_value as u16 };
+            }
+            VariableType::SWord => {
+                return unsafe { self.data.sword_value as u16 };
+            }
+            _ => {
+                panic!("Unsupported type: {:?}", self.vtype);
+            }
+        }
+    }
+
+    pub fn as_sword(&self) -> i16 {
+        self.as_word() as i16
+    }
+
     /// .
     ///
     /// # Panics
@@ -1097,7 +1307,7 @@ impl VariableValue {
                 GenericVariableData::String(s) => s.to_string(),
                 _ => match self.vtype {
                     VariableType::Boolean => {
-                        if self.data.bool_value {
+                        if self.as_bool() {
                             "1".to_string()
                         } else {
                             "0".to_string()
@@ -1285,10 +1495,7 @@ impl VariableValue {
 
         match convert_to_type {
             VariableType::Boolean => {
-                if self.vtype == VariableType::String {
-                    return VariableValue::new_bool(self.as_string() == "0");
-                }
-                data.bool_value = self.as_int() != 0;
+                data.unsigned_value = if self.as_bool() { 1 } else { 0 };
             }
             VariableType::Unsigned => {
                 data.unsigned_value = self.as_int() as u64;
@@ -1317,32 +1524,22 @@ impl VariableValue {
                 data.time_value = self.as_int();
             }
             VariableType::Byte => {
-                data.byte_value = self.as_int() as u8;
+                data.byte_value = self.as_byte();
             }
             VariableType::Word => {
-                data.word_value = self.as_int() as u16;
+                data.word_value = self.as_word();
             }
             VariableType::SByte => {
-                data.sbyte_value = self.as_int() as i8;
+                data.sbyte_value = self.as_sbyte();
             }
             VariableType::SWord => {
-                data.sword_value = self.as_int() as i16;
+                data.sword_value = self.as_sword();
             }
             VariableType::Float => {
-                if let Ok(res) = self.as_string().parse() {
-                    data.float_value = res;
-                } else {
-                    log::error!("can't convert {} to float", self.as_string());
-                    data.float_value = 0.0;
-                }
+                data.float_value = self.as_float();
             }
             VariableType::Double => {
-                if let Ok(res) = self.as_string().parse() {
-                    data.double_value = res;
-                } else {
-                    log::error!("can't convert {} to double", self.as_string());
-                    data.double_value = 0.0;
-                }
+                data.double_value = self.as_double();
             }
             VariableType::DDate => {
                 data.ddate_value = self.as_int();

@@ -246,7 +246,7 @@ impl Decompiler {
                         VariableType::BigStr | VariableType::String => Constant::String(entry.value.as_string()),
                         VariableType::Float => Constant::Double(entry.value.data.float_value as f64),
                         VariableType::Double => Constant::Double(entry.value.data.double_value),
-                        VariableType::Boolean => Constant::Boolean(entry.value.data.bool_value),
+                        VariableType::Boolean => Constant::Boolean(entry.value.as_bool()),
                         VariableType::Unsigned => Constant::Unsigned(entry.value.data.unsigned_value),
                         //VariableType::Integer |
                         _ => Constant::Integer(entry.value.as_int()),

@@ -88,6 +88,36 @@ pub struct SecurityLevelDefinitions {
     #[serde(rename = "level")]
     pub levels: Vec<SecurityLevel>,
 }
+impl SecurityLevelDefinitions {
+    pub fn export_pcboard(&self, file: &std::path::PathBuf) -> Res<()> {
+        let mut data = String::new();
+        for level in &self.levels {
+            data.push_str(&format!(
+                "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\r\n",
+                level.password,
+                level.security,
+                level.time_per_day,
+                level.daily_file_kb_limit,
+                0, // base baud
+                0, // batch limit
+                level.uldl_ratio,
+                level.uldl_kb_ratio,
+                level.file_limit,
+                level.file_kb_limit,
+                if level.enforce_time_limit { "Y" } else { "N" },
+                if level.allow_alias { "Y" } else { "N" },
+                if level.enforce_read_mail { "Y" } else { "N" },
+                if level.is_demo_account { "Y" } else { "N" },
+                "N", // unused
+                level.file_credit,
+                level.file_kb_credit,
+                if level.is_enabled { "Y" } else { "N" }
+            ));
+        }
+        std::fs::write(file, data)?;
+        Ok(())
+    }
+}
 
 impl PCBoardTextImport for SecurityLevelDefinitions {
     fn import_data(data: String) -> Res<Self> {

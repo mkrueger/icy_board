@@ -52,6 +52,7 @@ impl IcyBoardState {
             if let Some(action) = self.try_find_command(&command).await {
                 return self.dispatch_command(&command, &action).await;
             }
+            log::warn!("Command not found: '{}'", command);
             self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFAFTER | display_flags::LFBEFORE)
                 .await?;
         }

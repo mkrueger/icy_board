@@ -608,10 +608,7 @@ impl Constant {
                 data.double_value = *i;
                 VariableValue::new(VariableType::Double, data)
             }
-            Constant::Boolean(b) => {
-                data.bool_value = *b;
-                VariableValue::new(VariableType::Boolean, data)
-            }
+            Constant::Boolean(b) => VariableValue::new_bool(*b),
             Constant::Builtin(s) => {
                 data.int_value = s.value;
                 VariableValue::new(VariableType::Integer, data)

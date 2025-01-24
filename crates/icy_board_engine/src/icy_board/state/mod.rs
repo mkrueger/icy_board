@@ -585,6 +585,8 @@ impl IcyBoardState {
                     .await?;
             }
         }
+        // clear all ppe parameters
+        self.session.tokens.clear();
         Ok(())
     }
 

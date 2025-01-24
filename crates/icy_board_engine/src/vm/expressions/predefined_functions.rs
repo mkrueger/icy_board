@@ -848,11 +848,18 @@ pub async fn s2i(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     if src.is_empty() {
         return Ok(VariableValue::new_int(0));
     }
-    if let Ok(i) = i32::from_str_radix(&src, base as u32) {
-        return Ok(VariableValue::new_int(i));
-    };
-    log::error!("s2i: invalid number: '{}' for base {}", src, base);
-    Ok(VariableValue::new_int(0))
+
+    let mut res = 0;
+    for c in src.chars() {
+        if c.is_digit(base as u32) {
+            if let Some(c) = c.to_digit(base as u32) {
+                res = res * base + c as i32;
+            } else {
+                break;
+            }
+        }
+    }
+    Ok(VariableValue::new_int(res))
 }
 pub async fn carrier(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.icy_board_state.get_bps()))

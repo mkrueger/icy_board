@@ -1799,6 +1799,14 @@ impl IcbTextFile {
         // default has all entries
         true
     }
+
+    pub fn update_record_number(&mut self, number: usize, new_text: impl Into<String>) -> Res<()> {
+        if number < 1 || number >= self.entries.len() {
+            return Err(Box::new(IcyError::InvalidRecordNumber(number)));
+        }
+        self.entries[number].text = new_text.into();
+        Ok(())
+    }
 }
 
 impl Deref for IcbTextFile {

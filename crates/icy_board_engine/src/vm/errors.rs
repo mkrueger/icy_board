@@ -41,4 +41,7 @@ pub enum IcyError {
 
     #[error("Error saving file ({0}) : {1}")]
     ErrorSavingFile(String, String),
+
+    #[error("Invalid Record Number ({0})")]
+    InvalidRecordNumber(usize),
 }

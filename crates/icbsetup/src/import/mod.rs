@@ -212,7 +212,7 @@ impl PCBoardImporter {
 
         let protocol_data_file = self.convert_data::<SupportedProtocols>(&self.data.path.protocol_data_file.clone(), "config/protocols.toml")?;
         let language_file = self.convert_data::<SupportedLanguages>(&self.data.path.pcml_dat_file.clone(), "config/languages.toml")?;
-        let security_level_file = self.convert_data::<SecurityLevelDefinitions>(&self.data.path.pwd_file.clone(), "config/security_levels.toml")?;
+        let security_level_file = self.convert_data::<SecurityLevelDefinitions>(&self.data.path.pwrd_file.clone(), "config/security_levels.toml")?;
         let command_file = self.convert_default_cmd_lst(&self.data.path.cmd_lst.clone(), "config/commands.toml")?;
         let statistics_file = self.convert_data::<Statistics>(&self.data.path.stats_file.clone(), "config/statistics.toml")?;
 

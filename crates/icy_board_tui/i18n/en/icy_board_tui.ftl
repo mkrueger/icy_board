@@ -76,8 +76,6 @@ icbmoni_protocol_header = Protocol
 
 icbmoni_log_in=User logging in…
 
-#MkIcbTxt
-
 yes=Yes
 no=No
 
