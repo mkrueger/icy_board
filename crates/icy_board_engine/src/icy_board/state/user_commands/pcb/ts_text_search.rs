@@ -3,7 +3,7 @@ use crate::icy_board::{
     state::{
         functions::{display_flags, MASK_COMMAND, MASK_NUM},
         user_commands::message_reader::MessageViewer,
-        IcyBoardState, UserActivity,
+        IcyBoardState, NodeStatus,
     },
 };
 use bstr::BString;
@@ -13,7 +13,7 @@ use crate::Res;
 
 impl IcyBoardState {
     pub async fn text_search(&mut self, help: &str) -> Res<()> {
-        self.set_activity(UserActivity::ReadMessages).await;
+        self.set_activity(NodeStatus::HandlingMail).await;
         let Ok(Some(area)) = self.show_message_areas(self.session.current_conference_number, help).await else {
             self.press_enter().await?;
             self.display_current_menu = true;

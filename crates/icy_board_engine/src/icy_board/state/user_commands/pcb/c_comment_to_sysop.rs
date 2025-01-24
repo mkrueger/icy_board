@@ -6,7 +6,7 @@ use crate::{
     datetime::IcbTime,
     icy_board::{
         icb_text::IceText,
-        state::{functions::display_flags, UserActivity},
+        state::{functions::display_flags, NodeStatus},
     },
 };
 use bstr::BString;
@@ -53,7 +53,7 @@ impl IcyBoardState {
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::YESNO | display_flags::FIELDLEN,
             )
             .await?;
-        self.set_activity(UserActivity::CommentToSysop).await;
+        self.set_activity(NodeStatus::HandlingMail).await;
         self.write_message(
             -1,
             -1,

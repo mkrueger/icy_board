@@ -11,7 +11,7 @@ use crate::{
         security_expr::SecurityExpression,
         state::{
             functions::{display_flags, pwd_flags, MASK_ALNUM, MASK_PHONE, MASK_WEB},
-            UserActivity,
+            NodeStatus,
         },
         surveys::Survey,
         user_base::{Password, User},
@@ -22,7 +22,7 @@ use chrono::{Datelike, Local, Utc};
 use icy_net::iemsi::try_iemsi;
 impl IcyBoardState {
     pub async fn login(&mut self) -> Res<bool> {
-        self.set_activity(UserActivity::LoggingIn).await;
+        self.set_activity(NodeStatus::LogIntoSystem).await;
 
         self.reset_color(TerminalTarget::Both).await?;
         self.clear_screen(TerminalTarget::Both).await?;

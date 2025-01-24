@@ -667,22 +667,24 @@ pub async fn onlocal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 
 pub async fn un_stat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     if let Some(node) = &vm.pcb_node {
-        Ok(VariableValue::new_int(node.status as i32))
+        Ok(VariableValue::new_string(node.status.to_char().to_string()))
     } else {
-        Ok(VariableValue::new_int(0))
+        Ok(VariableValue::new_string(String::new()))
     }
 }
 
 pub async fn un_name(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     if let Some(node) = &vm.pcb_node {
-        Ok(VariableValue::new_string(node.name.clone()))
-    } else {
-        Ok(VariableValue::new_string(String::new()))
+        if let Some(user) = vm.icy_board_state.board.lock().await.users.get(node.cur_user as usize) {
+            return Ok(VariableValue::new_string(user.get_name().clone()));
+        }
     }
+    Ok(VariableValue::new_string(String::new()))
 }
 pub async fn un_city(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     if let Some(node) = &vm.pcb_node {
-        Ok(VariableValue::new_string(node.city.clone()))
+        let city = vm.icy_board_state.board.lock().await.users[node.cur_user as usize].city_or_state.clone();
+        Ok(VariableValue::new_string(city))
     } else {
         Ok(VariableValue::new_string(String::new()))
     }
@@ -1225,7 +1227,7 @@ pub async fn minkey(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
     target_inkey(vm, TerminalTarget::User).await
 }
 pub async fn maxnode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.nodes.len() as i32))
+    Ok(VariableValue::new_int(vm.icy_board_state.node_state.lock().await.len() as i32))
 }
 pub async fn slpath(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_string(

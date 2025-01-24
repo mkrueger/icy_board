@@ -33,7 +33,6 @@ use super::{
     conferences::Conference,
     icb_config::{IcbColor, DEFAULT_PCBOARD_DATE_FORMAT},
     icb_text::{IcbTextFile, IcbTextStyle, IceText},
-    pcboard_data::Node,
     surveys::SurveyList,
     user_base::{FSEMode, User},
     IcyBoard, IcyBoardSerializer,
@@ -300,33 +299,86 @@ impl Default for Session {
 }
 
 #[derive(Clone, Copy)]
-pub enum UserActivity {
-    LoggingIn,
-    BrowseMenu,
-    EnterMessage,
-    BrowseFiles,
-    ReadMessages,
-    ReadBulletins,
-    TakeSurvey,
-    CommentToSysop,
-    UploadFiles,
-    DownloadFiles,
-
-    Goodbye,
-
+pub enum NodeStatus {
+    NoCaller,
+    Available,
     RunningDoor,
-    ChatWithSysop,
+    EnterMessage,
     GroupChat,
+    HandlingMail,
+    LogoffPending,
+    NodeMessage,
+    RunningEvent,
+    LogIntoSystem,
     PagingSysop,
-    ReadBroadcast,
+    ChatWithSysop,
+    RecycleBBS,
+    TakeSurvey,
+    Transfer,
+    Unavailable,
+    DropDOSDelayed,
+    DropDOSNow,
+    ReadBulletins,
 }
+
+impl NodeStatus {
+    pub fn to_char(&self) -> char {
+        match self {
+            NodeStatus::NoCaller => ' ',
+            NodeStatus::Available => 'A',
+            NodeStatus::RunningDoor => 'D',
+            NodeStatus::EnterMessage => 'E',
+            NodeStatus::GroupChat => 'G',
+            NodeStatus::HandlingMail => 'H',
+            NodeStatus::LogoffPending => 'L',
+            NodeStatus::NodeMessage => 'M',
+            NodeStatus::RunningEvent => 'N',
+            NodeStatus::LogIntoSystem => 'O',
+            NodeStatus::PagingSysop => 'P',
+            NodeStatus::ChatWithSysop => 'C',
+            NodeStatus::RecycleBBS => 'R',
+            NodeStatus::TakeSurvey => 'S',
+            NodeStatus::Transfer => 'T',
+            NodeStatus::Unavailable => 'U',
+            NodeStatus::DropDOSDelayed => 'W',
+            NodeStatus::DropDOSNow => 'X',
+            NodeStatus::ReadBulletins => 'B',
+        }
+    }
+    pub fn from_char(ch: char) -> Option<Self> {
+        match ch.to_ascii_uppercase() {
+            ' ' => Some(NodeStatus::NoCaller),
+            'A' => Some(NodeStatus::Available),
+            'D' => Some(NodeStatus::RunningDoor),
+            'E' => Some(NodeStatus::EnterMessage),
+            'G' => Some(NodeStatus::GroupChat),
+            'H' => Some(NodeStatus::HandlingMail),
+            'L' => Some(NodeStatus::LogoffPending),
+            'M' => Some(NodeStatus::NodeMessage),
+            'N' => Some(NodeStatus::RunningEvent),
+            'O' => Some(NodeStatus::LogIntoSystem),
+            'P' => Some(NodeStatus::PagingSysop),
+            'C' => Some(NodeStatus::ChatWithSysop),
+            'R' => Some(NodeStatus::RecycleBBS),
+            'S' => Some(NodeStatus::TakeSurvey),
+            'T' => Some(NodeStatus::Transfer),
+            'U' => Some(NodeStatus::Unavailable),
+            'W' => Some(NodeStatus::DropDOSDelayed),
+            'X' => Some(NodeStatus::DropDOSNow),
+            'B' => Some(NodeStatus::ReadBulletins),
+            _ => None,
+        }
+    }
+}
+
 pub struct NodeState {
     pub sysop_connection: Option<ChannelConnection>,
     pub bbs_channel: Option<tokio::sync::mpsc::Receiver<BBSMessage>>,
     pub cur_user: i32,
     pub cur_conference: u16,
     pub graphics_mode: GraphicsMode,
-    pub user_activity: UserActivity,
+    pub status: NodeStatus,
+    pub operation: String,
     pub enabled_chat: bool,
     pub node_number: usize,
     pub connection_type: ConnectionType,
@@ -342,7 +394,8 @@ impl NodeState {
         Self {
             sysop_connection: None,
             bbs_channel: Some(rx),
-            user_activity: UserActivity::LoggingIn,
+            status: NodeStatus::NoCaller,
+            operation: String::new(),
             graphics_mode: GraphicsMode::Ansi,
             cur_user: -1,
             cur_conference: 0,
@@ -381,8 +434,6 @@ pub struct IcyBoardState {
 
     pub node_state: Arc<Mutex<Vec<Option<NodeState>>>>,
     pub node: usize,
-
-    pub nodes: Vec<Node>,
 
     pub transfer_statistics: TransferStatistics,
 
@@ -439,7 +490,6 @@ impl IcyBoardState {
             connection,
             node_state,
             node,
-            nodes: Vec::new(),
             debug_level: 0,
             display_text,
             env_vars: HashMap::new(),
@@ -821,8 +871,35 @@ impl IcyBoardState {
         None
     }
 
-    pub async fn set_activity(&self, activity: UserActivity) {
-        self.node_state.lock().await[self.node].as_mut().unwrap().user_activity = activity;
+    pub async fn set_activity(&self, node_status: NodeStatus) {
+        let text = match node_status {
+            NodeStatus::LogIntoSystem => IceText::LogIntoSystem,
+            NodeStatus::Available => IceText::Available,
+            NodeStatus::Unavailable => IceText::Unavailable,
+            NodeStatus::EnterMessage => IceText::EnterMessage,
+
+            NodeStatus::Transfer => IceText::Transfer,
+
+            NodeStatus::HandlingMail => IceText::HandlingMail,
+            NodeStatus::TakeSurvey => IceText::AnswerSurvey,
+
+            NodeStatus::ReadBulletins => IceText::HandlingMail,
+
+            NodeStatus::RunningDoor => IceText::InADOOR,
+            NodeStatus::ChatWithSysop => IceText::ChatWithSysop,
+            NodeStatus::GroupChat => IceText::GroupChat,
+            NodeStatus::PagingSysop => IceText::PagingSysop,
+            NodeStatus::LogoffPending => IceText::LogoffPending,
+            NodeStatus::NoCaller => IceText::NoCaller,
+            NodeStatus::NodeMessage => IceText::ReceivedMessage,
+            NodeStatus::RunningEvent => IceText::RunningEvent,
+            NodeStatus::RecycleBBS => IceText::RecycleBBS,
+            NodeStatus::DropDOSDelayed => IceText::DropDOSDelayed,
+            NodeStatus::DropDOSNow => IceText::DropDOSNow,
+        };
+        let txt = self.display_text.get_display_text(text).unwrap();
+        self.node_state.lock().await[self.node].as_mut().unwrap().operation = txt.text;
+        self.node_state.lock().await[self.node].as_mut().unwrap().status = node_status;
     }
 
     pub async fn set_grapics_mode(&mut self, mode: GraphicsMode) {
@@ -1665,7 +1742,7 @@ impl IcyBoardState {
     async fn show_broadcast(&mut self, msg: String) -> Res<()> {
         let buf = self.user_screen.buffer.flat_clone(false);
         let pos = self.user_screen.caret.get_position();
-        self.set_activity(UserActivity::ReadBroadcast).await;
+        self.set_activity(NodeStatus::NodeMessage).await;
         self.new_line().await?;
         self.set_color(TerminalTarget::Both, IcbColor::Dos(15)).await?;
         self.println(TerminalTarget::Both, &"Broadcast:").await?;

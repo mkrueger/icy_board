@@ -7,7 +7,7 @@ use crate::Res;
 use crate::{
     icy_board::{
         icb_text::IceText,
-        state::{functions::display_flags, UserActivity},
+        state::{functions::display_flags, NodeStatus},
     },
     vm::TerminalTarget,
 };
@@ -16,7 +16,7 @@ use super::l_find_files::FileList;
 
 impl IcyBoardState {
     pub async fn show_file_directories(&mut self, help: &str) -> Res<()> {
-        self.set_activity(UserActivity::BrowseFiles).await;
+        self.set_activity(NodeStatus::Available).await;
 
         self.session.is_non_stop = false;
         self.session.more_requested = false;

@@ -7,7 +7,7 @@ use crate::icy_board::{
     icb_text::IceText,
     state::{
         functions::{display_flags, MASK_ALNUM},
-        UserActivity,
+        NodeStatus,
     },
 };
 use icy_engine::TextPane;
@@ -22,7 +22,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 impl IcyBoardState {
     pub async fn open_door(&mut self, help: &str) -> Res<()> {
-        self.set_activity(UserActivity::RunningDoor).await;
+        self.set_activity(NodeStatus::RunningDoor).await;
         let doors = self.session.current_conference.doors.clone();
         if doors.is_empty() {
             self.display_text(

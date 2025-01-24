@@ -4,7 +4,7 @@ use crate::icy_board::{
     icb_text::IceText,
     state::{
         functions::{display_flags, MASK_ASCII},
-        UserActivity,
+        NodeStatus,
     },
 };
 
@@ -18,7 +18,7 @@ impl IcyBoardState {
             .await?;
             return Ok(());
         }
-        self.set_activity(UserActivity::EnterMessage).await;
+        self.set_activity(NodeStatus::EnterMessage).await;
         let conf = self.session.current_conference_number;
         let Ok(Some(area)) = self.show_message_areas(conf, help).await else {
             self.press_enter().await?;

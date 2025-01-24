@@ -2,7 +2,7 @@ use crate::{
     icy_board::{
         icb_text::IceText,
         security_expr::SecurityExpression,
-        state::{functions::display_flags, UserActivity},
+        state::{functions::display_flags, NodeStatus},
         surveys::Survey,
     },
     vm::TerminalTarget,
@@ -12,7 +12,7 @@ use crate::{icy_board::state::IcyBoardState, Res};
 
 impl IcyBoardState {
     pub async fn goodbye_cmd(&mut self) -> Res<()> {
-        self.set_activity(UserActivity::Goodbye).await;
+        self.set_activity(NodeStatus::LogoffPending).await;
         self.displaycmdfile("g").await?;
 
         if !self.session.flagged_files.is_empty() {

@@ -11,6 +11,7 @@ use crate::executable::PPEScript;
 use crate::executable::VariableTable;
 use crate::executable::VariableType;
 use crate::executable::VariableValue;
+use crate::icy_board::state::NodeState;
 use crate::icy_board::user_base::FSEMode;
 use crate::parser::UserTypeRegistry;
 use crate::Res;
@@ -25,7 +26,6 @@ use thiserror::Error;
 pub mod expressions;
 
 pub mod statements;
-use crate::icy_board::pcboard_data::Node;
 use crate::icy_board::state::IcyBoardState;
 use crate::icy_board::user_base::Password;
 use crate::icy_board::user_base::User;
@@ -146,7 +146,7 @@ pub struct VirtualMachine<'a> {
 
     pub icy_board_state: &'a mut IcyBoardState,
 
-    pub pcb_node: Option<Node>,
+    pub pcb_node: Option<NodeState>,
 
     pub user_data: Vec<Box<dyn UserDataValue>>,
 

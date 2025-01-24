@@ -1,6 +1,6 @@
 use crate::icy_board::{
     icb_text::IceText,
-    state::{functions::display_flags, UserActivity},
+    state::{functions::display_flags, NodeStatus},
 };
 use jamjam::jam::JamMessageBase;
 
@@ -8,7 +8,7 @@ use crate::{icy_board::state::IcyBoardState, Res};
 
 impl IcyBoardState {
     pub async fn read_messages(&mut self, help: &str) -> Res<()> {
-        self.set_activity(UserActivity::ReadMessages).await;
+        self.set_activity(NodeStatus::HandlingMail).await;
         let Ok(Some(area)) = self.show_message_areas(self.session.current_conference_number, help).await else {
             self.press_enter().await?;
             self.display_current_menu = true;

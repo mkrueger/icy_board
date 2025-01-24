@@ -10,7 +10,7 @@ use crate::{
         icb_text::IceText,
         state::{
             functions::{display_flags, MASK_ASCII},
-            UserActivity,
+            NodeStatus,
         },
     },
     vm::TerminalTarget,
@@ -20,7 +20,7 @@ use humanize_bytes::humanize_bytes_decimal;
 
 impl IcyBoardState {
     pub async fn find_files_cmd(&mut self, help: &str) -> Res<()> {
-        self.set_activity(UserActivity::BrowseFiles).await;
+        self.set_activity(NodeStatus::Available).await;
 
         if self.session.current_conference.directories.is_empty() {
             self.display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)

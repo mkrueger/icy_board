@@ -22,7 +22,7 @@ use crate::{
     vm::TerminalTarget,
 };
 
-use super::{IcyBoardState, KeySource, UserActivity};
+use super::{IcyBoardState, KeySource, NodeStatus};
 
 pub mod display_flags {
     pub const DEFAULT: i32 = 0x00000;
@@ -477,7 +477,7 @@ impl IcyBoardState {
         let menu = self.get_board().await.conferences[conference as usize].area_menu.clone();
         let areas = self.get_board().await.conferences[conference as usize].areas.clone();
 
-        self.set_activity(UserActivity::EnterMessage).await;
+        self.set_activity(NodeStatus::EnterMessage).await;
         self.session.is_non_stop = false;
         self.session.more_requested = false;
 

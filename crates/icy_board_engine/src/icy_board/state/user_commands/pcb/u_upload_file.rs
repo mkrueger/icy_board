@@ -4,7 +4,7 @@ use crate::{
         icb_text::IceText,
         state::{
             functions::{display_flags, MASK_ASCII},
-            UserActivity,
+            NodeStatus,
         },
     },
     vm::TerminalTarget,
@@ -15,7 +15,7 @@ use icy_net::protocol::{Protocol, TransferProtocolType, XYModemVariant, XYmodem,
 
 impl IcyBoardState {
     pub async fn upload_file(&mut self, help: &str) -> Res<()> {
-        self.set_activity(UserActivity::UploadFiles).await;
+        self.set_activity(NodeStatus::Transfer).await;
         let upload_location = self.resolve_path(&self.session.current_conference.pub_upload_location);
         if !upload_location.exists() {
             self.display_text(

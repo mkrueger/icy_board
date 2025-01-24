@@ -1,9 +1,5 @@
 use crate::{
-    icy_board::{
-        icb_config::IcbColor,
-        icb_text::IceText,
-        state::{functions::display_flags, UserActivity},
-    },
+    icy_board::{icb_config::IcbColor, icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
 };
 
@@ -22,37 +18,7 @@ impl IcyBoardState {
             if let Some(connection) = connection {
                 if let Some(name) = self.get_board().await.users.get(connection.cur_user as usize) {
                     let name = name.get_name().to_string();
-                    let text = match connection.user_activity {
-                        UserActivity::LoggingIn => IceText::LogIntoSystem,
-                        UserActivity::BrowseMenu => {
-                            if connection.enabled_chat {
-                                IceText::Available
-                            } else {
-                                IceText::Unavailable
-                            }
-                        }
-                        UserActivity::EnterMessage => IceText::EnterMessage,
-
-                        UserActivity::BrowseFiles => IceText::Transfer,
-                        UserActivity::UploadFiles => IceText::Transfer,
-                        UserActivity::DownloadFiles => IceText::Transfer,
-
-                        UserActivity::ReadMessages => IceText::HandlingMail,
-                        UserActivity::TakeSurvey => IceText::AnswerSurvey,
-
-                        UserActivity::ReadBulletins => IceText::HandlingMail,
-                        UserActivity::CommentToSysop => IceText::EnterMessage,
-
-                        UserActivity::RunningDoor => IceText::InADOOR,
-                        UserActivity::ChatWithSysop => IceText::ChatWithSysop,
-                        UserActivity::GroupChat => IceText::GroupChat,
-                        UserActivity::PagingSysop => IceText::PagingSysop,
-                        UserActivity::Goodbye => IceText::LogoffPending,
-                        UserActivity::ReadBroadcast => IceText::ReceivedMessage,
-                    };
-
-                    let txt = self.display_text.get_display_text(text).unwrap();
-                    lines.push(format!("{:>4}   {:23} {}", i + 1, txt.text, name));
+                    lines.push(format!("{:>4}   {:23} {}", i + 1, connection.operation, name));
                 }
             }
         }

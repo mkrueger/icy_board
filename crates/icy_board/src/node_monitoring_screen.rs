@@ -31,7 +31,7 @@ pub struct NodeMonitoringScreen {
 }
 
 pub struct Info {
-    pub user_activity: icy_board_engine::icy_board::state::UserActivity,
+    pub user_activity: String,
     pub cur_user: Option<String>,
     pub connection_type: ConnectionType,
 }
@@ -50,7 +50,7 @@ impl Info {
         };
 
         Info {
-            user_activity: state.user_activity,
+            user_activity: state.operation.clone(),
             cur_user: user,
             connection_type: state.connection_type,
         }
@@ -251,7 +251,8 @@ impl NodeMonitoringScreen {
                 } else {
                     get_text("icbmoni_log_in")
                 };
-
+                let activity = state.user_activity.clone();
+                /*/
                 let activity = match state.user_activity {
                     icy_board_engine::icy_board::state::UserActivity::LoggingIn => get_text("icbmoni_user_log_in"),
                     icy_board_engine::icy_board::state::UserActivity::BrowseMenu => get_text("icbmoni_user_browse_menu"),
@@ -270,7 +271,7 @@ impl NodeMonitoringScreen {
                     icy_board_engine::icy_board::state::UserActivity::GroupChat => get_text("icbmoni_user_group_chat"),
                     icy_board_engine::icy_board::state::UserActivity::PagingSysop => get_text("icbmoni_user_page_sysop"),
                     icy_board_engine::icy_board::state::UserActivity::ReadBroadcast => get_text("icbmoni_user_read_broadcast"),
-                };
+                };*/
 
                 Row::new(vec![
                     Cell::from(format!("{:<3}", i + 1)),

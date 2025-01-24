@@ -7,7 +7,7 @@ use crate::{
     icy_board::{
         icb_config::IcbColor,
         icb_text::IceText,
-        state::{functions::display_flags, UserActivity},
+        state::{functions::display_flags, NodeStatus},
     },
     vm::TerminalTarget,
 };
@@ -17,7 +17,7 @@ use jamjam::jam::JamMessageBase;
 
 impl IcyBoardState {
     pub async fn quick_message_scan(&mut self, help: &str) -> Res<()> {
-        self.set_activity(UserActivity::ReadMessages).await;
+        self.set_activity(NodeStatus::HandlingMail).await;
 
         let Ok(Some(area)) = self.show_message_areas(self.session.current_conference_number, help).await else {
             self.press_enter().await?;

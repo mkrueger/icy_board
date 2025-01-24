@@ -13,7 +13,7 @@ use crate::{
         read_with_encoding_detection,
         state::{
             functions::{display_flags, MASK_ALNUM},
-            UserActivity,
+            NodeStatus,
         },
     },
     vm::TerminalTarget,
@@ -22,7 +22,7 @@ use chrono::Local;
 
 impl IcyBoardState {
     pub async fn take_survey(&mut self, help: &str) -> Res<()> {
-        self.set_activity(UserActivity::TakeSurvey).await;
+        self.set_activity(NodeStatus::TakeSurvey).await;
 
         let surveys = self.load_surveys().await?;
         if surveys.is_empty() {

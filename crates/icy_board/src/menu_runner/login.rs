@@ -11,7 +11,7 @@ use icy_board_engine::{
         security_expr::SecurityExpression,
         state::{
             functions::{display_flags, pwd_flags, MASK_ALNUM, MASK_PHONE, MASK_WEB},
-            UserActivity,
+            NodeStatus,
         },
         surveys::Survey,
         user_base::{Password, User},
@@ -21,7 +21,7 @@ use icy_board_engine::{
 use icy_net::iemsi::try_iemsi;
 impl PcbBoardCommand {
     pub async fn login(&mut self) -> Res<bool> {
-        self.state.set_activity(UserActivity::LoggingIn).await;
+        self.state.set_activity(NodeStatus::LogIntoSystem).await;
 
         self.state.reset_color(TerminalTarget::Both).await?;
         self.state.clear_screen(TerminalTarget::Both).await?;

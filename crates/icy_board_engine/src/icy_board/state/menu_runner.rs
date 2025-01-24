@@ -14,11 +14,11 @@ use crate::{
     Res,
 };
 
-use super::{functions::MASK_COMMAND, IcyBoardState, UserActivity};
+use super::{functions::MASK_COMMAND, IcyBoardState};
 
 impl IcyBoardState {
     pub async fn ask_run_command(&mut self) -> Res<()> {
-        self.set_activity(UserActivity::BrowseMenu).await;
+        self.set_activity(super::NodeStatus::Available).await;
         if self.display_current_menu && !self.session.expert_mode {
             self.display_current_menu().await?;
             if self.session.request_logoff {

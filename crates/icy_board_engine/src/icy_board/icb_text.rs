@@ -633,7 +633,7 @@ pub enum IceText {
     /// `Auto Logoff Pending`
     LogoffPending = 306,
     /// `DOS Recycle Pending`
-    _RecycleBBS = 307,
+    RecycleBBS = 307,
     /// `Unavailable for CHAT`
     Unavailable = 308,
     /// `Transferring a File`
@@ -643,7 +643,7 @@ pub enum IceText {
     /// `CHATTING with Group`
     GroupChat = 311,
     /// `Drop to DOS Pending`
-    _DropDOSDelayed = 312,
+    DropDOSDelayed = 312,
     /// `@OPTEXT@ has made the discussion public.`
     MadeTopicPublic = 313,
     /// `Channel 1 cannot be made private.`
@@ -707,7 +707,7 @@ pub enum IceText {
     /// `(NS) continue reading in non-stop mode`
     MorehelpNonstop = 343,
     /// `Drop to DOS - Urgent`
-    _DropDOSNow = 344,
+    DropDOSNow = 344,
     /// `Force logoff now (`N'=wait until caller logs off, then drop to DOS)`
     DropNow = 345,
     /// `(V) View a file, then continue displaying files`
@@ -1385,7 +1385,7 @@ pub enum IceText {
     /// `@OPTEXT@ Menu Command ('MENU' for options)`
     MenuCommand = 682,
     /// `Running Event`
-    _RunningEvent = 683,
+    RunningEvent = 683,
     /// `Event finished at~`
     _EventFinished = 684,
     /// `Message(s) successfully inserted.`

@@ -7,13 +7,13 @@ use crate::{
         icb_config::IcbColor,
         state::{
             functions::{display_flags, MASK_ALNUM},
-            GraphicsMode,
+            GraphicsMode, NodeState, NodeStatus,
         },
     },
     Res,
 };
 use bstr::BString;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use codepages::tables::CP437_TO_UNICODE;
 use icy_engine::{BufferType, OutputFormat, SaveOptions, ScreenPreperation};
 use jamjam::jam::JamMessage;
@@ -663,9 +663,36 @@ pub async fn dispstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 pub async fn rdunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let node = vm.eval_expr(&args[0]).await?.as_int() - 1;
-
-    if let Some(node) = vm.icy_board_state.nodes.get(node as usize) {
-        vm.pcb_node = Some(node.clone());
+    if let Some(Some(node)) = vm.icy_board_state.node_state.lock().await.get(node as usize) {
+        vm.pcb_node = Some(NodeState {
+            sysop_connection: None,
+            bbs_channel: None,
+            cur_user: node.cur_user,
+            cur_conference: node.cur_conference,
+            graphics_mode: node.graphics_mode,
+            operation: node.operation.clone(),
+            status: node.status.clone(),
+            enabled_chat: node.enabled_chat,
+            node_number: node.node_number,
+            connection_type: node.connection_type,
+            logon_time: node.logon_time,
+            handle: None,
+        });
+    } else {
+        vm.pcb_node = Some(NodeState {
+            sysop_connection: None,
+            bbs_channel: None,
+            cur_user: -1,
+            cur_conference: 0,
+            graphics_mode: GraphicsMode::Graphics,
+            operation: String::new(),
+            status: NodeStatus::NoCaller,
+            enabled_chat: false,
+            node_number: node as usize,
+            connection_type: icy_net::ConnectionType::Channel,
+            logon_time: DateTime::<Utc>::MIN_UTC,
+            handle: None,
+        });
     }
     Ok(())
 }
@@ -673,19 +700,19 @@ pub async fn rdunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 pub async fn wrunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let node = vm.eval_expr(&args[0]).await?.as_int() - 1;
     let stat = vm.eval_expr(&args[1]).await?.as_string();
-    let name = vm.eval_expr(&args[2]).await?.as_string();
+    let name: String = vm.eval_expr(&args[2]).await?.as_string();
     let city = vm.eval_expr(&args[3]).await?.as_string();
     let operation = vm.eval_expr(&args[4]).await?.as_string();
     let broadcast = vm.eval_expr(&args[5]).await?.as_string();
 
-    // Todo: Broadcast
+    // Todo: Name/City/Broadcast
 
-    if let Some(node) = vm.icy_board_state.nodes.get_mut(node as usize) {
+    if let Some(Some(node)) = vm.icy_board_state.node_state.lock().await.get_mut(node as usize) {
         if !stat.is_empty() {
-            node.status = stat.as_bytes()[0] as char;
+            if let Some(stat) = NodeStatus::from_char(stat.chars().next().unwrap()) {
+                node.status = stat;
+            }
         }
-        node.name = name;
-        node.city = city;
         node.operation = operation;
     } else {
         log::error!("PPE wrunet - node invalid: {}", node);
