@@ -125,7 +125,7 @@ pub async fn right(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
             res.push(' ');
             chars -= 1;
         }
-        str.iter().rev().take(chars).for_each(|c| res.push(*c));
+        str.iter().rev().take(chars).rev().for_each(|c| res.push(*c));
     }
     Ok(VariableValue::new_string(res))
 }
@@ -1758,13 +1758,29 @@ pub async fn qwklimits(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
     panic!("TODO")
 }
 pub async fn findfirst(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let filespec = vm.eval_expr(&args[0]).await?.as_string();
+    vm.file_list.clear();
+
+    if let Ok(g) = glob::glob(&filespec) {
+        for entry in g {
+            match entry {
+                Ok(path) => {
+                    let path = path.to_string_lossy().to_string();
+                    vm.file_list.push_back(path);
+                }
+                Err(e) => {
+                    continue;
+                }
+            }
+        }
+    }
+    Ok(VariableValue::new_string(vm.file_list.pop_front().unwrap_or(String::new())))
 }
+
 pub async fn findnext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_string(vm.file_list.pop_front().unwrap_or(String::new())))
 }
+
 pub async fn uselmrs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")

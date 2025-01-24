@@ -582,21 +582,36 @@ pub async fn pop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn call(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("call not implemented statement!");
-    panic!("TODO")
+    let file_name = vm.eval_expr(&args[0]).await?.as_string();
+    vm.icy_board_state.run_ppe(&file_name, None);
+    Ok(())
 }
+
 pub async fn join(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("join not implemented statement!");
-    panic!("TODO")
+    let conf = vm.eval_expr(&args[0]).await?.as_int();
+    if conf >= 0 {
+        vm.icy_board_state.join_conference(conf as u16, true);
+    }
+    Ok(())
 }
 pub async fn quest(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("quest not implemented statement!");
-    panic!("TODO")
+    let nr = vm.eval_expr(&args[0]).await?.as_int();
+    let surveys = vm.icy_board_state.load_surveys().await?;
+    if let Some(survey) = surveys.get(nr as usize) {
+        vm.icy_board_state.start_survey(survey);
+    }
+    Ok(())
 }
+
 pub async fn blt(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("blt not implemented statement!");
-    panic!("TODO")
+    let nr = vm.eval_expr(&args[0]).await?.as_int();
+    let bulletins = vm.icy_board_state.load_bullettins().await?;
+    if let Some(bulletin) = bulletins.get(nr as usize) {
+        vm.icy_board_state.display_file(&bulletin.file).await?;
+    }
+    Ok(())
 }
+
 pub async fn dir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("dir not implemented statement!");
     panic!("TODO")

@@ -1433,7 +1433,7 @@ impl VariableValue {
                 if dim1 < data.len() {
                     data[dim1] = val.convert_to(self.vtype);
                 } else {
-                    return Err(Box::new(VMError::ArrayIndexOutOfBounds(1, dim1, data.len())));
+                    log::error!("dim1 out of bounds: {} > {}", dim1, data.len());
                 }
             }
             GenericVariableData::Dim2(data) => {
@@ -1441,9 +1441,9 @@ impl VariableValue {
                     data[dim1][dim2] = val.convert_to(self.vtype);
                 } else {
                     if dim1 < data.len() {
-                        return Err(Box::new(VMError::ArrayIndexOutOfBounds(2, dim2, data[dim1].len())));
+                        log::error!("dim2 out of bounds: {} > {}", dim2, data[dim1].len());
                     } else {
-                        return Err(Box::new(VMError::ArrayIndexOutOfBounds(1, dim1, data.len())));
+                        log::error!("dim1 out of bounds: {} > {}", dim1, data.len());
                     }
                 }
             }
@@ -1453,12 +1453,12 @@ impl VariableValue {
                 } else {
                     if dim1 < data.len() {
                         if dim2 < data[dim1].len() {
-                            return Err(Box::new(VMError::ArrayIndexOutOfBounds(3, dim3, data[dim1][dim2].len())));
+                            log::error!("dim3 out of bounds: {} > {}", dim3, data[dim1][dim2].len());
                         } else {
-                            return Err(Box::new(VMError::ArrayIndexOutOfBounds(2, dim2, data[dim1].len())));
+                            log::error!("dim2 out of bounds: {} > {}", dim2, data[dim1].len());
                         }
                     } else {
-                        return Err(Box::new(VMError::ArrayIndexOutOfBounds(1, dim1, data.len())));
+                        log::error!("dim1 out of bounds: {} > {}", dim1, data.len());
                     }
                 }
             }

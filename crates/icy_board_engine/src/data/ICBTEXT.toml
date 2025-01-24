@@ -1208,7 +1208,7 @@ style = "Cyan"
 text = "Auto Logoff Pending"
 style = "Cyan"
 
-[_RecycleBBS]
+[RecycleBBS]
 text = "DOS Recycle Pending"
 style = "Cyan"
 
@@ -1228,7 +1228,7 @@ style = "Cyan"
 text = "CHATTING with Group"
 style = "Cyan"
 
-[_DropDOSDelayed]
+[DropDOSDelayed]
 text = "Drop to DOS Pending"
 style = "Cyan"
 
@@ -1347,7 +1347,7 @@ text = "    (N) no, stop displaying this text"
 [MorehelpNonstop]
 text = "    (NS) continue reading in non-stop mode"
 
-[_DropDOSNow]
+[DropDOSNow]
 text = "Drop to DOS - Urgent"
 style = "Cyan"
 
@@ -2614,7 +2614,7 @@ style = "Red"
 text = "@OPTEXT@ Menu Command ('MENU' for options)"
 style = "Yellow"
 
-[_RunningEvent]
+[RunningEvent]
 text = "Running Event"
 style = "Cyan"
 

@@ -68,63 +68,63 @@ hint-statement-end=
     ### Statement
     `END`
     
-    ### Remarks
+    ### Description
     Ends the program execution
 hint-statement-cls=
     ### Statement
     `CLS`
     
-    ### Remarks
+    ### Description
     Clears the screen
 hint-statement-clreol=
     ### Statement
     `CLREOL`
     
-    ### Remarks
+    ### Description
     Clears to the end of the line
 hint-statement-more=
     ### Statement
     `MORE`
     
-    ### Remarks
+    ### Description
     Pauses and waits for a keypress (Displays a MORE? prompt)
 hint-statement-wait=
     ### Statement
     `WAIT`
     
-    ### Remarks
+    ### Description
     Pauses and waits for a keypress
 hint-statement-color=
     ### Statement
     `COLOR col:integer`
     
-    ### Remarks
+    ### Description
     Sets the text color to `col`    
 hint-statement-goto=
     ### Statement
     `GOTO label`
     
-    ### Remarks
+    ### Description
     Jumps to the label specified
 hint-statement-let=
     ### Statement
     `LET var1=exp`
     
-    ### Remarks
+    ### Description
     Assigns the value of `exp` to `var1`
 hint-statement-print=
     ### Statement
     Print a line to the screen
     ### Syntax
     ```PRINT exp[, exp]*```
-    ### Remarks
+    ### Description
     This statement will process all @ codes and display them as expected.
 hint-statement-println=
     ### Statement
     Print a line to the screen and append a newline to the end of the expression(s).
     ### Syntax
     ```PRINTLN [exp[, exp]*]?```
-    ### Remarks
+    ### Description
     This statement will process all @ codes and display them as expected.
 hint-statement-confflag=todo
 hint-statement-confunflag=todo
@@ -152,7 +152,7 @@ hint-statement-adjtime=
     ### Syntax
     ```ADJTIME minutes```
     ```minutes``` An integer expression containing the number of minutes to adjust the time left by. > 0 will add time, < 0 will deduct time.
-    ### Remarks
+    ### Description
     The added/deducted time is only applied to the curent call.
 hint-statement-log=todo
 hint-statement-inputstr=todo
@@ -179,7 +179,7 @@ hint-statement-tokenize=
     ### Statement
     `TOKENIZE str:string`
 
-    ### Remarks
+    ### Description
     Tokenize string “string” into individual items separated by semi-colons or spaces
 
     ### See also
@@ -188,7 +188,7 @@ hint-statement-gettoken=
     ### Statement
     `GETTOKEN() :STRING`
 
-    ### Remarks
+    ### Description
     Returns the next string token from a prior call to `Tokenize` (Same as the `GETTOKEN` statement but can be used in an expression without prior assignement to a variable)
     
     ### Example
@@ -203,10 +203,30 @@ hint-statement-beep=todo
 hint-statement-push=todo
 hint-statement-pop=todo
 hint-statement-kbdstuff=todo
-hint-statement-call=todo
-hint-statement-join=todo
-hint-statement-quest=todo
-hint-statement-blt=todo
+hint-statement-call=
+    ### Statement
+    `CALL ppename`
+
+    ### Description
+    Load and execute PPE filename specified by “ppename”
+hint-statement-join=
+    ### Statement
+    `JOIN conf:integer`
+
+    ### Description
+    Performs a join conference command, passing it “conf” as arguments
+hint-statement-quest=
+    ### Statement
+    `QUEST nr:integer`
+
+    ### Description
+    Do script questionnaire “nr”
+hint-statement-blt=
+    ### Statement
+    `BLT bltnr:integer`
+
+    ### Description
+    Display bulletin number “bltnr”
 hint-statement-dir=todo
 hint-statement-kbdfile=todo
 hint-statement-bye=todo
@@ -215,7 +235,7 @@ hint-statement-broadcast=
     ### Statement
     `BROADCAST var1:integer, var2:integer, message:string`
     
-    ### Remarks
+    ### Description
     Broadcast message `message` to nodes from `var1` to `var2` inclusive
 hint-statement-waitfor=todo
 hint-statement-kbdchkon=todo
@@ -236,7 +256,7 @@ hint-statement-ansipos=
     
     Move the cursor to column `col` and row `row`
 
-    ### Remarks
+    ### Description
     ```
     1 <= col <= 80  
     1 <= row <= 23 (Because of the status lines)  
@@ -247,7 +267,7 @@ hint-statement-forward=
     ### Statement
     `FORWARD var:integer`
     
-    ### Remarks
+    ### Description
     Move the cursor forward `var` columns without going past column 80
 hint-statement-freshline=todo
 hint-statement-wrusys=todo
@@ -414,50 +434,50 @@ hint-function-lower=
     ### Function
     `LOWER(var1:bigstr) :BIGSTR`
 
-    ### Remarks
+    ### Description
     Returns the string `var1` converted to lower case
 hint-function-upper=
     ### Function
     `UPPER(var1:bigstr) :BIGSTR`
 
-    ### Remarks
+    ### Description
     Returns the string `var1` converted to upper case
 hint-function-mid=
     ### Function
     `MID(str:bigstr,start:integer,length:integer) :BIGSTR`
 
-    ### Remarks
+    ### Description
     Returns a substring of `str` starting at position `start` and `length` characters long
 hint-function-left=
     ### Function
     `LEFT(str:bigstr,length:integer) :BIGSTR`
 
-    ### Remarks
+    ### Description
     Returns the leftmost `length` characters of `str`
 hint-function-right=
     ### Function
     `RIGHT(str:bigstr,length:integer) :BIGSTR`
 
-    ### Remarks
+    ### Description
     Returns the rightmost `length` characters of `str`
 hint-function-space=
     ### Function
     `SPACE(length:integer) :BIGSTR`
 
-    ### Remarks
+    ### Description
     Returns a string of `length` spaces
 hint-function-ferr=todo
 hint-function-chr=
     ### Function
     `CHR(var1:integer) : BIGSTR`
 
-    ### Remarks
+    ### Description
     Returns a single character long string of the character represented by ASCII code var (0-255)
 hint-function-asc=
     ### Function
     `ASC(var1:bigstr) :INTEGER`
 
-    ### Remarks
+    ### Description
     Returns the ASCII value of the first character in `var1`
 hint-function-instr=todo
 hint-function-abort=todo
@@ -549,7 +569,7 @@ hint-function-i2s=
     ### Function
     `I2S(var1:integer,var2:integer) :STRING`
 
-    ### Remarks
+    ### Description
     Returns a string representing the integer value `var1` converted to base `var2`
 hint-function-s2i=todo
 hint-function-carrier=todo
@@ -597,7 +617,7 @@ hint-function-scrtext=
     ### Function
     `SCRTEXT(col:integer, row:integer, len:integer, code:boolean) : STRING`
 
-    ### Remarks
+    ### Description
     Returns a string of `len` characters from the screen at `col`, `row`. 
     If `code` is `TRUE` then the string will be returned with all @ codes intact.
 hint-function-showstat=todo
@@ -622,7 +642,7 @@ hint-function-mixed=
     ### Function
     `MIXED(var1:string)`
 
-    ### Remarks
+    ### Description
     Converts a string to mixed (or proper name) case
 hint-function-alias=todo
 hint-function-confreg=todo
@@ -660,7 +680,7 @@ hint-function-actmsgnum=
     ### Function
     `ACTMSGNUM()`
 
-    ### Remarks
+    ### Description
     Returns number of active messages in current conference
 
     ### Example
@@ -724,8 +744,18 @@ hint-function-scanmsghdr=todo
 hint-function-checkrip=todo
 hint-function-ripver=todo
 hint-function-qwklimits=todo
-hint-function-findfirst=todo
-hint-function-findnext=todo
+hint-function-findfirst=
+    ### Function
+    `FINDFIRST(filespec:bigstr) :BIGSTR`
+
+    ### Description
+    Find the first occurence of filespec in a directory. Used in conjunction with FindNext to get a directory listing.
+hint-function-findnext=
+    ### Function
+    `FINDNEXT() :BIGSTR`
+
+    ### Description
+    Find the next occurence of filespec (used with FindFirst) in a directory.
 hint-function-uselmrs=todo
 hint-function-confinfo=todo
 hint-function-tinkey=todo

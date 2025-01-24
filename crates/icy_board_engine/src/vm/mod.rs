@@ -19,6 +19,7 @@ use async_recursion::async_recursion;
 use icy_engine::rip::to_base_36;
 use icy_engine::Buffer;
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::mem;
 use std::path::Path;
 use std::path::PathBuf;
@@ -162,6 +163,8 @@ pub struct VirtualMachine<'a> {
 
     pub fd_default_in: usize,
     pub fd_default_out: usize,
+
+    pub file_list: VecDeque<String>,
 }
 
 impl<'a> VirtualMachine<'a> {
@@ -806,6 +809,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
                 stored_screen: None,
                 fd_default_in: 0,
                 fd_default_out: 0,
+                file_list: VecDeque::new(),
             };
 
             vm.run().await?;

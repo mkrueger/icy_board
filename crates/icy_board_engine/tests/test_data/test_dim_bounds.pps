@@ -1,0 +1,13 @@
+INTEGER I
+STRING FOO(3)
+
+FOO(0) = "What?"
+FOO(1) = "Hello"
+FOO(2) = "World"
+FOO(3) = "!"
+FOO(4) = "Hidden"
+FOO(5) = "Too Hidden"
+
+for i = 0 to 5
+    PRINTLN FOO(i)
+next

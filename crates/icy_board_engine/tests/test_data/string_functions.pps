@@ -1,4 +1,4 @@
-STRING S
+STRING S, T
 INTEGER I, L
 
 S = "*"
@@ -19,3 +19,20 @@ PRINTLN MID("12345", 3, 2)
 S = "Foo Bar   Baz"
 TOKENIZE S
 PRINTLN GETTOKEN(), GETTOKEN(), GETTOKEN()
+
+
+S = "Z,I,1024,Zmodem (batch),N,N,N"
+PRINTLN LEFT(S, 1)
+
+I = INSTR(S, ",")
+S = RIGHT(S, LEN(S) - I)
+PRINTLN S
+I = INSTR(S, ",")
+S = RIGHT(S, LEN(S) - I)
+PRINTLN S
+I = INSTR(S, ",")
+S = RIGHT(S, LEN(S) - I)
+PRINTLN S
+I = INSTR(S, ",")
+T = LEFT(S, I - 1)
+PRINTLN LEFT(T, 30) + "."
