@@ -1,9 +1,13 @@
 use app::App;
 use argh::FromArgs;
 use color_eyre::Result;
+use crossterm::{
+    execute,
+    style::{Attribute, Color, Print, SetAttribute, SetForegroundColor},
+};
 use icy_board_tui::{get_text_args, print_error, term};
 use semver::Version;
-use std::{collections::HashMap, path::PathBuf, process::exit};
+use std::{collections::HashMap, io::stdout, path::PathBuf, process::exit};
 mod app;
 mod tabs;
 
@@ -20,17 +24,25 @@ struct Cli {
     #[argh(switch, short = 'c')]
     create: bool,
 
-    /// import PCBTEXT file
-    #[argh(switch, short = 'i')]
-    import: bool,
+    /// record number to update with new text,
+    #[argh(option, short = 'i')]
+    update: Option<usize>,
 
     /// default is 80x25
     #[argh(switch, short = 'f')]
     full_screen: bool,
 
+    /// convert PCBTEXT to ICBTEXT
+    #[argh(switch)]
+    convert: bool,
+
     /// file to edit/create
     #[argh(positional)]
     file: PathBuf,
+
+    /// new text to update record
+    #[argh(positional)]
+    new_text: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -52,7 +64,27 @@ fn main() -> Result<()> {
 
     match IcbTextFile::load(&file) {
         Ok(mut icb_txt) => {
-            if arguments.import {
+            if let Some(rec_num) = arguments.update {
+                let Some(text) = arguments.new_text else {
+                    print_error("New text is required for update".to_string());
+                    exit(1);
+                };
+                if let Err(err) = icb_txt.update_record_number(rec_num, text) {
+                    print_error(format!("{}", err));
+                    exit(1);
+                }
+                save_file(&file, &icb_txt);
+                execute!(
+                    stdout(),
+                    SetAttribute(Attribute::Bold),
+                    SetForegroundColor(Color::White),
+                    Print(format!("Record #{} has been upgraded in {}.\n", rec_num, file.display())),
+                    SetAttribute(Attribute::Reset),
+                )
+                .unwrap();
+                return Ok(());
+            }
+            if arguments.convert {
                 let out_file = file.with_extension("toml");
                 if let Err(err) = icb_txt.save(&out_file) {
                     print_error(format!("Can't save: {}", err));
@@ -67,14 +99,7 @@ fn main() -> Result<()> {
             app.run(terminal)?;
             term::restore()?;
             if app.save {
-                let res = match icb_txt.get_format() {
-                    IcbTextFormat::IcyBoard => icb_txt.save(&file),
-                    IcbTextFormat::PCBoard => icb_txt.export_pcboard_format(&file),
-                };
-                if let Err(err) = res {
-                    print_error(format!("Can't save: {}", err));
-                    exit(1);
-                }
+                save_file(&file, &icb_txt);
             }
             Ok(())
         }
@@ -82,5 +107,16 @@ fn main() -> Result<()> {
             print_error(format!("{}", err));
             exit(1);
         }
+    }
+}
+
+fn save_file(file: &PathBuf, icb_txt: &IcbTextFile) {
+    let res = match icb_txt.get_format() {
+        IcbTextFormat::IcyBoard => icb_txt.save(file),
+        IcbTextFormat::PCBoard => icb_txt.export_pcboard_format(file),
+    };
+    if let Err(err) = res {
+        print_error(format!("Can't save: {}", err));
+        exit(1);
     }
 }
