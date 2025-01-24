@@ -398,7 +398,9 @@ impl Add<VariableValue> for VariableValue {
                 }
 
                 VariableType::String | VariableType::BigStr => {
-                    generic_data = GenericVariableData::String(format!("{self}{other}"));
+                    let mut new_string = self.as_string();
+                    new_string.push_str(&other.as_string());
+                    generic_data = GenericVariableData::String(new_string);
                 }
 
                 VariableType::Byte => {

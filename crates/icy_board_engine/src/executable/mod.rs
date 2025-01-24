@@ -21,6 +21,9 @@ pub use variable_table::*;
 pub mod exec;
 pub use exec::*;
 
+pub mod output_visitor;
+pub use output_visitor::*;
+
 #[cfg(test)]
 pub mod expr_tests;
 #[cfg(test)]

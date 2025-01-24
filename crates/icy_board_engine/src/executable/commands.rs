@@ -1,8 +1,15 @@
-use std::{collections::HashMap, fmt::Display, ops::Range};
+use std::{
+    collections::HashMap,
+    fmt::{self, Display},
+    ops::Range,
+};
 
 use thiserror::Error;
 
-use crate::ast::{BinOp, UnaryOp};
+use crate::{
+    ast::{BinOp, UnaryOp},
+    executable::PPEOutputVisitor,
+};
 
 use super::{DeserializationErrorType, Executable, FuncOpCode, FunctionDefinition, GenericVariableData, OpCode, StatementDefinition, VariableValue};
 
@@ -286,6 +293,14 @@ impl PPECommand {
     }
 }
 
+impl fmt::Display for PPECommand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut output_visitor = PPEOutputVisitor::default();
+        self.visit(&mut output_visitor);
+        write!(f, "{}", output_visitor.output)
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Clone)]
 pub enum PPEExpr {
     #[default]
@@ -299,6 +314,14 @@ pub enum PPEExpr {
     PredefinedFunctionCall(&'static FunctionDefinition, Vec<PPEExpr>),
     FunctionCall(usize, Vec<PPEExpr>),
     MemberFunctionCall(Box<PPEExpr>, Vec<PPEExpr>, usize),
+}
+
+impl fmt::Display for PPEExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut output_visitor = PPEOutputVisitor::default();
+        self.visit(&mut output_visitor);
+        write!(f, "{}", output_visitor.output)
+    }
 }
 
 impl PPEExpr {
