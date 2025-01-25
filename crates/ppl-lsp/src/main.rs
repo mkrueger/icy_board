@@ -468,7 +468,7 @@ impl AstVisitor<()> for TooltipVisitor {
             if identifier.get_identifier_token().span.contains(&self.offset) {
                 let predef = FunctionDefinition::get_function_definitions(identifier.get_identifier());
                 for p in predef {
-                    if FUNCTION_DEFINITIONS[p].args as usize == call.get_arguments().len() {
+                    if FUNCTION_DEFINITIONS[p].arg_descr as usize == call.get_arguments().len() {
                         self.tooltip = get_function_hover(FUNCTION_DEFINITIONS[p].opcode);
                         return;
                     }
@@ -1041,8 +1041,6 @@ fn get_function_hover(opcode: FuncOpCode) -> Option<Hover> {
         FuncOpCode::GetBankBal => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-getbankbal")),
         FuncOpCode::GetMsgHdr => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-getmsghdr")),
         FuncOpCode::SetMsgHdr => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-setmsghdr")),
-        FuncOpCode::MemberReference => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-memberreference")),
-        FuncOpCode::MemberCall => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-membercall")),
         FuncOpCode::NewConfInfo => get_hint(fl!(crate::LANGUAGE_LOADER, "hint-function-newconfinfo")),
         _ => None,
     }
@@ -1054,8 +1052,8 @@ mod test {
 
     #[test]
     fn test_function_translations() {
-        for f in &FUNCTION_DEFINITIONS {
-            if f.args < 0 || f.args >= 0x10 {
+        for f in FUNCTION_DEFINITIONS.iter() {
+            if f.arg_descr < 0 || f.arg_descr >= 0x10 {
                 continue;
             }
             super::get_function_hover(f.opcode).unwrap();

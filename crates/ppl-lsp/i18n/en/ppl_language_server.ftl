@@ -564,81 +564,134 @@ hint-function-u_stat=todo
 hint-function-defcolor=todo
 hint-function-abs=todo
 hint-function-grafmode=todo
-hint-function-psa=todo
-hint-function-fileinf=todo
-hint-function-ppename=todo
-hint-function-mkdate=todo
-hint-function-curcolor=todo
-hint-function-kinkey=todo
-hint-function-minkey=todo
-hint-function-maxnode=todo
-hint-function-slpath=todo
-hint-function-helppath=todo
-hint-function-temppath=todo
-hint-function-modem=todo
-hint-function-loggedon=todo
-hint-function-callnum=todo
-hint-function-mgetbyte=todo
-hint-function-tokcount=todo
-hint-function-u_recnum=todo
-hint-function-u_inconf=todo
-hint-function-peekdw=todo
-hint-function-dbglevel=todo
+hint-function-psa=
+    ### Parameters
+    @1 = The PSA variable to retrieve
+
+    ### Returns
+    Returns the value of the specified PSA variable
+
+    ### PSA
+    1	Alias Support Enabled
+    2	Verify Support Enabled
+    3	Address Support Enabled
+    4	Password Support Enabled
+    5	Statistics Support Enabled
+    6	Notes Support Enabled
+hint-function-fileinf=
+    ### Parameters
+    @1 = The file to get information about
+    @2 = The information to return
+
+    ### Returns
+    Returns information about the file specified by @1
+
+    ### Valid Options
+    1 = Return TRUE if file exists
+     2 = Return file date stamp
+     3 = Return file time stamp
+     4 = Return file size
+     5 = Return file attributes
+           01h = Read Only
+           02h = Hidden
+           04h = System
+           20h = Archive
+     6 = Return file drive
+     7 = Return file path
+     8 = Return file base name
+     9 = Return file extension
+hint-function-ppename=Returns the name of the currently executing PPE file minus the path and extension
+hint-function-mkdate=Returns a date with the year specified by year (1900-2079), month specified by month (1-12), and day specified by day (1-31).
+hint-function-curcolor=Returns the current color (0-255) in use by the ANSI driver
+hint-function-kinkey=Returns the next keypress from the BBS keyboard as a single character long string, or a string with the name of the function or cursor control key
+hint-function-minkey=Returns the next keypress from the remote caller as a single character long string, or a string with the name of the function or cursor control key
+hint-function-maxnode=Returns the maximum node possible with the current software (ie, /2 would return 2, /10 would return 10, etc)
+hint-function-slpath=Returns the path, as specified in PCBSetup, to the login security files
+hint-function-helppath=Returns the path, as specified in PCBSetup, to the help files
+hint-function-temppath=Returns the path, as specified in PCBSetup, to the temporary work directory
+hint-function-modem=Returns the modem connect string as reported by the modem to PCBoard
+hint-function-loggedon=Returns `TRUE` if the user has already logged on to the BBS, `FALSE` otherwise
+hint-function-callnum=Returns the caller number of the current user.
+hint-function-mgetbyte=Returns the value of the next byte from the modem (0-255) or -1 if there are no bytes waiting for input
+hint-function-tokcount=Returns the number of tokens available via the GetToken statement and/or function
+hint-function-u_recnum=Returns the user record number (0-65535) for user name user or -1 if user is not registered on this system.
+hint-function-u_inconf=Returns `TRUE` if user record number @1 is registered in conference @2
+hint-function-peekdw=Returns a signed integer value (-2147483648 - +2147483647) located at memory address “var”
+hint-function-dbglevel=Returns the debug level in effect
 hint-function-scrtext=
     ### Returns
     Returns a string of @3 characters from the screen at @1, @2.
     If @3 is `TRUE` then the string will be returned with all @ codes intact.
-hint-function-showstat=todo
-hint-function-pagestat=todo
-hint-function-replacestr=todo
-hint-function-stripstr=todo
-hint-function-tobigstr=todo
-hint-function-toboolean=todo
-hint-function-tobyte=todo
-hint-function-todate=todo
-hint-function-todreal=todo
-hint-function-toedate=todo
-hint-function-tointeger=todo
-hint-function-tomoney=todo
-hint-function-toreal=todo
-hint-function-tosbyte=todo
-hint-function-tosword=todo
-hint-function-totime=todo
-hint-function-tounsigned=todo
-hint-function-toword=todo
+hint-function-showstat=Returns `TRUE` if writing to the display is active, `FALSE` if writing to the display is disabled
+hint-function-pagestat=Returns `TRUE` if the user has paged the SysOp (or PageOn has been issued), `FALSE` otherwise (or PageOff has been issued)
+hint-function-replacestr=
+    It functions just like the Replace function except that a complete sub-string may be specified for both search and replace
+hint-function-stripstr=
+    Functions just like the Strip function except that a complete sub-string may be specified for search
+hint-function-tobigstr=Converts an expression to a `BIGSTR` type
+hint-function-toboolean=Converts an expression to a `BOOLEAN` type
+hint-function-tobyte=Converts an expression to a `BYTE` type
+hint-function-todate=Converts an expression to a `DATE` type
+hint-function-todreal=Converts an expression to a `DREAL` type
+hint-function-toedate=Converts an expression to a `EDATE` type
+hint-function-tointeger=Converts an expression to a `INTEGER` type
+hint-function-tomoney=Converts an expression to a `MONEY` type
+hint-function-toreal=Converts an expression to a `REAL` type
+hint-function-tosbyte=Converts an expression to a `SBYTE` type
+hint-function-tosword=Converts an expression to a `SWORD` type
+hint-function-totime=Converts an expression to a `TIME` type
+hint-function-tounsigned=Converts an expression to a `UNSIGNED` type
+hint-function-toword=Converts an expression to a `WORD` type
 hint-function-mixed=Converts a string to mixed (or proper name) case
-hint-function-alias=todo
-hint-function-confreg=todo
-hint-function-confexp=todo
-hint-function-confsel=todo
-hint-function-confsys=todo
-hint-function-confmw=todo
-hint-function-lprinted=todo
-hint-function-isnonstop=todo
-hint-function-errcorrect=todo
-hint-function-confalias=todo
-hint-function-useralias=todo
-hint-function-curuser=todo
-hint-function-u_lmr=todo
-hint-function-chatstat=todo
-hint-function-defans=todo
-hint-function-lastans=todo
-hint-function-meganum=todo
-hint-function-evttimeadj=todo
-hint-function-isbitset=todo
-hint-function-fmtreal=todo
-hint-function-flagcnt=todo
-hint-function-kbdbufsize=todo
-hint-function-pplbufsize=todo
+hint-function-alias=Return the users current ALIAS setting (TRUE = alias use on, FALSE = alias use off)
+hint-function-confreg=Returns TRUE if users registered flag is set, FALSE otherwise
+hint-function-confexp=Returns TRUE if users expired flag is set, FALSE otherwise
+hint-function-confsel=Returns TRUE if user has selected the conference, FALSE otherwise
+hint-function-confsys=Returns TRUE if user has conference SysOp access, FALSE otherwise
+hint-function-confmw=Returns TRUE if user has mail waiting in conference confnum, FALSE otherwise
+hint-function-lprinted=Return the number of lines printed on the display
+hint-function-isnonstop=Return whether or not the display is currently in non-stop mode (ie, did the user type NS as part of their command line)
+hint-function-errcorrect=Returns TRUE if a session is determined to be error corrected (or FALSE for non-error corrected sessions).
+hint-function-confalias=Return TRUE if the current conference is configured to allow aliases
+hint-function-useralias=Return TRUE if the current user is allowed to use an alias
+hint-function-curuser=
+    Determine what users information, if any, is available via the user variables. It takes no arguments and returns one of the following values:
+    NO_USER (-1) - User variables are currently undefined  
+    CUR_USER (0) - User variables are for the current user  
+    Other        - The record number of an alternate user for whom user  variables are defined 
+hint-function-u_lmr=function to return the number of the last message read for the specified conference.
+hint-function-chatstat=Return the current users chat availability status (TRUE means available, FALSE means unavailable).
+hint-function-defans=Returns the last default answer passed to an Input statement. For example, this allows a PPE to determine what the default answer would have been had a PCBTEXT prompt not been replaced with a PPE.
+hint-function-lastans=function to return the last answer accepted by an Input statement.
+hint-function-meganum=Converts a decimal number (from 0 to 1295) to a hexa-tri-decimal number, or meganum.
+hint-function-evttimeadj=Detects if the users time has been adjusted for an upcoming event. This is useful to detect if a users time left can be increased with the AdjTime statement.
+hint-function-isbitset=
+    Check the status of a specified bit in a variable.
+    This function is primarily intended to be used with BIGSTR variables which can be up to 2048 bytes long.
+    However, it will work with other data types (and expressions) as well if desired.
+hint-function-fmtreal=
+    Formats REAL/DREAL values for display purposes.
+    ### Parameters
+    realExp	A REAL/DREAL floating point expression
+    fieldWidth	The minimum number of characters to display
+    decimalPlaces	The number of characters to display to the right of the decimal point
+
+hint-function-flagcnt=Return the number of files flagged for download.
+hint-function-kbdbufsize=Return the number of key presses pending in the KbdString buffer
+hint-function-pplbufsize=Returns the number of key presses pending in the KbdStuff buffer.
 hint-function-kbdfilused=todo
-hint-function-lomsgnum=todo
-hint-function-himsgnum=todo
-hint-function-drivespace=todo
-hint-function-outbytes=todo
-hint-function-hiconfnum=todo
-hint-function-inbytes=todo
-hint-function-crc32=todo
-hint-function-pcbmac=todo
+hint-function-lomsgnum=Returns the low message number for the current conference.
+hint-function-himsgnum=Returns the high message number for the current conference.
+hint-function-drivespace=Return Val: Amount of divespace left of drive drivespec. 
+hint-function-outbytes=Returns the number of bytes waiting in the modems output buffer Not available in local mode.
+hint-function-hiconfnum=Returns the highest conference number available on the board
+hint-function-inbytes=Returns number of bytes waiting in the modem input buffer Not available in local mode.
+hint-function-crc32=Returns an UNSIGNED value of the CRC of a file or string.
+hint-function-pcbmac=
+    Returns a BIGSTR containing the expanded text of a PCB MACRO
+
+    ### PCB MACROS not supported
+    @automore@ @beep@ @clreol@ @cls@ @delay@ @more@ @pause@ @poff@ @pon@ @pos@ @qoff@ @qon@ @wait@ @who@ @x@
 hint-function-actmsgnum=
     ### Returns
     Returns number of active messages in current conference
@@ -648,59 +701,81 @@ hint-function-actmsgnum=
     integer i
     println "There are ",ACTMSGNUM()," messages in conference ",CURCONF()
     ```
-hint-function-stackleft=todo
-hint-function-stackerr=todo
-hint-function-dgetalias=todo
-hint-function-dbof=todo
-hint-function-dchanged=todo
-hint-function-ddecimals=todo
-hint-function-ddeleted=todo
-hint-function-deof=todo
-hint-function-derr=todo
-hint-function-dfields=todo
-hint-function-dlength=todo
-hint-function-dname=todo
-hint-function-dreccount=todo
-hint-function-drecno=todo
-hint-function-dtype=todo
-hint-function-fnext=todo
+hint-function-stackleft=Returns the number of bytes left on the system stack.
+hint-function-stackerr=Returns a boolean value which indicates a stack error has occured if TRUE.
+hint-function-dgetalias=return the current alias
+hint-function-dbof=return the begin of file statustodo
+hint-function-dchanged=return the changed flag
+hint-function-ddecimals=return decimals of named field
+hint-function-ddeleted=return the deleted flag
+hint-function-deof=return the end of file status
+hint-function-derr=return error flag for channel
+hint-function-dfields=return count of fields
+hint-function-dlength=return length of named field
+hint-function-dname=return name of numbered field
+hint-function-dreccount=return the number of recordstodo
+hint-function-drecno=return the current record number
+hint-function-dtype=return type of named field
+hint-function-fnext=Returns an available file channel. -1 when none are available.
 hint-function-dnext=todo
-hint-function-toddate=todo
-hint-function-dcloseall=todo
-hint-function-dopen=todo
-hint-function-dclose=todo
-hint-function-dsetalias=todo
-hint-function-dpack=todo
-hint-function-dlockf=todo
-hint-function-dlock=todo
-hint-function-dlockr=todo
-hint-function-dunlock=todo
-hint-function-dnopen=todo
-hint-function-dnclose=todo
-hint-function-dncloseall=todo
-hint-function-dnew=todo
-hint-function-dadd=todo
-hint-function-dappend=todo
-hint-function-dtop=todo
-hint-function-dgo=todo
-hint-function-dbottom=todo
-hint-function-dskip=todo
-hint-function-dblank=todo
-hint-function-ddelete=todo
-hint-function-drecall=todo
-hint-function-dtag=todo
-hint-function-dseek=todo
-hint-function-dfblank=todo
-hint-function-dget=todo
-hint-function-dput=todo
-hint-function-dfcopy=todo
-hint-function-dselect=todo
+hint-function-toddate=Converts a date to a string in the format MM/DD/YYYY
+hint-function-dcloseall=close all DBF files
+hint-function-dopen=open DBF file
+hint-function-dclose=close DBF file
+hint-function-dsetalias=set DBF alias
+hint-function-dpack=pack DBF file
+hint-function-dlockf=lock DBF file
+hint-function-dlock=lock DBF file
+hint-function-dlockr=lock a recordtodo
+hint-function-dunlock=unlock any current locks
+hint-function-dnopen=open NDX file
+hint-function-dnclose=close NDX file
+hint-function-dncloseall=close all NDX files
+hint-function-dnew=start a new record
+hint-function-dadd=add the new record
+hint-function-dappend=append a blank record
+hint-function-dtop=go to top record
+hint-function-dgo=go to specific record
+hint-function-dbottom=go to bottom record
+hint-function-dskip=skip +/- a number of records
+hint-function-dblank=blank the record
+hint-function-ddelete=delete the record
+hint-function-drecall=recall the record
+hint-function-dtag=select a tag
+hint-function-dseek=
+    returns error status ( 0|1 )
+    or seek success (0 = Error
+    1 = success, 2 = following record
+    3 = end of file )
+hint-function-dfblank=blank a named field
+hint-function-dget=get a value from a named field
+hint-function-dput=put a value to a named field
+hint-function-dfcopy=copy a field to a field
+hint-function-dselect=returns channel associated with alias
 hint-function-dchkstat=todo
-hint-function-pcbaccount=todo
-hint-function-pcbaccstat=todo
-hint-function-derrmsg=todo
-hint-function-account=todo
-hint-function-scanmsghdr=todo
+hint-function-pcbaccount=
+    Returns what PCBoard will charge a user for a certain activity. These are values the SysOp assigns in PCBsetup when accounting is configures and enabled.
+    Valid values for the field parameter are 0-14. Use of the corresponding constants is encouraged. (see the Accounting section)
+hint-function-pcbaccstat=
+    Returns value in status field
+    This function can and should be used in conjunction with the ACC_??? constants as the field parameter. Valid values for field are 0-3. (see the Accounting section)
+
+hint-function-derrmsg=returns last DBase error text
+hint-function-account=Returns amount of credits charged for services corresponding to the field parameter.
+hint-function-scanmsghdr=
+    Returns the first message number in the message base which matches the search criteria.
+
+    MESSAGE HEADER FIELD ACCESS CONSTANTS
+    Field	hex	dec	Field Description
+    —————–	——	—–	—————————————-
+    HDRACTIVE | 0x0E | 14 | Message active flag field | | HDRBLOCKS	0x04	4	Number of 128 byte blocks in message
+    HDRDATE | 0x05 | 5 | Date message was written | | HDRECHO	0x0F	15	Echoed message flag
+    HDRFROM | 0x0B | 11 | Who the message is from | | HDRMSGNUM	0x02	2	Message number
+    HDRMSGREF | 0x03 | 3 | Reference message | | HDRPWD	0x0D	13	Message password
+    HDRREPLY | 0x0A | 10 | Message reply flag | | HDRRPLYDATE	0x08	8	Reply message date
+    HDRRPLYTIME | 0x09 | 9 | Reply message time | | HDRSTATUS	0x01	1	Message status
+    HDRSUBJ | 0x0C | 12 | Message subject | | HDRTIME	0x06	6	Message time
+
 hint-function-checkrip=todo
 hint-function-ripver=todo
 hint-function-qwklimits=todo
@@ -948,6 +1023,4 @@ hint-function-setmsghdr=
     If modefied header change will not fit in the original message
     header then it will insert the message to the end of the message
     base.
-hint-function-memberreference=todo
-hint-function-membercall=todo
 hint-function-newconfinfo=todo

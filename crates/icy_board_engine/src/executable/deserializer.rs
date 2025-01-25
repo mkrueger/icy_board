@@ -357,7 +357,7 @@ impl PPEDeserializer {
 
                 let func = -id as usize;
                 let func_def = &FUNCTION_DEFINITIONS[func];
-                match func_def.args {
+                match func_def.arg_descr {
                     0x10 => {
                         self.offset += 1;
                         let op = UnaryOp::from_opcode(func_def.opcode);
@@ -390,17 +390,17 @@ impl PPEDeserializer {
                     }
                     _ => {
                         self.offset += 1;
-                        if func_def.args < 0 {
+                        if func_def.arg_descr < 0 {
                             self.push_expr(PPEExpr::PredefinedFunctionCall(func_def, vec![]));
                         } else {
-                            if (self.expr_stack.len() as i8) < func_def.args {
+                            if (self.expr_stack.len() as i8) < func_def.arg_descr {
                                 return Err(DeserializationErrorType::TooFewBuiltInFunctionArguments(
                                     func_def.opcode,
-                                    func_def.args,
+                                    func_def.arg_descr,
                                     self.expr_stack.len(),
                                 ));
                             }
-                            let arguments = self.expr_stack.drain(self.expr_stack.len() - func_def.args as usize..).collect();
+                            let arguments = self.expr_stack.drain(self.expr_stack.len() - func_def.arg_descr as usize..).collect();
                             self.push_expr(PPEExpr::PredefinedFunctionCall(func_def, arguments));
                         }
                     }

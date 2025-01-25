@@ -146,7 +146,7 @@ impl CompletionVisitor {
     }
 
     fn add_functions(&mut self) {
-        for stmt in &FUNCTION_DEFINITIONS {
+        for stmt in FUNCTION_DEFINITIONS.iter() {
             self.items.push(CompletionItem {
                 label: stmt.name.to_string(),
                 insert_text: Some(stmt.name.to_string()),

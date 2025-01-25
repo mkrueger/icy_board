@@ -1059,7 +1059,7 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
             Some(SemanticInfo::PredefFunctionGroup(funcs)) => {
                 for func in funcs {
                     let def = &FUNCTION_DEFINITIONS[*func];
-                    if def.args as usize == call.get_arguments().len() {
+                    if def.arg_descr as usize == call.get_arguments().len() {
                         if self.version < def.version {
                             self.errors.lock().unwrap().report_error(
                                 call.get_expression().get_span(),
@@ -1075,7 +1075,11 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
                     }
                 }
                 // report wrong argument count
-                self.check_expr_arg_count(FUNCTION_DEFINITIONS[funcs[0]].args as usize, call.get_arguments().len(), call.get_expression());
+                self.check_expr_arg_count(
+                    FUNCTION_DEFINITIONS[funcs[0]].arg_descr as usize,
+                    call.get_arguments().len(),
+                    call.get_expression(),
+                );
             }
 
             _ => {

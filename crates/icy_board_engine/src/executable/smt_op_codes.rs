@@ -303,6 +303,9 @@ pub enum ArgumentDefinitionFlags {
 
     /// NORMAL = 1, CRASH  = 2, HOLD   = 3
     FidoFlags,
+
+    /// CRC_FILE = true, CRC_FALSE = false
+    Crc32,
 }
 
 #[derive(Debug, PartialEq)]
