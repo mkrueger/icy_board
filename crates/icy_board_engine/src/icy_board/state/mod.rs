@@ -34,7 +34,7 @@ use super::{
     icb_config::{IcbColor, DEFAULT_PCBOARD_DATE_FORMAT},
     icb_text::{IcbTextFile, IcbTextStyle, IceText},
     surveys::SurveyList,
-    user_base::{FSEMode, User},
+    user_base::{FSEMode, Password, User},
     IcyBoard, IcyBoardSerializer,
 };
 
@@ -1945,6 +1945,32 @@ impl IcyBoardState {
     pub fn format_time(&self, date_time: DateTime<Utc>) -> String {
         let local_time = date_time.with_timezone(&Local);
         local_time.format("%H:%M").to_string()
+    }
+
+    pub async fn is_valid_password(&self, new_pwd: &str) -> Res<bool> {
+        Ok(new_pwd.len() >= self.board.lock().await.config.user_password_policy.min_length as usize)
+    }
+
+    pub async fn change_password(&mut self, new_pwd: &str) -> Res<bool> {
+        if !self.is_valid_password(new_pwd).await? {
+            return Ok(false);
+        }
+        let exp_days = self.get_board().await.config.user_password_policy.password_expire_days;
+        if let Some(user) = &mut self.session.current_user {
+            let old = user.password.password.clone();
+            user.password.password = Password::PlainText(new_pwd.to_string());
+            user.password.times_changed += 1;
+            user.password.last_change = Utc::now();
+            user.password.prev_pwd.push(old);
+            while user.password.prev_pwd.len() > 3 {
+                user.password.prev_pwd.remove(0);
+            }
+            if exp_days > 0 {
+                user.password.expire_date = Utc::now() + chrono::Duration::days(exp_days as i64);
+            }
+            self.get_board().await.save_userbase()?;
+        }
+        Ok(false)
     }
 }
 

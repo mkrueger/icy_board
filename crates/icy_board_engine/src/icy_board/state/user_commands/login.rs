@@ -536,7 +536,7 @@ impl IcyBoardState {
                 if user.password.expire_date > today {
                     self.display_text(IceText::PasswordExpired, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
-                    self.change_password().await?;
+                    self.request_change_password().await?;
                     return Ok(false);
                 }
 
@@ -583,24 +583,23 @@ impl IcyBoardState {
         }
     }
 
-    async fn change_password(&mut self) -> Res<()> {
+    async fn request_change_password(&mut self) -> Res<()> {
         loop {
             let Some(pw1) = self.input_required(IceText::NewPassword, &MASK_ALNUM, 20, display_flags::ECHODOTS).await? else {
                 return Ok(());
             };
+
+            if !self.is_valid_password(&pw1).await? {
+                self.display_text(IceText::PasswordTooShort, display_flags::NEWLINE).await?;
+                continue;
+            }
+
             let Some(pw2) = self.input_required(IceText::ReEnterPassword, &MASK_ALNUM, 20, display_flags::ECHODOTS).await? else {
                 return Ok(());
             };
 
             if pw1 == pw2 {
-                let exp_days = self.get_board().await.config.user_password_policy.password_expire_days;
-                if let Some(cur_user) = &mut self.session.current_user {
-                    cur_user.password.password = Password::PlainText(pw1);
-                    if exp_days > 0 {
-                        cur_user.password.expire_date = Utc::now() + chrono::Duration::days(exp_days as i64);
-                    }
-                }
-                self.get_board().await.save_userbase()?;
+                self.change_password(&pw1).await?;
                 return Ok(());
             }
             self.display_text(IceText::PasswordsDontMatch, display_flags::NEWLINE).await?;

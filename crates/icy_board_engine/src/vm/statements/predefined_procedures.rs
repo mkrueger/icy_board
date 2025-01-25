@@ -816,8 +816,10 @@ pub async fn rdusys(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     panic!("USER.SYS is not supported")
 }
 pub async fn newpwd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    let new_pwd = vm.eval_expr(&args[0]).await?.as_string();
+    let was_changed = vm.icy_board_state.change_password(&new_pwd).await?;
+    vm.set_variable(&args[1], VariableValue::new_bool(was_changed)).await?;
+    Ok(())
 }
 pub async fn opencap(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("not implemented statement!");

@@ -480,22 +480,22 @@ impl AstVisitor<()> for TooltipVisitor {
 
 fn get_type_hover(var_type: VariableType) -> Option<Hover> {
     match var_type {
-        VariableType::Boolean => get_hint(fl!(LANGUAGE_LOADER, "hint-type-boolean")),
-        VariableType::Unsigned => get_hint(fl!(LANGUAGE_LOADER, "hint-type-unsigned")),
-        VariableType::Date => get_hint(fl!(LANGUAGE_LOADER, "hint-type-date")),
-        VariableType::EDate => get_hint(fl!(LANGUAGE_LOADER, "hint-type-edate")),
-        VariableType::Integer => get_hint(fl!(LANGUAGE_LOADER, "hint-type-integer")),
-        VariableType::Money => get_hint(fl!(LANGUAGE_LOADER, "hint-type-money")),
-        VariableType::Float => get_hint(fl!(LANGUAGE_LOADER, "hint-type-float")),
-        VariableType::String => get_hint(fl!(LANGUAGE_LOADER, "hint-type-string")),
-        VariableType::Time => get_hint(fl!(LANGUAGE_LOADER, "hint-type-time")),
-        VariableType::Byte => get_hint(fl!(LANGUAGE_LOADER, "hint-type-byte")),
-        VariableType::Word => get_hint(fl!(LANGUAGE_LOADER, "hint-type-word")),
-        VariableType::SByte => get_hint(fl!(LANGUAGE_LOADER, "hint-type-sbyte")),
-        VariableType::SWord => get_hint(fl!(LANGUAGE_LOADER, "hint-type-sword")),
-        VariableType::BigStr => get_hint(fl!(LANGUAGE_LOADER, "hint-type-bigstr")),
-        VariableType::Double => get_hint(fl!(LANGUAGE_LOADER, "hint-type-double")),
-        VariableType::DDate => get_hint(fl!(LANGUAGE_LOADER, "hint-type-ddate")),
+        VariableType::Boolean => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-boolean")),
+        VariableType::Unsigned => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-unsigned")),
+        VariableType::Date => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-date")),
+        VariableType::EDate => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-edate")),
+        VariableType::Integer => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-integer")),
+        VariableType::Money => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-money")),
+        VariableType::Float => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-float")),
+        VariableType::String => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-string")),
+        VariableType::Time => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-time")),
+        VariableType::Byte => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-byte")),
+        VariableType::Word => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-word")),
+        VariableType::SByte => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-sbyte")),
+        VariableType::SWord => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-sword")),
+        VariableType::BigStr => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-bigstr")),
+        VariableType::Double => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-double")),
+        VariableType::DDate => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-ddate")),
         _ => None,
     }
 }
@@ -752,6 +752,16 @@ fn get_hint(arg: String) -> Option<Hover> {
         contents: HoverContents::Markup(MarkupContent {
             kind: MarkupKind::Markdown,
             value: arg,
+        }),
+        range: None,
+    })
+}
+
+fn get_sig_hint(sig: String, arg: String) -> Option<Hover> {
+    Some(Hover {
+        contents: HoverContents::Markup(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: format!("`{sig}`\n{arg}"),
         }),
         range: None,
     })

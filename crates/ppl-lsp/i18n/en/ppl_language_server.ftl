@@ -1,132 +1,72 @@
-hint-type-boolean=
-    `BOOLEAN`
-    
-    unsigned character (1 byte) 0 = FALSE, non-0 = TRUE
-hint-type-date=
-    `DATE`
-    
-    unsigned integer (2 bytes) PCBoard julian date (count of days since 1/1/1900) 
+hint-type-boolean=unsigned character (1 byte) 0 = FALSE, non-0 = TRUE
+hint-type-date=unsigned integer (2 bytes) PCBoard julian date (count of days since 1/1/1900) 
 hint-type-ddate=
-    `DDATE`
-
     Signed long integer for julian date. DDATE is for use with DBase date fields.
     It holds a long integer for julian dates. When coerced to string type it is in the format CCYYMMDD or 19940527
-hint-type-integer=
-    `INTEGER / SDWORD / LONG`
-
-    signed long integer (4 bytes) Range: -2,147,483,648 → +2,147,483,647
-hint-type-money=
-    `MONEY`
-    
-    signed long integer (4 bytes) Range: -$21,474,836.48 → +$21,474,836.47
-hint-type-string=
-    `STRING`
-    
-    far character pointer (4 bytes) NULL is an empty string non-NULL points to a string of some length less than or equal to 256
-hint-type-time=
-    `TIME`
-    
-    signed long integer (4 bytes) Count of seconds since midnight
-hint-type-bigstr=
-    `BIGSTR`
-     
-    Allows up to 2048 characters per big string (up from 256 for STRING variables) May include CHR(0) characters in the middle of the big string (unlike STRING variables which may not)
-hint-type-edate=
-    `EDATE`
-    
-    Julian date in earth date format Deals with dates formatted YYMM.DD Range: Same as DATE
-hint-type-float=
-    `REAL / FLOAT`
-
-    4-byte floating point number Range: +/-3.4E-38 - +/-3.4E+38 (7-digit precision)
-hint-type-double=
-    `DREAL / DOUBLE`
-
-    8-byte floating point number Range: +/-1.7E-308 - +/-1.7E+308 (15-digit precision)
-hint-type-unsigned=
-    `UNSIGNED / DWORD / UDWORD`
-
-    4-byte unsigned integer Range: 0 - 4,294,967,295
-hint-type-byte=
-    `BYTE / UBYTE`
-
-    1-byte unsigned integer Range: 0 - 255
-hint-type-word=
-    `WORD / UWORD`
-
-    2-byte unsigned integer Range: 0 - 65,535
-hint-type-sbyte=
-    `SBYTE / SHORT`
-
-    1-byte signed Integer Range: -128 - 127
-hint-type-sword=
-    `SWORD / INT`
-
-    2-byte signed integer Range: -32,768 - 32,767
+hint-type-integer=signed long integer (4 bytes) Range: -2,147,483,648 → +2,147,483,647
+hint-type-money=signed long integer (4 bytes) Range: -$21,474,836.48 → +$21,474,836.47
+hint-type-string=far character pointer (4 bytes) NULL is an empty string non-NULL points to a string of some length less than or equal to 256
+hint-type-time=signed long integer (4 bytes) Count of seconds since midnight
+hint-type-bigstr=Allows up to 2048 characters per big string (up from 256 for STRING variables) May include CHR(0) characters in the middle of the big string (unlike STRING variables which may not)
+hint-type-edate=Julian date in earth date format Deals with dates formatted YYMM.DD Range: Same as DATE
+hint-type-float=4-byte floating point number Range: +/-3.4E-38 - +/-3.4E+38 (7-digit precision)
+hint-type-double=8-byte floating point number Range: +/-1.7E-308 - +/-1.7E+308 (15-digit precision)
+hint-type-unsigned=4-byte unsigned integer Range: 0 - 4,294,967,295
+hint-type-byte=1-byte unsigned integer Range: 0 - 255
+hint-type-word=2-byte unsigned integer Range: 0 - 65,535
+hint-type-sbyte=1-byte signed Integer Range: -128 - 127
+hint-type-sword=2-byte signed integer Range: -32,768 - 32,767
 
 hint-statement-end=
-    ### Statement
     `END`
     
-    ### Description
     Ends the program execution
 hint-statement-cls=
-    ### Statement
     `CLS`
     
-    ### Description
     Clears the screen
 hint-statement-clreol=
-    ### Statement
     `CLREOL`
     
-    ### Description
     Clears to the end of the line
 hint-statement-more=
-    ### Statement
     `MORE`
     
-    ### Description
     Pauses and waits for a keypress (Displays a MORE? prompt)
 hint-statement-wait=
-    ### Statement
     `WAIT`
     
-    ### Description
     Pauses and waits for a keypress
 hint-statement-color=
-    ### Statement
     `COLOR col:integer`
     
-    ### Description
     Sets the text color to `col`    
 hint-statement-goto=
-    ### Statement
     `GOTO label`
     
-    ### Description
     Jumps to the label specified
 hint-statement-let=
-    ### Statement
     `LET var1=exp`
     
-    ### Description
     Assigns the value of `exp` to `var1`
 hint-statement-print=
-    ### Statement
+    `PRINT exp[, exp]*`
+
     Print a line to the screen
-    ### Syntax
-    ```PRINT exp[, exp]*```
-    ### Description
+
+    ### Remarks
     This statement will process all @ codes and display them as expected.
 hint-statement-println=
-    ### Statement
+    `PRINTLN [exp[, exp]*]?`
+
     Print a line to the screen and append a newline to the end of the expression(s).
-    ### Syntax
-    ```PRINTLN [exp[, exp]*]?```
-    ### Description
+
+    ### Remarks
     This statement will process all @ codes and display them as expected.
-hint-statement-confflag=todo
+hint-statement-confflag=
+    `CONFFLAG conf:integer, flags:integer`
+    
+    Turn on the conference `conf` flags specified by `flags`
 hint-statement-confunflag=todo
 hint-statement-dispfile=todo
 hint-statement-input=todo
@@ -147,12 +87,10 @@ hint-statement-defcolor=todo
 hint-statement-delete=todo
 hint-statement-deluser=todo
 hint-statement-adjtime=
-    ### Statement
     Adjust the users time up or down
     ### Syntax
     ```ADJTIME minutes```
     ```minutes``` An integer expression containing the number of minutes to adjust the time left by. > 0 will add time, < 0 will deduct time.
-    ### Description
     The added/deducted time is only applied to the curent call.
 hint-statement-log=todo
 hint-statement-inputstr=todo
@@ -176,19 +114,15 @@ hint-statement-dec=todo
 hint-statement-newline=todo
 hint-statement-newlines=todo
 hint-statement-tokenize=
-    ### Statement
     `TOKENIZE str:string`
 
-    ### Description
     Tokenize string “string” into individual items separated by semi-colons or spaces
 
     ### See also
     `GetToken, TokenStr, TokCount`
 hint-statement-gettoken=
-    ### Statement
     `GETTOKEN() :STRING`
 
-    ### Description
     Returns the next string token from a prior call to `Tokenize` (Same as the `GETTOKEN` statement but can be used in an expression without prior assignement to a variable)
     
     ### Example
@@ -204,38 +138,28 @@ hint-statement-push=todo
 hint-statement-pop=todo
 hint-statement-kbdstuff=todo
 hint-statement-call=
-    ### Statement
     `CALL ppename`
 
-    ### Description
     Load and execute PPE filename specified by “ppename”
 hint-statement-join=
-    ### Statement
     `JOIN conf:integer`
 
-    ### Description
     Performs a join conference command, passing it “conf” as arguments
 hint-statement-quest=
-    ### Statement
     `QUEST nr:integer`
 
-    ### Description
     Do script questionnaire “nr”
 hint-statement-blt=
-    ### Statement
     `BLT bltnr:integer`
 
-    ### Description
     Display bulletin number “bltnr”
 hint-statement-dir=todo
 hint-statement-kbdfile=todo
 hint-statement-bye=todo
 hint-statement-goodbye=todo
 hint-statement-broadcast=
-    ### Statement
     `BROADCAST var1:integer, var2:integer, message:string`
     
-    ### Description
     Broadcast message `message` to nodes from `var1` to `var2` inclusive
 hint-statement-waitfor=todo
 hint-statement-kbdchkon=todo
@@ -251,12 +175,10 @@ hint-statement-pokeb=todo
 hint-statement-pokew=todo
 hint-statement-varaddr=todo
 hint-statement-ansipos=
-    ### Statement
     `ANSIPOS col:integer, row:integer`
     
     Move the cursor to column `col` and row `row`
 
-    ### Description
     ```
     1 <= col <= 80  
     1 <= row <= 23 (Because of the status lines)  
@@ -264,10 +186,8 @@ hint-statement-ansipos=
     (1,1) is the top left corner of the screen
 hint-statement-backup=todo
 hint-statement-forward=
-    ### Statement
     `FORWARD var:integer`
     
-    ### Description
     Move the cursor forward `var` columns without going past column 80
 hint-statement-freshline=todo
 hint-statement-wrusys=todo
@@ -324,7 +244,6 @@ hint-statement-adjtfiles=todo
 hint-statement-lang=todo
 hint-statement-sort=todo
 hint-statement-mousereg=
-    ### Statement
     `MOUSEREG num,x1,y1,x2,y2,fontX,fontY,invert,clear,text`
 
     Set up a RIP mouse region on the remote terminal.
@@ -434,50 +353,42 @@ hint-function-lower=
     ### Function
     `LOWER(var1:bigstr) :BIGSTR`
 
-    ### Description
     Returns the string `var1` converted to lower case
 hint-function-upper=
     ### Function
     `UPPER(var1:bigstr) :BIGSTR`
 
-    ### Description
     Returns the string `var1` converted to upper case
 hint-function-mid=
     ### Function
     `MID(str:bigstr,start:integer,length:integer) :BIGSTR`
 
-    ### Description
     Returns a substring of `str` starting at position `start` and `length` characters long
 hint-function-left=
     ### Function
     `LEFT(str:bigstr,length:integer) :BIGSTR`
 
-    ### Description
     Returns the leftmost `length` characters of `str`
 hint-function-right=
     ### Function
     `RIGHT(str:bigstr,length:integer) :BIGSTR`
 
-    ### Description
     Returns the rightmost `length` characters of `str`
 hint-function-space=
     ### Function
     `SPACE(length:integer) :BIGSTR`
 
-    ### Description
     Returns a string of `length` spaces
 hint-function-ferr=todo
 hint-function-chr=
     ### Function
     `CHR(var1:integer) : BIGSTR`
 
-    ### Description
     Returns a single character long string of the character represented by ASCII code var (0-255)
 hint-function-asc=
     ### Function
     `ASC(var1:bigstr) :INTEGER`
 
-    ### Description
     Returns the ASCII value of the first character in `var1`
 hint-function-instr=todo
 hint-function-abort=todo
@@ -569,7 +480,6 @@ hint-function-i2s=
     ### Function
     `I2S(var1:integer,var2:integer) :STRING`
 
-    ### Description
     Returns a string representing the integer value `var1` converted to base `var2`
 hint-function-s2i=todo
 hint-function-carrier=todo
@@ -617,7 +527,6 @@ hint-function-scrtext=
     ### Function
     `SCRTEXT(col:integer, row:integer, len:integer, code:boolean) : STRING`
 
-    ### Description
     Returns a string of `len` characters from the screen at `col`, `row`. 
     If `code` is `TRUE` then the string will be returned with all @ codes intact.
 hint-function-showstat=todo
@@ -642,7 +551,6 @@ hint-function-mixed=
     ### Function
     `MIXED(var1:string)`
 
-    ### Description
     Converts a string to mixed (or proper name) case
 hint-function-alias=todo
 hint-function-confreg=todo
@@ -680,7 +588,6 @@ hint-function-actmsgnum=
     ### Function
     `ACTMSGNUM()`
 
-    ### Description
     Returns number of active messages in current conference
 
     ### Example
@@ -748,13 +655,11 @@ hint-function-findfirst=
     ### Function
     `FINDFIRST(filespec:bigstr) :BIGSTR`
 
-    ### Description
     Find the first occurence of filespec in a directory. Used in conjunction with FindNext to get a directory listing.
 hint-function-findnext=
     ### Function
     `FINDNEXT() :BIGSTR`
 
-    ### Description
     Find the next occurence of filespec (used with FindFirst) in a directory.
 hint-function-uselmrs=todo
 hint-function-confinfo=todo

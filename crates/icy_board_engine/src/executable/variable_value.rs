@@ -33,8 +33,10 @@ pub enum VariableType {
     Integer,
     /// signed long integer (4 bytes) Range: -$21,474,836.48 → +$21,474,836.47
     Money,
+
     ///  4-byte floating point number Range: +/-3.4E-38 - +/-3.4E+38 (7-digit precision)
     Float,
+
     /// far character pointer (4 bytes) NULL is an empty string non-NULL points to a string of some length less than or equal to 256
     String,
 
@@ -43,19 +45,24 @@ pub enum VariableType {
 
     /// 1-byte unsigned integer Range: 0 - 255
     Byte,
+
     /// 2-byte unsigned integer Range: 0 - 65,535
     Word,
+
     /// 1-byte signed Integer Range: -128 - 127
     SByte,
+
     /// 2-byte signed integer Range: -32,768 - 32,767
     SWord,
 
     /// Allows up to 2048 characters per big string (up from 256 for STRING variables) May include CHR(0) characters in the middle of the big string (unlike STRING variables which may not)
     BigStr,
+
     /// 8-byte floating point number Range: +/-1.7E-308 - +/-1.7E+308 (15-digit precision)
     Double,
 
     Function,
+
     Procedure,
 
     /// Signed long integer for julian date. DDATE is for use with `DBase` date fields.
@@ -132,6 +139,32 @@ impl VariableType {
             17 => VariableType::DDate,
             18 => VariableType::Table,
             _ => VariableType::UserData(b),
+        }
+    }
+
+    pub fn get_signature(&self) -> String {
+        match self {
+            VariableType::Boolean => "BOOLEAN".to_string(),
+            VariableType::Unsigned => "UNSIGNED".to_string(),
+            VariableType::Date => "DATE".to_string(),
+            VariableType::EDate => "EDATE".to_string(),
+            VariableType::Integer => "INTEGER / SDWORD / LONG".to_string(),
+            VariableType::Money => "MONEY".to_string(),
+            VariableType::Float => "REAL / FLOAT".to_string(),
+            VariableType::String => "STRING".to_string(),
+            VariableType::Time => "TIME".to_string(),
+            VariableType::Byte => "BYTE / UBYTE".to_string(),
+            VariableType::Word => "WORD / UWORD".to_string(),
+            VariableType::SByte => "SBYTE / SHORT".to_string(),
+            VariableType::SWord => "SWORD / INT".to_string(),
+            VariableType::BigStr => "BIGSTR".to_string(),
+            VariableType::Double => "DREAL / DOUBLE".to_string(),
+            VariableType::Function => "FUNCTION".to_string(),
+            VariableType::Procedure => "PROCEDURE".to_string(),
+            VariableType::DDate => "DDATE".to_string(),
+            VariableType::Table => "TABLE".to_string(),
+            VariableType::UserData(u) => format!("USERDATA({})", u),
+            VariableType::None => "NONE".to_string(),
         }
     }
 }
