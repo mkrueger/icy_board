@@ -249,7 +249,7 @@ pub enum OpCode {
     KILLMSG = 215,
     CHDIR = 216,
     MKDIR = 217,
-    REDIR = 218,
+    RMDIR = 218,
     FDOWRAKA = 219,
     FDOADDAKA = 220,
     FDOWRORG = 221,
@@ -277,7 +277,7 @@ impl Display for OpCode {
 }
 
 #[derive(Debug, PartialEq)]
-enum ArgumentDefinitionFlags {
+pub enum ArgumentDefinitionFlags {
     None,
 
     /// GRAPH | SEC | LANG
@@ -297,10 +297,16 @@ enum ArgumentDefinitionFlags {
 
     /// NEWLINE, LFBEFORE, LFAFTER, BELL, LOGIT, LOGITLEFT
     DisplayTextFlags,
+
+    /// SEEK_SET, SEEK_CUR, SEEK_END
+    SeekPosition,
+
+    /// NORMAL = 1, CRASH  = 2, HOLD   = 3
+    FidoFlags,
 }
 
 #[derive(Debug, PartialEq)]
-struct ArgumentDefinition {
+pub struct ArgumentDefinition {
     pub name: &'static str,
     pub arg_type: VariableType,
     pub flags: ArgumentDefinitionFlags,
@@ -343,17 +349,33 @@ impl StatementDefinition {
             OpCode::GOTO => "GOTO LABEL".to_string(),
             OpCode::LET => "LET var:multitype = EXP".to_string(),
             OpCode::IFNOT => "IF … THEN … ELSE …".to_string(),
+            OpCode::REDIM => "REDIM var:MULTITYPE, dim1:INTEGER [,dim2:INTEGER [,dim3:INTEGER]] ".to_string(),
 
             _ => {
                 let mut res = self.name.to_ascii_uppercase();
-                if self.args.is_some() {
+                if let Some(args) = &self.args {
                     res.push_str(" ");
-                    res.push_str(&self.args.as_ref().unwrap().iter().map(|arg| arg.name).collect::<Vec<&str>>().join(", "));
+                    res.push_str(&args.iter().map(|arg| format_argument(arg)).collect::<Vec<String>>().join(", "));
+
+                    if matches!(self.sig, StatementSignature::VariableArguments(_)) {
+                        res.push_str("[, ");
+                        res.push_str(&format_argument(args.iter().last().unwrap()));
+                        res.push_str("]*");
+                    }
                 }
                 res
             }
         }
     }
+}
+
+fn format_argument(arg: &ArgumentDefinition) -> String {
+    let ts = if arg.arg_type == VariableType::None {
+        "multitype".to_string()
+    } else {
+        arg.arg_type.to_string()
+    };
+    format!("{} {}", ts, arg.name)
 }
 
 lazy_static::lazy_static! {
@@ -1128,7 +1150,7 @@ lazy_static::lazy_static! {
             opcode: OpCode::POKEB,
             args: Some(vec![
                 ArgumentDefinition::new("addr", VariableType::Integer),
-                ArgumentDefinition::new("var2", VariableType::Byte),
+                ArgumentDefinition::new("value", VariableType::Byte),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
@@ -1138,7 +1160,7 @@ lazy_static::lazy_static! {
             opcode: OpCode::POKEW,
             args: Some(vec![
                 ArgumentDefinition::new("addr", VariableType::Integer),
-                ArgumentDefinition::new("var2", VariableType::Word),
+                ArgumentDefinition::new("value", VariableType::Word),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
@@ -1206,8 +1228,8 @@ lazy_static::lazy_static! {
             version: 100,
             opcode: OpCode::NEWPWD,
             args: Some(vec![
-                ArgumentDefinition::new("col", VariableType::Integer),
-                ArgumentDefinition::new("row", VariableType::Integer),
+                ArgumentDefinition::new("pw", VariableType::String),
+                ArgumentDefinition::new("success", VariableType::Boolean),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(2, 2),
         },
@@ -1215,7 +1237,10 @@ lazy_static::lazy_static! {
             name: "OpenCap",
             version: 100,
             opcode: OpCode::OPENCAP,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("captfile", VariableType::String),
+                ArgumentDefinition::new("error", VariableType::Boolean),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(2, 2),
         },
         StatementDefinition {
@@ -1229,7 +1254,17 @@ lazy_static::lazy_static! {
             name: "Message",
             version: 100,
             opcode: OpCode::MESSAGE,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("conf", VariableType::Integer),
+                ArgumentDefinition::new("to", VariableType::String),
+                ArgumentDefinition::new("from", VariableType::String),
+                ArgumentDefinition::new("subject", VariableType::String),
+                ArgumentDefinition::new("sec", VariableType::String),
+                ArgumentDefinition::new("msgdate", VariableType::Date),
+                ArgumentDefinition::new("retreceipt", VariableType::Boolean),
+                ArgumentDefinition::new("echo", VariableType::Boolean),
+                ArgumentDefinition::new("file", VariableType::String)
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 9),
         },
         StatementDefinition {
@@ -1250,7 +1285,9 @@ lazy_static::lazy_static! {
             name: "Sound",
             version: 100,
             opcode: OpCode::SOUND,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("freq", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -1300,28 +1337,38 @@ lazy_static::lazy_static! {
             name: "Rename",
             version: 100,
             opcode: OpCode::RENAME,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("oldname", VariableType::String),
+                ArgumentDefinition::new("newname", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "FRewind",
             version: 100,
             opcode: OpCode::FREWIND,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("chnl", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "PokeDW",
             version: 100,
             opcode: OpCode::POKEDW,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("addr", VariableType::Integer),
+                ArgumentDefinition::new("value", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "DbgLevel",
             version: 100,
             opcode: OpCode::DBGLEVEL,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("level", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -1356,105 +1403,144 @@ lazy_static::lazy_static! {
             name: "FSeek",
             version: 200,
             opcode: OpCode::FSEEK,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("chnl", VariableType::Integer),
+                ArgumentDefinition::new("byte", VariableType::Integer),
+                ArgumentDefinition::new_flags("position", ArgumentDefinitionFlags::SeekPosition),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 3),
         },
         StatementDefinition {
             name: "FFlush",
             version: 200,
             opcode: OpCode::FFLUSH,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("chnl", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "FRead",
             version: 200,
             opcode: OpCode::FREAD,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("chnl", VariableType::Integer),
+                ArgumentDefinition::new("var", VariableType::None),
+                ArgumentDefinition::new("size", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(2, 3),
         },
         StatementDefinition {
             name: "FWrite",
             version: 200,
             opcode: OpCode::FWRITE,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("chnl", VariableType::Integer),
+                ArgumentDefinition::new("var", VariableType::None),
+                ArgumentDefinition::new("size", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 3),
         },
         StatementDefinition {
             name: "FDefIn",
             version: 200,
             opcode: OpCode::FDEFIN,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("chnl", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "FDefOut",
             version: 200,
             opcode: OpCode::FDEFOUT,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("chnl", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "FDGet",
             version: 200,
             opcode: OpCode::FDGET,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("var", VariableType::None),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(1, 1),
         },
         StatementDefinition {
             name: "FDPut",
             version: 200,
             opcode: OpCode::FDPUT,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("str", VariableType::String),
+            ]),
             sig: StatementSignature::VariableArguments(0),
         },
         StatementDefinition {
             name: "FDPutLn",
             version: 200,
             opcode: OpCode::FDPUTLN,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("str", VariableType::String),
+            ]),
             sig: StatementSignature::VariableArguments(0),
         },
         StatementDefinition {
             name: "FDPutPad",
             version: 200,
             opcode: OpCode::FDPUTPAD,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("str", VariableType::String),
+                ArgumentDefinition::new("len", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "FDRead",
             version: 200,
             opcode: OpCode::FDREAD,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("var", VariableType::None),
+                ArgumentDefinition::new("size", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(1, 2),
         },
         StatementDefinition {
             name: "FDWrite",
             version: 200,
             opcode: OpCode::FDWRITE,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("exp", VariableType::None),
+                ArgumentDefinition::new("size", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "AdjBytes",
             version: 200,
             opcode: OpCode::ADJBYTES,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("bytes", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "KbdString",
             version: 200,
             opcode: OpCode::KBDSTRING,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("str", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Alias",
             version: 200,
             opcode: OpCode::ALIAS,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("on", VariableType::Boolean),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -1468,14 +1554,20 @@ lazy_static::lazy_static! {
             name: "Append",
             version: 200,
             opcode: OpCode::APPEND,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("srcfile", VariableType::String),
+                ArgumentDefinition::new("destfile", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "Copy",
             version: 200,
             opcode: OpCode::COPY,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("srcfile", VariableType::String),
+                ArgumentDefinition::new("destfile", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
@@ -1503,98 +1595,139 @@ lazy_static::lazy_static! {
             name: "LastIn",
             version: 200,
             opcode: OpCode::LASTIN,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("conf", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Flag",
             version: 200,
             opcode: OpCode::FLAG,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("filepath", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Download",
             version: 200,
             opcode: OpCode::DOWNLOAD,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("cmd", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "WRUsysDoor",
             version: 200,
             opcode: OpCode::WRUSYSDOOR,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("str", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "GetAltUser",
             version: 200,
             opcode: OpCode::GETALTUSER,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("user", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "AdjDBytes",
             version: 200,
             opcode: OpCode::ADJDBYTES,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("bytes", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "AdjTBytes",
             version: 200,
             opcode: OpCode::ADJTBYTES,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("bytes", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "AdjTFiles",
             version: 200,
             opcode: OpCode::ADJTFILES,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("files", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Lang",
             version: 200,
             opcode: OpCode::LANG,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("num", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Sort",
             version: 200,
             opcode: OpCode::SORT,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("sortArray", VariableType::None),
+                ArgumentDefinition::new("pointerArray", VariableType::None),
+            ]),
             sig: StatementSignature::SpecialCaseSort,
         },
         StatementDefinition {
             name: "MouseReg",
             version: 200,
             opcode: OpCode::MOUSEREG,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("num", VariableType::Integer),
+                ArgumentDefinition::new("x1", VariableType::Integer),
+                ArgumentDefinition::new("y1", VariableType::Integer),
+                ArgumentDefinition::new("x2", VariableType::Integer),
+                ArgumentDefinition::new("y2", VariableType::Integer),
+                ArgumentDefinition::new("fontX", VariableType::Integer),
+                ArgumentDefinition::new("fontY", VariableType::Integer),
+                ArgumentDefinition::new("invert", VariableType::Boolean),
+                ArgumentDefinition::new("clear", VariableType::Boolean),
+                ArgumentDefinition::new("text", VariableType::String)
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 10),
         },
         StatementDefinition {
             name: "ScrFile",
             version: 200,
             opcode: OpCode::SCRFILE,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("line", VariableType::Integer),
+                ArgumentDefinition::new("filename", VariableType::String),
+            ]),
             sig: StatementSignature::SpecialCaseVarSeg,
         },
         StatementDefinition {
             name: "SearchInit",
             version: 200,
             opcode: OpCode::SEARCHINIT,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("line", VariableType::Integer),
+                ArgumentDefinition::new("filename", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "SearchFind",
             version: 200,
             opcode: OpCode::SEARCHFIND,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("buffer", VariableType::String),
+                ArgumentDefinition::new("var", VariableType::None),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(2, 2),
         },
         StatementDefinition {
@@ -1608,84 +1741,122 @@ lazy_static::lazy_static! {
             name: "PrFound",
             version: 200,
             opcode: OpCode::PRFOUND,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("str", VariableType::String),
+            ]),
             sig: StatementSignature::VariableArguments(0),
         },
         StatementDefinition {
             name: "PrFoundLn",
             version: 200,
             opcode: OpCode::PRFOUNDLN,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("str", VariableType::String),
+            ]),
             sig: StatementSignature::VariableArguments(0),
         },
         StatementDefinition {
             name: "TPAGet",
             version: 200,
             opcode: OpCode::TPAGET,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("keyword", VariableType::String),
+                ArgumentDefinition::new("var", VariableType::None),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(2, 2),
         },
         StatementDefinition {
             name: "TPAPut",
             version: 200,
             opcode: OpCode::TPAPUT,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("keyword", VariableType::String),
+                ArgumentDefinition::new("expr", VariableType::None),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
-            name: "TPACGea",
+            name: "TPACGet",
             version: 200,
             opcode: OpCode::TPACGET,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("keyword", VariableType::String),
+                ArgumentDefinition::new("var", VariableType::None),
+                ArgumentDefinition::new("conf", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(2, 3),
         },
         StatementDefinition {
             name: "TPACPut",
             version: 200,
             opcode: OpCode::TPACPUT,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("keyword", VariableType::String),
+                ArgumentDefinition::new("expr", VariableType::None),
+                ArgumentDefinition::new("conf", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 3),
         },
         StatementDefinition {
             name: "TPARead",
             version: 200,
             opcode: OpCode::TPAREAD,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("keyword", VariableType::String),
+                ArgumentDefinition::new("var", VariableType::None),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(2, 2),
         },
         StatementDefinition {
             name: "TPAWrite",
             version: 200,
             opcode: OpCode::TPAWRITE,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("keyword", VariableType::String),
+                ArgumentDefinition::new("expr", VariableType::None),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "TPACRead",
             version: 200,
             opcode: OpCode::TPACREAD,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("keyword", VariableType::String),
+                ArgumentDefinition::new("var", VariableType::None),
+                ArgumentDefinition::new("conf", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(2, 3),
         },
         StatementDefinition {
             name: "TPACWrite",
             version: 200,
             opcode: OpCode::TPACWRITE,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("keyword", VariableType::String),
+                ArgumentDefinition::new("expr", VariableType::None),
+                ArgumentDefinition::new("conf", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 3),
         },
         StatementDefinition {
             name: "BitSet",
             version: 200,
             opcode: OpCode::BITSET,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("var", VariableType::None),
+                ArgumentDefinition::new("bit", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(1, 2),
         },
         StatementDefinition {
             name: "BitClear",
             version: 200,
             opcode: OpCode::BITCLEAR,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("var", VariableType::None),
+                ArgumentDefinition::new("bit", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(1, 2),
         },
         StatementDefinition {
@@ -1706,14 +1877,19 @@ lazy_static::lazy_static! {
             name: "SetLMR",
             version: 200,
             opcode: OpCode::SETLMR,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("conf", VariableType::Integer),
+                ArgumentDefinition::new("msg", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "SetEnv",
             version: 200,
             opcode: OpCode::SETENV,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("envVar", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -1783,42 +1959,60 @@ lazy_static::lazy_static! {
             name: "StackAbort",
             version: 200,
             opcode: OpCode::STACKABORT,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("abort", VariableType::Boolean),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DCreate",
             version: 300,
             opcode: OpCode::DCREATE,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+                ArgumentDefinition::new("name", VariableType::String),
+                ArgumentDefinition::new("exclusive", VariableType::Boolean),
+                ArgumentDefinition::new("fieldInfo", VariableType::String)
+            ]),
             sig: StatementSignature::SpecialCaseDcreate,
         },
         StatementDefinition {
             name: "DOpen",
             version: 300,
             opcode: OpCode::DOPEN,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+                ArgumentDefinition::new("name", VariableType::String),
+                ArgumentDefinition::new("exclusive", VariableType::Boolean),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 3),
         },
         StatementDefinition {
             name: "DClose",
             version: 300,
             opcode: OpCode::DCLOSE,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DSetAlias",
             version: 300,
             opcode: OpCode::DSETALIAS,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+                ArgumentDefinition::new("alias", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "DPack",
             version: 300,
             opcode: OpCode::DPACK,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -1832,168 +2026,235 @@ lazy_static::lazy_static! {
             name: "DLock",
             version: 300,
             opcode: OpCode::DLOCK,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DLockR",
             version: 300,
             opcode: OpCode::DLOCKR,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+                ArgumentDefinition::new("recNo", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "DLockG",
             version: 300,
             opcode: OpCode::DLOCKG,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+                ArgumentDefinition::new("recNos", VariableType::Integer),
+                ArgumentDefinition::new("count", VariableType::Integer),
+            ]),
             sig: StatementSignature::SpecialCaseDlockg,
         },
         StatementDefinition {
             name: "DUnlock",
             version: 300,
             opcode: OpCode::DUNLOCK,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DNCreate",
             version: 300,
             opcode: OpCode::DNCREATE,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+                ArgumentDefinition::new("name", VariableType::String),
+                ArgumentDefinition::new("expression", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 3),
         },
         StatementDefinition {
             name: "DNOpen",
             version: 300,
             opcode: OpCode::DNOPEN,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+                ArgumentDefinition::new("name", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "DNClose",
             version: 300,
             opcode: OpCode::DNCLOSE,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+                ArgumentDefinition::new("name", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "DNCloseAll",
             version: 300,
             opcode: OpCode::DNCLOSEALL,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("name", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DNew",
             version: 300,
             opcode: OpCode::DNEW,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("name", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DAdd",
             version: 300,
             opcode: OpCode::DADD,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DAppend",
             version: 300,
             opcode: OpCode::DAPPEND,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DTop",
             version: 300,
             opcode: OpCode::DTOP,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DGo",
             version: 300,
             opcode: OpCode::DGO,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+                ArgumentDefinition::new("recNo", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "DBottom",
             version: 300,
             opcode: OpCode::DBOTTOM,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DSkip",
             version: 300,
             opcode: OpCode::DSKIP,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+                ArgumentDefinition::new("number", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "DBlank",
             version: 300,
             opcode: OpCode::DBLANK,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DDelete",
             version: 300,
             opcode: OpCode::DDELETE,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DRecall",
             version: 300,
             opcode: OpCode::DRECALL,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DTag",
             version: 300,
             opcode: OpCode::DTAG,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+                ArgumentDefinition::new("name", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "DSeek",
             version: 300,
             opcode: OpCode::DSEEK,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+                ArgumentDefinition::new("expr", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "DFBlank",
             version: 300,
             opcode: OpCode::DFBLANK,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+                ArgumentDefinition::new("name", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "DGet",
             version: 300,
             opcode: OpCode::DGET,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+                ArgumentDefinition::new("name", VariableType::String),
+                ArgumentDefinition::new("var", VariableType::None),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(3, 3),
         },
         StatementDefinition {
             name: "DPut",
             version: 300,
             opcode: OpCode::DPUT,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("channel", VariableType::Integer),
+                ArgumentDefinition::new("name", VariableType::String),
+                ArgumentDefinition::new("expression", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 3),
         },
         StatementDefinition {
             name: "DFCopy",
             version: 300,
             opcode: OpCode::DFCOPY,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("srcchannel", VariableType::Integer),
+                ArgumentDefinition::new("srcname", VariableType::String),
+                ArgumentDefinition::new("dstchannel", VariableType::Integer),
+                ArgumentDefinition::new("dstname", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 4),
         },
         StatementDefinition {
@@ -2007,98 +2268,139 @@ lazy_static::lazy_static! {
             name: "Account",
             version: 300,
             opcode: OpCode::ACCOUNT,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("field", VariableType::Integer),
+                ArgumentDefinition::new("value", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "RecordUsage",
             version: 300,
             opcode: OpCode::RECORDUSAGE,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("field", VariableType::Integer),
+                ArgumentDefinition::new("desc1", VariableType::String),
+                ArgumentDefinition::new("desc2", VariableType::String),
+                ArgumentDefinition::new("unitcost", VariableType::Integer),
+                ArgumentDefinition::new("value", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 5),
         },
         StatementDefinition {
             name: "MsgToFile",
             version: 300,
             opcode: OpCode::MSGTOFILE,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("conf", VariableType::Integer),
+                ArgumentDefinition::new("msg_no", VariableType::Integer),
+                ArgumentDefinition::new("filename", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 3),
         },
         StatementDefinition {
             name: "QwkLimits",
             version: 300,
             opcode: OpCode::QWKLIMITS,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("maxmsgs", VariableType::Integer),
+                ArgumentDefinition::new("no", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "Command",
             version: 300,
             opcode: OpCode::COMMAND,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("viaCmdLst", VariableType::Boolean),
+                ArgumentDefinition::new("cmd", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
-            name: "USelMrs",
+            name: "UseLMRs",
             version: 300,
             opcode: OpCode::USELMRS,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("useLMR", VariableType::Boolean),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "ConfInfo",
             version: 300,
             opcode: OpCode::CONFINFO,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("confnum", VariableType::Integer),
+                ArgumentDefinition::new("field", VariableType::Integer),
+                ArgumentDefinition::new("value", VariableType::None),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 3),
         },
         StatementDefinition {
             name: "AdjTUBytes",
             version: 300,
             opcode: OpCode::ADJTUBYTES,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("bytes", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "GrafMode",
             version: 300,
             opcode: OpCode::GRAFMODE,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("mode", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "AddUser",
             version: 300,
             opcode: OpCode::ADDUSER,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("name", VariableType::String),
+                ArgumentDefinition::new("uservars", VariableType::Boolean),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "KillMsg",
             version: 300,
             opcode: OpCode::KILLMSG,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("confnum", VariableType::Integer),
+                ArgumentDefinition::new("msgnum", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
             name: "ChDir",
             version: 300,
             opcode: OpCode::CHDIR,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("path", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "MkDir",
             version: 300,
             opcode: OpCode::MKDIR,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("path", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
-            name: "ReDir",
+            name: "RmDir",
             version: 300,
-            opcode: OpCode::REDIR,
-            args: None,
+            opcode: OpCode::RMDIR,
+            args: Some(vec![
+                ArgumentDefinition::new("path", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2133,50 +2435,74 @@ lazy_static::lazy_static! {
             name: "FDOQMod",
             version: 300,
             opcode: OpCode::FDOQMOD,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("recnum", VariableType::Integer),
+                ArgumentDefinition::new("addr", VariableType::String),
+                ArgumentDefinition::new("file", VariableType::String),
+                ArgumentDefinition::new_flags("flags", ArgumentDefinitionFlags::FidoFlags),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 4),
         },
         StatementDefinition {
             name: "FDOQAdd",
             version: 300,
             opcode: OpCode::FDOQADD,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("addr", VariableType::String),
+                ArgumentDefinition::new("file", VariableType::String),
+                ArgumentDefinition::new_flags("flags", ArgumentDefinitionFlags::FidoFlags),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 3),
         },
         StatementDefinition {
             name: "FDOQDel",
             version: 300,
             opcode: OpCode::FDOQDEL,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("recnum", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "SoundDelay",
             version: 300,
             opcode: OpCode::SOUNDDELAY,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("freq", VariableType::Integer),
+                ArgumentDefinition::new("duration", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
+
         // 3.4 statements
         StatementDefinition {
             name: "ShortDesc",
             version: 340,
             opcode: OpCode::ShortDesc,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("val", VariableType::Boolean),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "MoveMsg",
             version: 340,
             opcode: OpCode::MoveMsg,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("conf", VariableType::Integer),
+                ArgumentDefinition::new("message", VariableType::Integer),
+                ArgumentDefinition::new("movetype", VariableType::Boolean),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 3),
         },
         StatementDefinition {
             name: "SetBankBal",
             version: 340,
             opcode: OpCode::SetBankBal,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("field", VariableType::Integer),
+                ArgumentDefinition::new("value", VariableType::Integer),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         // Alias section
@@ -2199,14 +2525,19 @@ lazy_static::lazy_static! {
             name: "Erase",
             version: 100,
             opcode: OpCode::DELETE,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("file", VariableType::String),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Poke",
             version: 100,
             opcode: OpCode::POKEB,
-            args: None,
+            args: Some(vec![
+                ArgumentDefinition::new("addr", VariableType::Integer),
+                ArgumentDefinition::new("value", VariableType::Byte),
+            ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
     ];

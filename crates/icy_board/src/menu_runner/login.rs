@@ -213,7 +213,7 @@ impl PcbBoardCommand {
             let Some(pw1) = self.input_required(IceText::NewPassword, &MASK_ALNUM, 20, display_flags::ECHODOTS).await? else {
                 return Ok(false);
             };
-            if !self.state.is_valid_password(&pw1).await {
+            if !self.state.is_valid_password(&pw1).await? {
                 self.state.display_text(IceText::PasswordTooShort, display_flags::NEWLINE).await?;
                 continue;
             }

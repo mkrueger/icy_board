@@ -69,7 +69,7 @@ pub struct Conference {
     pub private_uploads: bool,
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
-    pub private_msgs: bool,
+    pub no_private_msgs: bool,
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub allow_aliases: bool,
@@ -187,7 +187,7 @@ impl ConferenceBase {
                 auto_rejoin: c.auto_rejoin,
                 view_members: c.view_members,
                 private_uploads: c.private_uploads,
-                private_msgs: c.private_msgs,
+                no_private_msgs: c.private_msgs,
                 allow_aliases: d.allow_aliases,
                 add_conference_security: c.add_conference_security,
                 add_conference_time: c.add_conference_time as u16,

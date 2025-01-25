@@ -66,7 +66,7 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
             });
         }
 
-        for stmt in &STATEMENT_DEFINITIONS {
+        for stmt in STATEMENT_DEFINITIONS.iter() {
             if stmt.sig == StatementSignature::Invalid {
                 continue;
             }

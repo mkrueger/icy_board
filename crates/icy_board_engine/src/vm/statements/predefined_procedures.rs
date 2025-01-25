@@ -583,14 +583,14 @@ pub async fn pop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 pub async fn call(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let file_name = vm.eval_expr(&args[0]).await?.as_string();
-    vm.icy_board_state.run_ppe(&file_name, None);
+    vm.icy_board_state.run_ppe(&file_name, None).await?;
     Ok(())
 }
 
 pub async fn join(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let conf = vm.eval_expr(&args[0]).await?.as_int();
     if conf >= 0 {
-        vm.icy_board_state.join_conference(conf as u16, true);
+        vm.icy_board_state.join_conference(conf as u16, true).await;
     }
     Ok(())
 }
@@ -598,7 +598,7 @@ pub async fn quest(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let nr = vm.eval_expr(&args[0]).await?.as_int();
     let surveys = vm.icy_board_state.load_surveys().await?;
     if let Some(survey) = surveys.get(nr as usize) {
-        vm.icy_board_state.start_survey(survey);
+        vm.icy_board_state.start_survey(survey).await?;
     }
     Ok(())
 }
@@ -1629,9 +1629,8 @@ pub async fn uselmrs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 pub async fn confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
     let conf_field = vm.eval_expr(&args[1]).await?.as_int();
-
-    let value = crate::vm::expressions::get_confinfo(vm, conf_num, conf_field).await?;
-    vm.set_variable(&args[2], value).await?;
+    let value = vm.eval_expr(&args[2]).await?;
+    crate::vm::expressions::set_confinfo(vm, conf_num, conf_field, value).await?;
     Ok(())
 }
 

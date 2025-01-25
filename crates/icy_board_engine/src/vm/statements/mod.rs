@@ -3,6 +3,7 @@
 #[allow(clippy::missing_panics_doc)]
 pub mod predefined_procedures;
 
+use async_recursion::async_recursion;
 pub use predefined_procedures::*;
 
 use crate::{
@@ -12,6 +13,7 @@ use crate::{
 
 use super::VirtualMachine;
 
+#[async_recursion(?Send)]
 pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'_>, arguments: &[PPEExpr]) -> Res<()> {
     match opcode {
         OpCode::END => predefined_procedures::end(arg, arguments).await,
@@ -231,7 +233,7 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::KILLMSG => predefined_procedures::killmsg(arg, arguments).await,
         OpCode::CHDIR => predefined_procedures::chdir(arg, arguments).await,
         OpCode::MKDIR => predefined_procedures::mkdir(arg, arguments).await,
-        OpCode::REDIR => predefined_procedures::redir(arg, arguments).await,
+        OpCode::RMDIR => predefined_procedures::redir(arg, arguments).await,
         OpCode::FDOWRAKA => predefined_procedures::fdowraka(arg, arguments).await,
         OpCode::FDOADDAKA => predefined_procedures::fdoaddaka(arg, arguments).await,
         OpCode::FDOWRORG => predefined_procedures::fdowrorg(arg, arguments).await,

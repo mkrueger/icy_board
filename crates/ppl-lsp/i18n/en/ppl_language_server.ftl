@@ -17,56 +17,25 @@ hint-type-word=2-byte unsigned integer Range: 0 - 65,535
 hint-type-sbyte=1-byte signed Integer Range: -128 - 127
 hint-type-sword=2-byte signed integer Range: -32,768 - 32,767
 
-hint-statement-end=
-    `END`
-    
-    Ends the program execution
-hint-statement-cls=
-    `CLS`
-    
-    Clears the screen
-hint-statement-clreol=
-    `CLREOL`
-    
-    Clears to the end of the line
-hint-statement-more=
-    `MORE`
-    
-    Pauses and waits for a keypress (Displays a MORE? prompt)
-hint-statement-wait=
-    `WAIT`
-    
-    Pauses and waits for a keypress
-hint-statement-color=
-    `COLOR col:integer`
-    
-    Sets the text color to `col`    
-hint-statement-goto=
-    `GOTO label`
-    
-    Jumps to the label specified
-hint-statement-let=
-    `LET var1=exp`
-    
-    Assigns the value of `exp` to `var1`
+hint-statement-end=Ends the program execution
+hint-statement-cls=Clears the screen
+hint-statement-clreol=Clears to the end of the line
+hint-statement-more=Pauses and waits for a keypress (Displays a MORE? prompt)
+hint-statement-wait=Pauses and waits for a keypress
+hint-statement-color=Sets the text color to @1
+hint-statement-goto=Jumps to the label specified
+hint-statement-let=Assigns the value of `exp` to `var1`
 hint-statement-print=
-    `PRINT exp[, exp]*`
-
     Print a line to the screen
 
     ### Remarks
     This statement will process all @ codes and display them as expected.
 hint-statement-println=
-    `PRINTLN [exp[, exp]*]?`
-
     Print a line to the screen and append a newline to the end of the expression(s).
 
     ### Remarks
     This statement will process all @ codes and display them as expected.
-hint-statement-confflag=
-    `CONFFLAG conf:integer, flags:integer`
-    
-    Turn on the conference `conf` flags specified by `flags`
+hint-statement-confflag=Turn on the conference @1 flags specified by @2
 hint-statement-confunflag=todo
 hint-statement-dispfile=todo
 hint-statement-input=todo
@@ -114,16 +83,13 @@ hint-statement-dec=todo
 hint-statement-newline=todo
 hint-statement-newlines=todo
 hint-statement-tokenize=
-    `TOKENIZE str:string`
-
     Tokenize string “string” into individual items separated by semi-colons or spaces
 
     ### See also
     `GetToken, TokenStr, TokCount`
 hint-statement-gettoken=
-    `GETTOKEN() :STRING`
-
-    Returns the next string token from a prior call to `Tokenize` (Same as the `GETTOKEN` statement but can be used in an expression without prior assignement to a variable)
+    ### Returns
+    The next string token from a prior call to `Tokenize` (Same as the `GETTOKEN` statement but can be used in an expression without prior assignement to a variable)
     
     ### Example
     `GETTOKEN VAR`
@@ -137,30 +103,15 @@ hint-statement-beep=todo
 hint-statement-push=todo
 hint-statement-pop=todo
 hint-statement-kbdstuff=todo
-hint-statement-call=
-    `CALL ppename`
-
-    Load and execute PPE filename specified by “ppename”
-hint-statement-join=
-    `JOIN conf:integer`
-
-    Performs a join conference command, passing it “conf” as arguments
-hint-statement-quest=
-    `QUEST nr:integer`
-
-    Do script questionnaire “nr”
-hint-statement-blt=
-    `BLT bltnr:integer`
-
-    Display bulletin number “bltnr”
+hint-statement-call=Load and execute PPE filename specified by @1
+hint-statement-join=Performs a join conference command, passing it @1 as arguments
+hint-statement-quest=Do script questionnaire @1
+hint-statement-blt=Display bulletin number @1
 hint-statement-dir=todo
 hint-statement-kbdfile=todo
 hint-statement-bye=todo
 hint-statement-goodbye=todo
-hint-statement-broadcast=
-    `BROADCAST var1:integer, var2:integer, message:string`
-    
-    Broadcast message `message` to nodes from `var1` to `var2` inclusive
+hint-statement-broadcast=Broadcast message @3 to nodes from @1 to @2 inclusive
 hint-statement-waitfor=todo
 hint-statement-kbdchkon=todo
 hint-statement-kbdchkoff=todo
@@ -175,20 +126,15 @@ hint-statement-pokeb=todo
 hint-statement-pokew=todo
 hint-statement-varaddr=todo
 hint-statement-ansipos=
-    `ANSIPOS col:integer, row:integer`
-    
-    Move the cursor to column `col` and row `row`
+    Move the cursor to column @1 and row @2
 
     ```
-    1 <= col <= 80  
-    1 <= row <= 23 (Because of the status lines)  
+    1 <= @1 <= 80  
+    1 <= @2 <= 23 (Because of the status lines)  
     ```
     (1,1) is the top left corner of the screen
 hint-statement-backup=todo
-hint-statement-forward=
-    `FORWARD var:integer`
-    
-    Move the cursor forward `var` columns without going past column 80
+hint-statement-forward=Move the cursor forward @1 columns without going past column 80
 hint-statement-freshline=todo
 hint-statement-wrusys=todo
 hint-statement-rdusys=todo
@@ -244,18 +190,16 @@ hint-statement-adjtfiles=todo
 hint-statement-lang=todo
 hint-statement-sort=todo
 hint-statement-mousereg=
-    `MOUSEREG num,x1,y1,x2,y2,fontX,fontY,invert,clear,text`
-
     Set up a RIP mouse region on the remote terminal.
-
-    `num`    = Is the RIP region number  
-    `x1`,y1  = The (X,Y) coordinates of the upper-left of the region  
-    `x2`,y2  = The (X,Y) coordinates of the lower-right of the region  
-    `fontX`  = The width of each character in pixels  
-    `fontY`  = The height of each character in pixels  
-    `invert` = A boolean flag (TRUE to invert the region when clicked)  
-    `clear`  = A boolean flag (TRUE to clear and full screen the text window)  
-    `text`   = Text that the remote terminal should transmit when the region is clicked  
+    
+    @1    = Is the RIP region number  
+    @2, @3  = The (X,Y) coordinates of the upper-left of the region  
+    @4, @5  = The (X,Y) coordinates of the lower-right of the region  
+    @6  = The width of each character in pixels  
+    @7  = The height of each character in pixels  
+    @8 = A boolean flag (TRUE to invert the region when clicked)  
+    @9  = A boolean flag (TRUE to clear and full screen the text window)  
+    @10   = Text that the remote terminal should transmit when the region is clicked  
 hint-statement-scrfile=todo
 hint-statement-searchinit=todo
 hint-statement-searchfind=todo
@@ -323,73 +267,192 @@ hint-statement-msgtofile=todo
 hint-statement-qwklimits=todo
 hint-statement-command=todo
 hint-statement-uselmrs=todo
-hint-statement-confinfo=todo
-hint-statement-adjtubytes=todo
-hint-statement-grafmode=todo
-hint-statement-adduser=todo
-hint-statement-killmsg=todo
+hint-statement-confinfo=
+    This statement can be used to modify a field in the conference
+    configuration.
+
+    ### Parameters
+    @1 = The conference number to get information about
+    @2 = Conference field to modify. (See note)
+    @3 = New value to store in field
+
+    ### Fields
+     1: STRING     Conference Name
+     2: BOOLEAN    Public Conference
+     8: INTEGER    Required Security if public
+    40: STRING     Password to Join if Private;
+    43: STRING     Auto-Register Flags
+    11: INTEGER    Number of Message Blocks
+    12: STRING     Name/Loc of MSGS File
+    13: STRING     Name/Loc of Users's Menu
+    14: STRING     Name/Loc of Sysops Menu
+    15: STRING     Name/Loc of NEWS file.
+    41: STRING     Name/Loc of Conf INTRO File
+    42: STRING     Location for Attachments
+    16: INTEGER    Public Upload Sort
+    17: STRING     Name/Loc upload DIR file
+    18: STRING     Location of Public Uploads
+    19: INTEGER    Private Upload Sort
+    20: STRING     Name/Loc Private Upload DIR file
+    21: STRING     Location of private uploads
+    22: STRING     Doors Menu
+    23: STRING     Doors File
+    24: STRING     Bulletin Menu
+    25: STRING     Bulletin File
+    26: STRING     Script Menu
+    27: STRING     Script File
+    28: STRING     Directories Menu
+    29: STRING     Directories File
+    30: STRING     Download Paths File
+     3: BOOLEAN    Auto Rejoin
+     4: BOOLEAN    View Other Users
+     5: BOOLEAN    Make Uploads Private
+     6: BOOLEAN    Make All Messages Private
+     7: BOOLEAN    Echo Mail in Conf
+    31: BOOLEAN    Force Echo on All Messages
+    50: BYTE       Type of NetMail Conference
+    48: BOOLEAN    Allow Internet (long) TO: Names
+    32: BOOLEAN    Make Conference Read Only
+    33: BOOLEAN    Disallow Private Messages
+    35: BOOLEAN    Place Origin Info In Messages
+    36: BOOLEAN    Prompt For Route info
+    37: BOOLEAN    Allow Aliases to be used
+    38: BOOLEAN    Show INTRO in 'R A' Scan
+    47: BOOLEAN    Maintain Old MSGS.NDX File
+    46: STRING     Conf-Specific CMD.LST File
+     9: INTEGER    Additional Conference Security
+    10: INTEGER    Additional Conference Time
+    44: BYTE       Level to Save File Attachment
+    39: INTEGER    Level to Enter a Message
+    34: INTEGER    Level to Request Return Receipt
+    49: BYTE       Level to Enter Carbon List Msgs
+    45: BYTE       Carbon Copy List Limit
+    52: DREAL      Charge Per Minute
+    53: DREAL      Charge per Message Read
+    54: DREAL      Charge per Message Written
+    51: INTEGER    Last Message Exported
+hint-statement-adjtubytes=
+    This statement can be used to adjust a users total uploads bytes
+    up or down.
+    
+    ### Parameters
+    @1 = Number of bytes to adjust current users upload bytes with.
+    This can be a positive or negative value
+hint-statement-grafmode=
+    This statement can be used to change a users graphics mode while online.
+
+    ### Parameters
+    @1 = The graphics mode to change to.
+    1 = If user has ANSI capabilities it will change graphics to color ANSI
+    2 = Will attempt to put user in color ansi regardless of ansi ability
+    3 = Puts user in ansi-black and white mode
+    4 = Puts user in non-ansi black and white mode
+    5 = If user has RIP ability, will put user in RIP mode.
+    (IcyBoard: 6 = Avatar mode
+    )
+
+hint-statement-adduser=
+    ### Parameters
+    @1 = name of the new user to add
+    @2 = TRUE instructs PCBoard to leave the new user's variables active, as if a GETALTUSER were executed
+    using the new user record number. FALSE will restore the current users variables.
+
+    ### Remarks
+    This statement allows PPL to create a new user record, filling
+    in all fields but the name with pcboard default values.
+hint-statement-killmsg=
+    ### Parameters
+    @1 = conference number in which the doomed message resides.
+    @2 = message number to kill
 hint-statement-chdir=todo
-hint-statement-mkdir=todo
-hint-statement-redir=todo
+hint-statement-mkdir=Creates a new directory
+    ### Parameters
+    @1 = directory to create 
+hint-statement-rmdir=todo
 hint-statement-fdowraka=todo
 hint-statement-fdoaddaka=todo
 hint-statement-fdowrorg=todo
 hint-statement-fdoaddorg=todo
-hint-statement-fdoqmod=todo
-hint-statement-fdoqadd=todo
-hint-statement-fdoqdel=todo
-hint-statement-sounddelay=todo
-hint-statement-shortdesc=todo
-hint-statement-movemsg=todo
-hint-statement-setbankbal=todo
+hint-statement-fdoqmod=This statement can be used to modify fido queue records.todo
+hint-statement-fdoqadd=This statement can be used to add entries to the FIDO queue.
+hint-statement-fdoqdel=This statement can be used to delete fido queue records.
+hint-statement-sounddelay=
+    ### Parameters
+    @1 = frequency at which to sound the PC speaker
+    @2 = length, in clock ticks (18 = 1 second), to leave the speaker on
 
+    ### Remarks
+    This function was added to replace the
+    ```
+    SOUND 500
+    SOUND 0
+    ```
+    combination required for DOS, since this functionality is not available under OS/2.
+hint-statement-shortdesc=
+    Sets the current user's status for viewing short (one line) or full file descriptions.
+
+    ### Parameters
+    @1 = A boolean expression stating if the short description set on.
+hint-statement-movemsg=
+    Moves the message from its current location to the end of the message base.
+
+    ### Parameters
+    @1 = conference number in which the message resides
+    @2 = message number to move
+    @3 = A Boolean expression stating where the message should be
+    move or not.  TRUE if it will be moved, FALSE if the message is to be copied.
+hint-statement-setbankbal=
+    Sets the value of a specified field.
+    ### Parameters
+    @1 An interger expression stating the field to get.
+    @2 An interger expression stating the value that the specified field is to set to.
+
+    ### Fields
+    Time Fields (in minutes)
+    ------------------------
+        0 = Last Deposit Date
+        1 = Last Withdrawal Date
+        2 = Last Transaction Amount (in minutes)
+        3 = Amount Saved (their time balance in their account)
+        4 = Max Withdrawal (the max a user can withdraw in a day)
+        5 = Max Stored Amount (Maximum time allowed to be stored)
+
+    Byte Fields (in K bytes)
+    ------------------------
+        6 = Last Deposit Date
+        7 = Last Withdrawal Date
+        8 = Last Transaction Amount (in K bytes)
+        9 = Amount Saved (their K byte balance in their account)
+        10 = Max Withdrawal (the max a user can withdraw in a day)
+        11 = Max Stored Amount (Maximum K bytes allowed to be stored)
 hint-function-len=
-    ### Function
-    `LEN(var1:bigstr) :INTEGER`
-
-    #Remarks
-    Returns the length of the string `var1`
+    ### Returns
+    Returns the length of the string @1
 hint-function-lower=
-    ### Function
-    `LOWER(var1:bigstr) :BIGSTR`
-
-    Returns the string `var1` converted to lower case
+    ### Returns
+    Returns the string @1 converted to lower case
 hint-function-upper=
-    ### Function
-    `UPPER(var1:bigstr) :BIGSTR`
-
-    Returns the string `var1` converted to upper case
+    ### Returns
+    Returns the string @1 converted to upper case
 hint-function-mid=
-    ### Function
-    `MID(str:bigstr,start:integer,length:integer) :BIGSTR`
-
-    Returns a substring of `str` starting at position `start` and `length` characters long
+    ### Returns
+    Returns a substring of @1 starting at position @2 and @3 characters long
 hint-function-left=
-    ### Function
-    `LEFT(str:bigstr,length:integer) :BIGSTR`
-
-    Returns the leftmost `length` characters of `str`
+    ### Returns
+    Returns the leftmost @2 characters of @1
 hint-function-right=
-    ### Function
-    `RIGHT(str:bigstr,length:integer) :BIGSTR`
-
-    Returns the rightmost `length` characters of `str`
+    ### Returns
+    Returns the rightmost @2 characters of @1
 hint-function-space=
-    ### Function
-    `SPACE(length:integer) :BIGSTR`
-
-    Returns a string of `length` spaces
+    ### Returns
+    Returns a string of @1 spaces
 hint-function-ferr=todo
 hint-function-chr=
-    ### Function
-    `CHR(var1:integer) : BIGSTR`
-
+    ### Returns
     Returns a single character long string of the character represented by ASCII code var (0-255)
 hint-function-asc=
-    ### Function
-    `ASC(var1:bigstr) :INTEGER`
-
-    Returns the ASCII value of the first character in `var1`
+    ### Returns
+    Returns the ASCII value of the first character in @1
 hint-function-instr=todo
 hint-function-abort=todo
 hint-function-ltrim=todo
@@ -477,10 +540,8 @@ hint-function-peekw=todo
 hint-function-mkaddr=todo
 hint-function-exist=todo
 hint-function-i2s=
-    ### Function
-    `I2S(var1:integer,var2:integer) :STRING`
-
-    Returns a string representing the integer value `var1` converted to base `var2`
+    ### Returns
+    Returns a string representing the integer value @1 converted to base @2
 hint-function-s2i=todo
 hint-function-carrier=todo
 hint-function-tokenstr=todo
@@ -524,11 +585,9 @@ hint-function-u_inconf=todo
 hint-function-peekdw=todo
 hint-function-dbglevel=todo
 hint-function-scrtext=
-    ### Function
-    `SCRTEXT(col:integer, row:integer, len:integer, code:boolean) : STRING`
-
-    Returns a string of `len` characters from the screen at `col`, `row`. 
-    If `code` is `TRUE` then the string will be returned with all @ codes intact.
+    ### Returns
+    Returns a string of @3 characters from the screen at @1, @2.
+    If @3 is `TRUE` then the string will be returned with all @ codes intact.
 hint-function-showstat=todo
 hint-function-pagestat=todo
 hint-function-replacestr=todo
@@ -547,11 +606,7 @@ hint-function-tosword=todo
 hint-function-totime=todo
 hint-function-tounsigned=todo
 hint-function-toword=todo
-hint-function-mixed=
-    ### Function
-    `MIXED(var1:string)`
-
-    Converts a string to mixed (or proper name) case
+hint-function-mixed=Converts a string to mixed (or proper name) case
 hint-function-alias=todo
 hint-function-confreg=todo
 hint-function-confexp=todo
@@ -585,9 +640,7 @@ hint-function-inbytes=todo
 hint-function-crc32=todo
 hint-function-pcbmac=todo
 hint-function-actmsgnum=
-    ### Function
-    `ACTMSGNUM()`
-
+    ### Returns
     Returns number of active messages in current conference
 
     ### Example
@@ -652,36 +705,249 @@ hint-function-checkrip=todo
 hint-function-ripver=todo
 hint-function-qwklimits=todo
 hint-function-findfirst=
-    ### Function
-    `FINDFIRST(filespec:bigstr) :BIGSTR`
-
     Find the first occurence of filespec in a directory. Used in conjunction with FindNext to get a directory listing.
-hint-function-findnext=
-    ### Function
-    `FINDNEXT() :BIGSTR`
 
-    Find the next occurence of filespec (used with FindFirst) in a directory.
-hint-function-uselmrs=todo
-hint-function-confinfo=todo
-hint-function-tinkey=todo
-hint-function-cwd=todo
+    ### Parameters
+    @1 = A string expression with the path and file name to access information about.
+    Quite often this expression involves a DOS wildcard (e.g., *.*, *.BAT, etc.)
+
+    ### Returns
+    The first filename matching the filename criteria.
+
+    ### Remarks
+    This function is designed to help locate files matching a specific
+    criteria.  For example, you may want to delete all files matching *.BAK
+    in the current directory.  This can be done easily because
+    FINDFIRST() locates the first match, while FINDNEXT() locates
+    additional matches.
+
+    It should be noted that only the filenames are returned.  If you need
+    additional information such as date, time, or size of the file, use
+    the FILEINF() function.
+
+hint-function-findnext=
+    This function determines if there are any more files matching a specified pattern.
+
+    ### Returns
+    The next filename matching the filename criteria or an
+    empty string if there are no more matching files.
+
+    ### Remarks
+    This function is designed to continue where the FINDFIRST() function
+    leaves off because it locates any additional files matching the pattern
+    last searched for.  There are no more matching files when the return
+    value is null or an empty string. Because you do not know how many
+    matching files there are, a WHILE loop is usually involved in gathering
+    all of the filenames.
+
+    It should be noted that only the filenames are returned.  If you need
+    additional information such as date, time, or size of the file, use the
+    FILEINF() function.
+hint-function-uselmrs=
+    ### Parameters
+    @1 = Instructs PCBoard NOT to load an alternate users LMRS
+    when a GETALTUSER is executed.
+
+    ### Remarks
+    This statment can save a significant amount of memory when a GETALTUSER
+    is executed at a later time. When GETALTUSER is executed, it loads
+    the users LMR's by default. If you have a significant number of conferences
+    on your system, this can require a great deal of memory. Since PCBoard
+    is so rich with features, it can take most if not all available
+    conventional memory, leaving PPEs out to dry. If an alternate users
+    LMRs are not needed by the PPE application, then you can use this
+    statement to tell PCBoard not to load the LMR data.
+
+    See also the FUNCTION USELMRS, this will return the current status
+    of USELMRS. Eg, if the funtion USELMRS returns TRUE, then a GETALTUSEr
+    will load LMRS, if it returns FALSE, LMRS will not be loaded.
+hint-function-confinfo=
+    This statement can be used to access a field in the conference
+    configuration.
+
+    ### Parameters
+    @1 = The conference number to get information about
+    @2 = Conference field to modify. (See note)
+
+    ### Fields
+     1: STRING     Conference Name
+     2: BOOLEAN    Public Conference
+     8: INTEGER    Required Security if public
+    40: STRING     Password to Join if Private;
+    43: STRING     Auto-Register Flags
+    11: INTEGER    Number of Message Blocks
+    12: STRING     Name/Loc of MSGS File
+    13: STRING     Name/Loc of Users's Menu
+    14: STRING     Name/Loc of Sysops Menu
+    15: STRING     Name/Loc of NEWS file.
+    41: STRING     Name/Loc of Conf INTRO File
+    42: STRING     Location for Attachments
+    16: INTEGER    Public Upload Sort
+    17: STRING     Name/Loc upload DIR file
+    18: STRING     Location of Public Uploads
+    19: INTEGER    Private Upload Sort
+    20: STRING     Name/Loc Private Upload DIR file
+    21: STRING     Location of private uploads
+    22: STRING     Doors Menu
+    23: STRING     Doors File
+    24: STRING     Bulletin Menu
+    25: STRING     Bulletin File
+    26: STRING     Script Menu
+    27: STRING     Script File
+    28: STRING     Directories Menu
+    29: STRING     Directories File
+    30: STRING     Download Paths File
+     3: BOOLEAN    Auto Rejoin
+     4: BOOLEAN    View Other Users
+     5: BOOLEAN    Make Uploads Private
+     6: BOOLEAN    Make All Messages Private
+     7: BOOLEAN    Echo Mail in Conf
+    31: BOOLEAN    Force Echo on All Messages
+    50: BYTE       Type of NetMail Conference
+    48: BOOLEAN    Allow Internet (long) TO: Names
+    32: BOOLEAN    Make Conference Read Only
+    33: BOOLEAN    Disallow Private Messages
+    35: BOOLEAN    Place Origin Info In Messages
+    36: BOOLEAN    Prompt For Route info
+    37: BOOLEAN    Allow Aliases to be used
+    38: BOOLEAN    Show INTRO in 'R A' Scan
+    47: BOOLEAN    Maintain Old MSGS.NDX File
+    46: STRING     Conf-Specific CMD.LST File
+     9: INTEGER    Additional Conference Security
+    10: INTEGER    Additional Conference Time
+    44: BYTE       Level to Save File Attachment
+    39: INTEGER    Level to Enter a Message
+    34: INTEGER    Level to Request Return Receipt
+    49: BYTE       Level to Enter Carbon List Msgs
+    45: BYTE       Carbon Copy List Limit
+    52: DREAL      Charge Per Minute
+    53: DREAL      Charge per Message Read
+    54: DREAL      Charge per Message Written
+    51: INTEGER    Last Message Exported
+
+hint-function-tinkey=
+    ### Parameters
+    @1 = Number of clock ticks to wait for input.
+
+    ### Returns
+    Input entered by user
+
+    ### Remarks
+    Y1 is the number of clock ticks you wish `TINEKY` to wait for input
+    before timing out. 1 second = 18 ticks (approx)
+    
+    A tick value of 0 will cause `TINKEY` to wait indefinatly for input with
+    a maximum timout time of about 4 hours. Carrier loss will also terminate
+    `TINKEY`.
+hint-function-cwd=
+    ### Returns
+    The current working directory
 hint-function-instrr=todo
 hint-function-fdordaka=todo
 hint-function-fdordorg=todo
 hint-function-fdordarea=todo
 hint-function-fdoqrd=todo
-hint-function-getdrive=todo
+hint-function-getdrive=
+    ### Returns
+    The current drive letter
+
+    ### Remarks
+    Drive numbers correspond to drive letters in the following way
+    A: = 0
+    B: = 1
+    C: = 2
+    …
 hint-function-setdrive=todo
-hint-function-bs2i=todo
-hint-function-bd2i=todo
-hint-function-i2bs=todo
-hint-function-i2bd=todo
-hint-function-ftell=todo
-hint-function-os=todo
-hint-function-short_desc=todo
-hint-function-getbankbal=todo
-hint-function-getmsghdr=todo
-hint-function-setmsghdr=todo
+hint-function-bs2i=
+    Converts a 4 byte bsreal to a PPL integer.
+
+    ### Parameters
+    @1 is a BIGSTR type since BIGSTR types can contain
+    binary data. For this function, PPL will convert the first
+    4 bytes of the BIGSTR into an INTEGER variable and retun
+    it.
+
+    ### Returns
+    Returns a converted 4 byte bsreal in the form of a 4 byte integer.
+hint-function-bd2i=Converts an 8 byte bdreal to a PPL integer.
+hint-function-i2bs=Converts a 4 byte PPL INTEGER into a 4 byte bsreal and stores it in a BIGSTR.
+hint-function-i2bd=Converts a 4 byte PPL INTEGER into an 8 byte bdreal and stores it.
+hint-function-ftell=
+        `FTELL` returns the current file pointer offset for the specified
+        file channel. If the channel is not open, it will return 0.
+        Otherwise it will return the current position in the open file.
+
+        ### Parameters
+        @1 - The file channel to process
+        
+        ### Returns
+        4 byte signed integer containing the file pointer offset
+        of the file attached to channel.
+hint-function-os=
+        ### Returns
+        An Integer indicating which operating system/pcboard version
+        the PPE is currently running under.
+        1=DOS, 2 = OS2, 0 = unknown.
+hint-function-short_desc=
+    ### Returns
+    TRUE if the user has short file descriptions set to on else it returns FALSE.
+hint-function-getbankbal=
+    ### Parameters
+    @1 The field to get.
+
+    ### Returns
+    Returns the value of a specified field.
+
+    ### Fields
+
+    Time Fields (in minutes)
+    ------------------------
+        0 = Last Deposit Date
+        1 = Last Withdrawal Date
+        2 = Last Transaction Amount (in minutes)
+        3 = Amount Saved (their time balance in their account)
+        4 = Max Withdrawal (the max a user can withdraw in a day)
+        5 = Max Stored Amount (Maximum time allowed to be stored)
+
+    Byte Fields (in K bytes)
+    ------------------------
+        6 = Last Deposit Date
+        7 = Last Withdrawal Date
+        8 = Last Transaction Amount (in K bytes)
+        9 = Amount Saved (their K byte balance in their account)
+        10 = Max Withdrawal (the max a user can withdraw in a day)
+        11 = Max Stored Amount (Maximum K bytes allowed to be stored)
+
+hint-function-getmsghdr=
+    ### Parameters
+    @1 = conference number of the message base
+    @2 = A double expression stating the message number of the message to get the message header value.
+    @3 = The field to get.
+
+    ### Returns
+    Returns the value of the specified field.
+
+    ### Fields
+hint-function-setmsghdr=
+    ### Parameters
+    @1 = An integer expression stating the conference number of the message base.
+    @2 = A double expression stating the message number of the message to set the message header value.
+    @3 = An integer expression between 1 and 5 representing the field to get.
+    @4 = A string expression containing the data to insert into the specified field.
+
+    ### Fields
+    1 = 'To' field
+    2 = 'From' field
+    3 = 'Subject' field
+    4 = 'Password' field
+    5 = 'Echo' Flag
+
+    ### Returns
+    Returns the value of the message number.  If the message will
+    fit in the same place as the original then it will be the same.
+    If modefied header change will not fit in the original message
+    header then it will insert the message to the end of the message
+    base.
 hint-function-memberreference=todo
 hint-function-membercall=todo
 hint-function-newconfinfo=todo

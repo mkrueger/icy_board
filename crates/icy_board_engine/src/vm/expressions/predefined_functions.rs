@@ -2,13 +2,16 @@
 
 use std::fs;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use crate::ast::constant::STACK_LIMIT;
 use crate::datetime::{IcbDate, IcbTime};
 use crate::executable::{GenericVariableData, PPEExpr, VariableData, VariableType, VariableValue};
 use crate::icy_board::read_with_encoding_detection;
+use crate::icy_board::security_expr::SecurityExpression;
 use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_NUM, MASK_PATH, MASK_PWD};
 use crate::icy_board::state::GraphicsMode;
+use crate::icy_board::user_base::Password;
 use crate::parser::CONFERENCE_ID;
 use crate::vm::{TerminalTarget, VirtualMachine};
 use crate::Res;
@@ -1815,7 +1818,7 @@ pub async fn get_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             3 => Ok(VariableValue::new_bool(conference.auto_rejoin)),
             4 => Ok(VariableValue::new_bool(conference.view_members)),
             5 => Ok(VariableValue::new_bool(conference.private_uploads)),
-            6 => Ok(VariableValue::new_bool(conference.private_msgs)),
+            6 => Ok(VariableValue::new_bool(conference.no_private_msgs)),
             7 => Ok(VariableValue::new_bool(false)), // conference.echo_mail
             8 => Ok(VariableValue::new_int(conference.required_security.level() as i32)),
             9 => Ok(VariableValue::new_int(conference.add_conference_security)),
@@ -1842,7 +1845,7 @@ pub async fn get_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             30 => Ok(VariableValue::new_string(conference.attachment_location.to_string_lossy().to_string())), // PthNameLoc ???
             31 => Ok(VariableValue::new_bool(false)),                                                          // force echo
             32 => Ok(VariableValue::new_bool(false)),                                                          // read only
-            33 => Ok(VariableValue::new_bool(conference.private_msgs)),
+            33 => Ok(VariableValue::new_bool(conference.no_private_msgs)),
             34 => Ok(VariableValue::new_int(0)),      // ret receipt level
             35 => Ok(VariableValue::new_bool(false)), // record origin
             36 => Ok(VariableValue::new_bool(false)), // prompt for routing
@@ -1869,6 +1872,70 @@ pub async fn get_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
     } else {
         Ok(VariableValue::new_int(-1))
     }
+}
+
+pub async fn set_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_field: i32, value: VariableValue) -> Res<()> {
+    if let Some(conference) = vm.icy_board_state.get_board().await.conferences.get_mut(conf_num) {
+        match conf_field {
+            1 => conference.name = value.as_string(),
+            2 => conference.is_public = value.as_bool(),
+            3 => conference.auto_rejoin = value.as_bool(),
+            4 => conference.view_members = value.as_bool(),
+            5 => conference.private_uploads = value.as_bool(),
+            6 => conference.no_private_msgs = value.as_bool(),
+            7 => (), // conference.echo_mail
+            8 => conference.required_security = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
+            9 => conference.add_conference_security = value.as_int(),
+            10 => conference.add_conference_time = value.as_int() as u16,
+            11 => (), // message blocks
+            12 => (), // message file
+            13 => conference.users_menu = PathBuf::from_str(&value.as_string())?,
+            14 => conference.sysop_menu = PathBuf::from_str(&value.as_string())?,
+            15 => conference.news_file = PathBuf::from_str(&value.as_string())?,
+            16 => conference.pub_upload_sort = value.as_int() as u8,
+            17 => conference.pub_upload_dir_file = PathBuf::from_str(&value.as_string())?,
+            18 => conference.pub_upload_location = PathBuf::from_str(&value.as_string())?,
+            19 => conference.private_upload_sort = value.as_int() as u8,
+            20 => conference.private_upload_dir_file = PathBuf::from_str(&value.as_string())?,
+            21 => conference.private_upload_location = PathBuf::from_str(&value.as_string())?,
+            22 => conference.doors_menu = PathBuf::from_str(&value.as_string())?,
+            23 => conference.doors_file = PathBuf::from_str(&value.as_string())?,
+            24 => conference.blt_menu = PathBuf::from_str(&value.as_string())?,
+            25 => conference.blt_file = PathBuf::from_str(&value.as_string())?,
+            26 => conference.survey_menu = PathBuf::from_str(&value.as_string())?,
+            27 => conference.survey_file = PathBuf::from_str(&value.as_string())?,
+            28 => conference.dir_menu = PathBuf::from_str(&value.as_string())?,
+            29 => conference.dir_file = PathBuf::from_str(&value.as_string())?,
+            30 => conference.attachment_location = PathBuf::from_str(&value.as_string())?,
+            31 => (), // force echo
+            32 => (), // read only
+            33 => conference.no_private_msgs = value.as_bool(),
+            34 => (), // ret receipt level
+            35 => (), // record origin
+            36 => (), // prompt for routing
+            37 => conference.allow_aliases = value.as_bool(),
+            38 => (), // show intro  on ra
+            39 => conference.required_security = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
+            40 => conference.password = Password::PlainText(value.as_string()),
+            41 => conference.intro_file = PathBuf::from_str(&value.as_string())?,
+            42 => conference.attachment_location = PathBuf::from_str(&value.as_string())?,
+            43 => (), // reg flags
+            44 => conference.sec_attachments = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
+            45 => (), // conference.carbon_limit = value.as_byte(),
+            46 => conference.command_file = PathBuf::from_str(&value.as_string())?,
+            47 => (), // old index
+            48 => (), // long to names
+            49 => (), // conference.carbon_level = value.as_byte(),
+            50 => (), // conference.conf_type = value.as_byte(),
+            51 => (), // conference.export_ptr = value.as_int(),
+            52 => (), // conference.charge_time = value.as_double(),
+            53 => (), // conference.charge_msg_read = value.as_double(),
+            54 => (), // conference.charge_msg_write = value.as_double(),
+            _ => (),
+        }
+    }
+
+    Ok(())
 }
 
 pub async fn tinkey(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

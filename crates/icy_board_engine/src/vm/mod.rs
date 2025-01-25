@@ -523,6 +523,7 @@ impl<'a> VirtualMachine<'a> {
         }
     }
 
+    #[async_recursion(?Send)]
     async fn run(&mut self) -> Res<()> {
         let max_ptr = self.script.statements.len();
         while !self.fpclear && self.is_running && self.cur_ptr < max_ptr {

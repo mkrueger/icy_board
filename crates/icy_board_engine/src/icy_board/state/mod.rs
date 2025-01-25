@@ -1351,8 +1351,9 @@ impl IcyBoardState {
             "HIGHMSGNUM" => {}
             "INAME" => {}
             "INCONF" => result = self.session.current_conference.name.to_string(),
-            "KBLEFT" | "KBLIMIT" | "LASTCALLERNODE" | "LASTCALLERSYSTEM" | "LASTDATEON" | "LASTTIMEON" | "LMR" | "LOGDATE" | "LOGTIME" | "LOWMSGNUM"
-            | "MAXBYTES" | "MAXFILES" => {}
+            "LOGDATE" => {} // Logon Date
+            "LOGTIME" => {} // Logon Time
+            "KBLEFT" | "KBLIMIT" | "LASTCALLERNODE" | "LASTCALLERSYSTEM" | "LASTDATEON" | "LASTTIMEON" | "LMR" | "LOWMSGNUM" | "MAXBYTES" | "MAXFILES" => {}
             "MINLEFT" => result = "1000".to_string(),
             "MORE" => {
                 let _ = self.more_promt().await;
@@ -1959,7 +1960,7 @@ impl IcyBoardState {
         if let Some(user) = &mut self.session.current_user {
             let old = user.password.password.clone();
             user.password.password = Password::PlainText(new_pwd.to_string());
-            user.password.times_changed += 1;
+            user.password.times_changed = user.password.times_changed.wrapping_add(1);
             user.password.last_change = Utc::now();
             user.password.prev_pwd.push(old);
             while user.password.prev_pwd.len() > 3 {
@@ -1969,6 +1970,7 @@ impl IcyBoardState {
                 user.password.expire_date = Utc::now() + chrono::Duration::days(exp_days as i64);
             }
             self.get_board().await.save_userbase()?;
+            return Ok(true);
         }
         Ok(false)
     }
