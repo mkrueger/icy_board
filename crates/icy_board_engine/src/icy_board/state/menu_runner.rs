@@ -268,7 +268,7 @@ impl IcyBoardState {
             CommandType::NewFileScan => {
                 // N
                 if let Some(user) = &self.session.current_user {
-                    self.find_new_files(help, user.stats.last_on.into()).await?;
+                    self.find_new_files(user.stats.last_on.into()).await?;
                 }
             }
             CommandType::PageSysop => {

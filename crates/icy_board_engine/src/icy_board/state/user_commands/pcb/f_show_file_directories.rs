@@ -74,6 +74,7 @@ impl IcyBoardState {
     }
 
     async fn display_file_area(&mut self, help: &str, area: usize) -> Res<()> {
+        self.session.disp_options.file_list_help = help.to_string();
         let area = &self.session.current_conference.directories[area];
 
         let colors = self.get_board().await.config.color_configuration.clone();
@@ -89,22 +90,20 @@ impl IcyBoardState {
         self.clear_screen(TerminalTarget::Both).await?;
 
         self.set_color(TerminalTarget::Both, colors.file_head).await?;
-        self.print(TerminalTarget::Both, "Filename       Size      Date    Description of File Contents")
+        self.println(TerminalTarget::Both, "Filename       Size      Date    Description of File Contents")
             .await?;
-        self.new_line().await?;
-        self.print(
+        self.println(
             TerminalTarget::Both,
             "============ ========  ========  ============================================",
         )
         .await?;
-        self.new_line().await?;
         let files = base.file_headers.iter_mut().collect::<Vec<_>>();
         log::info!("Files: {}", files.len());
-        let mut list: FileList<'_> = FileList::new(file_base_path.clone(), files, help);
+        let mut list: FileList<'_> = FileList::new(file_base_path.clone(), files);
         list.display_file_list(self).await?;
 
         if self.session.num_lines_printed > 0 {
-            FileList::filebase_more(self, &file_base_path.clone(), help).await?;
+            self.filebase_more(&file_base_path.clone()).await?;
         }
         self.session.non_stop_off();
         self.session.more_requested = false;

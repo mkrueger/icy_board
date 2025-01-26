@@ -69,7 +69,7 @@ impl IcyBoardState {
             self.session.cancel_batch = false;
             for area in 0..self.session.current_conference.directories.len() {
                 if self.session.current_conference.directories[area].list_security.user_can_access(&self.session) {
-                    self.pattern_search_file_area(help, area, search_pattern.clone()).await?;
+                    self.pattern_search_file_area(area, search_pattern.clone()).await?;
                 }
                 if self.session.cancel_batch {
                     break;
@@ -81,7 +81,7 @@ impl IcyBoardState {
                 let area = &self.session.current_conference.directories[number as usize - 1];
 
                 if area.list_security.user_can_access(&self.session) {
-                    self.pattern_search_file_area(help, number as usize - 1, search_pattern).await?;
+                    self.pattern_search_file_area(number as usize - 1, search_pattern).await?;
                 }
 
                 joined = true;
@@ -100,7 +100,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    async fn pattern_search_file_area(&mut self, help: &str, area: usize, search_pattern: String) -> Res<()> {
+    async fn pattern_search_file_area(&mut self, area: usize, search_pattern: String) -> Res<()> {
         let file_base_path = self.resolve_path(&self.session.current_conference.directories[area].path);
         let Ok(base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());
@@ -118,10 +118,9 @@ impl IcyBoardState {
         self.new_line().await?;
         let files = base.find_files_with_pattern(search_pattern.as_str())?;
 
-        let mut list = FileList::new(file_base_path, files, help);
+        let mut list = FileList::new(file_base_path, files);
         list.display_file_list(self).await?;
 
-        self.session.non_stop_off();
         self.session.more_requested = false;
         Ok(())
     }

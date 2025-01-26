@@ -12,6 +12,12 @@ use crate::{executable::Executable, Res};
 use async_recursion::async_recursion;
 use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use codepages::tables::UNICODE_TO_CP437;
+use dizbase::file_base::{
+    pattern::{MatchOptions, Pattern},
+    FileBase,
+};
+use functions::MASK_ASCII;
+use humanize_bytes::humanize_bytes_decimal;
 use icy_engine::{ansi, OutputFormat, SaveOptions, ScreenPreperation};
 use icy_engine::{ansi::constants::COLOR_OFFSETS, Position};
 use icy_engine::{TextAttribute, TextPane};
@@ -67,6 +73,9 @@ pub struct DisplayOptions {
 
     pub display_text: bool,
     pub show_on_screen: bool,
+
+    pub in_file_list: Option<PathBuf>,
+    pub file_list_help: String,
 }
 impl DisplayOptions {
     pub fn reset_printout(&mut self) {
@@ -89,6 +98,8 @@ impl Default for DisplayOptions {
             is_non_stop: false,
             display_text: true,
             show_on_screen: true,
+            in_file_list: None,
+            file_list_help: String::new(),
         }
     }
 }
@@ -1089,10 +1100,9 @@ impl IcyBoardState {
     }
 
     pub async fn println(&mut self, target: TerminalTarget, str: &str) -> Res<()> {
-        let mut line = str.chars().collect::<Vec<char>>();
-        line.push('\r');
-        line.push('\n');
-        self.write_raw(target, line.as_slice()).await
+        let line = str.chars().collect::<Vec<char>>();
+        self.write_raw(target, line.as_slice()).await?;
+        self.new_line().await
     }
 
     async fn write_chars(&mut self, target: TerminalTarget, data: &[char]) -> Res<()> {
@@ -1116,34 +1126,49 @@ impl IcyBoardState {
                 }
             }
             if *c == '\n' {
+                self.write_chars_internal(target, &user_bytes, &sysop_bytes).await?;
+                user_bytes.clear();
+                sysop_bytes.clear();
                 self.next_line().await?;
             }
         }
+        self.write_chars_internal(target, &user_bytes, &sysop_bytes).await?;
+        Ok(())
+    }
 
+    async fn write_chars_internal(&mut self, target: TerminalTarget, user_bytes: &Vec<u8>, sysop_bytes: &Vec<u8>) -> Res<()> {
         if target != TerminalTarget::Sysop || self.session.is_sysop {
-            self.connection.send(&user_bytes).await?;
+            if !user_bytes.is_empty() {
+                self.connection.send(&user_bytes).await?;
+            }
         }
 
         if target != TerminalTarget::User {
-            // Send user only not to other connections
-            let mut node_state = self.node_state.lock().await;
-            match node_state[self.node].as_mut() {
-                Some(ns) => {
-                    if let Some(sysop_connection) = &mut ns.sysop_connection {
-                        let _ = sysop_connection.send(&sysop_bytes).await;
+            if !sysop_bytes.is_empty() {
+                // Send user only not to other connections
+                let mut node_state = self.node_state.lock().await;
+                match node_state[self.node].as_mut() {
+                    Some(ns) => {
+                        if let Some(sysop_connection) = &mut ns.sysop_connection {
+                            let _ = sysop_connection.send(&sysop_bytes).await;
+                        }
                     }
-                }
-                None => {
-                    log::error!("Node {} was empty", self.node);
+                    None => {
+                        log::error!("Node {} was empty", self.node);
+                    }
                 }
             }
         }
         match target {
             TerminalTarget::Both | TerminalTarget::User => {
-                self.session.cursor_pos = self.user_screen.caret.get_position();
+                if !user_bytes.is_empty() {
+                    self.session.cursor_pos = self.user_screen.caret.get_position();
+                }
             }
             TerminalTarget::Sysop => {
-                self.session.cursor_pos = self.sysop_screen.caret.get_position();
+                if !sysop_bytes.is_empty() {
+                    self.session.cursor_pos = self.sysop_screen.caret.get_position();
+                }
             }
         }
         Ok(())
@@ -1900,6 +1925,12 @@ impl IcyBoardState {
     }
 
     pub async fn more_promt(&mut self) -> Res<()> {
+        if let Some(path) = self.session.disp_options.in_file_list.take() {
+            self.filebase_more(&path).await?;
+            self.session.disp_options.in_file_list = Some(path);
+            return Ok(());
+        }
+
         loop {
             let result = self
                 .input_field(
@@ -1928,6 +1959,88 @@ impl IcyBoardState {
         }
     }
 
+    pub async fn filebase_more(&mut self, path: &Path) -> Res<()> {
+        loop {
+            let input = self
+                .input_field(
+                    IceText::FilesMorePrompt,
+                    40,
+                    functions::MASK_COMMAND,
+                    &self.session.disp_options.file_list_help.clone(),
+                    None,
+                    display_flags::UPCASE | display_flags::STACKED | display_flags::ERASELINE,
+                )
+                .await?;
+            self.session.more_requested = false;
+            self.session.num_lines_printed = 0;
+
+            match input.as_str() {
+                "F" => {
+                    // flag
+                    let input = self
+                        .input_field(
+                            IceText::FlagForDownload,
+                            60,
+                            &MASK_ASCII,
+                            &"hlpflag",
+                            None,
+                            display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFAFTER | display_flags::HIGHASCII,
+                        )
+                        .await?;
+                    if !input.is_empty() {
+                        let mut files = FileBase::open(path)?;
+                        let mut found = false;
+                        let mut options = MatchOptions::new();
+                        options.case_sensitive = false;
+                        if let Ok(pattern) = Pattern::new(&input) {
+                            self.display_text(IceText::CheckingFileTransfer, display_flags::NEWLINE).await?;
+                            let mut count = 0;
+                            for f in &mut files.file_headers {
+                                if pattern.matches_with(&f.name(), &options) {
+                                    let size = f.size();
+                                    self.session.flag_for_download(f.full_path.clone());
+                                    count += 1;
+                                    let nr = format!("({})", count);
+                                    self.set_color(TerminalTarget::Both, IcbColor::Dos(10)).await?;
+                                    self.println(
+                                        TerminalTarget::Both,
+                                        &format!("{:<6}{:<12} {}", nr, f.name(), humanize_bytes_decimal!(size).to_string()),
+                                    )
+                                    .await?;
+                                    self.reset_color(TerminalTarget::Both).await?;
+                                    found = true;
+                                }
+                            }
+                        }
+
+                        if !found {
+                            self.session.op_text = input.clone();
+                            self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
+                                .await?;
+                        }
+                    }
+                }
+                "V" => {
+                    // view: TODO
+                    self.println(TerminalTarget::Both, "TODO").await?;
+                }
+                "S" => {
+                    // show: TODO
+                    self.println(TerminalTarget::Both, "TODO").await?;
+                }
+                "G" => {
+                    self.goodbye_cmd().await?;
+                }
+                _ => {
+                    if input.to_ascii_uppercase() == self.session.no_char.to_string() {
+                        self.session.disp_options.abort_printout = true;
+                    }
+                    return Ok(());
+                }
+            }
+        }
+    }
+
     pub async fn press_enter(&mut self) -> Res<()> {
         self.session.non_stop_on();
         self.session.more_requested = false;
@@ -1936,12 +2049,11 @@ impl IcyBoardState {
     }
 
     pub async fn new_line(&mut self) -> Res<()> {
-        self.session.num_lines_printed += 1;
-        self.write_raw(TerminalTarget::Both, &['\r', '\n']).await
+        self.write_chars(TerminalTarget::Both, &['\r', '\n']).await
     }
 
     pub fn format_date(&self, date_time: DateTime<Utc>) -> String {
-        let local_time = date_time.with_timezone(&Local);
+        let local_time: DateTime<Local> = date_time.with_timezone(&Local);
         local_time.format(&self.session.date_format).to_string()
     }
     pub fn format_time(&self, date_time: DateTime<Utc>) -> String {

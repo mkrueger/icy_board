@@ -5,10 +5,10 @@ use dizbase::file_base::FileBase;
 use super::l_find_files::FileList;
 
 impl IcyBoardState {
-    pub async fn find_new_files(&mut self, help: &str, time_stamp: DateTime<Local>) -> Res<()> {
+    pub async fn find_new_files(&mut self, time_stamp: DateTime<Local>) -> Res<()> {
         for area in 0..self.session.current_conference.directories.len() {
             if self.session.current_conference.directories[area].list_security.user_can_access(&self.session) {
-                self.find_newer_files(help, area, time_stamp).await?;
+                self.find_newer_files(area, time_stamp).await?;
             }
             if self.session.cancel_batch {
                 break;
@@ -18,7 +18,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    async fn find_newer_files(&mut self, help: &str, area: usize, time_stamp: DateTime<Local>) -> Res<()> {
+    async fn find_newer_files(&mut self, area: usize, time_stamp: DateTime<Local>) -> Res<()> {
         let file_base_path = self.resolve_path(&self.session.current_conference.directories[area].path);
         let Ok(mut base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());
@@ -27,7 +27,7 @@ impl IcyBoardState {
 
         let files = base.find_newer_files(time_stamp)?;
 
-        let mut list = FileList::new(file_base_path, files, help);
+        let mut list = FileList::new(file_base_path, files);
         list.display_file_list(self).await
     }
 }

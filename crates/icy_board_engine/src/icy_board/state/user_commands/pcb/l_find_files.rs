@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::{
     icy_board::state::{functions::MASK_COMMAND, IcyBoardState},
@@ -15,11 +15,7 @@ use crate::{
     },
     vm::TerminalTarget,
 };
-use dizbase::file_base::{
-    metadata::MetadaType,
-    pattern::{MatchOptions, Pattern},
-    FileBase, FileEntry,
-};
+use dizbase::file_base::{metadata::MetadaType, FileBase, FileEntry};
 use humanize_bytes::humanize_bytes_decimal;
 
 impl IcyBoardState {
@@ -79,7 +75,7 @@ impl IcyBoardState {
             self.session.cancel_batch = false;
             for area in 0..self.session.current_conference.directories.len() {
                 if self.session.current_conference.directories[area].list_security.user_can_access(&self.session) {
-                    self.search_file_area(help, area, search_pattern.clone()).await?;
+                    self.search_file_area(area, search_pattern.clone()).await?;
                 }
                 if self.session.cancel_batch {
                     break;
@@ -90,7 +86,7 @@ impl IcyBoardState {
             if 1 <= number && (number as usize) <= self.session.current_conference.directories.len() {
                 let area = &self.session.current_conference.directories[number as usize - 1];
                 if area.list_security.user_can_access(&self.session) {
-                    self.search_file_area(help, number as usize - 1, search_pattern).await?;
+                    self.search_file_area(number as usize - 1, search_pattern).await?;
                 }
 
                 joined = true;
@@ -109,7 +105,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    async fn search_file_area(&mut self, help: &str, area: usize, search_pattern: String) -> Res<()> {
+    async fn search_file_area(&mut self, area: usize, search_pattern: String) -> Res<()> {
         let file_base_path = self.resolve_path(&self.session.current_conference.directories[area].path);
         let Ok(mut base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());
@@ -127,7 +123,7 @@ impl IcyBoardState {
         self.new_line().await?;
         let files = base.find_files(search_pattern.as_str())?;
 
-        let mut list = FileList::new(file_base_path.clone(), files, help);
+        let mut list = FileList::new(file_base_path.clone(), files);
         list.display_file_list(self).await
     }
 }
@@ -135,22 +131,20 @@ impl IcyBoardState {
 pub struct FileList<'a> {
     pub path: PathBuf,
     pub files: Vec<&'a mut FileEntry>,
-    pub help: &'a str,
 }
 
 impl<'a> FileList<'a> {
-    pub fn new(path: PathBuf, files: Vec<&'a mut FileEntry>, help: &'a str) -> Self {
-        Self { path, files, help }
+    pub fn new(path: PathBuf, files: Vec<&'a mut FileEntry>) -> Self {
+        Self { path, files }
     }
 
     pub async fn display_file_list(&mut self, cmd: &mut IcyBoardState) -> Res<()> {
-        cmd.session.non_stop_on();
         let short_header = if let Some(user) = &cmd.session.current_user {
             user.flags.use_short_filedescr
         } else {
             false
         };
-        cmd.session.num_lines_printed = 0;
+        cmd.session.disp_options.in_file_list = Some(self.path.clone());
         let colors = cmd.get_board().await.config.color_configuration.clone();
         for entry in &mut self.files {
             let date = entry.date();
@@ -194,14 +188,6 @@ impl<'a> FileList<'a> {
                                 cmd.print(TerminalTarget::Both, line).await?;
                                 cmd.new_line().await?;
                                 printed_lines = true;
-                                if cmd.session.num_lines_printed >= cmd.session.page_len as usize {
-                                    cmd.session.num_lines_printed = 0;
-                                    Self::filebase_more(cmd, &self.path, &self.help).await?;
-                                    if cmd.session.disp_options.abort_printout {
-                                        cmd.session.cancel_batch = cmd.session.disp_options.abort_printout;
-                                        return Ok(());
-                                    }
-                                }
                                 if short_header {
                                     break;
                                 }
@@ -218,82 +204,7 @@ impl<'a> FileList<'a> {
                 cmd.new_line().await?;
             }
         }
+        cmd.session.disp_options.in_file_list = None;
         Ok(())
-    }
-
-    pub async fn filebase_more(cmd: &mut IcyBoardState, path: &Path, help: &str) -> Res<()> {
-        loop {
-            let input = cmd
-                .input_field(
-                    IceText::FilesMorePrompt,
-                    40,
-                    MASK_COMMAND,
-                    help,
-                    None,
-                    display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFAFTER | display_flags::HIGHASCII,
-                )
-                .await?;
-            cmd.session.more_requested = false;
-            cmd.session.num_lines_printed = 0;
-
-            match input.as_str() {
-                "F" => {
-                    // flag
-                    let input = cmd
-                        .input_field(
-                            IceText::FlagForDownload,
-                            60,
-                            &MASK_ASCII,
-                            &"hlpflag",
-                            None,
-                            display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFAFTER | display_flags::HIGHASCII,
-                        )
-                        .await?;
-                    if !input.is_empty() {
-                        let mut files = FileBase::open(path)?;
-                        let mut found = false;
-                        let mut options = MatchOptions::new();
-                        options.case_sensitive = false;
-                        if let Ok(pattern) = Pattern::new(&input) {
-                            cmd.display_text(IceText::CheckingFileTransfer, display_flags::NEWLINE).await?;
-                            cmd.set_color(TerminalTarget::Both, IcbColor::Dos(10)).await?;
-                            for f in &mut files.file_headers {
-                                if pattern.matches_with(&f.name(), &options) {
-                                    let size = f.size();
-                                    cmd.session.flag_for_download(f.full_path.clone());
-                                    cmd.println(TerminalTarget::Both, &format!("{:<12} {}", f.name(), humanize_bytes_decimal!(size).to_string()))
-                                        .await?;
-                                    found = true;
-                                }
-                            }
-                            cmd.reset_color(TerminalTarget::Both).await?;
-                        }
-
-                        if !found {
-                            cmd.session.op_text = input.clone();
-                            cmd.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
-                                .await?;
-                        }
-                    }
-                }
-                "V" => {
-                    // view: TODO
-                    cmd.println(TerminalTarget::Both, "TODO").await?;
-                }
-                "S" => {
-                    // show: TODO
-                    cmd.println(TerminalTarget::Both, "TODO").await?;
-                }
-                "G" => {
-                    cmd.goodbye_cmd().await?;
-                }
-                _ => {
-                    if input.to_ascii_uppercase() == cmd.session.no_char.to_string() {
-                        cmd.session.disp_options.abort_printout = true;
-                    }
-                    return Ok(());
-                }
-            }
-        }
     }
 }
