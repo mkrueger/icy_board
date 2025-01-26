@@ -202,7 +202,7 @@ impl PPECommand {
                         vec.push(id1 as i16);
                         vec.push(id2 as i16);
                     }
-                    super::StatementSignature::VariableArguments(var_index) => {
+                    super::StatementSignature::VariableArguments(var_index, _) => {
                         vec.push(args.len() as i16);
                         for (i, arg) in args.iter().enumerate() {
                             if i + 1 == var_index {
@@ -259,7 +259,7 @@ impl PPECommand {
                 super::StatementSignature::ArgumentsWithVariable(var_index, _) => {
                     1 + PPEExpr::count_size(args) + if var_index > 0 { args.len() - 1 } else { args.len() }
                 }
-                super::StatementSignature::VariableArguments(var_index) => {
+                super::StatementSignature::VariableArguments(var_index, _) => {
                     1 + 1 + PPEExpr::count_size(args) + if var_index > 0 { args.len() - 2 } else { args.len() }
                 }
                 super::StatementSignature::SpecialCaseSort => 3,

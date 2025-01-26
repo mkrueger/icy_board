@@ -183,7 +183,7 @@ impl PPEDeserializer {
 
                 let (var_idx, argument_count) = match def.sig {
                     crate::executable::StatementSignature::ArgumentsWithVariable(var_idx, argument_count) => (var_idx, argument_count),
-                    crate::executable::StatementSignature::VariableArguments(var_idx) => {
+                    crate::executable::StatementSignature::VariableArguments(var_idx, _) => {
                         let argument_count = executable.script_buffer[self.offset];
                         assert!(argument_count >= 0, "negative argument count");
                         self.offset += 1;

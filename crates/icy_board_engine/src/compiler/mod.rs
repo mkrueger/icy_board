@@ -74,6 +74,9 @@ pub enum CompilationErrorType {
 
     #[error("Type not found.")]
     TypeNotFound,
+
+    #[error("At least one argument is required ({0})")]
+    TooFewArguments(String),
 }
 
 #[derive(Error, Debug)]

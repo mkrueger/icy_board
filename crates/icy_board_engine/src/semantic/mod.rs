@@ -923,7 +923,14 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
                     self.check_argument_is_variable(v - 1, &call_stmt.get_arguments()[v - 1]);
                 }
             }
-            crate::executable::StatementSignature::VariableArguments(_) => {}
+            crate::executable::StatementSignature::VariableArguments(_, allow_empty) => {
+                if !allow_empty && call_stmt.get_arguments().is_empty() {
+                    self.errors.lock().unwrap().report_error(
+                        call_stmt.get_identifier_token().span.clone(),
+                        CompilationErrorType::TooFewArguments(call_stmt.get_identifier().to_string()),
+                    );
+                }
+            }
             crate::executable::StatementSignature::SpecialCaseDlockg => {
                 self.check_arg_count(3, call_stmt.get_arguments().len(), call_stmt.get_identifier_token());
                 if call_stmt.get_arguments().len() >= 3 {
