@@ -102,7 +102,7 @@ impl IcyBoardState {
 
     async fn pattern_search_file_area(&mut self, area: usize, search_pattern: String) -> Res<()> {
         let file_base_path = self.resolve_path(&self.session.current_conference.directories[area].path);
-        let Ok(base) = FileBase::open(&file_base_path) else {
+        let Ok(mut base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());
             self.session.op_text = file_base_path.display().to_string();
             self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)

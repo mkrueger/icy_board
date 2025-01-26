@@ -5,7 +5,7 @@ use std::{
 };
 
 use chrono::{DateTime, Local};
-use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
 use thiserror::Error;
 
 use crate::{extensions, file_base_scanner::scan_file};
@@ -138,27 +138,16 @@ impl FileBase {
         Ok(res)
     }
 
-    pub fn find_files_with_pattern(&self, str: &str) -> crate::Result<Vec<&mut FileEntry>> {
+    pub fn find_files_with_pattern(&mut self, str: &str) -> crate::Result<Vec<&mut FileEntry>> {
         let lc = str.to_lowercase();
-        let _bytes = lc.as_bytes();
-        Ok(Vec::new())
-        /*
-        Ok(self
-            .file_headers
-            .par_iter()
-            .filter(|header| {
-                if let Ok(metadata) = self.read_metadata(header) {
-                    for m in metadata {
-                        if m.metadata_type == MetadaType::FileID {
-                            if find_match(m.data, bytes) {
-                                return true;
-                            }
-                        }
-                    }
-                }
-                false
-            })
-            .collect())*/
+        let bytes = lc.as_bytes();
+        let mut res = Vec::new();   
+        for f in self.file_headers.iter_mut() {
+            if find_match(&f.file_name.to_lowercase().as_bytes().to_vec(), bytes) {
+                res.push(f);
+            }
+        }
+        Ok(res)
     }
 
     pub fn get_headers(&self) -> &Vec<FileEntry> {
@@ -191,3 +180,15 @@ impl FileBase {
         Ok(result)
     }
 }
+
+fn find_match(data: &Vec<u8>, pattern: &[u8]) -> bool {
+    let mut data = &data.to_ascii_lowercase()[..];
+    while data.len() > pattern.len() {
+        if data.starts_with(pattern) {
+            return true;
+        }
+        data = &data[1..];
+    }
+    false
+}
+

@@ -203,6 +203,9 @@ impl<'a> FileList<'a> {
             if !printed_lines {
                 cmd.new_line().await?;
             }
+            if cmd.session.disp_options.abort_printout {
+                break;
+            }
         }
         cmd.session.disp_options.in_file_list = None;
         Ok(())
