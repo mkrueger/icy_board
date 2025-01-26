@@ -25,7 +25,7 @@ BOOLEAN BOOL001
     CLS 
     ANSIPOS 1, 1
     PRINT "@POFF@"
-    DISPFILE PPEPATH() + "ansigal.pcb", 0
+    DISPFILE PPEPATH() + "ansigal.pcb", DEFS
     PROC002(1, 1)
     PROC004(1)
     END 
@@ -268,7 +268,7 @@ PROCEDURE PROC004(INTEGER PAR004)
             PROC006(STR006 + STR002[LOC008])
             PRINT "@X07"
             CLS 
-            DISPFILE PPEPATH() + "ansigal.pcb", 0
+            DISPFILE PPEPATH() + "ansigal.pcb", DEFS
             PROC002(PAR004, 1)
             PROC004(PAR004)
         ENDIF

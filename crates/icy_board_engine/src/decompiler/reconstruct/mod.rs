@@ -10,7 +10,7 @@ use crate::{
 
 use self::while_do::scan_do_while;
 
-use super::{constant_scan_visitor::ConstantScanVisitor, rename_visitor::RenameScanVisitor, Ast, Expression, Statement};
+use super::{rename_visitor::RenameScanVisitor, Ast, Expression, Statement};
 
 pub mod for_next;
 mod if_else;
@@ -205,7 +205,6 @@ pub fn strip_unused_labels(ast: &mut Ast) -> Ast {
 pub fn finish_ast(prg: &mut Ast) -> Ast {
     let mut scanner = RenameScanVisitor::default();
     prg.visit(&mut scanner);
-    let prg = prg.visit_mut(&mut ConstantScanVisitor::default());
     let mut renamer = RenameVisitor::new(scanner.rename_map);
     prg.visit_mut(&mut renamer)
 }

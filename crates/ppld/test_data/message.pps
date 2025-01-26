@@ -1,1 +1,1 @@
-MESSAGE 1, "to", "from", "subject", "N", 0, 1, 1, "MESSAGE_TEXT_FILE"
+MESSAGE 1, "to", "from", "subject", "N", 0, TRUE, TRUE, "MESSAGE_TEXT_FILE"

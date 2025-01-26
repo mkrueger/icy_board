@@ -1,1 +1,1 @@
-LOG "FooBar", 0
+LOG "FooBar", FALSE

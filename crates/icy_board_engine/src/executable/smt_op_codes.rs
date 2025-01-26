@@ -1,5 +1,10 @@
 use std::fmt::Display;
 
+use crate::ast::{
+    constant::{BuiltinConst, BUILTIN_CONSTS},
+    BinOp, BinaryExpression, Constant, ConstantExpression, Expression,
+};
+
 use super::VariableType;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -306,6 +311,95 @@ pub enum ArgumentDefinitionFlags {
 
     /// CRC_FILE = true, CRC_FALSE = false
     Crc32,
+
+    /// F_MW, F_SYS, F_SEL, F_EXP, F_REG
+    ConfFlags,
+}
+lazy_static::lazy_static! {
+    pub static ref DISPLAY_FLAGS_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "GRAPH" || c.name == "SEC" || c.name == "LANG").collect();
+
+    pub static ref START_DISPLAY_FLAGS_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "NC" || c.name == "FNS" || c.name == "FCL").collect();
+
+    pub static ref FILE_ACCESS_MODE_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "O_RD" || c.name == "O_WR" || c.name == "O_RW").collect();
+
+    pub static ref FILE_SHARE_MODE_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "S_DN" || c.name == "S_DR" || c.name == "S_DW" || c.name == "S_DB").collect();
+
+    pub static ref INPUT_FLAGS_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "ECHODOTS" || c.name == "FIELDLEN" || c.name == "GUIDE" || c.name == "UPCASE" || c.name == "STACKED" || c.name == "ERASELINE" || c.name == "NEWLINE" || c.name == "LFBEFORE" || c.name == "LFAFTER" || c.name == "WORDWRAP" || c.name == "NOCLEAR" || c.name == "HIGHASCII" || c.name == "AUTO" || c.name == "YESNO").collect();
+
+    pub static ref DISPLAY_TEXT_FLAGS_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "NEWLINE" || c.name == "LFBEFORE" || c.name == "LFAFTER" || c.name == "BELL" || c.name == "LOGIT" || c.name == "LOGITLEFT").collect();
+
+    pub static ref SEEK_POSITION_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "SEEK_SET" || c.name == "SEEK_CUR" || c.name == "SEEK_END").collect();
+
+    pub static ref FIDO_FLAGS_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "NORMAL" || c.name == "CRASH" || c.name == "HOLD").collect();
+
+    pub static ref CRC32_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "CRC_FILE" || c.name == "CRC_STR").collect();
+
+    pub static ref CONFFLAG_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "F_MW" || c.name == "F_SYS" || c.name == "F_SEL" || c.name == "F_EXP" || c.name == "F_REG").collect();
+
+}
+
+impl ArgumentDefinitionFlags {
+    pub fn convert_expr(&self, expr: crate::ast::Expression) -> crate::ast::Expression {
+        match self {
+            ArgumentDefinitionFlags::None => expr,
+            ArgumentDefinitionFlags::DisplayFileFlags => replace_constants(expr, &DISPLAY_FLAGS_CONST),
+            ArgumentDefinitionFlags::StartDisplayFlags => replace_constants(expr, &START_DISPLAY_FLAGS_CONST),
+            ArgumentDefinitionFlags::FileAccessMode => replace_constants(expr, &FILE_ACCESS_MODE_CONST),
+            ArgumentDefinitionFlags::FileShareMode => replace_constants(expr, &FILE_SHARE_MODE_CONST),
+            ArgumentDefinitionFlags::InputFlags => replace_constants(expr, &INPUT_FLAGS_CONST),
+            ArgumentDefinitionFlags::DisplayTextFlags => replace_constants(expr, &DISPLAY_TEXT_FLAGS_CONST),
+            ArgumentDefinitionFlags::SeekPosition => replace_constants(expr, &SEEK_POSITION_CONST),
+            ArgumentDefinitionFlags::FidoFlags => replace_constants(expr, &FIDO_FLAGS_CONST),
+            ArgumentDefinitionFlags::Crc32 => replace_constants(expr, &CRC32_CONST),
+            ArgumentDefinitionFlags::ConfFlags => replace_constants(expr, &CONFFLAG_CONST),
+        }
+    }
+}
+
+fn replace_constants(expr: crate::ast::Expression, consts: &'static [BuiltinConst]) -> crate::ast::Expression {
+    match &expr {
+        Expression::Const(c) => {
+            match c.get_constant_value() {
+                &Constant::Integer(value) => {
+                    for c in consts {
+                        if c.value == value {
+                            return ConstantExpression::create_empty_expression(Constant::Builtin(c));
+                        }
+                    }
+                    let mut used_consts = Vec::new();
+                    let mut cur_val = value;
+                    for c in consts {
+                        if c.value & cur_val == c.value {
+                            used_consts.push(ConstantExpression::create_empty_expression(Constant::Builtin(c)));
+                            cur_val &= !c.value;
+                        }
+                    }
+                    if used_consts.is_empty() {
+                        if value == 0 {
+                            // DEFS
+                            return ConstantExpression::create_empty_expression(Constant::Builtin(&BUILTIN_CONSTS[15]));
+                        }
+                        return expr;
+                    }
+                    let mut last = used_consts.pop().unwrap();
+                    while !used_consts.is_empty() {
+                        last = BinaryExpression::create_empty_expression(BinOp::Add, used_consts.pop().unwrap(), last);
+                    }
+                    return last;
+                }
+                _ => {}
+            }
+        }
+        Expression::Binary(bin_op) => {
+            return BinaryExpression::create_empty_expression(
+                bin_op.get_op(),
+                replace_constants(bin_op.get_left_expression().clone(), consts),
+                replace_constants(bin_op.get_right_expression().clone(), consts),
+            );
+        }
+        _ => {}
+    }
+    expr
 }
 
 #[derive(Debug, PartialEq)]
@@ -503,7 +597,7 @@ lazy_static::lazy_static! {
             opcode: OpCode::CONFFLAG,
             args: Some(vec![
                 ArgumentDefinition::new("conf", VariableType::Integer),
-                ArgumentDefinition::new("flags", VariableType::Integer)
+                ArgumentDefinition::new_flags("flags", ArgumentDefinitionFlags::ConfFlags)
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
@@ -513,7 +607,7 @@ lazy_static::lazy_static! {
             opcode: OpCode::CONFUNFLAG,
             args: Some(vec![
                 ArgumentDefinition::new("conf", VariableType::Integer),
-                ArgumentDefinition::new("flags", VariableType::Integer)
+                ArgumentDefinition::new_flags("flags", ArgumentDefinitionFlags::ConfFlags)
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },

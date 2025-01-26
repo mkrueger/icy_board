@@ -23,7 +23,6 @@ use crate::{
 
 use self::evaluation_visitor::OptimizationVisitor;
 
-pub mod constant_scan_visitor;
 pub mod evaluation_visitor;
 pub mod reconstruct;
 pub mod relabel_visitor;
@@ -292,7 +291,21 @@ impl Decompiler {
             }
             PPEExpr::PredefinedFunctionCall(f, args) => FunctionCallExpression::create_empty_expression(
                 IdentifierExpression::create_empty_expression(unicase::Ascii::new(f.name.to_string())),
-                args.iter().map(|e| self.decompile_expression(e)).collect(),
+                args.iter()
+                    .enumerate()
+                    .map(|(i, e)| {
+                        let expr = self.decompile_expression(e);
+                        if let Some(args) = &f.args {
+                            if let Some(arg) = args.get(i) {
+                                if arg.arg_type == VariableType::Boolean {
+                                    return Statement::try_boolean_conversion(&expr);
+                                }
+                                return arg.flags.convert_expr(expr);
+                            }
+                        }
+                        expr
+                    })
+                    .collect(),
             ),
             PPEExpr::FunctionCall(f, args) => FunctionCallExpression::create_empty_expression(
                 IdentifierExpression::create_empty_expression(self.get_variable_name(*f)),
@@ -319,9 +332,24 @@ impl Decompiler {
             PPECommand::ProcedureCall(p, args) => {
                 ProcedureCallStatement::create_empty_statement(self.get_variable_name(*p), args.iter().map(|e| self.decompile_expression(e)).collect())
             }
-            PPECommand::PredefinedCall(p, args) => {
-                PredefinedCallStatement::create_empty_statement(p, args.iter().map(|e| self.decompile_expression(e)).collect())
-            }
+            PPECommand::PredefinedCall(p, args) => PredefinedCallStatement::create_empty_statement(
+                p,
+                args.iter()
+                    .enumerate()
+                    .map(|(i, e)| {
+                        let expr = self.decompile_expression(e);
+                        if let Some(args) = &p.args {
+                            if let Some(arg) = args.get(i) {
+                                if arg.arg_type == VariableType::Boolean {
+                                    return Statement::try_boolean_conversion(&expr);
+                                }
+                                return arg.flags.convert_expr(expr);
+                            }
+                        }
+                        expr
+                    })
+                    .collect(),
+            ),
             PPECommand::Let(left, expr) => {
                 let (identifier, arguments) = match self.decompile_expression(left) {
                     Expression::FunctionCall(f) => (unicase::Ascii::new(f.get_expression().to_string()), f.get_arguments().clone()),
