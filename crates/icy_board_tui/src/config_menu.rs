@@ -125,6 +125,7 @@ pub enum ListValue {
 pub struct ListItem {
     pub id: String,
     title: String,
+    label_width: u16,
     pub status: String,
     pub text_field_state: TextfieldState,
     pub value: ListValue,
@@ -136,6 +137,7 @@ impl ListItem {
             id: id.to_string(),
             status: format!("{}", title),
             text_field_state: TextfieldState::default(),
+            label_width: title.len() as u16,
             title,
             value,
         }
@@ -150,6 +152,7 @@ impl ListItem {
         while self.title.len() < width as usize {
             self.title.push(' ');
         }
+        self.label_width = width;
         self
     }
 
@@ -164,7 +167,7 @@ impl ListItem {
                 let area = Rect {
                     x: left_area.x,
                     y: left_area.y,
-                    width: title.len() as u16 + 1,
+                    width: self.label_width,
                     height: left_area.height,
                 };
                 Text::from(title)

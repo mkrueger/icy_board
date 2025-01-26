@@ -15,7 +15,7 @@ pub struct TextfieldState {
 
 impl TextfieldState {
     pub fn set_cursor_position(&self, frame: &mut Frame) {
-        frame.set_cursor_position((self.area.x + self.cursor_position, self.area.y));
+        frame.set_cursor_position((self.area.x + self.cursor_position - self.first_char as u16, self.area.y));
     }
 
     pub fn max_len(&self) -> u16 {
@@ -66,6 +66,11 @@ impl TextfieldState {
             }
 
             _ => {}
+        }
+        if self.cursor_position < self.first_char as u16 {
+            self.first_char = self.cursor_position as usize;
+        } else if self.cursor_position >= self.first_char as u16 + self.area.width {
+            self.first_char = (self.cursor_position as usize + 1 - self.area.width as usize).min(value.len());
         }
     }
 
@@ -146,7 +151,12 @@ impl StatefulWidget for TextField {
             return;
         }
         state.area = area;
-        buf.set_string(area.x, area.y, self.value[state.first_char..].to_string(), self.text_style);
+        let mut s = self.value[state.first_char..].to_string();
+        while s.len() as u16 > area.width {
+            s.pop();
+        }
+
+        buf.set_string(area.x, area.y, s, self.text_style);
         let len = self.value.len().saturating_sub(state.first_char);
         buf.set_string(
             area.x + len as u16,

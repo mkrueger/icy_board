@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 use crate::{
     icy_board::state::{functions::MASK_COMMAND, IcyBoardState},
     Res,
@@ -13,7 +15,11 @@ use crate::{
     },
     vm::TerminalTarget,
 };
-use dizbase::file_base::{metadata::MetadaType, FileBase, FileEntry};
+use dizbase::file_base::{
+    metadata::MetadaType,
+    pattern::{MatchOptions, Pattern},
+    FileBase, FileEntry,
+};
 use humanize_bytes::humanize_bytes_decimal;
 
 impl IcyBoardState {
@@ -121,19 +127,20 @@ impl IcyBoardState {
         self.new_line().await?;
         let files = base.find_files(search_pattern.as_str())?;
 
-        let mut list = FileList::new(files, help);
+        let mut list = FileList::new(file_base_path.clone(), files, help);
         list.display_file_list(self).await
     }
 }
 
 pub struct FileList<'a> {
+    pub path: PathBuf,
     pub files: Vec<&'a mut FileEntry>,
     pub help: &'a str,
 }
 
 impl<'a> FileList<'a> {
-    pub fn new(files: Vec<&'a mut FileEntry>, help: &'a str) -> Self {
-        Self { files, help }
+    pub fn new(path: PathBuf, files: Vec<&'a mut FileEntry>, help: &'a str) -> Self {
+        Self { path, files, help }
     }
 
     pub async fn display_file_list(&mut self, cmd: &mut IcyBoardState) -> Res<()> {
@@ -189,7 +196,7 @@ impl<'a> FileList<'a> {
                                 printed_lines = true;
                                 if cmd.session.num_lines_printed >= cmd.session.page_len as usize {
                                     cmd.session.num_lines_printed = 0;
-                                    Self::filebase_more(cmd, &self.help).await?;
+                                    Self::filebase_more(cmd, &self.path, &self.help).await?;
                                     if cmd.session.disp_options.abort_printout {
                                         cmd.session.cancel_batch = cmd.session.disp_options.abort_printout;
                                         return Ok(());
@@ -214,7 +221,7 @@ impl<'a> FileList<'a> {
         Ok(())
     }
 
-    pub async fn filebase_more(cmd: &mut IcyBoardState, help: &str) -> Res<()> {
+    pub async fn filebase_more(cmd: &mut IcyBoardState, path: &Path, help: &str) -> Res<()> {
         loop {
             let input = cmd
                 .input_field(
@@ -232,7 +239,7 @@ impl<'a> FileList<'a> {
             match input.as_str() {
                 "F" => {
                     // flag
-                    let _input = cmd
+                    let input = cmd
                         .input_field(
                             IceText::FlagForDownload,
                             60,
@@ -242,41 +249,32 @@ impl<'a> FileList<'a> {
                             display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFAFTER | display_flags::HIGHASCII,
                         )
                         .await?;
-                    /*
                     if !input.is_empty() {
-                        for f in files {
-                            if f.name().eq_ignore_ascii_case(&input) {
-                                let metadata = f.get_metadata()?;
-                                for m in metadata {
-                                    if m.metadata_type == MetadaType::FilePath {
-                                        cmd.display_text(IceText::CheckingFileTransfer, display_flags::NEWLINE).await?;
-
-                                        let file_name = unsafe { OsString::from_encoded_bytes_unchecked(m.data.clone()) };
-                                        let file_path = PathBuf::from(file_name);
-                                        if !file_path.exists() {
-                                            cmd.session.op_text = input.clone();
-                                            cmd.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
-                                                .await?;
-                                        } else {
-                                            cmd.session.flag_for_download(file_path.clone());
-                                            cmd.set_color(TerminalTarget::Both, IcbColor::Dos(10)).await?;
-                                            cmd.println(
-                                                TerminalTarget::Both,
-                                                &format!(
-                                                    "{:<12} {}",
-                                                    file_path.file_name().unwrap().to_string_lossy(),
-                                                    humanize_bytes_decimal!(f.size()).to_string()
-                                                ),
-                                            )
-                                            .await?;
-                                        }
-                                        break;
-                                    }
+                        let mut files = FileBase::open(path)?;
+                        let mut found = false;
+                        let mut options = MatchOptions::new();
+                        options.case_sensitive = false;
+                        if let Ok(pattern) = Pattern::new(&input) {
+                            cmd.display_text(IceText::CheckingFileTransfer, display_flags::NEWLINE).await?;
+                            cmd.set_color(TerminalTarget::Both, IcbColor::Dos(10)).await?;
+                            for f in &mut files.file_headers {
+                                if pattern.matches_with(&f.name(), &options) {
+                                    let size = f.size();
+                                    cmd.session.flag_for_download(f.full_path.clone());
+                                    cmd.println(TerminalTarget::Both, &format!("{:<12} {}", f.name(), humanize_bytes_decimal!(size).to_string()))
+                                        .await?;
+                                    found = true;
                                 }
-                                break;
                             }
+                            cmd.reset_color(TerminalTarget::Both).await?;
                         }
-                    }*/
+
+                        if !found {
+                            cmd.session.op_text = input.clone();
+                            cmd.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
+                                .await?;
+                        }
+                    }
                 }
                 "V" => {
                     // view: TODO

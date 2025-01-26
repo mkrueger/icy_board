@@ -118,16 +118,16 @@ impl Pattern {
     }
 
     pub fn matches(&self, str: &str) -> bool {
-        self.matches_with(str, MatchOptions::new())
+        self.matches_with(str, &MatchOptions::new())
     }
 
     /// Return if the given `str` matches this `Pattern` using the specified
     /// match options.
-    pub fn matches_with(&self, str: &str, options: MatchOptions) -> bool {
+    pub fn matches_with(&self, str: &str, options: &MatchOptions) -> bool {
         self.matches_from(true, str.chars(), 0, options) == MatchResult::Match
     }
 
-    fn matches_from(&self, mut follows_separator: bool, mut file: std::str::Chars, i: usize, options: MatchOptions) -> MatchResult {
+    fn matches_from(&self, mut follows_separator: bool, mut file: std::str::Chars, i: usize, options: &MatchOptions) -> MatchResult {
         for (ti, token) in self.tokens[i..].iter().enumerate() {
             match *token {
                 PatternToken::AnySequence => {
@@ -203,7 +203,7 @@ fn parse_char_specifiers(s: &[char]) -> Vec<CharSpecifier> {
     cs
 }
 
-fn in_char_specifiers(specifiers: &[CharSpecifier], c: char, options: MatchOptions) -> bool {
+fn in_char_specifiers(specifiers: &[CharSpecifier], c: char, options: &MatchOptions) -> bool {
     for &specifier in specifiers.iter() {
         match specifier {
             CharSpecifier::SingleChar(sc) => {

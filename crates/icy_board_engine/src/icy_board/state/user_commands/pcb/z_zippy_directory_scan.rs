@@ -118,7 +118,7 @@ impl IcyBoardState {
         self.new_line().await?;
         let files = base.find_files_with_pattern(search_pattern.as_str())?;
 
-        let mut list = FileList::new(files, help);
+        let mut list = FileList::new(file_base_path, files, help);
         list.display_file_list(self).await?;
 
         self.session.non_stop_off();

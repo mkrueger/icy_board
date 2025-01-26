@@ -27,7 +27,7 @@ impl IcyBoardState {
 
         let files = base.find_newer_files(time_stamp)?;
 
-        let mut list = FileList::new(files, help);
+        let mut list = FileList::new(file_base_path, files, help);
         list.display_file_list(self).await
     }
 }
