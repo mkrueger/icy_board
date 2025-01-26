@@ -1,6 +1,6 @@
 use crate::executable::ArgumentDefinitionFlags;
 
-use super::{ArgumentDefinition, VariableType};
+use super::{ArgumentDefinition, Signature, VariableType};
 
 #[repr(i16)]
 #[allow(dead_code)]
@@ -335,6 +335,28 @@ impl FunctionDefinition {
             }
         }
         ret
+    }
+
+    pub fn get_signature(&self) -> Signature {
+        let mut res = self.name.to_ascii_uppercase();
+        let sig_args;
+
+        res.push_str("(");
+        if let Some(args) = &self.args {
+            res.push_str(&args.iter().map(|arg| super::format_argument(arg)).collect::<Vec<String>>().join(", "));
+            sig_args = args.iter().map(|arg| arg.name.to_string()).collect::<Vec<String>>();
+        } else {
+            sig_args = Vec::new();
+        }
+        res.push_str(") ");
+        let ts = if self.return_type == VariableType::None {
+            "multitype".to_string()
+        } else {
+            self.return_type.to_string()
+        }
+        .to_ascii_uppercase();
+        res.push_str(&ts);
+        Signature::new_with_args(res, sig_args)
     }
 }
 lazy_static::lazy_static! {

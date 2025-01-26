@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::executable::{VariableData, VariableType, VariableValue};
+use crate::executable::{Signature, VariableData, VariableType, VariableValue};
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq, Clone)]
@@ -50,6 +50,12 @@ impl BuiltinConst {
         value: 0x00,
         used_by: &[ConstantType::General],
     };
+
+    pub fn get_signature(&self) -> Signature {
+        let mut res = self.name.to_ascii_uppercase();
+        res.push_str(format!(" = {:X}h", self.value).as_str());
+        Signature::new(res)
+    }
 }
 
 pub const STACK_LIMIT: i32 = 6022 + 1024;
@@ -629,3 +635,16 @@ impl fmt::Display for Constant {
         }
     }
 }
+/*
+#[cfg(test)]
+mod test {
+    use super::BUILTIN_CONSTS;
+
+
+    #[test]
+    fn pr(){
+        for c in BUILTIN_CONSTS.iter(){
+            println!("{}", c.name);
+        }
+    }
+}*/

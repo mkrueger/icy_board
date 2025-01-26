@@ -1,12 +1,14 @@
 use std::sync::{Arc, Mutex};
 
 use icy_board_engine::{
-    ast::{walk_predefined_call_statement, Ast, AstVisitor, IdentifierExpression, PredefinedCallStatement},
+    ast::{constant::BUILTIN_CONSTS, walk_predefined_call_statement, Ast, AstVisitor, IdentifierExpression, PredefinedCallStatement},
     executable::{StatementSignature, FUNCTION_DEFINITIONS, LAST_PPLC, STATEMENT_DEFINITIONS},
     parser::{ErrorRepoter, UserTypeRegistry},
     semantic::{ReferenceType, SemanticVisitor},
 };
-use tower_lsp::lsp_types::CompletionItem;
+use tower_lsp::lsp_types::{CompletionItem, Documentation, HoverContents};
+
+use crate::documentation::{get_const_hover, get_function_hover, get_statement_hover};
 
 pub enum ImCompleteCompletionItem {
     Variable(String),
@@ -60,7 +62,7 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
             map.items.push(CompletionItem {
                 label: stmt.to_string(),
                 insert_text: Some(stmt.to_string()),
-                kind: Some(tower_lsp::lsp_types::CompletionItemKind::KEYWORD),
+                kind: Some(tower_lsp::lsp_types::CompletionItemKind::CLASS),
                 insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
                 ..Default::default()
             });
@@ -70,11 +72,22 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
             if stmt.sig == StatementSignature::Invalid {
                 continue;
             }
+            let content = if let Some(hover) = get_statement_hover(stmt) {
+                if let HoverContents::Markup(content) = hover.contents {
+                    Some(Documentation::MarkupContent(content))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
             map.items.push(CompletionItem {
                 label: stmt.name.to_string(),
                 insert_text: Some(stmt.name.to_string()),
-                kind: Some(tower_lsp::lsp_types::CompletionItemKind::FUNCTION),
+                kind: Some(tower_lsp::lsp_types::CompletionItemKind::METHOD),
                 insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
+                documentation: content,
                 ..Default::default()
             });
         }
@@ -85,7 +98,7 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
                     map.items.push(CompletionItem {
                         label: decl.token.to_string(),
                         insert_text: Some(decl.token.to_string()),
-                        kind: Some(tower_lsp::lsp_types::CompletionItemKind::FUNCTION),
+                        kind: Some(tower_lsp::lsp_types::CompletionItemKind::METHOD),
                         insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
                         ..Default::default()
                     });
@@ -146,12 +159,43 @@ impl CompletionVisitor {
     }
 
     fn add_functions(&mut self) {
-        for stmt in FUNCTION_DEFINITIONS.iter() {
+        for c in BUILTIN_CONSTS.iter() {
+            let content = if let Some(hover) = get_const_hover(c) {
+                if let HoverContents::Markup(content) = hover.contents {
+                    Some(Documentation::MarkupContent(content))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
             self.items.push(CompletionItem {
-                label: stmt.name.to_string(),
-                insert_text: Some(stmt.name.to_string()),
+                label: c.name.to_string(),
+                insert_text: Some(c.name.to_string()),
+                kind: Some(tower_lsp::lsp_types::CompletionItemKind::CONSTANT),
+                insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
+                documentation: content,
+                ..Default::default()
+            });
+        }
+
+        for func in FUNCTION_DEFINITIONS.iter() {
+            let content = if let Some(hover) = get_function_hover(func) {
+                if let HoverContents::Markup(content) = hover.contents {
+                    Some(Documentation::MarkupContent(content))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            self.items.push(CompletionItem {
+                label: func.name.to_string(),
+                insert_text: Some(func.name.to_string()),
                 kind: Some(tower_lsp::lsp_types::CompletionItemKind::FUNCTION),
                 insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
+                documentation: content,
                 ..Default::default()
             });
         }

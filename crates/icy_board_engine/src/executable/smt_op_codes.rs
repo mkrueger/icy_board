@@ -342,42 +342,60 @@ pub struct StatementDefinition {
     pub args: Option<Vec<ArgumentDefinition>>,
 }
 
+pub struct Signature {
+    pub signature: String,
+    pub args: Vec<String>,
+}
+impl Signature {
+    pub fn new(signature: String) -> Self {
+        Self { signature, args: Vec::new() }
+    }
+
+    pub fn new_with_args(signature: String, args: Vec<String>) -> Signature {
+        Signature { signature, args }
+    }
+}
+
 impl StatementDefinition {
     pub(crate) fn get_statement_definition(identifier: &unicase::Ascii<String>) -> Option<&'static StatementDefinition> {
         STATEMENT_DEFINITIONS.iter().find(|def| unicase::Ascii::new(def.name) == identifier)
     }
 
-    pub fn get_signature(&self) -> String {
+    pub fn get_signature(&self) -> Signature {
         match self.opcode {
-            OpCode::GOTO => "GOTO LABEL".to_string(),
-            OpCode::LET => "LET var:multitype = EXP".to_string(),
-            OpCode::IFNOT => "IF … THEN … ELSE …".to_string(),
-            OpCode::REDIM => "REDIM var:MULTITYPE, dim1:INTEGER [,dim2:INTEGER [,dim3:INTEGER]] ".to_string(),
+            OpCode::GOTO => Signature::new("GOTO LABEL".to_string()),
+            OpCode::LET => Signature::new("LET var:multitype = EXP".to_string()),
+            OpCode::IFNOT => Signature::new("IF … THEN … ELSE …".to_string()),
+            OpCode::REDIM => Signature::new("REDIM var:MULTITYPE, dim1:INTEGER [,dim2:INTEGER [,dim3:INTEGER]] ".to_string()),
 
             _ => {
                 let mut res = self.name.to_ascii_uppercase();
+                let sig_args;
                 if let Some(args) = &self.args {
                     res.push_str(" ");
                     res.push_str(&args.iter().map(|arg| format_argument(arg)).collect::<Vec<String>>().join(", "));
-
+                    sig_args = args.iter().map(|arg| arg.name.to_string()).collect::<Vec<String>>();
                     if matches!(self.sig, StatementSignature::VariableArguments(_)) {
                         res.push_str("[, ");
                         res.push_str(&format_argument(args.iter().last().unwrap()));
                         res.push_str("]*");
                     }
+                } else {
+                    sig_args = Vec::new();
                 }
-                res
+                Signature::new_with_args(res, sig_args)
             }
         }
     }
 }
 
-fn format_argument(arg: &ArgumentDefinition) -> String {
+pub fn format_argument(arg: &ArgumentDefinition) -> String {
     let ts = if arg.arg_type == VariableType::None {
         "multitype".to_string()
     } else {
         arg.arg_type.to_string()
-    };
+    }
+    .to_ascii_uppercase();
     format!("{} {}", ts, arg.name)
 }
 

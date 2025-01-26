@@ -11,6 +11,8 @@ use crate::{
     Res,
 };
 
+use super::Signature;
+
 #[derive(Clone, Copy, PartialEq, Debug, Default, Eq, Hash)]
 #[allow(dead_code)]
 pub enum VariableType {
@@ -142,8 +144,8 @@ impl VariableType {
         }
     }
 
-    pub fn get_signature(&self) -> String {
-        match self {
+    pub fn get_signature(&self) -> Signature {
+        let sig = match self {
             VariableType::Boolean => "BOOLEAN".to_string(),
             VariableType::Unsigned => "UNSIGNED".to_string(),
             VariableType::Date => "DATE".to_string(),
@@ -165,7 +167,8 @@ impl VariableType {
             VariableType::Table => "TABLE".to_string(),
             VariableType::UserData(u) => format!("USERDATA({})", u),
             VariableType::None => "NONE".to_string(),
-        }
+        };
+        Signature::new(sig)
     }
 }
 

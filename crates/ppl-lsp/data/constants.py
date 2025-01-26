@@ -10,3 +10,11 @@ f = open("FUNCS", "r")
 #	print("hint-function-"+ line.strip().lower()+"=todo")
 for line in f:
 	print("        FuncOpCode::" + line.strip() + " => get_hint(fl!(crate::LANGUAGE_LOADER, \"hint-function-"+ line.strip().lower()+"\")),")
+
+
+
+f = open("CONSTS", "r")
+#for line in f:
+#	print("hint-const-"+ line.strip().lower()+"=todo")
+for line in f:
+	print("        \"" + line.strip() + "\" => get_sig_hint(c.get_signature(), fl!(crate::LANGUAGE_LOADER, \"hint-const-"+ line.strip().lower()+"\")),")
