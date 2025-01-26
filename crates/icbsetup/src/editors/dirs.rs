@@ -160,12 +160,6 @@ impl<'a> Editor for DirsEditor<'a> {
                                 }
                             }
 
-                            "file_base" => {
-                                if let ListValue::Path(path) = &item.value {
-                                    self.dir_list.lock().unwrap()[selected_item].file_base = path.clone();
-                                }
-                            }
-
                             "password" => {
                                 if let ListValue::Text(_, text) = &item.value {
                                     self.dir_list.lock().unwrap()[selected_item].password = Password::PlainText(text.to_string());
@@ -289,9 +283,6 @@ impl<'a> Editor for DirsEditor<'a> {
                             entry: vec![
                                 ConfigEntry::Item(ListItem::new("name", "Name".to_string(), ListValue::Text(25, item.name.to_string())).with_label_width(16)),
                                 ConfigEntry::Item(ListItem::new("path", "Path".to_string(), ListValue::Path(item.path.clone())).with_label_width(16)),
-                                ConfigEntry::Item(
-                                    ListItem::new("file_base", "File Base".to_string(), ListValue::Path(item.file_base.clone())).with_label_width(16),
-                                ),
                                 ConfigEntry::Item(
                                     ListItem::new("password", "Password".to_string(), ListValue::Text(25, item.password.to_string())).with_label_width(16),
                                 ),

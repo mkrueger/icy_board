@@ -1,4 +1,3 @@
-use dizbase::file_base::file_header::FileHeader;
 use dizbase::file_base::FileBase;
 
 use crate::icy_board::state::functions::MASK_COMMAND;
@@ -78,10 +77,10 @@ impl IcyBoardState {
         let area = &self.session.current_conference.directories[area];
 
         let colors = self.get_board().await.config.color_configuration.clone();
-        let file_base_path = self.resolve_path(&area.file_base);
-        let Ok(base) = FileBase::open(&file_base_path) else {
+        let file_base_path = self.resolve_path(&area.path);
+        let Ok(mut base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());
-            self.session.op_text = area.file_base.to_str().unwrap().to_string();
+            self.session.op_text = file_base_path.display().to_string();
             self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
             return Ok(());
@@ -99,15 +98,13 @@ impl IcyBoardState {
         )
         .await?;
         self.new_line().await?;
-
-        let files: Vec<FileHeader> = base.iter().flatten().collect();
-        let files: Vec<&FileHeader> = files.iter().collect();
-
-        let mut list = FileList { base: &base, files, help };
+        let files = base.file_headers.iter_mut().collect::<Vec<_>>();
+        log::info!("Files: {}", files.len());
+        let mut list: FileList<'_> = FileList::new(files, help);
         list.display_file_list(self).await?;
 
         if self.session.num_lines_printed > 0 {
-            list.filebase_more(self).await?;
+            FileList::filebase_more(self, help).await?;
         }
         self.session.non_stop_off();
         self.session.more_requested = false;

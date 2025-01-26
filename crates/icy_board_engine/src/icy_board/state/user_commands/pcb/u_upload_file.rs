@@ -9,8 +9,6 @@ use crate::{
     },
     vm::TerminalTarget,
 };
-use chrono::Utc;
-use dizbase::file_base::{file_info::FileInfo, FileBase};
 use icy_net::protocol::{Protocol, TransferProtocolType, XYModemVariant, XYmodem, Zmodem};
 
 impl IcyBoardState {
@@ -116,26 +114,10 @@ impl IcyBoardState {
                     self.display_text(IceText::ThanksForTheFiles, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
 
-                    let mut file_base = match FileBase::open(&self.session.current_conference.pub_upload_dir_file) {
-                        Ok(file_base) => file_base,
-                        Err(err) => {
-                            log::error!("Error while opening file base: {}", err);
-                            FileBase::create(&self.session.current_conference.pub_upload_dir_file)?
-                        }
-                    };
-
-                    file_base.load_headers()?;
                     for (x, path) in state.recieve_state.finished_files {
                         let dest = upload_location.join(x);
                         std::fs::copy(&path, &dest)?;
-
                         // todo: scan
-                        let info = FileInfo::new(&dest)
-                            .with_uploader(self.session.get_username_or_alias())
-                            .with_date(Utc::now().timestamp() as u64);
-
-                        file_base.write_info(&info)?;
-
                         std::fs::remove_file(&path)?;
                     }
                 }

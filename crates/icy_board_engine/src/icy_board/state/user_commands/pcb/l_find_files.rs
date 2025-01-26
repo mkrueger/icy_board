@@ -1,5 +1,3 @@
-use std::{ffi::OsString, path::PathBuf};
-
 use crate::{
     icy_board::state::{functions::MASK_COMMAND, IcyBoardState},
     Res,
@@ -15,7 +13,7 @@ use crate::{
     },
     vm::TerminalTarget,
 };
-use dizbase::file_base::{file_header::FileHeader, metadata::MetadaType, FileBase};
+use dizbase::file_base::{metadata::MetadaType, FileBase, FileEntry};
 use humanize_bytes::humanize_bytes_decimal;
 
 impl IcyBoardState {
@@ -106,10 +104,10 @@ impl IcyBoardState {
     }
 
     async fn search_file_area(&mut self, help: &str, area: usize, search_pattern: String) -> Res<()> {
-        let file_base_path = self.resolve_path(&self.session.current_conference.directories[area].file_base);
+        let file_base_path = self.resolve_path(&self.session.current_conference.directories[area].path);
         let Ok(mut base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());
-            self.session.op_text = self.session.current_conference.directories[area].file_base.to_str().unwrap().to_string();
+            self.session.op_text = file_base_path.display().to_string();
             self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
             return Ok(());
@@ -121,21 +119,23 @@ impl IcyBoardState {
         self.print(TerminalTarget::Both, &format!("({})", self.session.current_conference.directories[area].name))
             .await?;
         self.new_line().await?;
-        base.load_headers()?;
         let files = base.find_files(search_pattern.as_str())?;
 
-        let mut list = FileList { base: &base, files, help };
+        let mut list = FileList::new(files, help);
         list.display_file_list(self).await
     }
 }
 
 pub struct FileList<'a> {
-    pub base: &'a FileBase,
-    pub files: Vec<&'a FileHeader>,
+    pub files: Vec<&'a mut FileEntry>,
     pub help: &'a str,
 }
 
 impl<'a> FileList<'a> {
+    pub fn new(files: Vec<&'a mut FileEntry>, help: &'a str) -> Self {
+        Self { files, help }
+    }
+
     pub async fn display_file_list(&mut self, cmd: &mut IcyBoardState) -> Res<()> {
         cmd.session.non_stop_on();
         let short_header = if let Some(user) = &cmd.session.current_user {
@@ -143,37 +143,25 @@ impl<'a> FileList<'a> {
         } else {
             false
         };
+        cmd.session.num_lines_printed = 0;
         let colors = cmd.get_board().await.config.color_configuration.clone();
-
-        for header in &self.files {
-            let metadata = self.base.read_metadata(header)?;
-
-            let size = header.size();
-            let date = header.file_date().unwrap();
-            let name = header.name();
+        for entry in &mut self.files {
+            let date = entry.date();
+            let size = entry.size();
+            let name = &entry.file_name;
             cmd.set_color(TerminalTarget::Both, colors.file_name.clone()).await?;
             cmd.print(TerminalTarget::Both, &format!("{:<12} ", name)).await?;
             if name.len() > 12 {
                 cmd.new_line().await?;
             }
             cmd.set_color(TerminalTarget::Both, colors.file_size.clone()).await?;
-            let mut exists = false;
-            for m in &metadata {
-                if m.metadata_type == MetadaType::FilePath {
-                    let file_name = unsafe { OsString::from_encoded_bytes_unchecked(m.data.clone()) };
-                    let file_path = PathBuf::from(file_name);
-                    exists = file_path.exists();
-                    break;
-                }
-            }
-            if exists {
-                cmd.print(TerminalTarget::Both, &format!("{:>8}  ", humanize_bytes_decimal!(size).to_string()))
-                    .await?;
-            } else {
+            cmd.print(TerminalTarget::Both, &format!("{:>8}  ", humanize_bytes_decimal!(size).to_string()))
+                .await?;
+
+            /* Filebase no longer supports offline files
                 cmd.set_color(TerminalTarget::Both, colors.file_offline.clone()).await?;
                 cmd.print(TerminalTarget::Both, &format!("{:>8}  ", "Offline".to_string())).await?;
-            }
-
+            */
             cmd.set_color(TerminalTarget::Both, colors.file_date.clone()).await?;
             cmd.print(TerminalTarget::Both, &format!("{}", date.format("%m/%d/%y"))).await?;
             if false {
@@ -186,26 +174,37 @@ impl<'a> FileList<'a> {
             }
 
             let mut printed_lines = false;
-            for m in metadata {
-                if m.get_type() == MetadaType::FileID {
-                    let description = std::str::from_utf8(&m.data)?;
-                    cmd.set_color(TerminalTarget::Both, colors.file_description.clone()).await?;
-                    for (i, line) in description.lines().enumerate() {
-                        if i > 0 {
-                            cmd.print(TerminalTarget::Both, &format!("{:33}", " ")).await?;
+            match entry.get_metadata() {
+                Ok(data) => {
+                    for m in data {
+                        if m.get_type() == MetadaType::FileID {
+                            let description = std::str::from_utf8(&m.data)?;
+                            cmd.set_color(TerminalTarget::Both, colors.file_description.clone()).await?;
+                            for (i, line) in description.lines().enumerate() {
+                                if i > 0 {
+                                    cmd.print(TerminalTarget::Both, &format!("{:33}", " ")).await?;
+                                }
+                                cmd.print(TerminalTarget::Both, line).await?;
+                                cmd.new_line().await?;
+                                printed_lines = true;
+                                if cmd.session.num_lines_printed >= cmd.session.page_len as usize {
+                                    cmd.session.num_lines_printed = 0;
+                                    Self::filebase_more(cmd, &self.help).await?;
+                                    if cmd.session.disp_options.abort_printout {
+                                        cmd.session.cancel_batch = cmd.session.disp_options.abort_printout;
+                                        return Ok(());
+                                    }
+                                }
+                                if short_header {
+                                    break;
+                                }
+                                cmd.set_color(TerminalTarget::Both, colors.file_description_low.clone()).await?;
+                            }
                         }
-                        cmd.print(TerminalTarget::Both, line).await?;
-                        cmd.new_line().await?;
-                        printed_lines = true;
-                        if cmd.session.more_requested && !self.filebase_more(cmd).await? {
-                            cmd.session.cancel_batch = true;
-                            return Ok(());
-                        }
-                        if short_header {
-                            break;
-                        }
-                        cmd.set_color(TerminalTarget::Both, colors.file_description_low.clone()).await?;
                     }
+                }
+                Err(e) => {
+                    log::error!("Error reading metadata: {} for {}", e, entry.full_path.display());
                 }
             }
             if !printed_lines {
@@ -215,14 +214,14 @@ impl<'a> FileList<'a> {
         Ok(())
     }
 
-    pub async fn filebase_more(&self, cmd: &mut IcyBoardState) -> Res<bool> {
+    pub async fn filebase_more(cmd: &mut IcyBoardState, help: &str) -> Res<()> {
         loop {
             let input = cmd
                 .input_field(
                     IceText::FilesMorePrompt,
                     40,
                     MASK_COMMAND,
-                    &self.help,
+                    help,
                     None,
                     display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFAFTER | display_flags::HIGHASCII,
                 )
@@ -233,7 +232,7 @@ impl<'a> FileList<'a> {
             match input.as_str() {
                 "F" => {
                     // flag
-                    let input = cmd
+                    let _input = cmd
                         .input_field(
                             IceText::FlagForDownload,
                             60,
@@ -243,11 +242,12 @@ impl<'a> FileList<'a> {
                             display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFAFTER | display_flags::HIGHASCII,
                         )
                         .await?;
+                    /*
                     if !input.is_empty() {
-                        for f in &self.files {
+                        for f in files {
                             if f.name().eq_ignore_ascii_case(&input) {
-                                let metadata = self.base.read_metadata(f)?;
-                                for m in &metadata {
+                                let metadata = f.get_metadata()?;
+                                for m in metadata {
                                     if m.metadata_type == MetadaType::FilePath {
                                         cmd.display_text(IceText::CheckingFileTransfer, display_flags::NEWLINE).await?;
 
@@ -265,7 +265,7 @@ impl<'a> FileList<'a> {
                                                 &format!(
                                                     "{:<12} {}",
                                                     file_path.file_name().unwrap().to_string_lossy(),
-                                                    humanize_bytes_decimal!(f.size).to_string()
+                                                    humanize_bytes_decimal!(f.size()).to_string()
                                                 ),
                                             )
                                             .await?;
@@ -276,7 +276,7 @@ impl<'a> FileList<'a> {
                                 break;
                             }
                         }
-                    }
+                    }*/
                 }
                 "V" => {
                     // view: TODO
@@ -289,7 +289,12 @@ impl<'a> FileList<'a> {
                 "G" => {
                     cmd.goodbye_cmd().await?;
                 }
-                _ => return Ok(input.to_ascii_uppercase() != cmd.session.no_char.to_string()),
+                _ => {
+                    if input.to_ascii_uppercase() == cmd.session.no_char.to_string() {
+                        cmd.session.disp_options.abort_printout = true;
+                    }
+                    return Ok(());
+                }
             }
         }
     }

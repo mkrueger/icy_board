@@ -101,10 +101,10 @@ impl IcyBoardState {
     }
 
     async fn pattern_search_file_area(&mut self, help: &str, area: usize, search_pattern: String) -> Res<()> {
-        let file_base_path = self.resolve_path(&self.session.current_conference.directories[area].file_base);
-        let Ok(mut base) = FileBase::open(&file_base_path) else {
+        let file_base_path = self.resolve_path(&self.session.current_conference.directories[area].path);
+        let Ok(base) = FileBase::open(&file_base_path) else {
             log::error!("Could not open file base: {}", file_base_path.display());
-            self.session.op_text = self.session.current_conference.directories[area].file_base.to_str().unwrap().to_string();
+            self.session.op_text = file_base_path.display().to_string();
             self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
             return Ok(());
@@ -116,10 +116,9 @@ impl IcyBoardState {
         self.print(TerminalTarget::Both, &format!("({})", self.session.current_conference.directories[area].name))
             .await?;
         self.new_line().await?;
-        base.load_headers()?;
         let files = base.find_files_with_pattern(search_pattern.as_str())?;
 
-        let mut list = FileList { base: &base, files, help };
+        let mut list = FileList::new(files, help);
         list.display_file_list(self).await?;
 
         self.session.non_stop_off();

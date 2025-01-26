@@ -20,7 +20,7 @@ regex = { workspace = true }
 
 zip = "2.2.0"
 delharc = "0.6.0"
-unrar = "0.5.3"
+unrar = "0.5.7"
 icy_sauce = { git ="https://github.com/mkrueger/icy_tools" }
 
 tempfile = { workspace = true }

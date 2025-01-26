@@ -1936,6 +1936,7 @@ impl IcyBoardState {
     }
 
     pub async fn new_line(&mut self) -> Res<()> {
+        self.session.num_lines_printed += 1;
         self.write_raw(TerminalTarget::Both, &['\r', '\n']).await
     }
 

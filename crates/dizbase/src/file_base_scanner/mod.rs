@@ -1,65 +1,28 @@
 use std::{
     fs,
     io::{BufReader, Read, Seek, SeekFrom},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use codepages::{normalize_file, tables::get_utf8};
-use icy_net::crc::get_crc32;
 use icy_sauce::SauceInformation;
 use unrar::Archive;
-use walkdir::WalkDir;
+
+use crate::file_base::metadata::{MetadaType, MetadataHeader};
 pub mod repack;
 
 pub mod bbstro_fingerprint;
 
-use crate::file_base::{file_info::FileInfo, FileBase};
+pub fn scan_file(path: &Path, extension: &str) -> crate::Result<Vec<MetadataHeader>> {
+    let info = Vec::new();
+    match extension {
+        "ZIP" => scan_zip(info, &path),
+        "LHA" | "LZH" => scan_lha(info, path),
 
-pub fn scan_file_directory(scan_dir: &PathBuf, out_file_base: &PathBuf) -> crate::Result<()> {
-    if !scan_dir.is_dir() {
-        return Err("Input is not a directory".into());
-    }
+        "ANS" | "NFO" | "TXT" | "XB" | "PCB" | "ASC" => scan_sauce(info, path),
 
-    let base = FileBase::create(out_file_base)?;
-    //  let paths = fs::read_dir(scan_dir)?;
-    for path in WalkDir::new(scan_dir).into_iter().filter_map(|e| e.ok()) {
-        if path.path().is_dir() {
-            continue;
-        }
-        let mut info = FileInfo::new(path.path());
-
-        if let Ok(file) = fs::read(&path.path()) {
-            info = info.with_size(file.len() as u64);
-            let hash = get_crc32(&file);
-            info = info.with_hash(hash);
-        }
-
-        if let Some(extension) = path.path().extension() {
-            match scan_file(info, &path.path(), extension.to_ascii_uppercase()) {
-                Ok(i) => {
-                    info = i;
-                }
-                Err(err) => {
-                    eprintln!("{}:{}", path.path().display(), err);
-                    continue;
-                }
-            }
-        }
-
-        base.write_info(&info)?;
-    }
-    Ok(())
-}
-
-fn scan_file(info: FileInfo, path: &Path, extension: std::ffi::OsString) -> crate::Result<FileInfo> {
-    match extension.to_str() {
-        Some("ZIP") => scan_zip(info, &path),
-        Some("LHA") | Some("LZH") => scan_lha(info, path),
-
-        Some("ANS") | Some("NFO") | Some("TXT") => scan_sauce(info, path),
-
-        Some("RAR") => scan_rar(info, path),
-        Some("EXE") | Some("COM") | Some("BAT") | Some("BMP") | Some("GIF") | Some("JPG") => Ok(info),
+        "RAR" => scan_rar(info, path),
+        "EXE" | "COM" | "BAT" | "BMP" | "GIF" | "JPG" => Ok(info),
 
         ext => {
             println!("Unknown extension {:?}", ext);
@@ -79,20 +42,20 @@ fn is_short_desc(name: &std::ffi::OsStr) -> Option<i32> {
     None
 }
 
-fn scan_sauce(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {
+fn scan_sauce(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<MetadataHeader>> {
     let file = fs::File::open(path)?;
     let mut reader = BufReader::new(file);
     if reader.seek(SeekFrom::End(-128)).is_ok() {
         let mut sauce = [0u8; 128];
         reader.read_exact(&mut sauce)?;
         if let Ok(Some(_)) = SauceInformation::read(&sauce[..]) {
-            return Ok(info.with_sauce(sauce.to_vec()));
+            info.push(MetadataHeader::new(MetadaType::Sauce, sauce.to_vec()));
         }
     }
     Ok(info)
 }
 
-fn scan_zip(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {
+fn scan_zip(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<MetadataHeader>> {
     let file = fs::File::open(path)?;
     let reader = BufReader::new(file);
     let mut archive = zip::ZipArchive::new(reader)?;
@@ -115,11 +78,11 @@ fn scan_zip(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {
             continue;
         };
     }
-    if short_descr.is_empty() {
-        Ok(info)
-    } else {
-        Ok(info.with_file_id(get_file_id(short_descr)))
+    if !short_descr.is_empty() {
+        info.push(MetadataHeader::new(MetadaType::FileID, get_file_id(short_descr).as_bytes().to_vec()));
     }
+
+    Ok(info)
 }
 
 fn get_file_id(mut content: Vec<u8>) -> String {
@@ -130,7 +93,7 @@ fn get_file_id(mut content: Vec<u8>) -> String {
     get_utf8(&file_id)
 }
 
-fn scan_lha(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {
+fn scan_lha(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<MetadataHeader>> {
     let mut lha_reader = delharc::parse_file(path)?;
     let mut last_prio = -1;
     let mut short_descr = Vec::new();
@@ -160,54 +123,41 @@ fn scan_lha(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {
             break;
         }
     }
-    if short_descr.is_empty() {
-        Ok(info)
-    } else {
-        Ok(info.with_file_id(get_file_id(short_descr)))
+    if !short_descr.is_empty() {
+        info.push(MetadataHeader::new(MetadaType::FileID, get_file_id(short_descr).as_bytes().to_vec()));
     }
+    Ok(info)
 }
 
-fn scan_rar(info: FileInfo, path: &Path) -> crate::Result<FileInfo> {
+fn scan_rar(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<MetadataHeader>> {
     let mut archive = Archive::new(path).open_for_processing()?;
-
-    let mut lha_reader = delharc::parse_file(path)?;
+    let mut short_descr = Vec::new();
+    let mut last_prio = -1;
 
     while let Some(header) = archive.read_header()? {
-        archive = if header.entry().is_file() {
-            let name = header.entry().filename.to_string_lossy();
-            if name.eq_ignore_ascii_case("FILE_ID.DIZ") || name.eq_ignore_ascii_case("DESC.SDI") {
-                header.extract_to("out.tmp")?;
-                let content = fs::read("out.tmp")?;
-                return Ok(info.with_file_id(get_file_id(content)));
-            }
-            header.skip()?
+        if !header.entry().is_file() {
+            archive = header.skip()?
         } else {
-            header.skip()?
-        };
-    }
+            let name = header.entry().filename.file_name().unwrap_or_default();
 
-    loop {
-        let header = lha_reader.header();
-        let filename = header.parse_pathname();
-
-        if let Some(name) = filename.file_name() {
-            if name.eq_ignore_ascii_case("FILE_ID.DIZ") || name.eq_ignore_ascii_case("DESC.SDI") {
-                if lha_reader.is_decoder_supported() {
-                    let mut content = Vec::new();
-                    lha_reader.read_to_end(&mut content)?;
-                    lha_reader.crc_check()?;
-                    return Ok(info.with_file_id(get_file_id(content)));
-                } else if header.is_directory() {
-                    eprintln!("skipping: an empty directory");
-                } else {
-                    eprintln!("skipping: has unsupported compression method");
+            if let Some(prio) = is_short_desc(name) {
+                if prio <= last_prio {
+                    archive = header.skip()?;
+                    continue;
                 }
+                last_prio = prio;
+                short_descr.clear();
+                archive = header.extract_to("out.tmp")?;
+                short_descr = fs::read("out.tmp")?;
+            } else {
+                archive = header.skip()?
             }
         }
-
-        if !lha_reader.next_file()? {
-            break;
-        }
     }
+
+    if !short_descr.is_empty() {
+        info.push(MetadataHeader::new(MetadaType::FileID, get_file_id(short_descr).as_bytes().to_vec()));
+    }
+
     Ok(info)
 }

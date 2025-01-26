@@ -2,8 +2,8 @@ use std::{path::PathBuf, time::SystemTime};
 
 use argh::FromArgs;
 use dizbase::{
-    file_base::{metadata::MetadaType, FileBase},
-    file_base_scanner::{bbstro_fingerprint::FingerprintData, repack::repack_files, scan_file_directory},
+    file_base::FileBase,
+    file_base_scanner::{bbstro_fingerprint::FingerprintData, repack::repack_files},
 };
 use thiserror::Error;
 
@@ -97,7 +97,8 @@ pub fn main() {
             println!("Fingerprints saved to 'bbstros.dat'");
         }
         Commands::ScanFileDirectory(ScanFileDirectory { input, file }) => {
-            scan_file_directory(input, file).unwrap();
+            let _input = input;
+            let _file = file;
         }
 
         Commands::Repack(Repack { input, bbstros }) => {
@@ -116,19 +117,18 @@ pub fn main() {
 fn search_file_base(file: &PathBuf, pattern: &str) {
     let mut base = FileBase::open(file).unwrap();
     let time = SystemTime::now();
-    base.load_headers().unwrap();
     println!("Loading headers took {:?}", time.elapsed().unwrap());
     let time = SystemTime::now();
 
     let headers = base.find_files(pattern).unwrap();
     println!("Searching multi thread took {:?} found {}", time.elapsed().unwrap(), headers.len());
-
+    /*
     for header in headers {
         println!(
             "{:20} {:-15}kb {}",
             header.name(),
             header.size() / 1024,
-            header.file_date().unwrap().format("%d/%m/%Y")
+            "DATE",//header.file_date().unwrap().format("%d/%m/%Y")
         );
         match base.read_metadata(header) {
             Ok(metadata) => {
@@ -168,13 +168,12 @@ fn search_file_base(file: &PathBuf, pattern: &str) {
             }
             Err(err) => eprintln!("{}", err),
         }
-    }
+    }*/
 }
 
 fn list_file_base(file: &PathBuf) {
-    let mut base = FileBase::open(file).unwrap();
+    let _base = FileBase::open(file).unwrap();
     let time = SystemTime::now();
-    base.load_headers().unwrap();
     println!("Loading headers took {:?}", time.elapsed().unwrap());
     /*
     for (i, ch) in CP437_TO_UNICODE_NO_CTRL_CODES.iter().enumerate() {
@@ -192,7 +191,7 @@ fn list_file_base(file: &PathBuf) {
         println!("], // '{}' ({})", ch, i);
     }
     println!();*/
-
+    /*
     for header in base.get_headers() {
         match base.read_metadata(header) {
             Ok(metadata) => {
@@ -231,9 +230,10 @@ fn list_file_base(file: &PathBuf) {
             }
             Err(err) => eprintln!("{}", err),
         }
-    }
+    }*/
 }
 
+/*
 fn convert_to_utf8(data: &[u8]) -> String {
     if data.is_ascii() {
         return unsafe { String::from_utf8_unchecked(data.to_vec()) };
@@ -246,7 +246,7 @@ fn convert_to_utf8(data: &[u8]) -> String {
         res.push(CP437_TO_UNICODE[*c as usize]);
     }
     res
-}
+}*/
 
 pub const CP437_TO_UNICODE: [char; 256] = [
     '\u{0000}', '\u{263a}', '\u{263b}', '\u{2665}', '\u{2666}', '\u{2663}', '\u{2660}', '\u{2022}', '\u{25d8}', '\u{25cb}', '\u{25d9}', '\u{2642}', '\u{2640}',

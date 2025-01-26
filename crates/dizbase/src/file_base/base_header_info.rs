@@ -3,11 +3,7 @@ use crate::{
     file_base::{FileBaseError, HDR_SIGNATURE},
 };
 use chrono::{DateTime, Utc};
-use std::{
-    fs::{self, File},
-    io::Read,
-    path::Path,
-};
+use std::{fs::File, io::Read};
 
 pub struct FileBaseHeaderInfo {
     /// 'I' 'C' 'F' 'B'
@@ -52,7 +48,7 @@ impl FileBaseHeaderInfo {
             attributes,
         })
     }
-
+    /*
     pub(crate) fn create<P: AsRef<Path>>(file_name: &P, password: u32, attributes: u32) -> crate::Result<()> {
         let now = Utc::now();
         let datecreated = now.timestamp();
@@ -65,5 +61,5 @@ impl FileBaseHeaderInfo {
         result.resize(Self::HEADER_SIZE as usize, 0);
         fs::write(file_name, result)?;
         Ok(())
-    }
+    }*/
 }

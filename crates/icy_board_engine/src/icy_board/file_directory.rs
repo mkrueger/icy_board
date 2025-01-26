@@ -61,7 +61,6 @@ pub enum SortDirection {
 pub struct FileDirectory {
     pub name: String,
     pub path: PathBuf,
-    pub file_base: PathBuf,
 
     pub password: Password,
 
@@ -115,7 +114,7 @@ impl DirectoryList {
         let mut buf = Vec::with_capacity(Self::RECORD_SIZE * self.areas.len());
 
         for area in &self.areas {
-            buf.extend(export_cp437_string(&area.file_base.to_string_lossy(), Self::PATH_SIZE, b' '));
+            buf.extend(export_cp437_string("", Self::PATH_SIZE, b' ')); // file base - no longer required
             buf.extend(export_cp437_string(&area.path.to_string_lossy(), Self::PATH_SIZE, b' '));
             buf.extend(export_cp437_string(&area.name, Self::NAME_SIZE, b' '));
             let sort_order = match area.sort_order {
@@ -161,7 +160,7 @@ impl PCBoardRecordImporter<FileDirectory> for DirectoryList {
     }
 
     fn load_pcboard_record(data: &[u8]) -> Res<FileDirectory> {
-        let file_base = PathBuf::from(crate::tables::import_cp437_string(&data[..Self::PATH_SIZE], true));
+        let _file_base = PathBuf::from(crate::tables::import_cp437_string(&data[..Self::PATH_SIZE], true));
         let data = &data[Self::PATH_SIZE..];
         let path = PathBuf::from(crate::tables::import_cp437_string(&data[..Self::PATH_SIZE], true));
         let data = &data[Self::PATH_SIZE..];
@@ -179,7 +178,6 @@ impl PCBoardRecordImporter<FileDirectory> for DirectoryList {
 
         Ok(FileDirectory {
             name,
-            file_base,
             path,
             sort_order,
             sort_direction,

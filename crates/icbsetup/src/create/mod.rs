@@ -343,12 +343,10 @@ impl IcyBoardCreator {
         let mut list = DirectoryList::default();
         let fd = FileDirectory {
             name: "General".to_string(),
-            file_base: PathBuf::from("conferences/main/general/dir00"),
             path: PathBuf::from("conferences/main/general/files/dir00"),
             ..Default::default()
         };
         fs::create_dir_all(&self.destination.join(&fd.path))?;
-        dizbase::file_base::FileBase::create(&self.destination.join(&fd.file_base))?;
         list.push(fd);
         list.save(&self.destination.join(&conf.dir_file))?;
 

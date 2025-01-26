@@ -6,7 +6,6 @@ use std::{
 };
 
 use codepages::tables::write_with_bom;
-use dizbase::file_base_scanner::scan_file_directory;
 use icy_board_engine::{
     datetime::IcbTime,
     icy_board::{
@@ -1195,15 +1194,10 @@ impl PCBoardImporter {
         let destination = PathBuf::from(dest_path).join(resolved_file.file_name().unwrap().to_ascii_lowercase());
 
         for (i, entry) in list.iter_mut().enumerate() {
-            entry.file_base = PathBuf::from(format!("{}/dir{:02}", output, i));
             entry.path = self.resolve_file(entry.path.to_str().unwrap());
             let base_path = PathBuf::from(dest_path).join(format!("dir{:02}", i));
             self.logger
                 .log(&format!("Create file base for {} : {}", entry.path.display(), base_path.display()));
-            if let Err(err) = scan_file_directory(&entry.path, &base_path) {
-                self.output.warning(format!("Warning, can't scan file directory {}", entry.path.display()));
-                self.logger.log(&format!("Error creating file base {}", err));
-            }
         }
 
         if destination.exists() {
