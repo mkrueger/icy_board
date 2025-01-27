@@ -36,6 +36,11 @@ pub async fn invalid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     panic!("Invalid statement");
 }
 
+pub async fn eval(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    vm.eval_expr(&args[0]).await?;
+    Ok(())
+}
+
 pub async fn end(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     vm.is_running = false;
     Ok(())
