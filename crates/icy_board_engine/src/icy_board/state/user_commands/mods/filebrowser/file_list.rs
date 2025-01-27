@@ -5,13 +5,13 @@ use humanize_bytes::humanize_bytes_decimal;
 
 use crate::{icy_board::state::IcyBoardState, vm::TerminalTarget, Res};
 
-pub struct FileList<'a> {
+pub struct FileList {
     pub path: PathBuf,
-    pub files: Vec<&'a mut FileEntry>,
+    pub files: Vec<FileEntry>,
 }
 
-impl<'a> FileList<'a> {
-    pub fn new(path: PathBuf, files: Vec<&'a mut FileEntry>) -> Self {
+impl FileList {
+    pub fn new(path: PathBuf, files: Vec<FileEntry>) -> Self {
         Self { path, files }
     }
 
@@ -24,6 +24,9 @@ impl<'a> FileList<'a> {
         cmd.session.disp_options.in_file_list = Some(self.path.clone());
         let colors = cmd.get_board().await.config.color_configuration.clone();
         for entry in &mut self.files {
+            if cmd.session.disp_options.abort_printout {
+                break;
+            }
             let date = entry.date();
             let size = entry.size();
             let name = &entry.file_name;
@@ -61,6 +64,9 @@ impl<'a> FileList<'a> {
                             let description = std::str::from_utf8(&m.data)?;
                             cmd.set_color(TerminalTarget::Both, colors.file_description.clone()).await?;
                             for (i, line) in description.lines().enumerate() {
+                                if cmd.session.disp_options.abort_printout {
+                                    break;
+                                }
                                 if i > 0 {
                                     cmd.print(TerminalTarget::Both, &format!("{:33}", " ")).await?;
                                 }
@@ -81,9 +87,6 @@ impl<'a> FileList<'a> {
             }
             if !printed_lines {
                 cmd.new_line().await?;
-            }
-            if cmd.session.disp_options.abort_printout {
-                break;
             }
         }
         cmd.session.disp_options.in_file_list = None;

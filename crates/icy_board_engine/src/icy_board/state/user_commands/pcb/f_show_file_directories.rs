@@ -90,10 +90,18 @@ impl IcyBoardState {
             "============ ========  ========  ============================================",
         )
         .await?;
-        let mut base = base.lock().await;
-        let files = base.file_headers.iter_mut().collect::<Vec<_>>();
-        log::info!("Files: {}", files.len());
-        let mut list: FileList<'_> = FileList::new(file_base_path.clone(), files);
+
+        let files = {
+            let mut base = base.lock().await;
+            base.file_headers
+                .iter_mut()
+                .map(|f| {
+                    let _ = f.get_metadata();
+                    f.clone()
+                })
+                .collect::<Vec<_>>()
+        };
+        let mut list = FileList::new(file_base_path.clone(), files);
         list.display_file_list(self).await?;
 
         if self.session.num_lines_printed > 0 {

@@ -20,13 +20,20 @@ impl IcyBoardState {
 
     async fn find_newer_files(&mut self, area: usize, time_stamp: DateTime<Local>) -> Res<()> {
         let file_base_path = self.resolve_path(&self.session.current_conference.directories[area].path);
-        let Ok(base) = self.get_filebase(&file_base_path).await else {
-            return Ok(());
+
+        let files = {
+            let Ok(base) = self.get_filebase(&file_base_path).await else {
+                return Ok(());
+            };
+            let mut base = base.lock().await;
+            base.find_newer_files(time_stamp)?
+                .iter_mut()
+                .map(|f| {
+                    let _ = f.get_metadata();
+                    f.clone()
+                })
+                .collect::<Vec<_>>()
         };
-
-        let mut b = base.lock().await;
-        let files = b.find_newer_files(time_stamp)?;
-
         let mut list = FileList::new(file_base_path, files);
         list.display_file_list(self).await
     }

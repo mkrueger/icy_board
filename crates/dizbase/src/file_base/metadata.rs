@@ -41,6 +41,7 @@ impl MetadaType {
     }
 }
 
+#[derive(Clone)]
 pub struct MetadataHeader {
     pub metadata_type: MetadaType,
     pub data: Vec<u8>,

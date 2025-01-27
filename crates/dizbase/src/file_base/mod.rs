@@ -32,6 +32,7 @@ pub enum FileBaseError {
 
 const HDR_SIGNATURE: [u8; 4] = [b'I', b'C', b'F', b'B'];
 
+#[derive(Clone)]
 pub struct FileEntry {
     pub file_name: String,
     pub full_path: PathBuf,

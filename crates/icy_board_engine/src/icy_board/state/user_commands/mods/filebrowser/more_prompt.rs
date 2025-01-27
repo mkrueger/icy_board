@@ -25,16 +25,13 @@ impl IcyBoardState {
                 .await?;
             self.session.more_requested = false;
             self.session.num_lines_printed = 0;
-
-            log::info!("input: {}", input);
-
-            match input.as_str() {
-                "F" => {
+            self.session.push_tokens(&input);
+            match self.session.tokens.pop_front().unwrap_or_default().to_ascii_uppercase().as_str() {
+                "F" | "FL" | "FLA" | "FLAG" => {
                     self.flag_files().await?;
                 }
                 "V" => {
-                    // view: TODO
-                    self.println(TerminalTarget::Both, "TODO").await?;
+                    self.view_file().await?;
                 }
                 "S" => {
                     // show: TODO
@@ -43,12 +40,18 @@ impl IcyBoardState {
                 "G" => {
                     self.goodbye_cmd().await?;
                 }
-                _ => {
-                    if input.to_ascii_uppercase() == self.session.no_char.to_string() {
-                        self.session.disp_options.abort_printout = true;
-                    }
+                "NS" => {
+                    self.session.non_stop_on();
                     return Ok(());
                 }
+                "N" => {
+                    self.session.disp_options.abort_printout = true;
+                    return Ok(());
+                }
+                "Y" | "" => {
+                    return Ok(());
+                }
+                _ => {}
             }
         }
     }

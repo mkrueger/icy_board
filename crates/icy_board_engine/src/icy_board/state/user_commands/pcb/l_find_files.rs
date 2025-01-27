@@ -103,9 +103,6 @@ impl IcyBoardState {
 
     async fn search_file_area(&mut self, area: usize, search_pattern: String) -> Res<()> {
         let file_base_path = self.resolve_path(&self.session.current_conference.directories[area].path);
-        let Ok(base) = self.get_filebase(&file_base_path).await else {
-            return Ok(());
-        };
 
         self.display_text(IceText::ScanningDirectory, display_flags::DEFAULT).await?;
         self.print(TerminalTarget::Both, &format!(" {} ", area + 1)).await?;
@@ -113,9 +110,19 @@ impl IcyBoardState {
         self.print(TerminalTarget::Both, &format!("({})", self.session.current_conference.directories[area].name))
             .await?;
         self.new_line().await?;
-        let mut b = base.lock().await;
-        let files = b.find_files(search_pattern.as_str())?;
-
+        let files = {
+            let Ok(base) = self.get_filebase(&file_base_path).await else {
+                return Ok(());
+            };
+            let mut base = base.lock().await;
+            base.find_files(search_pattern.as_str())?
+                .iter_mut()
+                .map(|f| {
+                    let _ = f.get_metadata();
+                    f.clone()
+                })
+                .collect::<Vec<_>>()
+        };
         let mut list = FileList::new(file_base_path.clone(), files);
         list.display_file_list(self).await
     }
