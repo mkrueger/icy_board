@@ -223,6 +223,10 @@ impl IcyBoardState {
                 // D
                 self.download().await?;
             }
+            CommandType::FlagFiles => {
+                // FLAG
+                self.flag_files().await?;
+            }
             CommandType::EnterMessage => {
                 // E
                 self.enter_message(help).await?;

@@ -7,6 +7,7 @@ pub mod c_comment_to_sysop;
 pub mod d_download;
 pub mod e_enter_message;
 pub mod f_show_file_directories;
+pub mod flag_flag_files;
 pub mod g_goodbye;
 pub mod h_help;
 pub mod i_initial_welcome;

@@ -239,7 +239,7 @@ impl IcyBoardState {
             Ok(str) => {
                 if str == "complete" {
                     let mut connection = TelnetConnection::open(
-                        &"games.bbslink.net:23",
+                        "games.bbslink.net:23",
                         TermCaps {
                             window_size: (80, 24),
                             terminal: TerminalEmulation::Ansi,

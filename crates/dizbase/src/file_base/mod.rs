@@ -5,7 +5,7 @@ use std::{
 };
 
 use chrono::{DateTime, Local};
-use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use thiserror::Error;
 
 use crate::{extensions, file_base_scanner::scan_file};
@@ -141,7 +141,7 @@ impl FileBase {
     pub fn find_files_with_pattern(&mut self, str: &str) -> crate::Result<Vec<&mut FileEntry>> {
         let lc = str.to_lowercase();
         let bytes = lc.as_bytes();
-        let mut res = Vec::new();   
+        let mut res = Vec::new();
         for f in self.file_headers.iter_mut() {
             if find_match(&f.file_name.to_lowercase().as_bytes().to_vec(), bytes) {
                 res.push(f);
@@ -191,4 +191,3 @@ fn find_match(data: &Vec<u8>, pattern: &[u8]) -> bool {
     }
     false
 }
-

@@ -89,7 +89,6 @@ pub async fn confunflag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
 /// Errors if
 pub async fn dispfile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let file_name = &vm.eval_expr(&args[0]).await?.as_string();
-
     let file_name = vm.resolve_file(&file_name).await;
     vm.icy_board_state.display_file(&file_name).await?;
     Ok(())
@@ -1373,8 +1372,15 @@ pub async fn mousereg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 }
 
 pub async fn scrfile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("scrfile not implemented statement!");
-    panic!("TODO")
+    let line = vm.eval_expr(&args[0]).await?.as_int() - 1;
+    if let Some((line, name)) = vm.icy_board_state.scan_filename(line) {
+        log::info!("found name {line}:{name}");
+        vm.set_variable(&args[0], VariableValue::new_int(line + 1)).await?;
+        vm.set_variable(&args[1], VariableValue::new_string(name)).await?;
+    } else {
+        vm.set_variable(&args[0], VariableValue::new_int(0)).await?;
+    }
+    Ok(())
 }
 
 pub async fn searchinit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {

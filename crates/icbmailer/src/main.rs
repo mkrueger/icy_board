@@ -191,7 +191,7 @@ async fn main() {
         terminal: TerminalEmulation::Ascii,
     };
 
-    let mut connection = TelnetConnection::open(&"ip", caps, Duration::from_secs(2)).await.unwrap();
+    let mut connection = TelnetConnection::open("ip", caps, Duration::from_secs(2)).await.unwrap();
     if !janus_login(&mut connection, "name\r", "pw\r").await {
         return;
     }

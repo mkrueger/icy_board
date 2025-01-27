@@ -1,5 +1,5 @@
 use crate::{
-    icy_board::state::{functions::MASK_COMMAND, IcyBoardState},
+    icy_board::state::{functions::MASK_COMMAND, user_commands::mods::filebrowser::FileList, IcyBoardState},
     Res,
 };
 use crate::{
@@ -11,8 +11,6 @@ use crate::{
     vm::TerminalTarget,
 };
 use dizbase::file_base::FileBase;
-
-use super::l_find_files::FileList;
 
 impl IcyBoardState {
     pub async fn zippy_directory_scan(&mut self, help: &str) -> Res<()> {

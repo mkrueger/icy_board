@@ -29,9 +29,9 @@ pub fn add_default_commands(data: &PcbBoardData, cmd_list: &mut CommandList) {
     cmd_list.push(convert_cmd("B", CommandType::BulletinList, data.user_levels.cmd_b));
     cmd_list.push(convert_cmd("C", CommandType::CommentToSysop, data.user_levels.cmd_c));
     cmd_list.push(convert_cmd("DOWN", CommandType::Download, data.user_levels.cmd_d));
-    cmd_list.push(convert_cmd("FLAG", CommandType::Download, data.user_levels.cmd_d));
     cmd_list.push(convert_cmd("E", CommandType::EnterMessage, data.user_levels.cmd_e));
     cmd_list.push(convert_cmd("F", CommandType::FileDirectory, data.user_levels.cmd_f));
+    cmd_list.push(convert_cmd("FLAG", CommandType::FlagFiles, data.user_levels.cmd_d));
 
     // doesn't make sense to have a sec for that but it's in the record
     cmd_list.push(convert_cmd("G", CommandType::Goodbye, data.user_levels.cmd_g));

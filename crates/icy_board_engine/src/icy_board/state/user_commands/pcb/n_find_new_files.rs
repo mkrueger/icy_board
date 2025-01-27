@@ -1,8 +1,9 @@
-use crate::{icy_board::state::IcyBoardState, Res};
+use crate::{
+    icy_board::state::{user_commands::mods::filebrowser::FileList, IcyBoardState},
+    Res,
+};
 use chrono::{DateTime, Local};
 use dizbase::file_base::FileBase;
-
-use super::l_find_files::FileList;
 
 impl IcyBoardState {
     pub async fn find_new_files(&mut self, time_stamp: DateTime<Local>) -> Res<()> {

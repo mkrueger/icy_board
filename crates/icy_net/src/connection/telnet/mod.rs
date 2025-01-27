@@ -62,7 +62,7 @@ pub struct TelnetConnection {
 
 impl TelnetConnection {
     pub async fn open(addr: impl Into<String>, caps: TermCaps, timeout: Duration) -> crate::Result<Self> {
-        let mut addr:String = addr.into();
+        let mut addr: String = addr.into();
         if !addr.contains(':') {
             addr.push_str(":23");
         }

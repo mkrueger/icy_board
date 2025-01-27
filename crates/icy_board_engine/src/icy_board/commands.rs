@@ -117,6 +117,9 @@ pub enum CommandType {
     /// F command
     FileDirectory,
 
+    /// Flag command
+    FlagFiles,
+
     /// G command
     Goodbye,
 
@@ -260,6 +263,7 @@ impl Display for CommandType {
             CommandType::BulletinList => write!(f, "(B)\tBulletinList"),
             CommandType::CommentToSysop => write!(f, "(C)\tCommentToSysop"),
             CommandType::Download => write!(f, "(D)\tDownload"),
+            CommandType::FlagFiles => write!(f, "(FLAG)\tFlagFiles"),
             CommandType::EnterMessage => write!(f, "(E)\tEnterMessage"),
             CommandType::FileDirectory => write!(f, "(F)\tFileDirectory"),
             CommandType::Goodbye => write!(f, "(G)\tGoodbye"),
@@ -407,6 +411,7 @@ impl CommandType {
             CommandType::BulletinList,
             CommandType::CommentToSysop,
             CommandType::Download,
+            CommandType::FlagFiles,
             CommandType::EnterMessage,
             CommandType::FileDirectory,
             CommandType::Goodbye,

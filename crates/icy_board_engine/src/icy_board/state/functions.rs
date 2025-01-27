@@ -244,16 +244,21 @@ impl IcyBoardState {
         } else {
             let mut s = String::new();
             for byte in content {
+                if byte == 0x1A {
+                    break;
+                }
                 s.push(CP437_TO_UNICODE[byte as usize]);
             }
             s
         };
-        for (_i, line) in converted_content.lines().enumerate() {
-            self.display_line(line).await?;
-            self.write_raw(TerminalTarget::Both, &['\r', '\n']).await?;
-            if self.session.disp_options.abort_printout {
-                break;
+        for (i, line) in converted_content.lines().enumerate() {
+            if i > 0 {
+                self.write_raw(TerminalTarget::Both, &['\r', '\n']).await?;
+                if self.session.disp_options.abort_printout {
+                    break;
+                }
             }
+            self.display_line(line).await?;
         }
         Ok(true)
     }
@@ -298,7 +303,9 @@ impl IcyBoardState {
                     result.push(key.ch);
                 }
                 log::info!("PPE stuffed input: {}", result);
-                return Ok(result);
+                self.session.push_tokens(&result);
+                let token = self.session.tokens.pop_front().unwrap();
+                return Ok(token);
             }
         }
 

@@ -12,12 +12,6 @@ use crate::{executable::Executable, Res};
 use async_recursion::async_recursion;
 use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use codepages::tables::UNICODE_TO_CP437;
-use dizbase::file_base::{
-    pattern::{MatchOptions, Pattern},
-    FileBase,
-};
-use functions::MASK_ASCII;
-use humanize_bytes::humanize_bytes_decimal;
 use icy_engine::{ansi, OutputFormat, SaveOptions, ScreenPreperation};
 use icy_engine::{ansi::constants::COLOR_OFFSETS, Position};
 use icy_engine::{TextAttribute, TextPane};
@@ -303,8 +297,9 @@ impl Session {
         }
     }
 
-    pub fn flag_for_download(&mut self, file: PathBuf) {
+    pub fn flag_for_download(&mut self, file: PathBuf) -> usize {
         self.flagged_files.insert(file);
+        self.flagged_files.len()
     }
 
     pub fn minutes_left(&self) -> i32 {
@@ -1925,9 +1920,8 @@ impl IcyBoardState {
     }
 
     pub async fn more_promt(&mut self) -> Res<()> {
-        if let Some(path) = self.session.disp_options.in_file_list.take() {
-            self.filebase_more(&path).await?;
-            self.session.disp_options.in_file_list = Some(path);
+        if self.session.disp_options.in_file_list.is_some() {
+            self.filebase_more().await?;
             return Ok(());
         }
 
@@ -1955,88 +1949,6 @@ impl IcyBoardState {
                     return Ok(());
                 }
                 _ => {}
-            }
-        }
-    }
-
-    pub async fn filebase_more(&mut self, path: &Path) -> Res<()> {
-        loop {
-            let input = self
-                .input_field(
-                    IceText::FilesMorePrompt,
-                    40,
-                    functions::MASK_COMMAND,
-                    &self.session.disp_options.file_list_help.clone(),
-                    None,
-                    display_flags::UPCASE | display_flags::STACKED | display_flags::ERASELINE,
-                )
-                .await?;
-            self.session.more_requested = false;
-            self.session.num_lines_printed = 0;
-
-            match input.as_str() {
-                "F" => {
-                    // flag
-                    let input = self
-                        .input_field(
-                            IceText::FlagForDownload,
-                            60,
-                            &MASK_ASCII,
-                            &"hlpflag",
-                            None,
-                            display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFAFTER | display_flags::HIGHASCII,
-                        )
-                        .await?;
-                    if !input.is_empty() {
-                        let mut files = FileBase::open(path)?;
-                        let mut found = false;
-                        let mut options = MatchOptions::new();
-                        options.case_sensitive = false;
-                        if let Ok(pattern) = Pattern::new(&input) {
-                            self.display_text(IceText::CheckingFileTransfer, display_flags::NEWLINE).await?;
-                            let mut count = 0;
-                            for f in &mut files.file_headers {
-                                if pattern.matches_with(&f.name(), &options) {
-                                    let size = f.size();
-                                    self.session.flag_for_download(f.full_path.clone());
-                                    count += 1;
-                                    let nr = format!("({})", count);
-                                    self.set_color(TerminalTarget::Both, IcbColor::Dos(10)).await?;
-                                    self.println(
-                                        TerminalTarget::Both,
-                                        &format!("{:<6}{:<12} {}", nr, f.name(), humanize_bytes_decimal!(size).to_string()),
-                                    )
-                                    .await?;
-                                    self.reset_color(TerminalTarget::Both).await?;
-                                    found = true;
-                                }
-                            }
-                        }
-
-                        if !found {
-                            self.session.op_text = input.clone();
-                            self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
-                                .await?;
-                        }
-                    }
-                }
-                "V" => {
-                    // view: TODO
-                    self.println(TerminalTarget::Both, "TODO").await?;
-                }
-                "S" => {
-                    // show: TODO
-                    self.println(TerminalTarget::Both, "TODO").await?;
-                }
-                "G" => {
-                    self.goodbye_cmd().await?;
-                }
-                _ => {
-                    if input.to_ascii_uppercase() == self.session.no_char.to_string() {
-                        self.session.disp_options.abort_printout = true;
-                    }
-                    return Ok(());
-                }
             }
         }
     }

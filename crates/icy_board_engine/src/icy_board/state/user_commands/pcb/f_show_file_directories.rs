@@ -1,6 +1,7 @@
 use dizbase::file_base::FileBase;
 
 use crate::icy_board::state::functions::MASK_COMMAND;
+use crate::icy_board::state::user_commands::mods::filebrowser::FileList;
 use crate::icy_board::state::IcyBoardState;
 use crate::Res;
 use crate::{
@@ -10,8 +11,6 @@ use crate::{
     },
     vm::TerminalTarget,
 };
-
-use super::l_find_files::FileList;
 
 impl IcyBoardState {
     pub async fn show_file_directories(&mut self, help: &str) -> Res<()> {
@@ -103,7 +102,7 @@ impl IcyBoardState {
         list.display_file_list(self).await?;
 
         if self.session.num_lines_printed > 0 {
-            self.filebase_more(&file_base_path.clone()).await?;
+            self.filebase_more().await?;
         }
         self.session.non_stop_off();
         self.session.more_requested = false;
