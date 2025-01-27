@@ -25,17 +25,6 @@ pub enum ConnectionType {
     SecureWebsocket,
 }
 
-impl ConnectionType {
-    pub fn get_default_port(self) -> u16 {
-        match self {
-            ConnectionType::Telnet => 23,
-            ConnectionType::SSH => 22,
-            ConnectionType::Websocket | ConnectionType::SecureWebsocket => 443,
-            _ => 0,
-        }
-    }
-}
-
 #[async_trait]
 pub trait Connection: Send + Unpin {
     fn get_connection_type(&self) -> ConnectionType;

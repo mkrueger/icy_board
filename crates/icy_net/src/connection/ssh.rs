@@ -21,7 +21,11 @@ pub struct Credentials {
 }
 
 impl SSHConnection {
-    pub async fn open<A: ToSocketAddrs>(addr: &A, caps: TermCaps, credentials: Credentials) -> crate::Result<Self> {
+    pub async fn open(addr: impl Into<String>, caps: TermCaps, credentials: Credentials) -> crate::Result<Self> {
+        let mut addr:String = addr.into();
+        if !addr.contains(':') {
+            addr.push_str(":22");
+        }
         let ssh = SshClient::connect(addr, &credentials.user_name, credentials.password).await?;
         println!("SSH connection established");
         let channel = ssh.session.channel_open_session().await?;

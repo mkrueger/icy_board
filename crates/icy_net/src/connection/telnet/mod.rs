@@ -8,7 +8,7 @@ use std::{
 use async_trait::async_trait;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpStream, ToSocketAddrs},
+    net::TcpStream,
 };
 
 use super::{Connection, ConnectionType};
@@ -61,7 +61,12 @@ pub struct TelnetConnection {
 }
 
 impl TelnetConnection {
-    pub async fn open<A: ToSocketAddrs>(addr: &A, caps: TermCaps, timeout: Duration) -> crate::Result<Self> {
+    pub async fn open(addr: impl Into<String>, caps: TermCaps, timeout: Duration) -> crate::Result<Self> {
+        let mut addr:String = addr.into();
+        if !addr.contains(':') {
+            addr.push_str(":23");
+        }
+
         let result = tokio::time::timeout(timeout, TcpStream::connect(addr)).await;
         match result {
             Ok(tcp_stream) => match tcp_stream {
