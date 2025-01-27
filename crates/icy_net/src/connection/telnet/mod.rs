@@ -66,7 +66,6 @@ impl TelnetConnection {
         if !addr.contains(':') {
             addr.push_str(":23");
         }
-
         let result = tokio::time::timeout(timeout, TcpStream::connect(addr)).await;
         match result {
             Ok(tcp_stream) => match tcp_stream {

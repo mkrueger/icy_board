@@ -233,7 +233,7 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::KILLMSG => predefined_procedures::killmsg(arg, arguments).await,
         OpCode::CHDIR => predefined_procedures::chdir(arg, arguments).await,
         OpCode::MKDIR => predefined_procedures::mkdir(arg, arguments).await,
-        OpCode::RMDIR => predefined_procedures::redir(arg, arguments).await,
+        OpCode::RMDIR => predefined_procedures::rmdir(arg, arguments).await,
         OpCode::FDOWRAKA => predefined_procedures::fdowraka(arg, arguments).await,
         OpCode::FDOADDAKA => predefined_procedures::fdoaddaka(arg, arguments).await,
         OpCode::FDOWRORG => predefined_procedures::fdowrorg(arg, arguments).await,

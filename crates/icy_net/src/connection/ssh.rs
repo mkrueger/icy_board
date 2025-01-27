@@ -2,13 +2,15 @@
 use async_trait::async_trait;
 use russh::{client::Msg, *};
 use russh_keys::*;
-use std::{borrow::Cow, io::ErrorKind, net::TcpStream, sync::Arc, time::Duration};
+use std::{borrow::Cow, io::ErrorKind, sync::Arc, time::Duration};
 
 use crate::{telnet::TermCaps, Connection, ConnectionType};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::ToSocketAddrs,
+    net::TcpStream,
 };
+
+
 pub struct SSHConnection {
     client: SshClient,
     channel: Channel<Msg>,
@@ -27,16 +29,12 @@ impl SSHConnection {
             addr.push_str(":22");
         }
         let ssh = SshClient::connect(addr, &credentials.user_name, credentials.password).await?;
-        println!("SSH connection established");
         let channel = ssh.session.channel_open_session().await?;
         let terminal_type: String = format!("{:?}", caps.terminal).to_lowercase();
-        println!("Terminal type: {}", terminal_type);
         channel
             .request_pty(false, &terminal_type, caps.window_size.0 as u32, caps.window_size.1 as u32, 1, 1, &[])
             .await?;
-        println!("PTY requested");
         channel.request_shell(false).await?;
-        println!("SSH connection opened");
         return Ok(Self { client: ssh, channel });
     }
 
@@ -57,7 +55,9 @@ impl Connection for SSHConnection {
 
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
         match self.channel.make_reader().read(buf).await {
-            Ok(size) => Ok(size),
+            Ok(size) => {
+                Ok(size)
+            },
             Err(e) => match e.kind() {
                 ErrorKind::ConnectionAborted | ErrorKind::NotConnected => {
                     return Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into());
@@ -98,7 +98,12 @@ pub struct SshClient {
 }
 
 impl SshClient {
-    async fn connect<A: ToSocketAddrs>(addrs: A, user: impl Into<String>, password: impl Into<String>) -> crate::Result<Self> {
+    async fn connect(addr: impl Into<String>, user: impl Into<String>, password: impl Into<String>) -> crate::Result<Self> {
+        let mut addr: String = addr.into();
+        if !addr.contains(':') {
+            addr.push_str(":22");
+        }
+
         let mut preferred = Preferred::DEFAULT.clone();
         preferred.kex = Cow::Owned(kex::ALL_KEX_ALGORITHMS.iter().map(|k| **k).collect());
         preferred.cipher = Cow::Owned(cipher::ALL_CIPHERS.iter().map(|k| **k).collect());
@@ -111,14 +116,26 @@ impl SshClient {
         };
         let config = Arc::new(config);
         let sh = Client {};
-        let mut session = russh::client::connect(config, addrs, sh).await?;
+        let timeout = Duration::from_secs(5);
+        let result = tokio::time::timeout(timeout, TcpStream::connect(addr)).await;
+        match result {
+            Ok(tcp_stream) => match tcp_stream {
+                Ok(tcp_stream) => {
+                    tcp_stream.set_nodelay(true)?;
+                    let mut session: client::Handle<Client> = russh::client::connect_stream(config, tcp_stream, sh).await?;
 
-        let auth_res = session.authenticate_password(user, password).await?;
-        if !auth_res {
-            return Err("Authentication failed".into());
+                    let auth_res = session.authenticate_password(user, password).await?;
+                    if !auth_res.success() {
+                        return Err("Authentication failed".into());
+                    }
+
+                    Ok(Self { session })
+                }
+
+                Err(err) => Err(Box::new(err)),
+            },
+            Err(err) => Err(Box::new(err)),
         }
-
-        Ok(Self { session })
     }
 
     async fn call(&mut self, command: &str) -> crate::Result<u32> {
