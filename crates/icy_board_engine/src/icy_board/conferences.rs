@@ -95,13 +95,11 @@ pub struct Conference {
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_8")]
     pub pub_upload_sort: u8,
-    pub pub_upload_dir_file: PathBuf,
     pub pub_upload_location: PathBuf,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_8")]
     pub private_upload_sort: u8,
-    pub private_upload_dir_file: PathBuf,
     pub private_upload_location: PathBuf,
 
     pub command_file: PathBuf,
@@ -196,10 +194,8 @@ impl ConferenceBase {
                 news_file: PathBuf::from(&c.news_file),
                 attachment_location: PathBuf::from(&d.attach_loc),
                 pub_upload_sort: c.pub_upload_sort,
-                pub_upload_dir_file: PathBuf::from(&c.pub_upload_dirfile),
                 pub_upload_location: PathBuf::from(&c.pub_upload_location),
                 private_upload_sort: c.private_upload_sort,
-                private_upload_dir_file: PathBuf::from(&c.private_upload_dirfile),
                 private_upload_location: PathBuf::from(&c.private_upload_location),
                 command_file: PathBuf::from(&d.cmd_lst),
                 intro_file: PathBuf::from(&d.intro),

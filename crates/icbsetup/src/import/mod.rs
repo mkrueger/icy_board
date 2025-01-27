@@ -427,10 +427,8 @@ impl PCBoardImporter {
             conf.users_menu = self.convert_conference_display_file(&output, &conf.users_menu)?;
             conf.sysop_menu = self.convert_conference_display_file(&output, &conf.sysop_menu)?;
             conf.news_file = self.convert_conference_display_file(&output, &conf.news_file)?;
-            conf.pub_upload_dir_file = PathBuf::from(output.to_string() + "/upload");
-            conf.pub_upload_location = PathBuf::from(output.to_string() + "/up");
-            conf.private_upload_dir_file = PathBuf::from(output.to_string() + "/private");
-            conf.private_upload_location = PathBuf::from(output.to_string() + "/pr");
+            conf.pub_upload_location = PathBuf::from(output.to_string() + "/pub_up");
+            conf.private_upload_location = PathBuf::from(output.to_string() + "/priv_up");
             conf.doors_menu = self.convert_conference_display_file(&output, &conf.doors_menu)?;
             conf.doors_file = self.convert_doors_file(&destination, &output, &conf.doors_file)?;
 

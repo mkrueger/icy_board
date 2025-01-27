@@ -231,21 +231,21 @@ impl ConferencesTab {
             ),
             ConfigEntry::Item(ListItem::new("command_file", "Conf. CMD.LST File".to_string(), ListValue::Path(conf.command_file.clone())).with_label_width(28)),
             ConfigEntry::Separator,
-            ConfigEntry::Table(
-                2,
-                vec![
-                    ConfigEntry::Item(
-                        ListItem::new(
-                            "pub_upload_dir_file",
-                            "Public Upld".to_string(),
-                            ListValue::Path(conf.pub_upload_dir_file.clone()),
-                        )
-                        .with_label_width(12),
-                    ),
-                    ConfigEntry::Item(
-                        ListItem::new("pub_upload_location", ":".to_string(), ListValue::Path(conf.pub_upload_location.clone())).with_label_width(1),
-                    ),
-                ],
+            ConfigEntry::Item(
+                ListItem::new(
+                    "pub_upload_location",
+                    "Public Up Path".to_string(),
+                    ListValue::Path(conf.pub_upload_location.clone()),
+                )
+                .with_label_width(1),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    "priv_upload_location",
+                    "Private Up Path".to_string(),
+                    ListValue::Path(conf.private_upload_location.clone()),
+                )
+                .with_label_width(1),
             ),
             ConfigEntry::Separator,
             ConfigEntry::Table(
@@ -291,8 +291,8 @@ impl ConferencesTab {
                 "intro_file" => conf.intro_file = path.clone(),
                 "attachment_location" => conf.attachment_location = path.clone(),
                 "command_file" => conf.command_file = path.clone(),
-                "pub_upload_dir_file" => conf.pub_upload_dir_file = path.clone(),
                 "pub_upload_location" => conf.pub_upload_location = path.clone(),
+                "priv_upload_location" => conf.private_upload_location = path.clone(),
                 "doors_menu" => conf.doors_menu = path.clone(),
                 "doors_file" => conf.doors_file = path.clone(),
                 "blt_menu" => conf.blt_menu = path.clone(),

@@ -257,7 +257,6 @@ impl IcyBoardCreator {
         fs::create_dir_all(&self.destination.join(&conf.attachment_location))?;
         conf.pub_upload_location = PathBuf::from("conferences/main/upload");
         fs::create_dir_all(&self.destination.join(&conf.pub_upload_location))?;
-        conf.pub_upload_dir_file = PathBuf::from("conferences/main/upload.dir");
 
         self.logger.start_action("Write user & sysop menus…".to_string());
         conf.users_menu = PathBuf::from("conferences/main/brdm");

@@ -6,7 +6,6 @@ use crate::{
             IcyBoardState,
         },
     },
-    vm::TerminalTarget,
     Res,
 };
 
@@ -18,7 +17,7 @@ impl IcyBoardState {
                     IceText::FilesMorePrompt,
                     40,
                     functions::MASK_COMMAND,
-                    &self.session.disp_options.file_list_help.clone(),
+                    "HLPXFRMORE",
                     None,
                     display_flags::UPCASE | display_flags::STACKED | display_flags::ERASELINE,
                 )
@@ -30,13 +29,10 @@ impl IcyBoardState {
                 "F" | "FL" | "FLA" | "FLAG" => {
                     self.flag_files().await?;
                 }
-                "V" => {
+                "V" | "S" => {
                     self.view_file().await?;
                 }
-                "S" => {
-                    // show: TODO
-                    self.println(TerminalTarget::Both, "TODO").await?;
-                }
+
                 "G" => {
                     self.goodbye_cmd().await?;
                 }

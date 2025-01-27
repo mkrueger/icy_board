@@ -1829,10 +1829,10 @@ pub async fn get_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             14 => Ok(VariableValue::new_string(conference.sysop_menu.to_string_lossy().to_string())),
             15 => Ok(VariableValue::new_string(conference.news_file.to_string_lossy().to_string())),
             16 => Ok(VariableValue::new_int(conference.pub_upload_sort as i32)),
-            17 => Ok(VariableValue::new_string(conference.pub_upload_dir_file.to_string_lossy().to_string())),
+            17 => Ok(VariableValue::new_string(String::new())), // public upload dir file
             18 => Ok(VariableValue::new_string(conference.pub_upload_location.to_string_lossy().to_string())),
             19 => Ok(VariableValue::new_int(conference.private_upload_sort as i32)),
-            20 => Ok(VariableValue::new_string(conference.private_upload_dir_file.to_string_lossy().to_string())),
+            20 => Ok(VariableValue::new_string(String::new())), // private upload dir file
             21 => Ok(VariableValue::new_string(conference.private_upload_location.to_string_lossy().to_string())),
             22 => Ok(VariableValue::new_string(conference.doors_menu.to_string_lossy().to_string())),
             23 => Ok(VariableValue::new_string(conference.doors_file.to_string_lossy().to_string())),
@@ -1893,10 +1893,10 @@ pub async fn set_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             14 => conference.sysop_menu = PathBuf::from_str(&value.as_string())?,
             15 => conference.news_file = PathBuf::from_str(&value.as_string())?,
             16 => conference.pub_upload_sort = value.as_int() as u8,
-            17 => conference.pub_upload_dir_file = PathBuf::from_str(&value.as_string())?,
+            17 => (), // public upload dir file
             18 => conference.pub_upload_location = PathBuf::from_str(&value.as_string())?,
             19 => conference.private_upload_sort = value.as_int() as u8,
-            20 => conference.private_upload_dir_file = PathBuf::from_str(&value.as_string())?,
+            20 => (), // private upload dir file
             21 => conference.private_upload_location = PathBuf::from_str(&value.as_string())?,
             22 => conference.doors_menu = PathBuf::from_str(&value.as_string())?,
             23 => conference.doors_file = PathBuf::from_str(&value.as_string())?,
