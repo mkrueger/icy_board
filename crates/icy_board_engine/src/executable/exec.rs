@@ -160,6 +160,8 @@ impl Executable {
         }
         let mut buffer = Vec::new();
         buffer.extend_from_slice(PREAMBLE);
+        buffer.push(b' ');
+        buffer.push(b' ');
         buffer.push(b'0' + (self.version / 100) as u8);
         buffer.push(b'.');
         let minor = self.version % 100;

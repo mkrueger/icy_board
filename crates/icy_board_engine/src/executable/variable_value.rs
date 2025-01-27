@@ -282,7 +282,7 @@ impl GenericVariableData {
                     log::error!("Creating a large array of size: {} elements - probably file is corrupt.", vector_size,);
                     return None;
                 }
-                return Some(GenericVariableData::Dim1(vec![base_value; vector_size + 1]))
+                return Some(GenericVariableData::Dim1(vec![base_value; vector_size + 1]));
             }
             2 => {
                 if vector_size * matrix_size > MAX_ARRAY_SIZE {
@@ -310,7 +310,10 @@ impl GenericVariableData {
                     return None;
                 }
                 println!("generate array !!!");
-                return Some(GenericVariableData::Dim3(vec![vec![vec![base_value; cube_size + 1]; matrix_size + 1]; vector_size + 1]));
+                return Some(GenericVariableData::Dim3(vec![
+                    vec![vec![base_value; cube_size + 1]; matrix_size + 1];
+                    vector_size + 1
+                ]));
             }
             _ => panic!("Invalid dimension: {dim}"),
         }

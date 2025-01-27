@@ -1,4 +1,7 @@
-use std::{fmt::{self, Display}, io::stdout};
+use std::{
+    fmt::{self, Display},
+    io::stdout,
+};
 
 use codepages::tables::{CP437_TO_UNICODE, UNICODE_TO_CP437};
 use crossterm::{
@@ -27,7 +30,11 @@ pub struct VarHeader {
 impl Display for VarHeader {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.dim > 0 {
-            write!(f, "[id:{}, variable_type:{}, flags:{}, dim:{}[{},{},{})]", self.id, self.variable_type, self.flags, self.dim, self.vector_size, self.matrix_size, self.cube_size)
+            write!(
+                f,
+                "[id:{}, variable_type:{}, flags:{}, dim:{}[{},{},{})]",
+                self.id, self.variable_type, self.flags, self.dim, self.vector_size, self.matrix_size, self.cube_size
+            )
         } else {
             write!(f, "[id:{}, variable_type:{}, flags:{}]", self.id, self.variable_type, self.flags)
         }
@@ -534,7 +541,7 @@ impl VariableTable {
 
             res.set_name(name);
         }
-        let mut par = 1; 
+        let mut par = 1;
         let mut vars = 1;
         let mut loc = 1;
 
