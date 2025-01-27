@@ -38,6 +38,12 @@ pub enum ExecutableError {
 
     #[error("Function/Procedure is not supported in ppe version ({0})")]
     FunctionsNotSupported(u16),
+
+    #[error("Variable count exceeds maximum: {0} ({1})")]
+    VariableCountExceedsMaximum(usize, usize),
+
+    #[error("Variable id mismatch: {0} != {1}")]
+    VariableIdMismatch(usize, i32),
 }
 
 #[derive(Clone)]
@@ -47,7 +53,7 @@ pub struct Executable {
     pub script_buffer: Vec<i16>,
 }
 
-static PREAMBLE: &[u8] = b"PCBoard Programming Language Executable  ";
+static PREAMBLE: &[u8] = b"PCBoard Programming Language Executable";
 
 const HEADER_SIZE: usize = 48;
 

@@ -20,11 +20,8 @@ pub enum DeserializationErrorType {
     #[error("Invalid expression stack state")]
     InvalidExpressionStackState,
 
-    #[error("Too few arguments for binary expression")]
-    TooFewArgumentsForBinaryExpression(BinOp),
-
-    #[error("Too few arguments for unary expression")]
-    TooFewArgumentsForUnaryExpression(UnaryOp),
+    #[error("Too few arguments for unary expression ({0:04X}:{1:?})")]
+    TooFewArgumentsForUnaryExpression(usize, UnaryOp),
 
     #[error("Too few function arguments for {0:?}, expected {1}, got {2}")]
     TooFewBuiltInFunctionArguments(FuncOpCode, i8, usize),
@@ -109,7 +106,7 @@ impl PPEDeserializer {
         }
         if !(0..LAST_STMT).contains(&cur_stmt) {
             self.report_bug(DeserializationErrorType::InvalidStatement(cur_stmt));
-            return Err(DeserializationErrorType::InvalidStatement(cur_stmt));
+            return Ok(None);
         }
 
         let op: OpCode = unsafe { transmute(cur_stmt) };
@@ -367,7 +364,7 @@ impl PPEDeserializer {
                         } else {
                             // Some obfuscators try to trick the decompiler by using invalid unary expressions with 0 arguments
                             // PCBoard will just skip these
-                            self.report_bug(DeserializationErrorType::TooFewArgumentsForUnaryExpression(op));
+                            self.report_bug(DeserializationErrorType::TooFewArgumentsForUnaryExpression(self.offset, op));
                             return self.deserialize_expression(executable);
                         }
                     }

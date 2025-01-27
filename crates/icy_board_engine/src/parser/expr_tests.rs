@@ -1,5 +1,5 @@
 use crate::{
-    ast::{BinOp, BinaryExpression, Constant, ConstantExpression, Expression, ParensExpression, UnaryExpression, UnaryOp},
+    ast::{constant::NumberFormat, BinOp, BinaryExpression, Constant, ConstantExpression, Expression, ParensExpression, UnaryExpression, UnaryOp},
     executable::LAST_PPLC,
     parser::{Encoding, Parser, UserTypeRegistry},
 };
@@ -32,7 +32,7 @@ fn _check_error(input: &str) {
 fn test_parse_parens() {
     check_expression(
         "(5)",
-        &ParensExpression::create_empty_expression(ConstantExpression::create_empty_expression(Constant::Integer(5))),
+        &ParensExpression::create_empty_expression(ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default))),
     );
 }
 
@@ -48,12 +48,18 @@ fn test_unary_expressions() {
 
     check_expression(
         "-5",
-        &UnaryExpression::create_empty_expression(UnaryOp::Minus, ConstantExpression::create_empty_expression(Constant::Integer(5))),
+        &UnaryExpression::create_empty_expression(
+            UnaryOp::Minus,
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
+        ),
     );
 
     check_expression(
         "+5",
-        &UnaryExpression::create_empty_expression(UnaryOp::Plus, ConstantExpression::create_empty_expression(Constant::Integer(5))),
+        &UnaryExpression::create_empty_expression(
+            UnaryOp::Plus,
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
+        ),
     );
 }
 
@@ -69,7 +75,7 @@ fn test_parse_expression() {
         "ABS(5)",
         &PredefinedFunctionCallExpression::create_empty_expression(
             FuncOpCode::ABS.get_definition(),
-            vec![ConstantExpression::create_empty_expression(Constant::Integer(5))],
+            vec![ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default))],
         ),
     );*/
 }
@@ -80,136 +86,136 @@ fn test_binary_expressions() {
         "2^5",
         &BinaryExpression::create_empty_expression(
             BinOp::PoW,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
     check_expression(
         "2**5",
         &BinaryExpression::create_empty_expression(
             BinOp::PoW,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
     check_expression(
         "2*5",
         &BinaryExpression::create_empty_expression(
             BinOp::Mul,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
     check_expression(
         "2/5",
         &BinaryExpression::create_empty_expression(
             BinOp::Div,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
     check_expression(
         "2%5",
         &BinaryExpression::create_empty_expression(
             BinOp::Mod,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
     check_expression(
         "2+5",
         &BinaryExpression::create_empty_expression(
             BinOp::Add,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
     check_expression(
         "2-5",
         &BinaryExpression::create_empty_expression(
             BinOp::Sub,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
     check_expression(
         "2=5",
         &BinaryExpression::create_empty_expression(
             BinOp::Eq,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
     check_expression(
         "2==5",
         &BinaryExpression::create_empty_expression(
             BinOp::Eq,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
     check_expression(
         "2<>5",
         &BinaryExpression::create_empty_expression(
             BinOp::NotEq,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
     check_expression(
         "2!=5",
         &BinaryExpression::create_empty_expression(
             BinOp::NotEq,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
     check_expression(
         "2<5",
         &BinaryExpression::create_empty_expression(
             BinOp::Lower,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
     check_expression(
         "2<=5",
         &BinaryExpression::create_empty_expression(
             BinOp::LowerEq,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
     check_expression(
         "2>5",
         &BinaryExpression::create_empty_expression(
             BinOp::Greater,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
     check_expression(
         "2>=5",
         &BinaryExpression::create_empty_expression(
             BinOp::GreaterEq,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
     check_expression(
         "2&5",
         &BinaryExpression::create_empty_expression(
             BinOp::And,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
     check_expression(
         "2|5",
         &BinaryExpression::create_empty_expression(
             BinOp::Or,
-            ConstantExpression::create_empty_expression(Constant::Integer(2)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
 }

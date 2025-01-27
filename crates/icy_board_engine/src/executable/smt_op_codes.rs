@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use crate::ast::{
-    constant::{BuiltinConst, BUILTIN_CONSTS},
+    constant::{BuiltinConst, NumberFormat, BUILTIN_CONSTS},
     BinOp, BinaryExpression, Constant, ConstantExpression, Expression,
 };
 
@@ -360,7 +360,7 @@ fn replace_constants(expr: crate::ast::Expression, consts: &'static [BuiltinCons
     match &expr {
         Expression::Const(c) => {
             match c.get_constant_value() {
-                &Constant::Integer(value) => {
+                &Constant::Integer(value, _) => {
                     for c in consts {
                         if c.value == value {
                             return ConstantExpression::create_empty_expression(Constant::Builtin(c));
@@ -407,6 +407,7 @@ pub struct ArgumentDefinition {
     pub name: &'static str,
     pub arg_type: VariableType,
     pub flags: ArgumentDefinitionFlags,
+    pub number_format: NumberFormat,
 }
 
 impl ArgumentDefinition {
@@ -415,6 +416,7 @@ impl ArgumentDefinition {
             name,
             arg_type,
             flags: ArgumentDefinitionFlags::None,
+            number_format: NumberFormat::Default,
         }
     }
 
@@ -423,6 +425,16 @@ impl ArgumentDefinition {
             name,
             arg_type: VariableType::Integer,
             flags,
+            number_format: NumberFormat::Default,
+        }
+    }
+
+    pub fn new_color(name: &'static str) -> Self {
+        Self {
+            name,
+            arg_type: VariableType::Integer,
+            flags: ArgumentDefinitionFlags::None,
+            number_format: NumberFormat::Hex,
         }
     }
 }
@@ -822,7 +834,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("prompt", VariableType::String),
                 ArgumentDefinition::new("var", VariableType::String),
-                ArgumentDefinition::new("color", VariableType::Integer),
+                ArgumentDefinition::new_color("color"),
                 ArgumentDefinition::new("len", VariableType::Integer),
                 ArgumentDefinition::new("valid", VariableType::String),
                 ArgumentDefinition::new_flags("flags", ArgumentDefinitionFlags::InputFlags),
@@ -836,7 +848,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("prompt", VariableType::String),
                 ArgumentDefinition::new("var", VariableType::String),
-                ArgumentDefinition::new("color", VariableType::Integer),
+                ArgumentDefinition::new_color("color"),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(2, 3),
         },
@@ -847,7 +859,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("prompt", VariableType::String),
                 ArgumentDefinition::new("var", VariableType::String),
-                ArgumentDefinition::new("color", VariableType::Integer),
+                ArgumentDefinition::new_color("color"),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(2, 3),
         },
@@ -858,7 +870,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("prompt", VariableType::String),
                 ArgumentDefinition::new("var", VariableType::String),
-                ArgumentDefinition::new("color", VariableType::Integer),
+                ArgumentDefinition::new_color("color"),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(2, 3),
         },
@@ -869,7 +881,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("prompt", VariableType::String),
                 ArgumentDefinition::new("var", VariableType::String),
-                ArgumentDefinition::new("color", VariableType::Integer),
+                ArgumentDefinition::new_color("color"),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(2, 3),
         },
@@ -880,7 +892,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("prompt", VariableType::String),
                 ArgumentDefinition::new("var", VariableType::String),
-                ArgumentDefinition::new("color", VariableType::Integer),
+                ArgumentDefinition::new_color("color"),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(2, 3),
         },
@@ -891,7 +903,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("prompt", VariableType::String),
                 ArgumentDefinition::new("var", VariableType::String),
-                ArgumentDefinition::new("color", VariableType::Integer),
+                ArgumentDefinition::new_color("color"),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(2, 3),
         },
@@ -1056,7 +1068,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("prompt", VariableType::String),
                 ArgumentDefinition::new("var", VariableType::String),
-                ArgumentDefinition::new("color", VariableType::Integer),
+                ArgumentDefinition::new_color("color"),
                 ArgumentDefinition::new("len", VariableType::Integer),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(2, 4),

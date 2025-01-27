@@ -2,9 +2,9 @@ use core::panic;
 
 use crate::{
     ast::{
-        AstNode, AstVisitorMut, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, DimensionSpecifier, Expression, ForStatement,
-        FunctionImplementation, GotoStatement, IdentifierExpression, IfStatement, LabelStatement, LetStatement, ReturnStatement, SelectStatement, Statement,
-        VariableDeclarationStatement, VariableSpecifier,
+        constant::NumberFormat, AstNode, AstVisitorMut, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, DimensionSpecifier,
+        Expression, ForStatement, FunctionImplementation, GotoStatement, IdentifierExpression, IfStatement, LabelStatement, LetStatement, ReturnStatement,
+        SelectStatement, Statement, VariableDeclarationStatement, VariableSpecifier,
     },
     decompiler::evaluation_visitor::OptimizationVisitor,
     parser::lexer::{Spanned, Token},
@@ -247,7 +247,7 @@ impl AstVisitorMut for AstTransformationVisitor {
         let increment = if let Some(increment) = for_stmt.get_step_expr() {
             increment.visit_mut(self)
         } else {
-            Expression::Const(ConstantExpression::empty(Constant::Integer(1)))
+            Expression::Const(ConstantExpression::empty(Constant::Integer(1, NumberFormat::Default)))
         };
 
         let end_expr = for_stmt.get_end_expr().visit_mut(self);
@@ -256,7 +256,7 @@ impl AstVisitorMut for AstTransformationVisitor {
             crate::ast::BinOp::Or,
             BinaryExpression::create_empty_expression(
                 crate::ast::BinOp::Lower,
-                ConstantExpression::create_empty_expression(Constant::Integer(0)),
+                ConstantExpression::create_empty_expression(Constant::Integer(0, NumberFormat::Default)),
                 increment.clone(),
             ),
             BinaryExpression::create_empty_expression(crate::ast::BinOp::Lower, id_expr.clone(), end_expr.clone()),
@@ -266,7 +266,7 @@ impl AstVisitorMut for AstTransformationVisitor {
             crate::ast::BinOp::Or,
             BinaryExpression::create_empty_expression(
                 crate::ast::BinOp::Greater,
-                ConstantExpression::create_empty_expression(Constant::Integer(0)),
+                ConstantExpression::create_empty_expression(Constant::Integer(0, NumberFormat::Default)),
                 increment.clone(),
             ),
             BinaryExpression::create_empty_expression(crate::ast::BinOp::Greater, id_expr.clone(), end_expr.clone()),
@@ -441,7 +441,10 @@ impl AstVisitorMut for AstTransformationVisitor {
                                 None,
                                 var.get_identifier_token().clone(),
                                 None,
-                                vec![Expression::Const(ConstantExpression::empty(Constant::Integer(idx as i32)))],
+                                vec![Expression::Const(ConstantExpression::empty(Constant::Integer(
+                                    idx as i32,
+                                    NumberFormat::Default,
+                                )))],
                                 None,
                                 Spanned::create_empty(Token::Eq),
                                 expr.visit_mut(self),

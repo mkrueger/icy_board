@@ -1,5 +1,5 @@
 use crate::{
-    ast::{AstVisitor, AstVisitorMut, BinOp, BinaryExpression, Constant, ConstantExpression, Expression, UnaryExpression, UnaryOp},
+    ast::{constant::NumberFormat, AstVisitor, AstVisitorMut, BinOp, BinaryExpression, Constant, ConstantExpression, Expression, UnaryExpression, UnaryOp},
     executable::{VariableType, VariableValue},
 };
 
@@ -10,7 +10,7 @@ impl AstVisitor<Option<VariableValue>> for EvaluationVisitor {
     fn visit_constant_expression(&mut self, constant: &crate::ast::ConstantExpression) -> Option<VariableValue> {
         match constant.get_constant_value() {
             Constant::Boolean(b) => Some(VariableValue::new_bool(*b)),
-            Constant::Integer(i) => Some(VariableValue::new_int(*i)),
+            Constant::Integer(i, _) => Some(VariableValue::new_int(*i)),
             Constant::String(s) => Some(VariableValue::new_string(s.clone())),
             Constant::Double(f) => Some(VariableValue::new_double(*f)),
             Constant::Money(m) => Some(VariableValue::new_int(*m)),
@@ -123,7 +123,7 @@ impl AstVisitorMut for OptimizationVisitor {
             match binary.get_op() {
                 BinOp::Mul => {
                     if val.as_int() == 0 {
-                        return ConstantExpression::create_empty_expression(Constant::Integer(0));
+                        return ConstantExpression::create_empty_expression(Constant::Integer(0, NumberFormat::Default));
                     }
                 }
                 BinOp::Or => {
@@ -158,7 +158,12 @@ impl AstVisitorMut for OptimizationVisitor {
 fn value_to_expression(value: &VariableValue) -> Option<Expression> {
     match value.get_type() {
         VariableType::Boolean => return Some(ConstantExpression::create_empty_expression(Constant::Boolean(value.as_bool()))),
-        VariableType::Integer => return Some(ConstantExpression::create_empty_expression(Constant::Integer(value.as_int()))),
+        VariableType::Integer => {
+            return Some(ConstantExpression::create_empty_expression(Constant::Integer(
+                value.as_int(),
+                NumberFormat::Default,
+            )))
+        }
         VariableType::String => return Some(ConstantExpression::create_empty_expression(Constant::String(value.as_string()))),
         VariableType::Double => {
             return Some(ConstantExpression::create_empty_expression(Constant::Double(unsafe {

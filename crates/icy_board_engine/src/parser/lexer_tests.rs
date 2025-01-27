@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    ast::Constant,
+    ast::{constant::NumberFormat, Constant},
     executable::LAST_PPLC,
     parser::{
         lexer::{CommentType, Lexer, Token},
@@ -133,19 +133,19 @@ fn test_identifier() {
 
 #[test]
 fn test_constants() {
-    assert_eq!(Token::Const(Constant::Integer(123)), get_token("123"));
-    assert_eq!(Token::Const(Constant::Integer(100)), get_token("@X64"));
+    assert_eq!(Token::Const(Constant::Integer(123, NumberFormat::Default)), get_token("123"));
+    assert_eq!(Token::Const(Constant::Integer(100, NumberFormat::ColorCode)), get_token("@X64"));
 
     assert_eq!(Token::Const(Constant::Money(142)), get_token("$1.42"));
-    assert_eq!(Token::Const(Constant::Integer(255)), get_token("0FFh"));
-    assert_eq!(Token::Const(Constant::Integer(123)), get_token("123d"));
-    assert_eq!(Token::Const(Constant::Integer(88)), get_token("130o"));
-    assert_eq!(Token::Const(Constant::Integer(8)), get_token("1000b"));
+    assert_eq!(Token::Const(Constant::Integer(255, NumberFormat::Hex)), get_token("0FFh"));
+    assert_eq!(Token::Const(Constant::Integer(123, NumberFormat::Dec)), get_token("123d"));
+    assert_eq!(Token::Const(Constant::Integer(88, NumberFormat::Octal)), get_token("130o"));
+    assert_eq!(Token::Const(Constant::Integer(8, NumberFormat::Binary)), get_token("1000b"));
     assert_eq!(Token::Const(Constant::Builtin(&crate::ast::constant::BuiltinConst::TRUE)), get_token("TRUE"));
     assert_eq!(Token::Const(Constant::Builtin(&crate::ast::constant::BuiltinConst::FALSE)), get_token("FALSE"));
     assert_eq!(Token::Const(Constant::Double(3.15)), get_token("3.15"));
     assert_eq!(Token::Const(Constant::Double(3.15)), get_token("3.15"));
-    assert_eq!(Token::Const(Constant::Integer(0x0B00)), get_token("0B00h"));
+    assert_eq!(Token::Const(Constant::Integer(0x0B00, NumberFormat::Hex)), get_token("0B00h"));
     assert_eq!(Token::Const(Constant::Unsigned(142_9496_7296u64)), get_token("14294967296"));
 }
 
@@ -279,6 +279,6 @@ fn test_dotdot() {
         Arc::new(Mutex::new(ErrorRepoter::default())),
     );
 
-    assert_eq!(Token::Const(Constant::Integer(1)), lex.next_token().unwrap());
+    assert_eq!(Token::Const(Constant::Integer(1, NumberFormat::Default)), lex.next_token().unwrap());
     assert_eq!(Token::DotDot, lex.next_token().unwrap());
 }

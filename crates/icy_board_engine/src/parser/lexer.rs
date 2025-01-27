@@ -1,5 +1,8 @@
 use crate::{
-    ast::{constant::BUILTIN_CONSTS, Constant},
+    ast::{
+        constant::{NumberFormat, BUILTIN_CONSTS},
+        Constant,
+    },
     parser::load_with_encoding,
 };
 use core::fmt;
@@ -726,7 +729,7 @@ impl Lexer {
                     return None;
 
                 }
-                Some(Token::Const(Constant::Integer(conv_hex(first) * 16 + conv_hex(second))))
+                Some(Token::Const(Constant::Integer(conv_hex(first) * 16 + conv_hex(second), NumberFormat::ColorCode)))
             }
             '$' => {
                 let mut identifier = String::new();
@@ -810,14 +813,14 @@ impl Lexer {
                                 let r = self.text[start..self.token_end - 1].iter().collect::<String>().parse::<i32>();
                                 match r {
                                     Ok(i) => {
-                                        return Some(Token::Const(Constant::Integer(i)));
+                                        return Some(Token::Const(Constant::Integer(i, NumberFormat::Dec)));
                                     }
                                     Err(r) => {
                                         self.errors.lock().unwrap().report_warning(
                                             self.token_start..self.token_end,
                                             LexingErrorType::InvalidInteger(r.to_string(), self.text[self.token_start..self.token_end].iter().collect::<String>())
                                         );
-                                        return Some(Token::Const(Constant::Integer(-1)));
+                                        return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
                                     }
                                 }
                             }
@@ -825,14 +828,14 @@ impl Lexer {
                                 let r = i32::from_str_radix(&self.text[start..self.token_end - 1].iter().collect::<String>(), 16);
                                 match r {
                                     Ok(i) => {
-                                        return Some(Token::Const(Constant::Integer(i)));
+                                        return Some(Token::Const(Constant::Integer(i, NumberFormat::Hex)));
                                     }
                                     Err(r) => {
                                         self.errors.lock().unwrap().report_warning(
                                             self.token_start..self.token_end,
                                             LexingErrorType::InvalidInteger(r.to_string(), self.text[self.token_start..self.token_end].iter().collect::<String>())
                                         );
-                                        return Some(Token::Const(Constant::Integer(-1)));
+                                        return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
                                     }
                                 }
                             }
@@ -840,14 +843,14 @@ impl Lexer {
                                 let r = i32::from_str_radix(&self.text[start..self.token_end - 1].iter().collect::<String>(), 8);
                                 match r {
                                     Ok(i) => {
-                                        return Some(Token::Const(Constant::Integer(i)));
+                                        return Some(Token::Const(Constant::Integer(i, NumberFormat::Octal)));
                                     }
                                     Err(r) => {
                                         self.errors.lock().unwrap().report_warning(
                                             self.token_start..self.token_end,
                                             LexingErrorType::InvalidInteger(r.to_string(), self.text[self.token_start..self.token_end].iter().collect::<String>())
                                         );
-                                        return Some(Token::Const(Constant::Integer(-1)));
+                                        return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
                                     }
                                 }
                             }
@@ -863,7 +866,7 @@ impl Lexer {
 
                                 match r {
                                     Ok(i) => {
-                                        return Some(Token::Const(Constant::Integer(i)));
+                                        return Some(Token::Const(Constant::Integer(i, NumberFormat::Binary)));
                                     }
                                     Err(r) => {
                                         self.errors.lock().unwrap().report_warning(
@@ -871,7 +874,7 @@ impl Lexer {
                                             LexingErrorType::InvalidInteger(r.to_string(), self.text[self.token_start..self.token_end].iter().collect::<String>())
                                         );
 
-                                        return Some(Token::Const(Constant::Integer(-1)));
+                                        return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
                                     }
                                 }
                             }
@@ -931,7 +934,7 @@ impl Lexer {
                     match r {
                         Ok(i) => {
                             if i32::try_from(i).is_ok()  {
-                                return Some(Token::Const(Constant::Integer(i as i32)));
+                                return Some(Token::Const(Constant::Integer(i as i32, NumberFormat::Default)));
                             }
                             if i >= 0 {
                                 return Some(Token::Const(Constant::Unsigned(i as u64)));
@@ -946,7 +949,7 @@ impl Lexer {
                                 self.token_start..self.token_end,
                                 LexingErrorType::InvalidInteger(r.to_string(), self.text[self.token_start..self.token_end].iter().collect::<String>())
                             );
-                            return Some(Token::Const(Constant::Integer(-1)));
+                            return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
                         }
                     }
                 }

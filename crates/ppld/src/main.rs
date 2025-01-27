@@ -139,11 +139,11 @@ fn main() {
                         )
                         .unwrap();
                         println!();
-                        std::process::exit(1);
                     }
                     if !issues.is_empty() {
                         println!("{0} issues found during decompilation", issues.len());
                     }
+                    std::process::exit(0);
                 }
                 Err(err) => {
                     execute!(

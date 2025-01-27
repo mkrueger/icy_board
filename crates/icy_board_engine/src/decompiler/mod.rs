@@ -7,10 +7,10 @@ use reconstruct::strip_unused_labels;
 
 use crate::{
     ast::{
-        Ast, AstNode, BinOp, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression, FunctionCallExpression,
-        FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IndexerExpression,
-        LabelStatement, LetStatement, ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode,
-        ProcedureImplementation, Statement, UnaryExpression, UnaryOp, VariableDeclarationStatement, VariableSpecifier,
+        constant::NumberFormat, Ast, AstNode, BinOp, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression,
+        FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement,
+        IndexerExpression, LabelStatement, LetStatement, ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement,
+        ProcedureDeclarationAstNode, ProcedureImplementation, Statement, UnaryExpression, UnaryOp, VariableDeclarationStatement, VariableSpecifier,
     },
     executable::{
         DeserializationError, DeserializationErrorType, EntryType, Executable, OpCode, PPECommand, PPEExpr, PPEScript, PPEVisitor, StatementDefinition,
@@ -179,15 +179,6 @@ impl Decompiler {
                 " {} error(s) detected while decompiling",
                 self.script.bugged_offsets.len(),
             ))));
-
-            ast.nodes
-                .push(AstNode::TopLevelStatement(CommentAstNode::create_empty_statement(String::new())));
-            ast.nodes.push(AstNode::TopLevelStatement(CommentAstNode::create_empty_statement(
-                "Some PPEs got altered to avoid decompilation. PCBoard doesn't handle unary expressions correcty.".to_string(),
-            )));
-            ast.nodes.push(AstNode::TopLevelStatement(CommentAstNode::create_empty_statement(
-                "Search for 'PPLC bug' and look out for !!!<expr> or !<expr>*!<expr> cases.".to_string(),
-            )));
         }
 
         Ok(ast)
@@ -248,7 +239,7 @@ impl Decompiler {
                         VariableType::Boolean => Constant::Boolean(entry.value.as_bool()),
                         VariableType::Unsigned => Constant::Unsigned(entry.value.data.unsigned_value),
                         //VariableType::Integer |
-                        _ => Constant::Integer(entry.value.as_int()),
+                        _ => Constant::Integer(entry.value.as_int(), NumberFormat::Default),
                     };
                     ConstantExpression::create_empty_expression(constant)
                 } else {
@@ -297,10 +288,7 @@ impl Decompiler {
                         let expr = self.decompile_expression(e);
                         if let Some(args) = &f.args {
                             if let Some(arg) = args.get(i) {
-                                if arg.arg_type == VariableType::Boolean {
-                                    return Statement::try_boolean_conversion(&expr);
-                                }
-                                return arg.flags.convert_expr(expr);
+                                return convert_argument(expr, arg);
                             }
                         }
                         expr
@@ -340,10 +328,7 @@ impl Decompiler {
                         let expr = self.decompile_expression(e);
                         if let Some(args) = &p.args {
                             if let Some(arg) = args.get(i) {
-                                if arg.arg_type == VariableType::Boolean {
-                                    return Statement::try_boolean_conversion(&expr);
-                                }
-                                return arg.flags.convert_expr(expr);
+                                return convert_argument(expr, arg);
                             }
                         }
                         expr
@@ -496,6 +481,20 @@ impl Decompiler {
             parameters
         }
     }
+}
+
+fn convert_argument(expr: Expression, arg: &crate::executable::ArgumentDefinition) -> Expression {
+    if arg.arg_type == VariableType::Boolean {
+        return Statement::try_boolean_conversion(&expr);
+    }
+    if arg.number_format == NumberFormat::Hex {
+        if let Expression::Const(c) = &expr {
+            if let Constant::Integer(i, _) = c.get_constant_value() {
+                return ConstantExpression::create_empty_expression(Constant::Integer(*i, NumberFormat::ColorCode));
+            }
+        }
+    }
+    arg.flags.convert_expr(expr)
 }
 
 fn add_parens_if_required(op: BinOp, expr: Expression) -> Expression {

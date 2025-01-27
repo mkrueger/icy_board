@@ -720,7 +720,7 @@ impl<'a> VirtualMachine<'a> {
             if (flags & 0x1) == 0x0 {
                 let entry = self.variable_table.get_var_entry(id);
                 let mut val = vtype.create_empty_value();
-                val.generic_data = entry.header.create_generic_data();
+                val.generic_data = entry.header.create_generic_data().unwrap_or(GenericVariableData::None);
                 self.variable_table.set_value(id, val);
             }
         }

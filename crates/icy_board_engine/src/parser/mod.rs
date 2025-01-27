@@ -563,7 +563,7 @@ impl<'a> Parser<'a> {
         if is_lpar || matches!(self.get_cur_token(), Some(Token::LBracket)) {
             leftpar_token = Some(self.save_spanned_token());
             self.next_token();
-            let Some(Token::Const(Constant::Integer(_))) = self.get_cur_token() else {
+            let Some(Token::Const(Constant::Integer(_, _))) = self.get_cur_token() else {
                 self.report_error(self.lex.span(), ParserErrorType::NumberExpected(self.save_token()));
                 return None;
             };
@@ -572,7 +572,7 @@ impl<'a> Parser<'a> {
 
             while let Some(Token::Comma) = &self.get_cur_token() {
                 self.next_token();
-                let Some(Token::Const(Constant::Integer(_))) = self.get_cur_token() else {
+                let Some(Token::Const(Constant::Integer(_, _))) = self.get_cur_token() else {
                     self.report_error(self.lex.span(), ParserErrorType::NumberExpected(self.save_token()));
 
                     return None;

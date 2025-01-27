@@ -2,10 +2,10 @@ use std::path::PathBuf;
 
 use crate::{
     ast::{
-        BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, Constant, ConstantExpression, ContinueStatement, ElseBlock, ElseIfBlock, ForStatement,
-        GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement, LoopStatement, ParensExpression,
-        PredefinedCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, UnaryExpression, UnaryOp, VariableDeclarationStatement,
-        VariableSpecifier, WhileDoStatement, WhileStatement,
+        constant::NumberFormat, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, Constant, ConstantExpression, ContinueStatement, ElseBlock,
+        ElseIfBlock, ForStatement, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement,
+        LoopStatement, ParensExpression, PredefinedCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, UnaryExpression, UnaryOp,
+        VariableDeclarationStatement, VariableSpecifier, WhileDoStatement, WhileStatement,
     },
     executable::{OpCode, VariableType, LAST_PPLC},
 };
@@ -411,15 +411,24 @@ ENDSELECT",
             vec![
                 CaseBlock::empty(
                     vec![CaseSpecifier::Expression(Box::new(ConstantExpression::create_empty_expression(
-                        Constant::Integer(1),
+                        Constant::Integer(1, NumberFormat::Default),
                     )))],
                     vec![BreakStatement::create_empty_statement()],
                 ),
                 CaseBlock::empty(
                     vec![
-                        CaseSpecifier::Expression(Box::new(ConstantExpression::create_empty_expression(Constant::Integer(1)))),
-                        CaseSpecifier::Expression(Box::new(ConstantExpression::create_empty_expression(Constant::Integer(2)))),
-                        CaseSpecifier::Expression(Box::new(ConstantExpression::create_empty_expression(Constant::Integer(3)))),
+                        CaseSpecifier::Expression(Box::new(ConstantExpression::create_empty_expression(Constant::Integer(
+                            1,
+                            NumberFormat::Default,
+                        )))),
+                        CaseSpecifier::Expression(Box::new(ConstantExpression::create_empty_expression(Constant::Integer(
+                            2,
+                            NumberFormat::Default,
+                        )))),
+                        CaseSpecifier::Expression(Box::new(ConstantExpression::create_empty_expression(Constant::Integer(
+                            3,
+                            NumberFormat::Default,
+                        )))),
                     ],
                     vec![BreakStatement::create_empty_statement()],
                 ),
@@ -444,9 +453,18 @@ ENDSELECT",
             vec![
                 CaseBlock::empty(
                     vec![
-                        CaseSpecifier::Expression(Box::new(ConstantExpression::create_empty_expression(Constant::Integer(1)))),
-                        CaseSpecifier::Expression(Box::new(ConstantExpression::create_empty_expression(Constant::Integer(2)))),
-                        CaseSpecifier::Expression(Box::new(ConstantExpression::create_empty_expression(Constant::Integer(3)))),
+                        CaseSpecifier::Expression(Box::new(ConstantExpression::create_empty_expression(Constant::Integer(
+                            1,
+                            NumberFormat::Default,
+                        )))),
+                        CaseSpecifier::Expression(Box::new(ConstantExpression::create_empty_expression(Constant::Integer(
+                            2,
+                            NumberFormat::Default,
+                        )))),
+                        CaseSpecifier::Expression(Box::new(ConstantExpression::create_empty_expression(Constant::Integer(
+                            3,
+                            NumberFormat::Default,
+                        )))),
                     ],
                     vec![BreakStatement::create_empty_statement()],
                 ),
@@ -470,8 +488,8 @@ ENDSELECT",
             IdentifierExpression::create_empty_expression(unicase::Ascii::new("A".to_string())),
             vec![CaseBlock::empty(
                 vec![CaseSpecifier::FromTo(
-                    Box::new(ConstantExpression::create_empty_expression(Constant::Integer(1))),
-                    Box::new(ConstantExpression::create_empty_expression(Constant::Integer(3))),
+                    Box::new(ConstantExpression::create_empty_expression(Constant::Integer(1, NumberFormat::Default))),
+                    Box::new(ConstantExpression::create_empty_expression(Constant::Integer(3, NumberFormat::Default))),
                 )],
                 vec![BreakStatement::create_empty_statement()],
             )],
@@ -523,7 +541,7 @@ fn test_predefined_call() {
         &PredefinedCallStatement::create_empty_statement(
             OpCode::PRINTLN.get_definition(),
             vec![ParensExpression::create_empty_expression(ConstantExpression::create_empty_expression(
-                Constant::Integer(1),
+                Constant::Integer(1, NumberFormat::Default),
             ))],
         ),
     );
@@ -536,8 +554,8 @@ fn test_for_statement() {
 NEXT",
         &ForStatement::create_empty_statement(
             unicase::Ascii::new("I".to_string()),
-            ConstantExpression::create_empty_expression(Constant::Integer(0)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(0, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
             None,
             vec![],
         ),
@@ -548,8 +566,8 @@ NEXT",
 NEXT I",
         &ForStatement::create_empty_statement(
             unicase::Ascii::new("I".to_string()),
-            ConstantExpression::create_empty_expression(Constant::Integer(0)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(0, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
             None,
             vec![],
         ),
@@ -563,8 +581,8 @@ fn test_for_statement_alt_next() {
 ENDFOR",
         &ForStatement::create_empty_statement(
             unicase::Ascii::new("I".to_string()),
-            ConstantExpression::create_empty_expression(Constant::Integer(0)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(0, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
             None,
             vec![],
         ),
@@ -575,8 +593,8 @@ ENDFOR",
 END FOR",
         &ForStatement::create_empty_statement(
             unicase::Ascii::new("I".to_string()),
-            ConstantExpression::create_empty_expression(Constant::Integer(0)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(0, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
             None,
             vec![],
         ),
@@ -590,9 +608,12 @@ fn test_for_step_statement() {
 NEXT",
         &ForStatement::create_empty_statement(
             unicase::Ascii::new("I".to_string()),
-            ConstantExpression::create_empty_expression(Constant::Integer(0)),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
-            Some(Box::new(ConstantExpression::create_empty_expression(Constant::Integer(3)))),
+            ConstantExpression::create_empty_expression(Constant::Integer(0, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
+            Some(Box::new(ConstantExpression::create_empty_expression(Constant::Integer(
+                3,
+                NumberFormat::Default,
+            )))),
             vec![],
         ),
     );
@@ -602,11 +623,11 @@ NEXT",
 NEXT I",
         &ForStatement::create_empty_statement(
             unicase::Ascii::new("I".to_string()),
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
-            ConstantExpression::create_empty_expression(Constant::Integer(0)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
+            ConstantExpression::create_empty_expression(Constant::Integer(0, NumberFormat::Default)),
             Some(Box::new(UnaryExpression::create_empty_expression(
                 UnaryOp::Minus,
-                ConstantExpression::create_empty_expression(Constant::Integer(4)),
+                ConstantExpression::create_empty_expression(Constant::Integer(4, NumberFormat::Default)),
             ))),
             vec![],
         ),
@@ -626,7 +647,7 @@ fn check_let_statement() {
             unicase::Ascii::new("A".to_string()),
             Token::Eq,
             vec![],
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
 
@@ -636,11 +657,11 @@ fn check_let_statement() {
             unicase::Ascii::new("A".to_string()),
             Token::Eq,
             vec![
-                ConstantExpression::create_empty_expression(Constant::Integer(1)),
-                ConstantExpression::create_empty_expression(Constant::Integer(2)),
-                ConstantExpression::create_empty_expression(Constant::Integer(3)),
+                ConstantExpression::create_empty_expression(Constant::Integer(1, NumberFormat::Default)),
+                ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+                ConstantExpression::create_empty_expression(Constant::Integer(3, NumberFormat::Default)),
             ],
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
 
@@ -650,11 +671,11 @@ fn check_let_statement() {
             unicase::Ascii::new("A".to_string()),
             Token::Eq,
             vec![
-                ConstantExpression::create_empty_expression(Constant::Integer(1)),
-                ConstantExpression::create_empty_expression(Constant::Integer(2)),
-                ConstantExpression::create_empty_expression(Constant::Integer(3)),
+                ConstantExpression::create_empty_expression(Constant::Integer(1, NumberFormat::Default)),
+                ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+                ConstantExpression::create_empty_expression(Constant::Integer(3, NumberFormat::Default)),
             ],
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
 }
@@ -667,7 +688,7 @@ fn check_let_without_let_statement() {
             unicase::Ascii::new("A".to_string()),
             Token::Eq,
             vec![],
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
 
@@ -677,11 +698,11 @@ fn check_let_without_let_statement() {
             unicase::Ascii::new("A".to_string()),
             Token::Eq,
             vec![
-                ConstantExpression::create_empty_expression(Constant::Integer(1)),
-                ConstantExpression::create_empty_expression(Constant::Integer(2)),
-                ConstantExpression::create_empty_expression(Constant::Integer(3)),
+                ConstantExpression::create_empty_expression(Constant::Integer(1, NumberFormat::Default)),
+                ConstantExpression::create_empty_expression(Constant::Integer(2, NumberFormat::Default)),
+                ConstantExpression::create_empty_expression(Constant::Integer(3, NumberFormat::Default)),
             ],
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
 }
@@ -920,7 +941,7 @@ fn test_variable_declaration_initalizer() {
                 Vec::new(),
                 None,
                 None,
-                Some(ConstantExpression::create_empty_expression(Constant::Integer(42))),
+                Some(ConstantExpression::create_empty_expression(Constant::Integer(42, NumberFormat::Default))),
             )],
         ),
     );
@@ -934,7 +955,7 @@ fn check_assign_variants() {
             unicase::Ascii::new("A".to_string()),
             Token::AddAssign,
             vec![],
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
 
@@ -944,7 +965,7 @@ fn check_assign_variants() {
             unicase::Ascii::new("A".to_string()),
             Token::DivAssign,
             vec![],
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
 
@@ -954,7 +975,7 @@ fn check_assign_variants() {
             unicase::Ascii::new("A".to_string()),
             Token::AndAssign,
             vec![],
-            ConstantExpression::create_empty_expression(Constant::Integer(5)),
+            ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default)),
         ),
     );
 }

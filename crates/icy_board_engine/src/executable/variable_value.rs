@@ -272,39 +272,45 @@ pub enum GenericVariableData {
 }
 unsafe impl Send for GenericVariableData {}
 unsafe impl Sync for GenericVariableData {}
-const MAX_ARRAY_SIZE: usize = 10_000_000_000;
+const MAX_ARRAY_SIZE: usize = 100_000_000;
 
 impl GenericVariableData {
-    pub(crate) fn create_array(base_value: VariableValue, dim: u8, vector_size: usize, matrix_size: usize, cube_size: usize) -> GenericVariableData {
+    pub(crate) fn create_array(base_value: VariableValue, dim: u8, vector_size: usize, matrix_size: usize, cube_size: usize) -> Option<GenericVariableData> {
         match dim {
             1 => {
                 if vector_size > MAX_ARRAY_SIZE {
-                    panic!("Creating a large array of size: {} elements - probably file is corrupt.", vector_size,);
+                    log::error!("Creating a large array of size: {} elements - probably file is corrupt.", vector_size,);
+                    return None;
                 }
-                GenericVariableData::Dim1(vec![base_value; vector_size + 1])
+                return Some(GenericVariableData::Dim1(vec![base_value; vector_size + 1]))
             }
             2 => {
                 if vector_size * matrix_size > MAX_ARRAY_SIZE {
-                    panic!(
+                    log::error!(
                         "Creating a large array of size: {}x{}={} elements - probably file is corrupt.",
                         vector_size,
                         matrix_size,
                         vector_size * matrix_size
                     );
+                    return None;
                 }
-                GenericVariableData::Dim2(vec![vec![base_value; matrix_size + 1]; vector_size + 1])
+                println!("generate array !!!");
+
+                return Some(GenericVariableData::Dim2(vec![vec![base_value; matrix_size + 1]; vector_size + 1]));
             }
             3 => {
                 if vector_size * matrix_size * cube_size > MAX_ARRAY_SIZE {
-                    panic!(
+                    log::error!(
                         "Creating a large array of size: {}x{}x{}={} elements - probably file is corrupt.",
                         vector_size,
                         matrix_size,
                         cube_size,
                         vector_size * matrix_size * cube_size
                     );
+                    return None;
                 }
-                GenericVariableData::Dim3(vec![vec![vec![base_value; cube_size + 1]; matrix_size + 1]; vector_size + 1])
+                println!("generate array !!!");
+                return Some(GenericVariableData::Dim3(vec![vec![vec![base_value; cube_size + 1]; matrix_size + 1]; vector_size + 1]));
             }
             _ => panic!("Invalid dimension: {dim}"),
         }
@@ -1457,7 +1463,7 @@ impl VariableValue {
     }
 
     pub fn redim(&mut self, dim: u8, vs: usize, ms: usize, cs: usize) {
-        self.generic_data = GenericVariableData::create_array(self.vtype.create_empty_value(), dim, vs, ms, cs);
+        self.generic_data = GenericVariableData::create_array(self.vtype.create_empty_value(), dim, vs, ms, cs).unwrap_or(GenericVariableData::None);
     }
 
     pub fn set_array_value(&mut self, dim1: usize, dim2: usize, dim3: usize, val: VariableValue) -> Res<()> {

@@ -1,4 +1,4 @@
-use std::{fmt, io::stdout};
+use std::{fmt::{self, Display}, io::stdout};
 
 use codepages::tables::{CP437_TO_UNICODE, UNICODE_TO_CP437};
 use crossterm::{
@@ -22,6 +22,16 @@ pub struct VarHeader {
     pub cube_size: usize,
     pub variable_type: VariableType,
     pub flags: u8,
+}
+
+impl Display for VarHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.dim > 0 {
+            write!(f, "[id:{}, variable_type:{}, flags:{}, dim:{}[{},{},{})]", self.id, self.variable_type, self.flags, self.dim, self.vector_size, self.matrix_size, self.cube_size)
+        } else {
+            write!(f, "[id:{}, variable_type:{}, flags:{}]", self.id, self.variable_type, self.flags)
+        }
+    }
 }
 
 impl VarHeader {
@@ -75,9 +85,9 @@ impl VarHeader {
     /// # Panics
     ///
     /// Panics if .
-    pub fn create_generic_data(&self) -> GenericVariableData {
+    pub fn create_generic_data(&self) -> Option<GenericVariableData> {
         match self.dim {
-            0 => GenericVariableData::None,
+            0 => Some(GenericVariableData::None),
             1..=3 => GenericVariableData::create_array(
                 self.variable_type.create_empty_value(),
                 self.dim,
@@ -328,18 +338,18 @@ impl VariableTable {
             return Ok((i, VariableTable { version, entries: result }));
         }
         let mut var_count = max_var as i32 - 1;
-
         while var_count >= 0 {
             decrypt_chunks(&mut (buf[i..(i + 11)]), version, false);
             let cur_block = &buf[i..(i + 11)];
+            i += 11;
             let header = VarHeader::from_bytes(cur_block)?;
+
             if header.id > max_var {
-                log::warn!("Variable count exceeds maximum: {} ({})", var_count, max_var);
+                log::warn!("Variable count exceeds maximum: {} ({})", header.id, max_var);
             }
             if header.id != var_count as usize + 1 {
                 log::warn!("Variable id mismatch: {} != {}", header.id, var_count as usize + 1);
             }
-            i += 11;
 
             let variable;
             let entry_type;
@@ -355,11 +365,11 @@ impl VariableTable {
                         for c in &buf[i..(i + string_length - 1)] {
                             str.push(CP437_TO_UNICODE[*c as usize]);
                         }
-                        GenericVariableData::String(str)
+                        Some(GenericVariableData::String(str))
                     };
                     variable = VariableValue {
                         vtype: VariableType::String,
-                        generic_data,
+                        generic_data: generic_data.unwrap_or(GenericVariableData::None),
                         ..Default::default()
                     };
                     i += string_length;
@@ -429,7 +439,7 @@ impl VariableTable {
                         variable = VariableValue {
                             vtype,
                             data,
-                            generic_data: header.create_generic_data(),
+                            generic_data: header.create_generic_data().unwrap_or(GenericVariableData::None),
                             ..Default::default()
                         };
                         i += 4;
@@ -459,7 +469,7 @@ impl VariableTable {
                         variable = VariableValue {
                             vtype,
                             data,
-                            generic_data: header.create_generic_data(),
+                            generic_data: header.create_generic_data().unwrap_or(GenericVariableData::None),
                         };
                         i += 8;
                     }
@@ -524,7 +534,7 @@ impl VariableTable {
 
             res.set_name(name);
         }
-        let mut par = 1;
+        let mut par = 1; 
         let mut vars = 1;
         let mut loc = 1;
 
@@ -533,7 +543,9 @@ impl VariableTable {
             if var_type == VariableType::Function {
                 let id = unsafe { self.entries[i].value.data.function_value.return_var as usize };
                 let name = self.entries[i].get_name().clone();
-                self.get_var_entry_mut(id).set_name(name);
+                if let Some(entry) = self.try_get_entry_mut(id) {
+                    entry.set_name(name);
+                }
             }
             if var_type == VariableType::Function || var_type == VariableType::Procedure {
                 let first_var = unsafe { self.entries[i].value.data.procedure_value.first_var_id as usize };
@@ -655,11 +667,19 @@ impl VariableTable {
         );
         &mut self.entries[id - 1]
     }
+
     pub fn try_get_entry(&self, id: usize) -> Option<&TableEntry> {
         if id == 0 || id > self.entries.len() {
             return None;
         }
         Some(self.get_var_entry(id))
+    }
+
+    pub fn try_get_entry_mut(&mut self, id: usize) -> Option<&mut TableEntry> {
+        if id == 0 || id > self.entries.len() {
+            return None;
+        }
+        Some(self.get_var_entry_mut(id))
     }
 
     pub fn scan_user_variables_version(&self) -> u16 {

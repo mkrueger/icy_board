@@ -2,11 +2,22 @@ use std::fmt;
 
 use crate::executable::{Signature, VariableData, VariableType, VariableValue};
 
+#[derive(Default, Debug, PartialEq, Clone)]
+pub enum NumberFormat {
+    #[default]
+    Default,
+    Dec,
+    Hex,
+    ColorCode,
+    Octal,
+    Binary,
+}
+
 #[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum Constant {
     Money(i32),
-    Integer(i32),
+    Integer(i32, NumberFormat),
     Unsigned(u64),
     String(String),
     Double(f64),
@@ -309,7 +320,7 @@ impl Constant {
             Constant::String(_) => VariableType::String,
             Constant::Double(_) => VariableType::Float,
             Constant::Boolean(_) => VariableType::Boolean,
-            Constant::Integer(_) | Constant::Builtin(_) => VariableType::Integer,
+            Constant::Integer(_, _) | Constant::Builtin(_) => VariableType::Integer,
         }
     }
 
@@ -320,7 +331,7 @@ impl Constant {
                 data.money_value = *i;
                 VariableValue::new(VariableType::Money, data)
             }
-            Constant::Integer(i) => {
+            Constant::Integer(i, _) => {
                 data.int_value = *i;
                 VariableValue::new(VariableType::Integer, data)
             }
@@ -345,7 +356,15 @@ impl Constant {
 impl fmt::Display for Constant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Constant::Money(i) | Constant::Integer(i) => write!(f, "{i}"),
+            Constant::Money(i) => write!(f, "{i}"),
+            Constant::Integer(i, fmt) => match fmt {
+                NumberFormat::Dec => write!(f, "{i}D"),
+                NumberFormat::Hex => write!(f, "{i:X}h"),
+                NumberFormat::ColorCode => write!(f, "@X{i:02X}"),
+                NumberFormat::Octal => write!(f, "{i:o}o"),
+                NumberFormat::Binary => write!(f, "{i:b}b"),
+                _ => write!(f, "{i}"),
+            },
             Constant::Unsigned(i) => write!(f, "{i}"),
             Constant::String(str) => write!(f, "\"{str}\""),
             Constant::Double(i) => write!(f, "{i}"),

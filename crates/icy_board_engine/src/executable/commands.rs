@@ -56,7 +56,7 @@ impl PPEScript {
     ///
     /// This function will return an error if .
     pub fn from_ppe_file(exe: &Executable) -> Result<Self, DeserializationError> {
-        let mut deserializer = super::PPEDeserializer::default();
+        let mut deserializer: super::PPEDeserializer = super::PPEDeserializer::default();
         let mut result = PPEScript::default();
         loop {
             match deserializer.deserialize_statement(exe) {

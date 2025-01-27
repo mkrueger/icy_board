@@ -91,8 +91,8 @@ impl AstVisitor<()> for OutputVisitor {
                     self.output_keyword("False");
                 }
             }
-            _ => {
-                self.output.push_str(&format!("{}", constant.get_constant_value().get_value()));
+            val => {
+                self.output.push_str(&format!("{}", val));
             }
         }
     }

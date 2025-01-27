@@ -5,7 +5,7 @@ use crate::{
     parser::lexer::{Spanned, Token},
 };
 
-use super::{AstVisitorMut, Constant, Expression, Statement};
+use super::{constant::NumberFormat, AstVisitorMut, Constant, Expression, Statement};
 #[derive(Debug, PartialEq, Clone)]
 pub struct DimensionSpecifier {
     dimension_token: Spanned<Token>,
@@ -19,7 +19,7 @@ impl DimensionSpecifier {
     /// Panics if .
     pub fn new(dimension_token: Spanned<Token>) -> Self {
         #[allow(clippy::manual_assert)]
-        if !matches!(dimension_token.token, Token::Const(Constant::Integer(_))) {
+        if !matches!(dimension_token.token, Token::Const(Constant::Integer(_, _))) {
             panic!("DimensionSpecifier::new: invalid token {dimension_token:?}");
         }
         Self { dimension_token }
@@ -27,7 +27,7 @@ impl DimensionSpecifier {
 
     pub fn empty(dimension: usize) -> Self {
         Self {
-            dimension_token: Spanned::create_empty(Token::Const(Constant::Integer(dimension as i32))),
+            dimension_token: Spanned::create_empty(Token::Const(Constant::Integer(dimension as i32, NumberFormat::Default))),
         }
     }
 
@@ -41,7 +41,7 @@ impl DimensionSpecifier {
     ///
     /// Panics if .
     pub fn get_dimension(&self) -> usize {
-        if let Token::Const(Constant::Integer(i)) = self.dimension_token.token {
+        if let Token::Const(Constant::Integer(i, _)) = self.dimension_token.token {
             i as usize
         } else {
             panic!("DimensionSpecifier::new: invalid token")

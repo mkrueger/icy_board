@@ -25,14 +25,6 @@ struct Cli {
     #[argh(switch, short = 'd')]
     disassemble: bool,
 
-    /// force no user variables
-    #[argh(switch)]
-    nouvar: bool,
-
-    /// force user variables
-    #[argh(switch)]
-    forceuvar: bool,
-
     /// don't report any warnings
     #[argh(switch)]
     nowarnings: bool,
@@ -64,10 +56,6 @@ fn main() {
         return;
     }
 
-    if arguments.nouvar && arguments.forceuvar {
-        println!("--nouvar can't be used in conjunction with --forceuvar");
-        return;
-    }
     let file_name = if arguments.file.extension().is_none() {
         arguments.file.with_extension("pps")
     } else {
@@ -89,13 +77,7 @@ fn main() {
             println!();
             println!("Parsing...");
             let reg = UserTypeRegistry::icy_board_registry();
-            let (mut ast, errors) = parse_ast(PathBuf::from(&file_name), &src, &reg, encoding, version);
-            if arguments.nouvar {
-                ast.require_user_variables = false;
-            }
-            if arguments.forceuvar {
-                ast.require_user_variables = true;
-            }
+            let (ast, errors) = parse_ast(PathBuf::from(&file_name), &src, &reg, encoding, version);
             println!("Compiling...");
 
             if check_errors(errors.clone(), &arguments, &file_name, &src) {

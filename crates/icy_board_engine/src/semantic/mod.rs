@@ -886,7 +886,7 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
     fn visit_constant_expression(&mut self, constant: &ConstantExpression) -> VariableType {
         self.add_constant(constant.get_constant_value());
         match constant.get_constant_value() {
-            Constant::Integer(_) => VariableType::Integer,
+            Constant::Integer(_, _) => VariableType::Integer,
             Constant::String(_) => VariableType::String,
             Constant::Boolean(_) => VariableType::Boolean,
             Constant::Money(_) => VariableType::Money,
@@ -903,15 +903,6 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
 
     fn visit_predefined_call_statement(&mut self, call_stmt: &PredefinedCallStatement) -> VariableType {
         let def = call_stmt.get_func();
-        if def.opcode == OpCode::GETUSER
-            || def.opcode == OpCode::PUTUSER
-            || def.opcode == OpCode::GETALTUSER
-            || def.opcode == OpCode::FREALTUSER
-            || def.opcode == OpCode::DELUSER
-            || def.opcode == OpCode::ADDUSER
-        {
-            self.require_user_variables = true;
-        }
         walk_predefined_call_statement(self, call_stmt);
 
         match def.sig {

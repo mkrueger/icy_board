@@ -1,2 +1,2 @@
 STRING STR001
-INPUTSTR "Run program now", STR001, 123, 1, "YyNn", DEFS
+INPUTSTR "Run program now", STR001, @X7B, 1, "YyNn", DEFS
