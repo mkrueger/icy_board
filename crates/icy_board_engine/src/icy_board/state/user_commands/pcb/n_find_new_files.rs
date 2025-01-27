@@ -3,7 +3,6 @@ use crate::{
     Res,
 };
 use chrono::{DateTime, Local};
-use dizbase::file_base::FileBase;
 
 impl IcyBoardState {
     pub async fn find_new_files(&mut self, time_stamp: DateTime<Local>) -> Res<()> {
@@ -21,12 +20,12 @@ impl IcyBoardState {
 
     async fn find_newer_files(&mut self, area: usize, time_stamp: DateTime<Local>) -> Res<()> {
         let file_base_path = self.resolve_path(&self.session.current_conference.directories[area].path);
-        let Ok(mut base) = FileBase::open(&file_base_path) else {
-            log::error!("Could not open file base: {}", file_base_path.display());
+        let Ok(base) = self.get_filebase(&file_base_path).await else {
             return Ok(());
         };
 
-        let files = base.find_newer_files(time_stamp)?;
+        let mut b = base.lock().await;
+        let files = b.find_newer_files(time_stamp)?;
 
         let mut list = FileList::new(file_base_path, files);
         list.display_file_list(self).await

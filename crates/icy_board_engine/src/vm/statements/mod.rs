@@ -219,7 +219,7 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::DGET => predefined_procedures::dget(arg, arguments).await,
         OpCode::DPUT => predefined_procedures::dput(arg, arguments).await,
         OpCode::DFCOPY => predefined_procedures::dfcopy(arg, arguments).await,
-        OpCode::EVAL => { predefined_procedures::eval(arg, arguments).await },
+        OpCode::EVAL => predefined_procedures::eval(arg, arguments).await,
         OpCode::ACCOUNT => predefined_procedures::account(arg, arguments).await,
         OpCode::RECORDUSAGE => predefined_procedures::recordusage(arg, arguments).await,
         OpCode::MSGTOFILE => predefined_procedures::msgtofile(arg, arguments).await,

@@ -1,5 +1,4 @@
 use dizbase::file_base::pattern::{MatchOptions, Pattern};
-use dizbase::file_base::FileBase;
 use humanize_bytes::humanize_bytes_decimal;
 
 use crate::icy_board::icb_config::IcbColor;
@@ -26,19 +25,18 @@ impl IcyBoardState {
             )
             .await?
         };
-        log::info!("flag {input}");
 
         if !input.is_empty() {
             let saved_list = self.session.disp_options.in_file_list.take();
             let mut flagged = Vec::new();
             self.display_text(IceText::CheckingFileTransfer, display_flags::NEWLINE).await?;
 
-            for dir in self.session.current_conference.directories.iter() {
-                let mut files = FileBase::open(&dir.path)?;
+            for dir in self.session.current_conference.directories.clone().iter() {
+                let files = self.get_filebase(&dir.path).await?;
                 let mut options = MatchOptions::new();
                 options.case_sensitive = false;
                 if let Ok(pattern) = Pattern::new(&input) {
-                    for f in &mut files.file_headers {
+                    for f in &mut files.lock().await.file_headers {
                         if pattern.matches_with(&f.name(), &options) {
                             let size = f.size();
                             flagged.push((f.full_path.clone(), size));
@@ -56,10 +54,33 @@ impl IcyBoardState {
             }
 
             for (file, size) in flagged {
+                if self.session.disp_options.abort_printout {
+                    break;
+                }
+                if !file.exists() {
+                    self.session.op_text = file.file_name().unwrap().to_string_lossy().to_string();
+                    self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
+                        .await?;
+                    continue;
+                }
+
                 let name = file.file_name().unwrap().to_string_lossy().to_string();
-                let count = self.session.flag_for_download(file);
+
+                if self.session.flagged_files.len() >= self.session.batch_limit {
+                    self.session.op_text = name;
+                    self.display_text(IceText::BatchLimitReached, display_flags::NEWLINE).await?;
+                    continue;
+                }
+
+                if !self.session.flagged_files.insert(file) {
+                    self.session.op_text = name;
+                    self.display_text(IceText::DuplicateBatchFile, display_flags::NEWLINE).await?;
+                    continue;
+                }
+
+                let count = self.session.flagged_files.len();
                 self.set_color(TerminalTarget::Both, IcbColor::Dos(10)).await?;
-                let nr = format!("({})", count);
+                let nr: String = format!("({})", count);
                 self.println(
                     TerminalTarget::Both,
                     &format!("{:<6}{:<12} {}", nr, name, humanize_bytes_decimal!(size).to_string()),

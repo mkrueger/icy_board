@@ -12,6 +12,7 @@ use crate::{executable::Executable, Res};
 use async_recursion::async_recursion;
 use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use codepages::tables::UNICODE_TO_CP437;
+use dizbase::file_base::FileBase;
 use icy_engine::{ansi, OutputFormat, SaveOptions, ScreenPreperation};
 use icy_engine::{ansi::constants::COLOR_OFFSETS, Position};
 use icy_engine::{TextAttribute, TextPane};
@@ -196,14 +197,16 @@ pub struct Session {
 
     pub fse_mode: FSEMode,
 
-    pub flagged_files: HashSet<PathBuf>,
-
     // Used in @X00 macros to save color, to restore it with @XFF
     pub saved_color: IcbColor,
 
     pub emsi: Option<EmsiICI>,
 
     pub bytes_remaining: i64,
+
+    // The maximum number of files in flagged_files
+    pub batch_limit: usize,
+    pub flagged_files: HashSet<PathBuf>,
 }
 
 impl Session {
@@ -252,6 +255,9 @@ impl Session {
             emsi: None,
             paged_sysop: false,
             bytes_remaining: 0,
+
+            // Seems to be hardcoded in PCBoard
+            batch_limit: 30,
         }
     }
 
@@ -295,11 +301,6 @@ impl Session {
         } else {
             String::new()
         }
-    }
-
-    pub fn flag_for_download(&mut self, file: PathBuf) -> usize {
-        self.flagged_files.insert(file);
-        self.flagged_files.len()
     }
 
     pub fn minutes_left(&self) -> i32 {
@@ -471,6 +472,7 @@ pub struct IcyBoardState {
     pub display_current_menu: bool,
     pub autorun_times: HashMap<usize, u64>,
     pub saved_cmd: String,
+    pub file_bases: HashMap<PathBuf, Arc<Mutex<FileBase>>>,
 }
 
 impl IcyBoardState {
@@ -494,7 +496,7 @@ impl IcyBoardState {
         let mut session = Session::new();
         session.caller_number = board.lock().await.statistics.cur_caller_number() as usize;
         session.date_format = board.lock().await.config.board.date_format.clone();
-        let display_text = board.lock().await.default_display_text.clone();
+        let display_text: IcbTextFile = board.lock().await.default_display_text.clone();
         let root_path = board.lock().await.root_path.clone();
         let mut p1 = ansi::Parser::default();
         p1.bs_is_ctrl_char = true;
@@ -520,6 +522,7 @@ impl IcyBoardState {
             display_current_menu: true,
             saved_cmd: String::new(),
             autorun_times: HashMap::new(),
+            file_bases: HashMap::new(),
         }
     }
     async fn update_language(&mut self) {
@@ -1998,6 +2001,26 @@ impl IcyBoardState {
             return Ok(true);
         }
         Ok(false)
+    }
+
+    pub async fn get_filebase(&mut self, file_base_path: &PathBuf) -> Res<Arc<Mutex<FileBase>>> {
+        if let Some(some) = self.file_bases.get(file_base_path) {
+            return Ok(some.clone());
+        }
+        match FileBase::open(file_base_path) {
+            Ok(new_base) => {
+                let arc = Arc::new(Mutex::new(new_base));
+                self.file_bases.insert(file_base_path.clone(), arc.clone());
+                return Ok(arc);
+            }
+            Err(err) => {
+                log::error!("Could not open file base ({}) : {} ", file_base_path.display(), err);
+                self.session.op_text = file_base_path.display().to_string();
+                self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
+                Err(err)
+            }
+        }
     }
 }
 

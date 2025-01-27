@@ -32,14 +32,16 @@ impl<'a> FileList<'a> {
             if name.len() > 12 {
                 cmd.new_line().await?;
             }
-            cmd.set_color(TerminalTarget::Both, colors.file_size.clone()).await?;
-            cmd.print(TerminalTarget::Both, &format!("{:>8}  ", humanize_bytes_decimal!(size).to_string()))
-                .await?;
 
-            /* Filebase no longer supports offline files
+            if entry.full_path.exists() {
+                cmd.set_color(TerminalTarget::Both, colors.file_size.clone()).await?;
+                cmd.print(TerminalTarget::Both, &format!("{:>8}  ", humanize_bytes_decimal!(size).to_string()))
+                    .await?;
+            } else {
                 cmd.set_color(TerminalTarget::Both, colors.file_offline.clone()).await?;
                 cmd.print(TerminalTarget::Both, &format!("{:>8}  ", "Offline".to_string())).await?;
-            */
+            }
+
             cmd.set_color(TerminalTarget::Both, colors.file_date.clone()).await?;
             cmd.print(TerminalTarget::Both, &format!("{}", date.format("%m/%d/%y"))).await?;
             if false {

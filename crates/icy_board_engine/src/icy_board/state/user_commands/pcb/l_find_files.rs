@@ -13,7 +13,6 @@ use crate::{
     },
     vm::TerminalTarget,
 };
-use dizbase::file_base::FileBase;
 
 impl IcyBoardState {
     pub async fn find_files_cmd(&mut self, help: &str) -> Res<()> {
@@ -104,11 +103,7 @@ impl IcyBoardState {
 
     async fn search_file_area(&mut self, area: usize, search_pattern: String) -> Res<()> {
         let file_base_path = self.resolve_path(&self.session.current_conference.directories[area].path);
-        let Ok(mut base) = FileBase::open(&file_base_path) else {
-            log::error!("Could not open file base: {}", file_base_path.display());
-            self.session.op_text = file_base_path.display().to_string();
-            self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
-                .await?;
+        let Ok(base) = self.get_filebase(&file_base_path).await else {
             return Ok(());
         };
 
@@ -118,7 +113,8 @@ impl IcyBoardState {
         self.print(TerminalTarget::Both, &format!("({})", self.session.current_conference.directories[area].name))
             .await?;
         self.new_line().await?;
-        let files = base.find_files(search_pattern.as_str())?;
+        let mut b = base.lock().await;
+        let files = b.find_files(search_pattern.as_str())?;
 
         let mut list = FileList::new(file_base_path.clone(), files);
         list.display_file_list(self).await

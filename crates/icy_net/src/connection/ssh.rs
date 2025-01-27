@@ -10,7 +10,6 @@ use tokio::{
     net::TcpStream,
 };
 
-
 pub struct SSHConnection {
     client: SshClient,
     channel: Channel<Msg>,
@@ -55,9 +54,7 @@ impl Connection for SSHConnection {
 
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
         match self.channel.make_reader().read(buf).await {
-            Ok(size) => {
-                Ok(size)
-            },
+            Ok(size) => Ok(size),
             Err(e) => match e.kind() {
                 ErrorKind::ConnectionAborted | ErrorKind::NotConnected => {
                     return Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into());

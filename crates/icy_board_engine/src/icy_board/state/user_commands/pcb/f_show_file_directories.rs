@@ -1,5 +1,3 @@
-use dizbase::file_base::FileBase;
-
 use crate::icy_board::state::functions::MASK_COMMAND;
 use crate::icy_board::state::user_commands::mods::filebrowser::FileList;
 use crate::icy_board::state::IcyBoardState;
@@ -78,11 +76,7 @@ impl IcyBoardState {
 
         let colors = self.get_board().await.config.color_configuration.clone();
         let file_base_path = self.resolve_path(&area.path);
-        let Ok(mut base) = FileBase::open(&file_base_path) else {
-            log::error!("Could not open file base: {}", file_base_path.display());
-            self.session.op_text = file_base_path.display().to_string();
-            self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
-                .await?;
+        let Ok(base) = self.get_filebase(&file_base_path).await else {
             return Ok(());
         };
 
@@ -96,6 +90,7 @@ impl IcyBoardState {
             "============ ========  ========  ============================================",
         )
         .await?;
+        let mut base = base.lock().await;
         let files = base.file_headers.iter_mut().collect::<Vec<_>>();
         log::info!("Files: {}", files.len());
         let mut list: FileList<'_> = FileList::new(file_base_path.clone(), files);
