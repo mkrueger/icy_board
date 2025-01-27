@@ -897,8 +897,6 @@ pub async fn restscrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     Ok(())
 }
 pub async fn sound(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    // log::error!("not implemented statement!");
-    // panic!("TODO")
     log::warn!("Sound is not supported");
     Ok(())
 }
@@ -1438,12 +1436,31 @@ pub async fn tpacwrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
 }
 
 pub async fn bitset(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("bitset not implemented statement!");
-    panic!("TODO")
+    let num_xp = vm.eval_expr(&args[0]).await?;
+    if num_xp.get_type() == VariableType::String || num_xp.get_type() == VariableType::BigStr || num_xp.get_dimensions() > 0 {
+        log::error!("bitset not supported on data type {}", num_xp.vtype);
+        return Ok(());
+    }
+    let num = num_xp.as_unsigned();
+    let bit = vm.eval_expr(&args[1]).await?.as_int();
+    let num = num | (1 << bit);
+    vm.set_variable(&args[0], VariableValue::new_unsigned(num).convert_to(num_xp.get_type()))
+        .await?;
+    Ok(())
 }
+
 pub async fn bitclear(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("bitclear not implemented statement!");
-    panic!("TODO")
+    let num_xp = vm.eval_expr(&args[0]).await?;
+    if num_xp.get_type() == VariableType::String || num_xp.get_type() == VariableType::BigStr || num_xp.get_dimensions() > 0 {
+        log::error!("bitclear not supported on data type {}", num_xp.vtype);
+        return Ok(());
+    }
+    let num = num_xp.as_unsigned();
+    let bit = vm.eval_expr(&args[1]).await?.as_int();
+    let num = num & !(1 << bit);
+    vm.set_variable(&args[0], VariableValue::new_unsigned(num).convert_to(num_xp.get_type()))
+        .await?;
+    Ok(())
 }
 pub async fn brag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("brag not implemented statement!");
@@ -1602,14 +1619,11 @@ pub async fn dfcopy(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     panic!("TODO")
 }
 
-pub async fn eval(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    // nothing, that just avaluates the parameters (for using function calls as statement)
-    Ok(())
-}
 pub async fn account(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("account not implemented statement!");
     panic!("TODO")
 }
+
 pub async fn recordusage(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("recordusage not implemented statement!");
     panic!("TODO")
@@ -1695,7 +1709,7 @@ pub async fn mkdir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("mkdir not implemented statement!");
     panic!("TODO")
 }
-pub async fn redir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+pub async fn rmdir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("redir not implemented statement!");
     panic!("TODO")
 }

@@ -1,0 +1,10 @@
+INTEGER A
+A = 0
+BitSet A, 4
+PRINTLN A, IsBitSet(A, 4), IsBitSet(A, 1)
+BitSet A, 1
+PRINTLN A, IsBitSet(A, 4), IsBitSet(A, 1)
+BitClear A, 4
+PRINTLN A, IsBitSet(A, 4), IsBitSet(A, 1)
+BitClear A, 1
+PRINTLN A, IsBitSet(A, 4), IsBitSet(A, 1)

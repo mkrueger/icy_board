@@ -1143,6 +1143,64 @@ impl VariableValue {
         }
     }
 
+    pub fn as_unsigned(&self) -> u64 {
+        if let GenericVariableData::String(s) = &self.generic_data {
+            let mut res = 0;
+            for c in s.chars() {
+                if c.is_digit(10) {
+                    if let Some(c) = c.to_digit(10) {
+                        res = res * 10 + c as u64;
+                    } else {
+                        break;
+                    }
+                }
+            }
+            return res;
+        }
+
+        match self.vtype {
+            VariableType::Boolean => {
+                if self.as_bool() {
+                    return 1;
+                }
+                return 0;
+            }
+            VariableType::Unsigned => {
+                return unsafe { self.data.unsigned_value };
+            }
+            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => {
+                return unsafe { self.data.int_value as u64 };
+            }
+            VariableType::Money => {
+                return unsafe { self.data.money_value as u64 };
+            }
+            VariableType::Float => {
+                return unsafe { self.data.float_value as u64 };
+            }
+            VariableType::Double => {
+                return unsafe { self.data.double_value as u64 };
+            }
+            VariableType::Time => {
+                return unsafe { self.data.time_value as u64 };
+            }
+            VariableType::Byte => {
+                return unsafe { self.data.byte_value as u64 };
+            }
+            VariableType::Word => {
+                return unsafe { self.data.word_value as u64 };
+            }
+            VariableType::SByte => {
+                return unsafe { self.data.sbyte_value as u64 };
+            }
+            VariableType::SWord => {
+                return unsafe { self.data.sword_value as u64 };
+            }
+            _ => {
+                panic!("Unsupported type: {:?}", self.vtype);
+            }
+        }
+    }
+
     pub fn as_double(&self) -> f64 {
         if let GenericVariableData::String(s) = &self.generic_data {
             return s.parse::<f64>().unwrap_or_default();

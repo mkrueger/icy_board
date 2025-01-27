@@ -530,7 +530,7 @@ lazy_static::lazy_static! {
     // "WAIT FOR" == "WAITFOR"
     // "GO SUB"
     // " GO TO"
-    pub static ref STATEMENT_DEFINITIONS: [StatementDefinition; 234] = [
+    pub static ref STATEMENT_DEFINITIONS: [StatementDefinition; 235] = [
         StatementDefinition {
             // helps to map opcode to array index.
             name: "Placeholder",
@@ -2541,7 +2541,7 @@ lazy_static::lazy_static! {
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
-            name: "RmDir",
+            name: "ReDir",
             version: 300,
             opcode: OpCode::RMDIR,
             args: Some(vec![
@@ -2685,6 +2685,18 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("value", VariableType::Byte),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
+        },
+        // ReDir was in the original compiler but docs referred to it as "rmdir"
+        // RmDir is more common - so just add RmDir as alias. The original one needs to be ReDir
+        // so decompiled source code may be compiled with the original pplc.exe
+        StatementDefinition {
+            name: "RmDir",
+            version: 300,
+            opcode: OpCode::RMDIR,
+            args: Some(vec![
+                ArgumentDefinition::new("path", VariableType::String),
+            ]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
     ];
 }

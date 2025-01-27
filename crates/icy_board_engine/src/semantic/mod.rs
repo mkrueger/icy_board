@@ -909,9 +909,10 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
             crate::executable::StatementSignature::Invalid => panic!("Invalid signature"),
             crate::executable::StatementSignature::ArgumentsWithVariable(v, arg_count) => {
                 self.check_arg_count(arg_count, call_stmt.get_arguments().len(), call_stmt.get_identifier_token());
-
                 if v > 0 {
-                    self.check_argument_is_variable(v - 1, &call_stmt.get_arguments()[v - 1]);
+                    if let Some(arg) = call_stmt.get_arguments().get(v - 1) {
+                        self.check_argument_is_variable(v - 1, &arg);
+                    }
                 }
             }
             crate::executable::StatementSignature::VariableArguments(_, allow_empty) => {
