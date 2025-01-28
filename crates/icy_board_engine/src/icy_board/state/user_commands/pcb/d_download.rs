@@ -142,6 +142,9 @@ impl IcyBoardState {
                         self.transfer_statistics.downloaded_files = state.send_state.finished_files.len();
                         self.transfer_statistics.downloaded_cps = state.send_state.get_bps() as usize;
                         self.display_text(IceText::BatchSend, display_flags::LFBEFORE).await?;
+
+                        self.board.lock().await.statistics.add_download(&state);
+                        self.board.lock().await.save_statistics();
                     }
                     Err(e) => {
                         log::error!("Error while initiating file transfer with {:?} : {}", protocol, e);

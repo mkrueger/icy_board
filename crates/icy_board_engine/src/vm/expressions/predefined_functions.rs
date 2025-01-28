@@ -379,135 +379,82 @@ pub async fn time(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variable
 }
 
 pub async fn u_name(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.session.current_user {
-        Ok(VariableValue::new_string(user.get_name().clone()))
-    } else {
-        Ok(VariableValue::new_string(String::new()))
-    }
+    Ok(VariableValue::new_string(vm.user.get_name().clone()))
 }
 
 pub async fn u_ldate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.session.current_user {
-        Ok(VariableValue::new(
-            VariableType::Date,
-            VariableData::from_int(IcbDate::from_utc(user.stats.last_on).to_pcboard_date()),
-        ))
-    } else {
-        Ok(VariableValue::new(VariableType::Date, VariableData::default()))
-    }
+    log::info!("logon {} : {}", vm.user.name, vm.user.stats.last_on);
+
+    Ok(VariableValue::new(
+        VariableType::Date,
+        VariableData::from_int(IcbDate::from_utc(vm.user.stats.last_on).to_pcboard_date()),
+    ))
 }
 
 pub async fn u_ltime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.session.current_user {
-        Ok(VariableValue::new(
-            VariableType::Time,
-            VariableData::from_int(IcbTime::from_naive(user.stats.last_on.naive_local()).to_pcboard_time()),
-        ))
-    } else {
-        Ok(VariableValue::new(VariableType::Time, VariableData::default()))
-    }
+    Ok(VariableValue::new(
+        VariableType::Time,
+        VariableData::from_int(IcbTime::from_naive(vm.user.stats.last_on.naive_local()).to_pcboard_time()),
+    ))
 }
 
 pub async fn u_ldir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.session.current_user {
-        Ok(VariableValue::new(
-            VariableType::Time,
-            VariableData::from_int(IcbTime::from_naive(user.date_last_dir_read.naive_local()).to_pcboard_time()),
-        ))
-    } else {
-        Ok(VariableValue::new(VariableType::Time, VariableData::default()))
-    }
+    Ok(VariableValue::new(
+        VariableType::Time,
+        VariableData::from_int(IcbTime::from_naive(vm.user.date_last_dir_read.naive_local()).to_pcboard_time()),
+    ))
 }
 pub async fn u_lmr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO") // TODO
 }
 pub async fn u_logons(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.session.current_user {
-        Ok(VariableValue::new(
-            VariableType::Integer,
-            VariableData::from_int(user.stats.num_times_on as i32),
-        ))
-    } else {
-        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-    }
+    Ok(VariableValue::new_int(vm.user.stats.num_times_on as i32))
 }
 pub async fn u_ful(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.session.current_user {
-        Ok(VariableValue::new(VariableType::Integer, VariableData::from_int(user.stats.num_uploads as i32)))
-    } else {
-        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-    }
+    Ok(VariableValue::new_int(vm.user.stats.num_uploads as i32))
 }
 pub async fn u_fdl(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.session.current_user {
-        Ok(VariableValue::new(
-            VariableType::Integer,
-            VariableData::from_int(user.stats.num_downloads as i32),
-        ))
-    } else {
-        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-    }
+    Ok(VariableValue::new_int(vm.user.stats.num_downloads as i32))
 }
 pub async fn u_bdlday(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.session.current_user {
-        Ok(VariableValue::new(
-            VariableType::Integer,
-            VariableData::from_int(user.stats.today_dnld_bytes as i32),
-        ))
-    } else {
-        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-    }
+    Ok(VariableValue::new(
+        VariableType::Integer,
+        VariableData::from_int(vm.user.stats.today_dnld_bytes as i32),
+    ))
 }
 pub async fn u_timeon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.session.current_user {
-        Ok(VariableValue::new(
-            VariableType::Integer,
-            VariableData::from_int(0), // TODO: ON TIME COUNTER
-        ))
-    } else {
-        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-    }
+    Ok(VariableValue::new(
+        VariableType::Integer,
+        VariableData::from_int(0), // TODO: ON TIME COUNTER
+    ))
 }
 pub async fn u_bdl(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.session.current_user {
-        Ok(VariableValue::new(
-            VariableType::Integer,
-            VariableData::from_int(user.stats.total_dnld_bytes as i32),
-        ))
-    } else {
-        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-    }
+    Ok(VariableValue::new(
+        VariableType::Integer,
+        VariableData::from_int(vm.user.stats.total_dnld_bytes as i32),
+    ))
 }
+
 pub async fn u_bul(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.session.current_user {
-        Ok(VariableValue::new(
-            VariableType::Integer,
-            VariableData::from_int(user.stats.total_upld_bytes as i32),
-        ))
-    } else {
-        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-    }
+    Ok(VariableValue::new(
+        VariableType::Integer,
+        VariableData::from_int(vm.user.stats.total_upld_bytes as i32),
+    ))
 }
+
 pub async fn u_msgrd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.session.current_user {
-        Ok(VariableValue::new(
-            VariableType::Integer,
-            VariableData::from_int(user.stats.messages_read as i32),
-        ))
-    } else {
-        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-    }
+    Ok(VariableValue::new(
+        VariableType::Integer,
+        VariableData::from_int(vm.user.stats.messages_read as i32),
+    ))
 }
+
 pub async fn u_msgwr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.session.current_user {
-        Ok(VariableValue::new(
-            VariableType::Integer,
-            VariableData::from_int(user.stats.messages_left as i32),
-        ))
-    } else {
-        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-    }
+    Ok(VariableValue::new(
+        VariableType::Integer,
+        VariableData::from_int(vm.user.stats.messages_left as i32),
+    ))
 }
 
 pub async fn year(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -941,160 +888,93 @@ pub async fn u_pwdhist(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
     let hist = vm.eval_expr(&args[0]).await?.as_int();
     match hist {
         1..3 => {
-            if let Some(user) = &vm.icy_board_state.session.current_user {
-                if let Some(pwd) = user.password.prev_pwd.get(hist as usize - 1) {
-                    return Ok(VariableValue::new_string(format!("{}", pwd)));
-                }
-                Ok(VariableValue::new_string(String::new()))
-            } else {
-                Ok(VariableValue::new_string(String::new()))
+            if let Some(pwd) = vm.user.password.prev_pwd.get(hist as usize - 1) {
+                return Ok(VariableValue::new_string(format!("{}", pwd)));
             }
+            Ok(VariableValue::new_string(String::new()))
         }
         _ => Ok(VariableValue::new_string(String::new())),
     }
 }
 
 pub async fn u_pwdlc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.session.current_user {
-        Ok(VariableValue::new(
-            VariableType::Date,
-            VariableData::from_int(IcbDate::from_utc(user.password.last_change).to_pcboard_date()),
-        ))
-    } else {
-        Ok(VariableValue::new(VariableType::Date, VariableData::default()))
-    }
+    Ok(VariableValue::new(
+        VariableType::Date,
+        VariableData::from_int(IcbDate::from_utc(vm.user.password.last_change).to_pcboard_date()),
+    ))
 }
 
 pub async fn u_pwdtc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    if let Some(user) = &vm.icy_board_state.session.current_user {
-        Ok(VariableValue::new(
-            VariableType::Integer,
-            VariableData::from_int(user.password.times_changed as i32),
-        ))
-    } else {
-        Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-    }
+    Ok(VariableValue::new(
+        VariableType::Integer,
+        VariableData::from_int(vm.user.password.times_changed as i32),
+    ))
 }
+
 pub async fn u_stat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let option = vm.eval_expr(&args[0]).await?.as_int();
     match option {
         1 => {
             //  first date the user called the system
-            if let Some(user) = &vm.icy_board_state.session.current_user {
-                Ok(VariableValue::new(
-                    VariableType::Date,
-                    VariableData::from_int(IcbDate::from_utc(user.stats.first_date_on).to_pcboard_date()),
-                ))
-            } else {
-                Ok(VariableValue::new(VariableType::Date, VariableData::default()))
-            }
+            Ok(VariableValue::new(
+                VariableType::Date,
+                VariableData::from_int(IcbDate::from_utc(vm.user.stats.first_date_on).to_pcboard_date()),
+            ))
         }
         2 => {
             //  number of SysOp pages the user has requested
-            if let Some(user) = &vm.icy_board_state.session.current_user {
-                Ok(VariableValue::new(
-                    VariableType::Integer,
-                    VariableData::from_int(user.stats.num_sysop_pages as i32),
-                ))
-            } else {
-                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-            }
+            Ok(VariableValue::new(
+                VariableType::Integer,
+                VariableData::from_int(vm.user.stats.num_sysop_pages as i32),
+            ))
         }
         3 => {
             //  number of group chats the user has participated in
-            if let Some(user) = &vm.icy_board_state.session.current_user {
-                Ok(VariableValue::new(
-                    VariableType::Integer,
-                    VariableData::from_int(user.stats.num_group_chats as i32),
-                ))
-            } else {
-                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-            }
+            Ok(VariableValue::new(
+                VariableType::Integer,
+                VariableData::from_int(vm.user.stats.num_group_chats as i32),
+            ))
         }
         4 => {
             //  number of comments the user has left
-            if let Some(user) = &vm.icy_board_state.session.current_user {
-                Ok(VariableValue::new(
-                    VariableType::Integer,
-                    VariableData::from_int(user.stats.num_comments as i32),
-                ))
-            } else {
-                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-            }
+            Ok(VariableValue::new(
+                VariableType::Integer,
+                VariableData::from_int(vm.user.stats.num_comments as i32),
+            ))
         }
         5..=9 => {
             // Number of x bps connects
-            if let Some(user) = &vm.icy_board_state.session.current_user {
-                Ok(VariableValue::new(
-                    VariableType::Integer,
-                    VariableData::from_int(user.stats.num_times_on as i32),
-                ))
-            } else {
-                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-            }
+            Ok(VariableValue::new(
+                VariableType::Integer,
+                VariableData::from_int(vm.user.stats.num_times_on as i32),
+            ))
         }
         10 => {
             // number of security violations
-            if let Some(user) = &vm.icy_board_state.session.current_user {
-                Ok(VariableValue::new(
-                    VariableType::Integer,
-                    VariableData::from_int(user.stats.num_sec_viol as i32),
-                ))
-            } else {
-                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-            }
+            Ok(VariableValue::new(
+                VariableType::Integer,
+                VariableData::from_int(vm.user.stats.num_sec_viol as i32),
+            ))
         }
         11 => {
             // number of “not registered in conference” warnings
-            if let Some(user) = &vm.icy_board_state.session.current_user {
-                Ok(VariableValue::new(VariableType::Integer, VariableData::from_int(user.stats.num_not_reg as i32)))
-            } else {
-                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-            }
+            Ok(VariableValue::new_int(vm.user.stats.num_not_reg as i32))
         }
         12 => {
             // number of times the users download limit has been reached
-            if let Some(user) = &vm.icy_board_state.session.current_user {
-                Ok(VariableValue::new(
-                    VariableType::Integer,
-                    VariableData::from_int(user.stats.num_reach_dnld_lim as i32),
-                ))
-            } else {
-                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-            }
+            Ok(VariableValue::new_int(vm.user.stats.num_reach_dnld_lim as i32))
         }
         13 => {
             // number of “file not found” warnings
-            if let Some(user) = &vm.icy_board_state.session.current_user {
-                Ok(VariableValue::new(
-                    VariableType::Integer,
-                    VariableData::from_int(user.stats.num_file_not_found as i32),
-                ))
-            } else {
-                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-            }
+            Ok(VariableValue::new_int(vm.user.stats.num_file_not_found as i32))
         }
         14 => {
             // number of password errors the user has had
-            if let Some(user) = &vm.icy_board_state.session.current_user {
-                Ok(VariableValue::new(
-                    VariableType::Integer,
-                    VariableData::from_int(user.stats.num_password_failures as i32),
-                ))
-            } else {
-                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-            }
+            Ok(VariableValue::new_int(vm.user.stats.num_password_failures as i32))
         }
         15 => {
             //  number of verify errors the user has had
-            if let Some(user) = &vm.icy_board_state.session.current_user {
-                Ok(VariableValue::new(
-                    VariableType::Integer,
-                    VariableData::from_int(user.stats.num_verify_errors as i32),
-                ))
-            } else {
-                Ok(VariableValue::new(VariableType::Integer, VariableData::default()))
-            }
+            Ok(VariableValue::new_int(vm.user.stats.num_verify_errors as i32))
         }
         _ => Ok(VariableValue::new_int(0)),
     }

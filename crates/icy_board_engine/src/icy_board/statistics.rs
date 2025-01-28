@@ -46,6 +46,22 @@ impl Statistics {
             self.last_callers.remove(0);
         }
     }
+
+    pub fn add_download(&mut self, state: &icy_net::protocol::TransferState) {
+        self.total.downloads += state.send_state.finished_files.len() as u64;
+        self.total.downloads_kb += state.send_state.file_size;
+
+        self.today.downloads += state.send_state.finished_files.len() as u64;
+        self.today.downloads_kb += state.send_state.file_size;
+    }
+
+    pub fn add_upload(&mut self, state: &icy_net::protocol::TransferState) {
+        self.total.uploads += state.recieve_state.finished_files.len() as u64;
+        self.total.uploads_kb += state.recieve_state.file_size;
+
+        self.today.uploads += state.recieve_state.finished_files.len() as u64;
+        self.today.uploads_kb += state.recieve_state.file_size;
+    }
 }
 
 impl IcyBoardSerializer for Statistics {

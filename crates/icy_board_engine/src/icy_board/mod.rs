@@ -127,6 +127,10 @@ impl IcyBoard {
         }
     }
 
+    pub fn resolve_paths(&mut self) {
+        self.config.paths.statistics_file = self.resolve_file(&self.config.paths.statistics_file);
+    }
+
     pub fn resolve_file<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
         if file.as_ref().as_os_str().is_empty() {
             return PathBuf::new();
@@ -317,8 +321,12 @@ impl IcyBoard {
         Ok(())
     }
 
+    pub fn get_homedir(&self) -> PathBuf {
+        PathBuf::from(self.resolve_file(&self.config.paths.home_dir))
+    }
+
     pub fn save_userbase(&mut self) -> Res<()> {
-        let home_dir = PathBuf::from(self.resolve_file(&self.config.paths.home_dir));
+        let home_dir = self.get_homedir();
         if let Err(e) = self.users.save_users(&home_dir) {
             log::error!("Error saving user base: {}", e);
             Err(e)
@@ -557,6 +565,14 @@ impl IcyBoard {
         let user_txt = toml::to_string(&new_user)?;
         fs::write(home_dir.join("user.toml"), user_txt)?;
         self.users[i] = new_user;
+        Ok(())
+    }
+
+    pub fn save_statistics(&self) -> Res<()> {
+        let r = &self.config.paths.statistics_file;
+        if let Err(err) = self.statistics.save(&r) {
+            log::error!("Error saving statistics to {} : {err}", r.display());
+        }
         Ok(())
     }
 }

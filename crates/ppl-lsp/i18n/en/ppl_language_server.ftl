@@ -288,13 +288,19 @@ hint-statement-download=
 hint-statement-wrusysdoor=Write a USERS.SYS file with a TPA record for a DOOR application.
 hint-statement-getaltuser=
     Get the information for an alternate user.
+
     It will fill the user variables with information from the specified user record as well as redirect user statements and functions.
 
-    If an attempt is made to get a record number that doesn't exist, the user functions will revert to the current user and the user
-    variables will be invalidated as though no GetUser/GetAltUser statement had been issued (though they will continue to maintain any value held). 
-    PutUser/PutAltUser should be issued to commit any variable changes to the user record. Additionally, there is at least one statement that 
-    will not affect alternate users: AdjTime. It is restricted to the current user online. Also, if the alternate user is online, changes to the 
-    record won't take hold until after the user has logged off. 
+    If an attempt is made to get a record number that doesn't exist, 
+    the user functions will revert to the current user and the user variables will be invalidated as though no GetUser/GetAltUser 
+    statement had been issued (though they will continue to maintain any value held). 
+
+    `PutUser`/`PutAltUser` should be issued to commit any variable changes to the user record.
+    Additionally, there is at least one statement that will not affect alternate users: `AdjTime`. 
+    
+    It is restricted to the current user online.
+    
+    Also, if the alternate user is online, changes to the record won't take hold until after the user has logged off. 
     Also, if there is not enough memory available (primarily for the last message read pointers) this statement will fail.
 hint-statement-adjdbytes=
     Adjust the users daily download bytes.

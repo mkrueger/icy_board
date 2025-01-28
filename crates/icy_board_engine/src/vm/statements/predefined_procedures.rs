@@ -199,13 +199,12 @@ pub async fn hangup(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
 /// # Errors
 /// Errors if the variable is not found.
 pub async fn getuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    let user = if let Some(user) = &mut vm.icy_board_state.session.current_user {
+    vm.user = if let Some(user) = &mut vm.icy_board_state.session.current_user {
         user.clone()
     } else {
         return Err(Box::new(IcyError::UserNotFound(String::new())));
     };
-    vm.set_user_variables(&user)?;
-
+    vm.set_user_variables()?;
     Ok(())
 }
 
@@ -1257,9 +1256,9 @@ pub async fn getaltuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
     if user_record >= vm.icy_board_state.get_board().await.users.len() {
         return Err(Box::new(VMError::UserRecordOutOfBounds(user_record)));
     }
-    let user = vm.icy_board_state.get_board().await.users[user_record].clone();
-
-    vm.set_user_variables(&user)?;
+    vm.user = vm.icy_board_state.get_board().await.users[user_record].clone();
+    log::info!("get alt user ({user_record}) {}", vm.user.name);
+    vm.set_user_variables()?;
     Ok(())
 }
 
@@ -1472,8 +1471,9 @@ pub async fn brag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     panic!("TODO")
 }
 pub async fn frealtuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    if let Some(user) = &vm.icy_board_state.session.current_user.clone() {
-        vm.set_user_variables(user)?;
+    if let Some(user) = vm.icy_board_state.session.current_user.clone() {
+        vm.user = user;
+        vm.set_user_variables()?;
     }
     Ok(())
 }

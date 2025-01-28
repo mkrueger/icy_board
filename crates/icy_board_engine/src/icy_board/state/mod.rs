@@ -8,7 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{executable::Executable, Res};
+use crate::{executable::Executable, icy_board::user_base::UserBase, Res};
 use async_recursion::async_recursion;
 use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use codepages::tables::UNICODE_TO_CP437;
@@ -763,8 +763,9 @@ impl IcyBoardState {
         let mut user = self.get_board().await.users[user_number].clone();
         user.stats.last_on = Utc::now();
         user.stats.num_times_on += 1;
-        let last_conference = user.last_conference;
+        let last_conference: u16 = user.last_conference;
         self.get_board().await.statistics.add_caller(user.get_name().clone());
+        self.get_board().await.save_statistics()?;
         if !user.date_format.is_empty() {
             self.session.date_format = user.date_format.clone();
         }
@@ -805,6 +806,8 @@ impl IcyBoardState {
             for u in 0..board.users.len() {
                 if board.users[u].get_name() == user.get_name() {
                     board.set_user(user.clone(), u)?;
+                    let home_dir = UserBase::get_user_home_dir(&board.get_homedir(), &user.name);
+                    user.save(&home_dir)?;
                     return Ok(());
                 }
             }

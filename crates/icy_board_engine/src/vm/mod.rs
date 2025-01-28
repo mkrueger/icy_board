@@ -165,10 +165,12 @@ pub struct VirtualMachine<'a> {
     pub fd_default_out: usize,
 
     pub file_list: VecDeque<String>,
+    pub user: User,
 }
 
 impl<'a> VirtualMachine<'a> {
-    fn set_user_variables(&mut self, cur_user: &User) -> Res<()> {
+    fn set_user_variables(&mut self) -> Res<()> {
+        let cur_user = &self.user;
         self.variable_table.set_value(U_EXPERT, VariableValue::new_bool(cur_user.flags.expert_mode));
         match cur_user.flags.fse_mode {
             FSEMode::Yes => {
@@ -786,6 +788,11 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
             for (i, stmt) in script.statements.iter().enumerate() {
                 label_table.insert(stmt.span.start * 2, i);
             }
+            let user = if let Some(user) = &icy_board_state.session.current_user {
+                user.clone()
+            } else {
+                User::default()
+            };
             let file_name = file_name.as_ref().to_path_buf();
             let reg = UserTypeRegistry::icy_board_registry();
             log::info!("Run PPE {}", file_name.display());
@@ -811,6 +818,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
                 fd_default_in: 0,
                 fd_default_out: 0,
                 file_list: VecDeque::new(),
+                user,
             };
 
             vm.run().await?;
