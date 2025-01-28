@@ -34,12 +34,12 @@ struct Cli {
     #[argh(switch, short = 'f')]
     full_screen: bool,
 
-    #[argh(option)]
-    /// path/file name of the icyboard.toml configuration file
-    file: Option<PathBuf>,
-
     #[argh(subcommand)]
     command: Option<Commands>,
+
+    #[argh(positional)]
+    /// path/file name of the icyboard.toml configuration file
+    file: Option<PathBuf>,
 }
 
 #[derive(FromArgs, PartialEq, Debug)]

@@ -43,7 +43,7 @@ pub async fn await_telnet_connections(telnet: Telnet, board: Arc<tokio::sync::Mu
                     match TelnetConnection::accept(stream) {
                         Ok(connection) => {
                             // connection succeeded
-                            if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None).await {
+                            if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
                                 log::error!("Error running backround client: {}", err);
                             }
                         }
@@ -219,10 +219,16 @@ pub async fn handle_client(
     node: usize,
     connection: Box<dyn Connection>,
     login_options: Option<LoginOptions>,
+    stuffed_chars: &str,
 ) -> Res<()> {
     let mut state = IcyBoardState::new(bbs, board, node_state, node, connection).await;
     let mut logged_in = false;
     let mut local = false;
+
+    if !stuffed_chars.is_empty() {
+        state.stuff_keyboard_buffer(stuffed_chars, true)?;
+    }
+
     if let Some(login_options) = &login_options {
         if login_options.login_sysop {
             logged_in = true;

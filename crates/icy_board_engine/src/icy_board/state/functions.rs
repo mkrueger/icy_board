@@ -309,8 +309,9 @@ impl IcyBoardState {
                 }
                 log::info!("PPE stuffed input: {}", result);
                 self.session.push_tokens(&result);
-                let token = self.session.tokens.pop_front().unwrap();
-                return Ok(token);
+                if let Some(token) = self.session.tokens.pop_front() {
+                    return Ok(token);
+                }
             }
         }
 

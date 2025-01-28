@@ -669,16 +669,23 @@ impl IcyBoardState {
         })
     }
 
-    pub fn put_keyboard_buffer(&mut self, value: &str, is_visible: bool) -> Res<()> {
+    pub fn stuff_keyboard_buffer(&mut self, value: &str, is_visible: bool) -> Res<()> {
         let in_chars: Vec<char> = value.chars().collect();
 
         let src = if is_visible { KeySource::User } else { KeySource::StuffedHidden };
-        for (i, c) in in_chars.iter().enumerate() {
-            if *c == '^' && i + 1 < in_chars.len() && in_chars[i + 1] >= 'A' && in_chars[i + 1] <= '[' {
-                let c = in_chars[i + 1] as u8 - b'@';
-                self.char_buffer.push_back(KeyChar::new(src, c as char));
+        let mut i = 0;
+        while i < in_chars.len() {
+            let c = in_chars[i];
+            i += 1;
+            if c == '^' && i < in_chars.len() {
+                let next = in_chars[i].to_ascii_uppercase();
+                if next >= 'A' && next <= '[' {
+                    let ctrl_c = next as u8 - b'@';
+                    self.char_buffer.push_back(KeyChar::new(src, ctrl_c as char));
+                    i += 1;
+                }
             } else {
-                self.char_buffer.push_back(KeyChar::new(src, *c));
+                self.char_buffer.push_back(KeyChar::new(src, c));
             }
         }
         // self.char_buffer.push_back(KeyChar::new(KeySource::StuffedHidden, '\n'));

@@ -45,7 +45,13 @@ pub struct Tui {
 }
 
 impl Tui {
-    pub async fn local_mode(board: &Arc<tokio::sync::Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>, login_sysop: bool, ppe: Option<PathBuf>) -> Self {
+    pub async fn local_mode(
+        board: &Arc<tokio::sync::Mutex<IcyBoard>>,
+        bbs: &Arc<Mutex<BBS>>,
+        login_sysop: bool,
+        ppe: Option<PathBuf>,
+        stuffed_chars: String,
+    ) -> Self {
         let board = board.clone();
         let bbs2 = bbs.clone();
 
@@ -61,7 +67,7 @@ impl Tui {
             .name("Local mode handle".to_string())
             .spawn(move || {
                 tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                    if let Err(err) = handle_client(bbs2, board, node_state2, node, Box::new(connection), Some(options)).await {
+                    if let Err(err) = handle_client(bbs2, board, node_state2, node, Box::new(connection), Some(options), &stuffed_chars).await {
                         log::error!("Error running backround client: {}", err);
                     }
                 });

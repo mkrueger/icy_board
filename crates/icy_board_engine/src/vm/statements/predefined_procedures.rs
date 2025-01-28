@@ -623,20 +623,20 @@ pub async fn dir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 pub async fn kbdstuff(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let value = vm.eval_expr(&args[0]).await?.as_string();
-    vm.icy_board_state.put_keyboard_buffer(&value, false)?;
+    vm.icy_board_state.stuff_keyboard_buffer(&value, false)?;
     Ok(())
 }
 pub async fn kbdstring(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let value = vm.eval_expr(&args[0]).await?.as_string();
     vm.icy_board_state.print(TerminalTarget::Both, &value).await?;
-    vm.icy_board_state.put_keyboard_buffer(&value, false)?;
+    vm.icy_board_state.stuff_keyboard_buffer(&value, false)?;
     Ok(())
 }
 pub async fn kbdfile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let file_name = vm.eval_expr(&args[0]).await?.as_string();
     let fil_name = vm.resolve_file(&file_name).await;
     let contents = fs::read_to_string(file_name)?;
-    vm.icy_board_state.put_keyboard_buffer(&contents, false)?;
+    vm.icy_board_state.stuff_keyboard_buffer(&contents, false)?;
 
     Ok(())
 }

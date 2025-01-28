@@ -9,7 +9,7 @@ members = [
 	"crates/pplc",
 	"crates/ppld",
 	"crates/ppl-lsp",
-	"crates/scandb",
+#	"crates/scandb",
 	"crates/codepages", 
 	"crates/icy_board_tui",
 	"crates/mkicbmnu",
