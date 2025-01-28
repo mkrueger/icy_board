@@ -7,17 +7,17 @@ use jamjam::jam::JamMessageBase;
 use crate::{icy_board::state::IcyBoardState, Res};
 
 impl IcyBoardState {
-    pub async fn read_messages(&mut self, help: &str) -> Res<()> {
+    pub async fn read_messages(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::HandlingMail).await;
-        let Ok(Some(area)) = self.show_message_areas(self.session.current_conference_number, help).await else {
+        let Ok(Some(area)) = self.show_message_areas(self.session.current_conference_number).await else {
             self.press_enter().await?;
             self.display_current_menu = true;
             return Ok(());
         };
-        self.read_messages_in_area(area, help).await
+        self.read_messages_in_area(area).await
     }
 
-    async fn read_messages_in_area(&mut self, area: usize, help: &str) -> Res<()> {
+    async fn read_messages_in_area(&mut self, area: usize) -> Res<()> {
         // loop for recreating the message base without async recursion problem.
         let mut tries = 0;
         while tries < 2 {
@@ -26,7 +26,7 @@ impl IcyBoardState {
             let msgbase_file_resolved = self.get_board().await.resolve_file(message_base_file);
             match JamMessageBase::open(&msgbase_file_resolved) {
                 Ok(message_base) => {
-                    self.read_msgs_from_base(message_base, help).await?;
+                    self.read_msgs_from_base(message_base).await?;
                     return Ok(());
                 }
                 Err(err) => {

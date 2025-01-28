@@ -70,8 +70,8 @@ pub struct DisplayOptions {
     pub show_on_screen: bool,
 
     pub in_file_list: Option<PathBuf>,
-    pub file_list_help: String,
 }
+
 impl DisplayOptions {
     pub fn reset_printout(&mut self) {
         self.is_non_stop = false;
@@ -94,7 +94,6 @@ impl Default for DisplayOptions {
             display_text: true,
             show_on_screen: true,
             in_file_list: None,
-            file_list_help: String::new(),
         }
     }
 }
@@ -868,14 +867,30 @@ impl IcyBoardState {
     }
 
     fn find_file_with_extension(&self, lang_file: &String) -> Option<PathBuf> {
+        if self.session.disp_options.grapics_mode == GraphicsMode::Rip {
+            let file = PathBuf::from(lang_file.clone() + ".rip");
+            if file.exists() {
+                return Some(file);
+            }
+        }
+
+        if self.session.disp_options.grapics_mode == GraphicsMode::Graphics {
+            let file = PathBuf::from(lang_file.clone() + ".ans");
+            if file.exists() {
+                return Some(file);
+            }
+
+            let file = PathBuf::from(lang_file.clone() + ".avt");
+            if file.exists() {
+                return Some(file);
+            }
+        }
+
         let file = PathBuf::from(lang_file.clone() + ".pcb");
         if file.exists() {
             return Some(file);
         }
-        let file = PathBuf::from(lang_file.clone() + ".ans");
-        if file.exists() {
-            return Some(file);
-        }
+
         let file = PathBuf::from(lang_file.clone() + ".asc");
         if file.exists() {
             return Some(file);

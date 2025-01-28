@@ -37,6 +37,7 @@ The goal is to be as compatible as possible but enhancing PCBoard for the modere
   * Planned is to support multiple message base formats
   * Means all PPEs/tools break that may read the old format
 * No security level centralization. Security levels are now on command basis. 
+* DIR files are no longer used. Just throw the files in the directory, icy board takes care of everything.
 
 ### CP437 is dead
 

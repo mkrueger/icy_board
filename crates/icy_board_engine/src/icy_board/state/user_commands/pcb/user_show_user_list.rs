@@ -1,3 +1,4 @@
+use crate::icy_board::commands::CommandType;
 use crate::icy_board::state::functions::MASK_COMMAND;
 use crate::icy_board::state::IcyBoardState;
 use crate::Res;
@@ -7,7 +8,7 @@ use crate::{
 };
 
 impl IcyBoardState {
-    pub async fn show_user_list_cmd(&mut self, help: &str) -> Res<()> {
+    pub async fn show_user_list_cmd(&mut self) -> Res<()> {
         self.new_line().await?;
         let text = if let Some(token) = self.session.tokens.pop_front() {
             token
@@ -16,7 +17,7 @@ impl IcyBoardState {
                 IceText::UserScan,
                 40,
                 MASK_COMMAND,
-                help,
+                CommandType::UserList.get_help(),
                 None,
                 display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )

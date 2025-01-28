@@ -10,7 +10,7 @@ fn convert_cmd(name: &str, cmd_type: CommandType, security: i32) -> icy_board_en
         keyword: name.to_string(),
         display: "".to_string(),
         lighbar_display: "".to_string(),
-        help: format!("hlp{}", name.to_ascii_lowercase()),
+        help: "".to_string(),
         auto_run: AutoRun::Disabled,
         autorun_time: 0,
         position: Default::default(),
@@ -56,7 +56,7 @@ pub fn add_default_commands(data: &PcbBoardData, cmd_list: &mut CommandList) {
     cmd_list.push(convert_cmd("V", CommandType::ViewSettings, data.user_levels.cmd_v));
     cmd_list.push(convert_cmd("W", CommandType::WriteSettings, data.user_levels.cmd_w));
     cmd_list.push(convert_cmd("X", CommandType::ExpertMode, data.user_levels.cmd_x));
-    cmd_list.push(convert_cmd("Y", CommandType::PersonalMail, data.user_levels.cmd_y));
+    cmd_list.push(convert_cmd("Y", CommandType::YourMailScan, data.user_levels.cmd_y));
     cmd_list.push(convert_cmd("Z", CommandType::ZippyDirectoryScan, data.user_levels.cmd_z));
 
     cmd_list.push(convert_cmd("CHAT", CommandType::GroupChat, data.user_levels.cmd_chat));

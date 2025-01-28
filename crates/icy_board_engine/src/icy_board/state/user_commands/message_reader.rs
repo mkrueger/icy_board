@@ -186,7 +186,7 @@ impl MessageViewer {
 }
 
 impl IcyBoardState {
-    pub async fn read_msgs_from_base(&mut self, message_base: JamMessageBase, _help: &str) -> Res<()> {
+    pub async fn read_msgs_from_base(&mut self, message_base: JamMessageBase) -> Res<()> {
         let viewer = MessageViewer::load(&self.display_text)?;
 
         while !self.session.disp_options.abort_printout {

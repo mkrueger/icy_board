@@ -12,9 +12,9 @@ use jamjam::jam::JamMessageBase;
 use crate::Res;
 
 impl IcyBoardState {
-    pub async fn text_search(&mut self, help: &str) -> Res<()> {
+    pub async fn text_search(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::HandlingMail).await;
-        let Ok(Some(area)) = self.show_message_areas(self.session.current_conference_number, help).await else {
+        let Ok(Some(area)) = self.show_message_areas(self.session.current_conference_number).await else {
             self.press_enter().await?;
             self.display_current_menu = true;
             return Ok(());
@@ -27,7 +27,7 @@ impl IcyBoardState {
                 IceText::TextToScanFor,
                 40,
                 MASK_COMMAND,
-                help,
+                "hlpts", // Help text scan
                 None,
                 display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )
@@ -38,10 +38,10 @@ impl IcyBoardState {
             self.display_current_menu = true;
             return Ok(());
         }
-        self.text_search_in_area(&search_text, area, help).await
+        self.text_search_in_area(&search_text, area).await
     }
 
-    async fn text_search_in_area(&mut self, search_text: &str, area: usize, help: &str) -> Res<()> {
+    async fn text_search_in_area(&mut self, search_text: &str, area: usize) -> Res<()> {
         let message_base_file = &self.session.current_conference.areas[area].filename;
         let msgbase_file_resolved = self.get_board().await.resolve_file(message_base_file);
         match JamMessageBase::open(&msgbase_file_resolved) {
@@ -54,7 +54,7 @@ impl IcyBoardState {
                         IceText::MessageSearchFrom,
                         8,
                         &MASK_NUM,
-                        help,
+                        "",
                         None,
                         display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
                     )

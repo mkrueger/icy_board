@@ -12,7 +12,7 @@ use crate::{
 };
 
 impl IcyBoardState {
-    pub async fn zippy_directory_scan(&mut self, help: &str) -> Res<()> {
+    pub async fn zippy_directory_scan(&mut self) -> Res<()> {
         if self.session.current_conference.directories.is_empty() {
             self.display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
@@ -26,7 +26,7 @@ impl IcyBoardState {
                 IceText::TextToScanFor,
                 40,
                 &MASK_ASCII,
-                help,
+                "hlpts", // Help text scan
                 None,
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
             )
@@ -49,7 +49,7 @@ impl IcyBoardState {
                 },
                 40,
                 MASK_COMMAND,
-                help,
+                "",
                 None,
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
             )

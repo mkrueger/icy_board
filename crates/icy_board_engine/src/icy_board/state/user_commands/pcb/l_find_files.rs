@@ -15,7 +15,7 @@ use crate::{
 };
 
 impl IcyBoardState {
-    pub async fn find_files_cmd(&mut self, help: &str) -> Res<()> {
+    pub async fn find_files_cmd(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::Available).await;
 
         if self.session.current_conference.directories.is_empty() {
@@ -31,7 +31,7 @@ impl IcyBoardState {
                 IceText::SearchFileName,
                 40,
                 &MASK_ASCII,
-                help,
+                "",
                 None,
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
             )
@@ -54,7 +54,7 @@ impl IcyBoardState {
                 },
                 40,
                 MASK_COMMAND,
-                help,
+                "",
                 None,
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
             )

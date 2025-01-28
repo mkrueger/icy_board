@@ -9,7 +9,7 @@ use crate::icy_board::{
 };
 
 impl IcyBoardState {
-    pub async fn enter_message(&mut self, help: &str) -> Res<()> {
+    pub async fn enter_message(&mut self) -> Res<()> {
         if self.session.current_conference.is_read_only {
             self.display_text(
                 IceText::ConferenceIsReadOnly,
@@ -20,7 +20,7 @@ impl IcyBoardState {
         }
         self.set_activity(NodeStatus::EnterMessage).await;
         let conf = self.session.current_conference_number;
-        let Ok(Some(area)) = self.show_message_areas(conf, help).await else {
+        let Ok(Some(area)) = self.show_message_areas(conf).await else {
             self.press_enter().await?;
             self.display_current_menu = true;
             return Ok(());
@@ -31,7 +31,7 @@ impl IcyBoardState {
                 IceText::MessageTo,
                 54,
                 &MASK_ASCII,
-                help,
+                "",
                 Some("ALL".to_string()),
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN,
             )
@@ -46,7 +46,7 @@ impl IcyBoardState {
                 IceText::MessageSubject,
                 54,
                 &MASK_ASCII,
-                help,
+                "",
                 None,
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN,
             )

@@ -1,10 +1,11 @@
+use crate::icy_board::commands::CommandType;
 use crate::icy_board::state::functions::MASK_COMMAND;
 use crate::icy_board::state::IcyBoardState;
 use crate::icy_board::{icb_text::IceText, state::functions::display_flags};
 use crate::Res;
 
 impl IcyBoardState {
-    pub async fn join_conference_cmd(&mut self, help: &str) -> Res<()> {
+    pub async fn join_conference_cmd(&mut self) -> Res<()> {
         if self.get_board().await.conferences.is_empty() {
             self.display_text(IceText::NoConferenceAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
@@ -24,7 +25,7 @@ impl IcyBoardState {
                 IceText::JoinConferenceNumber,
                 40,
                 MASK_COMMAND,
-                help,
+                CommandType::JoinConference.get_help(),
                 None,
                 display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )
@@ -43,7 +44,7 @@ impl IcyBoardState {
                         IceText::JoinConferenceNumber,
                         40,
                         MASK_COMMAND,
-                        help,
+                        CommandType::JoinConference.get_help(),
                         None,
                         display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
                     )
@@ -62,7 +63,7 @@ impl IcyBoardState {
                         IceText::TextToScanFor,
                         40,
                         MASK_COMMAND,
-                        help,
+                        "hlpts", // Help text scan
                         None,
                         display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
                     )
@@ -81,7 +82,7 @@ impl IcyBoardState {
                         IceText::JoinConferenceNumber,
                         40,
                         MASK_COMMAND,
-                        help,
+                        "",
                         None,
                         display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
                     )

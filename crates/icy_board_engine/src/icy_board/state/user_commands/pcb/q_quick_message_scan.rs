@@ -1,5 +1,8 @@
 use crate::{
-    icy_board::state::{functions::MASK_COMMAND, IcyBoardState},
+    icy_board::{
+        commands::CommandType,
+        state::{functions::MASK_COMMAND, IcyBoardState},
+    },
     Res,
 };
 
@@ -16,24 +19,24 @@ use bstr::{BString, ByteSlice};
 use jamjam::jam::JamMessageBase;
 
 impl IcyBoardState {
-    pub async fn quick_message_scan(&mut self, help: &str) -> Res<()> {
+    pub async fn quick_message_scan(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::HandlingMail).await;
 
-        let Ok(Some(area)) = self.show_message_areas(self.session.current_conference_number, help).await else {
+        let Ok(Some(area)) = self.show_message_areas(self.session.current_conference_number).await else {
             self.press_enter().await?;
             self.display_current_menu = true;
             return Ok(());
         };
-        self.quick_message_scan_in_area(area, help).await
+        self.quick_message_scan_in_area(area).await
     }
 
     #[async_recursion(?Send)]
-    async fn quick_message_scan_in_area(&mut self, area: usize, help: &str) -> Res<()> {
+    async fn quick_message_scan_in_area(&mut self, area: usize) -> Res<()> {
         let message_base_file = &self.session.current_conference.areas[area].filename;
         let msgbase_file_resolved = self.get_board().await.resolve_file(message_base_file);
         match JamMessageBase::open(&msgbase_file_resolved) {
             Ok(message_base) => {
-                self.show_quick_scans(area, message_base, help).await?;
+                self.show_quick_scans(area, message_base).await?;
                 Ok(())
             }
             Err(err) => {
@@ -43,7 +46,7 @@ impl IcyBoardState {
                     .await?;
                 if JamMessageBase::create(msgbase_file_resolved).is_ok() {
                     log::error!("successfully created new message index.");
-                    return self.quick_message_scan_in_area(area, help).await;
+                    return self.quick_message_scan_in_area(area).await;
                 }
                 log::error!("failed to create message index.");
 
@@ -57,7 +60,7 @@ impl IcyBoardState {
         }
     }
 
-    async fn show_quick_scans(&mut self, area: usize, message_base: JamMessageBase, help: &str) -> Res<()> {
+    async fn show_quick_scans(&mut self, area: usize, message_base: JamMessageBase) -> Res<()> {
         let prompt = if self.session.expert_mode {
             IceText::MessageScanCommandExpertmode
         } else {
@@ -70,7 +73,7 @@ impl IcyBoardState {
                 prompt,
                 40,
                 MASK_COMMAND,
-                help,
+                CommandType::QuickMessageScan.get_help(),
                 None,
                 display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
             )
@@ -147,7 +150,7 @@ impl IcyBoardState {
             }
         }
 
-        self.read_msgs_from_base(message_base, help).await
+        self.read_msgs_from_base(message_base).await
     }
 }
 

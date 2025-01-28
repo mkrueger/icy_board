@@ -861,7 +861,7 @@ pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     }
 
     if conf >= 0 {
-        if let Ok(area_opt) = vm.icy_board_state.show_message_areas(conf as u16, "").await {
+        if let Ok(area_opt) = vm.icy_board_state.show_message_areas(conf as u16).await {
             match area_opt {
                 Some(area) => {
                     vm.icy_board_state

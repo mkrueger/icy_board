@@ -1,5 +1,6 @@
 use std::{process::Stdio, time::Duration};
 
+use crate::icy_board::commands::CommandType;
 use crate::{icy_board::state::IcyBoardState, Res};
 
 use crate::icy_board::{
@@ -21,7 +22,7 @@ use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 impl IcyBoardState {
-    pub async fn open_door(&mut self, help: &str) -> Res<()> {
+    pub async fn open_door(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::RunningDoor).await;
         let doors = self.session.current_conference.doors.clone();
         if doors.is_empty() {
@@ -49,7 +50,7 @@ impl IcyBoardState {
                 },
                 20,
                 &MASK_ALNUM,
-                help,
+                CommandType::OpenDoor.get_help(),
                 None,
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
             )

@@ -1,3 +1,4 @@
+use crate::icy_board::commands::CommandType;
 use crate::{icy_board::state::IcyBoardState, Res};
 use crate::{
     icy_board::{
@@ -12,7 +13,7 @@ use crate::{
 use icy_net::protocol::{Protocol, TransferProtocolType, XYModemVariant, XYmodem, Zmodem};
 
 impl IcyBoardState {
-    pub async fn upload_file(&mut self, help: &str) -> Res<()> {
+    pub async fn upload_file(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::Transfer).await;
         let upload_location = self.resolve_path(&self.session.current_conference.pub_upload_location);
         if !upload_location.exists() {
@@ -31,7 +32,7 @@ impl IcyBoardState {
                 IceText::FileNameToUpload,
                 60,
                 &MASK_ASCII,
-                help,
+                CommandType::UploadFile.get_help(),
                 None,
                 display_flags::NEWLINE | display_flags::LFBEFORE,
             )
@@ -50,7 +51,7 @@ impl IcyBoardState {
                     IceText::GoodbyeAfterUpload,
                     1,
                     &"AGP",
-                    help,
+                    "",
                     None,
                     display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE | display_flags::FIELDLEN,
                 )

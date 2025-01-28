@@ -1,3 +1,4 @@
+use crate::icy_board::commands::CommandType;
 use crate::icy_board::state::functions::MASK_NUM;
 use crate::icy_board::state::IcyBoardState;
 use crate::Res;
@@ -7,7 +8,7 @@ use crate::{
 };
 
 impl IcyBoardState {
-    pub async fn set_page_len_command(&mut self, help: &str) -> Res<()> {
+    pub async fn set_page_len_command(&mut self) -> Res<()> {
         let page_len = if let Some(token) = self.session.tokens.pop_front() {
             token
         } else {
@@ -17,7 +18,7 @@ impl IcyBoardState {
                 IceText::EnterPageLength,
                 2,
                 &MASK_NUM,
-                help,
+                CommandType::SetPageLength.get_help(),
                 Some(self.session.page_len.to_string()),
                 display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )

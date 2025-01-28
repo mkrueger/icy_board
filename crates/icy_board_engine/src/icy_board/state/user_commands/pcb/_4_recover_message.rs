@@ -1,3 +1,4 @@
+use crate::icy_board::commands::CommandType;
 use crate::icy_board::state::functions::MASK_COMMAND;
 use crate::{icy_board::state::IcyBoardState, Res};
 use crate::{
@@ -7,7 +8,7 @@ use crate::{
 use jamjam::jam::JamMessageBase;
 
 impl IcyBoardState {
-    pub async fn restore_message(&mut self, help: &str) -> Res<()> {
+    pub async fn restore_message(&mut self) -> Res<()> {
         let message_base_file = &self.session.current_conference.areas[0].filename;
         let msgbase_file_resolved = self.get_board().await.resolve_file(message_base_file);
 
@@ -22,7 +23,7 @@ impl IcyBoardState {
                         IceText::MessageNumberToActivate,
                         40,
                         MASK_COMMAND,
-                        help,
+                        &CommandType::RestoreMessage.get_help(),
                         None,
                         display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
                     )
@@ -44,7 +45,7 @@ impl IcyBoardState {
                     .await?;
                 if JamMessageBase::create(msgbase_file_resolved).is_ok() {
                     log::error!("successfully created new message index.");
-                    return self.read_messages(help).await;
+                    return self.read_messages().await;
                 }
                 log::error!("failed to create message index.");
 

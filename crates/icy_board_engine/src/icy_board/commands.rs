@@ -6,7 +6,7 @@ use serde_with::{serde_as, DisplayFromStr};
 
 use super::{security_expr::SecurityExpression, IcyBoardSerializer, PCBoardRecordImporter};
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug, Default)]
 pub enum CommandType {
     /// Do nothing
     #[default]
@@ -178,7 +178,7 @@ pub enum CommandType {
     ExpertMode,
 
     /// Y command
-    PersonalMail,
+    YourMailScan,
 
     /// Z command
     ZippyDirectoryScan,
@@ -285,7 +285,7 @@ impl Display for CommandType {
             CommandType::ViewSettings => write!(f, "(V)\tViewSettings"),
             CommandType::WriteSettings => write!(f, "(W)\tWriteSettings"),
             CommandType::ExpertMode => write!(f, "(X)\tExpertMode"),
-            CommandType::PersonalMail => write!(f, "(Y)\tPersonalMail"),
+            CommandType::YourMailScan => write!(f, "(Y)\tYourMailScan"),
             CommandType::ZippyDirectoryScan => write!(f, "(Z)\tZippyDirectoryScan"),
             CommandType::GroupChat => write!(f, "(CHAT)\tGroupChat"),
             CommandType::OpenDoor => write!(f, "(DOOR)\tOpenDoor"),
@@ -359,7 +359,7 @@ impl FromStr for CommandType {
             "ViewSettings" => Ok(CommandType::ViewSettings),
             "WriteSettings" => Ok(CommandType::WriteSettings),
             "ExpertMode" => Ok(CommandType::ExpertMode),
-            "PersonalMail" => Ok(CommandType::PersonalMail),
+            "YourMailScan" => Ok(CommandType::YourMailScan),
             "ZippyDirectoryScan" => Ok(CommandType::ZippyDirectoryScan),
             "GroupChat" => Ok(CommandType::GroupChat),
             "OpenDoor" => Ok(CommandType::OpenDoor),
@@ -433,7 +433,7 @@ impl CommandType {
             CommandType::ViewSettings,
             CommandType::WriteSettings,
             CommandType::ExpertMode,
-            CommandType::PersonalMail,
+            CommandType::YourMailScan,
             CommandType::ZippyDirectoryScan,
             CommandType::GroupChat,
             CommandType::OpenDoor,
@@ -458,6 +458,58 @@ impl CommandType {
             CommandType::RefreshDisplayString,
         ]
         .into_iter()
+    }
+
+    pub fn get_help(self) -> &'static str {
+        match self {
+            CommandType::RedisplayCommand => "hlp!",
+            CommandType::AbandonConference => "hlpa",
+            CommandType::BulletinList => "hlpb",
+            CommandType::CommentToSysop => "hlpc",
+            CommandType::Download => "hlpd",
+            CommandType::EnterMessage => "hlpe",
+            CommandType::FileDirectory => "hlpf",
+            CommandType::FlagFiles => "hlpflag",
+            CommandType::Goodbye => "hlpg",
+            CommandType::Bye => "hlpg",
+            CommandType::Help => "hlph",
+            CommandType::InitialWelcome => "hlpi",
+            CommandType::JoinConference => "hlpj",
+            CommandType::DeleteMessage => "hlpk",
+            CommandType::LocateFile => "hlpl",
+            CommandType::ToggleGraphics => "hlpm",
+            CommandType::NewFileScan => "hlpn",
+            CommandType::PageSysop => "hlpo",
+            CommandType::SetPageLength => "hlpp",
+            CommandType::QuickMessageScan => "hlpq",
+            CommandType::ReadMessages => "hlpr",
+            CommandType::Survey => "hlps",
+            CommandType::SetTransferProtocol => "hlpt",
+            CommandType::UploadFile => "hlpu",
+            CommandType::ViewSettings => "hlpv",
+            CommandType::WriteSettings => "hlpw",
+            CommandType::ExpertMode => "hlpx",
+            CommandType::YourMailScan => "hlpy",
+            CommandType::ZippyDirectoryScan => "hlpz",
+            CommandType::GroupChat => "hlpchat",
+            CommandType::OpenDoor => "hlpopen",
+            CommandType::TestFile => "hlptest",
+            CommandType::UserList => "hlpusers",
+            CommandType::WhoIsOnline => "hlpwho",
+            CommandType::ShowMenu => "hlpmenu",
+            CommandType::DisplayNews => "hlpnews",
+            CommandType::SetLanguage => "hlplang",
+            CommandType::ReplyMessage => "hlprep",
+            CommandType::EnableAlias => "hlpalias",
+            CommandType::Broadcast => "hlpbrd",
+            CommandType::RestoreMessage => "hlp4",
+            CommandType::ReadEmail => "hlp@",
+            CommandType::WriteEmail => "hlp@w",
+            CommandType::RunPPE => "hlpppe",
+            CommandType::TextSearch => "hlpts",
+
+            _ => "",
+        }
     }
 }
 

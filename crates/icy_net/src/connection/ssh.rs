@@ -81,11 +81,10 @@ impl Connection for SSHConnection {
 
 struct Client {}
 
-#[async_trait]
-impl client::Handler for Client {
+impl russh::client::Handler for Client {
     type Error = russh::Error;
 
-    async fn check_server_key(&mut self, _server_public_key: &ssh_key::PublicKey) -> Result<bool, Self::Error> {
+    async fn check_server_key(&mut self, _: &ssh_key::PublicKey) -> Result<bool, Self::Error> {
         Ok(true)
     }
 }

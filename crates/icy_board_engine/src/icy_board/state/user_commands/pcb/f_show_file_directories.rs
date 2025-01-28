@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use crate::icy_board::commands::CommandType;
 use crate::icy_board::state::functions::MASK_COMMAND;
 use crate::icy_board::state::user_commands::mods::filebrowser::FileList;
 use crate::icy_board::state::IcyBoardState;
@@ -13,7 +14,7 @@ use crate::{
 };
 
 impl IcyBoardState {
-    pub async fn show_file_directories(&mut self, help: &str) -> Res<()> {
+    pub async fn show_file_directories(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::Available).await;
 
         self.session.non_stop_off();
@@ -48,7 +49,7 @@ impl IcyBoardState {
                         },
                         40,
                         MASK_COMMAND,
-                        help,
+                        CommandType::FileDirectory.get_help(),
                         None,
                         display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
                     )
@@ -65,7 +66,7 @@ impl IcyBoardState {
                 if 1 <= number && (number as usize) <= self.session.current_conference.directories.len() {
                     let area = &self.session.current_conference.directories[number as usize - 1];
                     if area.list_security.user_can_access(&self.session) {
-                        self.display_file_area(help, &area.path.to_path_buf()).await?;
+                        self.display_file_area(&area.path.to_path_buf()).await?;
                         self.new_line().await?;
                         continue;
                     }
@@ -79,23 +80,21 @@ impl IcyBoardState {
             } else {
                 match directory_number.to_ascii_uppercase().as_str() {
                     "U" => {
-                        self.display_file_area(help, &self.session.current_conference.pub_upload_location.clone())
-                            .await?;
+                        self.display_file_area(&self.session.current_conference.pub_upload_location.clone()).await?;
                     }
                     "P" => {
                         if self.session.is_sysop {
-                            self.display_file_area(help, &self.session.current_conference.private_upload_location.clone())
-                                .await?;
+                            self.display_file_area(&self.session.current_conference.private_upload_location.clone()).await?;
                         }
                     }
                     "F" | "FL" | "FLA" | "FLAG" => {
                         self.flag_files().await?;
                     }
                     "L" => {
-                        self.find_files_cmd("hlpf").await?;
+                        self.find_files_cmd().await?;
                     }
                     "Z" => {
-                        self.zippy_directory_scan("hlpz").await?;
+                        self.zippy_directory_scan().await?;
                     }
                     "N" => {
                         self.find_new_files(self.session.current_user.as_ref().unwrap().stats.last_on.into()).await?;
@@ -128,9 +127,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    async fn display_file_area(&mut self, help: &str, path: &Path) -> Res<()> {
-        self.session.disp_options.file_list_help = help.to_string();
-
+    async fn display_file_area(&mut self, path: &Path) -> Res<()> {
         let colors = self.get_board().await.config.color_configuration.clone();
         let file_base_path = self.resolve_path(&path);
         let Ok(base) = self.get_filebase(&file_base_path).await else {

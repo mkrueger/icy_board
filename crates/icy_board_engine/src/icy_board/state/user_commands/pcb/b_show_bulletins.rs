@@ -1,12 +1,13 @@
 use crate::icy_board::{
     bulletins::MASK_BULLETINS,
+    commands::CommandType,
     icb_text::IceText,
     state::{functions::display_flags, NodeStatus},
 };
 use crate::{icy_board::state::IcyBoardState, Res};
 
 impl IcyBoardState {
-    pub async fn show_bulletins(&mut self, help: &str) -> Res<()> {
+    pub async fn show_bulletins(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::ReadBulletins).await;
 
         let bulletins = self.load_bullettins().await?;
@@ -36,7 +37,7 @@ impl IcyBoardState {
                     },
                     12,
                     MASK_BULLETINS,
-                    help,
+                    CommandType::Survey.get_help(),
                     None,
                     display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
                 )

@@ -20,7 +20,7 @@ impl IcyBoardState {
                 IceText::ArchiveViewFileName,
                 60,
                 &MASK_ASCII,
-                &"hlpflag",
+                &"",
                 None,
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )

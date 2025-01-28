@@ -1,5 +1,6 @@
 use crate::{
     icy_board::{
+        commands::CommandType,
         conferences::Conference,
         icb_config::IcbColor,
         icb_text::IceText,
@@ -13,7 +14,7 @@ use jamjam::jam::JamMessageBase;
 use crate::{icy_board::state::IcyBoardState, Res};
 
 #[derive(Default)]
-struct PersonalMailScan {
+struct YourMailScan {
     select_conf: bool,
     all_conf: bool,
     wait_conf: bool,
@@ -29,7 +30,7 @@ struct ScanResult {
 }
 
 impl IcyBoardState {
-    pub async fn personal_mail(&mut self, help: &str) -> Res<()> {
+    pub async fn your_mail_scan(&mut self) -> Res<()> {
         let text = if let Some(token) = self.session.tokens.pop_front() {
             token
         } else {
@@ -37,14 +38,14 @@ impl IcyBoardState {
                 IceText::MessageScanPrompt,
                 8,
                 &MASK_ASCII,
-                help,
+                CommandType::YourMailScan.get_help(),
                 None,
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE | display_flags::STACKED,
             )
             .await?
         };
         self.session.push_tokens(&text);
-        let mut scan = PersonalMailScan::default();
+        let mut scan = YourMailScan::default();
         scan.quick = true;
         loop {
             let Some(cmd) = self.session.tokens.pop_front() else {
@@ -163,7 +164,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    fn scan_conference(&self, conf: &Conference, _scan: &PersonalMailScan) -> Res<ScanResult> {
+    fn scan_conference(&self, conf: &Conference, _scan: &YourMailScan) -> Res<ScanResult> {
         let name = BString::from(self.session.user_name.clone());
         let alias = BString::from(self.session.alias_name.clone());
         let mut msg_from = 0;

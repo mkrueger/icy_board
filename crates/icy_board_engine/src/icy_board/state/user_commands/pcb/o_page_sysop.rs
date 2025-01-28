@@ -2,7 +2,7 @@ use crate::icy_board::{icb_text::IceText, state::functions::display_flags};
 use crate::{icy_board::state::IcyBoardState, Res};
 
 impl IcyBoardState {
-    pub async fn page_sysop_command(&mut self, help: &str) -> Res<()> {
+    pub async fn page_sysop_command(&mut self) -> Res<()> {
         if !self.get_board().await.config.options.page_bell {
             self.display_text(IceText::SysopUnAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
@@ -18,7 +18,7 @@ impl IcyBoardState {
                 )
                 .await?;
             if comment == self.session.yes_char.to_string() {
-                self.comment_to_sysop(help).await?;
+                self.comment_to_sysop().await?;
             }
             self.enter_comment_to_sysop().await?;
             return Ok(());

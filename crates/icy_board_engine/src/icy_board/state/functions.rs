@@ -242,7 +242,7 @@ impl IcyBoardState {
         let converted_content = if content.starts_with(&UTF8_BOM) {
             String::from_utf8_lossy(&content[3..]).to_string()
         } else {
-            let mut s = String::new();
+            let mut s: String = String::new();
             for byte in content {
                 if byte == 0x1A {
                     break;
@@ -253,12 +253,17 @@ impl IcyBoardState {
         };
         for (i, line) in converted_content.lines().enumerate() {
             if i > 0 {
-                self.write_raw(TerminalTarget::Both, &['\r', '\n']).await?;
+                self.new_line().await?;
                 if self.session.disp_options.abort_printout {
                     break;
                 }
             }
             self.display_line(line).await?;
+        }
+
+        // .lines() not recognizes last empty line.
+        if converted_content.ends_with('\n') {
+            self.new_line().await?;
         }
         Ok(true)
     }
@@ -502,7 +507,7 @@ impl IcyBoardState {
     }
 
     #[async_recursion(?Send)]
-    pub async fn show_message_areas(&mut self, conference: u16, help: &str) -> Res<Option<usize>> {
+    pub async fn show_message_areas(&mut self, conference: u16) -> Res<Option<usize>> {
         let menu = self.get_board().await.conferences[conference as usize].area_menu.clone();
         let areas = self.get_board().await.conferences[conference as usize].areas.clone();
 
@@ -531,7 +536,7 @@ impl IcyBoardState {
                 },
                 40,
                 &MASK_NUM,
-                &help,
+                CommandType::ReadMessages.get_help(),
                 None,
                 display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )

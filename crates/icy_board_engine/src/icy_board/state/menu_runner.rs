@@ -181,16 +181,15 @@ impl IcyBoardState {
         if !self.check_sec(command_str, &command.security).await? {
             return Ok(());
         }
-        let help = &command.help;
         for cmd_action in &command.actions {
-            self.run_action(command, cmd_action, help).await?;
+            self.run_action(command, cmd_action).await?;
         }
         self.session.tokens.clear();
 
         Ok(())
     }
 
-    async fn run_action(&mut self, command: &Command, cmd_action: &CommandAction, help: &String) -> Res<()> {
+    async fn run_action(&mut self, command: &Command, cmd_action: &CommandAction) -> Res<()> {
         match cmd_action.command_type {
             CommandType::GotoXY => {
                 let pos = crate::icy_board::commands::Position::parse(&cmd_action.parameter);
@@ -212,11 +211,11 @@ impl IcyBoardState {
             }
             CommandType::BulletinList => {
                 // B
-                self.show_bulletins(help).await?;
+                self.show_bulletins().await?;
             }
             CommandType::CommentToSysop => {
                 // C
-                self.comment_to_sysop(help).await?;
+                self.comment_to_sysop().await?;
             }
 
             CommandType::Download => {
@@ -229,12 +228,12 @@ impl IcyBoardState {
             }
             CommandType::EnterMessage => {
                 // E
-                self.enter_message(help).await?;
+                self.enter_message().await?;
             }
 
             CommandType::FileDirectory => {
                 // F
-                self.show_file_directories(help).await?;
+                self.show_file_directories().await?;
             }
 
             CommandType::Goodbye => {
@@ -255,15 +254,15 @@ impl IcyBoardState {
             }
             CommandType::JoinConference => {
                 // J
-                self.join_conference_cmd(help).await?;
+                self.join_conference_cmd().await?;
             }
             CommandType::DeleteMessage => {
                 // K
-                self.delete_message(help).await?;
+                self.delete_message().await?;
             }
             CommandType::LocateFile => {
                 // L
-                self.find_files_cmd(help).await?;
+                self.find_files_cmd().await?;
             }
             CommandType::ToggleGraphics => {
                 // M
@@ -277,23 +276,23 @@ impl IcyBoardState {
             }
             CommandType::PageSysop => {
                 // O
-                self.page_sysop_command(help).await?;
+                self.page_sysop_command().await?;
             }
             CommandType::SetPageLength => {
                 // P
-                self.set_page_len_command(help).await?;
+                self.set_page_len_command().await?;
             }
             CommandType::QuickMessageScan => {
                 // Q
-                self.quick_message_scan(help).await?;
+                self.quick_message_scan().await?;
             }
             CommandType::ReadMessages => {
                 // R
-                self.read_messages(help).await?;
+                self.read_messages().await?;
             }
             CommandType::Survey => {
                 // S
-                self.take_survey(help).await?;
+                self.take_survey().await?;
             }
             CommandType::SetTransferProtocol => {
                 // T
@@ -301,7 +300,7 @@ impl IcyBoardState {
             }
             CommandType::UploadFile => {
                 // U
-                self.upload_file(help).await?;
+                self.upload_file().await?;
             }
             CommandType::ViewSettings => {
                 // V
@@ -316,13 +315,13 @@ impl IcyBoardState {
                 // X
                 self.set_expert_mode().await?;
             }
-            CommandType::PersonalMail => {
+            CommandType::YourMailScan => {
                 // Y
-                self.personal_mail(help).await?;
+                self.your_mail_scan().await?;
             }
             CommandType::ZippyDirectoryScan => {
                 // Z
-                self.zippy_directory_scan(help).await?;
+                self.zippy_directory_scan().await?;
             }
 
             CommandType::ShowMenu => {
@@ -337,7 +336,7 @@ impl IcyBoardState {
             }
             CommandType::UserList => {
                 // USER
-                self.show_user_list_cmd(help).await?;
+                self.show_user_list_cmd().await?;
             }
             CommandType::SetLanguage => {
                 // LANG
@@ -354,18 +353,19 @@ impl IcyBoardState {
 
             CommandType::OpenDoor => {
                 // DOOR/OPEN
-                self.open_door(help).await?;
+                self.open_door().await?;
             }
 
             CommandType::RestoreMessage => {
                 // 4
-                self.restore_message(help).await?;
+                self.restore_message().await?;
             }
 
             CommandType::ReadEmail => {
                 // @
-                self.read_email(help).await?;
+                self.read_email().await?;
             }
+
             CommandType::RunPPE => {
                 // PPE
                 if !cmd_action.parameter.is_empty() {
@@ -376,7 +376,7 @@ impl IcyBoardState {
 
             CommandType::TextSearch => {
                 // TS
-                self.text_search(help).await?;
+                self.text_search().await?;
             }
 
             CommandType::Broadcast => {
@@ -462,7 +462,7 @@ impl IcyBoardState {
 
             for a in &cmd.actions {
                 if a.trigger == ActionTrigger::Selection {
-                    self.run_action(cmd, a, &cmd.help).await?;
+                    self.run_action(cmd, a).await?;
                 }
             }
             self.print(TerminalTarget::Both, "\x1b[u").await?;

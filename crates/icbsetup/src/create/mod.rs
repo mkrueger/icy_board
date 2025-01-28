@@ -63,6 +63,7 @@ lazy_static::lazy_static! {
         ("hlpo", include_bytes!("../../data/new_bbs/help/hlpo.icy").to_vec()),
         ("hlpopen", include_bytes!("../../data/new_bbs/help/hlpopen.icy").to_vec()),
         ("hlpp", include_bytes!("../../data/new_bbs/help/hlpp.icy").to_vec()),
+        ("hlpppe", include_bytes!("../../data/new_bbs/help/hlpppe.icy").to_vec()),
         ("hlpq", include_bytes!("../../data/new_bbs/help/hlpq.icy").to_vec()),
         ("hlpqwk", include_bytes!("../../data/new_bbs/help/hlpqwk.icy").to_vec()),
         ("hlpreg", include_bytes!("../../data/new_bbs/help/hlpreg.icy").to_vec()),
@@ -83,6 +84,8 @@ lazy_static::lazy_static! {
         ("hlpx", include_bytes!("../../data/new_bbs/help/hlpx.icy").to_vec()),
         ("hlpy", include_bytes!("../../data/new_bbs/help/hlpy.icy").to_vec()),
         ("hlpz", include_bytes!("../../data/new_bbs/help/hlpz.icy").to_vec()),
+        ("hlp@", include_bytes!("../../data/new_bbs/help/hlp@.icy").to_vec()),
+        ("hlp@w", include_bytes!("../../data/new_bbs/help/hlp@w.icy").to_vec()),
     ];
 }
 
@@ -114,7 +117,7 @@ impl IcyBoardCreator {
         for hlp in HELP_FILES.iter() {
             let buffer = Buffer::from_bytes(&path, true, &hlp.1, None, None).unwrap();
             let bytes = buffer.to_bytes("pcb", &options).unwrap();
-            fs::write(&self.destination.join(&config.paths.help_path).join(hlp.0), &bytes)?;
+            fs::write(&self.destination.join(&config.paths.help_path).join(hlp.0).with_extension("pcb"), &bytes)?;
         }
 
         fs::create_dir_all(&self.destination.join(&config.paths.tmp_work_path))?;

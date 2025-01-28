@@ -3,7 +3,10 @@ use std::{
     io::Write,
 };
 
-use crate::{icy_board::state::IcyBoardState, Res};
+use crate::{
+    icy_board::{commands::CommandType, state::IcyBoardState},
+    Res,
+};
 
 use crate::{
     icy_board::{
@@ -21,7 +24,7 @@ use crate::{
 use chrono::Local;
 
 impl IcyBoardState {
-    pub async fn take_survey(&mut self, help: &str) -> Res<()> {
+    pub async fn take_survey(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::TakeSurvey).await;
 
         let surveys = self.load_surveys().await?;
@@ -47,7 +50,7 @@ impl IcyBoardState {
                     IceText::QuestionNumberToAnswer,
                     12,
                     MASK_BULLETINS,
-                    help,
+                    CommandType::Survey.get_help(),
                     None,
                     display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
                 )
