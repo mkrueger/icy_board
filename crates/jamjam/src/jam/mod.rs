@@ -1,5 +1,6 @@
 use std::fs::{self, OpenOptions};
 use std::io::{BufReader, BufWriter, Seek, SeekFrom, Write};
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -359,6 +360,28 @@ impl JamMessageBase {
             res.push(last_read);
         }
         Ok(res)
+    }
+
+    pub fn write_last_read(&self, opt: JamLastReadStorage) -> crate::Result<()> {
+        let last_read_file_name = self.file_name.with_extension(extensions::LASTREAD_INFO);
+        let mut file = fs::OpenOptions::new().write(true).open(last_read_file_name)?;
+        const LEN: u64 = 16;
+        file.seek(SeekFrom::Start(self.last_read_record as u64 * LEN))?;
+        opt.write(&mut file)?;
+        Ok(())
+    }
+
+    pub fn create_last_read(&mut self, user_name_crc: u32, id: u32) -> crate::Result<JamLastReadStorage> {
+        let mut opt = JamLastReadStorage::default();
+        opt.user_crc = user_name_crc;
+        opt.user_id = id;
+        let last_read_file_name = self.file_name.with_extension(extensions::LASTREAD_INFO);
+
+        let mut file = fs::OpenOptions::new().append(true).open(last_read_file_name)?;
+        const LEN: u64 = 16;
+        self.last_read_record = (file.metadata().unwrap().size() / LEN) as i32;
+        opt.write(&mut file)?;
+        Ok(opt)
     }
 
     pub fn find_last_read(&mut self, user_name_crc: u32, id: u32) -> crate::Result<Option<JamLastReadStorage>> {

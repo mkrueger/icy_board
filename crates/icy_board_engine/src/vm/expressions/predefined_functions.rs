@@ -15,7 +15,7 @@ use crate::icy_board::user_base::Password;
 use crate::parser::CONFERENCE_ID;
 use crate::vm::{TerminalTarget, VirtualMachine};
 use crate::Res;
-use chrono::Local;
+use chrono::Utc;
 use icy_engine::{update_crc32, Position, TextPane};
 use radix_fmt::radix;
 use rand::Rng; // 0.8.5
@@ -663,7 +663,7 @@ pub async fn minleft(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn minon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let min = (Local::now() - vm.icy_board_state.session.login_date).num_minutes();
+    let min = (Utc::now() - vm.icy_board_state.session.login_date).num_minutes();
     Ok(VariableValue::new_int(min as i32))
 }
 

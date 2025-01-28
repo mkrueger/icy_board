@@ -190,6 +190,10 @@ pub struct UserStats {
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_64")]
     pub total_doors_executed: u64,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_null_16")]
+    pub minutes_today: u16,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -594,6 +598,7 @@ impl User {
                 today_num_downloads: 0,
                 today_num_uploads: 0,
                 total_doors_executed: 0,
+                minutes_today: 0,
             },
         }
     }

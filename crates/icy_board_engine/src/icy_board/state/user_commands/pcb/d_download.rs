@@ -144,7 +144,7 @@ impl IcyBoardState {
                         self.display_text(IceText::BatchSend, display_flags::LFBEFORE).await?;
 
                         self.board.lock().await.statistics.add_download(&state);
-                        self.board.lock().await.save_statistics();
+                        self.board.lock().await.save_statistics()?;
                     }
                     Err(e) => {
                         log::error!("Error while initiating file transfer with {:?} : {}", protocol, e);

@@ -186,7 +186,7 @@ impl MessageViewer {
 }
 
 impl IcyBoardState {
-    pub async fn read_msgs_from_base(&mut self, message_base: JamMessageBase) -> Res<()> {
+    pub async fn read_msgs_from_base(&mut self, mut message_base: JamMessageBase) -> Res<()> {
         let viewer = MessageViewer::load(&self.display_text)?;
 
         while !self.session.disp_options.abort_printout {
@@ -212,7 +212,7 @@ impl IcyBoardState {
             }
 
             if let Ok(number) = text.parse::<u32>() {
-                self.read_message_number(&message_base, &viewer, number, None).await?;
+                self.read_message_number(&mut message_base, &viewer, number, None).await?;
             }
         }
         self.press_enter().await?;
@@ -222,13 +222,29 @@ impl IcyBoardState {
 
     pub async fn read_message_number(
         &mut self,
-        message_base: &JamMessageBase,
+        message_base: &mut JamMessageBase,
         viewer: &MessageViewer,
         mut number: u32,
         matches: Option<Vec<(usize, usize)>>,
     ) -> Res<()> {
         if number == 0 {
             return Ok(());
+        }
+        self.session.current_messagenumber = number;
+        self.session.high_msg_num = message_base.base_messagenumber();
+        self.session.high_msg_num = message_base.base_messagenumber() + message_base.active_messages();
+
+        unsafe {
+            let crc = JamMessageBase::get_crc(&bstr::BString::new(self.session.user_name.as_mut_vec().clone()));
+            let mut opt = message_base
+                .find_last_read(crc, self.session.cur_user_id as u32)?
+                .unwrap_or(message_base.create_last_read(crc, self.session.cur_user_id as u32)?);
+            self.session.last_msg_read = opt.last_read_msg;
+            self.session.highest_msg_read = opt.high_read_msg;
+
+            opt.last_read_msg = number;
+            opt.high_read_msg = opt.high_read_msg.max(number);
+            message_base.write_last_read(opt)?;
         }
         loop {
             match message_base.read_header(number) {

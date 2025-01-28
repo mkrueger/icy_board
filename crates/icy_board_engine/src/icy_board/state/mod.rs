@@ -10,7 +10,7 @@ use std::{
 
 use crate::{executable::Executable, icy_board::user_base::UserBase, Res};
 use async_recursion::async_recursion;
-use chrono::{DateTime, Datelike, Local, Timelike, Utc};
+use chrono::{DateTime, Datelike, Local, Utc};
 use codepages::tables::UNICODE_TO_CP437;
 use dizbase::file_base::FileBase;
 use icy_engine::{ansi, OutputFormat, SaveOptions, ScreenPreperation};
@@ -70,6 +70,9 @@ pub struct DisplayOptions {
     pub show_on_screen: bool,
 
     pub in_file_list: Option<PathBuf>,
+
+    // Enable CTRL-X / CTRL-K checking for display_files
+    pub allow_break: bool,
 }
 
 impl DisplayOptions {
@@ -94,6 +97,7 @@ impl Default for DisplayOptions {
             display_text: true,
             show_on_screen: true,
             in_file_list: None,
+            allow_break: true,
         }
     }
 }
@@ -126,7 +130,7 @@ pub struct Session {
     pub is_local: bool,
     pub paged_sysop: bool,
 
-    pub login_date: DateTime<Local>,
+    pub login_date: DateTime<Utc>,
 
     pub current_user: Option<User>,
     pub cur_user_id: i32,
@@ -187,6 +191,13 @@ pub struct Session {
     // The maximum number of files in flagged_files
     pub batch_limit: usize,
     pub flagged_files: Vec<PathBuf>,
+
+    /// The current message number read (used for @CURMSGNUM@ macro)
+    pub current_messagenumber: u32,
+    pub high_msg_num: u32,
+    pub low_msg_num: u32,
+    pub last_msg_read: u32,
+    pub highest_msg_read: u32,
 }
 
 impl Session {
@@ -195,7 +206,7 @@ impl Session {
             disp_options: DisplayOptions::default(),
             current_conference_number: 0,
             current_conference: Conference::default(),
-            login_date: Local::now(),
+            login_date: Utc::now(),
             current_user: None,
             cur_user_id: -1,
             cur_security: 0,
@@ -238,6 +249,11 @@ impl Session {
 
             // Seems to be hardcoded in PCBoard
             batch_limit: 30,
+            current_messagenumber: 0,
+            high_msg_num: 0,
+            low_msg_num: 0,
+            last_msg_read: 0,
+            highest_msg_read: 0,
         }
     }
 
@@ -761,7 +777,6 @@ impl IcyBoardState {
             return Err(IcyBoardError::UserNumberInvalid(user_number).into());
         }
         let mut user = self.get_board().await.users[user_number].clone();
-        user.stats.last_on = Utc::now();
         user.stats.num_times_on += 1;
         let last_conference: u16 = user.last_conference;
         self.get_board().await.statistics.add_caller(user.get_name().clone());
@@ -799,6 +814,16 @@ impl IcyBoardState {
         };
         if self.session.language != old_language {
             self.update_language().await;
+        }
+
+        if let Some(user) = &mut self.session.current_user {
+            let login_date = self.session.login_date.to_utc();
+            if user.stats.last_on.date_naive() != login_date.date_naive() {
+                user.stats.minutes_today = 0;
+            }
+            user.stats.minutes_today += (Utc::now() - login_date).num_minutes() as u16;
+
+            user.stats.last_on = login_date;
         }
 
         if let Some(user) = &self.session.current_user {
@@ -1317,8 +1342,11 @@ impl IcyBoardState {
             "CONFNUM" => result = self.session.current_conference_number.to_string(),
 
             // TODO
-            "CREDLEFT" | "CREDNOW" | "CREDSTART" | "CREDUSED" | "CURMSGNUM" => {}
+            "CREDLEFT" | "CREDNOW" | "CREDSTART" | "CREDUSED" => {}
 
+            "CURMSGNUM" => {
+                result = self.session.current_messagenumber.to_string();
+            }
             "DATAPHONE" => {
                 if let Some(user) = &self.session.current_user {
                     result = user.bus_data_phone.to_string();
@@ -1379,12 +1407,28 @@ impl IcyBoardState {
                     result = user.home_voice_phone.to_string();
                 }
             }
-            "HIGHMSGNUM" => {}
+            "HIGHMSGNUM" => result = self.session.high_msg_num.to_string(),
             "INAME" => {}
             "INCONF" => result = self.session.current_conference.name.to_string(),
-            "LOGDATE" => {} // Logon Date
-            "LOGTIME" => {} // Logon Time
-            "KBLEFT" | "KBLIMIT" | "LASTCALLERNODE" | "LASTCALLERSYSTEM" | "LASTDATEON" | "LASTTIMEON" | "LMR" | "LOWMSGNUM" | "MAXBYTES" | "MAXFILES" => {}
+            "LOGDATE" => result = self.format_date(self.session.login_date),
+            "LOGTIME" => result = self.format_time(self.session.login_date),
+            "LASTDATEON" => {
+                if let Some(user) = &self.session.current_user {
+                    result = self.format_date(user.stats.last_on);
+                }
+            }
+            "LASTTIMEON" => {
+                if let Some(user) = &self.session.current_user {
+                    result = self.format_time(user.stats.last_on);
+                }
+            }
+            "LOWMSGNUM" => {
+                result = self.session.low_msg_num.to_string();
+            }
+            "LMR" => {
+                result = self.session.last_msg_read.to_string();
+            }
+            "KBLEFT" | "KBLIMIT" | "LASTCALLERNODE" | "LASTCALLERSYSTEM" | "MAXBYTES" | "MAXFILES" => {}
             "MINLEFT" => result = "1000".to_string(),
             "MORE" => {
                 let _ = self.more_promt().await;
@@ -1463,7 +1507,27 @@ impl IcyBoardState {
                 self.session.non_stop_off();
                 return None;
             }
-            "PROLTR" | "PRODESC" | "PWXDATE" | "PWXDAYS" | "QOFF" | "QON" | "RATIOBYTES" | "RATIOFILES" => {}
+            "PROLTR" => {
+                if let Some(user) = &self.session.current_user {
+                    result = user.protocol.to_string();
+                }
+            }
+            "PRODESC" => {
+                if let Some(user) = &self.session.current_user {
+                    if let Some(prot) = self.board.lock().await.protocols.find_protocol(&user.protocol) {
+                        result = prot.description.to_string();
+                    }
+                }
+            }
+            "QOFF" => {
+                self.session.disp_options.allow_break = false;
+                return None;
+            }
+            "QON" => {
+                self.session.disp_options.allow_break = true;
+                return None;
+            }
+            "PWXDATE" | "PWXDAYS" | "RATIOBYTES" | "RATIOFILES" => {}
             "RCPS" => result = self.transfer_statistics.uploaded_cps.to_string(),
             "RBYTES" => result = self.transfer_statistics.uploaded_bytes.to_string(),
             "RFILES" => result = self.transfer_statistics.uploaded_files.to_string(),
@@ -1486,13 +1550,11 @@ impl IcyBoardState {
             "SYSOPIN" => result = self.get_board().await.config.sysop.sysop_start.to_string(),
             "SYSOPOUT" => result = self.get_board().await.config.sysop.sysop_stop.to_string(),
             "SYSTIME" => {
-                let now = Local::now();
-                let t = now.time();
-                result = format!("{:02}:{:02}", t.hour(), t.minute());
+                result = self.format_time(Utc::now());
             }
             "TIMELIMIT" => result = self.session.time_limit.to_string(),
             "TIMELEFT" => {
-                let now = Local::now();
+                let now = Utc::now();
                 let time_on = now - self.session.login_date;
                 if self.session.time_limit == 0 {
                     result = "UNLIMITED".to_string();
@@ -1500,8 +1562,14 @@ impl IcyBoardState {
                     result = (self.session.time_limit as i64 - time_on.num_minutes()).to_string();
                 }
             }
-            "TIMEUSED" => {}
-            "TOTALTIME" => {}
+            "TIMEUSED" => result = (Utc::now() - self.session.login_date).num_minutes().to_string(),
+            "TOTALTIME" => {
+                let mut current = (Utc::now() - self.session.login_date).num_minutes();
+                if let Some(user) = &self.session.current_user {
+                    current += user.stats.minutes_today as i64;
+                }
+                result = current.to_string();
+            }
             "UPBYTES" => {
                 if let Some(user) = &self.session.current_user {
                     result = user.stats.total_upld_bytes.to_string();
@@ -1527,8 +1595,14 @@ impl IcyBoardState {
                     result = "0".to_string();
                 }
             }
-            "WAIT" => {}
-            "WHO" => {}
+            "WAIT" => {
+                let _ = self.press_enter().await;
+                return None;
+            }
+            "WHO" => {
+                let _ = self.who_display_nodes().await;
+                return None;
+            }
             "XOFF" => {
                 self.session.disp_options.grapics_mode = GraphicsMode::Ansi;
                 return None;

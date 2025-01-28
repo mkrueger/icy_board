@@ -10,7 +10,7 @@ use crate::{
     tables::export_cp437_string,
     Res,
 };
-use chrono::{Local, Timelike};
+use chrono::{Timelike, Utc};
 pub async fn create_pcboard(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     create_pcboard_sys(state, path)?;
     create_user_sys(state, path).await?;
@@ -39,7 +39,7 @@ fn create_pcboard_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> 
     contents.extend(export_cp437_string(&state.session.get_first_name(), 15, b' ')); // User's First Name (padded to 15 characters)
     contents.extend(export_cp437_string(&"SECRET", 12, b' ')); // User's Password (padded to 12 characters)
     contents.extend(u16::to_le_bytes((state.session.login_date.time().num_seconds_from_midnight() / 60) as u16)); // Time User Logged On (in minutes since midnight)
-    contents.extend(u16::to_le_bytes((Local::now() - state.session.login_date).num_minutes() as u16)); // Time used so far today (negative number of minutes)
+    contents.extend(u16::to_le_bytes((Utc::now() - state.session.login_date).num_minutes() as u16)); // Time used so far today (negative number of minutes)
     contents.extend(state.session.login_date.format("%H:%M").to_string().as_bytes()); // Time User Logged On (in "HH:MM" format)
     contents.extend(u16::to_le_bytes(32767)); // Time Allowed On (from PWRD file)
     contents.extend(u16::to_le_bytes(32767)); // Allowed K-Bytes for Download
@@ -158,7 +158,7 @@ async fn create_user_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<(
         contents.extend(export_cp437_string(&user.user_comment, 31, 0));
         contents.extend(export_cp437_string(&user.sysop_comment, 31, 0));
         contents.extend(u32::to_le_bytes(user.stats.today_dnld_bytes as u32));
-        contents.extend(u32::to_le_bytes((Local::now() - state.session.login_date).num_minutes() as u32));
+        contents.extend(u32::to_le_bytes((Utc::now() - state.session.login_date).num_minutes() as u32));
         contents.extend(u16::to_le_bytes(0)); // Julian date for Registration Expiration Date
         contents.extend(u32::to_le_bytes(0)); // Expired Security Level
         contents.extend(u16::to_le_bytes(0)); // LastConference

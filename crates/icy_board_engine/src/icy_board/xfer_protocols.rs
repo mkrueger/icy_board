@@ -64,6 +64,15 @@ impl SupportedProtocols {
         fs::write(output, res)?;
         Ok(())
     }
+
+    pub fn find_protocol(&self, char_code: &str) -> Option<&Protocol> {
+        for p in &self.protocols {
+            if p.char_code == char_code {
+                return Some(p);
+            }
+        }
+        None
+    }
 }
 
 impl Deref for SupportedProtocols {

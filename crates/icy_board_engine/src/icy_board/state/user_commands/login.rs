@@ -27,7 +27,7 @@ impl IcyBoardState {
         self.reset_color(TerminalTarget::Both).await?;
         self.clear_screen(TerminalTarget::Both).await?;
         self.get_term_caps()?;
-        self.session.login_date = chrono::Local::now();
+        self.session.login_date = chrono::Utc::now();
 
         // intial_welcome
         let board_name = self.get_board().await.config.board.name.clone();

@@ -1,6 +1,6 @@
 use std::fs;
 
-use chrono::{Local, Timelike, Utc};
+use chrono::{Timelike, Utc};
 use icy_engine::TextPane;
 
 use crate::{
@@ -53,7 +53,7 @@ pub async fn create_chain_txt(state: &IcyBoardState, path: &std::path::Path) -> 
     contents.push_str(&format!("{}\r\n", board.config.board.name));
     contents.push_str(&format!("{}\r\n", board.config.sysop.name));
     contents.push_str(&format!("{}\r\n", state.session.login_date.time().num_seconds_from_midnight()));
-    contents.push_str(&format!("{}\r\n", (Local::now() - state.session.login_date).num_seconds()));
+    contents.push_str(&format!("{}\r\n", (Utc::now() - state.session.login_date).num_seconds()));
     contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.total_upld_bytes / 1024));
     contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_uploads));
     contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.today_dnld_bytes / 1024));

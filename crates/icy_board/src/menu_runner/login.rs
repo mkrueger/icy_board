@@ -26,7 +26,7 @@ impl PcbBoardCommand {
         self.state.reset_color(TerminalTarget::Both).await?;
         self.state.clear_screen(TerminalTarget::Both).await?;
         self.state.get_term_caps()?;
-        self.state.session.login_date = chrono::Local::now();
+        self.state.session.login_date = chrono::Utc::now();
 
         // intial_welcome
         let board_name = self.state.get_board().await.config.board.name.clone();

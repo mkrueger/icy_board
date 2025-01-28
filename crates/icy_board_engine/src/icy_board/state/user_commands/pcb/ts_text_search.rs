@@ -45,7 +45,7 @@ impl IcyBoardState {
         let message_base_file = &self.session.current_conference.areas[area].filename;
         let msgbase_file_resolved = self.get_board().await.resolve_file(message_base_file);
         match JamMessageBase::open(&msgbase_file_resolved) {
-            Ok(message_base) => {
+            Ok(mut message_base) => {
                 let msg_search_from = if let Some(token) = self.session.tokens.pop_front() {
                     token
                 } else {
@@ -73,7 +73,7 @@ impl IcyBoardState {
                         let txt = message_base.read_msg_text(&msg)?;
                         let matches = get_matches(&txt, &search_text);
                         if !matches.is_empty() {
-                            self.read_message_number(&message_base, &viewer, start, Some(matches)).await?;
+                            self.read_message_number(&mut message_base, &viewer, start, Some(matches)).await?;
                         }
                     }
                     start += 1;
