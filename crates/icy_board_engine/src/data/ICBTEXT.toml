@@ -1848,7 +1848,7 @@ style = "White"
 text = "Output File Name"
 style = "Red"
 
-[BatchDownloadTime]
+[_BatchDownloadTime]
 text = "Batch Download Time:~"
 style = "Yellow"
 

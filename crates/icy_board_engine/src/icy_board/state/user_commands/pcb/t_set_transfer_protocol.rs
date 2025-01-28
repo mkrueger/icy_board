@@ -20,7 +20,7 @@ impl IcyBoardState {
             String::new()
         };
 
-        let protocol = self.ask_protocols(cur_protocol).await?;
+        let protocol = self.ask_protocols(&cur_protocol).await?;
         if !protocol.is_empty() {
             let selected_protocol = protocol.to_ascii_uppercase();
 
@@ -35,7 +35,7 @@ impl IcyBoardState {
             if let Some(user) = &mut self.session.current_user {
                 user.protocol = selected_protocol;
             }
-            self.set_color(TerminalTarget::Both, IcbColor::Dos(11)).await?;
+            self.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
             self.print(TerminalTarget::Both, &txt).await?;
             self.new_line().await?;
             self.new_line().await?;
@@ -45,7 +45,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub async fn ask_protocols(&mut self, cur_protocol: String) -> Res<String> {
+    pub async fn ask_protocols(&mut self, cur_protocol: &str) -> Res<String> {
         let mut protocols = Vec::new();
         self.new_line().await?;
         for protocol in self.get_board().await.protocols.iter() {
@@ -71,7 +71,7 @@ impl IcyBoardState {
             ));
         }
 
-        self.set_color(TerminalTarget::Both, IcbColor::Dos(11)).await?;
+        self.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
         for line in protocols {
             self.print(TerminalTarget::Both, &line).await?;
             self.new_line().await?;
@@ -83,7 +83,7 @@ impl IcyBoardState {
                 &MASK_ALNUM,
                 "",
                 Some(cur_protocol.to_string()),
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER | display_flags::UPCASE | display_flags::FIELDLEN,
+                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE | display_flags::FIELDLEN,
             )
             .await?;
         Ok(protocol)

@@ -256,7 +256,7 @@ pub async fn log(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 pub async fn input(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let prompt = vm.eval_expr(&args[0]).await?.as_string();
-    let color = IcbColor::Dos(14);
+    let color = IcbColor::dos_yellow();
     let d = get_default_string(vm, &args[1]).await;
     let output = vm
         .icy_board_state

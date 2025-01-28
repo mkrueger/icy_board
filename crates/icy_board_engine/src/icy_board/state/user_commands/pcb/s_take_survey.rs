@@ -168,7 +168,7 @@ impl IcyBoardState {
                 };
                 if txt.eq_ignore_ascii_case(&self.session.yes_char.to_string()) {
                     for question in &lines[start_line..] {
-                        self.set_color(TerminalTarget::Both, IcbColor::Dos(14)).await?;
+                        self.set_color(TerminalTarget::Both, IcbColor::dos_yellow()).await?;
                         self.print(TerminalTarget::Both, question).await?;
                         self.new_line().await?;
                         self.reset_color(TerminalTarget::Both).await?;

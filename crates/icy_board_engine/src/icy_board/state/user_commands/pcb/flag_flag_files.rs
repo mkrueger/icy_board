@@ -10,18 +10,22 @@ use crate::{
 };
 
 impl IcyBoardState {
-    pub async fn flag_files(&mut self) -> Res<()> {
+    pub async fn flag_files_cmd(&mut self, show_flagged: bool) -> Res<()> {
         // flag
         let input = if let Some(token) = self.session.tokens.pop_front() {
             token
         } else {
             self.input_field(
-                IceText::FlagForDownload,
+                if show_flagged {
+                    IceText::FileNameToDownloadBatch
+                } else {
+                    IceText::FlagForDownload
+                },
                 60,
                 &MASK_ASCII,
                 &"hlpflag",
                 None,
-                display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFAFTER | display_flags::HIGHASCII,
+                display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFAFTER | display_flags::LFBEFORE | display_flags::HIGHASCII,
             )
             .await?
         };
@@ -72,14 +76,15 @@ impl IcyBoardState {
                     continue;
                 }
 
-                if !self.session.flagged_files.insert(file) {
+                if self.session.flagged_files.contains(&file) {
                     self.session.op_text = name;
                     self.display_text(IceText::DuplicateBatchFile, display_flags::NEWLINE).await?;
                     continue;
                 }
+                self.session.flagged_files.push(file);
 
                 let count = self.session.flagged_files.len();
-                self.set_color(TerminalTarget::Both, IcbColor::Dos(10)).await?;
+                self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
                 let nr: String = format!("({})", count);
                 self.println(
                     TerminalTarget::Both,

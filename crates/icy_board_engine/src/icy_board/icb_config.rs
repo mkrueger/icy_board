@@ -194,6 +194,43 @@ pub enum IcbColor {
     IcyEngine(Color),
 }
 
+impl IcbColor {
+    pub fn dos_black() -> Self {
+        IcbColor::Dos(0x00)
+    }
+    pub fn dos_blue() -> Self {
+        IcbColor::Dos(0x00)
+    }
+
+    pub fn dos_light_blue() -> Self {
+        IcbColor::Dos(0x09)
+    }
+
+    pub fn dos_light_green() -> Self {
+        IcbColor::Dos(0x0A)
+    }
+
+    pub fn dos_cyan() -> Self {
+        IcbColor::Dos(0x0B)
+    }
+
+    pub fn dos_light_red() -> Self {
+        IcbColor::Dos(0x0C)
+    }
+
+    pub fn dos_magenta() -> Self {
+        IcbColor::Dos(0x0D)
+    }
+
+    pub fn dos_yellow() -> Self {
+        IcbColor::Dos(0x0E)
+    }
+
+    pub fn dos_white() -> Self {
+        IcbColor::Dos(0x0F)
+    }
+}
+
 impl From<u8> for IcbColor {
     fn from(color: u8) -> Self {
         IcbColor::Dos(color)

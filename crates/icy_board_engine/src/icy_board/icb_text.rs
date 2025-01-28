@@ -979,7 +979,7 @@ pub enum IceText {
     /// `Output File Name`
     OutputFileName = 479,
     /// `Batch Download Time:~`
-    BatchDownloadTime = 480,
+    _BatchDownloadTime = 480,
     /// `Batch Download Size:~`
     BatchDownloadSize = 481,
     /// `Batch Protocol Type: ~`
@@ -1633,13 +1633,13 @@ impl IcbTextStyle {
     pub fn to_color(&self) -> IcbColor {
         match self {
             IcbTextStyle::Plain => IcbColor::None,
-            IcbTextStyle::Red => IcbColor::Dos(12),
-            IcbTextStyle::Green => IcbColor::Dos(10),
-            IcbTextStyle::Yellow => IcbColor::Dos(14),
-            IcbTextStyle::Blue => IcbColor::Dos(9),
-            IcbTextStyle::Purple => IcbColor::Dos(13),
-            IcbTextStyle::Cyan => IcbColor::Dos(11),
-            IcbTextStyle::White => IcbColor::Dos(15),
+            IcbTextStyle::Red => IcbColor::dos_light_red(),
+            IcbTextStyle::Green => IcbColor::dos_light_green(),
+            IcbTextStyle::Yellow => IcbColor::dos_yellow(),
+            IcbTextStyle::Blue => IcbColor::dos_light_blue(),
+            IcbTextStyle::Purple => IcbColor::dos_magenta(),
+            IcbTextStyle::Cyan => IcbColor::dos_cyan(),
+            IcbTextStyle::White => IcbColor::dos_white(),
         }
     }
 

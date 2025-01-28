@@ -148,14 +148,14 @@ impl IcyBoardState {
             }
         }
         if res.msg_to > 0 {
-            self.set_color(TerminalTarget::Both, IcbColor::Dos(15)).await?;
+            self.set_color(TerminalTarget::Both, IcbColor::dos_white()).await?;
         } else {
             self.reset_color(TerminalTarget::Both).await?;
         }
         self.print(TerminalTarget::Both, &format!("{:>6}", res.msg_to)).await?;
 
         if res.msg_from > 0 {
-            self.set_color(TerminalTarget::Both, IcbColor::Dos(15)).await?;
+            self.set_color(TerminalTarget::Both, IcbColor::dos_white()).await?;
         } else {
             self.reset_color(TerminalTarget::Both).await?;
         }

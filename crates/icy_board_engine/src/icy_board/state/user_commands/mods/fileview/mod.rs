@@ -70,7 +70,7 @@ impl IcyBoardState {
                         .await?;
                     self.println(TerminalTarget::Both, "  Length      Date    Time   Name").await?;
                     self.println(TerminalTarget::Both, " ========  ========== ===== ======").await?;
-                    self.set_color(TerminalTarget::Both, IcbColor::Dos(11)).await?;
+                    self.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
                     for info in &file_content {
                         if self.session.disp_options.abort_printout {
                             break;
@@ -90,11 +90,11 @@ impl IcyBoardState {
                         self.println(TerminalTarget::Both, &info.name).await?;
                         len += info.size;
                     }
-                    self.set_color(TerminalTarget::Both, IcbColor::Dos(14)).await?;
+                    self.set_color(TerminalTarget::Both, IcbColor::dos_yellow()).await?;
                     self.set_color(TerminalTarget::Both, colors.file_head.clone()).await?;
                     self.println(TerminalTarget::Both, "---------                   ------").await?;
                     self.set_color(TerminalTarget::Both, colors.file_size).await?;
-                    self.set_color(TerminalTarget::Both, IcbColor::Dos(15)).await?;
+                    self.set_color(TerminalTarget::Both, IcbColor::dos_white()).await?;
                     self.println(
                         TerminalTarget::Both,
                         &format!("{:>9}                   {} files", humanize_bytes_decimal!(len).to_string(), file_content.len()),

@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, VecDeque},
     fmt::Alignment,
     fs,
     path::{Path, PathBuf},
@@ -102,35 +102,16 @@ impl Default for DisplayOptions {
 pub struct TransferStatistics {
     pub downloaded_files: usize,
     pub downloaded_bytes: usize,
+    pub downloaded_cps: usize,
+
     pub uploaded_files: usize,
     pub uploaded_bytes: usize,
-
-    pub dl_transfer_time: usize,
-    pub ul_transfer_time: usize,
+    pub uploaded_cps: usize,
 }
 
 impl TransferStatistics {
-    pub fn get_cps_download(&self) -> usize {
-        if self.dl_transfer_time == 0 {
-            return 0;
-        }
-        self.downloaded_bytes / self.dl_transfer_time
-    }
-
-    pub fn get_cps_upload(&self) -> usize {
-        if self.ul_transfer_time == 0 {
-            return 0;
-        }
-        self.uploaded_bytes / self.ul_transfer_time
-    }
-
     pub fn get_cps_both(&self) -> usize {
-        let total_time = self.dl_transfer_time + self.ul_transfer_time;
-        if total_time == 0 {
-            return 0;
-        }
-        // actually correct - it's not the average, but the accumlated csp
-        (self.downloaded_bytes + self.uploaded_bytes) / total_time
+        (self.downloaded_cps + self.uploaded_cps) / 2
     }
 }
 
@@ -205,7 +186,7 @@ pub struct Session {
 
     // The maximum number of files in flagged_files
     pub batch_limit: usize,
-    pub flagged_files: HashSet<PathBuf>,
+    pub flagged_files: Vec<PathBuf>,
 }
 
 impl Session {
@@ -250,7 +231,7 @@ impl Session {
             saved_color: IcbColor::Dos(7),
 
             sysop_name: "SYSOP".to_string(),
-            flagged_files: HashSet::new(),
+            flagged_files: Vec::new(),
             emsi: None,
             paged_sysop: false,
             bytes_remaining: 0,
@@ -1027,7 +1008,7 @@ impl IcyBoardState {
                 return Ok(());
             }
             if ch.source == KeySource::Sysop {
-                self.set_color(TerminalTarget::Both, IcbColor::Dos(10)).await?;
+                self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
             } else {
                 self.reset_color(TerminalTarget::Both).await?;
             }
@@ -1377,7 +1358,9 @@ impl IcyBoardState {
             "FIRSTU" => {
                 result = self.session.get_first_name().to_uppercase();
             }
-            "FNUM" => {}
+            "FNUM" => {
+                result = (self.session.flagged_files.len() + 1).to_string();
+            }
             "FREESPACE" => {}
             "GFXMODE" => {
                 result = match self.session.disp_options.grapics_mode {
@@ -1478,7 +1461,7 @@ impl IcyBoardState {
                 return None;
             }
             "PROLTR" | "PRODESC" | "PWXDATE" | "PWXDAYS" | "QOFF" | "QON" | "RATIOBYTES" | "RATIOFILES" => {}
-            "RCPS" => result = self.transfer_statistics.get_cps_upload().to_string(),
+            "RCPS" => result = self.transfer_statistics.uploaded_cps.to_string(),
             "RBYTES" => result = self.transfer_statistics.uploaded_bytes.to_string(),
             "RFILES" => result = self.transfer_statistics.uploaded_files.to_string(),
             "REAL" => {
@@ -1491,7 +1474,7 @@ impl IcyBoardState {
                     result = user.security_level.to_string()
                 }
             }
-            "SCPS" => result = self.transfer_statistics.get_cps_download().to_string(),
+            "SCPS" => result = self.transfer_statistics.downloaded_cps.to_string(),
             "SBYTES" => result = self.transfer_statistics.downloaded_bytes.to_string(),
             "SFILES" => result = self.transfer_statistics.downloaded_files.to_string(),
             "SYSDATE" => {
@@ -1799,7 +1782,7 @@ impl IcyBoardState {
         let pos = self.user_screen.caret.get_position();
         self.set_activity(NodeStatus::NodeMessage).await;
         self.new_line().await?;
-        self.set_color(TerminalTarget::Both, IcbColor::Dos(15)).await?;
+        self.set_color(TerminalTarget::Both, IcbColor::dos_white()).await?;
         self.println(TerminalTarget::Both, &"Broadcast:").await?;
         self.println(TerminalTarget::Both, &msg).await?;
         self.bell().await?;

@@ -291,7 +291,8 @@ impl PcbBoardCommand {
                 }
             }
             if settings.ask_xfer_protocol {
-                let protocol = self.state.ask_protocols("N".to_string()).await?;
+                let protocol = self.state.ask_protocols("N").await?;
+                self.state.new_line().await?;
                 if !protocol.is_empty() {
                     new_user.protocol = protocol;
                 } else {
@@ -656,7 +657,7 @@ impl PcbBoardCommand {
         self.state.new_line().await?;
         let date_formats = self.state.get_board().await.languages.date_formats.clone();
 
-        self.state.set_color(TerminalTarget::Both, IcbColor::Dos(11)).await?;
+        self.state.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
         let mut preview = String::new();
         for (i, (disp_fmt, fmt)) in date_formats.iter().enumerate() {
             if fmt == cur_format {

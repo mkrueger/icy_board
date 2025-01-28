@@ -45,7 +45,7 @@ impl IcyBoardState {
         self.display_text(IceText::LanguageAvailable, display_flags::NEWLINE | display_flags::LFAFTER)
             .await?;
 
-        self.set_color(TerminalTarget::Both, IcbColor::Dos(11)).await?;
+        self.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
         for line in languages {
             self.print(TerminalTarget::Both, &line).await?;
             self.new_line().await?;

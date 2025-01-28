@@ -46,17 +46,6 @@ pub mod display_flags {
     pub const NOTBLANK: i32 = 0x02000; // same as 'AUTO'
 }
 
-pub mod pcb_colors {
-    use crate::icy_board::icb_config::IcbColor;
-
-    pub const BLUE: IcbColor = IcbColor::Dos(9);
-    pub const GREEN: IcbColor = IcbColor::Dos(10);
-    pub const CYAN: IcbColor = IcbColor::Dos(11);
-    pub const RED: IcbColor = IcbColor::Dos(12);
-    pub const MAGENTA: IcbColor = IcbColor::Dos(13);
-    pub const YELLOW: IcbColor = IcbColor::Dos(14);
-    pub const WHITE: IcbColor = IcbColor::Dos(15);
-}
 const TXT_STOPCHAR: char = '_';
 
 lazy_static::lazy_static! {
@@ -233,7 +222,7 @@ impl IcyBoardState {
         let Ok(content) = fs::read(resolved_name) else {
             if display_error {
                 self.bell().await?;
-                self.set_color(TerminalTarget::Both, pcb_colors::RED).await?;
+                self.set_color(TerminalTarget::Both, IcbColor::dos_light_red()).await?;
                 self.print(TerminalTarget::Both, &format!("\r\n({}) is missing!\r\n\r\n", file_name.as_ref().display()))
                     .await?;
             }

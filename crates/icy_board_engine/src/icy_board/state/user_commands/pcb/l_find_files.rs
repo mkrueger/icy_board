@@ -106,7 +106,7 @@ impl IcyBoardState {
 
         self.display_text(IceText::ScanningDirectory, display_flags::DEFAULT).await?;
         self.print(TerminalTarget::Both, &format!(" {} ", area + 1)).await?;
-        self.set_color(TerminalTarget::Both, IcbColor::Dos(10)).await?;
+        self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
         self.print(TerminalTarget::Both, &format!("({})", self.session.current_conference.directories[area].name))
             .await?;
         self.new_line().await?;

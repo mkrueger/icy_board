@@ -88,7 +88,7 @@ impl IcyBoardState {
                         }
                     }
                     "F" | "FL" | "FLA" | "FLAG" => {
-                        self.flag_files().await?;
+                        self.flag_files_cmd(false).await?;
                     }
                     "L" => {
                         self.find_files_cmd().await?;

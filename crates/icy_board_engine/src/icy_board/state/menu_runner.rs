@@ -224,7 +224,7 @@ impl IcyBoardState {
             }
             CommandType::FlagFiles => {
                 // FLAG
-                self.flag_files().await?;
+                self.flag_files_cmd(false).await?;
             }
             CommandType::EnterMessage => {
                 // E

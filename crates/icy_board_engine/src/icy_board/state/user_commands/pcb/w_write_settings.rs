@@ -129,7 +129,8 @@ impl IcyBoardState {
         }
 
         if settings.ask_xfer_protocol {
-            let protocol = self.ask_protocols("N".to_string()).await?;
+            let protocol = self.ask_protocols("N").await?;
+            self.new_line().await?;
             if !protocol.is_empty() {
                 new_user.protocol = protocol;
             } else {

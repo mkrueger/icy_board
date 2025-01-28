@@ -27,7 +27,7 @@ impl IcyBoardState {
             self.session.push_tokens(&input);
             match self.session.tokens.pop_front().unwrap_or_default().to_ascii_uppercase().as_str() {
                 "F" | "FL" | "FLA" | "FLAG" => {
-                    self.flag_files().await?;
+                    self.flag_files_cmd(false).await?;
                 }
                 "V" | "S" => {
                     self.view_file().await?;
