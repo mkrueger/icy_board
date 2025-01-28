@@ -1,8 +1,9 @@
 use crate::icy_board::{
+    commands::CommandType,
     icb_text::IceText,
     state::{
         functions::{display_flags, MASK_COMMAND, MASK_NUM},
-        user_commands::message_reader::MessageViewer,
+        user_commands::mods::messagereader::MessageViewer,
         IcyBoardState, NodeStatus,
     },
 };
@@ -27,7 +28,7 @@ impl IcyBoardState {
                 IceText::TextToScanFor,
                 40,
                 MASK_COMMAND,
-                "hlpts", // Help text scan
+                &CommandType::TextSearch.get_help(),
                 None,
                 display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )

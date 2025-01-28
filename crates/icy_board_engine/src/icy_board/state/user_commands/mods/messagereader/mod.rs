@@ -1,3 +1,4 @@
+use crate::icy_board::commands::CommandType;
 use crate::icy_board::state::functions::MASK_COMMAND;
 use crate::Res;
 use crate::{
@@ -202,7 +203,7 @@ impl IcyBoardState {
                     prompt,
                     40,
                     MASK_COMMAND,
-                    "hlpendr",
+                    &CommandType::ReadMessages.get_help(),
                     None,
                     display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
                 )
@@ -291,17 +292,24 @@ impl IcyBoardState {
                     prompt,
                     40,
                     MASK_COMMAND,
-                    "hlpendr", // TODO: Hard coded help flag!
+                    "hlpendr",
                     None,
                     display_flags::UPCASE | display_flags::LFBEFORE | display_flags::NEWLINE,
                 )
                 .await?;
+
             if text.is_empty() {
                 break;
             }
-            if let Ok(new_number) = text.parse::<u32>() {
-                number = new_number;
-                continue;
+            self.session.push_tokens(&text);
+
+            match self.session.tokens.pop_front().unwrap_or_default() {
+                text => {
+                    if let Ok(new_number) = text.parse::<u32>() {
+                        number = new_number;
+                        continue;
+                    }
+                }
             }
         }
 

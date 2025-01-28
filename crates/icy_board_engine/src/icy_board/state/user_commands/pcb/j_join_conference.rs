@@ -63,7 +63,7 @@ impl IcyBoardState {
                         IceText::TextToScanFor,
                         40,
                         MASK_COMMAND,
-                        "hlpts", // Help text scan
+                        &CommandType::TextSearch.get_help(),
                         None,
                         display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
                     )

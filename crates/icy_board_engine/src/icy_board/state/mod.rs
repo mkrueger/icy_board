@@ -569,6 +569,7 @@ impl IcyBoardState {
     }
 
     pub async fn clear_screen(&mut self, target: TerminalTarget) -> Res<()> {
+        self.session.num_lines_printed = 0;
         match self.session.disp_options.grapics_mode {
             GraphicsMode::Ctty | GraphicsMode::Avatar => {
                 // form feed character
@@ -1138,6 +1139,7 @@ impl IcyBoardState {
         let mut user_bytes = Vec::new();
         let mut sysop_bytes = Vec::new();
         for c in data {
+            let y = self.user_screen.caret.get_position().y;
             if target != TerminalTarget::Sysop || self.session.is_sysop || self.session.current_user.is_none() {
                 let _ = self.user_screen.print_char(*c);
                 if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
@@ -1154,7 +1156,7 @@ impl IcyBoardState {
                     sysop_bytes.push(b'.');
                 }
             }
-            if *c == '\n' {
+            if y + 1 == self.user_screen.caret.get_position().y {
                 self.write_chars_internal(target, &user_bytes, &sysop_bytes).await?;
                 user_bytes.clear();
                 sysop_bytes.clear();

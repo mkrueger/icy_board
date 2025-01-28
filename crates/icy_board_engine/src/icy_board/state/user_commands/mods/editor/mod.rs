@@ -1,3 +1,4 @@
+use crate::icy_board::commands::CommandType;
 use crate::{icy_board::state::functions::MASK_COMMAND, Res};
 use crate::{
     icy_board::{
@@ -67,7 +68,7 @@ impl EditState {
                             IceText::MessageCommandExpertmode,
                             30,
                             "",
-                            &"hlpe",
+                            &CommandType::EnterMessage.get_help(),
                             None,
                             display_flags::NEWLINE | display_flags::UPCASE,
                         )
@@ -83,7 +84,7 @@ impl EditState {
                             IceText::TextEntryCommand,
                             30,
                             &MASK_COMMAND,
-                            &"hlpe",
+                            &CommandType::EnterMessage.get_help(),
                             None,
                             display_flags::NEWLINE | display_flags::LFAFTER | display_flags::UPCASE,
                         )

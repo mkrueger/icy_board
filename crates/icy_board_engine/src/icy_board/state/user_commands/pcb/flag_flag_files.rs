@@ -1,6 +1,7 @@
 use dizbase::file_base::pattern::{MatchOptions, Pattern};
 use humanize_bytes::humanize_bytes_decimal;
 
+use crate::icy_board::commands::CommandType;
 use crate::icy_board::icb_config::IcbColor;
 use crate::icy_board::state::functions::MASK_ASCII;
 use crate::{icy_board::state::IcyBoardState, Res};
@@ -23,7 +24,7 @@ impl IcyBoardState {
                 },
                 60,
                 &MASK_ASCII,
-                &"hlpflag",
+                &CommandType::FlagFiles.get_help(),
                 None,
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFAFTER | display_flags::LFBEFORE | display_flags::HIGHASCII,
             )
