@@ -31,7 +31,6 @@ jobs:
        mv target/release/mkicbtxt bin
        mv target/release/pplc bin
        mv target/release/ppld bin
-       mv target/release/scandb bin
        mv target/release/ppl-language-server bin
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
@@ -46,7 +45,6 @@ jobs:
          bin/mkicbtxt
          bin/pplc
          bin/pppld
-         bin/scandb
          bin/ppl-language-server
          file_id.diz
          INSTALL.txt
@@ -73,7 +71,6 @@ jobs:
        move target/release/mkicbtxt.exe bin
        move target/release/pplc.exe bin
        move target/release/ppld.exe bin
-       move target/release/scandb.exe bin
        move target/release/ppl-language-server.exe bin
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
@@ -88,7 +85,6 @@ jobs:
          bin/mkicbtxt.exe
          bin/pplc.exe
          bin/pppld.exe
-         bin/scandb.exe
          bin/ppl-language-server.exe
          file_id.diz
          INSTALL.txt
@@ -121,7 +117,6 @@ jobs:
        mv target/aarch64-apple-darwin/release/mkicbtxt aarch64-apple-darwin/bin
        mv target/aarch64-apple-darwin/release/pplc aarch64-apple-darwin/bin
        mv target/aarch64-apple-darwin/release/ppld aarch64-apple-darwin/bin
-       mv target/aarch64-apple-darwin/release/scandb aarch64-apple-darwin/bin
        mv target/aarch64-apple-darwin/release/ppl-language-server aarch64-apple-darwin/bin
 
        mkdir -p x86_64-apple-darwin/bin
@@ -133,7 +128,6 @@ jobs:
        mv target/x86_64-apple-darwin/release/mkicbtxt x86_64-apple-darwin/bin
        mv target/x86_64-apple-darwin/release/pplc x86_64-apple-darwin/bin
        mv target/x86_64-apple-darwin/release/ppld x86_64-apple-darwin/bin
-       mv target/x86_64-apple-darwin/release/scandb x86_64-apple-darwin/bin
        mv target/x86_64-apple-darwin/release/ppl-language-server x86_64-apple-darwin/bin
 
    - name: 'Upload zip'
@@ -149,7 +143,6 @@ jobs:
          aarch64-apple-darwin/bin/mkicbtxt
          aarch64-apple-darwin/bin/pplc
          aarch64-apple-darwin/bin/pppld
-         aarch64-apple-darwin/bin/scandb
          aarch64-apple-darwin/bin/ppl-language-server
          file_id.diz
          INSTALL.txt
@@ -166,7 +159,6 @@ jobs:
          x86_64-apple-darwin/bin/mkicbtxt
          x86_64-apple-darwin/bin/pplc
          x86_64-apple-darwin/bin/pppld
-         x86_64-apple-darwin/bin/scandb
          x86_64-apple-darwin/bin/ppl-language-server
          file_id.diz
          INSTALL.txt
