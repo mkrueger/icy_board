@@ -238,12 +238,11 @@ pub async fn handle_client(
         }
     }
     let mut cmd = PcbBoardCommand::new(state);
-    let caps = if local {
+    cmd.state.session.term_caps = if local {
         TerminalCaps::LOCAL
     } else {
         TerminalCaps::detect(&mut *cmd.state.connection).await?
     };
-    log::warn!("terminal caps: {:?}", caps);
 
     if let Some(login_options) = &login_options {
         if let Some(ppe) = &login_options.ppe {

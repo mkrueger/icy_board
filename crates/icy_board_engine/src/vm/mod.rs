@@ -146,6 +146,9 @@ pub struct VirtualMachine<'a> {
     pub is_running: bool,
     pub fpclear: bool,
 
+    /// currently unused.
+    pub use_lmrs: bool,
+
     pub icy_board_state: &'a mut IcyBoardState,
 
     pub pcb_node: Option<NodeState>,
@@ -819,6 +822,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
                 fd_default_out: 0,
                 file_list: VecDeque::new(),
                 user,
+                use_lmrs: true
             };
 
             vm.run().await?;

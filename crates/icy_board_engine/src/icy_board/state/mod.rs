@@ -16,7 +16,7 @@ use dizbase::file_base::FileBase;
 use icy_engine::{ansi, OutputFormat, SaveOptions, ScreenPreperation};
 use icy_engine::{ansi::constants::COLOR_OFFSETS, Position};
 use icy_engine::{TextAttribute, TextPane};
-use icy_net::{channel::ChannelConnection, iemsi::EmsiICI, terminal::virtual_screen::VirtualScreen, Connection, ConnectionType};
+use icy_net::{channel::ChannelConnection, iemsi::EmsiICI, termcap_detect::TerminalCaps, terminal::virtual_screen::VirtualScreen, Connection, ConnectionType};
 use tokio::{sync::Mutex, time::sleep};
 
 use crate::{
@@ -198,6 +198,9 @@ pub struct Session {
     pub low_msg_num: u32,
     pub last_msg_read: u32,
     pub highest_msg_read: u32,
+
+    pub term_caps: TerminalCaps
+    
 }
 
 impl Session {
@@ -254,6 +257,7 @@ impl Session {
             low_msg_num: 0,
             last_msg_read: 0,
             highest_msg_read: 0,
+            term_caps: TerminalCaps::LOCAL
         }
     }
 
@@ -760,11 +764,6 @@ impl IcyBoardState {
         if let Some(sysop_connection) = &mut node_state[self.node].as_mut().unwrap().sysop_connection {
             let _ = sysop_connection.shutdown();
         }
-    }
-
-    pub fn get_term_caps(&self) -> Res<()> {
-        // TODO
-        Ok(())
     }
 
     pub async fn set_current_user(&mut self, user_number: usize) -> Res<()> {

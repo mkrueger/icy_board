@@ -1,10 +1,8 @@
 use crate::{
     datetime::IcbDate,
     icy_board::{
-        icb_text::IceText,
-        state::functions::{display_flags, MASK_ALNUM, MASK_PHONE, MASK_WEB},
-        user_base::FSEMode,
-    },
+        icb_config::IcbColor, icb_text::IceText, state::functions::{display_flags, MASK_ALNUM, MASK_NUM, MASK_PHONE, MASK_WEB}, user_base::FSEMode
+    }, vm::TerminalTarget,
 };
 use crate::{icy_board::state::IcyBoardState, Res};
 
@@ -321,5 +319,37 @@ impl IcyBoardState {
         self.press_enter().await?;
         self.display_current_menu = true;
         Ok(())
+    }
+
+    pub async fn ask_date_format(&mut self, cur_format: &str) -> Res<String> {
+        self.new_line().await?;
+        let date_formats = self.get_board().await.languages.date_formats.clone();
+
+        self.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
+        let mut preview = String::new();
+        for (i, (disp_fmt, fmt)) in date_formats.iter().enumerate() {
+            if fmt == cur_format {
+                preview = (i + 1).to_string();
+                self.println(TerminalTarget::Both, &format!("=> ({}) {}", i + 1, disp_fmt)).await?;
+            } else {
+                self.println(TerminalTarget::Both, &format!("   ({}) {}", i + 1, disp_fmt)).await?;
+            }
+        }
+        let date_format = self
+            .input_field(
+                IceText::DateFormatDesired,
+                1,
+                &MASK_NUM,
+                "",
+                Some(preview),
+                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER | display_flags::UPCASE | display_flags::FIELDLEN,
+            )
+            .await?;
+        if let Ok(number) = date_format.parse::<usize>() {
+            if number > 0 && number <= date_formats.len() {
+                return Ok(date_formats[number - 1].1.clone());
+            }
+        }
+        return Ok(cur_format.to_string());
     }
 }

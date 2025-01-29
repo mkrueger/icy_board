@@ -610,7 +610,7 @@ lazy_static::lazy_static! {
             name: "Chr",
             version: 100,
             opcode: FuncOpCode::CHR,
-            return_type: VariableType::String,
+            return_type: VariableType::BigStr,
             args: Some(vec![
                 ArgumentDefinition::new("ch", VariableType::Integer),
             ]),
@@ -2886,7 +2886,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::INSTRR,
             return_type: VariableType::Integer,
             args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
+                ArgumentDefinition::new("str", VariableType::BigStr),
                 ArgumentDefinition::new("pattern", VariableType::String),
             ]),
             arg_descr: 0x02,

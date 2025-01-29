@@ -1,4 +1,4 @@
-use std::{fs, thread, time::Duration};
+use std::{env, fs, thread, time::Duration};
 
 use crate::{
     datetime::IcbDate,
@@ -901,7 +901,7 @@ pub async fn restscrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     Ok(())
 }
 pub async fn sound(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::warn!("Sound is not supported");
+    log::warn!("SOUND is not supported");
     Ok(())
 }
 
@@ -1010,7 +1010,6 @@ pub async fn fseek(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let pos = vm.eval_expr(&args[1]).await?.as_int();
     let position = vm.eval_expr(&args[2]).await?.as_int();
     vm.io.fseek(channel, pos, position)?;
-
     Ok(())
 }
 
@@ -1243,12 +1242,17 @@ pub async fn lastin(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 pub async fn flag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("flag not implemented statement!");
-    panic!("TODO")
+    let files = vm.eval_expr(&args[0]).await?.as_string();
+    vm.icy_board_state.session.push_tokens(&files);
+    vm.icy_board_state.flag_files_cmd(false).await?;
+    Ok(())
 }
+
 pub async fn download(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("download not implemented statement!");
-    panic!("TODO")
+    let files = vm.eval_expr(&args[0]).await?.as_string();
+    vm.icy_board_state.session.push_tokens(&files);
+    vm.icy_board_state.download().await?;
+    Ok(())
 }
 
 pub async fn getaltuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -1648,9 +1652,11 @@ pub async fn command(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn uselmrs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("uselmrs not implemented statement!");
-    panic!("TODO")
+    let use_lmrs = vm.eval_expr(&args[0]).await?.as_bool();
+    vm.use_lmrs = use_lmrs;
+    Ok(())
 }
+
 pub async fn confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
     let conf_field = vm.eval_expr(&args[1]).await?.as_int();
@@ -1707,16 +1713,37 @@ pub async fn killmsg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     panic!("TODO")
 }
 pub async fn chdir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("chdir not implemented statement!");
-    panic!("TODO")
+    let dir = vm.eval_expr(&args[0]).await?.as_string();
+    let path = vm.resolve_file(&dir).await;
+    if path.is_dir() {
+        if let Err(err) = env::set_current_dir(&path) {
+            log::error!("CHDIR {} error: {}", path.display(), err);
+        }
+    } else {
+        log::error!("CHDIR Can't find directory {}", path.display());
+    }
+    Ok(())
 }
+
 pub async fn mkdir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("mkdir not implemented statement!");
-    panic!("TODO")
+    let dir = vm.eval_expr(&args[0]).await?.as_string();
+    let path = vm.resolve_file(&dir).await;
+    if let Err(err) = fs::create_dir_all(&path) {
+        log::error!("MKDIR  {} error : {}", path.display(), err);
+    }
+    Ok(())
 }
 pub async fn rmdir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("redir not implemented statement!");
-    panic!("TODO")
+    let dir = vm.eval_expr(&args[0]).await?.as_string();
+    let path = vm.resolve_file(&dir).await;
+    if path.is_dir() {
+        if let Err(err) = fs::remove_dir(&path) {
+            log::error!("RMDIR {} error: {}", path.display(), err);
+        }
+    } else {
+        log::error!("RMDIR Can't find directory {}", path.display());
+    }
+    Ok(())
 }
 pub async fn fdowraka(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("fdowraka not implemented statement!");
@@ -1747,6 +1774,6 @@ pub async fn fdoqdel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     panic!("TODO")
 }
 pub async fn sounddelay(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("sounddelay not implemented statement!");
-    panic!("TODO")
+    log::warn!("SOUNDDELAY is not supported");
+    Ok(())
 }

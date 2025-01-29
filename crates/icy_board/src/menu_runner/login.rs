@@ -1,12 +1,12 @@
 use crate::VERSION;
 
-use super::{PcbBoardCommand, MASK_NUMBER};
+use super::PcbBoardCommand;
 use crate::Res;
 use chrono::{Datelike, Local, Utc};
 use icy_board_engine::{
     datetime::{IcbDate, IcbTime},
     icy_board::{
-        icb_config::{IcbColor, DEFAULT_PCBOARD_DATE_FORMAT},
+        icb_config::DEFAULT_PCBOARD_DATE_FORMAT,
         icb_text::IceText,
         security_expr::SecurityExpression,
         state::{
@@ -25,7 +25,6 @@ impl PcbBoardCommand {
 
         self.state.reset_color(TerminalTarget::Both).await?;
         self.state.clear_screen(TerminalTarget::Both).await?;
-        self.state.get_term_caps()?;
         self.state.session.login_date = chrono::Utc::now();
 
         // intial_welcome
@@ -285,7 +284,7 @@ impl PcbBoardCommand {
 
             if settings.ask_date_format && self.state.display_text.has_text(IceText::DateFormatDesired) {
                 new_user.date_format = DEFAULT_PCBOARD_DATE_FORMAT.to_string();
-                let date_format = self.ask_date_format(&new_user.date_format).await?;
+                let date_format = self.state.ask_date_format(&new_user.date_format).await?;
                 if !date_format.is_empty() {
                     new_user.date_format = date_format;
                 }
@@ -653,36 +652,5 @@ impl PcbBoardCommand {
         }
     }
 
-    pub async fn ask_date_format(&mut self, cur_format: &str) -> Res<String> {
-        self.state.new_line().await?;
-        let date_formats = self.state.get_board().await.languages.date_formats.clone();
-
-        self.state.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
-        let mut preview = String::new();
-        for (i, (disp_fmt, fmt)) in date_formats.iter().enumerate() {
-            if fmt == cur_format {
-                preview = (i + 1).to_string();
-                self.state.println(TerminalTarget::Both, &format!("=> ({}) {}", i + 1, disp_fmt)).await?;
-            } else {
-                self.state.println(TerminalTarget::Both, &format!("   ({}) {}", i + 1, disp_fmt)).await?;
-            }
-        }
-        let date_format = self
-            .state
-            .input_field(
-                IceText::DateFormatDesired,
-                1,
-                &MASK_NUMBER,
-                "",
-                Some(preview),
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER | display_flags::UPCASE | display_flags::FIELDLEN,
-            )
-            .await?;
-        if let Ok(number) = date_format.parse::<usize>() {
-            if number > 0 && number <= date_formats.len() {
-                return Ok(date_formats[number - 1].1.clone());
-            }
-        }
-        return Ok(cur_format.to_string());
-    }
+   
 }

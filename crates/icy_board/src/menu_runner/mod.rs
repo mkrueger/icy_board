@@ -11,8 +11,6 @@ pub struct PcbBoardCommand {
     pub autorun_times: HashMap<usize, u64>,
     pub saved_cmd: String,
 }
-pub const MASK_COMMAND: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;':,.<>?/\\\" ";
-const MASK_NUMBER: &str = "0123456789";
 
 impl PcbBoardCommand {
     pub fn new(state: IcyBoardState) -> Self {

@@ -74,6 +74,8 @@ pub trait PCBoardIO: Send {
 
     fn fseek(&mut self, channel: usize, pos: i32, seek_pos: i32) -> Res<()>;
 
+    fn ftell(&mut self, channel: usize) -> Res<u64>;
+    
     /// channel - integer expression with the channel to use for the file
     /// #Example
     /// STRING s
@@ -315,7 +317,25 @@ impl PCBoardIO for DiskIO {
         }
         Ok(())
     }
+    fn ftell(&mut self, channel: usize) -> Res<u64> {
+        let Some(chan) = self.channels.get_mut(&channel) else {
+            return Err(Box::new(VMError::FileChannelNotOpen(channel)));
+        };
 
+        match &mut chan.file {
+            Some(f) => {
+                Ok(f.seek(SeekFrom::Current(0)).unwrap_or_default())
+            },
+            _ => {
+                if let Some(reader) = &mut chan.reader {
+                    Ok(reader.position())
+                } else {
+                    Err(Box::new(VMError::FileChannelNotOpen(channel)))
+                }
+            }
+        }
+    }
+    
     fn fseek(&mut self, channel: usize, pos: i32, seek_pos: i32) -> Res<()> {
         let Some(chan) = self.channels.get_mut(&channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));

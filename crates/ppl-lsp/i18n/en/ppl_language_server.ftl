@@ -602,7 +602,13 @@ hint-statement-chdir=Changes to directory
 hint-statement-mkdir=Creates a new directory
     
     @1 = directory to create 
-hint-statement-rmdir=Removes a directory
+hint-statement-rmdir=
+    Removes a directory
+
+    @1 = directory to remove 
+
+    ### Note
+    The directory must be empty before removing it.
 hint-statement-fdowraka=todo
 hint-statement-fdoaddaka=todo
 hint-statement-fdowrorg=todo
@@ -1043,8 +1049,9 @@ hint-function-scanmsghdr=
     HDRRPLYTIME | 0x09 | 9 | Reply message time | | HDRSTATUS	0x01	1	Message status
     HDRSUBJ | 0x0C | 12 | Message subject | | HDRTIME	0x06	6	Message time
 
-hint-function-checkrip=todo
-hint-function-ripver=todo
+hint-function-checkrip=Returns `TRUE` if the terminal has RIP.
+hint-function-ripver=
+    Returns a string containing the RIP version. If no RIP is available "0" is returned.
 hint-function-qwklimits=todo
 hint-function-findfirst=
     Find the first occurence of filespec in a directory. Used in conjunction with FindNext to get a directory listing.
@@ -1186,7 +1193,8 @@ hint-function-tinkey=
 hint-function-cwd=
     ### Returns
     The current working directory
-hint-function-instrr=todo
+hint-function-instrr=
+    Returns the right most position of @2 in @1 `(1-LEN(@1))` or `0` if @2 not in @1
 hint-function-fdordaka=todo
 hint-function-fdordorg=todo
 hint-function-fdordarea=todo

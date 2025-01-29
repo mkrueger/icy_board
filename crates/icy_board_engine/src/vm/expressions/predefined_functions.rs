@@ -1,6 +1,6 @@
 #![allow(clippy::needless_pass_by_value, clippy::unnecessary_wraps)]
 
-use std::fs;
+use std::{env, fs};
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -405,8 +405,7 @@ pub async fn u_ldir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
     ))
 }
 pub async fn u_lmr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO") // TODO
+    Ok(VariableValue::new_int(vm.icy_board_state.session.last_msg_read as i32))
 }
 pub async fn u_logons(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.user.stats.num_times_on as i32))
@@ -827,9 +826,11 @@ pub async fn tokenstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     }
     Ok(VariableValue::new_string(res))
 }
+
+/// Returns TRUE if the carrier detect signal is on
+/// deprecated - always true
 pub async fn cdon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_bool(true))
 }
 pub async fn langext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_string(vm.icy_board_state.session.language.clone()))
@@ -1278,8 +1279,7 @@ pub async fn confmw(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
     panic!("TODO")
 }
 pub async fn lprinted(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_int(vm.icy_board_state.session.num_lines_printed as i32))
 }
 pub async fn isnonstop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_bool(vm.icy_board_state.session.disp_options.non_stop()))
@@ -1289,8 +1289,7 @@ pub async fn errcorrect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
     Ok(VariableValue::new_bool(true))
 }
 pub async fn confalias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_bool(vm.icy_board_state.session.current_conference.allow_aliases))
 }
 pub async fn useralias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_bool(
@@ -1300,10 +1299,14 @@ pub async fn useralias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
 pub async fn curuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.icy_board_state.session.cur_user_id as i32))
 }
+
 pub async fn chatstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    if let Some(state) = &vm.icy_board_state.node_state.lock().await[vm.icy_board_state.node] {
+        return Ok(VariableValue::new_bool(state.enabled_chat));
+    }
+    Ok(VariableValue::new_bool(false))
 }
+
 pub async fn defans(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
@@ -1312,10 +1315,25 @@ pub async fn lastans(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     log::error!("not implemented function!");
     panic!("TODO")
 }
-pub async fn meganum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+
+
+pub fn to_base_36(number: i32) -> String {
+    let mut res = String::new();
+    let mut number = number;
+    while number > 0 {
+        let num2 = (number % 36) as u8;
+        let ch2 = if num2 < 10 { (num2 + b'0') as char } else { (num2 - 10 + b'A') as char };
+        res = ch2.to_string() + res.as_str();
+        number /= 36;
+    }
+    res
 }
+
+pub async fn meganum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let var = vm.eval_expr(&args[0]).await?.as_int();
+    Ok(VariableValue::new_string(to_base_36(var)))
+}
+
 pub async fn evttimeadj(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
@@ -1331,28 +1349,29 @@ pub async fn fmtreal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     panic!("TODO")
 }
 pub async fn flagcnt(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_int(vm.icy_board_state.session.flagged_files.len() as i32))
 }
 pub async fn kbdbufsize(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn pplbufsize(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    // Seems to always return null in PCBoard
+    Ok(VariableValue::new_int(0))
 }
+
 pub async fn kbdfilusued(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn lomsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("lomsgnum is deprecated!");
-    Ok(VariableValue::new_int(1))
+    Ok(VariableValue::new_int(vm.icy_board_state.session.low_msg_num as i32))
 }
+
 pub async fn himsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("himsgnum is deprecated!");
-    Ok(VariableValue::new_int(1))
+    Ok(VariableValue::new_int(vm.icy_board_state.session.high_msg_num as i32))
 }
 
 pub async fn drivespace(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1407,8 +1426,16 @@ pub async fn pcbmac(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
     }
 }
 pub async fn actmsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let area = vm.icy_board_state.session.current_message_area;
+    let msg_base = vm.icy_board_state.session.current_conference.areas[area].filename.clone();
+    let msg_base = vm.resolve_file(&msg_base).await;
+    match jamjam::jam::JamMessageBase::open(msg_base) {
+        Ok(base) => Ok(VariableValue::new_int(base.active_messages() as i32)),
+        Err(err) => {
+            log::error!("ACTMSGNUM can't open message base: {err}");
+            Ok(VariableValue::new_int(0))
+        }
+    }
 }
 
 /// Usage: `STACKLEFT()`
@@ -1628,18 +1655,21 @@ pub async fn scanmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn checkrip(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_bool(vm.icy_board_state.session.term_caps.rip_version.is_some()))
 }
+
 pub async fn ripver(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let ver = vm.icy_board_state.session.term_caps.rip_version.clone().unwrap_or("0".to_string());
+    Ok(VariableValue::new_string(ver))
 }
+
 pub async fn qwklimits(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn findfirst(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let filespec = vm.eval_expr(&args[0]).await?.as_string();
     vm.file_list.clear();
@@ -1665,8 +1695,7 @@ pub async fn findnext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn uselmrs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_bool(vm.use_lmrs))
 }
 
 pub async fn new_confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1821,14 +1850,34 @@ pub async fn set_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
 pub async fn tinkey(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     inkey(vm, args).await
 }
+
 pub async fn cwd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    match env::current_dir() {
+        Ok(cur) => {
+            Ok(VariableValue::new_string(cur.to_string_lossy().to_string()))
+        }
+        Err(err) => {
+            log::error!("CWD error: {err}");
+            Ok(VariableValue::new_string(String::new()))
+        }
+    }
 }
+
 pub async fn instrr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let str = vm.eval_expr(&args[0]).await?.as_string();
+    let sub = vm.eval_expr(&args[1]).await?.as_string();
+    if sub.is_empty() {
+        return Ok(VariableValue::new_int(0));
+    }
+    match str.rfind(&sub) {
+        Some(x) => {
+            let x = str[0..x].chars().count();
+            Ok(VariableValue::new_int(1 + x as i32))
+        }
+        _ => Ok(VariableValue::new_int(0)),
+    }
 }
+
 pub async fn fdordaka(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
@@ -1837,46 +1886,56 @@ pub async fn fdordorg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn fdordarea(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn fdoqrd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn getdrive(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn setdrive(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn bs2i(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn bd2i(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn i2bs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn i2bd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn ftell(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    Ok(VariableValue::new_int(vm.io.ftell(channel)? as i32))
 }
+
 pub async fn os(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_int(0))
 }
+
 pub async fn shortdesc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
