@@ -1,8 +1,12 @@
 use crate::{
     datetime::IcbDate,
     icy_board::{
-        icb_config::IcbColor, icb_text::IceText, state::functions::{display_flags, MASK_ALNUM, MASK_NUM, MASK_PHONE, MASK_WEB}, user_base::FSEMode
-    }, vm::TerminalTarget,
+        icb_config::IcbColor,
+        icb_text::IceText,
+        state::functions::{display_flags, MASK_ALNUM, MASK_NUM, MASK_PHONE, MASK_WEB},
+        user_base::FSEMode,
+    },
+    vm::TerminalTarget,
 };
 use crate::{icy_board::state::IcyBoardState, Res};
 

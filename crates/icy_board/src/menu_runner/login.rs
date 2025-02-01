@@ -20,7 +20,7 @@ use icy_board_engine::{
 };
 use icy_net::iemsi::try_iemsi;
 impl PcbBoardCommand {
-    pub async fn login(&mut self) -> Res<bool> {
+    pub async fn login(&mut self, is_local: bool) -> Res<bool> {
         self.state.set_activity(NodeStatus::LogIntoSystem).await;
 
         self.state.reset_color(TerminalTarget::Both).await?;
@@ -45,7 +45,7 @@ impl PcbBoardCommand {
         self.state.new_line().await?;
 
         let mut tries = 0;
-        if self.state.get_board().await.config.options.allow_iemsi {
+        if !is_local && self.state.get_board().await.config.options.allow_iemsi {
             let (name, location, operator, notice, caps) = {
                 let board = self.state.get_board().await;
                 (
@@ -651,6 +651,4 @@ impl PcbBoardCommand {
             self.state.display_text(IceText::PasswordsDontMatch, display_flags::NEWLINE).await?;
         }
     }
-
-   
 }

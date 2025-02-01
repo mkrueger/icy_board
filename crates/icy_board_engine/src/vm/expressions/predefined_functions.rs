@@ -1,8 +1,8 @@
 #![allow(clippy::needless_pass_by_value, clippy::unnecessary_wraps)]
 
-use std::{env, fs};
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::{env, fs};
 
 use crate::ast::constant::STACK_LIMIT;
 use crate::datetime::{IcbDate, IcbTime};
@@ -1316,7 +1316,6 @@ pub async fn lastans(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     panic!("TODO")
 }
 
-
 pub fn to_base_36(number: i32) -> String {
     let mut res = String::new();
     let mut number = number;
@@ -1853,9 +1852,7 @@ pub async fn tinkey(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 
 pub async fn cwd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     match env::current_dir() {
-        Ok(cur) => {
-            Ok(VariableValue::new_string(cur.to_string_lossy().to_string()))
-        }
+        Ok(cur) => Ok(VariableValue::new_string(cur.to_string_lossy().to_string())),
         Err(err) => {
             log::error!("CWD error: {err}");
             Ok(VariableValue::new_string(String::new()))

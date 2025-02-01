@@ -15,7 +15,7 @@ pub struct TerminalCaps {
     pub program: TerminalProgram,
     pub term_size: (u16, u16),
     pub is_utf8: bool,
-    pub rip_version: Option<String>
+    pub rip_version: Option<String>,
 }
 
 impl TerminalCaps {
@@ -23,7 +23,7 @@ impl TerminalCaps {
         program: TerminalProgram::Unknown,
         term_size: (80, 25),
         is_utf8: false,
-        rip_version: None
+        rip_version: None,
     };
 
     pub async fn detect(com: &mut dyn Connection) -> crate::Result<Self> {
@@ -89,7 +89,12 @@ impl TerminalCaps {
             break;
         }
 
-        Ok(Self { program, term_size, is_utf8, rip_version })
+        Ok(Self {
+            program,
+            term_size,
+            is_utf8,
+            rip_version,
+        })
     }
 }
 
@@ -101,7 +106,7 @@ fn parse_rip_version(data: &str) -> Option<String> {
         if let Some(r) = caps.get(1) {
             return Some(r.as_str().to_string());
         }
-    } 
+    }
     None
 }
 
@@ -124,14 +129,12 @@ fn parse_cursor_pos(result: String) -> (u16, u16) {
     (x, y)
 }
 
-
 #[cfg(test)]
 mod test {
     use crate::termcap_detect::parse_rip_version;
 
     #[test]
-    fn test_parse_rip() 
-    {
+    fn test_parse_rip() {
         assert_eq!(parse_rip_version("NEEALEG"), None);
         assert_eq!(parse_rip_version("RIPSCRIP015410\0"), Some("015410".to_string()));
     }

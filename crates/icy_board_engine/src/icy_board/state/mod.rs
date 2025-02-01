@@ -199,8 +199,7 @@ pub struct Session {
     pub last_msg_read: u32,
     pub highest_msg_read: u32,
 
-    pub term_caps: TerminalCaps
-    
+    pub term_caps: TerminalCaps,
 }
 
 impl Session {
@@ -257,7 +256,7 @@ impl Session {
             low_msg_num: 0,
             last_msg_read: 0,
             highest_msg_read: 0,
-            term_caps: TerminalCaps::LOCAL
+            term_caps: TerminalCaps::LOCAL,
         }
     }
 

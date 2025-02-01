@@ -822,7 +822,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
                 fd_default_out: 0,
                 file_list: VecDeque::new(),
                 user,
-                use_lmrs: true
+                use_lmrs: true,
             };
 
             vm.run().await?;

@@ -234,8 +234,8 @@ pub async fn handle_client(
             logged_in = true;
             state.session.is_sysop = true;
             state.set_current_user(0).await.unwrap();
-            local = login_options.local;
         }
+        local = login_options.local;
     }
     let mut cmd = PcbBoardCommand::new(state);
     cmd.state.session.term_caps = if local {
@@ -253,7 +253,7 @@ pub async fn handle_client(
         }
     }
     if !logged_in {
-        match cmd.login().await {
+        match cmd.login(local).await {
             Ok(true) => {}
             Ok(false) => {
                 return Ok(());
