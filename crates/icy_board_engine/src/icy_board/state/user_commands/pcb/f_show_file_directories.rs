@@ -107,7 +107,7 @@ impl IcyBoardState {
                     }
                     "G" => {
                         self.goodbye_cmd().await?;
-                        break;
+                        return Ok(());
                     }
                     "NS" => {
                         self.session.non_stop_on();

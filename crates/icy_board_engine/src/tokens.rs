@@ -54,4 +54,10 @@ mod test {
         let expected = vec!["Hello", "world"];
         assert_eq!(tokenize(input), expected);
     }
+
+    #[test]
+    fn test_tokenize_empty() {
+        let input = "";
+        assert!(tokenize(input).is_empty());
+    }
 }

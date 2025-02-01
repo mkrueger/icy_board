@@ -261,14 +261,20 @@ impl Session {
     }
 
     pub fn non_stop_on(&mut self) {
+        if self.disp_options.is_non_stop {
+            return;
+        }
         self.disp_options.is_non_stop = true;
-        self.num_lines_printed = 0;
+        self.reset_num_lines();
         self.last_new_line_y = i32::MAX;
     }
 
     pub fn non_stop_off(&mut self) {
+        if !self.disp_options.is_non_stop {
+            return;
+        }
         self.disp_options.is_non_stop = false;
-        self.num_lines_printed = 0;
+        self.reset_num_lines();
         self.last_new_line_y = i32::MAX;
     }
 
@@ -307,6 +313,9 @@ impl Session {
     }
     pub fn seconds_left(&self) -> i32 {
         self.time_limit * 60
+    }
+    fn reset_num_lines(&mut self) {
+        self.num_lines_printed = 0;
     }
 }
 
@@ -572,7 +581,7 @@ impl IcyBoardState {
     }
 
     pub async fn clear_screen(&mut self, target: TerminalTarget) -> Res<()> {
-        self.session.num_lines_printed = 0;
+        self.session.reset_num_lines();
         match self.session.disp_options.grapics_mode {
             GraphicsMode::Ctty | GraphicsMode::Avatar => {
                 // form feed character
@@ -636,7 +645,9 @@ impl IcyBoardState {
                 self.session.more_requested = true;
                 return Ok(());
             }
-            self.more_promt().await?;
+            if let Err(err) = self.more_promt().await {
+                log::error!("Error in more prompt: {}", err);
+            }
         }
         Ok(())
     }
@@ -1154,7 +1165,7 @@ impl IcyBoardState {
                     sysop_bytes.push(b'.');
                 }
             }
-            if y + 1 == self.user_screen.caret.get_position().y {
+            if *c == '\n' {
                 self.write_chars_internal(target, &user_bytes, &sysop_bytes).await?;
                 user_bytes.clear();
                 sysop_bytes.clear();
@@ -1431,7 +1442,9 @@ impl IcyBoardState {
             "KBLEFT" | "KBLIMIT" | "LASTCALLERNODE" | "LASTCALLERSYSTEM" | "MAXBYTES" | "MAXFILES" => {}
             "MINLEFT" => result = "1000".to_string(),
             "MORE" => {
-                let _ = self.more_promt().await;
+                if let Err(err) = self.more_promt().await {
+                    log::error!("Error in more prompt: {}", err);
+                }
                 return None;
             }
             "MSGLEFT" => {
@@ -1498,12 +1511,10 @@ impl IcyBoardState {
             }
 
             "POFF" => {
-                self.session.num_lines_printed = 0;
                 self.session.non_stop_on();
                 return None;
             }
             "PON" => {
-                self.session.num_lines_printed = 0;
                 self.session.non_stop_off();
                 return None;
             }
@@ -1970,27 +1981,27 @@ impl IcyBoardState {
 
     /// # Errors
     pub async fn goodbye(&mut self) -> Res<()> {
-        /*   if HangupType::Hangup != hangup_type {
+        /*     if HangupType::Hangup != hangup_type {
 
-            if HangupType::Goodbye == hangup_type {
-                let logoff_script = self
-                    .board
-                    .lock()
-                    .as_ref()
-                    .unwrap()
-                    .data
-                    .paths
-                    .logoff_script
-                    .clone();
-                self.display_file(&logoff_script)?;
-            }
+                    if HangupType::Goodbye == hangup_type {
+                        let logoff_script = self
+                            .board
+                            .lock()
+                            .as_ref()
+                            .unwrap()
+                            .data
+                            .paths
+                            .logoff_script
+                            .clone();
+                        self.display_file(&logoff_script)?;
+                    }
 
 
-        } */
-        self.display_text(IceText::ThanksForCalling, display_flags::LFBEFORE | display_flags::NEWLINE)
-            .await?;
-        self.reset_color(TerminalTarget::Both).await?;
-
+                }
+                self.display_text(IceText::ThanksForCalling, display_flags::LFBEFORE | display_flags::NEWLINE)
+                    .await?;
+                self.reset_color(TerminalTarget::Both).await?;
+        */
         self.hangup().await
     }
 
@@ -2005,6 +2016,9 @@ impl IcyBoardState {
     }
 
     pub async fn more_promt(&mut self) -> Res<()> {
+        if self.session.request_logoff {
+            return Ok(());
+        }
         if self.session.disp_options.in_file_list.is_some() {
             self.filebase_more().await?;
             return Ok(());

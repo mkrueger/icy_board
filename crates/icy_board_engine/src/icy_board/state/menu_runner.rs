@@ -105,7 +105,7 @@ impl IcyBoardState {
             self.move_lightbar(mnu, &mut x, current_item).await?;
 
             self.session.last_new_line_y = self.display_screen().caret.get_position().y;
-            self.session.num_lines_printed = 0;
+            self.session.reset_num_lines();
             let pos = self.get_caret_position();
             for (i, command) in mnu.commands.iter().enumerate() {
                 if command.display.is_empty() {
@@ -123,7 +123,7 @@ impl IcyBoardState {
             if command.is_empty() {
                 if !mnu.commands[current_item].lighbar_display.is_empty() {
                     self.session.last_new_line_y = self.display_screen().caret.get_position().y;
-                    self.session.num_lines_printed = 0;
+                    self.session.reset_num_lines();
                     self.dispatch_command(&command, &mnu.commands[current_item]).await?;
                     continue;
                 }
@@ -133,7 +133,7 @@ impl IcyBoardState {
                 let cmd = mnu.commands.iter().find(|cmd| cmd.keyword.eq_ignore_ascii_case(&command_str));
                 if let Some(cmd) = cmd {
                     self.session.last_new_line_y = self.display_screen().caret.get_position().y;
-                    self.session.num_lines_printed = 0;
+                    self.session.reset_num_lines();
                     self.dispatch_command(&command_str, &cmd).await?;
                     self.session.tokens.clear();
                     continue;
@@ -141,7 +141,7 @@ impl IcyBoardState {
 
                 if let Some(command) = self.try_find_command(&command_str).await {
                     self.session.last_new_line_y = self.display_screen().caret.get_position().y;
-                    self.session.num_lines_printed = 0;
+                    self.session.reset_num_lines();
                     self.dispatch_command(&command_str, &command).await?;
                     self.session.tokens.clear();
                     continue;
@@ -190,6 +190,7 @@ impl IcyBoardState {
     }
 
     async fn run_action(&mut self, command: &Command, cmd_action: &CommandAction) -> Res<()> {
+        self.session.non_stop_off();
         match cmd_action.command_type {
             CommandType::GotoXY => {
                 let pos = crate::icy_board::commands::Position::parse(&cmd_action.parameter);

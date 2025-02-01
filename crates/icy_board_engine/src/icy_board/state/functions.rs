@@ -213,7 +213,7 @@ impl IcyBoardState {
     }
 
     pub async fn display_file_with_error<P: AsRef<Path>>(&mut self, file_name: &P, display_error: bool) -> Res<bool> {
-        self.session.num_lines_printed = 0;
+        self.session.reset_num_lines();
         self.session.disp_options.abort_printout = false;
         let resolved_name = self.get_board().await.resolve_file(file_name);
         // lookup language/security/graphics mode
@@ -283,7 +283,11 @@ impl IcyBoardState {
         default_string: Option<String>,
         mut display_flags: i32,
     ) -> Res<String> {
-        self.session.num_lines_printed = 0;
+        if self.session.request_logoff {
+            return Ok(String::new());
+        }
+
+        self.session.reset_num_lines();
 
         // we've data from a PPE here, so take that input and return it.
         // ignoring all other settings.
@@ -363,6 +367,10 @@ impl IcyBoardState {
 
         let mut output = String::new();
         loop {
+            if self.session.request_logoff {
+                return Ok(String::new());
+            }
+
             let Some(mut key_char) = self.get_char(TerminalTarget::Both).await? else {
                 continue;
             };
@@ -417,7 +425,6 @@ impl IcyBoardState {
         if display_flags & display_flags::LFAFTER != 0 {
             self.new_line().await?;
         }
-        self.session.num_lines_printed = 0;
 
         if output.is_empty() {
             if let Some(default) = default_string {

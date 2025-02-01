@@ -24,6 +24,9 @@ impl FileList {
         cmd.session.disp_options.in_file_list = Some(self.path.clone());
         let colors = cmd.get_board().await.config.color_configuration.clone();
         for entry in &mut self.files {
+            if cmd.session.request_logoff {
+                break;
+            }
             if cmd.session.disp_options.abort_printout {
                 break;
             }

@@ -11,6 +11,7 @@ use crate::{
 
 impl IcyBoardState {
     pub async fn filebase_more(&mut self) -> Res<()> {
+        log::info!("filebase_more");
         loop {
             let input = self
                 .input_field(
@@ -23,7 +24,7 @@ impl IcyBoardState {
                 )
                 .await?;
             self.session.more_requested = false;
-            self.session.num_lines_printed = 0;
+            self.session.reset_num_lines();
             self.session.push_tokens(&input);
             match self.session.tokens.pop_front().unwrap_or_default().to_ascii_uppercase().as_str() {
                 "F" | "FL" | "FLA" | "FLAG" => {
@@ -35,6 +36,7 @@ impl IcyBoardState {
 
                 "G" => {
                     self.goodbye_cmd().await?;
+                    return Ok(());
                 }
                 "NS" => {
                     self.session.non_stop_on();
