@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     fmt::Display,
     io::stdout,
     path::PathBuf,
@@ -72,8 +71,7 @@ lazy_static::lazy_static! {
 async fn main() -> Res<()> {
     let arguments: Cli = argh::from_env();
     let Some(file) = icy_board_engine::lookup_icyboard_file(&arguments.file) else {
-        let map = HashMap::new();
-        print_error(get_text_args("file_not_found", map));
+        print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
         exit(1);
     };
     start_icy_board(&arguments, file).await?;

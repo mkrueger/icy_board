@@ -1,5 +1,5 @@
 [package]
-name = "icy_board"
+name = "icboard"
 version.workspace = true
 edition = "2021"
 

@@ -1,5 +1,5 @@
 error_cmd_line_label = Fehler:
-error_file_not_found = { $name } nicht gefunden
+error_file_or_path_not_found = Datei oder Verzeichnis nicht gefunden
 
 
 yes=Ja

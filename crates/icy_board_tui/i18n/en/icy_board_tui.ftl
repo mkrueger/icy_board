@@ -1,5 +1,5 @@
 error_cmd_line_label = error:
-error_file_not_found = { $name } not found
+error_file_or_path_not_found = File or path not found
 
 
 exit_icy_board_msg = Thank you for using { $name } Professional BBS Software!

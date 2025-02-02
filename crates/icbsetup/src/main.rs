@@ -5,11 +5,10 @@ use codepages::tables::write_with_bom;
 use color_eyre::Result;
 use create::IcyBoardCreator;
 use icy_board_engine::icy_board::{read_with_encoding_detection, IcyBoard};
-use icy_board_tui::{get_text_args, print_error, term};
+use icy_board_tui::{print_error, term};
 use import::{console_logger::ConsoleLogger, PCBoardImporter};
 use semver::Version;
 use std::{
-    collections::HashMap,
     fs,
     path::PathBuf,
     process::{self, exit},
@@ -194,8 +193,7 @@ fn main() -> Result<()> {
         _ => {}
     }
     let Some(file) = icy_board_engine::lookup_icyboard_file(&arguments.file) else {
-        let map = HashMap::new();
-        print_error(get_text_args("file_not_found", map));
+        print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
         exit(1);
     };
 

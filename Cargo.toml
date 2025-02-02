@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
 members = [
-	"crates/icy_board", 
 	"crates/icy_board_engine", 
 	"crates/jamjam",
 	"crates/dizbase",
@@ -15,6 +14,7 @@ members = [
 	"crates/mkicbmnu",
 	"crates/icy_net",
 	"crates/mkicbtxt", 
+	"crates/icboard", 
 	"crates/icbsetup",
 	"crates/icbmailer",
 	"crates/icbsysmgr",

@@ -50,9 +50,7 @@ fn main() -> Result<()> {
 
     let file = arguments.file;
     if !file.exists() && !arguments.create {
-        let mut map = HashMap::new();
-        map.insert("name".to_string(), file.display().to_string());
-        print_error(get_text_args("file_not_found", map));
+        print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
         exit(1);
     }
 

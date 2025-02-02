@@ -56,8 +56,7 @@ fn main() -> Result<()> {
     let arguments: Cli = argh::from_env();
 
     let Some(file) = icy_board_engine::lookup_icyboard_file(&arguments.file) else {
-        let map = HashMap::new();
-        print_error(get_text_args("file_not_found", map));
+        print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
         exit(1);
     };
 
