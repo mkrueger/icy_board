@@ -193,18 +193,11 @@ fn main() -> Result<()> {
         }
         _ => {}
     }
-    let mut file = arguments.file.clone().unwrap_or(PathBuf::from("."));
-    if file.is_dir() {
-        file = file.join("icyboard.toml");
-    }
-
-    let file = file.with_extension("toml");
-    if !file.exists() {
-        let mut map: HashMap<String, String> = HashMap::new();
-        map.insert("name".to_string(), file.display().to_string());
+    let Some(file) = icy_board_engine::lookup_icyboard_file(&arguments.file) else {
+        let map = HashMap::new();
         print_error(get_text_args("file_not_found", map));
         exit(1);
-    }
+    };
 
     match IcyBoard::load(&file) {
         Ok(icy_board) => {

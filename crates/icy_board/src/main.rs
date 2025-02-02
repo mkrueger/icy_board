@@ -1,8 +1,9 @@
 use std::{
+    collections::HashMap,
     fmt::Display,
     io::stdout,
-    path::{Path, PathBuf},
-    process::{self, Command},
+    path::PathBuf,
+    process::{self, exit, Command},
     sync::Arc,
 };
 
@@ -21,6 +22,7 @@ use icy_board_engine::{
     Res,
 };
 
+use icy_board_tui::get_text_args;
 use node_monitoring_screen::NodeMonitoringScreenMessage;
 use ratatui::{backend::Backend, Terminal};
 use semver::Version;
@@ -69,18 +71,17 @@ lazy_static::lazy_static! {
 #[tokio::main]
 async fn main() -> Res<()> {
     let arguments: Cli = argh::from_env();
-    let file = arguments.file.clone().unwrap_or(PathBuf::from("."));
-    start_icy_board(&arguments, &file).await?;
+    let Some(file) = icy_board_engine::lookup_icyboard_file(&arguments.file) else {
+        let map = HashMap::new();
+        print_error(get_text_args("file_not_found", map));
+        exit(1);
+    };
+    start_icy_board(&arguments, file).await?;
     Ok(())
 }
 
-async fn start_icy_board<P: AsRef<Path>>(arguments: &Cli, config_file: &P) -> Res<()> {
+async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
     let stuffed = arguments.key.clone().unwrap_or_default();
-
-    let mut file = config_file.as_ref().to_path_buf();
-    if file.is_dir() {
-        file = file.join("icyboard.toml");
-    }
 
     let config_file = file.with_extension("toml");
 

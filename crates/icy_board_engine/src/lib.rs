@@ -11,7 +11,7 @@
     clippy::module_name_repetitions
 )]
 
-use std::error::Error;
+use std::{env, error::Error, path::PathBuf};
 
 use semver::Version;
 
@@ -33,4 +33,26 @@ pub type Res<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
 lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
+}
+
+pub fn lookup_icyboard_file(file: &Option<PathBuf>) -> Option<PathBuf> {
+    let mut file = file.clone().unwrap_or(PathBuf::from("."));
+    if file.is_dir() {
+        file = file.join("icyboard.toml");
+    }
+
+    let file = file.with_extension("toml");
+    if file.exists() {
+        return Some(file);
+    }
+
+    if let Ok(var) = env::var("ICB_PATH") {
+        let mut path = PathBuf::from(var);
+        path.push("icyboard.toml");
+        if path.exists() {
+            return Some(path);
+        }
+    }
+
+    None
 }
