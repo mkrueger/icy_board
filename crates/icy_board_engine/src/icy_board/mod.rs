@@ -399,6 +399,9 @@ impl IcyBoard {
         // Line 76
         pcb_dat.closed_board = self.config.options.is_closed_board;
 
+        // Line 87
+        pcb_dat.display_news = self.config.options.display_news_behavior.to_pcb_char();
+
         // Line 94
         pcb_dat.board_name = self.config.board.name.to_string();
 
@@ -427,6 +430,8 @@ impl IcyBoard {
         // Line 270
         pcb_dat.skip_alias = !self.config.new_user_settings.ask_alias;
 
+        // Line 296 (to prevent \0 char)
+        pcb_dat.uucp_high_ascii = 'N';
         let res = pcb_dat.serialize(crate::parser::Encoding::CP437);
         fs::write(file, res)?;
 

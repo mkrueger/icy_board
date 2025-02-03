@@ -279,7 +279,6 @@ pub async fn handle_client(
         if cmd.state.session.request_logoff {
             cmd.state.connection.shutdown().await?;
             cmd.state.save_current_user().await?;
-            log::info!("logoff");
             return Ok(());
         }
         thread::sleep(Duration::from_millis(20));

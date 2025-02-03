@@ -412,6 +412,10 @@ pub struct BoardOptions {
     pub alarm: bool,
 
     pub allow_iemsi: bool,
+
+    /// G command will ask for logoff (bye will skip that)
+    #[serde(default)]
+    pub guard_logoff: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
@@ -426,6 +430,27 @@ pub enum DisplayNewsBehavior {
     /// Display news on command if news is available
     #[serde(rename = "A")]
     Always,
+}
+impl DisplayNewsBehavior {
+    pub fn to_pcb_char(&self) -> char {
+        match self {
+            DisplayNewsBehavior::OnlyNewer => 'Y',
+            DisplayNewsBehavior::OncePerDay => 'N',
+            DisplayNewsBehavior::Always => 'A',
+        }
+    }
+
+    pub fn from_pcb_char(c: char) -> Self {
+        match c {
+            'Y' => DisplayNewsBehavior::OnlyNewer,
+            'N' => DisplayNewsBehavior::OncePerDay,
+            'A' => DisplayNewsBehavior::Always,
+            _ => {
+                log::warn!("Invalid DisplayNewsBehavior char: {}", c);
+                DisplayNewsBehavior::OnlyNewer
+            }
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -589,6 +614,7 @@ impl IcbConfig {
                 alarm: false,
                 call_log: true,
                 allow_iemsi: true,
+                guard_logoff: false,
             },
         }
     }

@@ -14,17 +14,18 @@ impl IcyBoardState {
     pub async fn goodbye_cmd(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::LogoffPending).await;
         self.displaycmdfile("g").await?;
-
-        if !self.session.flagged_files.is_empty() {
+        let is_flagged = !self.session.flagged_files.is_empty();
+        if self.board.lock().await.config.options.guard_logoff || is_flagged {
             if let Some(token) = self.session.tokens.pop_front() {
                 if token.eq_ignore_ascii_case(&self.session.yes_char.to_string()) {
                     self.bye_cmd().await?;
                     return Ok(());
                 }
             };
-
-            self.display_text(IceText::FilesAreFlagged, display_flags::NEWLINE | display_flags::BELL | display_flags::LFBEFORE)
-                .await?;
+            if is_flagged {
+                self.display_text(IceText::FilesAreFlagged, display_flags::NEWLINE | display_flags::BELL | display_flags::LFBEFORE)
+                    .await?;
+            }
             let res = self
                 .input_field(
                     IceText::ContinueLogoff,

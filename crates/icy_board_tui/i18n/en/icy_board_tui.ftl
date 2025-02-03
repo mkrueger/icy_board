@@ -40,12 +40,44 @@ call_wait_screen_system_manager_descr=Run IcyBoard System Manager for User File 
 call_wait_screen_setup=ICBSetup
 call_wait_screen_setup_descr=Run ICBSetup to change Icy Board configuration.
 
+call_wait_screen_icb_text=ICBText
+call_wait_screen_icb_text_descr=Changes the ICBText files on the system.
+
+call_wait_screen_total_statistics=ALL TIME Statistics
+call_wait_screen_today_statistics=TODAY Statistics
+call_wait_screen_statistics_descr=Choose between All Time or Today Statistics Display
+
+call_wait_screen_show_statistics=Show Statistics
+call_wait_screen_show_statistics_descr=Shows all Statistics for the system
+
 call_wait_screen_sys_ready = System is Ready For Callers
 call_wait_screen_last_caller = Last Caller:
+call_wait_screen_last_caller_none = None
 call_wait_screen_num_calls = Calls:
 call_wait_screen_num_msgs = Msgs:
 call_wait_screen_num_dls = D/Ls:
 call_wait_screen_num_uls = U/Ls:
+
+# System Statistics
+icb_system_statistics_title = [ IcyBoard System Statistics ]
+icb_system_statistics_footer = [ (↑), (↓), (Del) Reset Stats, (Esc) to End ]
+icb_system_statistics_header = Statistic
+
+icb_system_statistics_total_calls = All Time Calls
+icb_system_statistics_total_messages = All Time Messages
+icb_system_statistics_total_uploads = All Time Uploads
+icb_system_statistics_total_uploads_kb = All Time kb Uploaded
+icb_system_statistics_total_downloads = All Time Downloads
+icb_system_statistics_total_downloads_kb = All Time kb Downloaded
+
+icb_system_statistics_today_calls = Today Calls
+icb_system_statistics_today_messages = Today Messages
+icb_system_statistics_today_uploads = Today Uploads
+icb_system_statistics_today_uploads_kb = Today kb Uploaded
+icb_system_statistics_today_downloads = Today Downloads
+icb_system_statistics_today_downloads_kb = Today kb Downloaded
+
+
 
 # Node Monitioring Utility
 

@@ -240,11 +240,13 @@ impl IcyBoardCreator {
         user_base.new_user(user);
         user_base.save_users(&self.destination.join(&config.paths.home_dir))?;
 
-        config.save(&self.destination.join("icyboard.toml"))?;
+        config.save(&self.destination.join(icy_board_engine::DEFAULT_ICYBOARD_FILE))?;
 
         self.logger.start_action("IcyBoard created successfully.".to_string());
-        self.logger
-            .start_action(format!("Start with icy_board run \"{}\"", self.destination.join("icyboard.toml").display()));
+        self.logger.start_action(format!(
+            "Start with icy_board run \"{}\"",
+            self.destination.join(icy_board_engine::DEFAULT_ICYBOARD_FILE).display()
+        ));
         Ok(())
     }
 

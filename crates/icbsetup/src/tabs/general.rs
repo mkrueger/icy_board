@@ -510,6 +510,11 @@ impl GeneralTab {
                 "Doors get Plaintext Passwords".to_string(),
                 ListValue::Bool(icy_board.config.options.give_user_password_to_doors),
             )),
+            ConfigEntry::Item(ListItem::new(
+                "guard_logoff",
+                "Warning on Logoff Command".to_string(),
+                ListValue::Bool(icy_board.config.options.guard_logoff),
+            )),
         ];
 
         Self {
@@ -593,6 +598,7 @@ impl GeneralTab {
                 "display_userinfo_at_login" => icy_board.config.options.display_userinfo_at_login = *b,
                 "non_graphics" => icy_board.config.options.non_graphics = *b,
                 "give_user_password_to_doors" => icy_board.config.options.give_user_password_to_doors = *b,
+                "guard_logoff" => icy_board.config.options.guard_logoff = *b,
                 _ => panic!("Unknown id: {}", item.id),
             },
             ListValue::Color(c) => match item.id.as_str() {

@@ -597,6 +597,7 @@ pub async fn readline(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     let file_name = vm.resolve_file(&file_name).await;
 
     if let Ok(file) = read_with_encoding_detection(&file_name) {
+        let file = file.replace("\r\n", "\n");
         let line_text = file.lines().nth(line as usize - 1).unwrap_or_default();
         Ok(VariableValue::new_string(line_text.to_string()))
     } else {

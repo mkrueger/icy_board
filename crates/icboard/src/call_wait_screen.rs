@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::Res;
+use crate::{Res, SHOW_TOTAL_STATS};
 use chrono::{Local, Timelike};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use icy_board_engine::icy_board::{statistics::Statistics, IcyBoard};
@@ -40,6 +40,10 @@ pub enum CallWaitMessage {
     ToggleAlarm,
     SystemManager,
     Setup,
+
+    IcbText,
+    ToggleStatistics,
+    ShowStatistics,
 }
 
 struct Button {
@@ -61,6 +65,7 @@ pub struct CallWaitScreen {
 impl CallWaitScreen {
     pub async fn new(board: &Arc<Mutex<IcyBoard>>) -> Res<Self> {
         let buttons = vec![
+            // Row 1
             Button {
                 title: get_text("call_wait_screen_user_button_busy"),
                 description: get_text("call_wait_screen_user_button_busy_descr"),
@@ -76,6 +81,7 @@ impl CallWaitScreen {
                 description: get_text("call_wait_screen_dos_button_busy_descr"),
                 message: CallWaitMessage::Exit(true),
             },
+            // Row 2
             Button {
                 title: get_text("call_wait_screen_user_button_not_busy"),
                 description: get_text("call_wait_screen_user_button_not_busy_descr"),
@@ -91,6 +97,7 @@ impl CallWaitScreen {
                 description: get_text("call_wait_screen_dos_button_not_busy_descr"),
                 message: CallWaitMessage::Exit(false),
             },
+            // Row 3
             Button {
                 title: if board.lock().await.config.options.alarm {
                     get_text("call_wait_screen_call_log_on")
@@ -118,20 +125,41 @@ impl CallWaitScreen {
                 description: get_text("call_wait_screen_alarm_descr"),
                 message: CallWaitMessage::ToggleAlarm,
             },
-            Button {
-                title: get_text("call_wait_screen_monitor_button_not_busy"),
-                description: get_text("call_wait_screen_monitor_button_not_busy_descr"),
-                message: CallWaitMessage::Monitor,
-            },
+            // Row 4
             Button {
                 title: get_text("call_wait_screen_system_manager"),
                 description: get_text("call_wait_screen_system_manager_descr"),
                 message: CallWaitMessage::SystemManager,
             },
             Button {
+                title: get_text("call_wait_screen_icb_text"),
+                description: get_text("call_wait_screen_icb_text_descr"),
+                message: CallWaitMessage::IcbText,
+            },
+            Button {
                 title: get_text("call_wait_screen_setup"),
                 description: get_text("call_wait_screen_setup_descr"),
                 message: CallWaitMessage::Setup,
+            },
+            // Row 4
+            Button {
+                title: if unsafe { SHOW_TOTAL_STATS } {
+                    get_text("call_wait_screen_total_statistics")
+                } else {
+                    get_text("call_wait_screen_today_statistics")
+                },
+                description: get_text("call_wait_screen_statistics_descr"),
+                message: CallWaitMessage::ToggleStatistics,
+            },
+            Button {
+                title: get_text("call_wait_screen_monitor_button_not_busy"),
+                description: get_text("call_wait_screen_monitor_button_not_busy_descr"),
+                message: CallWaitMessage::Monitor,
+            },
+            Button {
+                title: get_text("call_wait_screen_show_statistics"),
+                description: get_text("call_wait_screen_show_statistics_descr"),
+                message: CallWaitMessage::ShowStatistics,
             },
         ];
 
@@ -167,6 +195,12 @@ impl CallWaitScreen {
             get_text("call_wait_screen_alarm_on")
         } else {
             get_text("call_wait_screen_alarm_off")
+        };
+
+        self.buttons[12].title = if unsafe { SHOW_TOTAL_STATS } {
+            get_text("call_wait_screen_total_statistics")
+        } else {
+            get_text("call_wait_screen_today_statistics")
         };
     }
 
@@ -327,7 +361,10 @@ impl CallWaitScreen {
         PcbButton::new(format!(
             "{} {}",
             get_text("call_wait_screen_last_caller"),
-            self.statistics.last_callers.last().map_or("", |c| &c.user_name)
+            self.statistics
+                .last_callers
+                .last()
+                .map_or(&get_text("call_wait_screen_last_caller_none"), |c| &c.user_name)
         ))
         .theme(stat_teme)
         .render(area, frame.buffer_mut());
@@ -348,21 +385,24 @@ impl CallWaitScreen {
         uls.height = 1;
 
         let horizontal = 2;
-        PcbButton::new(format!("{} {}", get_text("call_wait_screen_num_calls"), self.statistics.total.calls))
-            .theme(stat_teme)
-            .render(calls.inner(Margin { horizontal, vertical: 0 }), frame.buffer_mut());
+        unsafe {
+            let stats = if SHOW_TOTAL_STATS { &self.statistics.total } else { &self.statistics.today };
+            PcbButton::new(format!("{} {}", get_text("call_wait_screen_num_calls"), stats.calls))
+                .theme(stat_teme)
+                .render(calls.inner(Margin { horizontal, vertical: 0 }), frame.buffer_mut());
 
-        PcbButton::new(format!("{} {}", get_text("call_wait_screen_num_msgs"), self.statistics.total.messages))
-            .theme(stat_teme)
-            .render(msgs.inner(Margin { horizontal, vertical: 0 }), frame.buffer_mut());
+            PcbButton::new(format!("{} {}", get_text("call_wait_screen_num_msgs"), stats.messages))
+                .theme(stat_teme)
+                .render(msgs.inner(Margin { horizontal, vertical: 0 }), frame.buffer_mut());
 
-        PcbButton::new(format!("{} {}", get_text("call_wait_screen_num_dls"), self.statistics.total.downloads))
-            .theme(stat_teme)
-            .render(dls.inner(Margin { horizontal, vertical: 0 }), frame.buffer_mut());
+            PcbButton::new(format!("{} {}", get_text("call_wait_screen_num_dls"), stats.downloads))
+                .theme(stat_teme)
+                .render(dls.inner(Margin { horizontal, vertical: 0 }), frame.buffer_mut());
 
-        PcbButton::new(format!("{} {}", get_text("call_wait_screen_num_uls"), self.statistics.total.uploads))
-            .theme(stat_teme)
-            .render(uls.inner(Margin { horizontal, vertical: 0 }), frame.buffer_mut());
+            PcbButton::new(format!("{} {}", get_text("call_wait_screen_num_uls"), stats.uploads))
+                .theme(stat_teme)
+                .render(uls.inner(Margin { horizontal, vertical: 0 }), frame.buffer_mut());
+        }
     }
 
     fn get_select_state(&self, button: i32) -> State {

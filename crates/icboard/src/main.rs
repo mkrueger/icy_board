@@ -21,10 +21,10 @@ use icy_board_engine::{
     Res,
 };
 
-use icy_board_tui::get_text_args;
 use node_monitoring_screen::NodeMonitoringScreenMessage;
 use ratatui::{backend::Backend, Terminal};
 use semver::Version;
+use system_statistics_screen::{SystemStatisticsScreen, SystemStatisticsScreenMessage};
 use tokio::sync::Mutex;
 use tui::{print_exit_screen, Tui};
 
@@ -35,8 +35,11 @@ mod call_wait_screen;
 mod icy_engine_output;
 pub mod menu_runner;
 mod node_monitoring_screen;
+mod system_statistics_screen;
 mod terminal_thread;
 mod tui;
+
+static mut SHOW_TOTAL_STATS: bool = true;
 
 #[derive(FromArgs)]
 /// IcyBoard BBS
@@ -284,7 +287,6 @@ async fn run_message(
         CallWaitMessage::SystemManager => {
             let path = std::env::current_exe().unwrap().with_file_name("icbsysmgr");
             let mut cmd = Command::new(path)
-                .arg("--file")
                 .arg(format!("{}", board.lock().await.file_name.display()))
                 .spawn()
                 .expect("icbsysmgr command failed to start");
@@ -293,11 +295,43 @@ async fn run_message(
         CallWaitMessage::Setup => {
             let path = std::env::current_exe().unwrap().with_file_name("icbsetup");
             let mut cmd = Command::new(path)
-                .arg("--file")
                 .arg(format!("{}", board.lock().await.file_name.display()))
                 .spawn()
                 .expect("icbsysmgr command failed to start");
             cmd.wait().expect("icbsysmgr command failed to run");
+        }
+        CallWaitMessage::IcbText => {
+            let icbtxt_path = board.lock().await.config.paths.icbtext.clone();
+            let icbtxt_path = board.lock().await.resolve_file(&icbtxt_path);
+
+            let path = std::env::current_exe().unwrap().with_file_name("mkicbtxt");
+            let mut cmd = Command::new(path)
+                .arg(format!("{}", icbtxt_path.display()))
+                .spawn()
+                .expect("icbsysmgr command failed to start");
+            cmd.wait().expect("icbsysmgr command failed to run");
+        }
+        CallWaitMessage::ToggleStatistics => unsafe {
+            SHOW_TOTAL_STATS = !SHOW_TOTAL_STATS;
+        },
+        CallWaitMessage::ShowStatistics => {
+            let mut app = SystemStatisticsScreen::new(&board).await;
+            match app.run(terminal, full_screen).await {
+                Ok(msg) => {
+                    if msg == SystemStatisticsScreenMessage::Reset {
+                        let mut board = board.lock().await;
+                        board.statistics = Default::default();
+                        board.save_statistics().expect("failed to save statistics.");
+                    }
+                    // just exit
+                }
+                Err(err) => {
+                    restore_terminal()?;
+                    log::error!("while running system statistics screen: {}", err.to_string());
+                    print_error(err.to_string());
+                    process::exit(1);
+                }
+            }
         }
     }
     Ok(())

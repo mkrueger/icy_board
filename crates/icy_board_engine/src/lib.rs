@@ -35,10 +35,12 @@ lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
 
+pub const DEFAULT_ICYBOARD_FILE: &str = "icboard.toml";
+
 pub fn lookup_icyboard_file(file: &Option<PathBuf>) -> Option<PathBuf> {
     let mut file = file.clone().unwrap_or(PathBuf::from("."));
     if file.is_dir() {
-        file = file.join("icyboard.toml");
+        file = file.join(DEFAULT_ICYBOARD_FILE);
     }
 
     let file = file.with_extension("toml");
@@ -48,7 +50,7 @@ pub fn lookup_icyboard_file(file: &Option<PathBuf>) -> Option<PathBuf> {
 
     if let Ok(var) = env::var("ICB_PATH") {
         let mut path = PathBuf::from(var);
-        path.push("icyboard.toml");
+        path.push(DEFAULT_ICYBOARD_FILE);
         if path.exists() {
             return Some(path);
         }

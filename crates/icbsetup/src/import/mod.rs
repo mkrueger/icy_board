@@ -352,11 +352,7 @@ impl PCBoardImporter {
             options: BoardOptions {
                 disable_full_record_updating: self.data.allow_pwrd_only,
                 is_closed_board: self.data.closed_board,
-                display_news_behavior: match self.data.display_news {
-                    'N' => DisplayNewsBehavior::OncePerDay,
-                    'A' => DisplayNewsBehavior::Always,
-                    _ => DisplayNewsBehavior::OnlyNewer,
-                },
+                display_news_behavior: DisplayNewsBehavior::from_pcb_char(self.data.display_news),
                 exclude_local_calls: self.data.exclude_locals,
                 display_userinfo_at_login: self.data.display_userinfo_at_login,
                 max_msg_lines: self.data.max_msg_lines as u16,
@@ -372,10 +368,11 @@ impl PCBoardImporter {
                 alarm: false,
                 call_log: true,
                 allow_iemsi: true,
+                guard_logoff: self.data.guard_logoff,
             },
         };
 
-        let destination = self.output_directory.join("icyboard.toml");
+        let destination = self.output_directory.join(icy_board_engine::DEFAULT_ICYBOARD_FILE);
         self.output.start_action(format!("Create main configuration {}…", destination.display()));
         if let Err(err) = icb_cfg.save(&destination) {
             self.logger.log_boxed_error(&*err);

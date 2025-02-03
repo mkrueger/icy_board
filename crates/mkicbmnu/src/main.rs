@@ -4,12 +4,11 @@ use chrono::Local;
 use color_eyre::Result;
 use icy_board_engine::{
     icy_board::{menu::Menu, IcyBoard, IcyBoardSerializer},
-    Res,
+    Res, DEFAULT_ICYBOARD_FILE,
 };
-use icy_board_tui::{get_text_args, print_error, term};
+use icy_board_tui::{print_error, term};
 use semver::Version;
 use std::{
-    collections::HashMap,
     path::PathBuf,
     process::exit,
     sync::{Arc, Mutex},
@@ -52,7 +51,7 @@ fn main() -> Result<()> {
     }
 
     let Ok(icy_board) = load_icy_board(file.parent()) else {
-        print_error("icyboard.toml not found");
+        print_error(format!("{} not found", icy_board_engine::DEFAULT_ICYBOARD_FILE));
         exit(1);
     };
 
@@ -105,11 +104,11 @@ fn load_icy_board(parent: Option<&std::path::Path>) -> Res<IcyBoard> {
     let mut path = parent;
     while path.is_some() {
         let icb_path = path.unwrap();
-        if icb_path.join("icyboard.toml").exists() {
-            return IcyBoard::load(&icb_path.join("icyboard.toml"));
+        if icb_path.join(DEFAULT_ICYBOARD_FILE).exists() {
+            return IcyBoard::load(&icb_path.join(DEFAULT_ICYBOARD_FILE));
         }
         path = icb_path.parent();
     }
 
-    Err(std::io::Error::new(std::io::ErrorKind::NotFound, "icyboard.toml not found").into())
+    Err(std::io::Error::new(std::io::ErrorKind::NotFound, format!("{} not found", DEFAULT_ICYBOARD_FILE)).into())
 }
