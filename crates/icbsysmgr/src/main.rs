@@ -3,10 +3,9 @@ use argh::FromArgs;
 use chrono::Local;
 use color_eyre::Result;
 use icy_board_engine::icy_board::IcyBoard;
-use icy_board_tui::{get_text_args, print_error, term};
+use icy_board_tui::{print_error, term};
 use semver::Version;
 use std::{
-    collections::HashMap,
     path::PathBuf,
     process::exit,
     sync::{Arc, Mutex},

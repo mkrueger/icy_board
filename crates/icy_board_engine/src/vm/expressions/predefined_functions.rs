@@ -7,6 +7,7 @@ use std::{env, fs};
 use crate::ast::constant::STACK_LIMIT;
 use crate::datetime::{IcbDate, IcbTime};
 use crate::executable::{GenericVariableData, PPEExpr, VariableData, VariableType, VariableValue};
+use crate::icy_board::macro_parser::Macro;
 use crate::icy_board::read_with_encoding_detection;
 use crate::icy_board::security_expr::SecurityExpression;
 use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_NUM, MASK_PATH, MASK_PWD};
@@ -1414,16 +1415,12 @@ fn calc_crc32(buffer: &[u8]) -> u32 {
 
 pub async fn pcbmac(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let var = vm.eval_expr(&args[0]).await?.as_string();
-
-    if let Some(expanded) = vm
-        .icy_board_state
-        .translate_variable(crate::vm::TerminalTarget::Sysop, var.trim_matches('@'))
-        .await
-    {
-        Ok(VariableValue::new_string(expanded))
-    } else {
-        Ok(VariableValue::new_string(String::new()))
+    if let Ok(pm) = Macro::from_str(&var.trim_matches('@')) {
+        if let Some(expanded) = vm.icy_board_state.run_macro(crate::vm::TerminalTarget::Sysop, pm).await {
+            return Ok(VariableValue::new_string(expanded));
+        }
     }
+    Ok(VariableValue::new_string(String::new()))
 }
 pub async fn actmsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let area = vm.icy_board_state.session.current_message_area;

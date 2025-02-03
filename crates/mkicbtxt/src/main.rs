@@ -5,9 +5,9 @@ use crossterm::{
     execute,
     style::{Attribute, Color, Print, SetAttribute, SetForegroundColor},
 };
-use icy_board_tui::{get_text_args, print_error, term};
+use icy_board_tui::{print_error, term};
 use semver::Version;
-use std::{collections::HashMap, io::stdout, path::PathBuf, process::exit};
+use std::{io::stdout, path::PathBuf, process::exit};
 mod app;
 mod tabs;
 

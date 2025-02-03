@@ -1,8 +1,8 @@
 use std::{
     collections::{HashMap, VecDeque},
-    fmt::Alignment,
     fs,
     path::{Path, PathBuf},
+    str::FromStr,
     sync::Arc,
     thread,
     time::{Duration, Instant},
@@ -34,6 +34,7 @@ use super::{
     conferences::Conference,
     icb_config::{IcbColor, DEFAULT_PCBOARD_DATE_FORMAT},
     icb_text::{IcbTextFile, IcbTextStyle, IceText},
+    macro_parser::{Macro, MacroCommand},
     surveys::SurveyList,
     user_base::{FSEMode, Password, User},
     IcyBoard, IcyBoardSerializer,
@@ -1248,14 +1249,14 @@ impl IcyBoardState {
                             state = PcbState::Default;
                         } else if *c == '@' {
                             state = PcbState::Default;
-                            if let Some(output) = self.translate_variable(target, &s).await {
-                                if output.len() == 0 {
-                                    self.write_chars(target, &['@']).await?;
-                                    self.write_chars(target, s.chars().collect::<Vec<char>>().as_slice()).await?;
-                                    state = PcbState::GotAt;
-                                } else {
+                            if let Ok(pm) = Macro::from_str(&s) {
+                                if let Some(output) = self.run_macro(target, pm).await {
                                     self.write_chars(target, output.chars().collect::<Vec<char>>().as_slice()).await?;
                                 }
+                            } else {
+                                self.write_chars(target, &['@']).await?;
+                                self.write_chars(target, s.chars().collect::<Vec<char>>().as_slice()).await?;
+                                state = PcbState::GotAt;
                             }
                         } else {
                             state = PcbState::ReadAtSequence(s + c.to_string().as_str());
@@ -1304,13 +1305,10 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub async fn translate_variable(&mut self, target: TerminalTarget, input: &str) -> Option<String> {
-        let mut split = input.split(':');
-        let id = split.next().unwrap();
-        let param = split.next();
+    pub async fn run_macro(&mut self, target: TerminalTarget, id: Macro) -> Option<String> {
         let mut result = String::new();
-        match id {
-            "ALIAS" => {
+        match &id.command {
+            MacroCommand::Alias => {
                 if let Some(user) = &self.session.current_user {
                     result = user.alias.to_string();
                 }
@@ -1318,59 +1316,66 @@ impl IcyBoardState {
                     result = self.session.get_first_name();
                 }
             }
-            "AUTOMORE" => {
+            MacroCommand::AutoMore => {
                 self.session.disp_options.auto_more = true;
                 return None;
             }
-            "BEEP" => {
+            MacroCommand::Beep => {
                 let _ = self.bell().await;
                 return None;
             }
-            "BICPS" => result = self.transfer_statistics.get_cps_both().to_string(),
-            "BOARDNAME" => result = self.get_board().await.config.board.name.to_string(),
-            "BPS" | "CARRIER" => result = self.get_bps().to_string(),
+            MacroCommand::BICPS => result = self.transfer_statistics.get_cps_both().to_string(),
+            MacroCommand::BoardName => result = self.get_board().await.config.board.name.to_string(),
+            MacroCommand::BPS | MacroCommand::Carrier => result = self.get_bps().to_string(),
 
             // TODO
-            "BYTECREDIT" | "BYTELIMIT" | "BYTERATIO" | "BYTESLEFT" => {
+            MacroCommand::ByteCredit | MacroCommand::ByteLimit | MacroCommand::ByteRatio | MacroCommand::BytesLeft => {
                 // todo
             }
 
-            "CITY" => {
+            MacroCommand::City => {
                 if let Some(user) = &self.session.current_user {
                     result = user.city_or_state.to_string();
                 }
             }
-            "CLREOL" => {
+            MacroCommand::ClrEol => {
                 let _ = self.clear_eol(target).await;
                 return None;
             }
-            "CLS" => {
+            MacroCommand::Cls => {
                 let _ = self.clear_screen(target).await;
                 return None;
             }
-            "CONFNAME" => result = self.session.current_conference.name.to_string(),
-            "CONFNUM" => result = self.session.current_conference_number.to_string(),
+            MacroCommand::ConfName => result = self.session.current_conference.name.to_string(),
+            MacroCommand::ConfNum => result = self.session.current_conference_number.to_string(),
 
-            // TODO
-            "CREDLEFT" | "CREDNOW" | "CREDSTART" | "CREDUSED" => {}
+            MacroCommand::CredLeft | MacroCommand::CredNow | MacroCommand::CredStart | MacroCommand::CredUsed => {
+                // todo
+            }
 
-            "CURMSGNUM" => {
+            MacroCommand::CurMsgNum => {
                 result = self.session.current_messagenumber.to_string();
             }
-            "DATAPHONE" => {
+
+            MacroCommand::DataPhone => {
                 if let Some(user) = &self.session.current_user {
                     result = user.bus_data_phone.to_string();
                 }
             }
-            "DAYBYTES" | "DELAY" | "DLBYTES" | "DLFILES" | "EVENT" => {}
-            "EXPDATE" => {
+            MacroCommand::DayBytes | MacroCommand::DlBytes | MacroCommand::DlFiles | MacroCommand::Event => {}
+
+            MacroCommand::Delay(delay) => {
+                sleep(Duration::from_millis(*delay as u64 * 10)).await;
+                return None;
+            }
+            MacroCommand::ExpDate => {
                 if let Some(user) = &self.session.current_user {
                     result = self.format_date(user.exp_date);
                 } else {
                     result = "NEVER".to_string();
                 }
             }
-            "EXPDAYS" => {
+            MacroCommand::ExpDays => {
                 if self.get_board().await.config.subscription_info.is_enabled {
                     if let Some(user) = &self.session.current_user {
                         if user.exp_date.year() != 0 {
@@ -1392,18 +1397,19 @@ impl IcyBoardState {
                     result = entry.text;
                 }
             }
-            "FBYTES" | "FFILES" | "FILECREDIT" | "FILERATIO" => {}
-            "FIRST" => {
+            MacroCommand::FBytes | MacroCommand::FFiles | MacroCommand::FileCredit | MacroCommand::FileRatio => {}
+            MacroCommand::First => {
                 result = self.session.get_first_name();
             }
-            "FIRSTU" => {
+
+            MacroCommand::FirstU => {
                 result = self.session.get_first_name().to_uppercase();
             }
-            "FNUM" => {
+            MacroCommand::FNum => {
                 result = (self.session.flagged_files.len() + 1).to_string();
             }
-            "FREESPACE" => {}
-            "GFXMODE" => {
+            MacroCommand::FreeSpace => {}
+            MacroCommand::GfxMode => {
                 result = match self.session.disp_options.grapics_mode {
                     GraphicsMode::Ctty => self.display_text.get_display_text(IceText::GfxModeOff).unwrap().text,
                     GraphicsMode::Ansi => self.display_text.get_display_text(IceText::GfxModeAnsi).unwrap().text,
@@ -1412,158 +1418,159 @@ impl IcyBoardState {
                     GraphicsMode::Rip => self.display_text.get_display_text(IceText::GfxModeRip).unwrap().text,
                 };
             }
-            "HOMEPHONE" => {
+            MacroCommand::HomePhone => {
                 if let Some(user) = &self.session.current_user {
                     result = user.home_voice_phone.to_string();
                 }
             }
-            "HIGHMSGNUM" => result = self.session.high_msg_num.to_string(),
-            "INAME" => {}
-            "INCONF" => result = self.session.current_conference.name.to_string(),
-            "LOGDATE" => result = self.format_date(self.session.login_date),
-            "LOGTIME" => result = self.format_time(self.session.login_date),
-            "LASTDATEON" => {
+            MacroCommand::HighMSGNum => result = self.session.high_msg_num.to_string(),
+            MacroCommand::IName => {}
+            MacroCommand::InConf => result = self.session.current_conference.name.to_string(),
+            MacroCommand::LogDate => result = self.format_date(self.session.login_date),
+            MacroCommand::LogTime => result = self.format_time(self.session.login_date),
+            MacroCommand::LastDateOn => {
                 if let Some(user) = &self.session.current_user {
                     result = self.format_date(user.stats.last_on);
                 }
             }
-            "LASTTIMEON" => {
+            MacroCommand::LastTimeOn => {
                 if let Some(user) = &self.session.current_user {
                     result = self.format_time(user.stats.last_on);
                 }
             }
-            "LOWMSGNUM" => {
+            MacroCommand::LowMsgNum => {
                 result = self.session.low_msg_num.to_string();
             }
-            "LMR" => {
+            MacroCommand::LMR => {
                 result = self.session.last_msg_read.to_string();
             }
-            "KBLEFT" | "KBLIMIT" | "LASTCALLERNODE" | "LASTCALLERSYSTEM" | "MAXBYTES" | "MAXFILES" => {}
-            "MINLEFT" => result = "1000".to_string(),
-            "MORE" => {
+
+            MacroCommand::KBLeft
+            | MacroCommand::KBLimit
+            | MacroCommand::LastCallerNode
+            | MacroCommand::LastCallerSystem
+            | MacroCommand::MaxBytes
+            | MacroCommand::MaxFiles => {}
+            MacroCommand::MinLeft => result = "1000".to_string(),
+            MacroCommand::More => {
                 if let Err(err) = self.more_promt().await {
                     log::error!("Error in more prompt: {}", err);
                 }
                 return None;
             }
-            "MSGLEFT" => {
+            MacroCommand::MsgLeft => {
                 if let Some(user) = &self.session.current_user {
                     result = user.stats.messages_left.to_string();
                 }
             }
-            "MSGREAD" => {
+            MacroCommand::MsgRead => {
                 if let Some(user) = &self.session.current_user {
                     result = user.stats.messages_read.to_string();
                 }
             }
-            "NOCHAR" => result = self.session.no_char.to_string(),
-            "NODE" => result = self.node.to_string(),
-            "NUMBLT" => {
+            MacroCommand::NoChar => result = self.session.no_char.to_string(),
+            MacroCommand::Node => result = self.node.to_string(),
+            MacroCommand::NumBLT => {
                 if let Ok(bullettins) = self.load_bullettins().await {
                     result = bullettins.len().to_string();
                 }
             }
-            "NUMCALLS" => {
+            MacroCommand::NumCalls => {
                 result = self.get_board().await.statistics.total.calls.to_string();
             }
-            "NUMCONF" => result = self.get_board().await.conferences.len().to_string(),
-            "NUMDIR" => {
+            MacroCommand::NumConf => result = self.get_board().await.conferences.len().to_string(),
+            MacroCommand::NumDir => {
                 result = self.session.current_conference.directories.len().to_string();
             }
-            "DIRNAME" => {
+            MacroCommand::DirName => {
                 result = self.session.current_conference.directories[self.session.current_file_directory]
                     .name
                     .to_string();
             }
-            "DIRNUM" => {
+            MacroCommand::DirNum => {
                 result = self.session.current_conference.directories.len().to_string();
             }
-            "AREA" => {
+            MacroCommand::Area => {
                 result = self.session.current_conference.areas[self.session.current_message_area].name.to_string();
             }
-            "NUMAREA" => {
+            MacroCommand::NumArea => {
                 result = self.session.current_conference.areas.len().to_string();
             }
-            "NUMTIMESON" => {
+            MacroCommand::NumTimesOn => {
                 if let Some(user) = &self.session.current_user {
                     result = user.stats.num_times_on.to_string();
                 }
             }
-            "OFFHOURS" => {}
-            "OPTEXT" => result = self.session.op_text.to_string(),
-            "PAUSE" => {
+            MacroCommand::OffHours => {}
+            MacroCommand::OpText => result = self.session.op_text.to_string(),
+            MacroCommand::Pause => {
                 self.session.disp_options.auto_more = true;
                 let _ = self.press_enter().await;
                 self.session.disp_options.auto_more = false;
                 return None;
             }
-            "POS" => {
+            MacroCommand::POS(value) => {
                 let x = self.user_screen.caret.get_position().x as usize;
-                if let Some(value) = param {
-                    if let Ok(i) = value.parse::<usize>() {
-                        while result.len() + 1 < i.saturating_sub(x) {
-                            result.push(' ');
-                        }
-                        return Some(result);
-                    }
+                while result.len() + x + 1 < *value as usize {
+                    result.push(' ');
                 }
+                return Some(result);
             }
-
-            "POFF" => {
+            MacroCommand::POFF => {
                 self.session.non_stop_on();
                 return None;
             }
-            "PON" => {
+            MacroCommand::PON => {
                 self.session.non_stop_off();
                 return None;
             }
-            "PROLTR" => {
+            MacroCommand::ProLTR => {
                 if let Some(user) = &self.session.current_user {
                     result = user.protocol.to_string();
                 }
             }
-            "PRODESC" => {
+            MacroCommand::ProDesc => {
                 if let Some(user) = &self.session.current_user {
                     if let Some(prot) = self.board.lock().await.protocols.find_protocol(&user.protocol) {
                         result = prot.description.to_string();
                     }
                 }
             }
-            "QOFF" => {
+            MacroCommand::QOFF => {
                 self.session.disp_options.allow_break = false;
                 return None;
             }
-            "QON" => {
+            MacroCommand::QON => {
                 self.session.disp_options.allow_break = true;
                 return None;
             }
-            "PWXDATE" | "PWXDAYS" | "RATIOBYTES" | "RATIOFILES" => {}
-            "RCPS" => result = self.transfer_statistics.uploaded_cps.to_string(),
-            "RBYTES" => result = self.transfer_statistics.uploaded_bytes.to_string(),
-            "RFILES" => result = self.transfer_statistics.uploaded_files.to_string(),
-            "REAL" => {
+            MacroCommand::PwxDate | MacroCommand::PwxDays | MacroCommand::RatioBytes | MacroCommand::RatioFiles => {}
+            MacroCommand::RCPS => result = self.transfer_statistics.uploaded_cps.to_string(),
+            MacroCommand::RBytes => result = self.transfer_statistics.uploaded_bytes.to_string(),
+            MacroCommand::RFiles => result = self.transfer_statistics.uploaded_files.to_string(),
+            MacroCommand::Real => {
                 if let Some(user) = &self.session.current_user {
                     result = user.get_name().to_string();
                 }
             }
-            "SECURITY" => {
+            MacroCommand::Security => {
                 if let Some(user) = &self.session.current_user {
                     result = user.security_level.to_string()
                 }
             }
-            "SCPS" => result = self.transfer_statistics.downloaded_cps.to_string(),
-            "SBYTES" => result = self.transfer_statistics.downloaded_bytes.to_string(),
-            "SFILES" => result = self.transfer_statistics.downloaded_files.to_string(),
-            "SYSDATE" => {
+            MacroCommand::SCPS => result = self.transfer_statistics.downloaded_cps.to_string(),
+            MacroCommand::SBytes => result = self.transfer_statistics.downloaded_bytes.to_string(),
+            MacroCommand::SFiles => result = self.transfer_statistics.downloaded_files.to_string(),
+            MacroCommand::SysDate => {
                 result = self.format_date(Utc::now());
             }
-            "SYSOPIN" => result = self.get_board().await.config.sysop.sysop_start.to_string(),
-            "SYSOPOUT" => result = self.get_board().await.config.sysop.sysop_stop.to_string(),
-            "SYSTIME" => {
+            MacroCommand::SysopIn => result = self.get_board().await.config.sysop.sysop_start.to_string(),
+            MacroCommand::SysopOut => result = self.get_board().await.config.sysop.sysop_stop.to_string(),
+            MacroCommand::SysTime => {
                 result = self.format_time(Utc::now());
             }
-            "TIMELIMIT" => result = self.session.time_limit.to_string(),
-            "TIMELEFT" => {
+            MacroCommand::TimeLimit => result = self.session.time_limit.to_string(),
+            MacroCommand::TimeLeft => {
                 let now = Utc::now();
                 let time_on = now - self.session.login_date;
                 if self.session.time_limit == 0 {
@@ -1572,25 +1579,25 @@ impl IcyBoardState {
                     result = (self.session.time_limit as i64 - time_on.num_minutes()).to_string();
                 }
             }
-            "TIMEUSED" => result = (Utc::now() - self.session.login_date).num_minutes().to_string(),
-            "TOTALTIME" => {
+            MacroCommand::TimeUsed => result = (Utc::now() - self.session.login_date).num_minutes().to_string(),
+            MacroCommand::TotalTime => {
                 let mut current = (Utc::now() - self.session.login_date).num_minutes();
                 if let Some(user) = &self.session.current_user {
                     current += user.stats.minutes_today as i64;
                 }
                 result = current.to_string();
             }
-            "UPBYTES" => {
+            MacroCommand::UpBytes => {
                 if let Some(user) = &self.session.current_user {
                     result = user.stats.total_upld_bytes.to_string();
                 }
             }
-            "UPFILES" => {
+            MacroCommand::UpFiles => {
                 if let Some(user) = &self.session.current_user {
                     result = user.stats.num_uploads.to_string();
                 }
             }
-            "USER" => {
+            MacroCommand::User => {
                 if let Some(user) = &self.session.current_user {
                     if self.session.use_alias {
                         if user.alias.is_empty() {
@@ -1605,72 +1612,40 @@ impl IcyBoardState {
                     result = "0".to_string();
                 }
             }
-            "WAIT" => {
+            MacroCommand::Wait => {
                 let _ = self.press_enter().await;
                 return None;
             }
-            "WHO" => {
+            MacroCommand::Who => {
                 let _ = self.who_display_nodes().await;
                 return None;
             }
-            "XOFF" => {
+            MacroCommand::XOff => {
                 self.session.disp_options.grapics_mode = GraphicsMode::Ansi;
                 return None;
             }
-            "XON" => {
+            MacroCommand::XON => {
                 if !self.get_board().await.config.options.non_graphics {
                     self.session.disp_options.grapics_mode = GraphicsMode::Graphics;
                 }
                 return None;
             }
-            "YESCHAR" => result = self.session.yes_char.to_string(),
-            _ => {
-                if id.to_ascii_uppercase().starts_with("ENV=") {
-                    let key = &id[4..];
-                    if let Some(value) = self.get_env(key) {
-                        result = value.to_string();
-                    }
+            MacroCommand::YesChar => result = self.session.yes_char.to_string(),
+            MacroCommand::Env(id) => {
+                if let Some(value) = self.get_env(&id) {
+                    result = value.to_string();
                 }
             }
-        }
-
-        if let Some(mut param) = param {
-            let mut alignment = Alignment::Left;
-            if param.ends_with("C") || param.ends_with("c") {
-                alignment = Alignment::Center;
-                param = &param[..param.len() - 1];
-            } else if param.ends_with("R") || param.ends_with("r") {
-                alignment = Alignment::Right;
-                param = &param[..param.len() - 1];
+            MacroCommand::Hangup => {
+                let _ = self.bye_cmd().await;
+                return None;
             }
-            if let Ok(i) = param.parse::<usize>() {
-                match alignment {
-                    Alignment::Left => {
-                        while result.chars().count() < i {
-                            result.push(' ');
-                        }
-                    }
-                    Alignment::Center => {
-                        let len = result.chars().count();
-                        let spaces = (i - len) / 2;
-                        for _ in 0..spaces {
-                            result.insert(0, ' ');
-                        }
-                        while result.chars().count() < i {
-                            result.push(' ');
-                        }
-                    }
-                    Alignment::Right => {
-                        let len = result.chars().count();
-                        while result.chars().count() < i - len {
-                            result.insert(0, ' ');
-                        }
-                    }
-                }
+            MacroCommand::SwitchColor(color) => {
+                let _ = self.set_color(target, IcbColor::Dos(*color)).await;
+                return None;
             }
         }
-
-        Some(result)
+        Some(id.format_value(&result))
     }
 
     /// # Errors
