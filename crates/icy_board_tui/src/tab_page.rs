@@ -3,6 +3,24 @@ use ratatui::{layout::Rect, text::Text, Frame};
 
 use crate::config_menu::ResultState;
 
+pub enum PageMessage {
+    None,
+    Close,
+    ResultState(ResultState),
+}
+
+pub trait Page {
+    fn render(&mut self, frame: &mut Frame, area: Rect);
+
+    fn request_status(&self) -> ResultState {
+        ResultState::default()
+    }
+
+    fn handle_key_press(&mut self, _key: KeyEvent) -> PageMessage {
+        PageMessage::None
+    }
+}
+
 pub trait TabPage {
     fn render(&mut self, frame: &mut Frame, area: Rect);
 

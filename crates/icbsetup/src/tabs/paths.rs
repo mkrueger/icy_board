@@ -1,6 +1,5 @@
 use icy_board_tui::config_menu::EditMode;
 use icy_board_tui::tab_page::TabPage;
-use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -378,13 +377,11 @@ impl<'a> TabPage for PathTab<'a> {
 
         let area = area.inner(Margin { vertical: 1, horizontal: 1 });
         self.config.render(area, frame, &mut self.state);
-        if self.state.in_edit {
-            self.set_cursor_position(frame);
-        }
+        self.set_cursor_position(frame);
     }
 
     fn has_control(&self) -> bool {
-        self.state.in_edit || self.edit_text.is_some()
+        true
     }
 
     fn set_cursor_position(&self, frame: &mut Frame) {
@@ -399,36 +396,34 @@ impl<'a> TabPage for PathTab<'a> {
             }
             self.textarea.input(key);
             return ResultState::default();
-        }
-        if !self.state.in_edit {
-            match key.code {
-                crossterm::event::KeyCode::F(2) => {
-                    if let ListValue::Path(path) = &self.config.get_item(self.state.selected).unwrap().value {
-                        let path = self.icy_board.lock().unwrap().resolve_file(path);
+        } /*
+          if !self.state.in_edit {
+              match key.code {
+                  crossterm::event::KeyCode::F(2) => {
+                      if let ListValue::Path(path) = &self.config.get_item(self.state.selected).unwrap().value {
+                          let path = self.icy_board.lock().unwrap().resolve_file(path);
 
-                        let id = self.config.get_item(self.state.selected).unwrap().id.to_string();
-                        if id == "pwrd_sec_level_file" || id == "language_file" {
-                            return ResultState {
-                                edit_mode: EditMode::Open(id, path),
-                                status_line: "Editing Security Level File".to_string(),
-                            };
-                        }
+                          let id = self.config.get_item(self.state.selected).unwrap().id.to_string();
+                          if id == "pwrd_sec_level_file" || id == "language_file" {
+                              return ResultState {
+                                  edit_mode: EditMode::Open(id, path),
+                                  status_line: "Editing Security Level File".to_string(),
+                              };
+                          }
 
-                        if path.exists() {
-                            self.edit_text = Some(path.clone());
-                            let text = fs::read_to_string(path).unwrap();
-                            self.textarea = TextArea::new(text.lines().map(str::to_string).collect());
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
+                          if path.exists() {
+                              self.edit_text = Some(path.clone());
+                              let text = fs::read_to_string(path).unwrap();
+                              self.textarea = TextArea::new(text.lines().map(str::to_string).collect());
+                          }
+                      }
+                  }
+                  _ => {}
+              }
+          }*/
 
         let res = self.config.handle_key_press(key, &mut self.state);
-        if self.state.in_edit {
-            self.write_back(&mut self.icy_board.lock().unwrap());
-        }
+        self.write_back(&mut self.icy_board.lock().unwrap());
         res
     }
 

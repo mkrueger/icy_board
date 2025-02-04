@@ -13,6 +13,7 @@ use crate::{
     help_view::{HelpView, HelpViewState},
     tab_page::{Editor, TabPage},
     term::next_event,
+    text_field::set_cursor_mode,
     theme::{get_tui_theme, DOS_DARK_GRAY, DOS_LIGHT_GRAY, DOS_WHITE},
     TerminalType,
 };
@@ -45,6 +46,7 @@ pub enum Mode {
 impl<'a> App<'a> {
     /// Run the app until the user quits.
     pub fn run(&mut self, terminal: &mut TerminalType) -> Result<()> {
+        set_cursor_mode();
         while self.is_running() {
             self.draw(terminal)?;
             self.handle_events(terminal)?;
@@ -60,7 +62,7 @@ impl<'a> App<'a> {
     fn draw(&mut self, terminal: &mut TerminalType) -> Result<()> {
         terminal
             .draw(|frame| {
-                let screen = get_screen_size(&frame, self.full_screen);
+                let screen: Rect = get_screen_size(&frame, self.full_screen);
 
                 if let Some(editor) = &mut self.open_editor {
                     editor.render(frame, screen);

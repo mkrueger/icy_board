@@ -15,6 +15,7 @@ pub struct Theme {
 
     pub menu_title: Style,
 
+    pub item_separator: Style,
     pub item: Style,
     pub selected_item: Style,
 
@@ -61,6 +62,7 @@ pub static CLASSIC_THEME: Theme = Theme {
 
     item: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GREEN),
     selected_item: Style::new().bg(DOS_CYAN).fg(DOS_YELLOW),
+    item_separator: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
 
     value: Style::new().bg(DOS_BLACK).fg(DOS_CYAN),
     edit_value: Style::new().bg(DOS_RED).fg(DOS_WHITE),
@@ -68,7 +70,7 @@ pub static CLASSIC_THEME: Theme = Theme {
 
     status_line_text: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_CYAN),
     menu_title: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
-    content_box_title: Style::new().bg(DOS_BLACK).fg(DOS_RED),
+    content_box_title: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
     config_title: Style::new().bg(DOS_BLACK).fg(DOS_RED),
     filter_text: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
     description_text: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
@@ -104,6 +106,7 @@ pub static DEFAULT_THEME: Theme = Theme {
     status_line_text: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_CYAN),
     item: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
     selected_item: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
+    item_separator: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
     config_title: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_CYAN),
     value: Style::new().bg(DOS_BLACK).fg(LIGHT_GRAY),
     edit_value: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),

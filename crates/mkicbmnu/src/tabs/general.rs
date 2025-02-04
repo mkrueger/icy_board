@@ -151,7 +151,7 @@ impl TabPage for GeneralTab {
         self.menu.lock().unwrap().clone() != self.original
     }
     fn has_control(&self) -> bool {
-        self.state.in_edit
+        true
     }
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         let width = (2 + 50 + 2).min(area.width) as u16;
@@ -170,9 +170,7 @@ impl TabPage for GeneralTab {
 
         let area = area.inner(Margin { vertical: 1, horizontal: 1 });
         self.config.render(area, frame, &mut self.state);
-        if self.state.in_edit {
-            self.config.get_item(self.state.selected).unwrap().text_field_state.set_cursor_position(frame);
-        }
+        self.config.get_item(self.state.selected).unwrap().text_field_state.set_cursor_position(frame);
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {

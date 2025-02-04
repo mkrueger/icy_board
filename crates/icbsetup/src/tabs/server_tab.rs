@@ -203,13 +203,11 @@ impl TabPage for ServerTab {
 
         let area = area.inner(Margin { vertical: 1, horizontal: 1 });
         self.config.render(area, frame, &mut self.state);
-        if self.state.in_edit {
-            self.set_cursor_position(frame);
-        }
+        self.set_cursor_position(frame);
     }
 
     fn has_control(&self) -> bool {
-        self.state.in_edit
+        true
     }
 
     fn set_cursor_position(&self, frame: &mut Frame) {
@@ -218,9 +216,7 @@ impl TabPage for ServerTab {
 
     fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
         let res = self.config.handle_key_press(key, &mut self.state);
-        if self.state.in_edit {
-            self.write_back(&mut self.icy_board.lock().unwrap());
-        }
+        self.write_back(&mut self.icy_board.lock().unwrap());
         res
     }
 

@@ -1,4 +1,7 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::{
+    event::{KeyCode, KeyEvent, KeyModifiers},
+    ExecutableCommand,
+};
 use ratatui::{buffer::Buffer, layout::Rect, style::Style, widgets::StatefulWidget, Frame};
 
 use crate::theme::get_tui_theme;
@@ -12,6 +15,8 @@ pub struct TextfieldState {
     mask: String,
     max_len: u16,
 }
+
+static mut IS_INSERT_MODE: bool = true;
 
 impl TextfieldState {
     pub fn set_cursor_position(&self, frame: &mut Frame) {
@@ -37,6 +42,13 @@ impl TextfieldState {
             KeyEvent { code: KeyCode::End, .. } => {
                 self.cursor_position = value.len() as u16;
             }
+            KeyEvent { code: KeyCode::Insert, .. } => {
+                unsafe {
+                    IS_INSERT_MODE = !IS_INSERT_MODE;
+                }
+                set_cursor_mode();
+            }
+
             KeyEvent {
                 code: KeyCode::Char(ch),
                 modifiers: KeyModifiers::NONE,
@@ -77,7 +89,6 @@ impl TextfieldState {
     fn insert_key(&mut self, value: &mut String, ch: char) {
         if self.mask.is_empty() || self.mask.contains(ch) {
             self.cursor_position = self.cursor_position.clamp(0, value.len() as u16);
-
             if self.cursor_position + 1 < self.max_len || self.max_len == 0 {
                 value.insert(self.cursor_position as usize, ch);
                 self.cursor_position += 1;
@@ -98,6 +109,16 @@ impl TextfieldState {
     pub fn with_max_len(mut self, max_len: u16) -> Self {
         self.max_len = max_len;
         self
+    }
+}
+
+pub fn set_cursor_mode() {
+    unsafe {
+        if IS_INSERT_MODE {
+            let _ = std::io::stdout().execute(crossterm::cursor::SetCursorStyle::BlinkingBar);
+        } else {
+            let _ = std::io::stdout().execute(crossterm::cursor::SetCursorStyle::BlinkingBlock);
+        }
     }
 }
 

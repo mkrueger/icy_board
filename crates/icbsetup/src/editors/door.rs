@@ -138,13 +138,11 @@ impl<'a> Editor for DoorEditor<'a> {
 
         self.display_insert_table(frame, &table_area);
 
-        if self.menu_state.in_edit {
-            self.menu
-                .get_item(self.menu_state.selected)
-                .unwrap()
-                .text_field_state
-                .set_cursor_position(frame);
-        }
+        self.menu
+            .get_item(self.menu_state.selected)
+            .unwrap()
+            .text_field_state
+            .set_cursor_position(frame);
 
         if let Some(edit_config) = &mut self.edit_config {
             let area = area.inner(Margin { vertical: 8, horizontal: 3 });
@@ -160,13 +158,11 @@ impl<'a> Editor for DoorEditor<'a> {
             block.render(area, frame.buffer_mut());
             edit_config.render(area.inner(Margin { vertical: 1, horizontal: 1 }), frame, &mut self.edit_config_state);
 
-            if self.edit_config_state.in_edit {
-                edit_config
-                    .get_item(self.edit_config_state.selected)
-                    .unwrap()
-                    .text_field_state
-                    .set_cursor_position(frame);
-            }
+            edit_config
+                .get_item(self.edit_config_state.selected)
+                .unwrap()
+                .text_field_state
+                .set_cursor_position(frame);
         }
     }
 

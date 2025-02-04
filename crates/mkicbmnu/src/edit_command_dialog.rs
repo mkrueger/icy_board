@@ -400,9 +400,7 @@ impl<'a> EditCommandDialog<'a> {
 
         let vertical = Layout::vertical([Constraint::Length(9), Constraint::Fill(1)]);
         let [header, footer] = vertical.areas(area.inner(Margin { vertical: 1, horizontal: 1 }));
-        if self.state.in_edit {
-            self.display_insert_table(frame, &area, &footer);
-        }
+        self.display_insert_table(frame, &area, &footer);
 
         let sel = self.state.selected;
         if self.mode == EditCommandMode::Table {
@@ -410,13 +408,11 @@ impl<'a> EditCommandDialog<'a> {
         }
         self.config.render(header, frame, &mut self.state);
 
-        if self.state.in_edit {
-            // POSITION EDIT (full screen editor)
-            if self.state.selected == 2 {
-                return;
-            }
-            self.config.get_item(self.state.selected).unwrap().text_field_state.set_cursor_position(frame);
+        // POSITION EDIT (full screen editor)
+        if self.state.selected == 2 {
+            return;
         }
+        self.config.get_item(self.state.selected).unwrap().text_field_state.set_cursor_position(frame);
 
         for i in self.config.iter() {
             if i.id == "text" {
@@ -441,9 +437,7 @@ impl<'a> EditCommandDialog<'a> {
             }
         }
         self.state.selected = sel;
-        if !self.state.in_edit {
-            self.display_insert_table(frame, &area, &footer);
-        }
+        self.display_insert_table(frame, &area, &footer);
     }
 
     fn display_insert_table(&mut self, frame: &mut Frame, area: &Rect, footer: &Rect) {
@@ -468,13 +462,11 @@ impl<'a> EditCommandDialog<'a> {
             block.render(area, frame.buffer_mut());
             edit_config.render(area.inner(Margin { vertical: 1, horizontal: 1 }), frame, &mut self.edit_config_state);
 
-            if self.edit_config_state.in_edit {
-                edit_config
-                    .get_item(self.edit_config_state.selected)
-                    .unwrap()
-                    .text_field_state
-                    .set_cursor_position(frame);
-            }
+            edit_config
+                .get_item(self.edit_config_state.selected)
+                .unwrap()
+                .text_field_state
+                .set_cursor_position(frame);
         }
     }
 }
