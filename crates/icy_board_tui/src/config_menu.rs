@@ -12,7 +12,7 @@ use ratatui::{
 
 use crate::{
     text_field::{TextField, TextfieldState},
-    theme::THEME,
+    theme::get_tui_theme,
 };
 
 #[derive(Default)]
@@ -172,13 +172,17 @@ impl ListItem {
                 };
                 Text::from(title)
                     .alignment(ratatui::layout::Alignment::Right)
-                    .style(if selected { THEME.selected_item } else { THEME.item })
+                    .style(if selected { get_tui_theme().selected_item } else { get_tui_theme().item })
                     .render(area, frame.buffer_mut());
             }
             _ => {
                 Text::from(format!(" {}:", self.title.clone()))
                     .alignment(ratatui::layout::Alignment::Right)
-                    .style(if selected && !in_edit { THEME.selected_item } else { THEME.item })
+                    .style(if selected && !in_edit {
+                        get_tui_theme().selected_item
+                    } else {
+                        get_tui_theme().item
+                    })
                     .render(left_area, frame.buffer_mut());
             }
         }
@@ -187,38 +191,44 @@ impl ListItem {
     fn render_value(&self, area: Rect, frame: &mut Frame) {
         match &self.value {
             ListValue::Text(_, text) => {
-                Text::from(text.clone()).style(THEME.value).render(area, frame.buffer_mut());
+                Text::from(text.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
             }
             ListValue::ComboBox(v) => {
-                Text::from(v.cur_value.display.clone()).style(THEME.value).render(area, frame.buffer_mut());
+                Text::from(v.cur_value.display.clone())
+                    .style(get_tui_theme().value)
+                    .render(area, frame.buffer_mut());
             }
 
             ListValue::Path(text) => {
-                Text::from(format!("{}", text.display())).style(THEME.value).render(area, frame.buffer_mut());
+                Text::from(format!("{}", text.display()))
+                    .style(get_tui_theme().value)
+                    .render(area, frame.buffer_mut());
             }
 
             ListValue::U32(u, _min, _max) => {
-                Text::from(u.to_string()).style(THEME.value).render(area, frame.buffer_mut());
+                Text::from(u.to_string()).style(get_tui_theme().value).render(area, frame.buffer_mut());
             }
 
             ListValue::Color(color) => match color {
-                IcbColor::None => Text::from("Plain").style(THEME.value).render(area, frame.buffer_mut()),
-                IcbColor::Dos(u8) => Text::from(format!("@X{:02}", *u8)).style(THEME.value).render(area, frame.buffer_mut()),
+                IcbColor::None => Text::from("Plain").style(get_tui_theme().value).render(area, frame.buffer_mut()),
+                IcbColor::Dos(u8) => Text::from(format!("@X{:02}", *u8))
+                    .style(get_tui_theme().value)
+                    .render(area, frame.buffer_mut()),
                 IcbColor::IcyEngine(_) => todo!(),
             },
             ListValue::Bool(_) => {}
             ListValue::ValueList(cur_value, list) => {
                 for l in list {
                     if l.value == *cur_value {
-                        Text::from(l.display.clone()).style(THEME.value).render(area, frame.buffer_mut());
+                        Text::from(l.display.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
                         return;
                     }
                 }
-                Text::from(cur_value.clone()).style(THEME.value).render(area, frame.buffer_mut());
+                Text::from(cur_value.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
             }
             ListValue::Position(_, _, pos) => {
                 Text::from(format!("x: {} y: {}", pos.x, pos.y))
-                    .style(THEME.value)
+                    .style(get_tui_theme().value)
                     .render(area, frame.buffer_mut());
             }
         }
@@ -251,11 +261,11 @@ impl ListItem {
 
                 for l in list {
                     if l.value == *cur_value {
-                        Text::from(l.display.clone()).style(THEME.edit_value).render(area, frame.buffer_mut());
+                        Text::from(l.display.clone()).style(get_tui_theme().edit_value).render(area, frame.buffer_mut());
                         return true;
                     }
                 }
-                Text::from(cur_value.clone()).style(THEME.edit_value).render(area, frame.buffer_mut());
+                Text::from(cur_value.clone()).style(get_tui_theme().edit_value).render(area, frame.buffer_mut());
             }
             ListValue::ComboBox(c) => {
                 let mut area = area;
@@ -265,7 +275,7 @@ impl ListItem {
 
                 let block = Block::new()
                     //  .title(Title::from(Span::from(" Edit Action ").style(THEME.content_box_title)).alignment(Alignment::Center))
-                    .style(THEME.content_box)
+                    .style(get_tui_theme().content_box)
                     //  .padding(Padding::new(2, 2, 1, 1))
                     .borders(Borders::ALL)
                     .border_type(BorderType::Double);
@@ -279,9 +289,9 @@ impl ListItem {
                 line.height = 1;
                 for l in c.values.iter().skip(c.first).take(10) {
                     if l.value == c.cur_value.value {
-                        Text::from(l.display.clone()).style(THEME.edit_value).render(line, frame.buffer_mut());
+                        Text::from(l.display.clone()).style(get_tui_theme().edit_value).render(line, frame.buffer_mut());
                     } else {
-                        Text::from(l.display.clone()).style(THEME.value).render(line, frame.buffer_mut());
+                        Text::from(l.display.clone()).style(get_tui_theme().value).render(line, frame.buffer_mut());
                     }
                     line.y += 1;
                 }
@@ -425,7 +435,7 @@ impl ConfigMenu {
 
         frame.render_stateful_widget(
             Scrollbar::default()
-                .style(THEME.content_box)
+                .style(get_tui_theme().content_box)
                 .orientation(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("▲"))
                 .thumb_symbol("█")
@@ -645,7 +655,7 @@ impl ConfigMenu {
                                 };
                                 Text::from(format!(" {}", title.clone()))
                                     .alignment(ratatui::layout::Alignment::Left)
-                                    .style(THEME.config_title.italic())
+                                    .style(get_tui_theme().config_title.italic())
                                     .render(left_area, frame.buffer_mut());
                             }
                         }

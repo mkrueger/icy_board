@@ -1,12 +1,12 @@
 use icy_board_tui::{
     tab_page::TabPage,
-    theme::{DOS_LIGHT_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE, THEME},
+    theme::{get_tui_theme, DOS_LIGHT_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE},
 };
 use ratatui::{
     layout::{Margin, Rect},
     style::Style,
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Padding, Paragraph, Widget},
+    widgets::{Block, BorderType, Borders, Padding, Paragraph, Widget},
     Frame,
 };
 use substring::Substring;
@@ -63,16 +63,20 @@ impl TabPage for AboutTab {
         let width = (2 + text.iter().map(String::len).max().unwrap() as u16 + 2).min(area.width);
 
         let lines = (2 + text.len() as u16 + 2).min(area.height);
-        let area = Rect::new(area.x + (area.width - width) / 2, (area.y + area.height - lines) / 2, width + 2, lines);
+        let area = Rect::new(
+            area.x + (area.width.saturating_sub(width)) / 2,
+            (area.y + area.height).saturating_sub(lines) / 2,
+            width + 2,
+            lines,
+        );
 
-        Clear.render(area, frame.buffer_mut());
         let text: Vec<Line<'_>> = text
             .into_iter()
             .map(|t| IceText::from_txt(t).alignment(ratatui::layout::Alignment::Center))
             .collect();
 
         let block = Block::new()
-            .style(THEME.content_box)
+            .style(get_tui_theme().content_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
             .border_type(BorderType::Double);

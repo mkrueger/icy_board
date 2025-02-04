@@ -9,7 +9,7 @@ use icy_board_tui::{
     pcb_line::get_styled_pcb_line,
     term::next_event,
     text_field::{TextField, TextfieldState},
-    theme::{DOS_DARK_GRAY, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE, THEME},
+    theme::{get_tui_theme, DOS_DARK_GRAY, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE},
     TerminalType,
 };
 use itertools::Itertools;
@@ -287,7 +287,7 @@ impl<'a> App<'a> {
         let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1), Constraint::Length(1), Constraint::Length(1)]);
         let [title_bar, mut tab, key_bar, status_line] = vertical.areas(area);
 
-        Block::new().style(THEME.title_bar).render(area, frame.buffer_mut());
+        Block::new().style(get_tui_theme().title_bar).render(area, frame.buffer_mut());
         self.render_title_bar(title_bar, frame.buffer_mut());
 
         if !self.filter.is_empty() {
@@ -326,14 +326,14 @@ impl<'a> App<'a> {
 
                 Block::new()
                     .borders(Borders::ALL)
-                    .title(Title::from(Span::from(format!(" {} ", edit_title)).style(THEME.content_box_title)))
+                    .title(Title::from(Span::from(format!(" {} ", edit_title)).style(get_tui_theme().content_box_title)))
                     .title_position(block::Position::Bottom)
                     .title_alignment(Alignment::Center)
-                    .title(Title::from(Span::from(format!(" {} ", record_length)).style(THEME.content_box_title)))
+                    .title(Title::from(Span::from(format!(" {} ", record_length)).style(get_tui_theme().content_box_title)))
                     .title_position(block::Position::Top)
                     .title_alignment(Alignment::Right)
-                    .title(Title::from(Span::from(format!(" {} ", justify_title)).style(THEME.content_box_title)))
-                    .style(THEME.content_box)
+                    .title(Title::from(Span::from(format!(" {} ", justify_title)).style(get_tui_theme().content_box_title)))
+                    .style(get_tui_theme().content_box)
                     .border_type(BorderType::Double)
                     .render(edit_area, frame.buffer_mut());
 
@@ -352,7 +352,7 @@ impl<'a> App<'a> {
                     style_area.width -= 30;
 
                     Line::from(vec![
-                        Span::styled(get_text("icbtext_edit_style"), THEME.content_box_title),
+                        Span::styled(get_text("icbtext_edit_style"), get_tui_theme().content_box_title),
                         Span::raw(" "),
                         Span::styled(Self::get_style_description(entry.style), convert_style(entry.style).not_italic().bold()),
                         Span::raw(" "),
@@ -384,7 +384,7 @@ impl<'a> App<'a> {
                 style_area.width -= 30;
 
                 Line::from(vec![
-                    Span::styled(get_text("icbtext_edit_style"), THEME.content_box_title),
+                    Span::styled(get_text("icbtext_edit_style"), get_tui_theme().content_box_title),
                     Span::raw(" "),
                     Span::styled(
                         Self::get_style_description(self.edit_entry.style),
@@ -400,7 +400,7 @@ impl<'a> App<'a> {
 
                 area.y += 2;
                 Line::from(get_text("icbtext_edit_hard_space_info"))
-                    .style(THEME.description_text)
+                    .style(get_tui_theme().description_text)
                     .alignment(Alignment::Center)
                     .render(area, frame.buffer_mut());
             }
@@ -412,9 +412,9 @@ impl<'a> App<'a> {
                 Block::new()
                     .borders(Borders::ALL)
                     .title(Title::from(
-                        Span::from(format!(" {} ", get_text("icbtext_filter_title"))).style(THEME.content_box_title),
+                        Span::from(format!(" {} ", get_text("icbtext_filter_title"))).style(get_tui_theme().content_box_title),
                     ))
-                    .style(THEME.content_box)
+                    .style(get_tui_theme().content_box)
                     .border_type(BorderType::Double)
                     .render(filter_area, frame.buffer_mut());
 
@@ -432,9 +432,9 @@ impl<'a> App<'a> {
                 Block::new()
                     .borders(Borders::ALL)
                     .title(Title::from(
-                        Span::from(format!(" {} ", get_text("icbtext_jump_to_title"))).style(THEME.content_box_title),
+                        Span::from(format!(" {} ", get_text("icbtext_jump_to_title"))).style(get_tui_theme().content_box_title),
                     ))
-                    .style(THEME.content_box)
+                    .style(get_tui_theme().content_box)
                     .border_type(BorderType::Double)
                     .render(jump_area, frame.buffer_mut());
 
@@ -456,7 +456,7 @@ impl<'a> App<'a> {
 
                 Block::new()
                     .borders(Borders::ALL)
-                    .style(THEME.content_box)
+                    .style(get_tui_theme().content_box)
                     .border_type(BorderType::Double)
                     .render(save_area, frame.buffer_mut());
 
@@ -499,13 +499,13 @@ impl<'a> App<'a> {
 
         Span::styled(
             format!(" ICBTEXT File Generator/Editor ({})", self.file.file_name().unwrap().to_string_lossy()),
-            THEME.app_title,
+            get_tui_theme().app_title,
         )
         .render(title, buf);
         let titles = TabPageType::iter().map(TabPageType::title);
         Tabs::new(titles)
-            .style(THEME.tabs)
-            .highlight_style(THEME.tabs_selected)
+            .style(get_tui_theme().tabs)
+            .highlight_style(get_tui_theme().tabs_selected)
             .select(self.tab as usize)
             .divider("")
             .padding("", "")
@@ -517,7 +517,7 @@ impl<'a> App<'a> {
             "icbtext_filter_text",
             HashMap::from([("filter".to_string(), self.filter.to_string())]),
         ))
-        .style(THEME.filter_text.bold())
+        .style(get_tui_theme().filter_text.bold())
         .render(area, buf);
     }
 
@@ -546,8 +546,8 @@ impl<'a> App<'a> {
         let spans = keys
             .iter()
             .flat_map(|(key, desc)| {
-                let key = Span::styled(format!(" {key} "), THEME.key_binding);
-                let desc = Span::styled(format!(" {desc} "), THEME.key_binding_description);
+                let key = Span::styled(format!(" {key} "), get_tui_theme().key_binding);
+                let desc = Span::styled(format!(" {desc} "), get_tui_theme().key_binding_description);
                 [key, desc]
             })
             .collect_vec();
@@ -558,7 +558,7 @@ impl<'a> App<'a> {
         let now = Local::now();
         let time_status = format!(" {} {} |", now.time().with_nanosecond(0).unwrap(), now.date_naive().format("%m-%d-%y"));
         let time_len = time_status.len() as u16;
-        Line::from(time_status).left_aligned().style(THEME.status_line).render(area, buf);
+        Line::from(time_status).left_aligned().style(get_tui_theme().status_line).render(area, buf);
 
         if self.mode == Mode::RequestQuit {
             return;
@@ -568,7 +568,7 @@ impl<'a> App<'a> {
         area.width -= time_len + 1;
         Line::from(self.status_line.clone())
             .left_aligned()
-            .style(THEME.status_line_text)
+            .style(get_tui_theme().status_line_text)
             .render(area, buf);
     }
 }

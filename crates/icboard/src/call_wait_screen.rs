@@ -15,7 +15,7 @@ use icy_board_tui::{
 };
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Layout, Margin, Rect},
+    layout::{Constraint, Layout, Margin, Position, Rect},
     prelude::Backend,
     style::{Color, Style, Stylize},
     text::Line,
@@ -211,7 +211,9 @@ impl CallWaitScreen {
         loop {
             self.statistics = board.lock().await.statistics.clone();
 
-            terminal.draw(|frame| self.ui(frame, full_screen))?;
+            if terminal.get_frame().area().width > 1 && terminal.get_frame().area().height > 1 {
+                terminal.draw(|frame| self.ui(frame, full_screen))?;
+            }
 
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
 
@@ -287,8 +289,7 @@ impl CallWaitScreen {
             .centered()
             .render(header, frame.buffer_mut());
         let selected_button = (self.y * 3 + self.x) as usize;
-
-        title.width -= 1;
+        title.width = title.width.saturating_sub(1);
         PcbButton::new(self.board_name.clone())
             .theme(Theme {
                 text: DOS_BLACK,
@@ -298,7 +299,8 @@ impl CallWaitScreen {
 
         let horizontal = Layout::horizontal([Constraint::Percentage(33), Constraint::Percentage(33), Constraint::Percentage(33)]);
 
-        button_bar.y -= 1;
+        button_bar.y = button_bar.y.saturating_sub(1);
+
         //button_bar.width -= 2;
         let [mut row1, mut row2, mut row3] = horizontal.areas(button_bar);
 
@@ -340,7 +342,7 @@ impl CallWaitScreen {
             .render(separator, frame.buffer_mut());
 
         stats.y += 1;
-        stats.height -= 1;
+        stats.height = stats.height.saturating_sub(1);
 
         let mut area = stats.inner(Margin { horizontal: 3, vertical: 0 });
         area.height = 1;
@@ -353,7 +355,7 @@ impl CallWaitScreen {
             .theme(stat_teme)
             .render(area, frame.buffer_mut());
         stats.y += 2;
-        stats.height -= 2;
+        stats.height = stats.height.saturating_sub(2);
 
         let mut area = stats.inner(Margin { horizontal: 3, vertical: 0 });
         area.height = 1;
@@ -370,7 +372,7 @@ impl CallWaitScreen {
         .render(area, frame.buffer_mut());
 
         stats.y += 1;
-        stats.height -= 1;
+        stats.height = stats.height.saturating_sub(1);
         let horizontal = Layout::horizontal([
             Constraint::Percentage(25),
             Constraint::Percentage(25),
@@ -510,6 +512,9 @@ impl<'a> Widget for PcbButton<'a> {
             (self.state.get_fg(), self.state.get_bg())
         };
         buf.set_style(area, Style::new().bg(bg).fg(fg));
+        if !buf.area.contains(Position::new(area.x + 1, area.y + 1)) {
+            return;
+        }
         buf.set_string(area.x + 1, area.y + 1, "▀".repeat(area.width as usize), Style::new().fg(DOS_BLACK).bg(DOS_BLUE));
         buf.set_string(area.x + area.width, area.y, "▀", Style::new().fg(DOS_BLUE).bg(DOS_BLACK));
 

@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::theme::THEME;
+use crate::theme::get_tui_theme;
 
 pub struct InsertTable<'a> {
     pub scroll_state: ScrollbarState,
@@ -26,7 +26,7 @@ impl<'a> InsertTable<'a> {
             .cloned()
             .map(Cell::from)
             .collect::<Row>()
-            .style(THEME.table_header)
+            .style(get_tui_theme().table_header)
             .height(1);
 
         let mut rows = Vec::new();
@@ -45,9 +45,9 @@ impl<'a> InsertTable<'a> {
         widths.push(Constraint::Min(25 + 1));
         let table = Table::new(rows, widths)
             .header(header)
-            .row_highlight_style(THEME.selected_item)
+            .row_highlight_style(get_tui_theme().selected_item)
             .highlight_symbol(Text::from(vec!["".into(), bar.into(), bar.into(), "".into()]))
-            .style(THEME.table)
+            .style(get_tui_theme().table)
             .highlight_spacing(HighlightSpacing::Always);
         area.width -= 1;
         frame.render_stateful_widget(table, area, &mut self.table_state);

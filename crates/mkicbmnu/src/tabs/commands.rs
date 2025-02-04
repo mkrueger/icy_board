@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::icy_board::{menu::Menu, IcyBoard};
-use icy_board_tui::{config_menu::ResultState, insert_table::InsertTable, pcb_line::get_styled_pcb_line, tab_page::TabPage, theme::THEME};
+use icy_board_tui::{config_menu::ResultState, insert_table::InsertTable, pcb_line::get_styled_pcb_line, tab_page::TabPage, theme::get_tui_theme};
 use ratatui::{
     layout::{Margin, Rect},
     text::Line,
@@ -107,7 +107,7 @@ impl<'a> TabPage for CommandsTab<'a> {
         Clear.render(area, frame.buffer_mut());
 
         let block = Block::new()
-            .style(THEME.content_box)
+            .style(get_tui_theme().content_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
             .border_type(BorderType::Double);

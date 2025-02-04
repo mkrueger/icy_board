@@ -1,5 +1,5 @@
 use super::TabPage;
-use icy_board_tui::theme::{DOS_LIGHT_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE, THEME};
+use icy_board_tui::theme::{get_tui_theme, DOS_LIGHT_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE};
 use ratatui::{
     layout::{Margin, Rect},
     style::Style,
@@ -48,7 +48,14 @@ impl IceText {
 
 impl TabPage for AboutTab {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
-        icy_board_tui::colors::RgbSwatch.render(area, frame.buffer_mut());
+        if get_tui_theme().swatch {
+            icy_board_tui::colors::RgbSwatch.render(area, frame.buffer_mut());
+        } else {
+            Block::new()
+                .style(get_tui_theme().background)
+                .borders(Borders::NONE)
+                .render(area, frame.buffer_mut());
+        }
 
         let text = vec![
             format!("ICBTEXT File Generator/Editor v{}", crate::VERSION.to_string()),
@@ -69,7 +76,7 @@ impl TabPage for AboutTab {
             .collect();
 
         let block = Block::new()
-            .style(THEME.content_box)
+            .style(get_tui_theme().content_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
             .border_type(BorderType::Double);

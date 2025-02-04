@@ -15,7 +15,7 @@ use icy_board_tui::config_menu::EditMode;
 use icy_board_tui::config_menu::ListItem;
 use icy_board_tui::config_menu::ListValue;
 use icy_board_tui::tab_page::TabPage;
-use icy_board_tui::{config_menu::ResultState, theme::THEME};
+use icy_board_tui::{config_menu::ResultState, theme::get_tui_theme};
 use ratatui::widgets::Block;
 use ratatui::widgets::BorderType;
 use ratatui::widgets::Borders;
@@ -56,10 +56,10 @@ impl ConferencesTab {
 
     fn render_scrollbar(&mut self, frame: &mut Frame, mut area: Rect) {
         area.y += 1;
-        area.height -= 1;
+        area.height = area.height.saturating_sub(1);
         frame.render_stateful_widget(
             Scrollbar::default()
-                .style(THEME.content_box)
+                .style(get_tui_theme().content_box)
                 .orientation(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("▲"))
                 .thumb_symbol("█")
@@ -75,7 +75,7 @@ impl ConferencesTab {
             .into_iter()
             .map(Cell::from)
             .collect::<Row>()
-            .style(THEME.table_header)
+            .style(get_tui_theme().table_header)
             .height(1);
 
         let l = self.icy_board.lock().unwrap();
@@ -94,7 +94,7 @@ impl ConferencesTab {
             ],
         )
         .header(header)
-        .row_highlight_style(THEME.selected_item)
+        .row_highlight_style(get_tui_theme().selected_item)
         .highlight_symbol(Text::from(vec!["".into(), bar.into(), bar.into(), "".into()]))
         //.bg(THEME.content.bg.unwrap())
         .highlight_spacing(HighlightSpacing::Always);
@@ -323,7 +323,7 @@ impl TabPage for ConferencesTab {
         Clear.render(area, frame.buffer_mut());
 
         let block = Block::new()
-            .style(THEME.content_box)
+            .style(get_tui_theme().content_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
             .border_type(BorderType::Double);

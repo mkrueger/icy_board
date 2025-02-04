@@ -7,7 +7,7 @@ use icy_board_tui::config_menu::EditMode;
 use icy_board_tui::tab_page::TabPage;
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
-    theme::THEME,
+    theme::get_tui_theme,
 };
 use ratatui::{
     layout::{Margin, Rect},
@@ -195,7 +195,7 @@ impl TabPage for ServerTab {
         Clear.render(area, frame.buffer_mut());
 
         let block = Block::new()
-            .style(THEME.content_box)
+            .style(get_tui_theme().content_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
             .border_type(BorderType::Double);

@@ -13,7 +13,7 @@ use icy_board_engine::icy_board::{
 use icy_board_tui::{
     config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, EditMode, ListItem, ListValue, ResultState},
     tab_page::TabPage,
-    theme::THEME,
+    theme::get_tui_theme,
 };
 use ratatui::{
     layout::{Margin, Rect},
@@ -162,7 +162,7 @@ impl TabPage for GeneralTab {
         Clear.render(area, frame.buffer_mut());
 
         let block = Block::new()
-            .style(THEME.content_box)
+            .style(get_tui_theme().content_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
             .border_type(BorderType::Double);

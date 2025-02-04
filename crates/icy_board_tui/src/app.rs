@@ -13,7 +13,7 @@ use crate::{
     help_view::{HelpView, HelpViewState},
     tab_page::{Editor, TabPage},
     term::next_event,
-    theme::{DOS_DARK_GRAY, DOS_LIGHT_GRAY, DOS_WHITE, THEME},
+    theme::{get_tui_theme, DOS_DARK_GRAY, DOS_LIGHT_GRAY, DOS_WHITE},
     TerminalType,
 };
 
@@ -152,8 +152,8 @@ impl<'a> App<'a> {
                     self.mode = Mode::Quit;
                 }
             }
-            KeyCode::Char('h') | KeyCode::Left => self.prev_tab(),
-            KeyCode::Char('l') | KeyCode::Right => self.next_tab(),
+            KeyCode::Char('h') | KeyCode::BackTab => self.prev_tab(),
+            KeyCode::Char('l') | KeyCode::Tab => self.next_tab(),
             KeyCode::F(1) => {
                 self.help_state.text = self.get_tab().get_help();
                 self.mode = Mode::ShowHelp;
@@ -171,12 +171,12 @@ impl<'a> App<'a> {
     }
 
     fn prev_tab(&mut self) {
-        self.tab = self.tab.saturating_sub(1);
+        self.tab = (self.tab + self.tabs.len() - 1) % self.tabs.len();
         self.update_state();
     }
 
     fn next_tab(&mut self) {
-        self.tab = (self.tab + 1).min(self.tabs.len() - 1);
+        self.tab = (self.tab + 1) % self.tabs.len();
         self.update_state();
     }
 
@@ -184,7 +184,7 @@ impl<'a> App<'a> {
         let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1), Constraint::Length(1), Constraint::Length(1)]);
         let [title_bar, tab, key_bar, status_line] = vertical.areas(area);
 
-        Block::new().style(THEME.title_bar).render(area, frame.buffer_mut());
+        Block::new().style(get_tui_theme().title_bar).render(area, frame.buffer_mut());
         self.render_title_bar(title_bar, frame.buffer_mut());
         self.render_selected_tab(frame, tab);
         App::render_key_help_view(key_bar, frame.buffer_mut());
@@ -203,7 +203,7 @@ impl<'a> App<'a> {
 
             Block::new()
                 .borders(Borders::ALL)
-                .style(THEME.content_box)
+                .style(get_tui_theme().content_box)
                 .border_type(BorderType::Double)
                 .render(save_area, frame.buffer_mut());
 
@@ -237,7 +237,7 @@ impl<'a> App<'a> {
         let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(1 + len)]);
         let [title, tabs] = layout.areas(area);
 
-        Span::styled(&self.title, THEME.app_title).render(title, buf);
+        Span::styled(&self.title, get_tui_theme().app_title).render(title, buf);
         let titles = self.tabs.iter().enumerate().map(|(i, t)| {
             if i == self.tab {
                 format!(" {} ", t.title())
@@ -248,8 +248,8 @@ impl<'a> App<'a> {
             }
         });
         Tabs::new(titles)
-            .style(THEME.tabs)
-            .highlight_style(THEME.tabs_selected)
+            .style(get_tui_theme().tabs)
+            .highlight_style(get_tui_theme().tabs_selected)
             .select(self.tab as usize)
             .divider("")
             .padding("", "")
@@ -257,7 +257,14 @@ impl<'a> App<'a> {
     }
 
     fn render_selected_tab(&mut self, frame: &mut Frame, area: Rect) {
-        RgbSwatch.render(area, frame.buffer_mut());
+        if get_tui_theme().swatch {
+            RgbSwatch.render(area, frame.buffer_mut());
+        } else {
+            Block::new()
+                .style(get_tui_theme().background)
+                .borders(Borders::NONE)
+                .render(area, frame.buffer_mut());
+        }
         self.get_tab_mut().render(frame, area);
     }
 
@@ -266,8 +273,8 @@ impl<'a> App<'a> {
         let spans = keys
             .iter()
             .flat_map(|(key, desc)| {
-                let key = Span::styled(format!(" {key} "), THEME.key_binding);
-                let desc = Span::styled(format!(" {desc} "), THEME.key_binding_description);
+                let key = Span::styled(format!(" {key} "), get_tui_theme().key_binding);
+                let desc = Span::styled(format!(" {desc} "), get_tui_theme().key_binding_description);
                 [key, desc]
             })
             .collect::<Vec<Span>>();
@@ -278,13 +285,13 @@ impl<'a> App<'a> {
         let now = Local::now();
         let time_status = format!(" {} {} |", now.time().with_nanosecond(0).unwrap(), now.date_naive().format(&self.date_format));
         let time_len = time_status.len() as u16;
-        Line::from(time_status).left_aligned().style(THEME.status_line).render(area, buf);
+        Line::from(time_status).left_aligned().style(get_tui_theme().status_line).render(area, buf);
         let mut area = area;
         area.x += time_len + 1;
         area.width -= time_len + 1;
         Line::from(self.status_line.clone())
             .left_aligned()
-            .style(THEME.status_line_text)
+            .style(get_tui_theme().status_line_text)
             .render(area, buf);
     }
 }

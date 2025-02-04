@@ -1,6 +1,6 @@
 use ratatui::prelude::*;
 
-use crate::theme::THEME;
+use crate::theme::get_tui_theme;
 
 pub struct RgbSwatch;
 
@@ -17,7 +17,7 @@ impl Widget for RgbSwatch {
                 let lower = Color::Rgb((64.0 * value_fg) as u8, (128.0 * value_bg) as u8, (255.0 * value_bg) as u8);
 
                 if y == area.top() {
-                    if let Some(col) = THEME.tabs_selected.fg {
+                    if let Some(col) = get_tui_theme().tabs_selected.fg {
                         upper = col;
                     }
                 }

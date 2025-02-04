@@ -12,6 +12,7 @@ pub mod help_view;
 pub mod insert_table;
 pub mod pcb_line;
 pub mod position_editor;
+pub mod select_menu;
 pub mod tab_page;
 pub mod term;
 pub mod text_field;
@@ -22,7 +23,7 @@ use i18n_embed::{
     DesktopLanguageRequester,
 };
 use i18n_embed_fl::fl;
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{backend::CrosstermBackend, symbols::border, Terminal};
 use rust_embed::RustEmbed;
 
 #[derive(RustEmbed)]
@@ -68,3 +69,14 @@ pub fn print_error<A: Display>(error: A) {
     )
     .unwrap();
 }
+
+pub static BORDER_SET: border::Set = border::Set {
+    top_left: "╓",
+    top_right: "╖",
+    bottom_left: "╙",
+    bottom_right: "╜",
+    vertical_left: "║",
+    vertical_right: "║",
+    horizontal_top: "─",
+    horizontal_bottom: "─",
+};

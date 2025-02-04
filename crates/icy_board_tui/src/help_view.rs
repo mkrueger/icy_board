@@ -10,7 +10,7 @@ use ratatui::{
     widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
 };
 
-use crate::theme::THEME;
+use crate::theme::get_tui_theme;
 
 /// necessary as ScrollbarState fields are private
 #[derive(Debug, Default)]
@@ -95,7 +95,7 @@ impl<'a> StatefulWidget for HelpView<'a> {
     type State = HelpViewState<'a>;
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         Block::new()
-            .style(THEME.help_box)
+            .style(get_tui_theme().help_box)
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .render(area, buf);

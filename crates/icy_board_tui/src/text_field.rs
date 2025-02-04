@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{buffer::Buffer, layout::Rect, style::Style, widgets::StatefulWidget, Frame};
 
-use crate::theme::{DOS_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY};
+use crate::theme::get_tui_theme;
 
 #[derive(Default, Clone, PartialEq)]
 pub struct TextfieldState {
@@ -112,8 +112,8 @@ impl TextField {
     pub fn new() -> Self {
         Self {
             value: String::new(),
-            text_style: Style::default().fg(DOS_LIGHT_CYAN).bg(DOS_BLUE),
-            background_style: Style::default().fg(DOS_LIGHT_GRAY).bg(DOS_BLUE),
+            text_style: get_tui_theme().text_field_text,
+            background_style: get_tui_theme().text_field_background,
             background_symbol: '▒',
         }
     }

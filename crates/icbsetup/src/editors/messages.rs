@@ -16,7 +16,7 @@ use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
     insert_table::InsertTable,
     tab_page::Editor,
-    theme::THEME,
+    theme::get_tui_theme,
 };
 use ratatui::{
     layout::{Alignment, Margin, Rect},
@@ -101,8 +101,8 @@ impl<'a> Editor for MessageAreasEditor<'a> {
         Clear.render(area, frame.buffer_mut());
         let block = Block::new()
             .title_alignment(Alignment::Center)
-            .title(Title::from(Span::from(" Message Areas ").style(THEME.content_box_title)))
-            .style(THEME.content_box)
+            .title(Title::from(Span::from(" Message Areas ").style(get_tui_theme().content_box_title)))
+            .style(get_tui_theme().content_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
             .border_type(BorderType::Double);
@@ -115,8 +115,8 @@ impl<'a> Editor for MessageAreasEditor<'a> {
             Clear.render(area, frame.buffer_mut());
             let block = Block::new()
                 .title_alignment(Alignment::Center)
-                .title(Title::from(Span::from(" Message Area ").style(THEME.content_box_title)))
-                .style(THEME.content_box)
+                .title(Title::from(Span::from(" Message Area ").style(get_tui_theme().content_box_title)))
+                .style(get_tui_theme().content_box)
                 .padding(Padding::new(2, 2, 1, 1))
                 .borders(Borders::ALL)
                 .border_type(BorderType::Double);
