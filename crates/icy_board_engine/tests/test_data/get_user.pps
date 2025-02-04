@@ -1,0 +1,7 @@
+GetAltUser 1
+PrintLn U_NAME()
+GetAltUser 2
+PrintLn U_NAME()
+GetUser
+GetAltUser 100
+PrintLn U_NAME()

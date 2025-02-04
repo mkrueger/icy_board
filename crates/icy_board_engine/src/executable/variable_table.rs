@@ -319,11 +319,16 @@ impl TableEntry {
 pub struct VariableTable {
     version: u16,
     entries: Vec<TableEntry>,
+    has_user_vars: bool,
 }
 
 impl VariableTable {
     pub fn len(&self) -> usize {
         self.entries.len()
+    }
+
+    pub fn has_user_vars(&self) -> bool {
+        self.has_user_vars
     }
 
     #[must_use]
@@ -342,7 +347,14 @@ impl VariableTable {
 
         let mut result = vec![TableEntry::default(); max_var];
         if max_var == 0 {
-            return Ok((i, VariableTable { version, entries: result }));
+            return Ok((
+                i,
+                VariableTable {
+                    version,
+                    entries: result,
+                    has_user_vars: false,
+                },
+            ));
         }
         let mut var_count = max_var as i32 - 1;
         while var_count >= 0 {
@@ -524,7 +536,11 @@ impl VariableTable {
             }
         }
 
-        let mut table = VariableTable { version, entries: result };
+        let mut table = VariableTable {
+            version,
+            entries: result,
+            has_user_vars: false,
+        };
         table.analyze_locals();
         table.generate_names();
         Ok((i, table))
@@ -532,6 +548,7 @@ impl VariableTable {
 
     pub fn generate_names(&mut self) {
         let user_vars_version = self.scan_user_variables_version();
+        self.has_user_vars = user_vars_version > 0;
         let mut name_generator = VariableNameGenerator::new(self.version, user_vars_version);
         for res in &mut self.entries {
             let (name, is_user_variable) = name_generator.get_next_name(res);

@@ -1256,12 +1256,12 @@ pub async fn download(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 }
 
 pub async fn getaltuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let user_record = vm.eval_expr(&args[0]).await?.as_int() as usize;
-    if user_record >= vm.icy_board_state.get_board().await.users.len() {
-        return Err(Box::new(VMError::UserRecordOutOfBounds(user_record)));
+    let user_record = vm.eval_expr(&args[0]).await?.as_int();
+    if user_record <= 0 || user_record as usize > vm.icy_board_state.get_board().await.users.len() {
+        // it's expected behavior, user record is unchanged.
+        return Ok(());
     }
-    vm.user = vm.icy_board_state.get_board().await.users[user_record].clone();
-    log::info!("get alt user ({user_record}) {}", vm.user.name);
+    vm.user = vm.icy_board_state.get_board().await.users[user_record as usize - 1].clone();
     vm.set_user_variables()?;
     Ok(())
 }

@@ -67,9 +67,6 @@ pub enum VMError {
     #[error("File channel not open ({0})")]
     FileChannelNotOpen(usize),
 
-    #[error("Invalid user record out of bounds ({0})")]
-    UserRecordOutOfBounds(usize),
-
     #[error("Pass value stack empty")]
     PassValueStackEmpty,
 
@@ -173,6 +170,9 @@ pub struct VirtualMachine<'a> {
 
 impl<'a> VirtualMachine<'a> {
     fn set_user_variables(&mut self) -> Res<()> {
+        if !self.variable_table.has_user_vars() {
+            return Ok(());
+        }
         let cur_user = &self.user;
         self.variable_table.set_value(U_EXPERT, VariableValue::new_bool(cur_user.flags.expert_mode));
         match cur_user.flags.fse_mode {

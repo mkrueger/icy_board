@@ -3,7 +3,7 @@ use std::{env, path::PathBuf, sync::Arc, thread};
 use icy_board_engine::{
     compiler::PPECompiler,
     executable::{Executable, LAST_PPLC},
-    icy_board::{bbs::BBS, read_data_with_encoding_detection, state::IcyBoardState},
+    icy_board::{bbs::BBS, read_data_with_encoding_detection, state::IcyBoardState, user_base::User},
     parser::{Encoding, UserTypeRegistry},
 };
 use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
@@ -49,13 +49,28 @@ fn run_test(file_name: &str, input: &str, expected_output: &str) {
 
             let result = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
                 let bbs = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
-                let icy_board = icy_board_engine::icy_board::IcyBoard::new();
+                let mut icy_board = icy_board_engine::icy_board::IcyBoard::new();
+                icy_board.users.new_user(User {
+                    name: "SYSOP".to_string(),
+                    security_level: 255,
+                    ..Default::default()
+                });
+                icy_board.users.new_user(User {
+                    name: "TEST USER".to_string(),
+                    security_level: 10,
+                    ..Default::default()
+                });
                 let board: Arc<tokio::sync::Mutex<icy_board_engine::icy_board::IcyBoard>> = Arc::new(tokio::sync::Mutex::new(icy_board));
                 let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
                 let node_states = bbs.lock().await.open_connections.clone();
                 let (mut ui_connection, connection) = ChannelConnection::create_pair();
 
                 let mut state = IcyBoardState::new(bbs, board, node_states, node, Box::new(connection)).await;
+                state.session.current_user = Some(User {
+                    name: "SYSOP".to_string(),
+                    security_level: 255,
+                    ..Default::default()
+                });
                 let result = Arc::new(tokio::sync::Mutex::new(Vec::new()));
 
                 let res = result.clone();
