@@ -14,7 +14,7 @@ impl IcyBoardState {
         }
 
         let user = self.session.current_user.clone().unwrap();
-        if !(self.session.is_local || self.get_board().await.config.options.exclude_local_calls) {
+        if !(self.session.is_local || self.get_board().await.config.switches.exclude_local_calls_stats) {
             self.display_text(IceText::ViewSettingsCallerNumber, display_flags::DEFAULT).await?;
             self.println(TerminalTarget::Both, &format!(" {}", self.session.caller_number)).await?;
             self.reset_color(TerminalTarget::Both).await?;

@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crossterm::event::KeyEvent;
-use icy_board_engine::icy_board::{user_base::Password, IcyBoard};
+use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
     get_text,
@@ -15,28 +15,38 @@ use ratatui::{
     widgets::{Block, Borders, Padding, Widget},
 };
 
-use crate::{cfg_entry_bool, cfg_entry_password, cfg_entry_text};
+use crate::cfg_entry_color;
 
-pub struct SysopInformation {
+pub struct ColorOptions {
     pub state: ConfigMenuState,
-
     menu: ConfigMenu<Arc<Mutex<IcyBoard>>>,
 }
 
-impl SysopInformation {
+impl ColorOptions {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
-        let menu: ConfigMenu<Arc<Mutex<IcyBoard>>> = {
+        let menu = {
             let lock = icy_board.lock().unwrap();
-            let label_width = 30;
-            let sysop_info: Vec<ConfigEntry<Arc<Mutex<IcyBoard>>>> = vec![
-                cfg_entry_text!("sysop_name", 45, label_width, sysop, name, lock),
-                cfg_entry_password!("local_password", label_width, sysop, password, lock),
-                cfg_entry_bool!("require_password_to_exit", label_width, sysop, require_password_to_exit, lock),
-                cfg_entry_bool!("use_real_name", label_width, sysop, use_real_name, lock),
+            let label_width = 50;
+            let edge = vec![
+                cfg_entry_color!("default_color", label_width, color_configuration, default, lock),
+                cfg_entry_color!("msg_hdr_date", label_width, color_configuration, msg_hdr_date, lock),
+                cfg_entry_color!("msg_hdr_to", label_width, color_configuration, msg_hdr_to, lock),
+                cfg_entry_color!("msg_hdr_from", label_width, color_configuration, msg_hdr_from, lock),
+                cfg_entry_color!("msg_hdr_subj", label_width, color_configuration, msg_hdr_subj, lock),
+                cfg_entry_color!("msg_hdr_read", label_width, color_configuration, msg_hdr_read, lock),
+                cfg_entry_color!("msg_hdr_conf", label_width, color_configuration, msg_hdr_conf, lock),
+                cfg_entry_color!("file_head", label_width, color_configuration, file_head, lock),
+                cfg_entry_color!("file_name", label_width, color_configuration, file_name, lock),
+                cfg_entry_color!("file_size", label_width, color_configuration, file_size, lock),
+                cfg_entry_color!("file_date", label_width, color_configuration, file_date, lock),
+                cfg_entry_color!("file_description", label_width, color_configuration, file_description, lock),
+                cfg_entry_color!("file_description_low", label_width, color_configuration, file_description_low, lock),
+                cfg_entry_color!("file_text", label_width, color_configuration, file_text, lock),
+                cfg_entry_color!("file_deleted", label_width, color_configuration, file_deleted, lock),
             ];
             ConfigMenu {
                 obj: icy_board.clone(),
-                entry: sysop_info,
+                entry: edge,
             }
         };
 
@@ -47,8 +57,15 @@ impl SysopInformation {
     }
 }
 
-impl Page for SysopInformation {
+impl Page for ColorOptions {
     fn render(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
+        let area = Rect {
+            x: area.x + 1,
+            y: area.y + 1,
+            width: area.width.saturating_sub(2),
+            height: area.height.saturating_sub(1),
+        };
+
         let block: Block<'_> = Block::new()
             .style(get_tui_theme().background)
             .padding(Padding::new(2, 2, 1 + 4, 0))
@@ -57,8 +74,7 @@ impl Page for SysopInformation {
             .border_style(get_tui_theme().content_box);
         block.render(area, frame.buffer_mut());
 
-        let val = get_text("sysop_information_title");
-
+        let val = get_text("configuration_options_colors");
         let width = val.len() as u16;
         Line::raw(val).style(get_tui_theme().menu_title).render(
             Rect {
@@ -90,6 +106,7 @@ impl Page for SysopInformation {
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         let res = self.menu.handle_key_press(key, &mut self.state);
+
         PageMessage::ResultState(res)
     }
 }

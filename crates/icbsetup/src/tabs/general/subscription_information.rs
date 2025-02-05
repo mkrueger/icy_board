@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crossterm::event::KeyEvent;
-use icy_board_engine::icy_board::{user_base::Password, IcyBoard};
+use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
     get_text,
@@ -15,24 +15,23 @@ use ratatui::{
     widgets::{Block, Borders, Padding, Widget},
 };
 
-use crate::{cfg_entry_bool, cfg_entry_password, cfg_entry_text};
+use crate::{cfg_entry_bool, cfg_entry_sec_level, cfg_entry_u32};
 
-pub struct SysopInformation {
+pub struct SubscriptionInformation {
     pub state: ConfigMenuState,
-
     menu: ConfigMenu<Arc<Mutex<IcyBoard>>>,
 }
 
-impl SysopInformation {
+impl SubscriptionInformation {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
-        let menu: ConfigMenu<Arc<Mutex<IcyBoard>>> = {
+        let menu = {
             let lock = icy_board.lock().unwrap();
-            let label_width = 30;
-            let sysop_info: Vec<ConfigEntry<Arc<Mutex<IcyBoard>>>> = vec![
-                cfg_entry_text!("sysop_name", 45, label_width, sysop, name, lock),
-                cfg_entry_password!("local_password", label_width, sysop, password, lock),
-                cfg_entry_bool!("require_password_to_exit", label_width, sysop, require_password_to_exit, lock),
-                cfg_entry_bool!("use_real_name", label_width, sysop, use_real_name, lock),
+            let label_width = 50;
+            let sysop_info = vec![
+                cfg_entry_bool!("subscription_is_enabled", label_width, subscription_info, is_enabled, lock),
+                cfg_entry_u32!("subscription_length", label_width, 0, 1000, subscription_info, subscription_length, lock),
+                cfg_entry_sec_level!("default_expired_level", label_width, subscription_info, default_expired_level, lock),
+                cfg_entry_u32!("warning_days", label_width, 0, 365, subscription_info, warning_days, lock),
             ];
             ConfigMenu {
                 obj: icy_board.clone(),
@@ -47,7 +46,7 @@ impl SysopInformation {
     }
 }
 
-impl Page for SysopInformation {
+impl Page for SubscriptionInformation {
     fn render(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
         let block: Block<'_> = Block::new()
             .style(get_tui_theme().background)
@@ -57,8 +56,7 @@ impl Page for SysopInformation {
             .border_style(get_tui_theme().content_box);
         block.render(area, frame.buffer_mut());
 
-        let val = get_text("sysop_information_title");
-
+        let val = get_text("subscription_information_title");
         let width = val.len() as u16;
         Line::raw(val).style(get_tui_theme().menu_title).render(
             Rect {
@@ -90,6 +88,7 @@ impl Page for SysopInformation {
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         let res = self.menu.handle_key_press(key, &mut self.state);
+
         PageMessage::ResultState(res)
     }
 }

@@ -88,6 +88,7 @@ pub struct SecurityLevelDefinitions {
     #[serde(rename = "level")]
     pub levels: Vec<SecurityLevel>,
 }
+
 impl SecurityLevelDefinitions {
     pub fn export_pcboard(&self, file: &std::path::PathBuf) -> Res<()> {
         let mut data = String::new();

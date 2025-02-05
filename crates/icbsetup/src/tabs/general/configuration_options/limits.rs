@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crossterm::event::KeyEvent;
-use icy_board_engine::icy_board::{user_base::Password, IcyBoard};
+use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
     get_text,
@@ -15,29 +15,26 @@ use ratatui::{
     widgets::{Block, Borders, Padding, Widget},
 };
 
-use crate::{cfg_entry_bool, cfg_entry_password, cfg_entry_text};
+use crate::{cfg_entry_u16, cfg_entry_u8};
 
-pub struct SysopInformation {
+pub struct Limits {
     pub state: ConfigMenuState,
-
     menu: ConfigMenu<Arc<Mutex<IcyBoard>>>,
 }
 
-impl SysopInformation {
+impl Limits {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
-        let menu: ConfigMenu<Arc<Mutex<IcyBoard>>> = {
+        let menu = {
             let lock = icy_board.lock().unwrap();
-            let label_width = 30;
-            let sysop_info: Vec<ConfigEntry<Arc<Mutex<IcyBoard>>>> = vec![
-                cfg_entry_text!("sysop_name", 45, label_width, sysop, name, lock),
-                cfg_entry_password!("local_password", label_width, sysop, password, lock),
-                cfg_entry_bool!("require_password_to_exit", label_width, sysop, require_password_to_exit, lock),
-                cfg_entry_bool!("use_real_name", label_width, sysop, use_real_name, lock),
+            let label_width = 50;
+            let entry = vec![
+                cfg_entry_u16!("keyboard_timeout", label_width, 0, 1000, limits, keyboard_timeout, lock),
+                cfg_entry_u16!("max_number_upload_descr_lines", label_width, 0, 60, limits, max_number_upload_descr_lines, lock),
+                cfg_entry_u16!("password_expire_days", label_width, 0, 10000, limits, password_expire_days, lock),
+                cfg_entry_u16!("password_expire_warn_days", label_width, 0, 10000, limits, password_expire_warn_days, lock),
+                cfg_entry_u8!("min_pwd_length", label_width, 0, 10000, limits, min_pwd_length, lock),
             ];
-            ConfigMenu {
-                obj: icy_board.clone(),
-                entry: sysop_info,
-            }
+            ConfigMenu { obj: icy_board.clone(), entry }
         };
 
         Self {
@@ -47,8 +44,15 @@ impl SysopInformation {
     }
 }
 
-impl Page for SysopInformation {
+impl Page for Limits {
     fn render(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
+        let area = Rect {
+            x: area.x + 1,
+            y: area.y + 1,
+            width: area.width.saturating_sub(2),
+            height: area.height.saturating_sub(1),
+        };
+
         let block: Block<'_> = Block::new()
             .style(get_tui_theme().background)
             .padding(Padding::new(2, 2, 1 + 4, 0))
@@ -57,8 +61,7 @@ impl Page for SysopInformation {
             .border_style(get_tui_theme().content_box);
         block.render(area, frame.buffer_mut());
 
-        let val = get_text("sysop_information_title");
-
+        let val = get_text("configuration_options_limits");
         let width = val.len() as u16;
         Line::raw(val).style(get_tui_theme().menu_title).render(
             Rect {
@@ -90,6 +93,7 @@ impl Page for SysopInformation {
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         let res = self.menu.handle_key_press(key, &mut self.state);
+
         PageMessage::ResultState(res)
     }
 }

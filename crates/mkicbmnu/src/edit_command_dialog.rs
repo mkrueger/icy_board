@@ -36,12 +36,12 @@ pub struct EditCommandDialog<'a> {
     mode: EditCommandMode,
 
     state: ConfigMenuState,
-    config: ConfigMenu,
+    config: ConfigMenu<u32>,
 
     insert_table: InsertTable<'a>,
 
     edit_config_state: ConfigMenuState,
-    edit_config: Option<ConfigMenu>,
+    edit_config: Option<ConfigMenu<u32>>,
 }
 
 impl<'a> EditCommandDialog<'a> {
@@ -64,23 +64,18 @@ impl<'a> EditCommandDialog<'a> {
         let items = vec![
             ConfigEntry::Separator,
             ConfigEntry::Item(
-                ListItem::new("text", "Display Text".to_string(), ListValue::Text(25, command.display.clone()))
+                ListItem::new("Display Text".to_string(), ListValue::Text(25, command.display.clone()))
                     .with_status("Text displayed.")
                     .with_label_width(info_width),
             ),
             ConfigEntry::Separator,
             ConfigEntry::Item(
-                ListItem::new(
-                    "highlight_text",
-                    "Highlighted Text".to_string(),
-                    ListValue::Text(25, command.lighbar_display.clone()),
-                )
-                .with_status("Text displayed, when highlighted.")
-                .with_label_width(info_width),
+                ListItem::new("Highlighted Text".to_string(), ListValue::Text(25, command.lighbar_display.clone()))
+                    .with_status("Text displayed, when highlighted.")
+                    .with_label_width(info_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "position",
                     "Position".to_string(),
                     ListValue::Position(
                         Box::new(move |frame, pos| {
@@ -119,13 +114,12 @@ impl<'a> EditCommandDialog<'a> {
                 .with_label_width(info_width),
             ),
             ConfigEntry::Item(
-                ListItem::new("keyword", "Keyword".to_string(), ListValue::Text(10, command.keyword.to_string()))
+                ListItem::new("Keyword".to_string(), ListValue::Text(10, command.keyword.to_string()))
                     .with_status("The help file to display.")
                     .with_label_width(info_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "autorun",
                     "Autorun".to_string(),
                     ListValue::ComboBox(ComboBox {
                         cur_value: ComboBoxValue::new(format!("{:?}", command.auto_run), format!("{:?}", command.auto_run)),
@@ -140,7 +134,7 @@ impl<'a> EditCommandDialog<'a> {
                 .with_label_width(info_width),
             ),
             ConfigEntry::Item(
-                ListItem::new("autorun_time", "Time".to_string(), ListValue::U32(command.autorun_time as u32, 0, 3600))
+                ListItem::new("Time".to_string(), ListValue::U32(command.autorun_time as u32, 0, 3600))
                     .with_status("Autorun after a specific amount of time.")
                     .with_label_width(info_width),
             ),
@@ -170,6 +164,7 @@ impl<'a> EditCommandDialog<'a> {
             id,
             state: ConfigMenuState::default(),
             config: ConfigMenu {
+                obj: 0,
                 entry: vec![ConfigEntry::Group(String::new(), items)],
             },
             insert_table,
@@ -183,6 +178,7 @@ impl<'a> EditCommandDialog<'a> {
         if let Some(edit_config) = &mut self.edit_config {
             match key.code {
                 KeyCode::Esc => {
+                    /*
                     for item in &edit_config.entry {
                         if let ConfigEntry::Item(item) = item {
                             match item.id.as_str() {
@@ -211,7 +207,7 @@ impl<'a> EditCommandDialog<'a> {
                                 _ => {}
                             }
                         }
-                    }
+                    }*/
 
                     self.edit_config = None;
                     return Ok(true);
@@ -239,7 +235,6 @@ impl<'a> EditCommandDialog<'a> {
             _ => match self.mode {
                 EditCommandMode::Config => {
                     self.config.handle_key_press(key, &mut self.state);
-                    self.write_back_values();
                 }
                 EditCommandMode::Table => match key.code {
                     KeyCode::Char('1') => {
@@ -296,10 +291,10 @@ impl<'a> EditCommandDialog<'a> {
                                 .collect();
 
                             self.edit_config = Some(ConfigMenu {
+                                obj: 0,
                                 entry: vec![
                                     ConfigEntry::Item(
                                         ListItem::new(
-                                            "command_type",
                                             "Command Type".to_string(),
                                             ListValue::ComboBox(ComboBox {
                                                 first,
@@ -311,18 +306,14 @@ impl<'a> EditCommandDialog<'a> {
                                         .with_label_width(16),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new("parameter", "Parameter".to_string(), ListValue::Text(10, parameter))
+                                        ListItem::new("Parameter".to_string(), ListValue::Text(10, parameter))
                                             .with_status("The help file to display.")
                                             .with_label_width(16),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(
-                                            "run_on_selection",
-                                            "Run on Selection".to_string(),
-                                            ListValue::Bool(action.trigger == ActionTrigger::Selection),
-                                        )
-                                        .with_status("The help file to display.")
-                                        .with_label_width(16),
+                                        ListItem::new("Run on Selection".to_string(), ListValue::Bool(action.trigger == ActionTrigger::Selection))
+                                            .with_status("The help file to display.")
+                                            .with_label_width(16),
                                     ),
                                 ],
                             });
@@ -338,51 +329,51 @@ impl<'a> EditCommandDialog<'a> {
         }
         Ok(true)
     }
-
-    fn write_back_values(&mut self) {
-        let ConfigEntry::Group(_, items) = &self.config.entry[0] else {
-            return;
-        };
-        for entry in items {
-            if let ConfigEntry::Item(item) = entry {
-                match item.id.as_str() {
-                    "text" => {
-                        if let ListValue::Text(_, ref value) = item.value {
-                            self.command.lock().unwrap().display = value.clone();
+    /*
+        fn write_back_values(&mut self) {
+            let ConfigEntry::Group(_, items) = &self.config.entry[0] else {
+                return;
+            };
+            for entry in items {
+                if let ConfigEntry::Item(item) = entry {
+                    match item.id.as_str() {
+                        "text" => {
+                            if let ListValue::Text(_, ref value) = item.value {
+                                self.command.lock().unwrap().display = value.clone();
+                            }
                         }
-                    }
-                    "highlight_text" => {
-                        if let ListValue::Text(_, ref value) = item.value {
-                            self.command.lock().unwrap().lighbar_display = value.clone();
+                        "highlight_text" => {
+                            if let ListValue::Text(_, ref value) = item.value {
+                                self.command.lock().unwrap().lighbar_display = value.clone();
+                            }
                         }
-                    }
-                    "position" => {
-                        if let ListValue::Position(_, _, ref value) = item.value {
-                            self.command.lock().unwrap().position = value.clone();
+                        "position" => {
+                            if let ListValue::Position(_, _, ref value) = item.value {
+                                self.command.lock().unwrap().position = value.clone();
+                            }
                         }
-                    }
-                    "keyword" => {
-                        if let ListValue::Text(_, ref value) = item.value {
-                            self.command.lock().unwrap().keyword = value.clone();
+                        "keyword" => {
+                            if let ListValue::Text(_, ref value) = item.value {
+                                self.command.lock().unwrap().keyword = value.clone();
+                            }
                         }
-                    }
-                    "autorun" => {
-                        if let ListValue::ComboBox(ref value) = item.value {
-                            let value = value.cur_value.value.parse::<AutoRun>().unwrap();
-                            self.command.lock().unwrap().auto_run = value;
+                        "autorun" => {
+                            if let ListValue::ComboBox(ref value) = item.value {
+                                let value = value.cur_value.value.parse::<AutoRun>().unwrap();
+                                self.command.lock().unwrap().auto_run = value;
+                            }
                         }
-                    }
-                    "autorun_time" => {
-                        if let ListValue::U32(value, _, _) = item.value {
-                            self.command.lock().unwrap().autorun_time = value as u64;
+                        "autorun_time" => {
+                            if let ListValue::U32(value, _, _) = item.value {
+                                self.command.lock().unwrap().autorun_time = value as u64;
+                            }
                         }
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
         }
-    }
-
+    */
     pub fn ui(&mut self, frame: &mut Frame, screen: Rect) {
         let area = screen.inner(Margin::new(2, 2));
         Clear.render(area, frame.buffer_mut());
@@ -413,7 +404,7 @@ impl<'a> EditCommandDialog<'a> {
             return;
         }
         self.config.get_item(self.state.selected).unwrap().text_field_state.set_cursor_position(frame);
-
+        /*
         for i in self.config.iter() {
             if i.id == "text" {
                 if let ListValue::Text(_, ref value) = &i.value {
@@ -435,7 +426,7 @@ impl<'a> EditCommandDialog<'a> {
                     get_styled_pcb_line(value).render(area, frame.buffer_mut());
                 }
             }
-        }
+        }*/
         self.state.selected = sel;
         self.display_insert_table(frame, &area, &footer);
     }

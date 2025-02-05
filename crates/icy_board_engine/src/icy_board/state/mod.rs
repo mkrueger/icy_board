@@ -1564,8 +1564,8 @@ impl IcyBoardState {
             MacroCommand::SysDate => {
                 result = self.format_date(Utc::now());
             }
-            MacroCommand::SysopIn => result = self.get_board().await.config.sysop.sysop_start.to_string(),
-            MacroCommand::SysopOut => result = self.get_board().await.config.sysop.sysop_stop.to_string(),
+            MacroCommand::SysopIn => result = self.get_board().await.config.limits.sysop_start.to_string(),
+            MacroCommand::SysopOut => result = self.get_board().await.config.limits.sysop_stop.to_string(),
             MacroCommand::SysTime => {
                 result = self.format_time(Utc::now());
             }
@@ -1625,7 +1625,7 @@ impl IcyBoardState {
                 return None;
             }
             MacroCommand::XON => {
-                if !self.get_board().await.config.options.non_graphics {
+                if !self.get_board().await.config.switches.non_graphics {
                     self.session.disp_options.grapics_mode = GraphicsMode::Graphics;
                 }
                 return None;
@@ -2047,14 +2047,14 @@ impl IcyBoardState {
     }
 
     pub async fn is_valid_password(&self, new_pwd: &str) -> Res<bool> {
-        Ok(new_pwd.len() >= self.board.lock().await.config.user_password_policy.min_length as usize)
+        Ok(new_pwd.len() >= self.board.lock().await.config.limits.min_pwd_length as usize)
     }
 
     pub async fn change_password(&mut self, new_pwd: &str) -> Res<bool> {
         if !self.is_valid_password(new_pwd).await? {
             return Ok(false);
         }
-        let exp_days = self.get_board().await.config.user_password_policy.password_expire_days;
+        let exp_days = self.get_board().await.config.limits.password_expire_days;
         if let Some(user) = &mut self.session.current_user {
             let old = user.password.password.clone();
             user.password.password = Password::PlainText(new_pwd.to_string());

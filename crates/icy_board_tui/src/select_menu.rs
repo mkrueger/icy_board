@@ -7,13 +7,13 @@ use ratatui::{
     Frame,
 };
 
-pub struct MenuItem<T: Clone> {
+pub struct MenuItem<T> {
     id: T,
     char: char,
     title: String,
 }
 
-impl<T: Clone> MenuItem<T> {
+impl<T> MenuItem<T> {
     pub fn new(id: T, char: char, title: String) -> Self {
         Self { id, char, title }
     }
@@ -62,11 +62,11 @@ pub struct SelectMenuState {
     pub area_height: u16,
 }
 
-pub struct SelectMenu<T: Clone> {
+pub struct SelectMenu<T> {
     items: Vec<MenuItem<T>>,
 }
 
-impl<T: Clone> SelectMenu<T> {
+impl<T> SelectMenu<T> {
     pub fn new(items: Vec<MenuItem<T>>) -> Self {
         Self { items }
     }
@@ -110,7 +110,7 @@ impl<T: Clone> SelectMenu<T> {
         );
     }
 
-    pub fn handle_key_press(&self, key: crossterm::event::KeyEvent, state: &mut SelectMenuState) -> Option<T> {
+    pub fn handle_key_press(&self, key: crossterm::event::KeyEvent, state: &mut SelectMenuState) -> Option<&T> {
         match key.code {
             KeyCode::Up => {
                 if state.selected > 0 {
@@ -139,12 +139,12 @@ impl<T: Clone> SelectMenu<T> {
             KeyCode::Char(ch) => {
                 for item in &self.items {
                     if ch.to_ascii_uppercase() == item.char.to_ascii_uppercase() {
-                        return Some(item.id.clone());
+                        return Some(&item.id);
                     }
                 }
             }
             KeyCode::Enter => {
-                return Some(self.items[state.selected as usize].id.clone());
+                return Some(&self.items[state.selected as usize].id);
             }
             _ => {}
         }

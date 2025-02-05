@@ -350,7 +350,7 @@ impl IcyBoard {
         pcb_dat.sysop_info.use_local_graphics = true;
 
         // Line 8 Sysop Level
-        pcb_dat.sysop_security.sysop = self.config.sysop_security_level.sysop as i32;
+        pcb_dat.sysop_security.sysop = self.config.sysop_command_level.sysop as i32;
 
         // Line 24
         pcb_dat.path.help_loc = self.resolve_file(&self.config.paths.help_path).to_string_lossy().to_string();
@@ -398,10 +398,10 @@ impl IcyBoard {
         pcb_dat.path.group_chat = self.resolve_file(&self.config.paths.group_chat).to_string_lossy().to_string();
 
         // Line 76
-        pcb_dat.closed_board = self.config.options.is_closed_board;
+        pcb_dat.closed_board = self.config.system_control.is_closed_board;
 
         // Line 87
-        pcb_dat.display_news = self.config.options.display_news_behavior.to_pcb_char();
+        pcb_dat.display_news = self.config.switches.display_news_behavior.to_pcb_char();
 
         // Line 94
         pcb_dat.board_name = self.config.board.name.to_string();
@@ -424,7 +424,7 @@ impl IcyBoard {
         pcb_dat.path.cmd_display_files_loc = self.resolve_file(&self.config.paths.command_display_path).to_string_lossy().to_string();
 
         // Line 265
-        pcb_dat.min_pwrd_len = self.config.user_password_policy.min_length as i32;
+        pcb_dat.min_pwrd_len = self.config.limits.min_pwd_length as i32;
 
         // Line 269
         pcb_dat.skip_protocol = !self.config.new_user_settings.ask_xfer_protocol;

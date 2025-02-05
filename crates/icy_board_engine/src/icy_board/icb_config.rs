@@ -4,10 +4,10 @@ use crate::datetime::IcbTime;
 use icy_engine::Color;
 use serde::{Deserialize, Serialize};
 
-use super::{is_false, is_null_16, is_null_8, is_null_i32, login_server::LoginServer, user_base::Password, IcyBoardSerializer};
+use super::{is_false, is_null_16, is_null_32, is_null_8, login_server::LoginServer, user_base::Password, IcyBoardSerializer};
 
 #[derive(Serialize, Deserialize)]
-pub struct SysopSecurityLevels {
+pub struct SysopCommandLevels {
     /// Sysop Security Level
     pub sysop: u8,
 
@@ -15,11 +15,73 @@ pub struct SysopSecurityLevels {
     pub read_all_mail: u8,
     pub copy_move_messages: u8,
     pub enter_color_codes_in_messages: u8,
+
+    pub edit_any_message: u8,
+    pub not_update_msg_read: u8,
     pub use_broadcast_command: u8,
     pub view_private_uploads: u8,
+    pub enter_generic_messages: u8,
+
     pub edit_message_headers: u8,
     pub protect_unprotect_messages: u8,
+    pub overwrite_files_on_uploads: u8,
     pub set_pack_out_date_on_messages: u8,
+    pub see_all_return_receipts: u8,
+
+    /// Sysop commands
+    pub sec_1_view_caller_log: u8,
+    pub sec_2_view_usr_list: u8,
+    pub sec_3_pack_renumber_msg: u8,
+    pub sec_4_recover_deleted_msg: u8,
+    pub sec_5_list_message_hdr: u8,
+    pub sec_6_view_any_file: u8,
+    pub sec_7_user_maint: u8,
+    pub sec_8_pack_usr_file: u8,
+    pub sec_9_exit_to_dos: u8,
+    pub sec_10_shelled_dos_func: u8,
+    pub sec_11_view_other_nodes: u8,
+    pub sec_12_logoff_alt_node: u8,
+    pub sec_13_view_alt_node_callers: u8,
+    pub sec_14_drop_alt_node_to_dos: u8,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserCommandLevels {
+    pub cmd_a: u8,
+    pub cmd_b: u8,
+    pub cmd_c: u8,
+    pub cmd_d: u8,
+    pub cmd_e: u8,
+    pub cmd_f: u8,
+    // pub cmd_g: u8, No longer used by PCBoard
+    pub cmd_h: u8,
+    pub cmd_i: u8,
+    pub cmd_j: u8,
+    pub cmd_k: u8,
+    pub cmd_l: u8,
+    pub cmd_m: u8,
+    pub cmd_n: u8,
+    pub cmd_o: u8,
+    pub cmd_p: u8,
+
+    pub cmd_q: u8,
+    pub cmd_r: u8,
+    pub cmd_s: u8,
+    pub cmd_t: u8,
+    pub cmd_u: u8,
+    pub cmd_v: u8,
+    pub cmd_w: u8,
+    pub cmd_x: u8,
+    pub cmd_y: u8,
+    pub cmd_z: u8,
+    pub cmd_chat: u8,
+    pub cmd_open_door: u8,
+    pub cmd_test_file: u8,
+    pub cmd_show_user_list: u8,
+    pub cmd_who: u8,
+
+    pub batch_file_transfer: u8,
+    pub edit_own_messages: u8,
 }
 
 #[derive(Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
@@ -36,27 +98,6 @@ impl PasswordStorageMethod {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct UserPasswordPolicy {
-    /// Minimum Password Length (0=disable)
-    #[serde(default)]
-    #[serde(skip_serializing_if = "is_null_8")]
-    pub min_length: u8,
-    /// Number of days PWRD is valid before expiring
-    #[serde(default)]
-    #[serde(skip_serializing_if = "is_null_16")]
-    pub password_expire_days: u16,
-
-    /// Number of days prior to WARN of PWRD expiring
-    #[serde(default)]
-    #[serde(skip_serializing_if = "is_null_16")]
-    pub password_expire_warn_days: u16,
-
-    #[serde(default)]
-    #[serde(skip_serializing_if = "PasswordStorageMethod::is_default")]
-    pub password_storage_method: PasswordStorageMethod,
-}
-
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct SubscriptionMode {
     /// run in subscription mode
@@ -66,8 +107,8 @@ pub struct SubscriptionMode {
 
     /// default days in new subscription period (v14.5)
     #[serde(default)]
-    #[serde(skip_serializing_if = "is_null_i32")]
-    pub subscription_length: i32,
+    #[serde(skip_serializing_if = "is_null_32")]
+    pub subscription_length: u32,
 
     /// default expired security level (v14.5)
     #[serde(default)]
@@ -76,14 +117,18 @@ pub struct SubscriptionMode {
 
     /// days prior to subscription expiration (v14.5)
     #[serde(default)]
-    #[serde(skip_serializing_if = "is_null_i32")]
-    pub warning_days: i32,
+    #[serde(skip_serializing_if = "is_null_32")]
+    pub warning_days: u32,
 }
 
 #[derive(Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct BoardInformation {
     ///  name of board
     pub name: String,
+
+    /// Allow IEMSI logins
+    #[serde(default)]
+    pub allow_iemsi: bool,
 
     /// Location of the board (used in EmsiISI)
     pub location: String,
@@ -122,15 +167,6 @@ pub struct SysopInformation {
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub use_real_name: bool,
-
-    ///  start time to allow sysop page
-    #[serde(default)]
-    pub sysop_start: IcbTime,
-
-    ///  stop  time to allow sysop page
-    #[serde(default)]
-    #[serde(skip_serializing_if = "IcbTime::is_empty")]
-    pub sysop_stop: IcbTime,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -358,8 +394,8 @@ pub struct NewUserSettings {
     pub ask_address: bool,
     pub ask_verification: bool,
 
-    pub ask_bus_data_phone: bool,
-    pub ask_voice_phone: bool,
+    pub ask_business_phone: bool,
+    pub ask_home_phone: bool,
     pub ask_comment: bool,
     pub ask_clr_msg: bool,
 
@@ -374,48 +410,142 @@ pub struct NewUserSettings {
     pub ask_web_address: bool,
     pub ask_use_short_descr: bool,
 }
+
 #[derive(Clone, Serialize, Deserialize)]
-pub struct BoardOptions {
+pub struct MessageOptions {
+    /// max number of lines in a message
+    pub max_msg_lines: u16,
+    pub scan_all_mail_at_login: bool,
+
+    pub disable_message_scan_prompt: bool,
+    pub allow_esc_codes: bool,
+    pub allow_carbon_copy: bool,
+    pub validate_to_name: bool,
+    pub default_quick_personal_scan: bool,
+    pub default_scan_all_selected_confs_at_login: bool,
+    pub prompt_to_read_mail: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct FileTransferOptions {
+    pub disallow_batch_uploads: bool,
+    pub promote_to_batch_transfers: bool,
+
+    pub upload_credit_time: u32,
+    pub upload_credit_bytes: u32,
+
+    pub verify_files_uploaded: bool,
+    pub upload_descr_lines: u8,
+    pub display_uploader: bool,
+
+    pub disable_drive_size_check: bool,
+    pub stop_uploads_free_space: u32,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct SystemControlOptions {
+    pub disable_ns_logon: bool,
+
     /// Only allow pw change in 'w' command.
     pub disable_full_record_updating: bool,
+
+    pub allow_alias_change: bool,
+
+    pub is_multi_lingual: bool,
 
     /// Run in NewAsk mode.
     pub is_closed_board: bool,
 
+    /// Switch between daily and session limits
+    pub enforce_daily_time_limit: bool,
+
+    pub allow_password_failure_comment: bool,
+
+    /// G command will ask for logoff (bye will skip that)
+    pub guard_logoff: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ConfigSwitches {
+    #[serde(default)]
+    pub default_graphics_at_login: bool,
+
+    // disable colors
+    #[serde(default)]
+    pub non_graphics: bool,
+
     /// Exclude local calls from all statistics
-    pub exclude_local_calls: bool,
+    #[serde(default)]
+    pub exclude_local_calls_stats: bool,
 
     /// DisplayNewsBehavior
     pub display_news_behavior: DisplayNewsBehavior,
 
+    #[serde(default)]
     pub display_userinfo_at_login: bool,
 
-    /// max number of lines in a message
-    pub max_msg_lines: u16,
-    pub scan_all_mail_at_login: bool,
-    pub prompt_to_read_mail: bool,
+    #[serde(default)]
+    pub force_intro_on_join: bool,
 
-    // keyboard timeout in minutes
+    #[serde(default)]
+    pub scan_new_blt: bool,
+
+    #[serde(default)]
+    pub capture_grp_chat_session: bool,
+
+    #[serde(default)]
+    pub allow_handle_in_grpchat: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct LimitOptions {
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_null_16")]
     pub keyboard_timeout: u16,
 
-    pub check_files_uploaded: bool,
-    pub upload_descr_lines: u8,
-    pub display_uploader: bool,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_null_16")]
+    pub max_number_upload_descr_lines: u16,
 
-    // disable colors
-    pub non_graphics: bool,
+    /// Minimum Password Length (0=disable)
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_null_8")]
+    pub min_pwd_length: u8,
 
+    /// Number of days PWRD is valid before expiring
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_null_16")]
+    pub password_expire_days: u16,
+
+    /// Number of days prior to WARN of PWRD expiring
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_null_16")]
+    pub password_expire_warn_days: u16,
+
+    ///  start time to allow sysop page
+    #[serde(default)]
+    #[serde(skip_serializing_if = "IcbTime::is_empty")]
+    pub sysop_start: IcbTime,
+
+    ///  stop  time to allow sysop page
+    #[serde(default)]
+    #[serde(skip_serializing_if = "IcbTime::is_empty")]
+    pub sysop_stop: IcbTime,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct BoardOptions {
+    #[serde(default)]
     pub give_user_password_to_doors: bool,
 
-    pub call_log: bool,
-    pub page_bell: bool,
-    pub alarm: bool,
-
-    pub allow_iemsi: bool,
-
-    /// G command will ask for logoff (bye will skip that)
     #[serde(default)]
-    pub guard_logoff: bool,
+    pub call_log: bool,
+
+    #[serde(default)]
+    pub page_bell: bool,
+
+    #[serde(default)]
+    pub alarm: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
@@ -460,12 +590,20 @@ pub struct IcbConfig {
 
     pub new_user_settings: NewUserSettings,
 
+    pub message: MessageOptions,
+    pub file_transfer: FileTransferOptions,
+    pub system_control: SystemControlOptions,
+    pub switches: ConfigSwitches,
+    pub limits: LimitOptions,
     pub options: BoardOptions,
 
     pub login_server: LoginServer,
 
     #[serde(rename = "sysop_sec")]
-    pub sysop_security_level: SysopSecurityLevels,
+    pub sysop_command_level: SysopCommandLevels,
+
+    #[serde(rename = "user_sec")]
+    pub user_command_level: UserCommandLevels,
 
     #[serde(rename = "paths")]
     pub paths: ConfigPaths,
@@ -478,9 +616,6 @@ pub struct IcbConfig {
 
     #[serde(rename = "subs")]
     pub subscription_info: SubscriptionMode,
-
-    #[serde(rename = "user_pwrd")]
-    pub user_password_policy: UserPasswordPolicy,
 }
 
 pub const DEFAULT_PCBOARD_DATE_FORMAT: &str = "%m/%d/%y";
@@ -496,6 +631,7 @@ impl IcbConfig {
                 capabilities: String::new(),
                 date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
                 num_nodes: 4,
+                allow_iemsi: true,
             },
 
             sysop: SysopInformation {
@@ -503,11 +639,9 @@ impl IcbConfig {
                 password: Password::PlainText(String::new()),
                 require_password_to_exit: false,
                 use_real_name: false,
-                sysop_start: IcbTime::default(),
-                sysop_stop: IcbTime::default(),
             },
             login_server: LoginServer::default(),
-            sysop_security_level: SysopSecurityLevels {
+            sysop_command_level: SysopCommandLevels {
                 sysop: 100,
                 read_all_comments: 110,
                 read_all_mail: 110,
@@ -518,6 +652,60 @@ impl IcbConfig {
                 edit_message_headers: 110,
                 protect_unprotect_messages: 110,
                 set_pack_out_date_on_messages: 110,
+                see_all_return_receipts: 110,
+                overwrite_files_on_uploads: 110,
+                not_update_msg_read: 110,
+                enter_generic_messages: 110,
+                edit_any_message: 110,
+
+                sec_1_view_caller_log: 110,
+                sec_2_view_usr_list: 110,
+                sec_3_pack_renumber_msg: 110,
+                sec_4_recover_deleted_msg: 110,
+                sec_5_list_message_hdr: 110,
+                sec_6_view_any_file: 110,
+                sec_7_user_maint: 110,
+                sec_8_pack_usr_file: 110,
+                sec_9_exit_to_dos: 110,
+                sec_10_shelled_dos_func: 110,
+                sec_11_view_other_nodes: 110,
+                sec_12_logoff_alt_node: 110,
+                sec_13_view_alt_node_callers: 110,
+                sec_14_drop_alt_node_to_dos: 110,
+            },
+            user_command_level: UserCommandLevels {
+                cmd_a: 10,
+                cmd_b: 10,
+                cmd_c: 10,
+                cmd_d: 10,
+                cmd_e: 10,
+                cmd_f: 10,
+                cmd_h: 10,
+                cmd_i: 10,
+                cmd_j: 10,
+                cmd_k: 10,
+                cmd_l: 10,
+                cmd_m: 10,
+                cmd_n: 10,
+                cmd_o: 10,
+                cmd_p: 10,
+                cmd_q: 10,
+                cmd_r: 10,
+                cmd_s: 10,
+                cmd_t: 10,
+                cmd_u: 10,
+                cmd_v: 10,
+                cmd_w: 10,
+                cmd_x: 10,
+                cmd_y: 10,
+                cmd_z: 10,
+                cmd_chat: 10,
+                cmd_open_door: 10,
+                cmd_test_file: 10,
+                cmd_show_user_list: 10,
+                cmd_who: 10,
+                batch_file_transfer: 10,
+                edit_own_messages: 10,
             },
             color_configuration: ColorConfiguration::default(),
             func_keys: Default::default(),
@@ -526,12 +714,6 @@ impl IcbConfig {
                 subscription_length: 365,
                 default_expired_level: 10,
                 warning_days: 30,
-            },
-            user_password_policy: UserPasswordPolicy {
-                min_length: 0,
-                password_expire_days: 0,
-                password_expire_warn_days: 0,
-                password_storage_method: PasswordStorageMethod::PlainText,
             },
             paths: ConfigPaths {
                 help_path: PathBuf::from("art/help/"),
@@ -581,8 +763,8 @@ impl IcbConfig {
                 ask_city_or_state: true,
                 ask_address: false,
                 ask_verification: false,
-                ask_bus_data_phone: true,
-                ask_voice_phone: true,
+                ask_business_phone: true,
+                ask_home_phone: true,
                 ask_comment: true,
                 ask_clr_msg: true,
                 ask_date_format: false,
@@ -595,26 +777,64 @@ impl IcbConfig {
                 ask_use_short_descr: false,
                 ask_fse: false,
             },
-            options: BoardOptions {
-                disable_full_record_updating: false,
-                is_closed_board: false,
-                display_news_behavior: DisplayNewsBehavior::OnlyNewer,
-                display_userinfo_at_login: false,
-                exclude_local_calls: true,
+            message: MessageOptions {
                 max_msg_lines: 100,
                 scan_all_mail_at_login: true,
                 prompt_to_read_mail: true,
-                check_files_uploaded: true,
+                disable_message_scan_prompt: true,
+                allow_esc_codes: false,
+                allow_carbon_copy: true,
+                validate_to_name: true,
+                default_quick_personal_scan: true,
+                default_scan_all_selected_confs_at_login: true,
+            },
+            file_transfer: FileTransferOptions {
                 display_uploader: false,
-                non_graphics: false,
-                keyboard_timeout: 5,
                 upload_descr_lines: 20,
+                disallow_batch_uploads: false,
+                promote_to_batch_transfers: true,
+                upload_credit_time: 100,
+                upload_credit_bytes: 0,
+                verify_files_uploaded: true,
+                disable_drive_size_check: false,
+                stop_uploads_free_space: 1024,
+            },
+            system_control: SystemControlOptions {
+                disable_ns_logon: false,
+                disable_full_record_updating: false,
+                is_closed_board: false,
+                guard_logoff: false,
+                enforce_daily_time_limit: false,
+                allow_alias_change: false,
+                is_multi_lingual: false,
+                allow_password_failure_comment: false,
+            },
+            switches: ConfigSwitches {
+                display_news_behavior: DisplayNewsBehavior::OnlyNewer,
+                display_userinfo_at_login: false,
+                exclude_local_calls_stats: true,
+                non_graphics: false,
+                default_graphics_at_login: true,
+                force_intro_on_join: false,
+                scan_new_blt: true,
+                capture_grp_chat_session: false,
+                allow_handle_in_grpchat: false,
+            },
+            limits: LimitOptions {
+                keyboard_timeout: 5,
+                min_pwd_length: 0,
+                password_expire_days: 0,
+                password_expire_warn_days: 0,
+
+                sysop_start: IcbTime::default(),
+                sysop_stop: IcbTime::default(),
+                max_number_upload_descr_lines: 20,
+            },
+            options: BoardOptions {
                 give_user_password_to_doors: false,
                 page_bell: true,
                 alarm: false,
                 call_log: true,
-                allow_iemsi: true,
-                guard_logoff: false,
             },
         }
     }

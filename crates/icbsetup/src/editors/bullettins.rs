@@ -1,6 +1,5 @@
 use std::{
     path::PathBuf,
-    str::FromStr,
     sync::{Arc, Mutex},
 };
 
@@ -34,7 +33,7 @@ pub struct BullettinsEditor<'a> {
     sec_levels: Arc<Mutex<Vec<Bullettin>>>,
 
     edit_config_state: ConfigMenuState,
-    edit_config: Option<ConfigMenu>,
+    edit_config: Option<ConfigMenu<u32>>,
 }
 
 impl<'a> BullettinsEditor<'a> {
@@ -143,6 +142,7 @@ impl<'a> Editor for BullettinsEditor<'a> {
         if let Some(edit_config) = &mut self.edit_config {
             match key.code {
                 KeyCode::Esc => {
+                    /*
                     let Some(selected_item) = self.insert_table.table_state.selected() else {
                         return true;
                     };
@@ -164,7 +164,7 @@ impl<'a> Editor for BullettinsEditor<'a> {
                                 panic!("Unknown item: {}", item.id);
                             }
                         }
-                    }
+                    }*/
                     self.edit_config = None;
                     return true;
                 }
@@ -211,11 +211,11 @@ impl<'a> Editor for BullettinsEditor<'a> {
                             return true;
                         };
                         self.edit_config = Some(ConfigMenu {
+                            obj: 0,
                             entry: vec![
-                                ConfigEntry::Item(ListItem::new("path", "Path".to_string(), ListValue::Path(action.file.clone())).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("Path".to_string(), ListValue::Path(action.file.clone())).with_label_width(16)),
                                 ConfigEntry::Item(
-                                    ListItem::new("security", "Security".to_string(), ListValue::Text(25, action.required_security.to_string()))
-                                        .with_label_width(16),
+                                    ListItem::new("Security".to_string(), ListValue::Text(25, action.required_security.to_string())).with_label_width(16),
                                 ),
                             ],
                         });

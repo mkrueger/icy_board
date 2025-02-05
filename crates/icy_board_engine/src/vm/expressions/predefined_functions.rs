@@ -609,7 +609,7 @@ pub async fn readline(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 
 pub async fn sysopsec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(
-        vm.icy_board_state.get_board().await.config.sysop_security_level.sysop as i32,
+        vm.icy_board_state.get_board().await.config.sysop_command_level.sysop as i32,
     ))
 }
 pub async fn onlocal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

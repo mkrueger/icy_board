@@ -29,7 +29,7 @@ pub struct SecurityLevelEditor<'a> {
     sec_levels: Arc<Mutex<Vec<SecurityLevel>>>,
 
     edit_config_state: ConfigMenuState,
-    edit_config: Option<ConfigMenu>,
+    edit_config: Option<ConfigMenu<u32>>,
 }
 
 impl<'a> SecurityLevelEditor<'a> {
@@ -201,6 +201,7 @@ impl<'a> Editor for SecurityLevelEditor<'a> {
         if let Some(edit_config) = &mut self.edit_config {
             match key.code {
                 KeyCode::Esc => {
+                    /*
                     let Some(selected_item) = self.insert_table.table_state.selected() else {
                         return true;
                     };
@@ -291,7 +292,7 @@ impl<'a> Editor for SecurityLevelEditor<'a> {
                                 panic!("Unknown item: {}", item.id);
                             }
                         }
-                    }
+                    }*/
                     self.edit_config = None;
                     return true;
                 }
@@ -355,86 +356,45 @@ impl<'a> Editor for SecurityLevelEditor<'a> {
                             return true;
                         };
                         self.edit_config = Some(ConfigMenu {
+                            obj: 0,
                             entry: vec![
+                                ConfigEntry::Item(ListItem::new("Security".to_string(), ListValue::U32(action.security as u32, 0, 255)).with_label_width(16)),
                                 ConfigEntry::Item(
-                                    ListItem::new("security", "Security".to_string(), ListValue::U32(action.security as u32, 0, 255)).with_label_width(16),
+                                    ListItem::new("Description".to_string(), ListValue::Text(30, action.description.clone())).with_label_width(16),
+                                ),
+                                ConfigEntry::Item(ListItem::new("Password".to_string(), ListValue::Text(30, action.password.clone())).with_label_width(16)),
+                                ConfigEntry::Item(
+                                    ListItem::new("Time".to_string(), ListValue::U32(action.time_per_day as u32, 0, u32::MAX)).with_label_width(16),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new("description", "Description".to_string(), ListValue::Text(30, action.description.clone()))
+                                    ListItem::new("Daily KBytes".to_string(), ListValue::U32(action.daily_file_kb_limit as u32, 0, u32::MAX))
                                         .with_label_width(16),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new("password", "Password".to_string(), ListValue::Text(30, action.password.clone())).with_label_width(16),
+                                    ListItem::new("File Ratio".to_string(), ListValue::U32(action.uldl_ratio as u32, 0, u32::MAX)).with_label_width(16),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new("time_per_day", "Time".to_string(), ListValue::U32(action.time_per_day as u32, 0, u32::MAX))
-                                        .with_label_width(16),
+                                    ListItem::new("Byte Ratio".to_string(), ListValue::U32(action.uldl_kb_ratio as u32, 0, u32::MAX)).with_label_width(16),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(
-                                        "daily_file_kb_limit",
-                                        "Daily KBytes".to_string(),
-                                        ListValue::U32(action.daily_file_kb_limit as u32, 0, u32::MAX),
-                                    )
-                                    .with_label_width(16),
+                                    ListItem::new("File Limit".to_string(), ListValue::U32(action.file_limit as u32, 0, u32::MAX)).with_label_width(16),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new("uldl_ratio", "File Ratio".to_string(), ListValue::U32(action.uldl_ratio as u32, 0, u32::MAX))
-                                        .with_label_width(16),
+                                    ListItem::new("KByte Limit".to_string(), ListValue::U32(action.file_kb_limit as u32, 0, u32::MAX)).with_label_width(16),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(
-                                        "uldl_kb_ratio",
-                                        "Byte Ratio".to_string(),
-                                        ListValue::U32(action.uldl_kb_ratio as u32, 0, u32::MAX),
-                                    )
-                                    .with_label_width(16),
+                                    ListItem::new("File Credit".to_string(), ListValue::U32(action.file_credit as u32, 0, u32::MAX)).with_label_width(16),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new("file_limit", "File Limit".to_string(), ListValue::U32(action.file_limit as u32, 0, u32::MAX))
-                                        .with_label_width(16),
+                                    ListItem::new("KByte Credit".to_string(), ListValue::U32(action.file_kb_credit as u32, 0, u32::MAX)).with_label_width(16),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(
-                                        "file_kb_limit",
-                                        "KByte Limit".to_string(),
-                                        ListValue::U32(action.file_kb_limit as u32, 0, u32::MAX),
-                                    )
-                                    .with_label_width(16),
+                                    ListItem::new("Enforce Time Limit".to_string(), ListValue::Bool(action.enforce_time_limit)).with_label_width(16),
                                 ),
-                                ConfigEntry::Item(
-                                    ListItem::new("file_credit", "File Credit".to_string(), ListValue::U32(action.file_credit as u32, 0, u32::MAX))
-                                        .with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new(
-                                        "file_kb_credit",
-                                        "KByte Credit".to_string(),
-                                        ListValue::U32(action.file_kb_credit as u32, 0, u32::MAX),
-                                    )
-                                    .with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new(
-                                        "enforce_time_limit",
-                                        "Enforce Time Limit".to_string(),
-                                        ListValue::Bool(action.enforce_time_limit),
-                                    )
-                                    .with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new("allow_alias", "Allow Alias".to_string(), ListValue::Bool(action.allow_alias)).with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new("enforce_read_mail", "Force Read Mail".to_string(), ListValue::Bool(action.enforce_read_mail))
-                                        .with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new("is_demo_account", "Demo Account".to_string(), ListValue::Bool(action.is_demo_account)).with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new("is_enabled", "Enable Account".to_string(), ListValue::Bool(action.is_enabled)).with_label_width(16),
-                                ),
+                                ConfigEntry::Item(ListItem::new("Allow Alias".to_string(), ListValue::Bool(action.allow_alias)).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("Force Read Mail".to_string(), ListValue::Bool(action.enforce_read_mail)).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("Demo Account".to_string(), ListValue::Bool(action.is_demo_account)).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("Enable Account".to_string(), ListValue::Bool(action.is_enabled)).with_label_width(16)),
                             ],
                         });
                     } else {

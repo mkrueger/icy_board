@@ -31,7 +31,7 @@ enum EditCommandMode {
 pub struct DoorEditor<'a> {
     path: std::path::PathBuf,
     door_list: DoorList,
-    menu: ConfigMenu,
+    menu: ConfigMenu<u32>,
     menu_state: ConfigMenuState,
     mode: EditCommandMode,
 
@@ -39,7 +39,7 @@ pub struct DoorEditor<'a> {
     command: Arc<Mutex<Vec<Door>>>,
 
     edit_config_state: ConfigMenuState,
-    edit_config: Option<ConfigMenu>,
+    edit_config: Option<ConfigMenu<u32>>,
 }
 
 impl<'a> DoorEditor<'a> {
@@ -61,15 +61,13 @@ impl<'a> DoorEditor<'a> {
         let items = vec![ConfigEntry::Group(
             "BBSLink credentials".to_string(),
             vec![
-                ConfigEntry::Item(
-                    ListItem::new("system_code", "System Code".to_string(), ListValue::Text(25, bbs_link.system_code.clone())).with_label_width(l),
-                ),
-                ConfigEntry::Item(ListItem::new("auth_code", "Auth Code".to_string(), ListValue::Text(25, bbs_link.auth_code.clone())).with_label_width(l)),
-                ConfigEntry::Item(ListItem::new("sheme_code", "Scheme Code".to_string(), ListValue::Text(25, bbs_link.sheme_code.clone())).with_label_width(l)),
+                ConfigEntry::Item(ListItem::new("System Code".to_string(), ListValue::Text(25, bbs_link.system_code.clone())).with_label_width(l)),
+                ConfigEntry::Item(ListItem::new("Auth Code".to_string(), ListValue::Text(25, bbs_link.auth_code.clone())).with_label_width(l)),
+                ConfigEntry::Item(ListItem::new("Scheme Code".to_string(), ListValue::Text(25, bbs_link.sheme_code.clone())).with_label_width(l)),
             ],
         )];
 
-        let menu = ConfigMenu { entry: items };
+        let menu = ConfigMenu { obj: 0, entry: items };
         let command_arc = Arc::new(Mutex::new(door_list.doors.clone()));
         let scroll_state = ScrollbarState::default().content_length(door_list.doors.len());
         let content_length = door_list.doors.len();
@@ -170,10 +168,10 @@ impl<'a> Editor for DoorEditor<'a> {
         if let Some(edit_config) = &mut self.edit_config {
             match key.code {
                 KeyCode::Esc => {
+                    /*
                     let Some(selected_item) = self.insert_table.table_state.selected() else {
                         return true;
                     };
-
                     for item in edit_config.iter() {
                         match item.id.as_str() {
                             "name" => {
@@ -210,7 +208,7 @@ impl<'a> Editor for DoorEditor<'a> {
                             }
                             _ => {}
                         }
-                    }
+                    }*/
 
                     self.edit_config = None;
                     return true;
@@ -224,6 +222,7 @@ impl<'a> Editor for DoorEditor<'a> {
 
         match key.code {
             KeyCode::Esc => {
+                /*/
                 for item in self.menu.iter() {
                     if let ListValue::Text(_, value) = &item.value {
                         match item.id.as_str() {
@@ -243,6 +242,7 @@ impl<'a> Editor for DoorEditor<'a> {
                         }
                     }
                 }
+                    */
                 self.door_list.doors.clear();
                 self.door_list.doors.append(&mut self.command.lock().unwrap());
                 self.door_list.save(&self.path).unwrap();
@@ -290,19 +290,16 @@ impl<'a> Editor for DoorEditor<'a> {
                                 return true;
                             };
                             self.edit_config = Some(ConfigMenu {
+                                obj: 0,
                                 entry: vec![
-                                    ConfigEntry::Item(ListItem::new("name", "Name".to_string(), ListValue::Text(30, action.name.clone())).with_label_width(16)),
+                                    ConfigEntry::Item(ListItem::new("Name".to_string(), ListValue::Text(30, action.name.clone())).with_label_width(16)),
                                     ConfigEntry::Item(
-                                        ListItem::new("description", "Description".to_string(), ListValue::Text(30, action.description.clone()))
-                                            .with_label_width(16),
+                                        ListItem::new("Description".to_string(), ListValue::Text(30, action.description.clone())).with_label_width(16),
                                     ),
-                                    ConfigEntry::Item(
-                                        ListItem::new("password", "Password".to_string(), ListValue::Text(30, action.password.clone())).with_label_width(16),
-                                    ),
-                                    ConfigEntry::Item(ListItem::new("path", "Path".to_string(), ListValue::Text(30, action.path.clone())).with_label_width(16)),
+                                    ConfigEntry::Item(ListItem::new("Password".to_string(), ListValue::Text(30, action.password.clone())).with_label_width(16)),
+                                    ConfigEntry::Item(ListItem::new("Path".to_string(), ListValue::Text(30, action.path.clone())).with_label_width(16)),
                                     ConfigEntry::Item(
                                         ListItem::new(
-                                            "door_type",
                                             "Door Type".to_string(),
                                             ListValue::ComboBox(ComboBox {
                                                 cur_value: ComboBoxValue::new(format!("{}", action.door_type), format!("{}", action.door_type)),
@@ -316,8 +313,7 @@ impl<'a> Editor for DoorEditor<'a> {
                                         .with_label_width(16),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new("use_shell_execute", "Use Shell Execute".to_string(), ListValue::Bool(action.use_shell_execute))
-                                            .with_label_width(16),
+                                        ListItem::new("Use Shell Execute".to_string(), ListValue::Bool(action.use_shell_execute)).with_label_width(16),
                                     ),
                                 ],
                             });

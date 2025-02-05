@@ -31,6 +31,7 @@ pub struct Theme {
 
     pub text_field_text: Style,
     pub text_field_background: Style,
+    pub text_field_filler_char: char,
 
     pub table: Style,
     pub table_header: Style,
@@ -78,7 +79,8 @@ pub static CLASSIC_THEME: Theme = Theme {
     help_box: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
 
     text_field_text: Style::new().bg(DOS_RED).fg(DOS_WHITE),
-    text_field_background: Style::new().bg(DOS_RED).fg(DOS_RED),
+    text_field_filler_char: ' ',
+    text_field_background: Style::new().bg(DOS_RED).fg(DOS_WHITE),
 
     swatch: false,
 };
@@ -115,6 +117,7 @@ pub static DEFAULT_THEME: Theme = Theme {
 
     text_field_text: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
     text_field_background: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
+    text_field_filler_char: '▒',
 
     filter_text: Style::new().bg(DOS_BLUE).fg(DOS_YELLOW),
     description_text: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),

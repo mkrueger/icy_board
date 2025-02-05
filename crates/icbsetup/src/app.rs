@@ -11,14 +11,11 @@ use crate::{
         bullettins::BullettinsEditor, dirs::DirsEditor, door::DoorEditor, languages::LanguageListEditor, messages::MessageAreasEditor,
         sec_editor::SecurityLevelEditor, surveys::SurveyEditor,
     },
-    tabs::{AboutTab, ConferencesTab, GeneralTab, PathTab, ServerTab},
+    tabs::{AboutTab, GeneralTab},
 };
 
 pub fn new_main_window<'a>(icy_board: Arc<Mutex<IcyBoard>>, full_screen: bool) -> App<'a> {
     let general_tab = GeneralTab::new(icy_board.clone());
-    let server_tab = ServerTab::new(icy_board.clone());
-    let command_tab = ConferencesTab::new(icy_board.clone());
-    let path_tab = PathTab::new(icy_board.clone());
     let date_format = icy_board.lock().unwrap().config.board.date_format.clone();
     App {
         full_screen,
@@ -26,13 +23,7 @@ pub fn new_main_window<'a>(icy_board: Arc<Mutex<IcyBoard>>, full_screen: bool) -
         mode: Mode::default(),
         tab: 0,
         date_format,
-        tabs: vec![
-            Box::new(general_tab),
-            Box::new(path_tab),
-            Box::new(server_tab),
-            Box::new(command_tab),
-            Box::new(AboutTab::default()),
-        ],
+        tabs: vec![Box::new(general_tab), Box::new(AboutTab::default())],
         status_line: String::new(),
         help_state: HelpViewState::new(23),
         open_editor: None,

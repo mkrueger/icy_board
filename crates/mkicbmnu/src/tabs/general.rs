@@ -1,6 +1,5 @@
 use core::panic;
 use std::{
-    str::FromStr,
     sync::{Arc, Mutex},
     vec,
 };
@@ -23,7 +22,7 @@ use ratatui::{
 
 pub struct GeneralTab {
     state: ConfigMenuState,
-    config: ConfigMenu,
+    config: ConfigMenu<Arc<Mutex<IcyBoard>>>,
     menu: Arc<Mutex<Menu>>,
     original: Menu,
     _icy_board: Arc<Mutex<IcyBoard>>,
@@ -36,23 +35,22 @@ impl GeneralTab {
         let items = if let Ok(mnu) = menu.lock() {
             vec![
                 ConfigEntry::Item(
-                    ListItem::new("title", "Title".to_string(), ListValue::Text(25, mnu.title.clone()))
+                    ListItem::new("Title".to_string(), ListValue::Text(25, mnu.title.clone()))
                         .with_status("Enter the title of the menu.")
                         .with_label_width(info_width),
                 ),
                 ConfigEntry::Item(
-                    ListItem::new("display_file", "Display File".to_string(), ListValue::Path(mnu.display_file.clone()))
+                    ListItem::new("Display File".to_string(), ListValue::Path(mnu.display_file.clone()))
                         .with_status("The menu background file to display.")
                         .with_label_width(info_width),
                 ),
                 ConfigEntry::Item(
-                    ListItem::new("help_file", "Help File".to_string(), ListValue::Path(mnu.help_file.clone()))
+                    ListItem::new("Help File".to_string(), ListValue::Path(mnu.help_file.clone()))
                         .with_status("The help file to display.")
                         .with_label_width(info_width),
                 ),
                 ConfigEntry::Item(
                     ListItem::new(
-                        "menu_type",
                         "Menu Type".to_string(),
                         ListValue::ComboBox(ComboBox {
                             cur_value: ComboBoxValue::new(format!("{:?}", mnu.menu_type), format!("{:?}", mnu.menu_type)),
@@ -67,7 +65,7 @@ impl GeneralTab {
                     .with_label_width(info_width),
                 ),
                 ConfigEntry::Item(
-                    ListItem::new("prompt", "Prompt".to_string(), ListValue::Text(25, mnu.prompt.clone()))
+                    ListItem::new("Prompt".to_string(), ListValue::Text(25, mnu.prompt.clone()))
                         .with_status("The prompt for the menu.")
                         .with_label_width(info_width),
                 ),
@@ -84,6 +82,7 @@ impl GeneralTab {
         Self {
             state: ConfigMenuState::default(),
             config: ConfigMenu {
+                obj: icy_board.clone(),
                 entry: vec![ConfigEntry::Group(String::new(), items)],
             },
             menu,
@@ -93,6 +92,7 @@ impl GeneralTab {
     }
 
     fn write_back(&self) {
+        /*
         let ConfigEntry::Group(_, items) = &self.config.entry[0] else {
             return;
         };
@@ -139,7 +139,7 @@ impl GeneralTab {
                 },
                 _ => {}
             }
-        }
+        }*/
     }
 }
 

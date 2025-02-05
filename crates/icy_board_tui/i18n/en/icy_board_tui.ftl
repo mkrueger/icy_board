@@ -77,10 +77,7 @@ icb_system_statistics_today_uploads_kb = Today kb Uploaded
 icb_system_statistics_today_downloads = Today Downloads
 icb_system_statistics_today_downloads_kb = Today kb Downloaded
 
-
-
 # Node Monitioring Utility
-
 icbmoni_title = [ IcyBoard Node Monitoring Utility ]
 icbmoni_footer = [ (↑), (↓), (Esc) to End ]
 icbmoni_on_note_footer = [ (↑), (↓), (Return) to Monitor, (Esc) to End ]
@@ -150,3 +147,633 @@ key_desc_cancel=Cancel
 key_desc_filter=Filter
 key_desc_jump=Jump
 key_desc_edit=Edit
+
+
+# ICBSetup
+
+board_config_title=Board Configuration
+
+board_name=Board Name
+board_name-status=Board name is shown on login to the caller
+board_name-help=TODO
+
+allow_iemsi=Allow IEMSI
+allow_iemsi-status=Allow IEMSI login
+allow_iemsi-help=TODO
+
+board_iemsi_location=Location
+board_iemsi_location-status=Board location used in IEMSI
+board_iemsi_location-help=TODO
+
+board_iemsi_operator=Operator
+board_iemsi_operator-status=Board operator used in IEMSI
+board_iemsi_operator-help=TODO
+
+board_iemsi_notice=Notice
+board_iemsi_notice-status=Board notice used in IEMSI
+board_iemsi_notice-help=TODO
+
+board_iemsi_caps=Capabilities
+board_iemsi_caps-status=Board capabilities used in IEMSI
+board_iemsi_caps-help=TODO
+
+board_node_num=# Nodes
+board_node_num-status=Number of maximum active nodes
+board_node_num-help=TODO
+
+date_format=Date Format
+date_format-status=Date format used in the system
+date_format-help=TODO
+
+new_user_options_title=New User Options
+
+new_user_security_level=Security Level
+new_user_security_level-status=Default security level for new users
+new_user_security_level-help=TODO
+
+allow_one_name_users=Allow One Name Users
+allow_one_name_users-status=Allow single name users
+allow_one_name_users-help=TODO
+
+new_user_groups=New User Default Groups
+new_user_groups-status=Default groups for new users
+new_user_groups-help=TODO
+
+ask_city_or_state=City or State
+ask_city_or_state-status=Ask for city or state
+ask_city_or_state-help=TODO
+
+ask_address=Address
+ask_address-status=Ask for address
+ask_address-help=TODO
+
+ask_verification=Verification
+ask_verification-status=Ask for verification
+ask_verification-help=TODO
+
+ask_bus_data_phone=Business Phone
+ask_bus_data_phone-status=Ask for business data phone
+ask_bus_data_phone-help=TODO
+
+ask_home_phone=Home Phone
+ask_home_phone-status=Ask for home phone
+ask_home_phone-help=TODO
+
+ask_comment=Comment
+ask_comment-status=Ask for comment
+ask_comment-help=TODO
+
+ask_clr_msg=Clear Message
+ask_clr_msg-status=Ask for clear message
+ask_clr_msg-help=TODO
+
+ask_fse=Full Screen Editor
+ask_fse-status=Ask for full screen editor
+ask_fse-help=TODO
+
+ask_xfer_protocol=Protocols
+ask_xfer_protocol-status=Ask for transfer protocol
+ask_xfer_protocol-help=TODO
+
+ask_date_format=Date Format
+ask_date_format-status=Ask for date format
+ask_date_format-help=TODO
+
+ask_alias=Alias
+ask_alias-status=Ask for alias
+ask_alias-help=TODO
+
+ask_gender=Gender
+ask_gender-status=Ask for Gender
+ask_gender-help=TODO
+
+ask_birthdate=Birthdate
+ask_birthdate-status=Ask for birthdate
+ask_birthdate-help=TODO
+
+ask_email=Email
+ask_email-status=Ask for email
+ask_email-help=TODO
+
+ask_web_address=Web Address
+ask_web_address-status=Ask for web address
+ask_web_address-help=TODO
+
+ask_use_short_descr=Short Description
+ask_use_short_descr-status=Ask for short description
+ask_use_short_descr-help=TODO
+
+subscription_information_title=Subscription Information
+
+subscription_is_enabled=Enable Subscription Mode
+subscription_is_enabled-status=Enables account expiration support.
+subscription_is_enabled-help=TODO
+
+subscription_length=Default Subscription Length in Days
+subscription_length-status=Number of days before account expiration.
+subscription_length-help=TODO
+
+default_expired_level='Expired' Security Level
+default_expired_level-status=Security level for expired accounts.
+default_expired_level-help=TODO
+
+warning_days=Warning Days Prior to Expiration
+warning_days-status=Displays WARNING file to the caller prior to expiration.
+warning_days-help=TODO
+
+
+sysop_information_title=Sysop Information
+
+sysop_name=Sysop's Name
+sysop_name-status=Enter the first name of the sysop.
+sysop_name-help=TODO
+
+local_password=Local Password
+local_password-status=Call waiting screen password.
+local_password-help=TODO
+
+require_password_to_exit=Require Password to Exit
+require_password_to_exit-status=IcyBoard requires pw to exit the call waiting screen.
+require_password_to_exit-help=TODO
+
+use_real_name=Use Real Name
+use_real_name-status=Use the real name of the sysop.
+use_real_name-help=TODO
+
+sec_level_menu_title=Security Levels
+sec_level_menu_sysop_funcs=Sysop Functions
+sec_level_menu_sysop_commands=Sysop Commands
+sec_level_menu_user_commands=User Commands
+
+sysop_commands_title=Sysop Commands
+
+sysop_sec_level=Sysop Level
+sysop_sec_level-status=For Sysop Menu and F1-Temp-Sysop Upgrade
+sysop_sec_level-help=TODO
+
+sysop_sec_read_all_comments=Level Needed to Read All Comments
+sysop_sec_read_all_comments-status=Level Needed to Read All Comments
+sysop_sec_read_all_comments-help=TODO
+
+sysop_sec_read_all_mail=Level Needed to Read All Mail Except Comments
+sysop_sec_read_all_mail-status=Level Needed to Read All Mail Except Comments
+sysop_sec_read_all_mail-help=TODO
+
+sysop_sec_copy_move_messages=Level Needed to Copy or Move Messages Between Areas
+sysop_sec_copy_move_messages-status=Level Needed to Copy or Move Messages Between Areas
+sysop_sec_copy_move_messages-help=TODO
+
+sysop_sec_enter_color_codes_in_messages=Level Needed to Enter @-Variables in Message Base
+sysop_sec_enter_color_codes_in_messages-status=Level Needed to Enter @-Variables in Message Base
+sysop_sec_enter_color_codes_in_messages-help=TODO
+
+sysop_sec_edit_any_message=Level Needed to Edit Any Message in the Message Base
+sysop_sec_edit_any_message-status=Level Needed to Edit Any Message in the Message Base
+sysop_sec_edit_any_message-help=TODO
+
+sysop_sec_not_update_msg_read=Level Needed to NOT Update Msg Read Status
+sysop_sec_not_update_msg_read-status=R O cmd
+sysop_sec_not_update_msg_read-help=TODO
+
+sysop_sec_use_broadcast_command=Level Needed to Use the BROADCAST Command
+sysop_sec_use_broadcast_command-status=BR command
+sysop_sec_use_broadcast_command-help=TODO
+
+sysop_sec_view_private_uploads=Level Needed to View the Private Upload Directory
+sysop_sec_view_private_uploads-status=Level Needed to View the Private Upload Directory
+sysop_sec_view_private_uploads-help=TODO
+
+sysop_sec_enter_generic_messages=Level Needed to Enter Generic Messages
+sysop_sec_enter_generic_messages-status=Messages to @USER@
+sysop_sec_enter_generic_messages-help=TODO
+
+sysop_sec_edit_message_headers=Level Needed to Edit Message Headers
+sysop_sec_edit_message_headers-status=Level Needed to Edit Message Headers
+sysop_sec_edit_message_headers-help=TODO
+
+sysop_sec_protect_unprotect_messages=Level Needed to Protect/Unprotect a Message
+sysop_sec_protect_unprotect_messages-status=Level Needed to Protect/Unprotect a Message
+sysop_sec_protect_unprotect_messages-help=TODO
+
+sysop_sec_overwrite_files_on_uploads=Level Needed to Overwrite Files on Uploads
+sysop_sec_overwrite_files_on_uploads-status=Level Needed to Overwrite Files on Uploads
+sysop_sec_overwrite_files_on_uploads-help=TODO
+
+sysop_sec_set_pack_out_date_on_messages=Level Needed to Set the Pack-Out Date on Messages
+sysop_sec_set_pack_out_date_on_messages-status=Level Needed to Set the Pack-Out Date on Messages
+sysop_sec_set_pack_out_date_on_messages-help=TODO
+
+sysop_sec_see_all_return_receipts=Level Needed to See All Return Receipt Messages
+sysop_sec_see_all_return_receipts-status=Level Needed to See All Return Receipt Messages
+sysop_sec_see_all_return_receipts-help=TODO
+
+sysop_functions_title=Sysop Functions
+
+sysop_sec_1_view_caller_log=(1) View/Print Caller Log
+sysop_sec_1_view_caller_log-status=View/Print Caller Log
+sysop_sec_1_view_caller_log-help=TODO
+
+sysop_sec_2_view_system_statistics=(2) View/Print User List
+sysop_sec_2_view_system_statistics-status=View/Print User List
+sysop_sec_2_view_system_statistics-help=TODO
+
+sec_3_pack_renumber_msg=(3) Pack Renumber Messages
+sec_3_pack_renumber_msg-status=Pack Renumber Messages
+sec_3_pack_renumber_msg-help=TODO
+
+sysop_sec_4_recover_deleted_msg=(4) Recover Killed Message
+sysop_sec_4_recover_deleted_msg-status=Recover Killed Message
+sysop_sec_4_recover_deleted_msg-help=TODO
+
+sysop_sec_5_list_message_hdr=(5) List Message Headers
+sysop_sec_5_list_message_hdr-status=List Message Headers
+sysop_sec_5_list_message_hdr-help=TODO
+
+sysop_sec_6_view_any_file=(6) View Any File
+sysop_sec_6_view_any_file-status=View Any File
+sysop_sec_6_view_any_file-help=TODO
+
+sysop_sec_7_user_maint=(7) User Maintenance
+sysop_sec_7_user_maint-status=User Maintenance
+sysop_sec_7_user_maint-help=TODO
+
+sysop_sec_8_pack_usr_file=(8) Pack User File
+sysop_sec_8_pack_usr_file-status=Pack User File
+sysop_sec_8_pack_usr_file-help=TODO
+
+sysop_sec_9_exit_to_dos=(9) Exit to Shell remote
+sysop_sec_9_exit_to_dos-status=Exit to Shell remote
+sysop_sec_9_exit_to_dos-help=TODO
+
+sec_10_shelled_dos_func=(10) Execute Shell functions
+sec_10_shelled_dos_func-status=Execute Shell functions
+sec_10_shelled_dos_func-help=TODO
+
+sec_11_view_other_nodes=(11) View Other Nodes
+sec_11_view_other_nodes-status=View Other Nodes
+sec_11_view_other_nodes-help=TODO
+
+sysop_sec_12_logoff_alt_node=(12) Logoff Alternate Node
+sysop_sec_12_logoff_alt_node-status=Logoff Alternate Node
+sysop_sec_12_logoff_alt_node-help=TODO
+
+sysop_sec_13_view_alt_node_callers=(13) View Alt Node Callers
+sysop_sec_13_view_alt_node_callers-status=View Alt Node Callers
+sysop_sec_13_view_alt_node_callers-help=TODO
+
+sysop_sec_14_drop_alt_node_to_dos=(14) Drop Alt Node to DOS
+sysop_sec_14_drop_alt_node_to_dos-status=Drop Alt Node to DOS
+sysop_sec_14_drop_alt_node_to_dos-help=TODO
+
+user_commands_title=User Commands
+
+user_sec_cmd_a=A) Abandon Conference
+user_sec_cmd_a-status= TODO
+user_sec_cmd_a-help= TODO
+
+user_sec_cmd_b=B) Bulletin Listings
+user_sec_cmd_b-status= TODO
+user_sec_cmd_b-help= TODO
+
+user_sec_cmd_c=C) Comment to Sysop
+user_sec_cmd_c-status= TODO
+user_sec_cmd_c-help= TODO
+
+user_sec_cmd_d=D) Download a File
+user_sec_cmd_d-status= TODO
+user_sec_cmd_d-help= TODO
+
+user_sec_cmd_e=E) Enter a Message
+user_sec_cmd_e-status= TODO
+user_sec_cmd_e-help= TODO
+
+user_sec_cmd_f=F) File Directory
+user_sec_cmd_f-status= TODO
+user_sec_cmd_f-help= TODO
+
+user_sec_cmd_h=H) Help Functions
+user_sec_cmd_h-status= TODO
+user_sec_cmd_h-help= TODO
+
+user_sec_cmd_i=I) Initial Welcome
+user_sec_cmd_i-status= TODO
+user_sec_cmd_i-help= TODO
+
+user_sec_cmd_j=J) Join a Conference
+user_sec_cmd_j-status= TODO
+user_sec_cmd_j-help= TODO
+
+user_sec_cmd_k=K) Kill a Message
+user_sec_cmd_k-status= TODO
+user_sec_cmd_k-help= TODO
+
+user_sec_cmd_l=L) Locate File Name
+user_sec_cmd_l-status= TODO
+user_sec_cmd_l-help= TODO
+
+user_sec_cmd_m=M) Graphics Mode
+user_sec_cmd_m-status= TODO
+user_sec_cmd_m-help= TODO
+
+user_sec_cmd_n=N) New File Scan
+user_sec_cmd_n-status= TODO
+user_sec_cmd_n-help= TODO
+
+user_sec_cmd_o=O) Operator Page
+user_sec_cmd_o-status= TODO
+user_sec_cmd_o-help= TODO
+
+user_sec_cmd_p=P) Page Length
+user_sec_cmd_p-status= TODO
+user_sec_cmd_p-help= TODO
+
+user_sec_cmd_q=Q) Quick Message Scan
+user_sec_cmd_q-status= TODO
+user_sec_cmd_q-help= TODO
+
+user_sec_cmd_r=R) Read Messages
+user_sec_cmd_r-status= TODO
+user_sec_cmd_r-help= TODO
+
+user_sec_cmd_s=S) Surveys
+user_sec_cmd_s-status= TODO
+user_sec_cmd_s-help= TODO
+
+user_sec_cmd_t=T) Transfer Protocol
+user_sec_cmd_t-status= TODO
+user_sec_cmd_t-help= TODO
+
+user_sec_cmd_u=U) Upload a File
+user_sec_cmd_u-status= TODO
+user_sec_cmd_u-help= TODO
+
+user_sec_cmd_v=V) View Settings
+user_sec_cmd_v-status= TODO
+user_sec_cmd_v-help= TODO
+
+user_sec_cmd_w=W) Write User Info
+user_sec_cmd_w-status= TODO
+user_sec_cmd_w-help= TODO
+
+user_sec_cmd_x=X) Expert Mode Toggle
+user_sec_cmd_x-status= TODO
+user_sec_cmd_x-help= TODO
+
+user_sec_cmd_y=Y) Your Personal Mail
+user_sec_cmd_y-status= TODO
+user_sec_cmd_y-help= TODO
+
+user_sec_cmd_z=Z) Zippy DIR Scan
+user_sec_cmd_z-status= TODO
+user_sec_cmd_z-help= TODO
+
+user_sec_cmd_chat=Group CHAT
+user_sec_cmd_chat-status= TODO
+user_sec_cmd_chat-help= TODO
+
+user_sec_cmd_open_door=OPEN a DOOR
+user_sec_cmd_open_door-status= TODO
+user_sec_cmd_open_door-help= TODO
+
+user_sec_cmd_test_file=TEST a File
+user_sec_cmd_test_file-status= TODO
+user_sec_cmd_test_file-help= TODO
+
+user_sec_cmd_show_user_list=USER Search/Display
+user_sec_cmd_show_user_list-status= TODO
+user_sec_cmd_show_user_list-help= TODO
+
+user_sec_cmd_who=WHO is On Another Node
+user_sec_cmd_who-status= TODO
+user_sec_cmd_who-help= TODO
+
+user_sec_batch_file_transfer=Level Required for BATCH File Transfers
+user_sec_batch_file_transfer-status=TODO
+user_sec_batch_file_transfer-help=TODO
+
+user_sec_edit_own_messages=Level Required to EDIT Your Own Messages
+user_sec_edit_own_messages-status=TODO
+user_sec_edit_own_messages-help=TODO
+
+configuration_options_title=Configuration Options
+configuration_options_messages=Messages
+configuration_options_file_transfer=File Transfers
+configuration_options_system_control=System Control
+configuration_options_config_switches=Configuration Switches
+configuration_options_limits=Limits
+configuration_options_colors=Colors
+configuration_options_func_keys=Function Keys
+
+system_control_title=System Control
+
+disable_ns_logon=Disable NS Logon Feature
+disable_ns_logon-status=Allow to skip reading the WELCOME file.
+disable_ns_logon-help=TODO
+
+is_multi_lingual=Multi-Lingual Operation
+is_multi_lingual-status=Enable Multi-Lingual Operation
+is_multi_lingual-help=TODO
+
+allow_alias_change=Allow Alias Change after Chosen
+allow_alias_change-status=Preventing that avoids problems when leaving messages.
+allow_alias_change-help=TODO
+
+is_closed_board=Run System as a Closed Board
+is_closed_board-status=Disallow new users on the board.
+is_closed_board-help=TODO
+
+enforce_daily_time_limit=Enforce Daily Time Limit
+enforce_daily_time_limit-status=Switch between session and daily time limits.
+enforce_daily_time_limit-help=TODO
+
+allow_password_failure_comment=Allow Password Failure Comment
+allow_password_failure_comment-status=On PW failures message to sysop can be entered.
+allow_password_failure_comment-help=TODO
+
+guard_logoff=Warning on Logoff Command
+guard_logoff-status=Show Warning on 'g' command.
+guard_logoff-help=TODO
+
+
+max_msg_lines=Maximum Lines in the Message Editor
+max_msg_lines-status=Maximum number of lines the user is able to edit in the message editor.
+max_msg_lines-help=TODO
+
+disable_message_scan_prompt=Disable Message Scan Prompt
+disable_message_scan_prompt-status=Scans for messages on sign on or switch conference.
+disable_message_scan_prompt-help=TODO
+
+allow_esc_codes=Allow ESC Codes in Messages
+allow_esc_codes-status=Allow @X-color codes in messages.
+allow_esc_codes-help=TODO
+
+allow_carbon_copy=Allow Carbon-Copy Messages
+allow_carbon_copy-status=Allows the SC command to send messages to multiple users.
+allow_carbon_copy-help=TODO
+
+validate_to_name=Valiadate TO: Name in Messages
+validate_to_name-status=Validate the TO: name in messages.
+validate_to_name-help=TODO
+
+default_quick_personal_scan=Default to (Q)uick on Personal Mail Scan
+default_quick_personal_scan-status=Default to (Q)uick on Personal Mail Scan
+default_quick_personal_scan-help=TODO
+
+default_scan_all_selected_confs_at_login=Default to Scan ALL Conferences at Login
+default_scan_all_selected_confs_at_login-status=On first login scan current or all conferences.
+default_scan_all_selected_confs_at_login-help=TODO
+
+prompt_to_read_mail=Prompt to Read Mail when Mail Waiting
+prompt_to_read_mail-status=Prompt to read a new message addressed to the user.
+prompt_to_read_mail-help=TODO
+
+keyboard_timeout=Keyboard Timeout (in min)
+keyboard_timeout-status=0=disable
+keyboard_timeout-help=TODO
+
+max_number_upload_descr_lines=Max Number of Upload Description Lines
+max_number_upload_descr_lines-status=0=disable
+max_number_upload_descr_lines-help=TODO
+
+password_expire_days=Number Days Before FORCES Password Change
+password_expire_days-status=0=disable
+password_expire_days-help=TODO
+
+password_expire_warn_days=Number Days tow Warn Prior to FORCED Change
+password_expire_warn_days-status=0=disable
+password_expire_warn_days-help=TODO
+
+min_pwd_length=Minimum Password Length
+min_pwd_length-status=TODO
+min_pwd_length-help=TODO
+
+
+disallow_batch_uploads=Disallow BATCH Uploads
+disallow_batch_uploads-status=Disallow BATCH uploads should be avoided.
+disallow_batch_uploads-help=TODO
+
+promote_to_batch_transfers=Promote to Batch Transfer
+promote_to_batch_transfers-status=Auto promote to batch when batch protocol is selected.
+promote_to_batch_transfers-help=TODO
+
+
+upload_credit_time=Upload Credit for Time
+upload_credit_time-status=Default is 1.0 which means 'stop the clock'.
+upload_credit_time-help=TODO
+
+upload_credit_bytes=Upload Credit for Bytes
+upload_credit_bytes-status=Default is 1.0 which means 'stop the clock'.
+upload_credit_bytes-help=TODO
+
+verify_files_uploaded=Verify Files Uploaded
+verify_files_uploaded-status=Verify files uploaded after upload.
+verify_files_uploaded-help=TODO
+
+disable_drive_size_check=Disable Drive Size Check
+disable_drive_size_check-status=That disables the message as well.
+disable_drive_size_check-help=TODO
+
+stop_uploads_free_space=Stop Uploads when Free Space is less than
+stop_uploads_free_space-status=Minimum kb left on drive to allow uploads.
+stop_uploads_free_space-help=TODO
+
+default_graphics_at_login=Default to Graphics At Login
+default_graphics_at_login-status=Set default answer to 'Do you want graphics?' question
+default_graphics_at_login-help=TODO
+
+non_graphics=Usa Non-Graphics Mode Only
+non_graphics-status=Disables all graphics
+non_graphics-help=TODO
+
+exclude_local_calls_stats=Exclude Local Logins from Stats
+exclude_local_calls_stats-status=Disables counting local logins from stats
+exclude_local_calls_stats-help=TODO
+
+display_news_behavior=Display NEWS Only if Changed
+display_news_behavior-status=Y (Always New), N (Once per Day), A (Always)
+display_news_behavior-help=TODO
+
+
+display_userinfo_at_login=User InDisplayfo at Login
+display_userinfo_at_login-status=Display (V)iew Stats on login.
+display_userinfo_at_login-help=TODO
+
+force_intro_on_join=Force INTRO Display on Join
+force_intro_on_join-status=Force INTRO display on join.
+force_intro_on_join-help=TODO
+
+scan_new_blt=Scan for New Bulletins
+scan_new_blt-status=Scan for new blt on login.
+scan_new_blt-help=TODO
+
+capture_grp_chat_session=Capture GROUP CHAT Session to Disk
+capture_grp_chat_session-status=CaptLogs GROUP CHAT session
+capture_grp_chat_session-help=TODO
+
+allow_handle_in_grpchat=Allow Handles in GROUP CHAT
+allow_handle_in_grpchat-status=Allow handles in GROUP CHAT
+allow_handle_in_grpchat-help=TODO
+
+# ICBSETUP -> Configuration Options > Colors
+default_color=Default Color
+default_color-status=Default color for text prompts.
+default_color-help=TODO
+
+msg_hdr_date=Header DATE Line
+msg_hdr_date-status=Color for Message Header DATE Line
+msg_hdr_date-help=TODO
+
+msg_hdr_to=Header TO Line
+msg_hdr_to-status=Color for Message Header TO Line
+msg_hdr_to-help=TODO
+
+
+msg_hdr_from=Header FROM Line
+msg_hdr_from-status=Color for Message Header FROM Line
+msg_hdr_from-help=TODO
+
+msg_hdr_subj=Header SUBJ Line
+msg_hdr_subj-status=Color for Message Header SUBJ Line
+msg_hdr_subj-help=TODO
+
+msg_hdr_read=Header READ Line
+msg_hdr_read-status=Color for Message Header READ Line
+msg_hdr_read-help=TODO
+
+msg_hdr_conf=Header CONF Line
+msg_hdr_conf-status=Color for Message Header CONF Line
+msg_hdr_conf-help=TODO
+
+
+file_head=File HEAD Color
+file_head-status=Color for File Header
+file_head-help=TODO
+
+file_name=File NAME Color
+file_name-status=Color for File Name
+file_name-help=TODO
+
+file_size=File SIZE Color
+file_size-status=Color for File Size
+file_size-help=TODO
+
+file_date=File DATE Color
+file_date-status=Color for File Date
+file_date-help=TODO
+
+file_description=File DESCR1 Color
+file_description-status=Color for File first line of Description
+file_description-help=TODO
+
+file_description_low=File DESCR2 Color
+file_description_low-status=Color for File Description
+file_description_low-help=TODO
+
+file_text=File Text Color
+file_text-status=Color for Text in Files
+file_text-help=TODO
+
+file_deleted=File Deleted Color
+file_deleted-status=Color for 'Deleted' in Files
+file_deleted-help=TODO
+

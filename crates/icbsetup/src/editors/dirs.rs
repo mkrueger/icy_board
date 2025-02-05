@@ -1,14 +1,9 @@
-use std::{
-    str::FromStr,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
     icy_board::{
         file_directory::{DirectoryList, FileDirectory, SortDirection, SortOrder},
-        security_expr::SecurityExpression,
-        user_base::Password,
         IcyBoardSerializer,
     },
     Res,
@@ -33,7 +28,7 @@ pub struct DirsEditor<'a> {
     dir_list: Arc<Mutex<DirectoryList>>,
 
     edit_config_state: ConfigMenuState,
-    edit_config: Option<ConfigMenu>,
+    edit_config: Option<ConfigMenu<u32>>,
 }
 
 impl<'a> DirsEditor<'a> {
@@ -141,6 +136,7 @@ impl<'a> Editor for DirsEditor<'a> {
         if let Some(edit_config) = &mut self.edit_config {
             match key.code {
                 KeyCode::Esc => {
+                    /*
                     let Some(selected_item) = self.insert_table.table_state.selected() else {
                         return true;
                     };
@@ -231,7 +227,7 @@ impl<'a> Editor for DirsEditor<'a> {
                                 panic!("Unknown item: {}", item.id);
                             }
                         }
-                    }
+                    }*/
                     self.edit_config = None;
                     return true;
                 }
@@ -278,15 +274,14 @@ impl<'a> Editor for DirsEditor<'a> {
                             return true;
                         };
                         self.edit_config = Some(ConfigMenu {
+                            obj: 0,
+
                             entry: vec![
-                                ConfigEntry::Item(ListItem::new("name", "Name".to_string(), ListValue::Text(25, item.name.to_string())).with_label_width(16)),
-                                ConfigEntry::Item(ListItem::new("path", "Path".to_string(), ListValue::Path(item.path.clone())).with_label_width(16)),
-                                ConfigEntry::Item(
-                                    ListItem::new("password", "Password".to_string(), ListValue::Text(25, item.password.to_string())).with_label_width(16),
-                                ),
+                                ConfigEntry::Item(ListItem::new("Name".to_string(), ListValue::Text(25, item.name.to_string())).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("Path".to_string(), ListValue::Path(item.path.clone())).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("Password".to_string(), ListValue::Text(25, item.password.to_string())).with_label_width(16)),
                                 ConfigEntry::Item(
                                     ListItem::new(
-                                        "sort_order",
                                         "Sort".to_string(),
                                         ListValue::ComboBox(ComboBox {
                                             cur_value: ComboBoxValue::new(format!("{:?}", item.sort_order), format!("{:?}", item.sort_order)),
@@ -300,46 +295,22 @@ impl<'a> Editor for DirsEditor<'a> {
                                     .with_label_width(16),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(
-                                        "sort_direction",
-                                        "Sort ascending".to_string(),
-                                        ListValue::Bool(item.sort_direction == SortDirection::Ascending),
-                                    )
-                                    .with_label_width(16),
+                                    ListItem::new("Sort ascending".to_string(), ListValue::Bool(item.sort_direction == SortDirection::Ascending))
+                                        .with_label_width(16),
+                                ),
+                                ConfigEntry::Item(ListItem::new("Has New Files".to_string(), ListValue::Bool(item.has_new_files)).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("Is Read-Only".to_string(), ListValue::Bool(item.is_readonly)).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("Is Free".to_string(), ListValue::Bool(item.is_free)).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("Allow Upload Password".to_string(), ListValue::Bool(item.allow_ul_pwd)).with_label_width(16)),
+                                ConfigEntry::Item(
+                                    ListItem::new("List Security".to_string(), ListValue::Text(25, item.list_security.to_string())).with_label_width(16),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new("has_new_files", "Has New Files".to_string(), ListValue::Bool(item.has_new_files)).with_label_width(16),
+                                    ListItem::new("Download Security".to_string(), ListValue::Text(25, item.download_security.to_string()))
+                                        .with_label_width(16),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new("is_readonly", "Is Read-Only".to_string(), ListValue::Bool(item.is_readonly)).with_label_width(16),
-                                ),
-                                ConfigEntry::Item(ListItem::new("is_free", "Is Free".to_string(), ListValue::Bool(item.is_free)).with_label_width(16)),
-                                ConfigEntry::Item(
-                                    ListItem::new("allow_ul_pwd", "Allow Upload Password".to_string(), ListValue::Bool(item.allow_ul_pwd)).with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new(
-                                        "list_security",
-                                        "List Security".to_string(),
-                                        ListValue::Text(25, item.list_security.to_string()),
-                                    )
-                                    .with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new(
-                                        "download_security",
-                                        "Download Security".to_string(),
-                                        ListValue::Text(25, item.download_security.to_string()),
-                                    )
-                                    .with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new(
-                                        "upload_security",
-                                        "Upload Security".to_string(),
-                                        ListValue::Text(25, item.upload_security.to_string()),
-                                    )
-                                    .with_label_width(16),
+                                    ListItem::new("Upload Security".to_string(), ListValue::Text(25, item.upload_security.to_string())).with_label_width(16),
                                 ),
                             ],
                         });

@@ -177,7 +177,6 @@ impl ConferencesTab {
         let items = vec![
             ConfigEntry::Item(
                 ListItem::new(
-                    "name",
                     format!("Name (#{})", self.table_state.selected().unwrap() + 1),
                     ListValue::Text(25, conf.name.clone()),
                 )
@@ -186,10 +185,9 @@ impl ConferencesTab {
             ConfigEntry::Table(
                 2,
                 vec![
-                    ConfigEntry::Item(ListItem::new("is_public", "Public Conference".to_string(), ListValue::Bool(conf.is_public))),
+                    ConfigEntry::Item(ListItem::new( "Public Conference".to_string(), ListValue::Bool(conf.is_public))),
                     ConfigEntry::Item(
                         ListItem::new(
-                            "req_sec",
                             "Req. Security if Public".to_string(),
                             ListValue::Text(50, conf.required_security.to_string()),
                         )
@@ -199,7 +197,6 @@ impl ConferencesTab {
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "password",
                     "Password to Join if Private".to_string(),
                     ListValue::Text(25, conf.password.to_string()),
                 )
@@ -207,15 +204,14 @@ impl ConferencesTab {
             ),
             ConfigEntry::Separator,
             ConfigEntry::Item(
-                ListItem::new("users_menu", "Name/Loc of User's Menu".to_string(), ListValue::Path(conf.users_menu.clone())).with_label_width(28),
+                ListItem::new( "Name/Loc of User's Menu".to_string(), ListValue::Path(conf.users_menu.clone())).with_label_width(28),
             ),
             ConfigEntry::Item(
-                ListItem::new("sysop_menu", "Name/Loc of Sysop's Menu".to_string(), ListValue::Path(conf.sysop_menu.clone())).with_label_width(28),
+                ListItem::new( "Name/Loc of Sysop's Menu".to_string(), ListValue::Path(conf.sysop_menu.clone())).with_label_width(28),
             ),
-            ConfigEntry::Item(ListItem::new("news_file", "Name/Loc of NEWS File".to_string(), ListValue::Path(conf.news_file.clone())).with_label_width(28)),
+            ConfigEntry::Item(ListItem::new( "Name/Loc of NEWS File".to_string(), ListValue::Path(conf.news_file.clone())).with_label_width(28)),
             ConfigEntry::Item(
                 ListItem::new(
-                    "intro_file",
                     "Name/Loc of Conf INTRO File".to_string(),
                     ListValue::Path(conf.intro_file.clone()),
                 )
@@ -223,17 +219,15 @@ impl ConferencesTab {
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "attachment_location",
                     "Location for Attachments".to_string(),
                     ListValue::Path(conf.attachment_location.clone()),
                 )
                 .with_label_width(28),
             ),
-            ConfigEntry::Item(ListItem::new("command_file", "Conf. CMD.LST File".to_string(), ListValue::Path(conf.command_file.clone())).with_label_width(28)),
+            ConfigEntry::Item(ListItem::new( "Conf. CMD.LST File".to_string(), ListValue::Path(conf.command_file.clone())).with_label_width(28)),
             ConfigEntry::Separator,
             ConfigEntry::Item(
                 ListItem::new(
-                    "pub_upload_location",
                     "Public Up Path".to_string(),
                     ListValue::Path(conf.pub_upload_location.clone()),
                 )
@@ -241,7 +235,6 @@ impl ConferencesTab {
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "priv_upload_location",
                     "Private Up Path".to_string(),
                     ListValue::Path(conf.private_upload_location.clone()),
                 )
@@ -251,16 +244,16 @@ impl ConferencesTab {
             ConfigEntry::Table(
                 2,
                 vec![
-                    ConfigEntry::Item(ListItem::new("doors_menu", "Doors".to_string(), ListValue::Path(conf.doors_menu.clone())).with_label_width(12)),
-                    ConfigEntry::Item(ListItem::new("doors_file", "".to_string(), ListValue::Path(conf.doors_file.clone()))),
-                    ConfigEntry::Item(ListItem::new("blt_menu", "Bulletins".to_string(), ListValue::Path(conf.blt_menu.clone())).with_label_width(12)),
-                    ConfigEntry::Item(ListItem::new("blt_file", "".to_string(), ListValue::Path(conf.blt_file.clone()))),
-                    ConfigEntry::Item(ListItem::new("survey_menu", "Surveys".to_string(), ListValue::Path(conf.survey_menu.clone())).with_label_width(12)),
-                    ConfigEntry::Item(ListItem::new("survey_file", "".to_string(), ListValue::Path(conf.survey_file.clone()))),
-                    ConfigEntry::Item(ListItem::new("dir_menu", "Directories".to_string(), ListValue::Path(conf.dir_menu.clone())).with_label_width(12)),
-                    ConfigEntry::Item(ListItem::new("dir_file", "".to_string(), ListValue::Path(conf.dir_file.clone()))),
-                    ConfigEntry::Item(ListItem::new("area_menu", "Areas".to_string(), ListValue::Path(conf.area_menu.clone())).with_label_width(12)),
-                    ConfigEntry::Item(ListItem::new("area_file", "".to_string(), ListValue::Path(conf.area_file.clone()))),
+                    ConfigEntry::Item(ListItem::new( "Doors".to_string(), ListValue::Path(conf.doors_menu.clone())).with_label_width(12)),
+                    ConfigEntry::Item(ListItem::new( "".to_string(), ListValue::Path(conf.doors_file.clone()))),
+                    ConfigEntry::Item(ListItem::new( "Bulletins".to_string(), ListValue::Path(conf.blt_menu.clone())).with_label_width(12)),
+                    ConfigEntry::Item(ListItem::new( "".to_string(), ListValue::Path(conf.blt_file.clone()))),
+                    ConfigEntry::Item(ListItem::new( "Surveys".to_string(), ListValue::Path(conf.survey_menu.clone())).with_label_width(12)),
+                    ConfigEntry::Item(ListItem::new( "".to_string(), ListValue::Path(conf.survey_file.clone()))),
+                    ConfigEntry::Item(ListItem::new( "Directories".to_string(), ListValue::Path(conf.dir_menu.clone())).with_label_width(12)),
+                    ConfigEntry::Item(ListItem::new( "".to_string(), ListValue::Path(conf.dir_file.clone()))),
+                    ConfigEntry::Item(ListItem::new( "Areas".to_string(), ListValue::Path(conf.area_menu.clone())).with_label_width(12)),
+                    ConfigEntry::Item(ListItem::new( "".to_string(), ListValue::Path(conf.area_file.clone()))),
                 ],
             ),
         ];

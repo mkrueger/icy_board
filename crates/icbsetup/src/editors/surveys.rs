@@ -1,12 +1,8 @@
-use std::{
-    str::FromStr,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
     icy_board::{
-        security_expr::SecurityExpression,
         surveys::{Survey, SurveyList},
         IcyBoardSerializer,
     },
@@ -33,7 +29,7 @@ pub struct SurveyEditor<'a> {
     surveys: Arc<Mutex<Vec<Survey>>>,
 
     edit_config_state: ConfigMenuState,
-    edit_config: Option<ConfigMenu>,
+    edit_config: Option<ConfigMenu<u32>>,
 }
 
 impl<'a> SurveyEditor<'a> {
@@ -138,6 +134,7 @@ impl<'a> Editor for SurveyEditor<'a> {
         if let Some(edit_config) = &mut self.edit_config {
             match key.code {
                 KeyCode::Esc => {
+                    /*
                     let Some(selected_item) = self.insert_table.table_state.selected() else {
                         return true;
                     };
@@ -164,7 +161,7 @@ impl<'a> Editor for SurveyEditor<'a> {
                                 panic!("Unknown item: {}", item.id);
                             }
                         }
-                    }
+                    }*/
                     self.edit_config = None;
                     return true;
                 }
@@ -208,16 +205,12 @@ impl<'a> Editor for SurveyEditor<'a> {
                             return true;
                         };
                         self.edit_config = Some(ConfigMenu {
+                            obj: 0,
                             entry: vec![
+                                ConfigEntry::Item(ListItem::new("Survey File".to_string(), ListValue::Path(action.survey_file.clone())).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("Answer File".to_string(), ListValue::Path(action.answer_file.clone())).with_label_width(16)),
                                 ConfigEntry::Item(
-                                    ListItem::new("survey", "Survey File".to_string(), ListValue::Path(action.survey_file.clone())).with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new("answer", "Answer File".to_string(), ListValue::Path(action.answer_file.clone())).with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new("security", "Security".to_string(), ListValue::Text(25, action.required_security.to_string()))
-                                        .with_label_width(16),
+                                    ListItem::new("Security".to_string(), ListValue::Text(25, action.required_security.to_string())).with_label_width(16),
                                 ),
                             ],
                         });

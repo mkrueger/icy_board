@@ -45,7 +45,7 @@ impl PcbBoardCommand {
         self.state.new_line().await?;
 
         let mut tries = 0;
-        if !is_local && self.state.get_board().await.config.options.allow_iemsi {
+        if !is_local && self.state.get_board().await.config.board.allow_iemsi {
             let (name, location, operator, notice, caps) = {
                 let board = self.state.get_board().await;
                 (
@@ -191,7 +191,7 @@ impl PcbBoardCommand {
     async fn new_user(&mut self) -> Res<bool> {
         let mut tries = 0;
 
-        if self.state.get_board().await.config.options.is_closed_board {
+        if self.state.get_board().await.config.system_control.is_closed_board {
             self.newask_questions().await?;
             log::info!("New user registration for {} attempted on closed board.", self.state.session.user_name);
             self.state.display_text(IceText::ClosedBoard, display_flags::NEWLINE).await?;
@@ -224,7 +224,7 @@ impl PcbBoardCommand {
                 new_user.password.password = Password::PlainText(pw1);
                 break;
             }
-            let exp_days = self.state.get_board().await.config.user_password_policy.password_expire_days;
+            let exp_days = self.state.get_board().await.config.limits.password_expire_days;
             if exp_days > 0 {
                 new_user.password.expire_date = Utc::now() + chrono::Duration::days(exp_days as i64);
             }
@@ -239,14 +239,14 @@ impl PcbBoardCommand {
                 new_user.city_or_state = city_or_state;
             }
 
-            if settings.ask_bus_data_phone && self.state.display_text.has_text(IceText::BusDataPhone) {
+            if settings.ask_business_phone && self.state.display_text.has_text(IceText::BusDataPhone) {
                 let Some(bus_data_phone) = self.input_required(IceText::BusDataPhone, &MASK_PHONE, 13, 0).await? else {
                     return Ok(false);
                 };
                 new_user.bus_data_phone = bus_data_phone;
             }
 
-            if settings.ask_voice_phone && self.state.display_text.has_text(IceText::HomeVoicePhone) {
+            if settings.ask_home_phone && self.state.display_text.has_text(IceText::HomeVoicePhone) {
                 let Some(home_voice_phone) = self.input_required(IceText::HomeVoicePhone, &MASK_PHONE, 13, 0).await? else {
                     return Ok(false);
                 };
@@ -582,9 +582,9 @@ impl PcbBoardCommand {
                     return Ok(false);
                 }
 
-                let days = self.state.get_board().await.config.user_password_policy.password_expire_warn_days as i64;
+                let days = self.state.get_board().await.config.limits.password_expire_warn_days as i64;
 
-                if user.password.expire_date + chrono::Duration::days(days) > today {
+                if days > 0 && user.password.expire_date + chrono::Duration::days(days) > today {
                     self.state.session.op_text = (user.password.expire_date + chrono::Duration::days(days) - today).num_days().to_string();
                     self.state
                         .display_text(IceText::PasswordWillExpired, display_flags::NEWLINE | display_flags::LFBEFORE)
@@ -638,7 +638,7 @@ impl PcbBoardCommand {
             };
 
             if pw1 == pw2 {
-                let exp_days = self.state.get_board().await.config.user_password_policy.password_expire_days;
+                let exp_days = self.state.get_board().await.config.limits.password_expire_days;
                 if let Some(cur_user) = &mut self.state.session.current_user {
                     cur_user.password.password = Password::PlainText(pw1);
                     if exp_days > 0 {

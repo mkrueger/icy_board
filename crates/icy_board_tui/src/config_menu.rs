@@ -115,38 +115,49 @@ pub enum ListValue {
     ComboBox(ComboBox),
     Text(u16, String),
     Path(PathBuf),
+    /// value, min, max
     U32(u32, u32, u32),
+    /// float = u32/100
+    PseudoFloat(u32),
     Bool(bool),
     Color(IcbColor),
     ValueList(String, Vec<Value>),
     Position(Box<dyn Fn(&mut Frame, &Position)>, Box<dyn Fn(KeyEvent, &Position) -> Position>, Position),
 }
 
-pub struct ListItem {
-    pub id: String,
+pub struct ListItem<T> {
     title: String,
     label_width: u16,
     label_alignment: Alignment,
     pub status: String,
     pub text_field_state: TextfieldState,
     pub value: ListValue,
+    pub help: String,
+
+    pub update_value: Option<Box<dyn Fn(&T, &ListValue) -> ()>>,
 }
 
-impl ListItem {
-    pub fn new(id: &str, title: String, value: ListValue) -> Self {
+impl<T> ListItem<T> {
+    pub fn new(title: String, value: ListValue) -> Self {
         Self {
-            id: id.to_string(),
             status: format!("{}", title),
             text_field_state: TextfieldState::default(),
             label_width: title.len() as u16,
             label_alignment: Alignment::Right,
             title,
             value,
+            update_value: None,
+            help: String::new(),
         }
     }
 
     pub fn with_status(mut self, status: &str) -> Self {
         self.status = status.to_string();
+        self
+    }
+
+    pub fn with_help(mut self, help: impl Into<String>) -> Self {
+        self.help = help.into();
         self
     }
 
@@ -157,6 +168,33 @@ impl ListItem {
 
     pub fn with_label_alignment(mut self, alignment: Alignment) -> Self {
         self.label_alignment = alignment;
+        self
+    }
+
+    pub fn with_update_value(mut self, update_value: Box<dyn Fn(&T, &ListValue) -> ()>) -> Self {
+        self.update_value = Some(update_value);
+        self
+    }
+
+    pub fn with_update_text_value(mut self, update_value: &'static dyn Fn(&T, String) -> ()) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+            let ListValue::Text(_, text) = value else {
+                return;
+            };
+            update_value(val, text.clone());
+        });
+        self.update_value = Some(b);
+        self
+    }
+
+    pub fn with_update_bool_value(mut self, update_value: &'static dyn Fn(&T, bool) -> ()) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+            let ListValue::Bool(b) = value else {
+                return;
+            };
+            update_value(val, *b);
+        });
+        self.update_value = Some(b);
         self
     }
 
@@ -192,6 +230,12 @@ impl ListItem {
                 Text::from(u.to_string()).style(get_tui_theme().value).render(area, frame.buffer_mut());
             }
 
+            ListValue::PseudoFloat(u) => {
+                Text::from(((*u as f64) / 100.0).to_string())
+                    .style(get_tui_theme().value)
+                    .render(area, frame.buffer_mut());
+            }
+
             ListValue::Color(color) => match color {
                 IcbColor::None => Text::from("Plain").style(get_tui_theme().value).render(area, frame.buffer_mut()),
                 IcbColor::Dos(u8) => Text::from(format!("@X{:02}", *u8))
@@ -220,7 +264,7 @@ impl ListItem {
         }
     }
 
-    fn render_editor(&mut self, area: Rect, frame: &mut Frame) -> bool {
+    fn render_editor(&mut self, val: &T, area: Rect, frame: &mut Frame) -> bool {
         match &mut self.value {
             ListValue::Text(_edit_len, text) => {
                 let field = TextField::new().with_value(text.to_string());
@@ -238,6 +282,14 @@ impl ListItem {
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
                 self.text_field_state.set_cursor_position(frame);
             }
+            ListValue::PseudoFloat(value) => {
+                let a = *value / 100;
+                let b = *value % 100;
+                let field = TextField::new().with_value(format!("{}.{}", a, b));
+                frame.render_stateful_widget(field, area, &mut self.text_field_state);
+                self.text_field_state.set_cursor_position(frame);
+            }
+
             ListValue::Bool(value) => {
                 let title = if *value { " ✓ " } else { " ☐ " };
                 Text::from(title).style(get_tui_theme().edit_value).render(
@@ -301,6 +353,10 @@ impl ListItem {
                 return false;
             }
         }
+
+        if let Some(update) = self.update_value.as_ref() {
+            update(val, &self.value);
+        }
         true
     }
 
@@ -324,6 +380,13 @@ impl ListItem {
                 let mut text = format!("{}", path.display());
                 self.text_field_state.handle_input(key, &mut text);
                 *path = PathBuf::from(text);
+            }
+            ListValue::PseudoFloat(val) => {
+                let mut text = format!("{}", *val as f64 / 100.0);
+                self.text_field_state.handle_input(key, &mut text);
+                if let Ok(f) = text.parse::<f64>() {
+                    *val = (f * 100.0) as u32;
+                }
             }
             ListValue::U32(cur, min, max) => {
                 let mut text = format!("{}", *cur);
@@ -370,13 +433,14 @@ impl ListItem {
     }*/
 }
 
-pub enum ConfigEntry {
-    Item(ListItem),
-    Group(String, Vec<ConfigEntry>),
-    Table(usize, Vec<ConfigEntry>),
+pub enum ConfigEntry<T> {
+    Item(ListItem<T>),
+    Group(String, Vec<ConfigEntry<T>>),
+    Table(usize, Vec<ConfigEntry<T>>),
     Separator,
 }
-impl ConfigEntry {
+
+impl<T> ConfigEntry<T> {
     fn _title_len(&self) -> u16 {
         match self {
             ConfigEntry::Item(item) => item.title.len() as u16,
@@ -387,8 +451,9 @@ impl ConfigEntry {
     }
 }
 
-pub struct ConfigMenu {
-    pub entry: Vec<ConfigEntry>,
+pub struct ConfigMenu<T> {
+    pub obj: T,
+    pub entry: Vec<ConfigEntry<T>>,
 }
 
 #[derive(Default)]
@@ -402,7 +467,7 @@ pub struct ConfigMenuState {
     pub scroll_state: ScrollbarState,
 }
 
-impl ConfigMenu {
+impl<T> ConfigMenu<T> {
     pub fn render(&mut self, area: Rect, frame: &mut Frame, state: &mut ConfigMenuState) {
         let mut y = 0;
         let mut x = 0;
@@ -410,14 +475,14 @@ impl ConfigMenu {
 
         state.area_height = area.height;
 
-        if !Self::display_list(&mut i, &mut self.entry, area, &mut y, &mut x, frame, state, false) {
+        if !Self::display_list(&self.obj, &mut i, &mut self.entry, area, &mut y, &mut x, frame, state, false) {
             return;
         }
 
         let mut y = 0;
         let mut x = 0;
         let mut i = 0;
-        if !Self::display_list(&mut i, &mut self.entry, area, &mut y, &mut x, frame, state, true) {
+        if !Self::display_list(&self.obj, &mut i, &mut self.entry, area, &mut y, &mut x, frame, state, true) {
             return;
         }
 
@@ -447,12 +512,12 @@ impl ConfigMenu {
         len
     }
 
-    pub fn get_item(&self, i: usize) -> Option<&ListItem> {
+    pub fn get_item(&self, i: usize) -> Option<&ListItem<T>> {
         let mut len = 0;
         Self::get_item_internal(&self.entry, &mut len, i)
     }
 
-    pub fn get_item_internal<'a>(items: &'a Vec<ConfigEntry>, len: &mut usize, i: usize) -> Option<&'a ListItem> {
+    pub fn get_item_internal<'a>(items: &'a Vec<ConfigEntry<T>>, len: &mut usize, i: usize) -> Option<&'a ListItem<T>> {
         for item in items.iter() {
             match item {
                 ConfigEntry::Item(item) => {
@@ -480,12 +545,12 @@ impl ConfigMenu {
         None
     }
 
-    pub fn get_item_mut(&mut self, i: usize) -> Option<&mut ListItem> {
+    pub fn get_item_mut(&mut self, i: usize) -> Option<&mut ListItem<T>> {
         let mut len = 0;
         Self::get_item_internal_mut(&mut self.entry, &mut len, i)
     }
 
-    pub fn get_item_internal_mut<'a>(items: &'a mut Vec<ConfigEntry>, len: &mut usize, i: usize) -> Option<&'a mut ListItem> {
+    pub fn get_item_internal_mut<'a>(items: &'a mut Vec<ConfigEntry<T>>, len: &mut usize, i: usize) -> Option<&'a mut ListItem<T>> {
         for item in items.iter_mut() {
             match item {
                 ConfigEntry::Item(item) => {
@@ -513,7 +578,7 @@ impl ConfigMenu {
         None
     }
 
-    fn count_items(&self, items: &Vec<ConfigEntry>, len: &mut usize) {
+    fn count_items(&self, items: &Vec<ConfigEntry<T>>, len: &mut usize) {
         for item in items.iter() {
             match item {
                 ConfigEntry::Item(_) => {
@@ -531,8 +596,9 @@ impl ConfigMenu {
     }
 
     fn display_table(
+        val: &T,
         i: &mut usize,
-        items: &mut Vec<ConfigEntry>,
+        items: &mut Vec<ConfigEntry<T>>,
         area: Rect,
         y: &mut u16,
         x: &mut u16,
@@ -577,7 +643,7 @@ impl ConfigMenu {
                         };
                         if *i == state.selected {
                             if display_editor {
-                                if !item.render_editor(right_area, frame) {
+                                if !item.render_editor(val, right_area, frame) {
                                     return false;
                                 }
                             }
@@ -605,8 +671,9 @@ impl ConfigMenu {
     }
 
     pub fn display_list(
+        val: &T,
         i: &mut usize,
-        items: &mut Vec<ConfigEntry>,
+        items: &mut Vec<ConfigEntry<T>>,
         area: Rect,
         y: &mut u16,
         x: &mut u16,
@@ -644,7 +711,7 @@ impl ConfigMenu {
                         };
                         if *i == state.selected {
                             if display_editor {
-                                if !item.render_editor(right_area, frame) {
+                                if !item.render_editor(val, right_area, frame) {
                                     return false;
                                 }
                             }
@@ -675,12 +742,12 @@ impl ConfigMenu {
                         }
                         *y += 1;
                     }
-                    if !Self::display_list(i, items, area, y, x, frame, state, display_editor) {
+                    if !Self::display_list(val, i, items, area, y, x, frame, state, display_editor) {
                         return false;
                     }
                 }
                 ConfigEntry::Table(_cols, items) => {
-                    if !Self::display_table(i, items, area, y, x, frame, state, display_editor) {
+                    if !Self::display_table(val, i, items, area, y, x, frame, state, display_editor) {
                         return false;
                     }
                 }
@@ -749,7 +816,7 @@ impl ConfigMenu {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &ListItem> {
+    pub fn iter(&self) -> impl Iterator<Item = &ListItem<T>> {
         ConfigMenuIter { iter: vec![self.entry.iter()] }
     }
 
@@ -761,11 +828,11 @@ impl ConfigMenu {
     }
 }
 
-struct ConfigMenuIter<'a> {
-    iter: Vec<std::slice::Iter<'a, ConfigEntry>>,
+struct ConfigMenuIter<'a, T> {
+    iter: Vec<std::slice::Iter<'a, ConfigEntry<T>>>,
 }
-impl<'a> Iterator for ConfigMenuIter<'a> {
-    type Item = &'a ListItem;
+impl<'a, T> Iterator for ConfigMenuIter<'a, T> {
+    type Item = &'a ListItem<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let Some(mut l) = self.iter.pop() else {

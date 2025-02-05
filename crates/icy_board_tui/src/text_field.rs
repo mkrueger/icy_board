@@ -135,7 +135,7 @@ impl TextField {
             value: String::new(),
             text_style: get_tui_theme().text_field_text,
             background_style: get_tui_theme().text_field_background,
-            background_symbol: '▒',
+            background_symbol: get_tui_theme().text_field_filler_char,
         }
     }
 

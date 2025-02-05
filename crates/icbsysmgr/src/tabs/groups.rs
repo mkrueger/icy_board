@@ -33,7 +33,7 @@ pub struct GroupsTab {
     _old_groups: GroupList,
     in_edit_mode: bool,
 
-    conference_config: ConfigMenu,
+    conference_config: ConfigMenu<u32>,
     state: ConfigMenuState,
     edit_conference: usize,
 }
@@ -47,7 +47,7 @@ impl GroupsTab {
             icy_board: icy_board.clone(),
             _old_groups: old_groups,
             in_edit_mode: false,
-            conference_config: ConfigMenu { entry: vec![] },
+            conference_config: ConfigMenu { obj: 0, entry: vec![] },
             state: ConfigMenuState::default(),
             edit_conference: 0,
         }
@@ -175,23 +175,10 @@ impl GroupsTab {
         let ib = self.icy_board.lock().unwrap();
         let group = ib.groups.get(index).unwrap();
         let items = vec![
-            ConfigEntry::Item(ListItem::new("name", "Name".to_string(), ListValue::Text(60, group.name.to_string())).with_label_width(14)),
-            ConfigEntry::Item(ListItem::new("members", "Members".to_string(), ListValue::Text(60, group.members.join(",").to_string())).with_label_width(14)),
+            ConfigEntry::Item(ListItem::new("Name".to_string(), ListValue::Text(60, group.name.to_string())).with_label_width(14)),
+            ConfigEntry::Item(ListItem::new("Members".to_string(), ListValue::Text(60, group.members.join(",").to_string())).with_label_width(14)),
         ];
         self.conference_config.entry = items;
-    }
-
-    fn write_item(&self, item: &ListItem, group: &mut Group) {
-        match &item.value {
-            ListValue::Text(_, text) => match item.id.as_str() {
-                "name" => group.name = text.clone(),
-                "members" => {
-                    group.members = text.split(',').map(|s| s.trim().to_string()).collect();
-                }
-                _ => panic!("Unknown id: {}", item.id),
-            },
-            _ => todo!(),
-        }
     }
 
     fn save_groups(&self) {
@@ -249,11 +236,7 @@ impl TabPage for GroupsTab {
                 }
                 _ => {
                     self.conference_config.handle_key_press(key, &mut self.state);
-                    if let Some(group) = self.icy_board.lock().unwrap().groups.get_mut(self.edit_conference) {
-                        for item in self.conference_config.iter() {
-                            self.write_item(item, group);
-                        }
-                    }
+
                     self.save_groups();
                 }
             }

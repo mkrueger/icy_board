@@ -2,11 +2,8 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::vec;
 
-use chrono::DateTime;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
-use icy_board_engine::icy_board::user_base::Password;
-use icy_board_engine::icy_board::user_base::User;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::config_menu::ConfigEntry;
 use icy_board_tui::config_menu::ConfigMenu;
@@ -33,7 +30,7 @@ pub struct UsersTab {
 
     in_edit_mode: bool,
 
-    conference_config: ConfigMenu,
+    conference_config: ConfigMenu<u32>,
     state: ConfigMenuState,
     edit_conference: usize,
 }
@@ -47,7 +44,7 @@ impl UsersTab {
             table_state: TableState::default().with_selected(0),
             icy_board: icy_board.clone(),
             in_edit_mode: false,
-            conference_config: ConfigMenu { entry: items },
+            conference_config: ConfigMenu { obj: 0, entry: items },
             state: ConfigMenuState::default(),
             edit_conference: 0,
         }
@@ -182,163 +179,60 @@ impl UsersTab {
             ConfigEntry::Group(
                 "Form".to_string(),
                 vec![
-                    ConfigEntry::Item(ListItem::new("name", "Name".to_string(), ListValue::Text(25, user.name.clone())).with_label_width(14)),
-                    ConfigEntry::Item(ListItem::new("alias", "Alias".to_string(), ListValue::Text(25, user.alias.clone())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Name".to_string(), ListValue::Text(25, user.name.clone())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Alias".to_string(), ListValue::Text(25, user.alias.clone())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("B/D Phone".to_string(), ListValue::Text(25, user.bus_data_phone.clone())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("H/V Phone".to_string(), ListValue::Text(25, user.home_voice_phone.clone())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Password".to_string(), ListValue::Text(25, user.password.password.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Security".to_string(), ListValue::U32(user.security_level as u32, 0, 255)).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Verify answer".to_string(), ListValue::Text(25, user.verify_answer.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("City/State".to_string(), ListValue::Text(25, user.city_or_state.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Expert".to_string(), ListValue::Bool(user.flags.expert_mode)).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Protocol".to_string(), ListValue::Text(2, user.protocol.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Page Len".to_string(), ListValue::U32(user.page_len as u32, 0, 255)).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Msg Clear".to_string(), ListValue::Bool(user.flags.msg_clear)).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Scroll Msgs".to_string(), ListValue::Bool(user.flags.scroll_msg_body)).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Short Desc".to_string(), ListValue::Bool(user.flags.use_short_filedescr)).with_label_width(14)),
                     ConfigEntry::Item(
-                        ListItem::new("bus_data_phone", "B/D Phone".to_string(), ListValue::Text(25, user.bus_data_phone.clone())).with_label_width(14),
+                        ListItem::new("Last in".to_string(), ListValue::U32(user.last_conference as u32, 0, u16::MAX as u32)).with_label_width(14),
                     ),
-                    ConfigEntry::Item(
-                        ListItem::new("home_voice_phone", "H/V Phone".to_string(), ListValue::Text(25, user.home_voice_phone.clone())).with_label_width(14),
-                    ),
-                    ConfigEntry::Item(
-                        ListItem::new("password", "Password".to_string(), ListValue::Text(25, user.password.password.to_string())).with_label_width(14),
-                    ),
-                    ConfigEntry::Item(
-                        ListItem::new("security", "Security".to_string(), ListValue::U32(user.security_level as u32, 0, 255)).with_label_width(14),
-                    ),
-                    ConfigEntry::Item(
-                        ListItem::new(
-                            "verify_answer",
-                            "Verify answer".to_string(),
-                            ListValue::Text(25, user.verify_answer.to_string()),
-                        )
-                        .with_label_width(14),
-                    ),
-                    ConfigEntry::Item(
-                        ListItem::new("city_state", "City/State".to_string(), ListValue::Text(25, user.city_or_state.to_string())).with_label_width(14),
-                    ),
-                    ConfigEntry::Item(ListItem::new("expert_mode", "Expert".to_string(), ListValue::Bool(user.flags.expert_mode)).with_label_width(14)),
-                    ConfigEntry::Item(ListItem::new("protocol", "Protocol".to_string(), ListValue::Text(2, user.protocol.to_string())).with_label_width(14)),
-                    ConfigEntry::Item(ListItem::new("page_len", "Page Len".to_string(), ListValue::U32(user.page_len as u32, 0, 255)).with_label_width(14)),
-                    ConfigEntry::Item(ListItem::new("msg_clear", "Msg Clear".to_string(), ListValue::Bool(user.flags.msg_clear)).with_label_width(14)),
-                    ConfigEntry::Item(
-                        ListItem::new("scroll_msg_body", "Scroll Msgs".to_string(), ListValue::Bool(user.flags.scroll_msg_body)).with_label_width(14),
-                    ),
-                    ConfigEntry::Item(
-                        ListItem::new("use_short_filedescr", "Short Desc".to_string(), ListValue::Bool(user.flags.use_short_filedescr)).with_label_width(14),
-                    ),
-                    ConfigEntry::Item(
-                        ListItem::new(
-                            "last_conference",
-                            "Last in".to_string(),
-                            ListValue::U32(user.last_conference as u32, 0, u16::MAX as u32),
-                        )
-                        .with_label_width(14),
-                    ),
-                    ConfigEntry::Item(ListItem::new("delete_flag", "Delete User".to_string(), ListValue::Bool(user.flags.delete_flag)).with_label_width(14)),
-                    ConfigEntry::Item(
-                        ListItem::new("user_comment", "Comment1".to_string(), ListValue::Text(60, user.user_comment.to_string())).with_label_width(14),
-                    ),
-                    ConfigEntry::Item(
-                        ListItem::new("sysop_comment", "Comment2".to_string(), ListValue::Text(60, user.sysop_comment.to_string())).with_label_width(14),
-                    ),
+                    ConfigEntry::Item(ListItem::new("Delete User".to_string(), ListValue::Bool(user.flags.delete_flag)).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Comment1".to_string(), ListValue::Text(60, user.user_comment.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Comment2".to_string(), ListValue::Text(60, user.sysop_comment.to_string())).with_label_width(14)),
                 ],
             ),
             ConfigEntry::Group(
                 "Address Form".to_string(),
                 vec![
-                    ConfigEntry::Item(ListItem::new("street1", "Address #1".to_string(), ListValue::Text(25, user.street1.to_string())).with_label_width(14)),
-                    ConfigEntry::Item(ListItem::new("street2", "Address #2".to_string(), ListValue::Text(25, user.street2.to_string())).with_label_width(14)),
-                    ConfigEntry::Item(ListItem::new("city", "City".to_string(), ListValue::Text(25, user.city.to_string())).with_label_width(14)),
-                    ConfigEntry::Item(ListItem::new("state", "State".to_string(), ListValue::Text(25, user.state.to_string())).with_label_width(14)),
-                    ConfigEntry::Item(ListItem::new("zip_code", "Zip Code".to_string(), ListValue::Text(25, user.zip.to_string())).with_label_width(14)),
-                    ConfigEntry::Item(ListItem::new("country", "Country".to_string(), ListValue::Text(25, user.country.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Address #1".to_string(), ListValue::Text(25, user.street1.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Address #2".to_string(), ListValue::Text(25, user.street2.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("City".to_string(), ListValue::Text(25, user.city.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("State".to_string(), ListValue::Text(25, user.state.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Zip Code".to_string(), ListValue::Text(25, user.zip.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Country".to_string(), ListValue::Text(25, user.country.to_string())).with_label_width(14)),
                 ],
             ),
             ConfigEntry::Group(
                 "Caller Notes".to_string(),
                 vec![
-                    ConfigEntry::Item(
-                        ListItem::new("custom_comment1", "Line 1".to_string(), ListValue::Text(60, user.custom_comment1.to_string())).with_label_width(14),
-                    ),
-                    ConfigEntry::Item(
-                        ListItem::new("custom_comment2", "Line 2".to_string(), ListValue::Text(60, user.custom_comment2.to_string())).with_label_width(14),
-                    ),
-                    ConfigEntry::Item(
-                        ListItem::new("custom_comment3", "Line 3".to_string(), ListValue::Text(60, user.custom_comment3.to_string())).with_label_width(14),
-                    ),
-                    ConfigEntry::Item(
-                        ListItem::new("custom_comment4", "Line 4".to_string(), ListValue::Text(60, user.custom_comment4.to_string())).with_label_width(14),
-                    ),
-                    ConfigEntry::Item(
-                        ListItem::new("custom_comment5", "Line 5".to_string(), ListValue::Text(60, user.custom_comment5.to_string())).with_label_width(14),
-                    ),
+                    ConfigEntry::Item(ListItem::new("Line 1".to_string(), ListValue::Text(60, user.custom_comment1.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Line 2".to_string(), ListValue::Text(60, user.custom_comment2.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Line 3".to_string(), ListValue::Text(60, user.custom_comment3.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Line 4".to_string(), ListValue::Text(60, user.custom_comment4.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Line 5".to_string(), ListValue::Text(60, user.custom_comment5.to_string())).with_label_width(14)),
                 ],
             ),
             ConfigEntry::Group(
                 "Personal".to_string(),
                 vec![
-                    ConfigEntry::Item(ListItem::new("gender", "Gender".to_string(), ListValue::Text(60, user.gender.to_string())).with_label_width(14)),
-                    ConfigEntry::Item(
-                        ListItem::new("birth_date", "Birthdate".to_string(), ListValue::Text(60, user.birth_date.to_string())).with_label_width(14),
-                    ),
-                    ConfigEntry::Item(ListItem::new("email", "Email Address".to_string(), ListValue::Text(60, user.email.to_string())).with_label_width(14)),
-                    ConfigEntry::Item(ListItem::new("web", "Web Address".to_string(), ListValue::Text(60, user.web.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Gender".to_string(), ListValue::Text(60, user.gender.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Birthdate".to_string(), ListValue::Text(60, user.birth_date.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Email Address".to_string(), ListValue::Text(60, user.email.to_string())).with_label_width(14)),
+                    ConfigEntry::Item(ListItem::new("Web Address".to_string(), ListValue::Text(60, user.web.to_string())).with_label_width(14)),
                 ],
             ),
         ];
         self.conference_config.entry = items;
-    }
-
-    fn write_item(&self, item: &ListItem, user: &mut User) {
-        match &item.value {
-            ListValue::Text(_, text) => match item.id.as_str() {
-                "name" => user.name = text.clone(),
-                "alias" => user.alias = text.clone(),
-                "bus_data_phone" => user.bus_data_phone = text.clone(),
-                "home_voice_phone" => user.home_voice_phone = text.clone(),
-                "password" => user.password.password = Password::PlainText(text.clone()),
-                "security" => user.security_level = text.parse().unwrap(),
-                "protocol" => user.protocol = text.parse().unwrap(),
-                "user_comment" => user.user_comment = text.clone(),
-                "sysop_comment" => user.sysop_comment = text.clone(),
-                "custom_comment1" => user.custom_comment1 = text.clone(),
-                "custom_comment2" => user.custom_comment2 = text.clone(),
-                "custom_comment3" => user.custom_comment3 = text.clone(),
-                "custom_comment4" => user.custom_comment4 = text.clone(),
-                "custom_comment5" => user.custom_comment5 = text.clone(),
-
-                "gender" => user.gender = text.clone(),
-                "birth_date" => {
-                    if let Ok(dt) = DateTime::parse_from_rfc3339(text) {
-                        user.birth_date = dt.to_utc();
-                    }
-                }
-                "email" => user.email = text.clone(),
-                "web" => user.web = text.clone(),
-
-                "verify_answer" => user.verify_answer = text.clone(),
-                "city_state" => user.city_or_state = text.clone(),
-
-                "street1" => user.street1 = text.clone(),
-                "street2" => user.street2 = text.clone(),
-                "city" => user.city = text.clone(),
-                "state" => user.state = text.clone(),
-                "zip_code" => user.zip = text.clone(),
-                "country" => user.country = text.clone(),
-
-                _ => panic!("Unknown id: {}", item.id),
-            },
-            ListValue::Path(_path) => match item.id.as_str() {
-                _ => panic!("Unknown id: {}", item.id),
-            },
-            ListValue::Bool(b) => match item.id.as_str() {
-                "expert_mode" => user.flags.expert_mode = *b,
-                "msg_clear" => user.flags.msg_clear = *b,
-                "scroll_msg_body" => user.flags.scroll_msg_body = *b,
-                "use_short_filedescr" => user.flags.use_short_filedescr = *b,
-                "delete_flag" => user.flags.delete_flag = *b,
-                _ => panic!("Unknown id: {}", item.id),
-            },
-
-            ListValue::U32(val, _, _) => match item.id.as_str() {
-                "security" => user.security_level = *val as u8,
-                "last_conference" => user.last_conference = *val as u16,
-                "page_len" => user.page_len = *val as u16,
-                _ => panic!("Unknown id: {}", item.id),
-            },
-            _ => panic!("Unknown id: {}", item.id),
-        }
     }
 }
 
@@ -392,9 +286,6 @@ impl TabPage for UsersTab {
                     self.conference_config.handle_key_press(key, &mut self.state);
                     let home_dir = self.icy_board.lock().unwrap().config.paths.home_dir.clone();
                     if let Some(user) = self.icy_board.lock().unwrap().users.get_mut(self.edit_conference) {
-                        for item in self.conference_config.iter() {
-                            self.write_item(item, user);
-                        }
                         let _ = user.save(&home_dir);
                     }
                 }

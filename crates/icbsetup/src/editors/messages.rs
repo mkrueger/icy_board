@@ -1,13 +1,9 @@
-use std::{
-    str::FromStr,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
     icy_board::{
         message_area::{AreaList, MessageArea},
-        security_expr::SecurityExpression,
         IcyBoardSerializer,
     },
     Res,
@@ -32,7 +28,7 @@ pub struct MessageAreasEditor<'a> {
     dir_list: Arc<Mutex<AreaList>>,
 
     edit_config_state: ConfigMenuState,
-    edit_config: Option<ConfigMenu>,
+    edit_config: Option<ConfigMenu<u32>>,
 }
 
 impl<'a> MessageAreasEditor<'a> {
@@ -136,6 +132,7 @@ impl<'a> Editor for MessageAreasEditor<'a> {
         if let Some(edit_config) = &mut self.edit_config {
             match key.code {
                 KeyCode::Esc => {
+                    /*
                     let Some(selected_item) = self.insert_table.table_state.selected() else {
                         return true;
                     };
@@ -187,7 +184,7 @@ impl<'a> Editor for MessageAreasEditor<'a> {
                                 panic!("Unknown item: {}", item.id);
                             }
                         }
-                    }
+                    }*/
                     self.edit_config = None;
                     return true;
                 }
@@ -229,38 +226,21 @@ impl<'a> Editor for MessageAreasEditor<'a> {
                             return true;
                         };
                         self.edit_config = Some(ConfigMenu {
+                            obj: 0,
                             entry: vec![
-                                ConfigEntry::Item(ListItem::new("name", "Name".to_string(), ListValue::Text(25, item.name.to_string())).with_label_width(16)),
-                                ConfigEntry::Item(ListItem::new("filename", "File".to_string(), ListValue::Path(item.filename.clone())).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("Name".to_string(), ListValue::Text(25, item.name.to_string())).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("File".to_string(), ListValue::Path(item.filename.clone())).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("Is Read-Only".to_string(), ListValue::Bool(item.is_read_only)).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("Allow Aliases".to_string(), ListValue::Bool(item.allow_aliases)).with_label_width(16)),
                                 ConfigEntry::Item(
-                                    ListItem::new("is_readonly", "Is Read-Only".to_string(), ListValue::Bool(item.is_read_only)).with_label_width(16),
+                                    ListItem::new("List Security".to_string(), ListValue::Text(25, item.req_level_to_list.to_string())).with_label_width(16),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new("allow_aliases", "Allow Aliases".to_string(), ListValue::Bool(item.allow_aliases)).with_label_width(16),
+                                    ListItem::new("Enter Security".to_string(), ListValue::Text(25, item.req_level_to_enter.to_string())).with_label_width(16),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(
-                                        "req_level_to_list",
-                                        "List Security".to_string(),
-                                        ListValue::Text(25, item.req_level_to_list.to_string()),
-                                    )
-                                    .with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new(
-                                        "req_level_to_enter",
-                                        "Enter Security".to_string(),
-                                        ListValue::Text(25, item.req_level_to_enter.to_string()),
-                                    )
-                                    .with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new(
-                                        "req_level_to_save_attach",
-                                        "Attach Security".to_string(),
-                                        ListValue::Text(25, item.req_level_to_save_attach.to_string()),
-                                    )
-                                    .with_label_width(16),
+                                    ListItem::new("Attach Security".to_string(), ListValue::Text(25, item.req_level_to_save_attach.to_string()))
+                                        .with_label_width(16),
                                 ),
                             ],
                         });

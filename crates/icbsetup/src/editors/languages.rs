@@ -28,7 +28,7 @@ pub struct LanguageListEditor<'a> {
     dir_list: Arc<Mutex<SupportedLanguages>>,
 
     edit_config_state: ConfigMenuState,
-    edit_config: Option<ConfigMenu>,
+    edit_config: Option<ConfigMenu<u32>>,
 }
 
 impl<'a> LanguageListEditor<'a> {
@@ -146,6 +146,7 @@ impl<'a> Editor for LanguageListEditor<'a> {
         if let Some(edit_config) = &mut self.edit_config {
             match key.code {
                 KeyCode::Esc => {
+                    /*
                     let Some(selected_item) = self.insert_table.table_state.selected() else {
                         return true;
                     };
@@ -185,7 +186,7 @@ impl<'a> Editor for LanguageListEditor<'a> {
                                 panic!("Unknown item: {}", item.id);
                             }
                         }
-                    }
+                    }*/
                     self.edit_config = None;
                     return true;
                 }
@@ -227,23 +228,15 @@ impl<'a> Editor for LanguageListEditor<'a> {
                             return true;
                         };
                         self.edit_config = Some(ConfigMenu {
+                            obj: 0,
                             entry: vec![
                                 ConfigEntry::Item(
-                                    ListItem::new("description", "Language".to_string(), ListValue::Text(25, item.description.to_string()))
-                                        .with_label_width(16),
+                                    ListItem::new("Language".to_string(), ListValue::Text(25, item.description.to_string())).with_label_width(16),
                                 ),
-                                ConfigEntry::Item(
-                                    ListItem::new("extension", "Extension".to_string(), ListValue::Text(25, item.extension.to_string())).with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new("locale", "Locale".to_string(), ListValue::Text(25, item.locale.to_string())).with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new("yes_char", "Yes Char".to_string(), ListValue::Text(25, item.yes_char.to_string())).with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new("no_char", "No Char".to_string(), ListValue::Text(25, item.no_char.to_string())).with_label_width(16),
-                                ),
+                                ConfigEntry::Item(ListItem::new("Extension".to_string(), ListValue::Text(25, item.extension.to_string())).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("Locale".to_string(), ListValue::Text(25, item.locale.to_string())).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("Yes Char".to_string(), ListValue::Text(25, item.yes_char.to_string())).with_label_width(16)),
+                                ConfigEntry::Item(ListItem::new("No Char".to_string(), ListValue::Text(25, item.no_char.to_string())).with_label_width(16)),
                             ],
                         });
                     } else {

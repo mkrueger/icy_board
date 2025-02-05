@@ -15,7 +15,7 @@ impl IcyBoardState {
         self.set_activity(NodeStatus::LogoffPending).await;
         self.displaycmdfile("g").await?;
         let is_flagged = !self.session.flagged_files.is_empty();
-        if self.board.lock().await.config.options.guard_logoff || is_flagged {
+        if self.board.lock().await.config.system_control.guard_logoff || is_flagged {
             if let Some(token) = self.session.tokens.pop_front() {
                 if token.eq_ignore_ascii_case(&self.session.yes_char.to_string()) {
                     self.bye_cmd().await?;

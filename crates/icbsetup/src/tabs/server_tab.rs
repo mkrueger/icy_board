@@ -26,22 +26,18 @@ impl ServerTab {
         let icy_board: std::sync::MutexGuard<'_, IcyBoard> = lock.lock().unwrap();
         let telnet = vec![
             ConfigEntry::Item(ListItem::new(
-                "telnet_is_enabled",
                 "Enabled".to_string(),
                 ListValue::Bool(icy_board.config.login_server.telnet.is_enabled),
             )),
             ConfigEntry::Item(ListItem::new(
-                "telnet_port",
                 "Port".to_string(),
                 ListValue::U32(icy_board.config.login_server.telnet.port as u32, 1, u16::MAX as u32),
             )),
             ConfigEntry::Item(ListItem::new(
-                "telnet_address",
                 "Address".to_string(),
                 ListValue::Text(60, icy_board.config.login_server.telnet.address.clone()),
             )),
             ConfigEntry::Item(ListItem::new(
-                "telnet_display_file",
                 "Display File".to_string(),
                 ListValue::Path(icy_board.config.login_server.telnet.display_file.clone()),
             )),
@@ -49,22 +45,18 @@ impl ServerTab {
 
         let ssh = vec![
             ConfigEntry::Item(ListItem::new(
-                "ssh_is_enabled",
                 "Enabled".to_string(),
                 ListValue::Bool(icy_board.config.login_server.ssh.is_enabled),
             )),
             ConfigEntry::Item(ListItem::new(
-                "ssh_port",
                 "Port".to_string(),
                 ListValue::U32(icy_board.config.login_server.ssh.port as u32, 1, u16::MAX as u32),
             )),
             ConfigEntry::Item(ListItem::new(
-                "ssh_address",
                 "Address".to_string(),
                 ListValue::Text(60, icy_board.config.login_server.ssh.address.clone()),
             )),
             ConfigEntry::Item(ListItem::new(
-                "ssh_display_file",
                 "Display File".to_string(),
                 ListValue::Path(icy_board.config.login_server.ssh.display_file.clone()),
             )),
@@ -72,22 +64,18 @@ impl ServerTab {
 
         let websocket = vec![
             ConfigEntry::Item(ListItem::new(
-                "websocket_is_enabled",
                 "Enabled".to_string(),
                 ListValue::Bool(icy_board.config.login_server.websocket.is_enabled),
             )),
             ConfigEntry::Item(ListItem::new(
-                "websocket_port",
                 "Port".to_string(),
                 ListValue::U32(icy_board.config.login_server.websocket.port as u32, 1, u16::MAX as u32),
             )),
             ConfigEntry::Item(ListItem::new(
-                "websocket_address",
                 "Address".to_string(),
                 ListValue::Text(60, icy_board.config.login_server.websocket.address.clone()),
             )),
             ConfigEntry::Item(ListItem::new(
-                "websocket_display_file",
                 "Display File".to_string(),
                 ListValue::Path(icy_board.config.login_server.websocket.display_file.clone()),
             )),
@@ -95,22 +83,18 @@ impl ServerTab {
 
         let secure_websocket = vec![
             ConfigEntry::Item(ListItem::new(
-                "secure_websocket_is_enabled",
                 "Enabled".to_string(),
                 ListValue::Bool(icy_board.config.login_server.secure_websocket.is_enabled),
             )),
             ConfigEntry::Item(ListItem::new(
-                "secure_websocket_port",
                 "Port".to_string(),
                 ListValue::U32(icy_board.config.login_server.secure_websocket.port as u32, 1, u16::MAX as u32),
             )),
             ConfigEntry::Item(ListItem::new(
-                "secure_websocket_address",
                 "Address".to_string(),
                 ListValue::Text(60, icy_board.config.login_server.secure_websocket.address.clone()),
             )),
             ConfigEntry::Item(ListItem::new(
-                "secure_websocket_display_file",
                 "Display File".to_string(),
                 ListValue::Path(icy_board.config.login_server.secure_websocket.display_file.clone()),
             )),

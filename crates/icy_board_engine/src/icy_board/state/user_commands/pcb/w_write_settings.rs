@@ -32,7 +32,7 @@ impl IcyBoardState {
                 .await?;
         }
 
-        if settings.ask_bus_data_phone {
+        if settings.ask_business_phone {
             new_user.bus_data_phone = self
                 .input_field(
                     IceText::BusDataPhone,
@@ -45,7 +45,7 @@ impl IcyBoardState {
                 .await?;
         }
 
-        if settings.ask_voice_phone {
+        if settings.ask_home_phone {
             new_user.home_voice_phone = self
                 .input_field(
                     IceText::HomeVoicePhone,

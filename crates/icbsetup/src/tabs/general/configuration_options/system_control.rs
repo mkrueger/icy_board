@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crossterm::event::KeyEvent;
-use icy_board_engine::icy_board::{user_base::Password, IcyBoard};
+use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
     get_text,
@@ -15,29 +15,34 @@ use ratatui::{
     widgets::{Block, Borders, Padding, Widget},
 };
 
-use crate::{cfg_entry_bool, cfg_entry_password, cfg_entry_text};
+use crate::cfg_entry_bool;
 
-pub struct SysopInformation {
+pub struct SystemControl {
     pub state: ConfigMenuState,
-
     menu: ConfigMenu<Arc<Mutex<IcyBoard>>>,
 }
 
-impl SysopInformation {
+impl SystemControl {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
-        let menu: ConfigMenu<Arc<Mutex<IcyBoard>>> = {
+        let menu = {
             let lock = icy_board.lock().unwrap();
-            let label_width = 30;
-            let sysop_info: Vec<ConfigEntry<Arc<Mutex<IcyBoard>>>> = vec![
-                cfg_entry_text!("sysop_name", 45, label_width, sysop, name, lock),
-                cfg_entry_password!("local_password", label_width, sysop, password, lock),
-                cfg_entry_bool!("require_password_to_exit", label_width, sysop, require_password_to_exit, lock),
-                cfg_entry_bool!("use_real_name", label_width, sysop, use_real_name, lock),
+            let label_width = 50;
+            let entry = vec![
+                cfg_entry_bool!("disable_ns_logon", label_width, system_control, disable_ns_logon, lock),
+                cfg_entry_bool!("is_multi_lingual", label_width, system_control, is_multi_lingual, lock),
+                cfg_entry_bool!("allow_alias_change", label_width, system_control, allow_alias_change, lock),
+                cfg_entry_bool!("is_closed_board", label_width, system_control, is_closed_board, lock),
+                cfg_entry_bool!("enforce_daily_time_limit", label_width, system_control, enforce_daily_time_limit, lock),
+                cfg_entry_bool!(
+                    "allow_password_failure_comment",
+                    label_width,
+                    system_control,
+                    allow_password_failure_comment,
+                    lock
+                ),
+                cfg_entry_bool!("guard_logoff", label_width, system_control, guard_logoff, lock),
             ];
-            ConfigMenu {
-                obj: icy_board.clone(),
-                entry: sysop_info,
-            }
+            ConfigMenu { obj: icy_board.clone(), entry }
         };
 
         Self {
@@ -47,8 +52,15 @@ impl SysopInformation {
     }
 }
 
-impl Page for SysopInformation {
+impl Page for SystemControl {
     fn render(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
+        let area = Rect {
+            x: area.x + 1,
+            y: area.y + 1,
+            width: area.width.saturating_sub(2),
+            height: area.height.saturating_sub(1),
+        };
+
         let block: Block<'_> = Block::new()
             .style(get_tui_theme().background)
             .padding(Padding::new(2, 2, 1 + 4, 0))
@@ -57,8 +69,7 @@ impl Page for SysopInformation {
             .border_style(get_tui_theme().content_box);
         block.render(area, frame.buffer_mut());
 
-        let val = get_text("sysop_information_title");
-
+        let val = get_text("system_control_title");
         let width = val.len() as u16;
         Line::raw(val).style(get_tui_theme().menu_title).render(
             Rect {
@@ -90,6 +101,7 @@ impl Page for SysopInformation {
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         let res = self.menu.handle_key_press(key, &mut self.state);
+
         PageMessage::ResultState(res)
     }
 }

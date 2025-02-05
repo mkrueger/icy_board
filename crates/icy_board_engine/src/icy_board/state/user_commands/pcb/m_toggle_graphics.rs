@@ -11,7 +11,7 @@ impl IcyBoardState {
     pub async fn toggle_graphics(&mut self) -> Res<()> {
         self.displaycmdfile("m").await?;
 
-        if self.get_board().await.config.options.non_graphics {
+        if self.get_board().await.config.switches.non_graphics {
             self.display_text(IceText::GraphicsUnavailable, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
 

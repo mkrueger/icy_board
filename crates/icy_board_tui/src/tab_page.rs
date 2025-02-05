@@ -7,6 +7,7 @@ pub enum PageMessage {
     None,
     Close,
     ResultState(ResultState),
+    OpenSubPage(Box<dyn Page>),
 }
 
 pub trait Page {

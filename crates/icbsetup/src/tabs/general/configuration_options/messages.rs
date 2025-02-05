@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crossterm::event::KeyEvent;
-use icy_board_engine::icy_board::{user_base::Password, IcyBoard};
+use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
     get_text,
@@ -15,29 +15,35 @@ use ratatui::{
     widgets::{Block, Borders, Padding, Widget},
 };
 
-use crate::{cfg_entry_bool, cfg_entry_password, cfg_entry_text};
+use crate::{cfg_entry_bool, cfg_entry_u16};
 
-pub struct SysopInformation {
+pub struct Messages {
     pub state: ConfigMenuState,
-
     menu: ConfigMenu<Arc<Mutex<IcyBoard>>>,
 }
 
-impl SysopInformation {
+impl Messages {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
-        let menu: ConfigMenu<Arc<Mutex<IcyBoard>>> = {
+        let menu = {
             let lock = icy_board.lock().unwrap();
-            let label_width = 30;
-            let sysop_info: Vec<ConfigEntry<Arc<Mutex<IcyBoard>>>> = vec![
-                cfg_entry_text!("sysop_name", 45, label_width, sysop, name, lock),
-                cfg_entry_password!("local_password", label_width, sysop, password, lock),
-                cfg_entry_bool!("require_password_to_exit", label_width, sysop, require_password_to_exit, lock),
-                cfg_entry_bool!("use_real_name", label_width, sysop, use_real_name, lock),
+            let label_width = 50;
+            let entry: Vec<ConfigEntry<Arc<Mutex<IcyBoard>>>> = vec![
+                cfg_entry_u16!("max_msg_lines", label_width, 17, 400, message, max_msg_lines, lock),
+                cfg_entry_bool!("disable_message_scan_prompt", label_width, message, disable_message_scan_prompt, lock),
+                cfg_entry_bool!("allow_esc_codes", label_width, message, allow_esc_codes, lock),
+                cfg_entry_bool!("allow_carbon_copy", label_width, message, allow_carbon_copy, lock),
+                cfg_entry_bool!("validate_to_name", label_width, message, validate_to_name, lock),
+                cfg_entry_bool!("default_quick_personal_scan", label_width, message, default_quick_personal_scan, lock),
+                cfg_entry_bool!(
+                    "default_scan_all_selected_confs_at_login",
+                    label_width,
+                    message,
+                    default_scan_all_selected_confs_at_login,
+                    lock
+                ),
+                cfg_entry_bool!("prompt_to_read_mail", label_width, message, prompt_to_read_mail, lock),
             ];
-            ConfigMenu {
-                obj: icy_board.clone(),
-                entry: sysop_info,
-            }
+            ConfigMenu { obj: icy_board.clone(), entry }
         };
 
         Self {
@@ -47,8 +53,15 @@ impl SysopInformation {
     }
 }
 
-impl Page for SysopInformation {
+impl Page for Messages {
     fn render(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
+        let area = Rect {
+            x: area.x + 1,
+            y: area.y + 1,
+            width: area.width.saturating_sub(2),
+            height: area.height.saturating_sub(1),
+        };
+
         let block: Block<'_> = Block::new()
             .style(get_tui_theme().background)
             .padding(Padding::new(2, 2, 1 + 4, 0))
@@ -57,8 +70,7 @@ impl Page for SysopInformation {
             .border_style(get_tui_theme().content_box);
         block.render(area, frame.buffer_mut());
 
-        let val = get_text("sysop_information_title");
-
+        let val = get_text("configuration_options_messages");
         let width = val.len() as u16;
         Line::raw(val).style(get_tui_theme().menu_title).render(
             Rect {
@@ -90,6 +102,7 @@ impl Page for SysopInformation {
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         let res = self.menu.handle_key_press(key, &mut self.state);
+
         PageMessage::ResultState(res)
     }
 }
