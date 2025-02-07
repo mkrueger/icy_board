@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::{cfg_entry_bool, cfg_entry_path};
+use crate::{cfg_entry_bool, cfg_entry_dow, cfg_entry_path, cfg_entry_time};
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
@@ -27,9 +27,9 @@ impl AccountingConfig {
                 cfg_entry_bool!("accounting_use_money", label_width, accounting, use_money, lock),
                 cfg_entry_bool!("accounting_concurrent_tracking", label_width, accounting, concurrent_tracking, lock),
                 cfg_entry_bool!("accounting_ignore_empty_sec_level", label_width, accounting, ignore_empty_sec_level, lock),
-                //cfg_entry_bool!("accounting_peak_usage_start", label_width, accounting, peak_usage_start, lock),
-                //cfg_entry_bool!("accounting_peak_usage_end", label_width, accounting, peak_usage_end, lock),
-                //cfg_entry_bool!("accounting_peak_days_of_week", label_width, accounting, peak_days_of_week, lock),
+                cfg_entry_time!("accounting_peak_usage_start", label_width, accounting, peak_usage_start, lock),
+                cfg_entry_time!("accounting_peak_usage_end", label_width, accounting, peak_usage_end, lock),
+                cfg_entry_dow!("accounting_peak_days_of_week", label_width, accounting, peak_days_of_week, lock),
                 ConfigEntry::Separator,
                 cfg_entry_path!("accounting_peak_holiday_list_file", label_width, accounting, peak_holiday_list_file, lock),
                 cfg_entry_path!(

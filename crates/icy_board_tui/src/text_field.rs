@@ -127,6 +127,7 @@ pub struct TextField {
     text_style: Style,
     background_style: Style,
     background_symbol: char,
+    max_len: usize,
 }
 
 impl TextField {
@@ -136,6 +137,7 @@ impl TextField {
             text_style: get_tui_theme().text_field_text,
             background_style: get_tui_theme().text_field_background,
             background_symbol: get_tui_theme().text_field_filler_char,
+            max_len: 0,
         }
     }
 
@@ -160,6 +162,11 @@ impl TextField {
 
     pub fn with_background_symbol(mut self, symbol: char) -> Self {
         self.background_symbol = symbol;
+        self
+    }
+
+    pub fn with_max_len(mut self, max_len: usize) -> Self {
+        self.max_len = max_len;
         self
     }
 }

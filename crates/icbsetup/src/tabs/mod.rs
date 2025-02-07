@@ -247,3 +247,45 @@ macro_rules! cfg_entry_path {
         )
     };
 }
+
+#[macro_export]
+macro_rules! cfg_entry_time {
+    ($i:expr, $width:expr, $property:ident, $conf:ident, $lock:expr) => {
+        icy_board_tui::config_menu::ConfigEntry::Item(
+            icy_board_tui::config_menu::ListItem::new(
+                icy_board_tui::get_text($i),
+                icy_board_tui::config_menu::ListValue::Time($lock.config.$property.$conf.clone(), $lock.config.$property.$conf.to_string()),
+            )
+            .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
+            .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
+            .with_label_width($width)
+            .with_update_value(Box::new(|board: &Arc<Mutex<IcyBoard>>, value: &icy_board_tui::config_menu::ListValue| {
+                let icy_board_tui::config_menu::ListValue::Time(val, _) = value else {
+                    return;
+                };
+                board.lock().unwrap().config.$property.$conf = val.clone();
+            })),
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! cfg_entry_dow {
+    ($i:expr, $width:expr, $property:ident, $conf:ident, $lock:expr) => {
+        icy_board_tui::config_menu::ConfigEntry::Item(
+            icy_board_tui::config_menu::ListItem::new(
+                icy_board_tui::get_text($i),
+                icy_board_tui::config_menu::ListValue::DoW($lock.config.$property.$conf.clone(), $lock.config.$property.$conf.to_string()),
+            )
+            .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
+            .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
+            .with_label_width($width)
+            .with_update_value(Box::new(|board: &Arc<Mutex<IcyBoard>>, value: &icy_board_tui::config_menu::ListValue| {
+                let icy_board_tui::config_menu::ListValue::DoW(val, _) = value else {
+                    return;
+                };
+                board.lock().unwrap().config.$property.$conf = val.clone();
+            })),
+        )
+    };
+}

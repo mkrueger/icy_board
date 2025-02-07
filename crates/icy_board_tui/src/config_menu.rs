@@ -1,7 +1,10 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use crossterm::event::{KeyCode, KeyEvent};
-use icy_board_engine::icy_board::{commands::Position, icb_config::IcbColor};
+use icy_board_engine::{
+    datetime::{IcbDoW, IcbTime},
+    icy_board::{commands::Position, icb_config::IcbColor},
+};
 use ratatui::{
     layout::{Alignment, Rect},
     style::Stylize,
@@ -121,6 +124,8 @@ pub enum ListValue {
     U32(u32, u32, u32),
     /// float, cur_edit_string
     Float(f64, String),
+    Time(IcbTime, String),
+    DoW(IcbDoW, String),
     Bool(bool),
     Color(IcbColor),
     ValueList(String, Vec<Value>),
@@ -273,7 +278,7 @@ impl<T> ListItem<T> {
 
                 ListValue::Float(_u, _) => 5,
 
-                ListValue::Color(_color) => 4,
+                ListValue::Color(_color) => 2,
                 ListValue::Bool(_value) => 3,
                 ListValue::ValueList(_cur_value, _list) => {
                     /*
@@ -287,6 +292,9 @@ impl<T> ListItem<T> {
                     8
                 }
                 ListValue::Position(_, _, pos) => pos.x as usize,
+
+                ListValue::Time(_, _) => 5, // 00:00
+                ListValue::DoW(_, _) => 7,  // SMDMDFS
             }
         };
 
@@ -325,11 +333,17 @@ impl<T> ListItem<T> {
                 Text::from(str.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
             }
 
+            ListValue::Time(_val, str) => {
+                Text::from(str.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
+            }
+
+            ListValue::DoW(_val, str) => {
+                Text::from(str.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
+            }
+
             ListValue::Color(color) => match color {
                 IcbColor::None => Text::from("Plain").style(get_tui_theme().value).render(area, frame.buffer_mut()),
-                IcbColor::Dos(u8) => Text::from(format!("@X{:02}", *u8))
-                    .style(get_tui_theme().value)
-                    .render(area, frame.buffer_mut()),
+                IcbColor::Dos(u8) => Text::from(format!("{:02X}", *u8)).style(get_tui_theme().value).render(area, frame.buffer_mut()),
                 IcbColor::IcyEngine(_) => todo!(),
             },
             ListValue::Bool(value) => {
@@ -389,6 +403,28 @@ impl<T> ListItem<T> {
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
                 self.text_field_state.set_cursor_position(frame);
             }
+            ListValue::Time(_val, str) => {
+                let area = Rect {
+                    x: area.x,
+                    y: area.y,
+                    width: 5,
+                    height: 1,
+                };
+                let field = TextField::new().with_max_len(5).with_value(str.clone());
+                frame.render_stateful_widget(field, area, &mut self.text_field_state);
+                self.text_field_state.set_cursor_position(frame);
+            }
+            ListValue::DoW(_val, str) => {
+                let area = Rect {
+                    x: area.x,
+                    y: area.y,
+                    width: 7,
+                    height: 1,
+                };
+                let field = TextField::new().with_max_len(7).with_value(str.clone());
+                frame.render_stateful_widget(field, area, &mut self.text_field_state);
+                self.text_field_state.set_cursor_position(frame);
+            }
             ListValue::Bool(value) => {
                 let title = if *value { " ✓ " } else { " ☐ " };
                 Text::from(title).style(get_tui_theme().edit_value).render(
@@ -402,8 +438,18 @@ impl<T> ListItem<T> {
                 );
                 frame.set_cursor_position((area.x, area.y));
             }
-            ListValue::Color(_value) => {
-                self.render_value(area, frame);
+            ListValue::Color(value) => {
+                if let IcbColor::Dos(value) = value {
+                    let area = Rect {
+                        x: area.x,
+                        y: area.y,
+                        width: 2,
+                        height: 1,
+                    };
+                    let field = TextField::new().with_value(format!("{:02X}", value));
+                    frame.render_stateful_widget(field, area, &mut self.text_field_state);
+                    self.text_field_state.set_cursor_position(frame);
+                }
             }
             ListValue::ValueList(cur_value, list) => {
                 let mut area = area;
@@ -486,6 +532,14 @@ impl<T> ListItem<T> {
                     *val = f;
                 }
             }
+            ListValue::Time(val, str) => {
+                self.text_field_state.handle_input(key, str);
+                *val = IcbTime::parse(str);
+            }
+            ListValue::DoW(val, str) => {
+                self.text_field_state.handle_input(key, str);
+                *val = IcbDoW::from(str.clone());
+            }
             ListValue::U32(cur, min, max) => {
                 let mut text = format!("{}", *cur);
                 self.text_field_state.handle_input(key, &mut text);
@@ -497,7 +551,6 @@ impl<T> ListItem<T> {
                 *b = !*b;
                 return ResultState::default();
             }
-
             ListValue::ValueList(cur_value, list) => {
                 for (i, l) in list.iter().enumerate() {
                     if l.value == *cur_value {
@@ -509,7 +562,15 @@ impl<T> ListItem<T> {
                 return ResultState::default();
             }
 
-            ListValue::Color(_) => {}
+            ListValue::Color(col) => {
+                if let IcbColor::Dos(u) = col {
+                    let mut text = format!("{:02X}", u);
+                    self.text_field_state.handle_input(key, &mut text);
+                    if let Ok(u) = u8::from_str_radix(&text, 16) {
+                        *col = IcbColor::Dos(u);
+                    }
+                }
+            }
             ListValue::ComboBox(combo) => {
                 combo.handle_input(key);
             }
