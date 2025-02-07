@@ -118,6 +118,9 @@ impl<T> SelectMenu<T> {
                     if state.selected < state.first_row as i32 {
                         state.first_row = state.selected as u16;
                     }
+                } else {
+                    state.selected = self.items.len() as i32 - 1;
+                    state.first_row = (state.selected as u16).saturating_sub(state.area_height);
                 }
             }
             KeyCode::Down => {
@@ -126,6 +129,9 @@ impl<T> SelectMenu<T> {
                     if state.selected >= state.first_row as i32 + state.area_height as i32 {
                         state.first_row += 1;
                     }
+                } else {
+                    state.selected = 0;
+                    state.first_row = 0;
                 }
             }
             KeyCode::Home | KeyCode::PageUp => {

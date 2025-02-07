@@ -1,10 +1,9 @@
 error_cmd_line_label = error:
 error_file_or_path_not_found = File or path not found
 
-
 exit_icy_board_msg = Thank you for using { $name } Professional BBS Software!
-# Call wait screen
 
+# Call wait screen
 call_wait_screen_user_button_busy=User - Busy
 call_wait_screen_user_button_busy_descr=Log in as a regular user. Callers will get a busy signal.
 call_wait_screen_sysop_button_busy=Sysop - Busy
@@ -151,6 +150,24 @@ key_desc_edit=Edit
 
 # ICBSetup
 
+icb_setup_key_main_help=↑ Up  ↓ Down  F1 Help  ␛ Quit
+icb_setup_key_menu_help=↑ Up  ↓ Down  F1 Help  ␛ Back
+icb_setup_key_menu_edit_help=↑ Up  ↓ Down  F1 Help  F2 Edit this file  ␛ Back
+icb_setup_key_conf_list_help=↑ Up  ↓ Down  INS New  ␡ Delete  PgUp/Dn Move ␛ Back
+
+icb_setup_main_sysop_info=Sysop Information
+icb_setup_main_file_locs=File Locations
+icb_setup_main_con_info=Connection Information
+icb_setup_main_board_cfg=Board Configuration
+icb_setup_main_evt_setup=Event Setup
+icb_setup_main_subscription=Subscription
+icb_setup_main_conf_opt=Configuration Options
+icb_setup_main_sec_levels=Security Levels
+icb_setup_main_acc_cfg=Accounting Configuration
+icb_setup_main_new_user=New User Options
+icb_setup_mb_conf=Main Board Configuration
+icb_setup_conferences=Conferences
+
 board_config_title=Board Configuration
 
 board_name=Board Name
@@ -181,11 +198,21 @@ board_node_num=# Nodes
 board_node_num-status=Number of maximum active nodes
 board_node_num-help=TODO
 
+who_include_city=Include City Field in WHO Display
+who_include_city-status=Include City Field in WHO Display
+who_include_city-help=TODO
+
+who_show_alias=Show ALIAS Name in WHO Display
+who_show_alias-status=Show ALIAS Name in WHO Display
+who_show_alias-help=TODO
+
 date_format=Date Format
 date_format-status=Date format used in the system
 date_format-help=TODO
 
 new_user_options_title=New User Options
+
+new_user_options_ask_label=Ask New Users for:
 
 new_user_security_level=Security Level
 new_user_security_level-status=Default security level for new users
@@ -273,7 +300,7 @@ subscription_length=Default Subscription Length in Days
 subscription_length-status=Number of days before account expiration.
 subscription_length-help=TODO
 
-default_expired_level='Expired' Security Level
+default_expired_level=Default 'Expired' Security Level
 default_expired_level-status=Security level for expired accounts.
 default_expired_level-help=TODO
 
@@ -281,11 +308,10 @@ warning_days=Warning Days Prior to Expiration
 warning_days-status=Displays WARNING file to the caller prior to expiration.
 warning_days-help=TODO
 
-
 sysop_information_title=Sysop Information
 
 sysop_name=Sysop's Name
-sysop_name-status=Enter the first name of the sysop.
+sysop_name-status=When NOT using the real name.
 sysop_name-help=TODO
 
 local_password=Local Password
@@ -295,6 +321,14 @@ local_password-help=TODO
 require_password_to_exit=Require Password to Exit
 require_password_to_exit-status=IcyBoard requires pw to exit the call waiting screen.
 require_password_to_exit-help=TODO
+
+sys_info_external_editor=External Editor
+sys_info_external_editor-status=External editor for sysop messages.
+sys_info_external_editor-help=TODO
+
+sys_info_theme=Color Theme
+sys_info_theme=Color Theme
+sys_info_theme=TODO
 
 use_real_name=Use Real Name
 use_real_name-status=Use the real name of the sysop.
@@ -373,13 +407,13 @@ sysop_sec_1_view_caller_log=(1) View/Print Caller Log
 sysop_sec_1_view_caller_log-status=View/Print Caller Log
 sysop_sec_1_view_caller_log-help=TODO
 
-sysop_sec_2_view_system_statistics=(2) View/Print User List
-sysop_sec_2_view_system_statistics-status=View/Print User List
-sysop_sec_2_view_system_statistics-help=TODO
+sysop_sec_2_view_usr_list=(2) View/Print User List
+sysop_sec_2_view_usr_list-status=View/Print User List
+sysop_sec_2_view_usr_list-help=TODO
 
-sec_3_pack_renumber_msg=(3) Pack Renumber Messages
-sec_3_pack_renumber_msg-status=Pack Renumber Messages
-sec_3_pack_renumber_msg-help=TODO
+sysop_sec_3_pack_renumber_msg=(3) Pack Renumber Messages
+sysop_sec_3_pack_renumber_msg-status=Pack Renumber Messages
+sysop_sec_3_pack_renumber_msg-help=TODO
 
 sysop_sec_4_recover_deleted_msg=(4) Recover Killed Message
 sysop_sec_4_recover_deleted_msg-status=Recover Killed Message
@@ -405,13 +439,13 @@ sysop_sec_9_exit_to_dos=(9) Exit to Shell remote
 sysop_sec_9_exit_to_dos-status=Exit to Shell remote
 sysop_sec_9_exit_to_dos-help=TODO
 
-sec_10_shelled_dos_func=(10) Execute Shell functions
-sec_10_shelled_dos_func-status=Execute Shell functions
-sec_10_shelled_dos_func-help=TODO
+sysop_sec_10_shelled_dos_func=(10) Execute Shell functions
+sysop_sec_10_shelled_dos_func-status=Execute Shell functions
+sysop_sec_10_shelled_dos_func-help=TODO
 
-sec_11_view_other_nodes=(11) View Other Nodes
-sec_11_view_other_nodes-status=View Other Nodes
-sec_11_view_other_nodes-help=TODO
+sysop_sec_11_view_other_nodes=(11) View Other Nodes
+sysop_sec_11_view_other_nodes-status=View Other Nodes
+sysop_sec_11_view_other_nodes-help=TODO
 
 sysop_sec_12_logoff_alt_node=(12) Logoff Alternate Node
 sysop_sec_12_logoff_alt_node-status=Logoff Alternate Node
@@ -665,6 +699,10 @@ upload_credit_bytes=Upload Credit for Bytes
 upload_credit_bytes-status=Default is 1.0 which means 'stop the clock'.
 upload_credit_bytes-help=TODO
 
+display_uploader=Include 'Uploaded By' in Desc.
+display_uploader-status=Include 'Uploaded By' in Description.
+display_uploader-help=TODO
+
 verify_files_uploaded=Verify Files Uploaded
 verify_files_uploaded-status=Verify files uploaded after upload.
 verify_files_uploaded-help=TODO
@@ -777,3 +815,469 @@ file_deleted=File Deleted Color
 file_deleted-status=Color for 'Deleted' in Files
 file_deleted-help=TODO
 
+# ICBSETUP -> File Locations
+
+file_locations_title=File Locations
+file_locations_files_dirs=System Files & Directories
+file_locations_config_files=Configuration Files
+file_locations_display_files=Display Files
+file_locations_surveys=New User/Logon/off Surveys
+
+# ICBSETUP -> File Locations -> System Files & Directories
+
+paths_conferences=Name/Loc of Conference Data
+paths_conferences-status=Name/Loc of Conference Data
+paths_conferences-help=TODO
+
+paths_home_dir=Name/Loc of Home Directory
+paths_home_dir-status=Name/Loc of Home Directory
+paths_home_dir-help=TODO
+
+paths_caller_log=Name/Loc of Caller Log
+paths_caller_log-status=Name/Loc of Caller Log
+paths_caller_log-help=TODO
+
+paths_statistic_file=Name/Loc of Statistics File
+paths_statistic_file-status=Name/Loc of Statistics File
+paths_statistic_file-help=TODO
+
+paths_icbtext=Location of ICBTEXT File
+paths_icbtext-status=Name/Loc of ICBTEXT file
+paths_icbtext-help=TODO
+
+paths_tmp_files=Location of Temporary Work Files
+paths_tmp_files-status=Location of Temporary Work Files
+paths_tmp_files-help=TODO
+
+paths_help_path=Location of Help Files
+paths_help_path-status=Location of Help Files
+paths_help_path-help=TODO
+
+paths_security_file_path=Location of Login Security Files
+paths_security_file_path-status=Location of Login Login Security Files
+paths_security_file_path-help=TODO
+
+paths_command_display_path=Location of Command Display Files
+paths_command_display_path-status=Location of Command Display Files
+paths_command_display_path-help=TODO
+
+# ICBSETUP -> File Locations -> New User/Logon/off Surveys
+
+paths_newask_survey=Name/Loc of New Reg Survey
+paths_newask_survey-status=Name/Location of NEWASK Survey File
+paths_newask_survey-help=TODO
+
+paths_newask_answer=Name/Loc of New Reg Answers
+paths_newask_answer-status=Name/Location of NEWASK Survey Answers
+paths_newask_answer-help=TODO
+
+paths_logon_survey=Name/Loc of Logon Survey
+paths_logon_survey-status=Name/Location of Logon Survey File
+paths_logon_survey-help=TODO
+
+paths_logon_answer=Name/Loc of Logon Answers
+paths_logon_answer-status=Name/Location of Logon Survey Answers
+paths_logon_answer-help=TODO
+
+paths_logoff_survey=Name/Loc of Logoff Survey
+paths_logoff_survey-status=Name/Location of Logoff Survey File
+paths_logoff_survey-help=TODO
+
+paths_logoff_answer=Name/Loc of Logoff Answers
+paths_logoff_answer-status=Name/Location of Logoff Survey Answers
+paths_logoff_answer-help=TODO
+
+# ICBSETUP -> File Locations -> Display Files
+
+paths_welcome=Name/Loc of WELCOME File
+paths_welcome-status=Name/Location of WELCOME File
+paths_welcome-help=TODO
+
+paths_newuser=Name/Loc of NEWUSER File
+paths_newuser-status=Name/Location of NEWUSER File
+paths_newuser-help=TODO
+
+paths_closed=Name/Loc of CLOSED File
+paths_closed-status=Name/Location of CLOSED File
+paths_closed-help=TODO
+
+paths_expire_warning=Name/Loc of WARNING File
+paths_expire_warning-status=Name/Location of WARNING File
+paths_expire_warning-help=TODO
+
+paths_expired=Name/Loc of EXPIRED File
+paths_expired-status=Name/Location of EXPIRED File
+paths_expired-help=TODO
+
+paths_conf_join_menu=Name/Loc of Conference Join Menu
+paths_conf_join_menu-status=Name/Location of Conference Join Menu File
+paths_conf_join_menu-help=TODO
+
+paths_conf_chat_intro_file=Name/Loc of Group Chat Intro File
+paths_conf_chat_intro_file-status=Name/Location of Group Chat Intro File
+paths_conf_chat_intro_file-help=TODO
+
+paths_conf_chat_menu=Name/Loc of Group Chat Menu
+paths_conf_chat_menu-status=Name/Location of Group Chat Menu File
+paths_conf_chat_menu-help=TODO
+
+paths_conf_chat_actions_menu=Name/Loc of Chat Actions Menu
+paths_conf_chat_actions_menu-status=Name/Location of Chat Actions Menu File
+paths_conf_chat_actions_menu-help=TODO
+
+paths_no_ansi=Name/Loc of NOANSI Warning
+paths_no_ansi-status=Name/Location of NOANSI Warning File
+paths_no_ansi-help=TODO
+
+# ICBSETUP -> File Locations -> Configuration Files
+
+paths_pwrd_sec_level_file=Name/Loc of PWRD/Security File
+paths_pwrd_sec_level_file-status=Name/Location of PWRD/Security File
+paths_pwrd_sec_level_file-help=TODO
+
+paths_trashcan_user=Name/Loc of User Trashcan File
+paths_trashcan_user-status=Name/Location of User Trashcan File
+paths_trashcan_user-help=TODO
+
+paths_trashcan_upload_files=Name/Loc of Upload File Trashcan
+paths_trashcan_upload_files-status=Name/Location of Upload File Trashcan
+paths_trashcan_upload_files-help=TODO
+
+paths_trashcan_passwords=Name/Loc of PWD Trashcan File
+paths_trashcan_passwords-status=Name/Location of Password Trashcan File
+paths_trashcan_passwords-help=TODO
+
+paths_trashcan_email=Name/Loc of Email Trashcan File
+paths_trashcan_email-status=Name/Location of Email Trashcan File
+paths_trashcan_email-help=TODO
+
+paths_vip_users=Name/Loc of VIP Users File
+paths_vip_users-status=Name/Location of VIP Users File
+paths_vip_users-help=TODO
+
+paths_protocol_data_file=Name/Loc of Protocol Data File
+paths_protocol_data_file-status=Name/Location of Protocol Data File
+paths_protocol_data_file-help=TODO
+
+paths_language_file=Name/Loc of Multi-Lang. Data File
+paths_language_file-status=Name/Location of Multi-Lang. Data File
+paths_language_file-help=TODO
+
+paths_command_file=Name/Loc of CMD.LST File
+paths_command_file-status=Name/Location of CMD.LST File
+paths_command_file-help=TODO
+
+
+connection_info_title=Connection Information
+connection_info_telnet=Telnet
+connection_info_ssh=SSH
+connection_info_websockets=Websockets
+connection_info_secure_websockets=Secure Websockets
+
+connection_info_enabled=Enabled
+connection_info_enabled-status=TODO
+connection_info_enabled-help=TODO
+
+connection_info_port=Port
+connection_info_port-status=TODO
+connection_info_port-help=TODO
+
+connection_info_address=Address
+connection_info_address-status=TODO
+connection_info_address-help=TODO
+
+connection_info_display_file=Display File
+connection_info_display_file-status=TODO
+connection_info_display_file-help=TODO
+
+# ICBSETUP -> Event Information
+
+event_setup_title=Event Information
+
+event_enabled_for_expedited_label=For EXPEDITED Events:
+
+event_enabled=Is a Timed Event Active
+event_enabled-status=Is a Timed Event Active
+event_enabled-help=TODO
+
+event_dat_path=Name/Location of EVENT.DAT
+event_dat_path-status=Name/Location of EVENT.DAT
+event_dat_path-help=TODO
+
+event_suspend_minutes=Minutes Prior to Suspend All Activity
+event_suspend_minutes-status=Minutes Prior to Suspend All Activity
+event_suspend_minutes-help=TODO
+
+event_disallow_uploads=Disallow Uploads Prior to Event
+event_disallow_uploads-status=Disallow Uploads Prior to Event
+event_disallow_uploads-help=TODO
+
+event_minutes_uploads_disallowed=Minutes Prior to Disallow Uploads
+event_minutes_uploads_disallowed-status=Minutes Prior to Disallow Uploads
+event_minutes_uploads_disallowed-help=TODO
+
+# ICBSETUP -> Accounting Configuration
+accounting_config_title=Accounting Configuration
+
+accounting_enabled=Enable Accounting Features
+accounting_enabled-status=Enable Accounting Features
+accounting_enabled-help=TODO
+
+accounting_use_money=Display Money instead of Credits
+accounting_use_money-status=Display Money instead of Credits
+accounting_use_money-help=TODO
+
+accounting_concurrent_tracking=Concurrent Tracking of Charges
+accounting_concurrent_tracking-status=Concurrent Tracking of Charges
+accounting_concurrent_tracking-help=TODO
+
+accounting_ignore_empty_sec_level=Ignore Empty Security Level
+accounting_ignore_empty_sec_level-status=Ignore Empty Security Level
+accounting_ignore_empty_sec_level-help=TODO
+
+accounting_peak_usage_start=Peak Usage Start Time
+accounting_peak_usage_start-status=Peak Usage Start Time
+accounting_peak_usage_start-help=TODO
+
+accounting_peak_usage_end=Peak Usage End Time
+accounting_peak_usage_end-status=Peak Usage End Time
+accounting_peak_usage_end-help=TODO
+
+accounting_peak_days_of_week=Peak Days of the Week
+accounting_peak_days_of_week-status=Peak Days of the Week
+accounting_peak_days_of_week-help=TODO
+
+accounting_peak_holiday_list_file=Name/Loc of Peak Holidays List File
+accounting_peak_holiday_list_file-status=Name/Loc of Peak Holidays List File
+accounting_peak_holiday_list_file-help=TODO
+
+accounting_cfg_file=Name/Loc of Account Configuration File
+accounting_cfg_file-status=Name/Loc of Accounting Configuration File
+accounting_cfg_file-help=TODO
+
+accounting_tracking_file=Name/Loc of Account Tracking File
+accounting_tracking_file-status=Name/Loc of Accounting Tracking File
+accounting_tracking_file-help=TODO
+
+accounting_info_file=Name/Loc of Accounting Info File
+accounting_info_file-status=Name/Loc of Accounting Info File
+accounting_info_file-help=TODO
+
+accounting_warning_file=Name/Loc of Accounting Warning File
+accounting_warning_file-status=Name/Loc of Accounting Warning File
+accounting_warning_file-help=TODO
+
+accounting_logoff_file=Name/Loc of Accounting Logoff File
+accounting_logoff_file-status=Name/Loc of Accounting Logoff File
+accounting_logoff_file-help=TODO
+
+
+# Conference Editor
+
+conf_name=Name (#{ $number })
+
+conf_public_conf=Public Conference
+conf_public_conf-status=Public Conference
+conf_public_conf-help=TODO
+
+conf_req_sec_if_pub=Req. Security if Public
+conf_req_sec_if_pub-status=Req. Security if Public
+conf_req_sec_if_pub-help=TODO
+
+conf_pw_join_priv=Password to Join if Private
+conf_pw_join_priv-status=Password to Join if Private
+conf_pw_join_priv-help=TODO
+
+conf_user_menu=Name/Loc of User's Menu
+conf_user_menu-status=Name/Loc of User's Menu
+conf_user_menu-help=TODO
+
+conf_sysop_menu=Name/Loc of Sysop's Menu
+conf_sysop_menu-status=Name/Loc of Sysop's Menu
+conf_sysop_menu-help=TODO
+
+conf_news_file=Name/Loc of NEWS File
+conf_news_file-status=Name/Loc of NEWS File
+conf_news_file-help=TODO
+
+conf_intro_file=Name/Loc of Conf INTRO File
+conf_intro_file-status=Name/Loc of Conf INTRO File
+conf_intro_file-help=TODO
+
+conf_attach_loc=Location for Attachments
+conf_attach_loc-status=Location for Attachments
+conf_attach_loc-help=TODO
+
+conf_cmd_lst_file=Conf. CMD.LST File
+conf_cmd_lst_file-status=Conf. CMD.LST File
+conf_cmd_lst_file-help=TODO
+
+conf_sort_loc_label={"              "}Sort  Location of Uploads
+
+conf_pub_upld=Public  Upld
+conf_pub_upld-status=Public Upld
+conf_pub_upld-help=TODO
+
+conf_priv_upld=Private Upld
+conf_priv_upld-status=Private Upld
+conf_priv_upld-help=TODO
+
+conf_menu_path_label={"              "}Menu Listing                   Path/Name List File
+
+conf_doors=Doors
+conf_doors-status=Doors
+conf_doors-help=TODO
+
+conf_bulletins=Bulletins
+conf_bulletins-status=Bulletins
+conf_bulletins-help=TODO
+
+conf_surveys=Surveys
+conf_surveys-status=Surveys
+conf_surveys-help=TODO
+
+conf_directories=Directories
+conf_directories-status=Directories
+conf_directories-help=TODO
+
+conf_areas=Areas
+conf_areas-status=Areas
+conf_areas-help=TODO
+
+conf_auto_rejon=Auto-Rejoin into this Conf.
+conf_auto_rejon-status=Auto-Rejoin into this Conf.
+conf_auto_rejon-help=TODO
+
+conf_add_conf_sec=Additional Conference Security
+conf_add_conf_sec-status=Additional Conference Security
+conf_add_conf_sec-help=TODO
+
+conf_allow_view_conf_members=Allow Viewing Conf. Members
+conf_allow_view_conf_members-status=Allow Viewing Conf. Members
+conf_allow_view_conf_members-help=TODO
+
+conf_add_conference_time=Additional Conference Time
+conf_add_conference_time-status=Additional Conference Time
+conf_add_conference_time-help=TODO
+
+conf_private_uploads=Make All Uploads Private
+conf_private_uploads-status=Make All Uploads Private
+conf_private_uploads-help=TODO
+
+conf_private_messages=Make All Messages Private
+conf_private_messages-status=Make All Messages Private
+conf_private_messages-help=TODO
+
+conf_disallow_private_msgs=Disallow Private Messages
+conf_disallow_private_msgs-status=Disallow Private Messages
+conf_disallow_private_msgs-help=TODO
+
+conf_sec_attachments=Level to Save File Attachment
+conf_sec_attachments-status=Level to Save File Attachment
+conf_sec_attachments-help=TODO
+
+conf_show_intro_in_scan=Show INTRO in 'R A' Scan
+conf_show_intro_in_scan-status=Show INTRO in 'R A' Scan
+conf_show_intro_in_scan-help=TODO
+
+conf_sec_write_message=Level to Enter a Message
+conf_sec_write_message-status=Level to Enter a Message
+conf_sec_write_message-help=TODO
+
+conf_sec_carbon_copy=Level to Enter Carbon List Msgs
+conf_sec_carbon_copy-status=Level to Enter Carbon List Msgs
+conf_sec_carbon_copy-help=TODO
+
+conf_carbon_list_limit=Carbon Copy List Limit
+conf_carbon_list_limit-status=Carbon Copy List Limit
+conf_carbon_list_limit-help=TODO
+
+conf_allow_aliases=Allow Aliases to be used
+conf_allow_aliases-status=Allow Aliases to be used
+conf_allow_aliases-help=TODO
+
+conf_charge_time=Charge Per Minute
+conf_charge_time-status=Charge Per Minute
+conf_charge_time-help=TODO
+
+conf_charge_msg_read=Charge Per Message Read
+conf_charge_msg_read-status=Charge Per Message Read
+conf_charge_msg_read-help=TODO
+
+conf_charge_msg_write=Charge Per Message Written
+conf_charge_msg_write-status=Charge Per Message Written
+conf_charge_msg_write-help=TODO
+
+conf_is_read_only=Make Conference Read-Only
+conf_is_read_only-status=Make Conference Read-Only
+conf_is_read_only-help=TODO
+
+conf_list_title=Conferences Menu
+
+# Accounting Editor
+
+accounting_title=Accounting Rates Configuration
+
+accounting_start_balance=New User Starting Balance
+accounting_start_balance-status=New User Starting Balance
+accounting_start_balance-help=TODO
+
+accounting_warning_level=Balance Warning Level
+accounting_warning_level-status=Balance Warning Level
+accounting_warning_level-help=TODO
+
+accounting_charges_label=Charges:
+
+accounting_per_logon=Per Logon
+accounting_per_logon-status=Per Logon
+accounting_per_logon-help=TODO
+
+accounting_per_minute=Per Minute Online
+accounting_per_minute-status=Per Minute Online
+accounting_per_minute-help=TODO
+
+accounting_per_minute_peak=Per Minute Online Peak Time
+accounting_per_minute_peak-status=Per Minute Online Peak Time
+accounting_per_minute_peak-help=TODO
+
+accounting_per_minute_grpChat=Per Minute in Group Chat (Added)
+accounting_per_minute_grpChat-status=Per Minute in Group Chat (Added)
+accounting_per_minute_grpChat-help=TODO
+
+accounting_per_message_read=Per Message Read
+accounting_per_message_read-status=Per Message Read
+accounting_per_message_read-help=TODO
+
+accounting_per_message_captured=Per Message Captured (QWK/c/d/z)
+accounting_per_message_captured-status=Per Message Captured (QWK/c/d/z)
+accounting_per_message_captured-help=TODO
+
+accounting_per_message_written=Per Message Written
+accounting_per_message_written-status=Per Message Written
+accounting_per_message_written-help=TODO
+
+accounting_per_message_written_echoed=Per Message Written (Echoed)
+accounting_per_message_written_echoed-status=Per Message Written (Echoed)
+accounting_per_message_written_echoed-help=TODO
+
+accounting_per_message_written_private=Per Message Written (Private)
+accounting_per_message_written_private-status=Per Message Written (Private)
+accounting_per_message_written_private-help=TODO
+
+accounting_per_file_downloaded=Per File Downloaded
+accounting_per_file_downloaded-status=Per File Downloaded
+accounting_per_file_downloaded-help=TODO
+
+accounting_per_file_bytes_downloaded=Per 1K-Bytes Downloaded
+accounting_per_file_bytes_downloaded-status=Per 1K-Bytes Downloaded
+accounting_per_file_bytes_downloaded-help=TODO
+
+accounting_payback_label=Pay Back:
+
+accounting_payback_per_file=Per File Uploaded
+accounting_payback_per_file-status=Per File Uploaded
+accounting_payback_per_file-help=TODO
+
+accounting_payback_per_file_bytes=Per 1K-Bytes Uploaded
+accounting_payback_per_file_bytes-status=Per 1K-Bytes Uploaded
+accounting_payback_per_file_bytes-help=TODO

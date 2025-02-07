@@ -27,8 +27,6 @@ pub fn new_main_window<'a>(icy_board: IcyBoard, mnu: Arc<Mutex<Menu>>, full_scre
         tabs: vec![Box::new(general_tab), Box::new(command_tab), Box::new(AboutTab::default())],
         status_line: String::new(),
         help_state: HelpViewState::new(23),
-        open_editor: None,
-        get_editor: Box::new(|_id, _path| Ok(None)),
         save: false,
     }
 }

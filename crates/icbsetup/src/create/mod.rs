@@ -131,8 +131,15 @@ impl IcyBoardCreator {
         DEFAULT_DISPLAY_TEXT.save(&self.destination.join(&config.paths.icbtext))?;
 
         self.logger.start_action("Write trashcan files…".to_string());
+        config.paths.trashcan_upload_files = PathBuf::from("config/tcan_uploads.txt");
+        fs::write(
+            &self.destination.join(&config.paths.trashcan_upload_files),
+            include_str!("../../data/tcan_uploads.txt"),
+        )?;
+
         config.paths.trashcan_user = PathBuf::from("config/tcan_user.txt");
         fs::write(&self.destination.join(&config.paths.trashcan_user), include_str!("../../data/tcan_users.txt"))?;
+
         config.paths.trashcan_email = PathBuf::from("config/tcan_email.txt");
         fs::write(&self.destination.join(&config.paths.trashcan_email), include_str!("../../data/tcan_email.txt"))?;
         config.paths.trashcan_passwords = PathBuf::from("config/tcan_passwords.txt");

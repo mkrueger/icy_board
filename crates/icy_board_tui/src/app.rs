@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::Duration};
+use std::time::Duration;
 
 use chrono::{Local, Timelike};
 use color_eyre::{eyre::Context, Result};
@@ -11,7 +11,7 @@ use crate::{
     config_menu::EditMode,
     get_text,
     help_view::{HelpView, HelpViewState},
-    tab_page::{Editor, TabPage},
+    tab_page::TabPage,
     term::next_event,
     text_field::set_cursor_mode,
     theme::{get_tui_theme, DOS_DARK_GRAY, DOS_LIGHT_GRAY, DOS_WHITE},
@@ -28,8 +28,6 @@ pub struct App<'a> {
 
     pub tabs: Vec<Box<dyn TabPage>>,
     pub help_state: HelpViewState<'a>,
-    pub open_editor: Option<Box<dyn Editor>>,
-    pub get_editor: Box<dyn Fn(&str, &PathBuf) -> Result<Option<Box<dyn Editor>>>>,
 
     pub save: bool,
 }
@@ -63,12 +61,6 @@ impl<'a> App<'a> {
         terminal
             .draw(|frame| {
                 let screen: Rect = get_screen_size(&frame, self.full_screen);
-
-                if let Some(editor) = &mut self.open_editor {
-                    editor.render(frame, screen);
-                    return;
-                }
-
                 self.ui(frame, screen);
 
                 match self.mode {
@@ -103,7 +95,7 @@ impl<'a> App<'a> {
         self.tabs[self.tab].as_mut()
     }
 
-    fn handle_key_press(&mut self, _terminal: &mut TerminalType, key: KeyEvent) {
+    fn handle_key_press(&mut self, terminal: &mut TerminalType, key: KeyEvent) {
         if self.mode == Mode::RequestQuit {
             match key.code {
                 KeyCode::Left | KeyCode::Right => self.save = !self.save,
@@ -118,19 +110,10 @@ impl<'a> App<'a> {
             return;
         }
 
-        if let Some(editor) = &mut self.open_editor {
-            if !editor.handle_key_press(key) {
-                self.open_editor = None;
-            }
-            return;
-        }
-
         if self.get_tab().has_control() {
             let state = self.get_tab_mut().handle_key_press(key);
-            if let EditMode::Open(id, path) = &state.edit_mode {
-                if let Ok(res) = (*self.get_editor)(id, path) {
-                    self.open_editor = res;
-                }
+            if let EditMode::ExternalProgramStarted = &state.edit_mode {
+                let _ = terminal.clear();
             }
             self.status_line = state.status_line;
             return;
@@ -162,11 +145,7 @@ impl<'a> App<'a> {
             }
             _ => {
                 let state = self.get_tab_mut().handle_key_press(key);
-                if let EditMode::Open(id, path) = &state.edit_mode {
-                    if let Ok(res) = (*self.get_editor)(id, path) {
-                        self.open_editor = res;
-                    }
-                }
+
                 self.status_line = state.status_line;
             }
         };
@@ -183,13 +162,12 @@ impl<'a> App<'a> {
     }
 
     fn ui(&mut self, frame: &mut Frame, area: Rect) {
-        let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1), Constraint::Length(1), Constraint::Length(1)]);
-        let [title_bar, tab, key_bar, status_line] = vertical.areas(area);
+        let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1), Constraint::Length(1)]);
+        let [title_bar, tab, status_line] = vertical.areas(area);
 
         Block::new().style(get_tui_theme().title_bar).render(area, frame.buffer_mut());
         self.render_title_bar(title_bar, frame.buffer_mut());
         self.render_selected_tab(frame, tab);
-        App::render_key_help_view(key_bar, frame.buffer_mut());
         self.render_status_line(status_line, frame.buffer_mut());
 
         if self.mode == Mode::RequestQuit {
@@ -268,19 +246,6 @@ impl<'a> App<'a> {
                 .render(area, frame.buffer_mut());
         }
         self.get_tab_mut().render(frame, area);
-    }
-
-    fn render_key_help_view(area: Rect, buf: &mut Buffer) {
-        let keys = [("H/←", "Left"), ("L/→", "Right"), ("K/↑", "Up"), ("J/↓", "Down"), ("Q/Esc", "Quit")];
-        let spans = keys
-            .iter()
-            .flat_map(|(key, desc)| {
-                let key = Span::styled(format!(" {key} "), get_tui_theme().key_binding);
-                let desc = Span::styled(format!(" {desc} "), get_tui_theme().key_binding_description);
-                [key, desc]
-            })
-            .collect::<Vec<Span>>();
-        Line::from(spans).centered().style((Color::Indexed(236), Color::Indexed(232))).render(area, buf);
     }
 
     fn render_status_line(&self, area: Rect, buf: &mut Buffer) {

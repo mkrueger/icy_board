@@ -1,5 +1,6 @@
 use std::{
     path::PathBuf,
+    str::FromStr,
     sync::{Arc, Mutex},
 };
 
@@ -8,14 +9,15 @@ use icy_board_engine::{
     icy_board::{
         bulletins::{Bullettin, BullettinList},
         security_expr::SecurityExpression,
-        IcyBoardSerializer,
+        IcyBoard, IcyBoardSerializer,
     },
     Res,
 };
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
     insert_table::InsertTable,
-    tab_page::Editor,
+    save_changes_dialog::SaveChangesDialog,
+    tab_page::{Page, PageMessage},
     theme::get_tui_theme,
 };
 use ratatui::{
@@ -28,12 +30,15 @@ use ratatui::{
 pub struct BullettinsEditor<'a> {
     path: std::path::PathBuf,
     blt_list: BullettinList,
+    orig_blt_list: BullettinList,
 
     insert_table: InsertTable<'a>,
     sec_levels: Arc<Mutex<Vec<Bullettin>>>,
 
     edit_config_state: ConfigMenuState,
-    edit_config: Option<ConfigMenu<u32>>,
+    edit_config: Option<ConfigMenu<(usize, Arc<Mutex<Vec<Bullettin>>>)>>,
+
+    save_dialog: Option<SaveChangesDialog>,
 }
 
 impl<'a> BullettinsEditor<'a> {
@@ -67,11 +72,13 @@ impl<'a> BullettinsEditor<'a> {
 
         Ok(Self {
             path: path.clone(),
-            blt_list: bullettins,
+            blt_list: bullettins.clone(),
+            orig_blt_list: bullettins,
             insert_table,
             sec_levels: command_arc,
             edit_config: None,
             edit_config_state: ConfigMenuState::default(),
+            save_dialog: None,
         })
     }
 
@@ -102,7 +109,7 @@ impl<'a> BullettinsEditor<'a> {
     }
 }
 
-impl<'a> Editor for BullettinsEditor<'a> {
+impl<'a> Page for BullettinsEditor<'a> {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         Clear.render(area, frame.buffer_mut());
         let block = Block::new()
@@ -136,55 +143,54 @@ impl<'a> Editor for BullettinsEditor<'a> {
                 .text_field_state
                 .set_cursor_position(frame);
         }
+        if let Some(save_changes) = &self.save_dialog {
+            save_changes.render(frame, area);
+        }
     }
 
-    fn handle_key_press(&mut self, key: KeyEvent) -> bool {
+    fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
+        if self.save_dialog.is_some() {
+            let res = self.save_dialog.as_mut().unwrap().handle_key_press(key);
+            return match res {
+                icy_board_tui::save_changes_dialog::SaveChangesMessage::Cancel => {
+                    self.save_dialog = None;
+                    PageMessage::None
+                }
+                icy_board_tui::save_changes_dialog::SaveChangesMessage::Close => PageMessage::Close,
+                icy_board_tui::save_changes_dialog::SaveChangesMessage::Save => {
+                    self.blt_list.save(&self.path).unwrap();
+                    PageMessage::Close
+                }
+                icy_board_tui::save_changes_dialog::SaveChangesMessage::None => PageMessage::None,
+            };
+        }
+
         if let Some(edit_config) = &mut self.edit_config {
             match key.code {
                 KeyCode::Esc => {
-                    /*
-                    let Some(selected_item) = self.insert_table.table_state.selected() else {
-                        return true;
-                    };
-                    for item in edit_config.iter() {
-                        match item.id.as_str() {
-                            "path" => {
-                                if let ListValue::Path(path) = &item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].file = path.clone();
-                                }
-                            }
-                            "security" => {
-                                if let ListValue::Text(_, text) = &item.value {
-                                    if let Ok(expr) = SecurityExpression::from_str(text) {
-                                        self.sec_levels.lock().unwrap()[selected_item].required_security = expr;
-                                    }
-                                }
-                            }
-                            _ => {
-                                panic!("Unknown item: {}", item.id);
-                            }
-                        }
-                    }*/
                     self.edit_config = None;
-                    return true;
+                    return PageMessage::None;
                 }
                 _ => {
                     edit_config.handle_key_press(key, &mut self.edit_config_state);
                 }
             }
-            return true;
+            return PageMessage::None;
         }
 
         match key.code {
             KeyCode::Esc => {
                 self.blt_list.bullettins.clear();
-                self.blt_list.bullettins.append(&mut self.sec_levels.lock().unwrap());
-                self.blt_list.save(&self.path).unwrap();
-                return false;
+                self.blt_list.bullettins.append(&mut self.sec_levels.lock().unwrap().clone());
+                if self.blt_list == self.orig_blt_list {
+                    return PageMessage::Close;
+                }
+                self.save_dialog = Some(SaveChangesDialog::new());
+                return PageMessage::None;
             }
             _ => match key.code {
-                KeyCode::Char('1') => self.move_up(),
-                KeyCode::Char('2') => self.move_down(),
+                KeyCode::PageUp => self.move_up(),
+                KeyCode::PageDown => self.move_down(),
 
                 KeyCode::Insert => {
                     self.sec_levels.lock().unwrap().push(Bullettin {
@@ -208,14 +214,26 @@ impl<'a> Editor for BullettinsEditor<'a> {
                     if let Some(selected_item) = self.insert_table.table_state.selected() {
                         let cmd = self.sec_levels.lock().unwrap();
                         let Some(action) = cmd.get(selected_item) else {
-                            return true;
+                            return PageMessage::None;
                         };
                         self.edit_config = Some(ConfigMenu {
-                            obj: 0,
+                            obj: (selected_item, self.sec_levels.clone()),
                             entry: vec![
-                                ConfigEntry::Item(ListItem::new("Path".to_string(), ListValue::Path(action.file.clone())).with_label_width(16)),
                                 ConfigEntry::Item(
-                                    ListItem::new("Security".to_string(), ListValue::Text(25, action.required_security.to_string())).with_label_width(16),
+                                    ListItem::new("Path".to_string(), ListValue::Path(action.file.clone()))
+                                        .with_label_width(16)
+                                        .with_update_path_value(&|board: &(usize, Arc<Mutex<Vec<Bullettin>>>), value: PathBuf| {
+                                            board.1.lock().unwrap()[board.0].file = value;
+                                        }),
+                                ),
+                                ConfigEntry::Item(
+                                    ListItem::new("Security".to_string(), ListValue::Text(25, action.required_security.to_string()))
+                                        .with_label_width(16)
+                                        .with_update_text_value(&|board: &(usize, Arc<Mutex<Vec<Bullettin>>>), value: String| {
+                                            if let Ok(expr) = SecurityExpression::from_str(&value) {
+                                                board.1.lock().unwrap()[board.0].required_security = expr;
+                                            }
+                                        }),
                                 ),
                             ],
                         });
@@ -229,6 +247,10 @@ impl<'a> Editor for BullettinsEditor<'a> {
                 }
             },
         }
-        true
+        PageMessage::None
     }
+}
+
+pub fn edit_bulletins(_board: (usize, Arc<Mutex<IcyBoard>>), path: PathBuf) -> PageMessage {
+    PageMessage::OpenSubPage(Box::new(BullettinsEditor::new(&path).unwrap()))
 }

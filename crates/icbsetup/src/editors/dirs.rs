@@ -1,17 +1,20 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
     icy_board::{
         file_directory::{DirectoryList, FileDirectory, SortDirection, SortOrder},
-        IcyBoardSerializer,
+        IcyBoard, IcyBoardSerializer,
     },
     Res,
 };
 use icy_board_tui::{
     config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
     insert_table::InsertTable,
-    tab_page::Editor,
+    tab_page::{Page, PageMessage},
     theme::get_tui_theme,
 };
 use ratatui::{
@@ -96,7 +99,7 @@ impl<'a> DirsEditor<'a> {
     }
 }
 
-impl<'a> Editor for DirsEditor<'a> {
+impl<'a> Page for DirsEditor<'a> {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         Clear.render(area, frame.buffer_mut());
         let block = Block::new()
@@ -132,7 +135,7 @@ impl<'a> Editor for DirsEditor<'a> {
         }
     }
 
-    fn handle_key_press(&mut self, key: KeyEvent) -> bool {
+    fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         if let Some(edit_config) = &mut self.edit_config {
             match key.code {
                 KeyCode::Esc => {
@@ -229,13 +232,13 @@ impl<'a> Editor for DirsEditor<'a> {
                         }
                     }*/
                     self.edit_config = None;
-                    return true;
+                    return PageMessage::None;
                 }
                 _ => {
                     edit_config.handle_key_press(key, &mut self.edit_config_state);
                 }
             }
-            return true;
+            return PageMessage::None;
         }
 
         match key.code {
@@ -246,7 +249,7 @@ impl<'a> Editor for DirsEditor<'a> {
                     }
                 }
                 self.dir_list.lock().unwrap().save(&self.path).unwrap();
-                return false;
+                return PageMessage::Close;
             }
             _ => match key.code {
                 KeyCode::Char('1') => self.move_up(),
@@ -271,7 +274,7 @@ impl<'a> Editor for DirsEditor<'a> {
                     if let Some(selected_item) = self.insert_table.table_state.selected() {
                         let cmd = self.dir_list.lock().unwrap();
                         let Some(item) = cmd.get(selected_item) else {
-                            return true;
+                            return PageMessage::None;
                         };
                         self.edit_config = Some(ConfigMenu {
                             obj: 0,
@@ -324,6 +327,10 @@ impl<'a> Editor for DirsEditor<'a> {
                 }
             },
         }
-        true
+        PageMessage::None
     }
+}
+
+pub fn edit_dirs(_board: (usize, Arc<Mutex<IcyBoard>>), path: PathBuf) -> PageMessage {
+    PageMessage::OpenSubPage(Box::new(DirsEditor::new(&path).unwrap()))
 }

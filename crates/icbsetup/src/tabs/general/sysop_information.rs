@@ -1,38 +1,34 @@
 use std::sync::{Arc, Mutex};
 
+use crate::{cfg_entry_bool, cfg_entry_password, cfg_entry_text};
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::{user_base::Password, IcyBoard};
 use icy_board_tui::{
-    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
+    config_menu::{ConfigEntry, ConfigMenu, ResultState},
     get_text,
     tab_page::{Page, PageMessage},
-    theme::get_tui_theme,
-    BORDER_SET,
-};
-use ratatui::{
-    layout::{Margin, Rect},
-    text::Line,
-    widgets::{Block, Borders, Padding, Widget},
 };
 
-use crate::{cfg_entry_bool, cfg_entry_password, cfg_entry_text};
+use super::ICBConfigMenuUI;
 
 pub struct SysopInformation {
-    pub state: ConfigMenuState,
-
-    menu: ConfigMenu<Arc<Mutex<IcyBoard>>>,
+    menu: ICBConfigMenuUI,
 }
 
 impl SysopInformation {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
-        let menu: ConfigMenu<Arc<Mutex<IcyBoard>>> = {
+        let menu = {
             let lock = icy_board.lock().unwrap();
-            let label_width = 30;
-            let sysop_info: Vec<ConfigEntry<Arc<Mutex<IcyBoard>>>> = vec![
-                cfg_entry_text!("sysop_name", 45, label_width, sysop, name, lock),
+            let label_width = 25;
+            let sysop_info: Vec<icy_board_tui::config_menu::ConfigEntry<Arc<Mutex<IcyBoard>>>> = vec![
+                ConfigEntry::Separator,
+                cfg_entry_text!("sysop_name", label_width, 15, sysop, name, lock, 15),
                 cfg_entry_password!("local_password", label_width, sysop, password, lock),
                 cfg_entry_bool!("require_password_to_exit", label_width, sysop, require_password_to_exit, lock),
                 cfg_entry_bool!("use_real_name", label_width, sysop, use_real_name, lock),
+                ConfigEntry::Separator,
+                cfg_entry_text!("sys_info_external_editor", label_width, 30, sysop, external_editor, lock),
+                cfg_entry_text!("sys_info_theme", label_width, 30, sysop, config_color_theme, lock),
             ];
             ConfigMenu {
                 obj: icy_board.clone(),
@@ -41,55 +37,19 @@ impl SysopInformation {
         };
 
         Self {
-            state: ConfigMenuState::default(),
-            menu,
+            menu: ICBConfigMenuUI::new(get_text("sysop_information_title"), menu),
         }
     }
 }
 
 impl Page for SysopInformation {
-    fn render(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
-        let block: Block<'_> = Block::new()
-            .style(get_tui_theme().background)
-            .padding(Padding::new(2, 2, 1 + 4, 0))
-            .borders(Borders::ALL)
-            .border_set(BORDER_SET)
-            .border_style(get_tui_theme().content_box);
-        block.render(area, frame.buffer_mut());
-
-        let val = get_text("sysop_information_title");
-
-        let width = val.len() as u16;
-        Line::raw(val).style(get_tui_theme().menu_title).render(
-            Rect {
-                x: area.x + 1 + area.width.saturating_sub(width) / 2,
-                y: area.y + 1,
-                width,
-                height: 1,
-            },
-            frame.buffer_mut(),
-        );
-
-        frame.buffer_mut().set_string(
-            area.x + 1,
-            area.y + 2,
-            "─".repeat((area.width as usize).saturating_sub(2)),
-            get_tui_theme().content_box,
-        );
-
-        let area = area.inner(Margin { vertical: 4, horizontal: 1 });
-        self.menu.render(area, frame, &mut self.state);
+    fn render(&mut self, frame: &mut ratatui::Frame, disp_area: ratatui::prelude::Rect) {
+        self.menu.render(frame, disp_area)
     }
-
     fn request_status(&self) -> ResultState {
-        ResultState {
-            edit_mode: icy_board_tui::config_menu::EditMode::None,
-            status_line: self.menu.current_status_line(&self.state),
-        }
+        self.menu.request_status()
     }
-
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
-        let res = self.menu.handle_key_press(key, &mut self.state);
-        PageMessage::ResultState(res)
+        self.menu.handle_key_press(key)
     }
 }

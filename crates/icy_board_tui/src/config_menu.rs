@@ -11,6 +11,7 @@ use ratatui::{
 };
 
 use crate::{
+    tab_page::PageMessage,
     text_field::{TextField, TextfieldState},
     theme::get_tui_theme,
 };
@@ -20,6 +21,7 @@ pub enum EditMode {
     #[default]
     None,
     Open(String, PathBuf),
+    ExternalProgramStarted,
 }
 
 #[derive(Default)]
@@ -117,8 +119,8 @@ pub enum ListValue {
     Path(PathBuf),
     /// value, min, max
     U32(u32, u32, u32),
-    /// float = u32/100
-    PseudoFloat(u32),
+    /// float, cur_edit_string
+    Float(f64, String),
     Bool(bool),
     Color(IcbColor),
     ValueList(String, Vec<Value>),
@@ -129,12 +131,15 @@ pub struct ListItem<T> {
     title: String,
     label_width: u16,
     label_alignment: Alignment,
+    edit_width: u16,
     pub status: String,
     pub text_field_state: TextfieldState,
     pub value: ListValue,
     pub help: String,
 
     pub update_value: Option<Box<dyn Fn(&T, &ListValue) -> ()>>,
+
+    pub path_editor: Option<Box<dyn Fn(T, PathBuf) -> PageMessage>>,
 }
 
 impl<T> ListItem<T> {
@@ -143,11 +148,13 @@ impl<T> ListItem<T> {
             status: format!("{}", title),
             text_field_state: TextfieldState::default(),
             label_width: title.len() as u16,
-            label_alignment: Alignment::Right,
+            label_alignment: Alignment::Left,
             title,
             value,
             update_value: None,
             help: String::new(),
+            edit_width: 0,
+            path_editor: None,
         }
     }
 
@@ -176,6 +183,16 @@ impl<T> ListItem<T> {
         self
     }
 
+    pub fn with_edit_width(mut self, width: u16) -> Self {
+        self.edit_width = width;
+        self
+    }
+
+    pub fn with_path_editor(mut self, editor: Box<dyn Fn(T, PathBuf) -> PageMessage>) -> Self {
+        self.path_editor = Some(editor);
+        self
+    }
+
     pub fn with_update_text_value(mut self, update_value: &'static dyn Fn(&T, String) -> ()) -> Self {
         let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
             let ListValue::Text(_, text) = value else {
@@ -198,6 +215,39 @@ impl<T> ListItem<T> {
         self
     }
 
+    pub fn with_update_u32_value(mut self, update_value: &'static dyn Fn(&T, u32) -> ()) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+            let ListValue::U32(b, _, _) = value else {
+                return;
+            };
+            update_value(val, *b);
+        });
+        self.update_value = Some(b);
+        self
+    }
+
+    pub fn with_update_path_value(mut self, update_value: &'static dyn Fn(&T, PathBuf) -> ()) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+            let ListValue::Path(b) = value else {
+                return;
+            };
+            update_value(val, b.clone());
+        });
+        self.update_value = Some(b);
+        self
+    }
+
+    pub fn with_update_float_value(mut self, update_value: &'static dyn Fn(&T, f64) -> ()) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+            let ListValue::Float(f, _str) = value else {
+                return;
+            };
+            update_value(val, *f);
+        });
+        self.update_value = Some(b);
+        self
+    }
+
     fn render_label(&self, left_area: Rect, frame: &mut Frame, selected: bool, in_edit: bool) {
         Text::from(self.title.clone())
             .alignment(self.label_alignment)
@@ -207,6 +257,40 @@ impl<T> ListItem<T> {
                 get_tui_theme().item
             })
             .render(left_area, frame.buffer_mut());
+    }
+
+    fn measure_value(&self, area: Rect) -> usize {
+        let a = if self.edit_width > 0 {
+            self.edit_width as usize
+        } else {
+            match &self.value {
+                ListValue::Text(len, _text) => *len as usize,
+                ListValue::ComboBox(v) => v.cur_value.display.len(),
+
+                ListValue::Path(_) => area.width as usize,
+
+                ListValue::U32(_u, _min, max) => max.ilog10() as usize + 1,
+
+                ListValue::Float(_u, _) => 5,
+
+                ListValue::Color(_color) => 4,
+                ListValue::Bool(_value) => 3,
+                ListValue::ValueList(_cur_value, _list) => {
+                    /*
+                    for l in list {
+                        if l.value == *cur_value {
+                            Text::from(l.display.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
+                            return;
+                        }
+                    }
+                    Text::from(cur_value.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());*/
+                    8
+                }
+                ListValue::Position(_, _, pos) => pos.x as usize,
+            }
+        };
+
+        a + (self.label_width as usize) + 3
     }
 
     fn render_value(&self, area: Rect, frame: &mut Frame) {
@@ -227,13 +311,18 @@ impl<T> ListItem<T> {
             }
 
             ListValue::U32(u, _min, _max) => {
-                Text::from(u.to_string()).style(get_tui_theme().value).render(area, frame.buffer_mut());
+                let val = u.to_string();
+                let area = Rect {
+                    x: area.x,
+                    y: area.y,
+                    width: val.len() as u16,
+                    height: 1,
+                };
+                Text::from(val).style(get_tui_theme().value).render(area, frame.buffer_mut());
             }
 
-            ListValue::PseudoFloat(u) => {
-                Text::from(((*u as f64) / 100.0).to_string())
-                    .style(get_tui_theme().value)
-                    .render(area, frame.buffer_mut());
+            ListValue::Float(_val, str) => {
+                Text::from(str.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
             }
 
             ListValue::Color(color) => match color {
@@ -245,6 +334,12 @@ impl<T> ListItem<T> {
             },
             ListValue::Bool(value) => {
                 let title = if *value { " ✓ " } else { " ☐ " };
+                let area = Rect {
+                    x: area.x,
+                    y: area.y,
+                    width: 3,
+                    height: 1,
+                };
                 Text::from(title).style(get_tui_theme().value).render(area, frame.buffer_mut());
             }
             ListValue::ValueList(cur_value, list) => {
@@ -264,10 +359,11 @@ impl<T> ListItem<T> {
         }
     }
 
-    fn render_editor(&mut self, val: &T, area: Rect, frame: &mut Frame) -> bool {
+    fn render_editor(&mut self, val: &T, mut area: Rect, frame: &mut Frame) -> bool {
         match &mut self.value {
-            ListValue::Text(_edit_len, text) => {
+            ListValue::Text(edit_len, text) => {
                 let field = TextField::new().with_value(text.to_string());
+                area.width = area.width.min(*edit_len);
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
                 self.text_field_state.set_cursor_position(frame);
             }
@@ -277,19 +373,22 @@ impl<T> ListItem<T> {
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
                 self.text_field_state.set_cursor_position(frame);
             }
-            ListValue::U32(value, _min, _max) => {
+            ListValue::U32(value, _min, max) => {
+                let area = Rect {
+                    x: area.x,
+                    y: area.y,
+                    width: max.ilog10() as u16 + 1,
+                    height: 1,
+                };
                 let field = TextField::new().with_value(format!("{}", value));
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
                 self.text_field_state.set_cursor_position(frame);
             }
-            ListValue::PseudoFloat(value) => {
-                let a = *value / 100;
-                let b = *value % 100;
-                let field = TextField::new().with_value(format!("{}.{}", a, b));
+            ListValue::Float(_value, str) => {
+                let field = TextField::new().with_value(str.clone());
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
                 self.text_field_state.set_cursor_position(frame);
             }
-
             ListValue::Bool(value) => {
                 let title = if *value { " ✓ " } else { " ☐ " };
                 Text::from(title).style(get_tui_theme().edit_value).render(
@@ -381,11 +480,10 @@ impl<T> ListItem<T> {
                 self.text_field_state.handle_input(key, &mut text);
                 *path = PathBuf::from(text);
             }
-            ListValue::PseudoFloat(val) => {
-                let mut text = format!("{}", *val as f64 / 100.0);
-                self.text_field_state.handle_input(key, &mut text);
-                if let Ok(f) = text.parse::<f64>() {
-                    *val = (f * 100.0) as u32;
+            ListValue::Float(val, str) => {
+                self.text_field_state.handle_input(key, str);
+                if let Ok(f) = str.parse::<f64>() {
+                    *val = f;
                 }
             }
             ListValue::U32(cur, min, max) => {
@@ -437,6 +535,7 @@ pub enum ConfigEntry<T> {
     Item(ListItem<T>),
     Group(String, Vec<ConfigEntry<T>>),
     Table(usize, Vec<ConfigEntry<T>>),
+    Label(String),
     Separator,
 }
 
@@ -446,7 +545,16 @@ impl<T> ConfigEntry<T> {
             ConfigEntry::Item(item) => item.title.len() as u16,
             ConfigEntry::Group(_, items) => items.iter().map(|item| item._title_len()).max().unwrap_or(0),
             ConfigEntry::Table(_rows, _items) => 0,
-            ConfigEntry::Separator => 0,
+            ConfigEntry::Label(_) | ConfigEntry::Separator => 0,
+        }
+    }
+
+    fn measure_value(&self, area: Rect) -> u16 {
+        match self {
+            ConfigEntry::Item(item) => item.measure_value(area) as u16,
+            ConfigEntry::Group(_, items) => items.iter().map(|item| item.measure_value(area)).max().unwrap_or(0),
+            ConfigEntry::Table(_, items) => items.iter().map(|item| item.measure_value(area)).max().unwrap_or(0),
+            ConfigEntry::Label(_) | ConfigEntry::Separator => 0,
         }
     }
 }
@@ -475,23 +583,31 @@ impl<T> ConfigMenu<T> {
 
         state.area_height = area.height;
 
-        if !Self::display_list(&self.obj, &mut i, &mut self.entry, area, &mut y, &mut x, frame, state, false) {
+        let list_area = Rect {
+            x: area.x,
+            y: area.y,
+            width: area.width - 1,
+            height: area.height,
+        };
+
+        if !Self::display_list(&self.obj, &mut i, &mut self.entry, list_area, &mut y, &mut x, frame, state, false) {
             return;
         }
+        let content_length = y.saturating_sub(area.height);
 
         let mut y = 0;
         let mut x = 0;
         let mut i = 0;
-        if !Self::display_list(&self.obj, &mut i, &mut self.entry, area, &mut y, &mut x, frame, state, true) {
+        if !Self::display_list(&self.obj, &mut i, &mut self.entry, list_area, &mut y, &mut x, frame, state, true) {
             return;
         }
 
-        state.scroll_state = state.scroll_state.position(state.first_row as usize).content_length(state.area_height as usize);
+        state.scroll_state = ScrollbarState::new(content_length as usize).position(state.first_row as usize);
         Self::render_scrollbar(state, frame, area);
     }
 
     fn render_scrollbar(state: &mut ConfigMenuState, frame: &mut Frame, mut area: Rect) {
-        area.x += 1;
+        area.x -= 1;
 
         frame.render_stateful_widget(
             Scrollbar::default()
@@ -607,7 +723,15 @@ impl<T> ConfigMenu<T> {
         display_editor: bool,
     ) -> bool {
         let x1 = *x;
-        let x2 = *x + area.width / 2;
+        let mut x2 = 0;
+
+        for (j, item) in items.iter_mut().enumerate() {
+            if j % 2 == 0 {
+                x2 = x2.max(item.measure_value(area) as u16);
+            }
+        }
+
+        x2 += *x;
 
         for (j, item) in items.iter_mut().enumerate() {
             match item {
@@ -638,9 +762,14 @@ impl<T> ConfigMenu<T> {
                         let right_area = Rect {
                             x: left_area.left() + item.label_width + 3,
                             y: area.y + *y - state.first_row,
-                            width: xright.saturating_sub(item.label_width + 1),
+                            width: if item.edit_width > 0 {
+                                item.edit_width
+                            } else {
+                                xright.saturating_sub(item.label_width + 1)
+                            },
                             height: 1,
                         };
+
                         if *i == state.selected {
                             if display_editor {
                                 if !item.render_editor(val, right_area, frame) {
@@ -706,7 +835,7 @@ impl<T> ConfigMenu<T> {
                         let right_area = Rect {
                             x: left_area.left() + item.label_width + 3,
                             y: area.y + *y - state.first_row,
-                            width: left_area.right().saturating_sub(item.label_width + 1),
+                            width: area.right().saturating_sub(left_area.right() + 5),
                             height: 1,
                         };
                         if *i == state.selected {
@@ -751,6 +880,21 @@ impl<T> ConfigMenu<T> {
                         return false;
                     }
                 }
+                ConfigEntry::Label(text) => {
+                    let left_area = Rect {
+                        x: area.x + *x,
+                        y: area.y + y.saturating_sub(state.first_row),
+                        width: area.width.saturating_sub(*x + 1),
+                        height: 1,
+                    };
+
+                    Text::from(text.as_str())
+                        .alignment(ratatui::layout::Alignment::Left)
+                        .style(get_tui_theme().menu_label)
+                        .render(left_area, frame.buffer_mut());
+                    *y += 1;
+                }
+
                 ConfigEntry::Separator => {
                     /*
                     let left_area = Rect {
@@ -775,7 +919,7 @@ impl<T> ConfigMenu<T> {
 
     pub fn handle_key_press(&mut self, key: KeyEvent, state: &mut ConfigMenuState) -> ResultState {
         match key.code {
-            KeyCode::Up => Self::prev(state),
+            KeyCode::Up => Self::prev(self.count(), state),
             KeyCode::Down | KeyCode::Enter => Self::next(self.count(), state),
             _ => {
                 return self.get_item_mut(state.selected).unwrap().handle_key_press(key, state);
@@ -790,7 +934,7 @@ impl<T> ConfigMenu<T> {
         }
     }
 
-    fn prev(state: &mut ConfigMenuState) {
+    fn prev(count: usize, state: &mut ConfigMenuState) {
         if state.selected > 0 {
             state.selected -= 1;
 
@@ -802,6 +946,13 @@ impl<T> ConfigMenu<T> {
                     }
                 }
             }
+        } else {
+            state.selected = count - 1;
+            if let Some(y) = state.item_pos.get(&state.selected) {
+                if *y >= state.area_height {
+                    state.first_row = *y - state.area_height + 1;
+                }
+            }
         }
     }
 
@@ -811,6 +962,17 @@ impl<T> ConfigMenu<T> {
             if let Some(y) = state.item_pos.get(&state.selected) {
                 if *y >= state.area_height {
                     state.first_row = *y - state.area_height + 1;
+                }
+            }
+        } else {
+            state.selected = 0;
+
+            if let Some(y) = state.item_pos.get(&state.selected) {
+                if *y < state.first_row {
+                    state.first_row = *y;
+                    if state.first_row == 1 {
+                        state.first_row = 0;
+                    }
                 }
             }
         }
@@ -854,7 +1016,7 @@ impl<'a, T> Iterator for ConfigMenuIter<'a, T> {
                     self.iter.push(items.iter());
                     self.next()
                 }
-                ConfigEntry::Separator => {
+                ConfigEntry::Label(_) | ConfigEntry::Separator => {
                     self.iter.push(l);
                     self.next()
                 }

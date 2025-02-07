@@ -5,6 +5,7 @@ use display_files::DisplayFiles;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
     config_menu::ResultState,
+    get_text,
     select_menu::{MenuItem, SelectMenu},
     tab_page::{Page, PageMessage},
 };
@@ -28,12 +29,12 @@ impl FileLocations {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
         Self {
             page: IcbSetupMenuUI::new(SelectMenu::new(vec![
-                MenuItem::new(0, 'A', "System Files & Directories".to_string()),
-                MenuItem::new(1, 'B', "Configuration Files".to_string()),
-                MenuItem::new(2, 'C', "Display Files".to_string()),
-                MenuItem::new(3, 'D', "New User/Logon/off Surveys".to_string()),
+                MenuItem::new(0, 'A', get_text("file_locations_files_dirs")),
+                MenuItem::new(1, 'B', get_text("file_locations_config_files")),
+                MenuItem::new(2, 'C', get_text("file_locations_display_files")),
+                MenuItem::new(3, 'D', get_text("file_locations_surveys")),
             ]))
-            .with_center_title("File Locations".to_string()),
+            .with_center_title(get_text("file_locations_title")),
             icy_board,
         }
     }
@@ -49,6 +50,9 @@ impl Page for FileLocations {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
+        if key.code == crossterm::event::KeyCode::Esc {
+            return PageMessage::Close;
+        }
         let (_state, opt) = self.page.handle_key_press(key);
         if let Some(selected) = opt {
             return match selected {

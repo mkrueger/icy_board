@@ -1722,9 +1722,9 @@ pub async fn get_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             1 => Ok(VariableValue::new_string(conference.name.clone())),
             2 => Ok(VariableValue::new_bool(conference.is_public)),
             3 => Ok(VariableValue::new_bool(conference.auto_rejoin)),
-            4 => Ok(VariableValue::new_bool(conference.view_members)),
+            4 => Ok(VariableValue::new_bool(conference.allow_view_conf_members)),
             5 => Ok(VariableValue::new_bool(conference.private_uploads)),
-            6 => Ok(VariableValue::new_bool(conference.no_private_msgs)),
+            6 => Ok(VariableValue::new_bool(conference.private_msgs)),
             7 => Ok(VariableValue::new_bool(false)), // conference.echo_mail
             8 => Ok(VariableValue::new_int(conference.required_security.level() as i32)),
             9 => Ok(VariableValue::new_int(conference.add_conference_security)),
@@ -1751,7 +1751,7 @@ pub async fn get_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             30 => Ok(VariableValue::new_string(conference.attachment_location.to_string_lossy().to_string())), // PthNameLoc ???
             31 => Ok(VariableValue::new_bool(false)),                                                          // force echo
             32 => Ok(VariableValue::new_bool(false)),                                                          // read only
-            33 => Ok(VariableValue::new_bool(conference.no_private_msgs)),
+            33 => Ok(VariableValue::new_bool(conference.private_msgs)),
             34 => Ok(VariableValue::new_int(0)),      // ret receipt level
             35 => Ok(VariableValue::new_bool(false)), // record origin
             36 => Ok(VariableValue::new_bool(false)), // prompt for routing
@@ -1786,9 +1786,9 @@ pub async fn set_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             1 => conference.name = value.as_string(),
             2 => conference.is_public = value.as_bool(),
             3 => conference.auto_rejoin = value.as_bool(),
-            4 => conference.view_members = value.as_bool(),
+            4 => conference.allow_view_conf_members = value.as_bool(),
             5 => conference.private_uploads = value.as_bool(),
-            6 => conference.no_private_msgs = value.as_bool(),
+            6 => conference.private_msgs = value.as_bool(),
             7 => (), // conference.echo_mail
             8 => conference.required_security = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
             9 => conference.add_conference_security = value.as_int(),
@@ -1815,7 +1815,7 @@ pub async fn set_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             30 => conference.attachment_location = PathBuf::from_str(&value.as_string())?,
             31 => (), // force echo
             32 => (), // read only
-            33 => conference.no_private_msgs = value.as_bool(),
+            33 => conference.private_msgs = value.as_bool(),
             34 => (), // ret receipt level
             35 => (), // record origin
             36 => (), // prompt for routing

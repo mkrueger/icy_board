@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::datetime::IcbTime;
+use crate::datetime::{IcbDoW, IcbTime};
 use icy_engine::Color;
 use serde::{Deserialize, Serialize};
 
@@ -147,6 +147,12 @@ pub struct BoardInformation {
 
     /// Maximum number of active nodes
     pub num_nodes: u16,
+
+    #[serde(default)]
+    pub who_include_city: bool,
+
+    #[serde(default)]
+    pub who_show_alias: bool,
 }
 
 #[derive(Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -167,6 +173,10 @@ pub struct SysopInformation {
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub use_real_name: bool,
+
+    pub external_editor: String,
+
+    pub config_color_theme: String,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -333,11 +343,17 @@ pub struct ConfigPaths {
     pub conf_join_menu: PathBuf,
 
     /// name and loc of group chat Intro file
-    pub group_chat: PathBuf,
+    pub chat_intro_file: PathBuf,
     /// name and location of CHAT menu (v15.0)
     pub chat_menu: PathBuf,
+    /// name and location of CHAT ACTIONS menu (v15.4)
+    pub chat_actions_menu: PathBuf,
+
     /// name and location of NOANSI Warning
     pub no_ansi: PathBuf,
+
+    /// name and location of trashcan files
+    pub trashcan_upload_files: PathBuf,
 
     /// Bad users file
     pub trashcan_user: PathBuf,
@@ -368,6 +384,8 @@ pub struct ConfigPaths {
 
     /// home directory for user files
     pub home_dir: PathBuf,
+
+    pub caller_log: PathBuf,
 
     pub logon_survey: PathBuf,
     pub logon_answer: PathBuf,
@@ -548,6 +566,66 @@ pub struct BoardOptions {
     pub alarm: bool,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct EventOptions {
+    #[serde(default)]
+    pub enabled: bool,
+
+    #[serde(default)]
+    pub event_dat_path: PathBuf,
+
+    #[serde(default)]
+    pub suspend_minutes: u16,
+
+    #[serde(default)]
+    pub disallow_uploads: bool,
+
+    #[serde(default)]
+    pub minutes_uploads_disallowed: u16,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct AccountingOptions {
+    #[serde(default)]
+    pub enabled: bool,
+
+    #[serde(default)]
+    pub use_money: bool,
+
+    #[serde(default)]
+    pub concurrent_tracking: bool,
+
+    #[serde(default)]
+    pub ignore_empty_sec_level: bool,
+
+    #[serde(default)]
+    pub peak_usage_start: IcbTime,
+
+    #[serde(default)]
+    pub peak_usage_end: IcbTime,
+
+    #[serde(default)]
+    pub peak_days_of_week: IcbDoW,
+
+    #[serde(default)]
+    pub peak_holiday_list_file: PathBuf,
+
+    #[serde(default)]
+    pub cfg_file: PathBuf,
+
+    #[serde(default)]
+    pub tracking_file: PathBuf,
+
+    #[serde(default)]
+    pub info_file: PathBuf,
+
+    #[serde(default)]
+    pub warning_file: PathBuf,
+
+    #[serde(default)]
+    pub logoff_file: PathBuf,
+}
+
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 
 pub enum DisplayNewsBehavior {
@@ -596,6 +674,8 @@ pub struct IcbConfig {
     pub switches: ConfigSwitches,
     pub limits: LimitOptions,
     pub options: BoardOptions,
+    pub event: EventOptions,
+    pub accounting: AccountingOptions,
 
     pub login_server: LoginServer,
 
@@ -632,6 +712,8 @@ impl IcbConfig {
                 date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
                 num_nodes: 4,
                 allow_iemsi: true,
+                who_include_city: true,
+                who_show_alias: true,
             },
 
             sysop: SysopInformation {
@@ -639,6 +721,8 @@ impl IcbConfig {
                 password: Password::PlainText(String::new()),
                 require_password_to_exit: false,
                 use_real_name: false,
+                external_editor: "nano".to_string(),
+                config_color_theme: "DEFAULT".to_string(),
             },
             login_server: LoginServer::default(),
             sysop_command_level: SysopCommandLevels {
@@ -723,6 +807,7 @@ impl IcbConfig {
                 security_file_path: PathBuf::from("art/secmsgs/"),
                 command_display_path: PathBuf::from("art/cmd_display/"),
                 home_dir: PathBuf::from("home/"),
+                caller_log: PathBuf::from("caller.log"),
 
                 welcome: PathBuf::new(),
                 newuser: PathBuf::new(),
@@ -730,10 +815,12 @@ impl IcbConfig {
                 expire_warning: PathBuf::new(),
                 expired: PathBuf::new(),
                 conf_join_menu: PathBuf::new(),
-                group_chat: PathBuf::new(),
+                chat_intro_file: PathBuf::new(),
                 chat_menu: PathBuf::new(),
+                chat_actions_menu: PathBuf::new(),
                 no_ansi: PathBuf::new(),
 
+                trashcan_upload_files: PathBuf::new(),
                 trashcan_user: PathBuf::new(),
                 trashcan_email: PathBuf::new(),
                 trashcan_passwords: PathBuf::new(),
@@ -835,6 +922,28 @@ impl IcbConfig {
                 page_bell: true,
                 alarm: false,
                 call_log: true,
+            },
+            event: EventOptions {
+                enabled: false,
+                event_dat_path: PathBuf::new(),
+                suspend_minutes: 0,
+                disallow_uploads: false,
+                minutes_uploads_disallowed: 0,
+            },
+            accounting: AccountingOptions {
+                enabled: false,
+                use_money: false,
+                concurrent_tracking: false,
+                ignore_empty_sec_level: false,
+                peak_usage_start: IcbTime::default(),
+                peak_usage_end: IcbTime::default(),
+                peak_days_of_week: IcbDoW::default(),
+                peak_holiday_list_file: PathBuf::new(),
+                cfg_file: PathBuf::new(),
+                tracking_file: PathBuf::new(),
+                info_file: PathBuf::new(),
+                warning_file: PathBuf::new(),
+                logoff_file: PathBuf::new(),
             },
         }
     }

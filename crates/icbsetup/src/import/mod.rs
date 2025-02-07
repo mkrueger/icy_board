@@ -7,10 +7,13 @@ use std::{
 
 use codepages::tables::write_with_bom;
 use icy_board_engine::{
-    datetime::IcbTime,
+    datetime::{IcbDoW, IcbTime},
     icy_board::{
+        accounting_cfg::AccountingConfig,
         doors::DoorList,
-        icb_config::{ConfigSwitches, FileTransferOptions, LimitOptions, MessageOptions, SystemControlOptions, UserCommandLevels},
+        icb_config::{
+            AccountingOptions, ConfigSwitches, EventOptions, FileTransferOptions, LimitOptions, MessageOptions, SystemControlOptions, UserCommandLevels,
+        },
         user_base::{PasswordInfo, User},
         PCBoardRecordImporter,
     },
@@ -181,8 +184,8 @@ impl PCBoardImporter {
         })?;
 
         let icbtext = self.convert_pcbtext(&(self.data.path.text_loc.clone() + "/PCBTEXT"), "config/icbtext")?;
-        let bad_users = self.convert_trashcan(&self.data.path.tcan_file.clone(), "config/tcan_user.txt")?;
-
+        // let bad_users = self.convert_trashcan(&self.data.path.tcan_file.clone(), "config/tcan_user.txt")?;
+        let trashcan_upload_files = self.convert_trashcan(&self.data.path.tcan_file.clone(), "config/tcan_user.txt")?;
         let tcan_email = self.create_file(include_str!("../../data/tcan_email.txt"), "config/tcan_email.txt")?;
         let tcan_passwords = self.create_file(include_str!("../../data/tcan_passwords.txt"), "config/tcan_passwords.txt")?;
         let vip_users = self.create_file(include_str!("../../data/vip_users.txt"), "config/vip_users.txt")?;
@@ -194,9 +197,19 @@ impl PCBoardImporter {
         let closed = self.convert_display_file(&self.data.path.closed_file.clone(), "art/closed")?;
         let warning = self.convert_display_file(&self.data.path.warning_file.clone(), "art/warning")?;
         let expired = self.convert_display_file(&self.data.path.expired_file.clone(), "art/expired")?;
+        let caller_log = self.convert_display_file(&self.data.path.clr_file.clone(), "caller.log")?;
+
+        let accounting_config_file = self.convert_accounting_cfg(&self.data.account_config.clone(), "config/accounting_cfg.toml")?;
+        let accounting_holiday_list_file = self.convert_display_file(&self.data.holidays_file.clone(), "art/acc_holidays")?;
+        let accounting_info_file = self.convert_display_file(&self.data.account_info.clone(), "art/acc_info")?;
+        let accounting_warning_file = self.convert_display_file(&&self.data.account_warn.clone(), "art/acc_warn")?;
+        let accounting_logoff_file = self.convert_display_file(&&self.data.account_logoff.clone(), "art/acc_logoff")?;
+
         let conf_join_menu = self.convert_display_file(&self.data.path.conf_menu.clone(), "art/cnfn")?;
         let group_chat = self.convert_display_file(&self.data.path.group_chat.clone(), "art/group")?;
         let chat_menu = self.convert_display_file(&self.data.path.chat_menu.clone(), "art/chtm")?;
+        let chat_actions_menu = self.convert_display_file(&self.data.path.chat_menu.clone(), "art/chatactm")?;
+
         let no_ansi = self.convert_display_file(&self.data.path.no_ansi.clone(), "art/noansi")?;
 
         let logon_survey = self.convert_logon_surveys(&self.data.path.login_script.clone(), "art/login_survey")?;
@@ -252,6 +265,8 @@ impl PCBoardImporter {
                 password: Password::from_str(self.data.sysop_info.password.as_str()).unwrap(),
                 require_password_to_exit: self.data.sysop_info.require_pwrd_to_exit,
                 use_real_name: self.data.sysop_info.use_real_name,
+                external_editor: "nano".to_string(),
+                config_color_theme: "DEFAULT".to_string(),
             },
             sysop_command_level: SysopCommandLevels {
                 sysop: self.data.sysop_security.sysop as u8,
@@ -332,6 +347,8 @@ impl PCBoardImporter {
                 date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
                 num_nodes: 4,
                 allow_iemsi: true,
+                who_include_city: self.data.who_include_city,
+                who_show_alias: self.data.who_show_alias,
             },
             login_server: LoginServer::default(),
             func_keys: self.data.func_keys.clone(),
@@ -347,6 +364,7 @@ impl PCBoardImporter {
                 command_display_path: PathBuf::from("art/cmd_display"),
                 tmp_work_path: PathBuf::from("tmp/"),
                 home_dir: PathBuf::from("home/"),
+                caller_log,
                 icbtext,
                 conferences,
                 welcome,
@@ -355,8 +373,9 @@ impl PCBoardImporter {
                 expire_warning: warning,
                 expired,
                 conf_join_menu,
-                group_chat,
+                chat_intro_file: group_chat,
                 chat_menu,
+                chat_actions_menu,
                 no_ansi,
                 protocol_data_file,
                 pwrd_sec_level_file: security_level_file,
@@ -365,7 +384,8 @@ impl PCBoardImporter {
                 statistics_file,
                 group_file,
 
-                trashcan_user: bad_users,
+                trashcan_upload_files,
+                trashcan_user: PathBuf::new(),
                 trashcan_email: tcan_email,
                 trashcan_passwords: tcan_passwords,
                 vip_users,
@@ -457,6 +477,29 @@ impl PCBoardImporter {
                 page_bell: true,
                 alarm: false,
                 call_log: true,
+            },
+            event: EventOptions {
+                enabled: false,
+                event_dat_path: PathBuf::new(),
+                suspend_minutes: self.data.event_suspend as u16,
+                disallow_uploads: self.data.event_stop_uplds,
+                minutes_uploads_disallowed: self.data.min_prior_to_event as u16,
+            },
+            accounting: AccountingOptions {
+                enabled: self.data.enable_accounting,
+                use_money: self.data.acc_show_currency,
+                concurrent_tracking: self.data.acc_concurrent_tracking,
+                ignore_empty_sec_level: self.data.acc_ignore_drop_sec_level,
+                peak_usage_start: IcbTime::parse(&self.data.peak_start),
+                peak_usage_end: IcbTime::parse(&self.data.peak_end),
+                peak_days_of_week: IcbDoW::from_str(&self.data.peak_days).unwrap_or_default(),
+
+                peak_holiday_list_file: accounting_holiday_list_file,
+                cfg_file: accounting_config_file,
+                tracking_file: PathBuf::new(),
+                info_file: accounting_info_file,
+                warning_file: accounting_warning_file,
+                logoff_file: accounting_logoff_file,
             },
         };
 
@@ -681,6 +724,10 @@ impl PCBoardImporter {
                 self.logger.log(&format!("Can't find file {}", resolved_file.display()));
                 return Ok(line.to_string());
             }
+            if resolved_file.is_dir() {
+                self.logger.log(&format!("{} is a directory, skipping.", resolved_file.display()));
+                return Ok(line.to_string());
+            }
             let new_name = self.convert_file(resolved_file)?;
 
             let mut new_line = String::new();
@@ -754,9 +801,14 @@ impl PCBoardImporter {
     }
 
     pub fn import_and_scan_file<P: AsRef<Path>, Q: AsRef<Path>>(&mut self, from: &P, to: &Q) -> Res<()> {
-        let in_string = read_with_encoding_detection(from)?;
+        let from = from.as_ref();
+        if from.is_dir() {
+            self.logger.log(&format!("{} is a directory, skipping.", from.display()));
+            return Ok(());
+        }
+        let in_string = read_with_encoding_detection(&from)?;
         self.output
-            .start_action(format!("\t convert '{}' to utf8 '{}'…", from.as_ref().display(), to.as_ref().display()));
+            .start_action(format!("\t convert '{}' to utf8 '{}'…", from.display(), to.as_ref().display()));
         let mut import = String::new();
 
         for (i, line) in in_string.lines().enumerate() {
@@ -954,12 +1006,17 @@ impl PCBoardImporter {
                 if !filter(entry.path()) {
                     continue;
                 }
-                let rel_path = entry.path().relative_to(&help_loc).unwrap();
+                let rel_path: RelativePathBuf = entry.path().relative_to(&help_loc).unwrap();
                 let lower_case = RelativePathBuf::from_path(rel_path.as_str().to_lowercase()).unwrap();
                 let to = lower_case.to_logical_path(&o);
                 if let Some(parent_dir) = to.parent() {
                     if !parent_dir.exists() {
-                        fs::create_dir(parent_dir).unwrap();
+                        if let Err(err) = fs::create_dir(parent_dir) {
+                            self.logger.log(&format!("Can't create directory {}:", parent_dir.display()));
+                            self.logger.log_error(Some(err))?;
+                            self.output.warning(format!("Can't create directory {}", parent_dir.display()));
+                            continue;
+                        }
                     }
                 }
                 self.import_and_scan_file(&entry.path(), &to)?;
@@ -1360,5 +1417,28 @@ impl PCBoardImporter {
         }
 
         Ok(PathBuf::from(arg))
+    }
+
+    fn convert_accounting_cfg(&mut self, source: &str, new_rel_name: &str) -> Res<PathBuf> {
+        if source.is_empty() {
+            return Ok(PathBuf::new());
+        }
+
+        let src_file = PathBuf::from(source);
+        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
+        let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
+        if let Some(file) = self.converted_files.get(&upper_file_name) {
+            return Ok(PathBuf::from(file));
+        }
+        self.logger.log(&format!("\n=== Converting Accounting {} ===", source));
+
+        let Ok(list) = AccountingConfig::import_pcboard(&resolved_file) else {
+            self.logger.log(&format!("Warning, can't import accounting {}", resolved_file.display()));
+            self.output.warning(format!("Warning, can't import accounting {}", resolved_file.display()));
+            return Ok(resolved_file);
+        };
+        let destination = self.output_directory.join(new_rel_name);
+        list.save(&destination)?;
+        Ok(PathBuf::from(new_rel_name))
     }
 }

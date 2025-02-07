@@ -9,32 +9,37 @@ use icy_board_tui::{
     tab_page::{Page, PageMessage},
 };
 use ratatui::{layout::Rect, Frame};
+use secure_websockets::SecureWebsockets;
+use websockets::Websockets;
 
 use super::IcbSetupMenuUI;
-mod sysop_commands;
-mod sysop_functions;
-mod user_commands;
 
-pub struct SecurityLevelOptions {
+mod secure_websockets;
+mod ssh;
+mod telnet;
+mod websockets;
+
+pub struct ConnectionInfo {
     pub page: IcbSetupMenuUI,
     icy_board: Arc<Mutex<IcyBoard>>,
 }
 
-impl SecurityLevelOptions {
+impl ConnectionInfo {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
         Self {
             page: IcbSetupMenuUI::new(SelectMenu::new(vec![
-                MenuItem::new(0, 'A', get_text("sec_level_menu_sysop_funcs")),
-                MenuItem::new(1, 'B', get_text("sec_level_menu_sysop_commands")),
-                MenuItem::new(2, 'C', get_text("sec_level_menu_user_commands")),
+                MenuItem::new(0, 'A', get_text("connection_info_telnet")),
+                MenuItem::new(1, 'B', get_text("connection_info_ssh")),
+                MenuItem::new(2, 'C', get_text("connection_info_websockets")),
+                MenuItem::new(3, 'D', get_text("connection_info_secure_websockets")),
             ]))
-            .with_center_title(get_text("sec_level_menu_title")),
+            .with_center_title(get_text("connection_info_title")),
             icy_board,
         }
     }
 }
 
-impl Page for SecurityLevelOptions {
+impl Page for ConnectionInfo {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         self.page.render(frame, area);
     }
@@ -50,9 +55,10 @@ impl Page for SecurityLevelOptions {
         let (_state, opt) = self.page.handle_key_press(key);
         if let Some(selected) = opt {
             return match selected {
-                0 => PageMessage::OpenSubPage(Box::new(sysop_functions::SysopFunctions::new(self.icy_board.clone()))),
-                1 => PageMessage::OpenSubPage(Box::new(sysop_commands::SysopCommands::new(self.icy_board.clone()))),
-                2 => PageMessage::OpenSubPage(Box::new(user_commands::UserCommands::new(self.icy_board.clone()))),
+                0 => PageMessage::OpenSubPage(Box::new(telnet::Telnet::new(self.icy_board.clone()))),
+                1 => PageMessage::OpenSubPage(Box::new(ssh::SSH::new(self.icy_board.clone()))),
+                2 => PageMessage::OpenSubPage(Box::new(Websockets::new(self.icy_board.clone()))),
+                3 => PageMessage::OpenSubPage(Box::new(SecureWebsockets::new(self.icy_board.clone()))),
                 _ => PageMessage::None,
             };
         }

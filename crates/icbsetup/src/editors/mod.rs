@@ -1,3 +1,4 @@
+pub mod accounting_rates;
 pub mod bullettins;
 pub mod dirs;
 pub mod door;

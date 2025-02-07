@@ -2,11 +2,14 @@ use std::sync::{Arc, Mutex};
 
 use board_configuration::BoardConfiguration;
 use configuration_options::ConfigurationOptions;
+use connection_info::ConnectionInfo;
 use crossterm::event::KeyEvent;
+use event_setup::EventSetup;
 use file_locations::FileLocations;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
-    config_menu::ResultState,
+    config_menu::{ConfigMenu, ConfigMenuState, ListValue, ResultState},
+    get_text,
     select_menu::{MenuItem, SelectMenu, SelectMenuState},
     tab_page::{Page, PageMessage, TabPage},
     theme::get_tui_theme,
@@ -14,14 +17,17 @@ use icy_board_tui::{
 };
 use ratatui::{
     layout::{Margin, Rect},
-    text::{Line, Text},
+    text::{Line, Span, Text},
     widgets::{Block, Borders, Padding, Widget},
     Frame,
 };
 use subscription_information::SubscriptionInformation;
+mod accounting;
 mod board_configuration;
 mod conferences;
 mod configuration_options;
+mod connection_info;
+mod event_setup;
 mod file_locations;
 mod new_user_options;
 mod security_levels;
@@ -69,7 +75,9 @@ impl IcbSetupMenuUI {
             .padding(Padding::new(2, 2, 1 + 4, 0))
             .borders(Borders::ALL)
             .border_set(BORDER_SET)
-            .border_style(get_tui_theme().content_box);
+            .border_style(get_tui_theme().content_box)
+            .title_alignment(ratatui::layout::Alignment::Center)
+            .title_bottom(Span::styled(get_text("icb_setup_key_menu_help"), get_tui_theme().key_binding));
         block.render(disp_area, frame.buffer_mut());
 
         if let Some(val) = &self.center_title {
@@ -142,13 +150,6 @@ impl IcbSetupMenuUI {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> (ResultState, Option<i32>) {
-        if key.code == crossterm::event::KeyCode::Esc {
-            if !self.sub_pages.is_empty() {
-                self.sub_pages.pop();
-            }
-            return (ResultState::default(), None);
-        }
-
         if let Some(page) = self.sub_pages.last_mut() {
             let state = page.handle_key_press(key);
             match state {
@@ -161,6 +162,15 @@ impl IcbSetupMenuUI {
                 PageMessage::Close => {
                     self.sub_pages.pop();
                     return (ResultState::default(), None);
+                }
+                PageMessage::ExternalProgramStarted => {
+                    return (
+                        ResultState {
+                            edit_mode: icy_board_tui::config_menu::EditMode::ExternalProgramStarted,
+                            ..Default::default()
+                        },
+                        None,
+                    );
                 }
                 _ => {
                     return (ResultState::default(), None);
@@ -185,6 +195,126 @@ impl IcbSetupMenuUI {
     }
 }
 
+pub struct ICBConfigMenuUI {
+    state: ConfigMenuState,
+    title: String,
+    menu: ConfigMenu<Arc<Mutex<IcyBoard>>>,
+}
+
+impl ICBConfigMenuUI {
+    pub fn new(title: String, menu: ConfigMenu<Arc<Mutex<IcyBoard>>>) -> Self {
+        Self {
+            state: ConfigMenuState::default(),
+            title,
+            menu,
+        }
+    }
+
+    pub fn render(&mut self, frame: &mut ratatui::Frame, disp_area: ratatui::prelude::Rect) {
+        let area = Rect {
+            x: disp_area.x + 1,
+            y: disp_area.y + 1,
+            width: disp_area.width.saturating_sub(2),
+            height: disp_area.height.saturating_sub(1),
+        };
+        let mut bottom_text = get_text("icb_setup_key_menu_help");
+        if let Some(item) = self.menu.get_item(self.state.selected) {
+            if let ListValue::Path(path) = &item.value {
+                let path = self.menu.obj.lock().unwrap().resolve_file(path);
+                if path.exists() && path.is_file() {
+                    bottom_text = get_text("icb_setup_key_menu_edit_help");
+                }
+            }
+        }
+
+        let block: Block<'_> = Block::new()
+            .style(get_tui_theme().background)
+            .padding(Padding::new(2, 2, 1 + 4, 0))
+            .borders(Borders::ALL)
+            .border_set(BORDER_SET)
+            .title_alignment(ratatui::layout::Alignment::Center)
+            .title_bottom(Span::styled(bottom_text, get_tui_theme().key_binding))
+            .border_style(get_tui_theme().content_box);
+        block.render(area, frame.buffer_mut());
+
+        let width = self.title.len() as u16;
+        Line::raw(&self.title).style(get_tui_theme().menu_title).render(
+            Rect {
+                x: area.x + 1 + area.width.saturating_sub(width) / 2,
+                y: area.y + 1,
+                width,
+                height: 1,
+            },
+            frame.buffer_mut(),
+        );
+
+        frame.buffer_mut().set_string(
+            area.x + 1,
+            area.y + 2,
+            "─".repeat((area.width as usize).saturating_sub(2)),
+            get_tui_theme().content_box,
+        );
+
+        let area = Rect {
+            x: disp_area.x + 3,
+            y: area.y + 3,
+            width: disp_area.width - 3,
+            height: area.height - 4,
+        };
+        self.menu.render(area, frame, &mut self.state);
+    }
+
+    pub fn request_status(&self) -> ResultState {
+        ResultState {
+            edit_mode: icy_board_tui::config_menu::EditMode::None,
+            status_line: self.menu.current_status_line(&self.state),
+        }
+    }
+
+    pub fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
+        if let Some(item) = self.menu.get_item(self.state.selected) {
+            if let ListValue::Path(path) = &item.value {
+                if key.code == crossterm::event::KeyCode::F(2) {
+                    let path = self.menu.obj.lock().unwrap().resolve_file(path);
+                    if let Some(editor) = &item.path_editor {
+                        return editor(self.menu.obj.clone(), path);
+                    }
+
+                    let editor = &self.menu.obj.lock().unwrap().config.sysop.external_editor;
+                    match std::process::Command::new(editor).arg(format!("{}", path.display())).spawn() {
+                        Ok(mut child) => match child.wait() {
+                            Ok(_) => {
+                                return PageMessage::ExternalProgramStarted;
+                            }
+                            Err(e) => {
+                                log::error!("Error opening editor: {}", e);
+                                return PageMessage::ResultState(ResultState {
+                                    edit_mode: icy_board_tui::config_menu::EditMode::None,
+                                    status_line: format!("Error: {}", e),
+                                });
+                            }
+                        },
+                        Err(e) => {
+                            log::error!("Error opening editor: {}", e);
+                            ratatui::init();
+                            return PageMessage::ResultState(ResultState {
+                                edit_mode: icy_board_tui::config_menu::EditMode::None,
+                                status_line: format!("Error: {}", e),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        if key.code == crossterm::event::KeyCode::Esc {
+            return PageMessage::Close;
+        }
+        let res = self.menu.handle_key_press(key, &mut self.state);
+        PageMessage::ResultState(res)
+    }
+}
+
 pub struct GeneralTab {
     pub page: IcbSetupMenuUI,
     icy_board: Arc<Mutex<IcyBoard>>,
@@ -197,19 +327,19 @@ impl GeneralTab {
         let right_title = format!("Use /w ICB {}", VERSION.to_string());
         Self {
             page: IcbSetupMenuUI::new(SelectMenu::new(vec![
-                MenuItem::new(0, 'A', "Sysop Information".to_string()),
-                MenuItem::new(1, 'B', "File Locations".to_string()),
-                MenuItem::new(2, 'C', "Connection Information".to_string()),
-                MenuItem::new(3, 'D', "Board Configuration".to_string()),
-                MenuItem::new(4, 'E', "TODO".to_string()),
-                MenuItem::new(5, 'F', "Subscription".to_string()),
-                MenuItem::new(6, 'G', "Configuration Options".to_string()),
-                MenuItem::new(7, 'H', "Security Levels".to_string()),
-                MenuItem::new(8, 'I', "Accounting Configuration".to_string()),
-                MenuItem::new(9, 'J', "New User Options".to_string()),
-                MenuItem::new(10, 'K', "TODO".to_string()),
-                MenuItem::new(11, 'L', "Main Board Configuration".to_string()),
-                MenuItem::new(12, 'M', "Conferences".to_string()),
+                MenuItem::new(0, 'A', get_text("icb_setup_main_sysop_info")),
+                MenuItem::new(1, 'B', get_text("icb_setup_main_file_locs")),
+                MenuItem::new(2, 'C', get_text("icb_setup_main_con_info")),
+                MenuItem::new(3, 'D', get_text("icb_setup_main_board_cfg")),
+                MenuItem::new(4, 'E', get_text("icb_setup_main_evt_setup")),
+                MenuItem::new(5, 'F', get_text("icb_setup_main_subscription")),
+                MenuItem::new(6, 'G', get_text("icb_setup_main_conf_opt")),
+                MenuItem::new(7, 'H', get_text("icb_setup_main_sec_levels")),
+                MenuItem::new(8, 'I', get_text("icb_setup_main_acc_cfg")),
+                MenuItem::new(9, 'J', get_text("icb_setup_main_new_user")),
+                MenuItem::new(10, 'K', "TODO: Mailer/Tosser".to_string()),
+                MenuItem::new(11, 'L', get_text("icb_setup_mb_conf")),
+                MenuItem::new(12, 'M', get_text("icb_setup_conferences")),
             ]))
             .with_left_title(left_title)
             .with_center_title(center_title)
@@ -248,14 +378,18 @@ impl TabPage for GeneralTab {
                     let page = FileLocations::new(self.icy_board.clone());
                     return self.page.open_sup_page(Box::new(page));
                 }
-                2 => { // Connection Information
+                2 => {
+                    let page = ConnectionInfo::new(self.icy_board.clone());
+                    return self.page.open_sup_page(Box::new(page));
                 }
                 3 => {
                     let page = BoardConfiguration::new(self.icy_board.clone());
                     return self.page.open_sup_page(Box::new(page));
                 }
 
-                4 => { // Events - todo
+                4 => {
+                    let page = EventSetup::new(self.icy_board.clone());
+                    return self.page.open_sup_page(Box::new(page));
                 }
 
                 5 => {
@@ -272,7 +406,9 @@ impl TabPage for GeneralTab {
                     return self.page.open_sup_page(Box::new(page));
                 }
 
-                8 => { // Accounting Configuration TODO
+                8 => {
+                    let page = accounting::AccountingConfig::new(self.icy_board.clone());
+                    return self.page.open_sup_page(Box::new(page));
                 }
 
                 9 => {
@@ -283,6 +419,10 @@ impl TabPage for GeneralTab {
                 11 => {
                     // Main Board Configuration
                     let page = conferences::ConferenceEditor::new(self.icy_board.clone(), 0);
+                    return self.page.open_sup_page(Box::new(page));
+                }
+                12 => {
+                    let page = conferences::ConferenceListEditor::new(self.icy_board.clone());
                     return self.page.open_sup_page(Box::new(page));
                 }
                 _ => {}

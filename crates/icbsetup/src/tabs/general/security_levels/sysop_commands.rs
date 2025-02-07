@@ -3,33 +3,26 @@ use std::sync::{Arc, Mutex};
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
-    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
+    config_menu::{ConfigEntry, ConfigMenu, ResultState},
     get_text,
     tab_page::{Page, PageMessage},
-    theme::get_tui_theme,
-    BORDER_SET,
-};
-use ratatui::{
-    layout::Rect,
-    text::Line,
-    widgets::{Block, Borders, Padding, Widget},
 };
 
-use crate::cfg_entry_sec_level;
+use crate::{cfg_entry_sec_level, tabs::ICBConfigMenuUI};
 
 pub struct SysopCommands {
-    pub state: ConfigMenuState,
-    menu: ConfigMenu<Arc<Mutex<IcyBoard>>>,
+    menu: ICBConfigMenuUI,
 }
 
 impl SysopCommands {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
         let menu = {
             let lock = icy_board.lock().unwrap();
-            let label_width = 60;
+            let label_width = 52;
             let entry = vec![
+                ConfigEntry::Separator,
                 cfg_entry_sec_level!("sysop_sec_level", label_width, sysop_command_level, sysop, lock),
-                cfg_entry_sec_level!("sysop_sec_read_all_commentsl", label_width, sysop_command_level, read_all_comments, lock),
+                cfg_entry_sec_level!("sysop_sec_read_all_comments", label_width, sysop_command_level, read_all_comments, lock),
                 cfg_entry_sec_level!("sysop_sec_read_all_mail", label_width, sysop_command_level, read_all_mail, lock),
                 cfg_entry_sec_level!("sysop_sec_copy_move_messages", label_width, sysop_command_level, copy_move_messages, lock),
                 cfg_entry_sec_level!(
@@ -84,67 +77,19 @@ impl SysopCommands {
         };
 
         Self {
-            state: ConfigMenuState::default(),
-            menu,
+            menu: ICBConfigMenuUI::new(get_text("sysop_commands_title"), menu),
         }
     }
 }
 
 impl Page for SysopCommands {
-    fn render(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
-        let area = Rect {
-            x: area.x + 1,
-            y: area.y + 1,
-            width: area.width.saturating_sub(2),
-            height: area.height.saturating_sub(1),
-        };
-
-        let block: Block<'_> = Block::new()
-            .style(get_tui_theme().background)
-            .padding(Padding::new(2, 2, 1 + 4, 0))
-            .borders(Borders::ALL)
-            .border_set(BORDER_SET)
-            .border_style(get_tui_theme().content_box);
-        block.render(area, frame.buffer_mut());
-
-        let val = get_text("sysop_commands_title");
-        let width = val.len() as u16;
-        Line::raw(val).style(get_tui_theme().menu_title).render(
-            Rect {
-                x: area.x + 1 + area.width.saturating_sub(width) / 2,
-                y: area.y + 1,
-                width,
-                height: 1,
-            },
-            frame.buffer_mut(),
-        );
-
-        frame.buffer_mut().set_string(
-            area.x + 1,
-            area.y + 2,
-            "─".repeat((area.width as usize).saturating_sub(2)),
-            get_tui_theme().content_box,
-        );
-
-        let area = Rect {
-            x: area.x + 1,
-            y: area.y + 3,
-            width: area.width.saturating_sub(2),
-            height: area.height.saturating_sub(4),
-        };
-        self.menu.render(area, frame, &mut self.state);
+    fn render(&mut self, frame: &mut ratatui::Frame, disp_area: ratatui::prelude::Rect) {
+        self.menu.render(frame, disp_area)
     }
-
     fn request_status(&self) -> ResultState {
-        ResultState {
-            edit_mode: icy_board_tui::config_menu::EditMode::None,
-            status_line: self.menu.current_status_line(&self.state),
-        }
+        self.menu.request_status()
     }
-
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
-        let res = self.menu.handle_key_press(key, &mut self.state);
-
-        PageMessage::ResultState(res)
+        self.menu.handle_key_press(key)
     }
 }

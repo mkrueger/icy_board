@@ -21,8 +21,6 @@ pub fn new_main_window<'a>(icy_board: Arc<Mutex<IcyBoard>>, full_screen: bool) -
         tabs: vec![Box::new(users_tab), Box::new(groups_tab), Box::new(AboutTab::default())],
         status_line: String::new(),
         help_state: HelpViewState::new(23),
-        open_editor: None,
-        get_editor: Box::new(|_id, _path| Ok(None)),
         save: false,
     }
 }

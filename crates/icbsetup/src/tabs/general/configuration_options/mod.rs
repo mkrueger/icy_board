@@ -53,6 +53,9 @@ impl Page for ConfigurationOptions {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
+        if key.code == crossterm::event::KeyCode::Esc {
+            return PageMessage::Close;
+        }
         let (_state, opt) = self.page.handle_key_press(key);
         if let Some(selected) = opt {
             return match selected {

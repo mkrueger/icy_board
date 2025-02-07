@@ -403,29 +403,29 @@ impl PcbConferenceHeader {
 #[derive(Default, Clone, Debug)]
 pub struct PcbAdditionalConferenceHeader {
     pub force_echo: bool,
-    pub read_only: bool, //*
-    pub no_private_msgs: bool,
-    pub ret_receipt_level: u8,
+    pub read_only: bool,       //*
+    pub no_private_msgs: bool, // *
+    pub ret_receipt_level: u8, // *
     pub record_origin: bool,
     pub prompt_for_routing: bool,
-    pub allow_aliases: bool, // *
-    pub show_intro_on_ra: bool,
+    pub allow_aliases: bool,    // *
+    pub show_intro_on_ra: bool, //*
     pub req_level_to_enter: u8, // *
     pub password: String,       // *
     pub intro: String,          // *
     pub attach_loc: String,     // *
     pub reg_flags: u32,
-    pub attach_level: u8,
-    pub carbon_limit: u8,
-    pub cmd_lst: String, // *
+    pub attach_level: u8, //*
+    pub carbon_limit: u8, //*
+    pub cmd_lst: String,  // *
     pub old_index: bool,
     pub long_to_names: bool,
-    pub carbon_level: u8,
+    pub carbon_level: u8, // *
     pub conf_type: u8,
     pub export_ptr: u32,
-    pub charge_time: f32,
-    pub charge_msg_read: f32,
-    pub charge_msg_write: f32,
+    pub charge_time: f32,      // *
+    pub charge_msg_read: f32,  // *
+    pub charge_msg_write: f32, // *
 }
 
 impl PcbAdditionalConferenceHeader {

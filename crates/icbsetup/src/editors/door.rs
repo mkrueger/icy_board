@@ -1,18 +1,21 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
     icy_board::{
         doors::{BBSLink, Door, DoorList, DoorServerAccount, DoorType},
         security_expr::SecurityExpression,
-        IcyBoardSerializer,
+        IcyBoard, IcyBoardSerializer,
     },
     Res,
 };
 use icy_board_tui::{
     config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
     insert_table::InsertTable,
-    tab_page::Editor,
+    tab_page::{Page, PageMessage},
     theme::get_tui_theme,
 };
 use ratatui::{
@@ -113,7 +116,7 @@ impl<'a> DoorEditor<'a> {
     }
 }
 
-impl<'a> Editor for DoorEditor<'a> {
+impl<'a> Page for DoorEditor<'a> {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         Clear.render(area, frame.buffer_mut());
         let block = Block::new()
@@ -164,7 +167,7 @@ impl<'a> Editor for DoorEditor<'a> {
         }
     }
 
-    fn handle_key_press(&mut self, key: KeyEvent) -> bool {
+    fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         if let Some(edit_config) = &mut self.edit_config {
             match key.code {
                 KeyCode::Esc => {
@@ -211,13 +214,13 @@ impl<'a> Editor for DoorEditor<'a> {
                     }*/
 
                     self.edit_config = None;
-                    return true;
+                    return PageMessage::None;
                 }
                 _ => {
                     edit_config.handle_key_press(key, &mut self.edit_config_state);
                 }
             }
-            return true;
+            return PageMessage::None;
         }
 
         match key.code {
@@ -246,7 +249,7 @@ impl<'a> Editor for DoorEditor<'a> {
                 self.door_list.doors.clear();
                 self.door_list.doors.append(&mut self.command.lock().unwrap());
                 self.door_list.save(&self.path).unwrap();
-                return false;
+                return PageMessage::Close;
             }
 
             KeyCode::Tab => {
@@ -287,7 +290,7 @@ impl<'a> Editor for DoorEditor<'a> {
                         if let Some(selected_item) = self.insert_table.table_state.selected() {
                             let cmd = self.command.lock().unwrap();
                             let Some(action) = cmd.get(selected_item) else {
-                                return true;
+                                return PageMessage::None;
                             };
                             self.edit_config = Some(ConfigMenu {
                                 obj: 0,
@@ -331,6 +334,10 @@ impl<'a> Editor for DoorEditor<'a> {
                 }
             },
         }
-        true
+        PageMessage::None
     }
+}
+
+pub fn edit_doors(_board: (usize, Arc<Mutex<IcyBoard>>), path: PathBuf) -> PageMessage {
+    PageMessage::OpenSubPage(Box::new(DoorEditor::new(&path).unwrap()))
 }

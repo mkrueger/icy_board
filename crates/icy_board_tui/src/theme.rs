@@ -14,6 +14,7 @@ pub struct Theme {
     pub status_line_text: Style,
 
     pub menu_title: Style,
+    pub menu_label: Style,
 
     pub item_separator: Style,
     pub item: Style,
@@ -34,6 +35,7 @@ pub struct Theme {
     pub text_field_filler_char: char,
 
     pub table: Style,
+    pub table_inactive: Style,
     pub table_header: Style,
     pub help_box: Style,
     pub swatch: bool,
@@ -69,13 +71,15 @@ pub static CLASSIC_THEME: Theme = Theme {
     edit_value: Style::new().bg(DOS_RED).fg(DOS_WHITE),
     table_header: Style::new().bg(DOS_BLACK).fg(DOS_RED),
 
-    status_line_text: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_CYAN),
+    status_line_text: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
     menu_title: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
+    menu_label: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
     content_box_title: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
     config_title: Style::new().bg(DOS_BLACK).fg(DOS_RED),
     filter_text: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
     description_text: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
-    table: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
+    table: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GREEN),
+    table_inactive: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),
     help_box: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
 
     text_field_text: Style::new().bg(DOS_RED).fg(DOS_WHITE),
@@ -97,6 +101,7 @@ pub static DEFAULT_THEME: Theme = Theme {
         .add_modifier(Modifier::REVERSED),
 
     menu_title: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_CYAN),
+    menu_label: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
 
     content_box: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),
     content_box_title: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
@@ -113,6 +118,7 @@ pub static DEFAULT_THEME: Theme = Theme {
     value: Style::new().bg(DOS_BLACK).fg(LIGHT_GRAY),
     edit_value: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
     table: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
+    table_inactive: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),
     table_header: Style::new().bg(DOS_BLACK).fg(DOS_CYAN),
 
     text_field_text: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),

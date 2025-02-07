@@ -53,6 +53,8 @@ pub mod xfer_protocols;
 
 pub use pcb::*;
 
+pub mod accounting_cfg;
+
 #[derive(Error, Debug)]
 pub enum IcyBoardError {
     #[error("Error: {0}")]
@@ -395,7 +397,7 @@ impl IcyBoard {
         // Line 48
         pcb_dat.path.logoff_answer = self.resolve_file(&self.config.paths.logoff_answer).to_string_lossy().to_string();
         // Line 50
-        pcb_dat.path.group_chat = self.resolve_file(&self.config.paths.group_chat).to_string_lossy().to_string();
+        pcb_dat.path.group_chat = self.resolve_file(&self.config.paths.chat_intro_file).to_string_lossy().to_string();
 
         // Line 76
         pcb_dat.closed_board = self.config.system_control.is_closed_board;
@@ -464,9 +466,9 @@ impl IcyBoard {
             let header = PcbConferenceHeader {
                 name: conf.name.clone(),
                 auto_rejoin: conf.auto_rejoin,
-                view_members: conf.view_members,
+                view_members: conf.allow_view_conf_members,
                 private_uploads: conf.private_uploads,
-                private_msgs: conf.no_private_msgs,
+                private_msgs: conf.private_msgs,
                 echo_mail: false,
                 add_conference_security: conf.add_conference_security,
                 add_conference_time: conf.add_conference_time,
@@ -498,11 +500,11 @@ impl IcyBoard {
             let legacy_header = PcbLegacyConferenceHeader {
                 name: conf.name.clone(),
                 auto_rejoin: conf.auto_rejoin,
-                view_members: conf.view_members,
+                view_members: conf.allow_view_conf_members,
                 echo_mail: false,
                 public_conf: conf.is_public,
                 priv_uplds: conf.private_uploads,
-                priv_msgs: conf.no_private_msgs,
+                priv_msgs: conf.private_msgs,
                 req_sec_level: conf.required_security.level() as u16,
                 add_sec: conf.add_conference_security as u16,
                 add_time: conf.add_conference_time as u16,
@@ -723,7 +725,6 @@ pub trait IcyBoardSerializer: serde::de::DeserializeOwned + serde::ser::Serializ
 pub trait PCBoardImport: Sized + Default + IcyBoardSerializer {
     fn import_pcboard<P: AsRef<Path>>(path: &P) -> Res<Self>;
 }
-
 pub trait PCBoardRecordImporter<T>: Sized + Default {
     const RECORD_SIZE: usize;
 

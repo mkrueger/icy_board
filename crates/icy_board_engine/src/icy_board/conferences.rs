@@ -59,20 +59,46 @@ pub struct Conference {
     pub sec_write_message: SecurityExpression,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "is_false")]
-    pub auto_rejoin: bool,
+    #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
+    #[serde_as(as = "DisplayFromStr")]
+    pub sec_request_rr: SecurityExpression,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
+    #[serde_as(as = "DisplayFromStr")]
+    pub sec_carbon_copy: SecurityExpression,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_null_8")]
+    pub carbon_list_limit: u8,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
-    pub view_members: bool,
+    pub auto_rejoin: bool,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    pub allow_view_conf_members: bool,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub private_uploads: bool,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
-    pub no_private_msgs: bool,
+    pub private_msgs: bool,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    pub disallow_private_msgs: bool,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub allow_aliases: bool,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    pub show_intro_in_scan: bool,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_i32")]
@@ -130,6 +156,10 @@ pub struct Conference {
 
     #[serde(skip)]
     pub doors: DoorList,
+
+    pub charge_time: f64,
+    pub charge_msg_read: f64,
+    pub charge_msg_write: f64,
 }
 
 impl Conference {}
@@ -183,9 +213,9 @@ impl ConferenceBase {
                 sec_attachments: SecurityExpression::from_req_security(d.attach_level),
                 sec_write_message: SecurityExpression::from_req_security(d.req_level_to_enter),
                 auto_rejoin: c.auto_rejoin,
-                view_members: c.view_members,
+                allow_view_conf_members: c.view_members,
                 private_uploads: c.private_uploads,
-                no_private_msgs: c.private_msgs,
+                private_msgs: c.private_msgs,
                 allow_aliases: d.allow_aliases,
                 add_conference_security: c.add_conference_security,
                 add_conference_time: c.add_conference_time as u16,
@@ -212,6 +242,14 @@ impl ConferenceBase {
                 areas: AreaList::default(),
                 directories: DirectoryList::default(),
                 doors: DoorList::default(),
+                show_intro_in_scan: d.show_intro_on_ra,
+                sec_request_rr: SecurityExpression::from_req_security(d.ret_receipt_level),
+                sec_carbon_copy: SecurityExpression::from_req_security(d.carbon_level),
+                carbon_list_limit: d.carbon_limit,
+                charge_time: d.charge_time as f64,
+                charge_msg_read: d.charge_msg_read as f64,
+                charge_msg_write: d.charge_msg_write as f64,
+                disallow_private_msgs: d.no_private_msgs,
             };
             confs.push(new);
         }

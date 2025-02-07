@@ -12,6 +12,7 @@ pub mod help_view;
 pub mod insert_table;
 pub mod pcb_line;
 pub mod position_editor;
+pub mod save_changes_dialog;
 pub mod select_menu;
 pub mod tab_page;
 pub mod term;

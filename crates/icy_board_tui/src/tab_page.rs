@@ -8,6 +8,7 @@ pub enum PageMessage {
     Close,
     ResultState(ResultState),
     OpenSubPage(Box<dyn Page>),
+    ExternalProgramStarted,
 }
 
 pub trait Page {
@@ -48,9 +49,4 @@ pub trait TabPage {
     fn is_dirty(&self) -> bool {
         false
     }
-}
-
-pub trait Editor {
-    fn render(&mut self, frame: &mut Frame, area: Rect);
-    fn handle_key_press(&mut self, _key: KeyEvent) -> bool;
 }

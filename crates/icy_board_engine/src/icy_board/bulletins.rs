@@ -10,7 +10,7 @@ use serde_with::{serde_as, DisplayFromStr};
 use super::{security_expr::SecurityExpression, IcyBoardSerializer, PCBoardRecordImporter};
 
 #[serde_as]
-#[derive(Clone, Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Bullettin {
     pub file: PathBuf,
 
@@ -29,7 +29,7 @@ impl Bullettin {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct BullettinList {
     #[serde(rename = "bullettin")]
     pub bullettins: Vec<Bullettin>,

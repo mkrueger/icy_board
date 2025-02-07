@@ -1,4 +1,5 @@
 use core::fmt;
+use std::str::FromStr;
 
 use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
 use serde::Deserialize;
@@ -402,5 +403,68 @@ impl From<IcbTime> for Datetime {
             }),
             offset: None,
         }
+    }
+}
+
+#[derive(Default, Debug, Clone, PartialEq)]
+pub struct IcbDoW {
+    dow: u8,
+}
+
+impl IcbDoW {
+    pub fn new(day: u8) -> Self {
+        Self { dow: day }
+    }
+}
+
+impl fmt::Display for IcbDoW {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s = String::new();
+        for i in 0..7 {
+            if self.dow & (1 << i) != 0 {
+                s.push('Y');
+            } else {
+                s.push('N');
+            }
+        }
+        write!(f, "{}", s)
+    }
+}
+
+impl FromStr for IcbDoW {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut dow = 0;
+        for (i, c) in s.chars().enumerate() {
+            if c == 'Y' {
+                dow |= 1 << i;
+            }
+        }
+        Ok(Self { dow })
+    }
+}
+
+impl From<String> for IcbDoW {
+    fn from(datetime: String) -> IcbDoW {
+        IcbDoW::from_str(&datetime).unwrap()
+    }
+}
+
+impl<'de> Deserialize<'de> for IcbDoW {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        String::deserialize(deserializer).map(IcbDoW::from)
+    }
+}
+
+impl serde::Serialize for IcbDoW {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.to_string().serialize(serializer)
     }
 }

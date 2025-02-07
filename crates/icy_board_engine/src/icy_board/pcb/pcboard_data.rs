@@ -73,7 +73,7 @@ pub struct PcbBoardData {
     ///  exit to dos after each caller
     pub exit_to_dos: bool,
     ///  include user's city/state in node chat display
-    pub include_city: bool,
+    pub who_include_city: bool,
     ///  eliminate screen snow
     pub eliminate_snow: bool,
 
@@ -286,8 +286,8 @@ pub struct PcbBoardData {
     pub pwrd_warn: i32,
     ///  TRUE if group chat should be captured to disk (v15.0)
     pub record_group_chat: bool,
-    ///  TRUE if sysop wants ALIAS shown in USERNET (v15.0)
-    pub show_alias: bool,
+    ///  TRUE if sysop wants ALIAS shown in WHO Command (v15.0)
+    pub who_show_alias: bool,
     ///  Minimum Password Length when PSA is installed (v15.0)
     pub min_pwrd_len: i32,
     ///  TRUE if handles are allowed in Group Chat (v15.0)
@@ -305,11 +305,11 @@ pub struct PcbBoardData {
     ///  TRUE if accounting features are enabled (v15.2)
     pub enable_accounting: bool,
     ///  TRUE if currency values should be shown (v15.2)
-    pub show_currency: bool,
+    pub acc_show_currency: bool,
     ///  TRUE if charges run concurrently (v15.2)
-    pub concurrent: bool,
+    pub acc_concurrent_tracking: bool,
     ///  TRUE if the DropSecLevel should not be used (v15.2)
-    pub ignore_drop_sec_level: bool,
+    pub acc_ignore_drop_sec_level: bool,
     ///  Start of peak usage hours (v15.2)
     pub peak_start: String,
     ///  End of peak usage hours (v15.2)
@@ -675,6 +675,9 @@ pub struct FileLocations {
     pub chat_menu: String,
     ///  name and location of NOANSI file (v15.0)
     pub no_ansi: String,
+
+    /// location of chat actions file
+    pub chat_actions: String,
 }
 
 /// # Errors
@@ -834,7 +837,7 @@ impl PcbBoardData {
         ret.closed_board = read_bool(&mut reader, encoding)?;
         ret.non_graphics = read_bool(&mut reader, encoding)?;
         ret.exit_to_dos = read_bool(&mut reader, encoding)?;
-        ret.include_city = read_bool(&mut reader, encoding)?;
+        ret.who_include_city = read_bool(&mut reader, encoding)?;
         ret.eliminate_snow = read_bool(&mut reader, encoding)?;
         ret.subscription_info.is_enabled = read_bool(&mut reader, encoding)?;
         ret.allow_esc_codes = read_bool(&mut reader, encoding)?;
@@ -1047,7 +1050,7 @@ impl PcbBoardData {
         ret.pwrd_update = read_int(&mut reader, encoding)?;
         ret.pwrd_warn = read_int(&mut reader, encoding)?;
         ret.record_group_chat = read_bool(&mut reader, encoding)?;
-        ret.show_alias = read_bool(&mut reader, encoding)?;
+        ret.who_show_alias = read_bool(&mut reader, encoding)?;
         ret.min_pwrd_len = read_int(&mut reader, encoding)?;
         ret.allow_handles = read_bool(&mut reader, encoding)?;
 
@@ -1059,8 +1062,8 @@ impl PcbBoardData {
         ret.os2_driver = read_bool(&mut reader, encoding)?;
 
         ret.enable_accounting = read_bool(&mut reader, encoding)?;
-        ret.show_currency = read_bool(&mut reader, encoding)?;
-        ret.concurrent = read_bool(&mut reader, encoding)?;
+        ret.acc_show_currency = read_bool(&mut reader, encoding)?;
+        ret.acc_concurrent_tracking = read_bool(&mut reader, encoding)?;
 
         ret.peak_start = read_line(&mut reader, encoding)?;
         ret.peak_end = read_line(&mut reader, encoding)?;
@@ -1107,7 +1110,7 @@ impl PcbBoardData {
 
         ret.modem.modem_init2 = read_line(&mut reader, encoding)?;
         ret.modem.modem_answer = read_line(&mut reader, encoding)?;
-        ret.ignore_drop_sec_level = read_bool(&mut reader, encoding)?;
+        ret.acc_ignore_drop_sec_level = read_bool(&mut reader, encoding)?;
         ret.modem.modem_dial = read_line(&mut reader, encoding)?;
         ret.modem.num_redials = read_int(&mut reader, encoding)?;
         ret.modem.max_tries = read_int(&mut reader, encoding)?;
@@ -1145,9 +1148,12 @@ impl PcbBoardData {
         ret.priority_shells = read_int(&mut reader, encoding)?;
         ret.priority_fido_in = read_int(&mut reader, encoding)?;
         ret.priority_fido_out = read_int(&mut reader, encoding)?;
-
         ret.net_copy = read_line(&mut reader, encoding)?;
-
+        // End of 15.3 files
+        let Ok(_unknown) = read_line(&mut reader, encoding) else {
+            return Ok(ret);
+        };
+        ret.path.chat_actions = read_line(&mut reader, encoding)?;
         Ok(ret)
     }
 
@@ -1236,7 +1242,7 @@ impl PcbBoardData {
         append_bool(&mut res, encoding, self.closed_board);
         append_bool(&mut res, encoding, self.non_graphics);
         append_bool(&mut res, encoding, self.exit_to_dos);
-        append_bool(&mut res, encoding, self.include_city);
+        append_bool(&mut res, encoding, self.who_include_city);
         append_bool(&mut res, encoding, self.eliminate_snow);
         append_bool(&mut res, encoding, self.subscription_info.is_enabled);
         append_bool(&mut res, encoding, self.allow_esc_codes);
@@ -1431,7 +1437,7 @@ impl PcbBoardData {
         append_int(&mut res, encoding, self.pwrd_update);
         append_int(&mut res, encoding, self.pwrd_warn);
         append_bool(&mut res, encoding, self.record_group_chat);
-        append_bool(&mut res, encoding, self.show_alias);
+        append_bool(&mut res, encoding, self.who_show_alias);
         append_int(&mut res, encoding, self.min_pwrd_len);
         append_bool(&mut res, encoding, self.allow_handles);
 
@@ -1443,8 +1449,8 @@ impl PcbBoardData {
         append_bool(&mut res, encoding, self.os2_driver);
 
         append_bool(&mut res, encoding, self.enable_accounting);
-        append_bool(&mut res, encoding, self.show_currency);
-        append_bool(&mut res, encoding, self.concurrent);
+        append_bool(&mut res, encoding, self.acc_show_currency);
+        append_bool(&mut res, encoding, self.acc_concurrent_tracking);
 
         append_line(&mut res, encoding, &self.peak_start);
         append_line(&mut res, encoding, &self.peak_end);
@@ -1490,7 +1496,7 @@ impl PcbBoardData {
 
         append_line(&mut res, encoding, &self.modem.modem_init2);
         append_line(&mut res, encoding, &self.modem.modem_answer);
-        append_bool(&mut res, encoding, self.ignore_drop_sec_level);
+        append_bool(&mut res, encoding, self.acc_ignore_drop_sec_level);
         append_line(&mut res, encoding, &self.modem.modem_dial);
         append_int(&mut res, encoding, self.modem.num_redials);
         append_int(&mut res, encoding, self.modem.max_tries);
@@ -1530,6 +1536,8 @@ impl PcbBoardData {
         append_int(&mut res, encoding, self.priority_fido_out);
 
         append_line(&mut res, encoding, &self.net_copy);
+        append_line(&mut res, encoding, &String::new()); // unknown
+        append_line(&mut res, encoding, &self.path.chat_actions);
 
         res
     }
