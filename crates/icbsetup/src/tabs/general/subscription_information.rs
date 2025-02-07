@@ -8,7 +8,7 @@ use icy_board_tui::{
     tab_page::{Page, PageMessage},
 };
 
-use crate::{cfg_entry_bool, cfg_entry_sec_level, cfg_entry_u32};
+use crate::{cfg_entry_bool, cfg_entry_u32, cfg_entry_u8};
 
 use super::ICBConfigMenuUI;
 
@@ -25,7 +25,7 @@ impl SubscriptionInformation {
                 ConfigEntry::Separator,
                 cfg_entry_bool!("subscription_is_enabled", label_width, subscription_info, is_enabled, lock),
                 cfg_entry_u32!("subscription_length", label_width, 0, 1000, subscription_info, subscription_length, lock),
-                cfg_entry_sec_level!("default_expired_level", label_width, subscription_info, default_expired_level, lock),
+                cfg_entry_u8!("default_expired_level", label_width, 0, 255, subscription_info, default_expired_level, lock),
                 cfg_entry_u32!("warning_days", label_width, 0, 365, subscription_info, warning_days, lock),
             ];
             ConfigMenu {

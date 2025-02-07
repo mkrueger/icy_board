@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::{cfg_entry_bool, cfg_entry_sec_level, cfg_entry_text};
+use crate::{cfg_entry_bool, cfg_entry_text, cfg_entry_u8};
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
@@ -26,7 +26,7 @@ impl NewUserOptions {
 
             let entry: Vec<ConfigEntry<Arc<Mutex<IcyBoard>>>> = vec![
                 ConfigEntry::Separator,
-                cfg_entry_sec_level!("new_user_security_level", label_width, new_user_settings, sec_level, lock),
+                cfg_entry_u8!("new_user_security_level", label_width, 0, 255, new_user_settings, sec_level, lock),
                 ConfigEntry::Separator,
                 cfg_entry_bool!("allow_one_name_users", label_width, new_user_settings, allow_one_name_users, lock),
                 cfg_entry_text!("new_user_groups", label_width, 30, new_user_settings, new_user_groups, lock),

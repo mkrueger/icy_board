@@ -1,9 +1,9 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
     datetime::{IcbDoW, IcbTime},
-    icy_board::{commands::Position, icb_config::IcbColor},
+    icy_board::{commands::Position, icb_config::IcbColor, security_expr::SecurityExpression},
 };
 use ratatui::{
     layout::{Alignment, Rect},
@@ -129,6 +129,7 @@ pub enum ListValue {
     Bool(bool),
     Color(IcbColor),
     ValueList(String, Vec<Value>),
+    Security(SecurityExpression, String),
     Position(Box<dyn Fn(&mut Frame, &Position)>, Box<dyn Fn(KeyEvent, &Position) -> Position>, Position),
 }
 
@@ -253,6 +254,17 @@ impl<T> ListItem<T> {
         self
     }
 
+    pub fn with_update_sec_value(mut self, update_value: &'static dyn Fn(&T, SecurityExpression) -> ()) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+            let ListValue::Security(b, _) = value else {
+                return;
+            };
+            update_value(val, b.clone());
+        });
+        self.update_value = Some(b);
+        self
+    }
+
     fn render_label(&self, left_area: Rect, frame: &mut Frame, selected: bool, in_edit: bool) {
         Text::from(self.title.clone())
             .alignment(self.label_alignment)
@@ -280,6 +292,7 @@ impl<T> ListItem<T> {
 
                 ListValue::Color(_color) => 2,
                 ListValue::Bool(_value) => 3,
+                ListValue::Security(_e, _) => 6,
                 ListValue::ValueList(_cur_value, _list) => {
                     /*
                     for l in list {
@@ -334,10 +347,32 @@ impl<T> ListItem<T> {
             }
 
             ListValue::Time(_val, str) => {
+                let area = Rect {
+                    x: area.x,
+                    y: area.y,
+                    width: 5,
+                    height: 1,
+                };
                 Text::from(str.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
             }
 
             ListValue::DoW(_val, str) => {
+                let area = Rect {
+                    x: area.x,
+                    y: area.y,
+                    width: 7,
+                    height: 1,
+                };
+                Text::from(str.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
+            }
+
+            ListValue::Security(_val, str) => {
+                let area = Rect {
+                    x: area.x,
+                    y: area.y,
+                    width: 6,
+                    height: 1,
+                };
                 Text::from(str.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
             }
 
@@ -422,6 +457,18 @@ impl<T> ListItem<T> {
                     height: 1,
                 };
                 let field = TextField::new().with_max_len(7).with_value(str.clone());
+                frame.render_stateful_widget(field, area, &mut self.text_field_state);
+                self.text_field_state.set_cursor_position(frame);
+            }
+
+            ListValue::Security(_val, str) => {
+                let area = Rect {
+                    x: area.x,
+                    y: area.y,
+                    width: 6,
+                    height: 1,
+                };
+                let field = TextField::new().with_value(str.clone());
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
                 self.text_field_state.set_cursor_position(frame);
             }
@@ -539,6 +586,13 @@ impl<T> ListItem<T> {
             ListValue::DoW(val, str) => {
                 self.text_field_state.handle_input(key, str);
                 *val = IcbDoW::from(str.clone());
+            }
+
+            ListValue::Security(val, str) => {
+                self.text_field_state.handle_input(key, str);
+                if let Ok(res) = SecurityExpression::from_str(str) {
+                    *val = res;
+                }
             }
             ListValue::U32(cur, min, max) => {
                 let mut text = format!("{}", *cur);

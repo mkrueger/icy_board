@@ -8,7 +8,7 @@ use icy_board_tui::{
     tab_page::{Page, PageMessage},
 };
 
-use crate::{cfg_entry_sec_level, tabs::ICBConfigMenuUI};
+use crate::{cfg_entry_sec_level, cfg_entry_u8, tabs::ICBConfigMenuUI};
 
 pub struct SysopCommands {
     menu: ICBConfigMenuUI,
@@ -21,7 +21,7 @@ impl SysopCommands {
             let label_width = 52;
             let entry = vec![
                 ConfigEntry::Separator,
-                cfg_entry_sec_level!("sysop_sec_level", label_width, sysop_command_level, sysop, lock),
+                cfg_entry_u8!("sysop_sec_level", label_width, 0, 255, sysop_command_level, sysop, lock),
                 cfg_entry_sec_level!("sysop_sec_read_all_comments", label_width, sysop_command_level, read_all_comments, lock),
                 cfg_entry_sec_level!("sysop_sec_read_all_mail", label_width, sysop_command_level, read_all_mail, lock),
                 cfg_entry_sec_level!("sysop_sec_copy_move_messages", label_width, sysop_command_level, copy_move_messages, lock),

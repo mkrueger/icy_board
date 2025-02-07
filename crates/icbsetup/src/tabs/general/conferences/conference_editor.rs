@@ -64,15 +64,16 @@ impl ConferenceEditor {
                                 }),
                         ),
                         ConfigEntry::Item(
-                            ListItem::new(get_text("conf_req_sec_if_pub"), ListValue::Text(50, conf.required_security.to_string()))
-                                .with_label_width(24)
-                                .with_edit_width(14)
-                                .with_update_text_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: String| {
-                                    let mut ib = board.1.lock().unwrap();
-                                    if let Ok(se) = SecurityExpression::from_str(&value) {
-                                        ib.conferences[board.0].required_security = se;
-                                    }
-                                }),
+                            ListItem::new(
+                                get_text("conf_req_sec_if_pub"),
+                                ListValue::Security(conf.required_security.clone(), conf.required_security.to_string()),
+                            )
+                            .with_label_width(24)
+                            .with_edit_width(14)
+                            .with_update_sec_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: SecurityExpression| {
+                                let mut ib = board.1.lock().unwrap();
+                                ib.conferences[board.0].required_security = value;
+                            }),
                         ),
                     ],
                 ),

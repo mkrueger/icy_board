@@ -140,16 +140,16 @@ macro_rules! cfg_entry_sec_level {
         icy_board_tui::config_menu::ConfigEntry::Item(
             icy_board_tui::config_menu::ListItem::new(
                 icy_board_tui::get_text($i),
-                icy_board_tui::config_menu::ListValue::U32($lock.config.$property.$conf as u32, 0, 255),
+                icy_board_tui::config_menu::ListValue::Security($lock.config.$property.$conf.clone(), $lock.config.$property.$conf.to_string()),
             )
             .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
             .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
             .with_label_width($width)
             .with_update_value(Box::new(|board: &Arc<Mutex<IcyBoard>>, value: &icy_board_tui::config_menu::ListValue| {
-                let icy_board_tui::config_menu::ListValue::U32(val, _, _) = value else {
+                let icy_board_tui::config_menu::ListValue::Security(val, _) = value else {
                     return;
                 };
-                board.lock().unwrap().config.$property.$conf = *val as u8;
+                board.lock().unwrap().config.$property.$conf = val.clone();
             })),
         )
     };
@@ -157,17 +157,17 @@ macro_rules! cfg_entry_sec_level {
         icy_board_tui::config_menu::ConfigEntry::Item(
             icy_board_tui::config_menu::ListItem::new(
                 icy_board_tui::get_text($i),
-                icy_board_tui::config_menu::ListValue::U32($lock.config.$property.$conf as u32, 0, 255),
+                icy_board_tui::config_menu::ListValue::Security($lock.config.$property.$conf.clone(), $lock.config.$property.$conf.to_string()),
             )
             .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
             .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
             .with_label_width($width)
             .with_edit_width($edit_width)
             .with_update_value(Box::new(|board: &Arc<Mutex<IcyBoard>>, value: &icy_board_tui::config_menu::ListValue| {
-                let icy_board_tui::config_menu::ListValue::U32(val, _, _) = value else {
+                let icy_board_tui::config_menu::ListValue::Security(val, _) = value else {
                     return;
                 };
-                board.lock().unwrap().config.$property.$conf = *val as u8;
+                board.lock().unwrap().config.$property.$conf = val.clone();
             })),
         )
     };

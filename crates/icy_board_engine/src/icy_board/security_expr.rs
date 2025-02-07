@@ -2,11 +2,12 @@ use std::{fmt::Display, iter::Peekable, str::FromStr};
 
 use chrono::{Local, NaiveTime, Timelike};
 use logos::{Lexer, Logos};
+use serde::{Deserialize, Serialize};
 
 use super::state::Session;
 use crate::{datetime::IcbDate, Res};
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum UnaryOp {
     Not,
 }
@@ -18,7 +19,7 @@ impl Display for UnaryOp {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum BinaryOp {
     And,
     Or,
@@ -44,7 +45,7 @@ impl Display for BinaryOp {
     }
 }
 
-#[derive(PartialEq, Clone, Eq, Debug)]
+#[derive(PartialEq, Clone, Eq, Debug, Serialize, Deserialize)]
 pub enum Value {
     Bool(bool),
     Integer(i64),
@@ -63,7 +64,7 @@ impl Display for Value {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum SecurityExpression {
     UnaryExpression(UnaryOp, Box<SecurityExpression>),
     BinaryExpression(BinaryOp, Box<SecurityExpression>, Box<SecurityExpression>),
@@ -267,11 +268,7 @@ impl SecurityExpression {
     }
 
     pub fn from_req_security(security: u8) -> SecurityExpression {
-        SecurityExpression::BinaryExpression(
-            BinaryOp::GreaterEqual,
-            Box::new(SecurityExpression::Call(U_SEC_FUNC.to_string(), vec![])),
-            Box::new(SecurityExpression::Constant(Value::Integer(security as i64))),
-        )
+        SecurityExpression::Constant(Value::Integer(security as i64))
     }
 
     pub fn is_empty(&self) -> bool {
@@ -284,6 +281,11 @@ impl SecurityExpression {
     pub(crate) fn level(&self) -> u8 {
         // TODO
         0
+    }
+
+    /// TODO: Implement me.
+    pub fn to_pcb_sec(&self) -> i32 {
+        10
     }
 }
 
