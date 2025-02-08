@@ -1212,6 +1212,10 @@ conf_is_read_only=Make Conference Read-Only
 conf_is_read_only-status=Make Conference Read-Only
 conf_is_read_only-help=TODO
 
+conf_echo_mail_in_conference=Echo Mail in Conference
+conf_echo_mail_in_conference-status=Echo Mail in Conference
+conf_echo_mail_in_conference-help=TODO
+
 conf_list_title=Conferences Menu
 
 # Accounting Editor

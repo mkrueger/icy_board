@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     path::PathBuf,
-    str::FromStr as _,
     sync::{Arc, Mutex},
 };
 
@@ -29,7 +28,7 @@ impl ConferenceEditor {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>, num_conf: usize) -> Self {
         let conf_name = get_text_args("conf_name", HashMap::from([("number".to_string(), num_conf.to_string())]));
 
-        let menu = {
+        let menu: ConfigMenu<(usize, Arc<Mutex<IcyBoard>>)> = {
             let ib = icy_board.lock().unwrap();
             let conf = ib.conferences.get(num_conf).unwrap();
 
@@ -39,8 +38,9 @@ impl ConferenceEditor {
             let lpath_width = 28;
             let rpath_width = 30;
 
-            let opt_width = 12;
-            let opt_width_edit = 5;
+            let opt_width = 27;
+            let opt_width_right = 31;
+            let opt_width_edit = 4;
 
             let entry = vec![
                 ConfigEntry::Item(
@@ -287,7 +287,7 @@ impl ConferenceEditor {
                         ),
                         ConfigEntry::Item(
                             ListItem::new(get_text("conf_add_conf_sec"), ListValue::U32(conf.add_conference_security as u32, 0, 255))
-                                .with_label_width(opt_width)
+                                .with_label_width(opt_width_right)
                                 .with_edit_width(opt_width_edit)
                                 .with_update_u32_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: u32| {
                                     let mut ib = board.1.lock().unwrap();
@@ -305,7 +305,7 @@ impl ConferenceEditor {
                         ),
                         ConfigEntry::Item(
                             ListItem::new(get_text("conf_add_conference_time"), ListValue::U32(conf.add_conference_time as u32, 0, 255))
-                                .with_label_width(opt_width)
+                                .with_label_width(opt_width_right)
                                 .with_edit_width(opt_width_edit)
                                 .with_update_u32_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: u32| {
                                     let mut ib = board.1.lock().unwrap();
@@ -322,12 +322,73 @@ impl ConferenceEditor {
                                 }),
                         ),
                         ConfigEntry::Item(
+                            ListItem::new(
+                                get_text("conf_sec_attachments"),
+                                ListValue::Security(conf.sec_attachments.clone(), conf.sec_attachments.to_string()),
+                            )
+                            .with_label_width(opt_width_right)
+                            .with_update_sec_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: SecurityExpression| {
+                                let mut ib = board.1.lock().unwrap();
+                                ib.conferences[board.0].sec_attachments = value;
+                            }),
+                        ),
+                        ConfigEntry::Item(
                             ListItem::new(get_text("conf_private_messages"), ListValue::Bool(conf.private_msgs))
                                 .with_label_width(opt_width)
                                 .with_edit_width(opt_width_edit)
                                 .with_update_bool_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: bool| {
                                     let mut ib = board.1.lock().unwrap();
                                     ib.conferences[board.0].private_msgs = value;
+                                }),
+                        ),
+                        ConfigEntry::Item(
+                            ListItem::new(
+                                get_text("conf_sec_write_message"),
+                                ListValue::Security(conf.sec_write_message.clone(), conf.sec_write_message.to_string()),
+                            )
+                            .with_label_width(opt_width_right)
+                            .with_update_sec_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: SecurityExpression| {
+                                let mut ib = board.1.lock().unwrap();
+                                ib.conferences[board.0].sec_write_message = value;
+                            }),
+                        ),
+                        ConfigEntry::Item(
+                            ListItem::new(get_text("conf_echo_mail_in_conference"), ListValue::Bool(conf.echo_mail_in_conference))
+                                .with_label_width(opt_width)
+                                .with_edit_width(opt_width_edit)
+                                .with_update_bool_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: bool| {
+                                    let mut ib = board.1.lock().unwrap();
+                                    ib.conferences[board.0].echo_mail_in_conference = value;
+                                }),
+                        ),
+                        ConfigEntry::Item(
+                            ListItem::new(
+                                get_text("conf_sec_carbon_copy"),
+                                ListValue::Security(conf.sec_carbon_copy.clone(), conf.sec_carbon_copy.to_string()),
+                            )
+                            .with_label_width(opt_width_right)
+                            .with_edit_width(14)
+                            .with_update_sec_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: SecurityExpression| {
+                                let mut ib = board.1.lock().unwrap();
+                                ib.conferences[board.0].sec_carbon_copy = value;
+                            }),
+                        ),
+                        ConfigEntry::Item(
+                            ListItem::new(get_text("conf_is_read_only"), ListValue::Bool(conf.is_read_only))
+                                .with_label_width(opt_width)
+                                .with_edit_width(opt_width_edit)
+                                .with_update_bool_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: bool| {
+                                    let mut ib = board.1.lock().unwrap();
+                                    ib.conferences[board.0].is_read_only = value;
+                                }),
+                        ),
+                        ConfigEntry::Item(
+                            ListItem::new(get_text("conf_carbon_list_limit"), ListValue::U32(conf.carbon_list_limit as u32, 0, 255))
+                                .with_label_width(opt_width_right)
+                                .with_edit_width(opt_width_edit)
+                                .with_update_u32_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: u32| {
+                                    let mut ib = board.1.lock().unwrap();
+                                    ib.conferences[board.0].carbon_list_limit = value as u8;
                                 }),
                         ),
                         ConfigEntry::Item(
@@ -340,54 +401,12 @@ impl ConferenceEditor {
                                 }),
                         ),
                         ConfigEntry::Item(
-                            ListItem::new(get_text("conf_sec_attachments"), ListValue::Text(50, conf.sec_attachments.to_string()))
-                                .with_label_width(24)
-                                .with_edit_width(14)
-                                .with_update_text_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: String| {
+                            ListItem::new(get_text("conf_charge_time"), ListValue::Float(conf.charge_time, conf.charge_time.to_string()))
+                                .with_label_width(opt_width_right)
+                                .with_edit_width(4)
+                                .with_update_float_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: f64| {
                                     let mut ib = board.1.lock().unwrap();
-                                    if let Ok(se) = SecurityExpression::from_str(&value) {
-                                        ib.conferences[board.0].sec_attachments = se;
-                                    }
-                                }),
-                        ),
-                        ConfigEntry::Item(
-                            ListItem::new(get_text("conf_show_intro_in_scan"), ListValue::Bool(conf.show_intro_in_scan))
-                                .with_label_width(opt_width)
-                                .with_edit_width(opt_width_edit)
-                                .with_update_bool_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: bool| {
-                                    let mut ib = board.1.lock().unwrap();
-                                    ib.conferences[board.0].show_intro_in_scan = value;
-                                }),
-                        ),
-                        ConfigEntry::Item(
-                            ListItem::new(get_text("conf_sec_write_message"), ListValue::Text(50, conf.sec_write_message.to_string()))
-                                .with_label_width(24)
-                                .with_edit_width(14)
-                                .with_update_text_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: String| {
-                                    let mut ib = board.1.lock().unwrap();
-                                    if let Ok(se) = SecurityExpression::from_str(&value) {
-                                        ib.conferences[board.0].sec_write_message = se;
-                                    }
-                                }),
-                        ),
-                        ConfigEntry::Item(
-                            ListItem::new(get_text("conf_sec_carbon_copy"), ListValue::Text(50, conf.sec_carbon_copy.to_string()))
-                                .with_label_width(24)
-                                .with_edit_width(14)
-                                .with_update_text_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: String| {
-                                    let mut ib = board.1.lock().unwrap();
-                                    if let Ok(se) = SecurityExpression::from_str(&value) {
-                                        ib.conferences[board.0].sec_carbon_copy = se;
-                                    }
-                                }),
-                        ),
-                        ConfigEntry::Item(
-                            ListItem::new(get_text("conf_carbon_list_limit"), ListValue::U32(conf.carbon_list_limit as u32, 0, 255))
-                                .with_label_width(opt_width)
-                                .with_edit_width(opt_width_edit)
-                                .with_update_u32_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: u32| {
-                                    let mut ib = board.1.lock().unwrap();
-                                    ib.conferences[board.0].carbon_list_limit = value as u8;
+                                    ib.conferences[board.0].charge_time = value;
                                 }),
                         ),
                         ConfigEntry::Item(
@@ -400,46 +419,37 @@ impl ConferenceEditor {
                                 }),
                         ),
                         ConfigEntry::Item(
-                            ListItem::new(get_text("conf_is_read_only"), ListValue::Bool(conf.is_read_only))
+                            ListItem::new(
+                                get_text("conf_charge_msg_read"),
+                                ListValue::Float(conf.charge_msg_read, conf.charge_msg_read.to_string()),
+                            )
+                            .with_label_width(opt_width_right)
+                            .with_edit_width(4)
+                            .with_update_float_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: f64| {
+                                let mut ib = board.1.lock().unwrap();
+                                ib.conferences[board.0].charge_msg_read = value;
+                            }),
+                        ),
+                        ConfigEntry::Item(
+                            ListItem::new(get_text("conf_show_intro_in_scan"), ListValue::Bool(conf.show_intro_in_scan))
                                 .with_label_width(opt_width)
                                 .with_edit_width(opt_width_edit)
                                 .with_update_bool_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: bool| {
                                     let mut ib = board.1.lock().unwrap();
-                                    ib.conferences[board.0].is_read_only = value;
+                                    ib.conferences[board.0].show_intro_in_scan = value;
                                 }),
                         ),
                         ConfigEntry::Item(
-                            ListItem::new(get_text("conf_charge_time"), ListValue::Text(50, conf.charge_time.to_string()))
-                                .with_label_width(24)
-                                .with_edit_width(14)
-                                .with_update_text_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: String| {
-                                    let mut ib = board.1.lock().unwrap();
-                                    if let Ok(se) = value.parse::<f64>() {
-                                        ib.conferences[board.0].charge_time = se;
-                                    }
-                                }),
-                        ),
-                        ConfigEntry::Item(
-                            ListItem::new(get_text("conf_charge_msg_read"), ListValue::Text(50, conf.charge_msg_read.to_string()))
-                                .with_label_width(24)
-                                .with_edit_width(14)
-                                .with_update_text_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: String| {
-                                    let mut ib = board.1.lock().unwrap();
-                                    if let Ok(se) = value.parse::<f64>() {
-                                        ib.conferences[board.0].charge_msg_read = se;
-                                    }
-                                }),
-                        ),
-                        ConfigEntry::Item(
-                            ListItem::new(get_text("conf_charge_msg_write"), ListValue::Text(50, conf.charge_msg_write.to_string()))
-                                .with_label_width(24)
-                                .with_edit_width(14)
-                                .with_update_text_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: String| {
-                                    let mut ib = board.1.lock().unwrap();
-                                    if let Ok(se) = value.parse::<f64>() {
-                                        ib.conferences[board.0].charge_msg_write = se;
-                                    }
-                                }),
+                            ListItem::new(
+                                get_text("conf_charge_msg_write"),
+                                ListValue::Float(conf.charge_msg_write, conf.charge_msg_write.to_string()),
+                            )
+                            .with_label_width(opt_width_right)
+                            .with_edit_width(4)
+                            .with_update_float_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: f64| {
+                                let mut ib = board.1.lock().unwrap();
+                                ib.conferences[board.0].charge_msg_write = value;
+                            }),
                         ),
                     ],
                 ),
@@ -482,7 +492,7 @@ impl Page for ConferenceEditor {
             .border_set(BORDER_SET)
             .title_alignment(ratatui::layout::Alignment::Center)
             .title_bottom(Span::styled(bottom_text, get_tui_theme().key_binding))
-            .border_style(get_tui_theme().content_box);
+            .border_style(get_tui_theme().dialog_box);
         block.render(area, frame.buffer_mut());
 
         let area = Rect {

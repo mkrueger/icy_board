@@ -264,13 +264,13 @@ fn append_cp437(res: &mut Vec<u8>, name: &str, arg: i32) {
 #[derive(Default, Clone, Debug)]
 pub struct PcbConferenceHeader {
     pub name: String,
-    pub auto_rejoin: bool,
-    pub view_members: bool,
-    pub private_uploads: bool,
-    pub private_msgs: bool,
-    pub echo_mail: bool,
-    pub add_conference_security: i32,
-    pub add_conference_time: u16,
+    pub auto_rejoin: bool,            //*
+    pub view_members: bool,           //*
+    pub private_uploads: bool,        // *
+    pub private_msgs: bool,           //*
+    pub echo_mail: bool,              //*
+    pub add_conference_security: i32, //*
+    pub add_conference_time: u16,     // *
     pub message_blocks: i32,
     pub message_file: String,
     pub users_menu: String,
@@ -278,15 +278,15 @@ pub struct PcbConferenceHeader {
     pub news_file: String,
 
     /// Sort type for public upload DIR file
-    pub pub_upload_sort: u8,
+    pub pub_upload_sort: u8, //*
     pub pub_upload_dirfile: String,
     pub pub_upload_location: String,
 
-    pub private_upload_sort: u8,
+    pub private_upload_sort: u8, //*
     pub private_upload_dirfile: String,
     pub private_upload_location: String,
 
-    pub public_conference: bool,
+    pub public_conference: bool, //*
 
     pub doors_menu: String,
     pub doors_file: String,
@@ -403,24 +403,24 @@ impl PcbConferenceHeader {
 #[derive(Default, Clone, Debug)]
 pub struct PcbAdditionalConferenceHeader {
     pub force_echo: bool,
-    pub read_only: bool,       //*
-    pub no_private_msgs: bool, // *
-    pub ret_receipt_level: u8, // *
-    pub record_origin: bool,
-    pub prompt_for_routing: bool,
-    pub allow_aliases: bool,    // *
-    pub show_intro_on_ra: bool, //*
-    pub req_level_to_enter: u8, // *
-    pub password: String,       // *
-    pub intro: String,          // *
-    pub attach_loc: String,     // *
+    pub read_only: bool,          //*
+    pub no_private_msgs: bool,    // *
+    pub ret_receipt_level: u8,    // *
+    pub record_origin: bool,      // *
+    pub prompt_for_routing: bool, //*
+    pub allow_aliases: bool,      // *
+    pub show_intro_on_ra: bool,   //*
+    pub req_level_to_enter: u8,   // *
+    pub password: String,         // *
+    pub intro: String,            // *
+    pub attach_loc: String,       // *
     pub reg_flags: u32,
     pub attach_level: u8, //*
     pub carbon_limit: u8, //*
     pub cmd_lst: String,  // *
     pub old_index: bool,
-    pub long_to_names: bool,
-    pub carbon_level: u8, // *
+    pub long_to_names: bool, //*
+    pub carbon_level: u8,    // *
     pub conf_type: u8,
     pub export_ptr: u32,
     pub charge_time: f32,      // *

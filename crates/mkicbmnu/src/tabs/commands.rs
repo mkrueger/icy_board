@@ -107,7 +107,7 @@ impl<'a> TabPage for CommandsTab<'a> {
         Clear.render(area, frame.buffer_mut());
 
         let block = Block::new()
-            .style(get_tui_theme().content_box)
+            .style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
             .border_type(BorderType::Double);

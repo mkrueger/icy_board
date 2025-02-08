@@ -381,9 +381,9 @@ impl<'a> EditCommandDialog<'a> {
         let block = Block::new()
             .title_alignment(Alignment::Center)
             .title(Title::from(
-                Span::from(format!(" Command ID {} ", self.id)).style(get_tui_theme().content_box_title),
+                Span::from(format!(" Command ID {} ", self.id)).style(get_tui_theme().dialog_box_title),
             ))
-            .style(get_tui_theme().content_box)
+            .style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
             .border_type(BorderType::Double);
@@ -444,8 +444,8 @@ impl<'a> EditCommandDialog<'a> {
             Clear.render(area, frame.buffer_mut());
             let block = Block::new()
                 .title_alignment(Alignment::Center)
-                .title(Title::from(Span::from(" Edit Action ").style(get_tui_theme().content_box_title)))
-                .style(get_tui_theme().content_box)
+                .title(Title::from(Span::from(" Edit Action ").style(get_tui_theme().dialog_box_title)))
+                .style(get_tui_theme().dialog_box)
                 .padding(Padding::new(2, 2, 1, 1))
                 .borders(Borders::ALL)
                 .border_type(BorderType::Double);

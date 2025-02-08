@@ -326,14 +326,14 @@ impl<'a> App<'a> {
 
                 Block::new()
                     .borders(Borders::ALL)
-                    .title(Title::from(Span::from(format!(" {} ", edit_title)).style(get_tui_theme().content_box_title)))
+                    .title(Title::from(Span::from(format!(" {} ", edit_title)).style(get_tui_theme().dialog_box_title)))
                     .title_position(block::Position::Bottom)
                     .title_alignment(Alignment::Center)
-                    .title(Title::from(Span::from(format!(" {} ", record_length)).style(get_tui_theme().content_box_title)))
+                    .title(Title::from(Span::from(format!(" {} ", record_length)).style(get_tui_theme().dialog_box_title)))
                     .title_position(block::Position::Top)
                     .title_alignment(Alignment::Right)
-                    .title(Title::from(Span::from(format!(" {} ", justify_title)).style(get_tui_theme().content_box_title)))
-                    .style(get_tui_theme().content_box)
+                    .title(Title::from(Span::from(format!(" {} ", justify_title)).style(get_tui_theme().dialog_box_title)))
+                    .style(get_tui_theme().dialog_box)
                     .border_type(BorderType::Double)
                     .render(edit_area, frame.buffer_mut());
 
@@ -352,7 +352,7 @@ impl<'a> App<'a> {
                     style_area.width -= 30;
 
                     Line::from(vec![
-                        Span::styled(get_text("icbtext_edit_style"), get_tui_theme().content_box_title),
+                        Span::styled(get_text("icbtext_edit_style"), get_tui_theme().dialog_box_title),
                         Span::raw(" "),
                         Span::styled(Self::get_style_description(entry.style), convert_style(entry.style).not_italic().bold()),
                         Span::raw(" "),
@@ -384,7 +384,7 @@ impl<'a> App<'a> {
                 style_area.width -= 30;
 
                 Line::from(vec![
-                    Span::styled(get_text("icbtext_edit_style"), get_tui_theme().content_box_title),
+                    Span::styled(get_text("icbtext_edit_style"), get_tui_theme().dialog_box_title),
                     Span::raw(" "),
                     Span::styled(
                         Self::get_style_description(self.edit_entry.style),
@@ -412,9 +412,9 @@ impl<'a> App<'a> {
                 Block::new()
                     .borders(Borders::ALL)
                     .title(Title::from(
-                        Span::from(format!(" {} ", get_text("icbtext_filter_title"))).style(get_tui_theme().content_box_title),
+                        Span::from(format!(" {} ", get_text("icbtext_filter_title"))).style(get_tui_theme().dialog_box_title),
                     ))
-                    .style(get_tui_theme().content_box)
+                    .style(get_tui_theme().dialog_box)
                     .border_type(BorderType::Double)
                     .render(filter_area, frame.buffer_mut());
 
@@ -432,9 +432,9 @@ impl<'a> App<'a> {
                 Block::new()
                     .borders(Borders::ALL)
                     .title(Title::from(
-                        Span::from(format!(" {} ", get_text("icbtext_jump_to_title"))).style(get_tui_theme().content_box_title),
+                        Span::from(format!(" {} ", get_text("icbtext_jump_to_title"))).style(get_tui_theme().dialog_box_title),
                     ))
-                    .style(get_tui_theme().content_box)
+                    .style(get_tui_theme().dialog_box)
                     .border_type(BorderType::Double)
                     .render(jump_area, frame.buffer_mut());
 
@@ -456,7 +456,7 @@ impl<'a> App<'a> {
 
                 Block::new()
                     .borders(Borders::ALL)
-                    .style(get_tui_theme().content_box)
+                    .style(get_tui_theme().dialog_box)
                     .border_type(BorderType::Double)
                     .render(save_area, frame.buffer_mut());
 

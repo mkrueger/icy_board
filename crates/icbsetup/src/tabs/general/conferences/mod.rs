@@ -45,7 +45,7 @@ impl ConferenceListEditor {
         area.x += 2;
         frame.render_stateful_widget(
             Scrollbar::default()
-                .style(get_tui_theme().content_box)
+                .style(get_tui_theme().dialog_box)
                 .orientation(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("▲"))
                 .thumb_symbol("█")
@@ -163,7 +163,7 @@ impl Page for ConferenceListEditor {
             .padding(Padding::new(2, 2, 1 + 4, 0))
             .borders(Borders::ALL)
             .border_set(BORDER_SET)
-            .border_style(get_tui_theme().content_box)
+            .border_style(get_tui_theme().dialog_box)
             .title_alignment(ratatui::layout::Alignment::Center)
             .title_bottom(Span::styled(get_text("icb_setup_key_conf_list_help"), get_tui_theme().key_binding));
         block.render(disp_area, frame.buffer_mut());
@@ -183,7 +183,7 @@ impl Page for ConferenceListEditor {
             disp_area.x + 1,
             disp_area.y + 2,
             "─".repeat((disp_area.width as usize).saturating_sub(2)),
-            get_tui_theme().content_box,
+            get_tui_theme().dialog_box,
         );
 
         let area = Rect {

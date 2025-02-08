@@ -41,7 +41,7 @@ impl SaveChangesDialog {
 
         Block::new()
             .borders(Borders::ALL)
-            .style(get_tui_theme().content_box)
+            .style(get_tui_theme().dialog_box)
             .border_type(BorderType::Plain)
             .render(save_area, frame.buffer_mut());
 

@@ -40,6 +40,10 @@ pub struct Conference {
     pub is_read_only: bool,
 
     #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    pub echo_mail_in_conference: bool,
+
+    #[serde(default)]
     #[serde(skip_serializing_if = "Password::is_empty")]
     pub password: Password,
 
@@ -111,6 +115,18 @@ pub struct Conference {
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub use_main_commands: bool,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    pub record_origin: bool,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    pub prompt_for_routing: bool,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    pub long_to_names: bool,
 
     pub users_menu: PathBuf,
     pub sysop_menu: PathBuf,
@@ -217,6 +233,7 @@ impl ConferenceBase {
                 private_uploads: c.private_uploads,
                 private_msgs: c.private_msgs,
                 allow_aliases: d.allow_aliases,
+                echo_mail_in_conference: c.echo_mail,
                 add_conference_security: c.add_conference_security,
                 add_conference_time: c.add_conference_time as u16,
                 users_menu: PathBuf::from(&c.users_menu),
@@ -250,6 +267,9 @@ impl ConferenceBase {
                 charge_msg_read: d.charge_msg_read as f64,
                 charge_msg_write: d.charge_msg_write as f64,
                 disallow_private_msgs: d.no_private_msgs,
+                record_origin: d.record_origin,
+                prompt_for_routing: d.prompt_for_routing,
+                long_to_names: d.long_to_names,
             };
             confs.push(new);
         }

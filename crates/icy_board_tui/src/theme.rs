@@ -21,10 +21,17 @@ pub struct Theme {
     pub selected_item: Style,
 
     pub value: Style,
+    pub true_value: Style,
+    pub false_value: Style,
+
     pub edit_value: Style,
 
-    pub content_box: Style,
-    pub content_box_title: Style,
+    pub dialog_box: Style,
+    pub dialog_box_title: Style,
+
+    pub menu_box: Style,
+    pub menu_box_title: Style,
+
     pub config_title: Style,
 
     pub filter_text: Style,
@@ -56,7 +63,11 @@ pub static CLASSIC_THEME: Theme = Theme {
         .add_modifier(Modifier::BOLD)
         .add_modifier(Modifier::REVERSED),
 
-    content_box: Style::new().bg(DOS_BLACK).fg(DOS_RED),
+    dialog_box: Style::new().bg(DOS_BLACK).fg(DOS_BLUE),
+    dialog_box_title: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_RED),
+
+    menu_box: Style::new().bg(DOS_BLACK).fg(DOS_RED),
+    menu_box_title: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
 
     key_binding: Style::new().bg(DOS_BROWN).fg(DOS_BLACK),
     key_binding_description: Style::new().bg(DOS_BROWN).fg(DOS_BLACK),
@@ -68,13 +79,14 @@ pub static CLASSIC_THEME: Theme = Theme {
     item_separator: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
 
     value: Style::new().bg(DOS_BLACK).fg(DOS_CYAN),
+    true_value: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GREEN),
+    false_value: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_RED),
     edit_value: Style::new().bg(DOS_RED).fg(DOS_WHITE),
     table_header: Style::new().bg(DOS_BLACK).fg(DOS_RED),
 
     status_line_text: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
     menu_title: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
     menu_label: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
-    content_box_title: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
     config_title: Style::new().bg(DOS_BLACK).fg(DOS_RED),
     filter_text: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
     description_text: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
@@ -103,8 +115,11 @@ pub static DEFAULT_THEME: Theme = Theme {
     menu_title: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_CYAN),
     menu_label: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
 
-    content_box: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),
-    content_box_title: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
+    dialog_box: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),
+    dialog_box_title: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
+
+    menu_box: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),
+    menu_box_title: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
 
     key_binding: Style::new().bg(DOS_DARK_GRAY).fg(DOS_LIGHT_GRAY),
     key_binding_description: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),
@@ -116,6 +131,9 @@ pub static DEFAULT_THEME: Theme = Theme {
     item_separator: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
     config_title: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_CYAN),
     value: Style::new().bg(DOS_BLACK).fg(LIGHT_GRAY),
+    true_value: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GREEN),
+    false_value: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_RED),
+
     edit_value: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
     table: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
     table_inactive: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),

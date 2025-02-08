@@ -238,7 +238,7 @@ impl Page for AccountingRatesEditor {
             .title_alignment(ratatui::layout::Alignment::Center)
             .title_top(Span::styled(get_text("accounting_title"), get_tui_theme().menu_title))
             .title_bottom(Span::styled(bottom_text, get_tui_theme().key_binding))
-            .border_style(get_tui_theme().content_box);
+            .border_style(get_tui_theme().dialog_box);
         block.render(area, frame.buffer_mut());
 
         let area = Rect {

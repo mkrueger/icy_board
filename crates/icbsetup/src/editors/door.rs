@@ -121,8 +121,8 @@ impl<'a> Page for DoorEditor<'a> {
         Clear.render(area, frame.buffer_mut());
         let block = Block::new()
             .title_alignment(Alignment::Center)
-            .title(Title::from(Span::from(" Edit Doors ").style(get_tui_theme().content_box_title)))
-            .style(get_tui_theme().content_box)
+            .title(Title::from(Span::from(" Edit Doors ").style(get_tui_theme().dialog_box_title)))
+            .style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
             .border_type(BorderType::Double);
@@ -150,8 +150,8 @@ impl<'a> Page for DoorEditor<'a> {
             Clear.render(area, frame.buffer_mut());
             let block = Block::new()
                 .title_alignment(Alignment::Center)
-                .title(Title::from(Span::from(" Edit Door ").style(get_tui_theme().content_box_title)))
-                .style(get_tui_theme().content_box)
+                .title(Title::from(Span::from(" Edit Door ").style(get_tui_theme().dialog_box_title)))
+                .style(get_tui_theme().dialog_box)
                 .padding(Padding::new(2, 2, 1, 1))
                 .borders(Borders::ALL)
                 .border_type(BorderType::Double);

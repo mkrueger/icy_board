@@ -99,7 +99,7 @@ impl<T> SelectMenu<T> {
         area.x += 1;
         frame.render_stateful_widget(
             Scrollbar::default()
-                .style(get_tui_theme().content_box)
+                .style(get_tui_theme().dialog_box)
                 .orientation(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("▲"))
                 .thumb_symbol("█")

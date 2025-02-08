@@ -382,14 +382,16 @@ impl<T> ListItem<T> {
                 IcbColor::IcyEngine(_) => todo!(),
             },
             ListValue::Bool(value) => {
-                let title = if *value { " ✓ " } else { " ☐ " };
+                let title: &str = if *value { " ✓ " } else { " ✗ " };
                 let area = Rect {
                     x: area.x,
                     y: area.y,
                     width: 3,
                     height: 1,
                 };
-                Text::from(title).style(get_tui_theme().value).render(area, frame.buffer_mut());
+                Text::from(title)
+                    .style(if *value { get_tui_theme().true_value } else { get_tui_theme().false_value })
+                    .render(area, frame.buffer_mut());
             }
             ListValue::ValueList(cur_value, list) => {
                 for l in list {
@@ -473,7 +475,7 @@ impl<T> ListItem<T> {
                 self.text_field_state.set_cursor_position(frame);
             }
             ListValue::Bool(value) => {
-                let title = if *value { " ✓ " } else { " ☐ " };
+                let title = if *value { " ✓ " } else { " ✗ " };
                 Text::from(title).style(get_tui_theme().edit_value).render(
                     Rect {
                         x: area.x,
@@ -518,7 +520,7 @@ impl<T> ListItem<T> {
 
                 let block = Block::new()
                     //  .title(Title::from(Span::from(" Edit Action ").style(THEME.content_box_title)).alignment(Alignment::Center))
-                    .style(get_tui_theme().content_box)
+                    .style(get_tui_theme().dialog_box)
                     //  .padding(Padding::new(2, 2, 1, 1))
                     .borders(Borders::ALL)
                     .border_type(BorderType::Double);
@@ -726,7 +728,7 @@ impl<T> ConfigMenu<T> {
 
         frame.render_stateful_widget(
             Scrollbar::default()
-                .style(get_tui_theme().content_box)
+                .style(get_tui_theme().dialog_box)
                 .orientation(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("▲"))
                 .thumb_symbol("█")

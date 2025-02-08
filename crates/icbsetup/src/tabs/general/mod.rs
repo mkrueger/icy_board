@@ -75,7 +75,7 @@ impl IcbSetupMenuUI {
             .padding(Padding::new(2, 2, 1 + 4, 0))
             .borders(Borders::ALL)
             .border_set(BORDER_SET)
-            .border_style(get_tui_theme().content_box)
+            .border_style(get_tui_theme().menu_box)
             .title_alignment(ratatui::layout::Alignment::Center)
             .title_bottom(Span::styled(get_text("icb_setup_key_menu_help"), get_tui_theme().key_binding));
         block.render(disp_area, frame.buffer_mut());
@@ -123,7 +123,7 @@ impl IcbSetupMenuUI {
             disp_area.x + 1,
             disp_area.y + 2,
             "─".repeat((disp_area.width as usize).saturating_sub(2)),
-            get_tui_theme().content_box,
+            get_tui_theme().menu_box,
         );
 
         const MENU_WIDTH: u16 = 30;
@@ -234,7 +234,7 @@ impl ICBConfigMenuUI {
             .border_set(BORDER_SET)
             .title_alignment(ratatui::layout::Alignment::Center)
             .title_bottom(Span::styled(bottom_text, get_tui_theme().key_binding))
-            .border_style(get_tui_theme().content_box);
+            .border_style(get_tui_theme().menu_box);
         block.render(area, frame.buffer_mut());
 
         let width = self.title.len() as u16;
@@ -252,7 +252,7 @@ impl ICBConfigMenuUI {
             area.x + 1,
             area.y + 2,
             "─".repeat((area.width as usize).saturating_sub(2)),
-            get_tui_theme().content_box,
+            get_tui_theme().menu_box,
         );
 
         let area = Rect {

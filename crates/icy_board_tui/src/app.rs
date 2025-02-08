@@ -183,7 +183,7 @@ impl<'a> App<'a> {
 
             Block::new()
                 .borders(Borders::ALL)
-                .style(get_tui_theme().content_box)
+                .style(get_tui_theme().dialog_box)
                 .border_type(BorderType::Double)
                 .render(save_area, frame.buffer_mut());
 
