@@ -643,6 +643,10 @@ pub fn is_null_i32(b: impl std::borrow::Borrow<i32>) -> bool {
     *b.borrow() == 0
 }
 
+pub fn is_null_f64(b: impl std::borrow::Borrow<f64>) -> bool {
+    *b.borrow() == 0.0
+}
+
 const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
 
 pub fn read_with_encoding_detection<P: AsRef<Path>>(path: &P) -> Res<String> {

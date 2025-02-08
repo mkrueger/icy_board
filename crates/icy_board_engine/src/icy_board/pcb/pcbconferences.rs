@@ -402,7 +402,7 @@ impl PcbConferenceHeader {
 
 #[derive(Default, Clone, Debug)]
 pub struct PcbAdditionalConferenceHeader {
-    pub force_echo: bool,
+    pub force_echo: bool,         // *
     pub read_only: bool,          //*
     pub no_private_msgs: bool,    // *
     pub ret_receipt_level: u8,    // *

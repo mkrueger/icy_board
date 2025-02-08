@@ -18,13 +18,49 @@ use super::{
     commands::Command,
     doors::DoorList,
     file_directory::DirectoryList,
-    is_false, is_null_16, is_null_8, is_null_i32,
+    is_false, is_null_16, is_null_8, is_null_f64, is_null_i32,
     message_area::{AreaList, MessageArea},
     pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader},
     security_expr::SecurityExpression,
     user_base::Password,
     IcyBoardSerializer,
 };
+
+#[derive(Default, Clone, Serialize, Deserialize)]
+pub enum ConferenceType {
+    #[default]
+    Normal,
+    InternetEmail,
+    InternetUsenet,
+    UsnetModeratedNewsgroup,
+    UsnetPublicNewsgroup,
+    FidoConference,
+}
+
+impl ConferenceType {
+    pub fn from_u8(value: u8) -> Self {
+        match value {
+            0 => Self::Normal,
+            1 => Self::InternetEmail,
+            2 => Self::InternetUsenet,
+            3 => Self::UsnetModeratedNewsgroup,
+            4 => Self::UsnetPublicNewsgroup,
+            5 => Self::FidoConference,
+            _ => Self::Normal,
+        }
+    }
+
+    pub fn to_u8(&self) -> u8 {
+        match self {
+            Self::Normal => 0,
+            Self::InternetEmail => 1,
+            Self::InternetUsenet => 2,
+            Self::UsnetModeratedNewsgroup => 3,
+            Self::UsnetPublicNewsgroup => 4,
+            Self::FidoConference => 5,
+        }
+    }
+}
 
 #[serde_as]
 #[derive(Default, Clone, Serialize, Deserialize)]
@@ -128,6 +164,13 @@ pub struct Conference {
     #[serde(skip_serializing_if = "is_false")]
     pub long_to_names: bool,
 
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    pub force_echomail: bool,
+
+    #[serde(default)]
+    pub conference_type: ConferenceType,
+
     pub users_menu: PathBuf,
     pub sysop_menu: PathBuf,
     pub news_file: PathBuf,
@@ -173,8 +216,16 @@ pub struct Conference {
     #[serde(skip)]
     pub doors: DoorList,
 
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_null_f64")]
     pub charge_time: f64,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_null_f64")]
     pub charge_msg_read: f64,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_null_f64")]
     pub charge_msg_write: f64,
 }
 
@@ -270,6 +321,8 @@ impl ConferenceBase {
                 record_origin: d.record_origin,
                 prompt_for_routing: d.prompt_for_routing,
                 long_to_names: d.long_to_names,
+                force_echomail: d.force_echo,
+                conference_type: ConferenceType::from_u8(d.conf_type),
             };
             confs.push(new);
         }
