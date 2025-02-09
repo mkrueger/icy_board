@@ -21,9 +21,9 @@ jobs:
      id: build
      run: |
        cargo build --release
-       echo "Copy $DEB to icy_board.deb"
+       echo "Copy $DEB to icboard.deb"
        mkdir bin
-       mv target/release/icy_board bin
+       mv target/release/icboard bin
        mv target/release/icbsetup bin
        mv target/release/icbmailer bin
        mv target/release/icbsysmgr bin
@@ -37,7 +37,7 @@ jobs:
      with:
        name: icy_board_linux_${{ env.VERSION }}
        path: |
-         bin/icy_board
+         bin/icboard
          bin/icbsetup
          bin/icbmailer
          bin/icbsysmgr
@@ -63,7 +63,7 @@ jobs:
        cargo build --release
        echo "Copy $DEB to icy_board.deb"
        mkdir bin
-       move target/release/icy_board.exe bin
+       move target/release/icboard.exe bin
        move target/release/icbsetup.exe bin
        move target/release/icbmailer.exe bin
        move target/release/icbsysmgr.exe bin
@@ -77,7 +77,7 @@ jobs:
      with:
        name: icy_board_windows_${{ env.VERSION }}
        path: |
-         bin/icy_board.exe
+         bin/icboard.exe
          bin/icbsetup.exe
          bin/icbmailer.exe
          bin/icbsysmgr.exe
@@ -109,7 +109,7 @@ jobs:
 
        echo "Copy $DEB to icy_board.deb"
        mkdir -p aarch64-apple-darwin/bin
-       mv target/aarch64-apple-darwin/release/icy_board aarch64-apple-darwin/bin
+       mv target/aarch64-apple-darwin/release/icboard aarch64-apple-darwin/bin
        mv target/aarch64-apple-darwin/release/icbsetup aarch64-apple-darwin/bin
        mv target/aarch64-apple-darwin/release/icbmailer aarch64-apple-darwin/bin
        mv target/aarch64-apple-darwin/release/icbsysmgr aarch64-apple-darwin/bin
@@ -120,7 +120,7 @@ jobs:
        mv target/aarch64-apple-darwin/release/ppl-language-server aarch64-apple-darwin/bin
 
        mkdir -p x86_64-apple-darwin/bin
-       mv target/x86_64-apple-darwin/release/icy_board x86_64-apple-darwin/bin
+       mv target/x86_64-apple-darwin/release/icboard x86_64-apple-darwin/bin
        mv target/x86_64-apple-darwin/release/icbsetup x86_64-apple-darwin/bin
        mv target/x86_64-apple-darwin/release/icbmailer x86_64-apple-darwin/bin
        mv target/x86_64-apple-darwin/release/icbsysmgr x86_64-apple-darwin/bin
@@ -135,7 +135,7 @@ jobs:
      with:
        name: icy_board_osx_aarch64-apple-darwin_${{ env.VERSION }}
        path: |
-         aarch64-apple-darwin/bin/icy_board
+         aarch64-apple-darwin/bin/icboard
          aarch64-apple-darwin/bin/icbsetup
          aarch64-apple-darwin/bin/icbmailer
          aarch64-apple-darwin/bin/icbsysmgr
@@ -151,7 +151,7 @@ jobs:
      with:
        name: icy_board_osx_x86_64-apple-darwin_${{ env.VERSION }}
        path: |
-         x86_64-apple-darwin/bin/icy_board
+         x86_64-apple-darwin/bin/icboard
          x86_64-apple-darwin/bin/icbsetup
          x86_64-apple-darwin/bin/icbmailer
          x86_64-apple-darwin/bin/icbsysmgr
