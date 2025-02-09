@@ -1,4 +1,4 @@
-use std::{os::unix::thread, time::Duration};
+use std::time::Duration;
 
 use regex::Regex;
 use tokio::time::sleep;

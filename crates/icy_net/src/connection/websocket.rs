@@ -1,7 +1,7 @@
 use crate::{Connection, ConnectionType};
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures_util::{SinkExt, StreamExt, TryStreamExt};
+use futures_util::{SinkExt, StreamExt};
 use http::Uri;
 use std::io;
 use std::io::ErrorKind;

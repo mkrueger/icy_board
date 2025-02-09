@@ -28,7 +28,7 @@ use system_statistics_screen::{SystemStatisticsScreen, SystemStatisticsScreenMes
 use tokio::sync::Mutex;
 use tui::{print_exit_screen, Tui};
 
-use crate::bbs::{await_securewebsocket_connections, await_ssh_connections, await_websocket_connections};
+use crate::bbs::{await_securewebsocket_connections, await_websocket_connections};
 
 mod bbs;
 mod call_wait_screen;
@@ -136,6 +136,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                         .unwrap();
                 }
 
+                /*
                 let ssh_connection = board.lock().await.config.login_server.ssh.clone();
                 if ssh_connection.is_enabled {
                     let bbs: Arc<Mutex<BBS>> = bbs.clone();
@@ -148,7 +149,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                             });
                         })
                         .unwrap();
-                }
+                }*/
 
                 let websocket_connection = board.lock().await.config.login_server.websocket.clone();
                 if websocket_connection.is_enabled {

@@ -5,7 +5,7 @@ use async_recursion::async_recursion;
 use icy_board_engine::{
     icy_board::{
         bbs::BBS,
-        login_server::{SecureWebsocket, Telnet, Websocket, SSH},
+        login_server::{SecureWebsocket, Telnet, Websocket},
         state::{IcyBoardState, NodeState},
         IcyBoard,
     },
@@ -62,9 +62,9 @@ pub async fn await_telnet_connections(con: Telnet, board: Arc<tokio::sync::Mutex
         bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
     }
 }
-
+ /*
 pub async fn await_ssh_connections(_ssh: SSH, _board: Arc<tokio::sync::Mutex<IcyBoard>>, _bbs: Arc<Mutex<BBS>>) -> Res<()> {
-    /*    let addr = if ssh.address.is_empty() {
+       let addr = if ssh.address.is_empty() {
         format!("0.0.0.0:{}", ssh.port)
     } else {
         format!("{}:{}", ssh.address, ssh.port)
@@ -102,9 +102,9 @@ pub async fn await_ssh_connections(_ssh: SSH, _board: Arc<tokio::sync::Mutex<Icy
             })
             .unwrap();
         bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
-    }*/
+    }
     Ok(())
-}
+}*/
 
 pub async fn await_websocket_connections(con: Websocket, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
     let addr = if con.address.is_empty() {

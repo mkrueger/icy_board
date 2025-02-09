@@ -1,4 +1,3 @@
-use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 
 use async_recursion::async_recursion;
@@ -60,7 +59,7 @@ impl IcyBoardState {
             let mut total_size = 0;
             for path in &self.session.flagged_files {
                 if let Ok(data) = path.metadata() {
-                    total_size += data.size();
+                    total_size += data.len();
                 }
             }
             self.display_text(IceText::BatchDownloadSize, display_flags::DEFAULT).await?;
@@ -236,7 +235,7 @@ impl IcyBoardState {
     async fn list_dl_batch(&mut self) -> Res<()> {
         self.new_line().await?;
         for (i, path) in self.session.flagged_files.clone().iter().enumerate() {
-            let size = if let Ok(data) = path.metadata() { data.size() } else { 0 };
+            let size = if let Ok(data) = path.metadata() { data.len() } else { 0 };
             self.display_text(IceText::FileSelected, display_flags::DEFAULT).await?;
             self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
 

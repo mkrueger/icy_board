@@ -1,6 +1,5 @@
 use std::fs::{self, OpenOptions};
 use std::io::{BufReader, BufWriter, Seek, SeekFrom, Write};
-use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -379,7 +378,7 @@ impl JamMessageBase {
 
         let mut file = fs::OpenOptions::new().append(true).open(last_read_file_name)?;
         const LEN: u64 = 16;
-        self.last_read_record = (file.metadata().unwrap().size() / LEN) as i32;
+        self.last_read_record = (file.metadata().unwrap().len() / LEN) as i32;
         opt.write(&mut file)?;
         Ok(opt)
     }
