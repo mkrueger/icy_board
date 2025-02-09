@@ -12,8 +12,8 @@ use icy_board_tui::config_menu::ConfigMenu;
 use icy_board_tui::config_menu::ConfigMenuState;
 use icy_board_tui::config_menu::ListItem;
 use icy_board_tui::config_menu::ListValue;
-use icy_board_tui::config_menu::ResultState;
-use icy_board_tui::tab_page::TabPage;
+use icy_board_tui::tab_page::Page;
+use icy_board_tui::tab_page::PageMessage;
 use icy_board_tui::theme::get_tui_theme;
 use ratatui::widgets::Block;
 use ratatui::widgets::BorderType;
@@ -26,7 +26,7 @@ use ratatui::{
     Frame,
 };
 
-pub struct GroupsTab {
+pub struct GroupEditor {
     scroll_state: ScrollbarState,
     table_state: TableState,
     icy_board: Arc<Mutex<IcyBoard>>,
@@ -38,7 +38,7 @@ pub struct GroupsTab {
     edit_conference: usize,
 }
 
-impl GroupsTab {
+impl GroupEditor {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
         let old_groups = icy_board.lock().unwrap().groups.clone();
         Self {
@@ -188,11 +188,7 @@ impl GroupsTab {
     }
 }
 
-impl TabPage for GroupsTab {
-    fn title(&self) -> String {
-        "Groups".to_string()
-    }
-
+impl Page for GroupEditor {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         let area = area.inner(Margin { vertical: 1, horizontal: 2 });
         Clear.render(area, frame.buffer_mut());
@@ -207,57 +203,55 @@ impl TabPage for GroupsTab {
 
         if self.in_edit_mode {
             self.render_editor(frame, area);
-            self.set_cursor_position(frame);
+            //self.set_cursor_position(frame);
             return;
         }
 
         self.render_table(frame, area);
         self.render_scrollbar(frame, area);
-    }
+    } /*
+      fn set_cursor_position(&self, frame: &mut Frame) {
+          self.conference_config
+              .get_item(self.state.selected)
+              .unwrap()
+              .text_field_state
+              .set_cursor_position(frame);
+      }*/
 
-    fn set_cursor_position(&self, frame: &mut Frame) {
-        self.conference_config
-            .get_item(self.state.selected)
-            .unwrap()
-            .text_field_state
-            .set_cursor_position(frame);
-    }
-
-    fn has_control(&self) -> bool {
-        self.in_edit_mode
-    }
-
-    fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
+    fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         if self.in_edit_mode {
             match key.code {
                 KeyCode::Esc => {
                     self.in_edit_mode = false;
-                    return ResultState::default();
+                    return PageMessage::None;
                 }
                 _ => {
                     self.conference_config.handle_key_press(key, &mut self.state);
-
                     self.save_groups();
+                    return PageMessage::Close;
                 }
             }
-            return ResultState::status_line(String::new());
         }
         match key.code {
-            KeyCode::Char('k') | KeyCode::Up => self.prev(),
-            KeyCode::Char('j') | KeyCode::Down => self.next(),
-            KeyCode::Char('i') | KeyCode::Insert => self.insert(),
-            KeyCode::Char('r') | KeyCode::Delete => self.remove(),
-            KeyCode::Char('d') | KeyCode::Enter => {
+            KeyCode::Esc => {
+                return PageMessage::Close;
+            }
+            KeyCode::Up => self.prev(),
+            KeyCode::Down => self.next(),
+            KeyCode::Insert => self.insert(),
+            KeyCode::Delete => self.remove(),
+            KeyCode::Enter => {
                 if let Some(state) = self.table_state.selected() {
                     self.in_edit_mode = true;
                     self.open_editor(state);
-                    return ResultState::status_line(String::new());
+                    return PageMessage::None;
+                    //return ResultState::status_line(String::new());
                 } else {
                     self.in_edit_mode = false;
                 }
             }
             _ => {}
         }
-        ResultState::default()
+        return PageMessage::None;
     }
 }

@@ -401,7 +401,7 @@ impl NotesUserInf {
     }
 }
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct QwkConfigUserInf {
     pub max_msgs: u16,
     pub max_msgs_per_conf: u16,
@@ -440,7 +440,7 @@ impl QwkConfigUserInf {
     }
 }
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AccountUserInf {
     pub starting_balance: f64,
     pub start_this_session: f64,
@@ -554,7 +554,7 @@ impl PersonalUserInf {
     }
 }
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BankInfo {
     pub last_deposite_date: IcbDate,
     pub last_withdraw_date: IcbDate,
@@ -583,7 +583,7 @@ impl BankInfo {
     }
 }
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BankUserInf {
     pub time_info: BankInfo,
     pub byte_info: BankInfo,

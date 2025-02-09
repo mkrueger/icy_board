@@ -29,8 +29,11 @@ pub struct PcbUserRecord {
     pub dont_ask_fse: bool,
     pub use_fsedefault: bool,
     pub scroll_msg_body: bool,
-    pub short_header: bool,
+    pub long_msg_header: bool,
+    pub short_file_descr: bool,
+
     pub wide_editor: bool,
+    pub is_chat_available: bool,
 
     ///  Date for Last DIR Scan (most recent file)
     pub date_last_dir_read: IcbDate,
@@ -102,13 +105,23 @@ impl PcbUserRecord {
 
             let packet_flags = data[2];
 
-            let is_dirty: bool = (packet_flags & (1 << 0)) != 0;
+            /*
+             Bit 0 = Dirty Flag (used to indicate another process updated the record)
+             Bit 1 = Clear Screen Between Messages
+             Bit 2 = Has Mail Flag
+             Bit 3 = Don't Ask for Full Screen Editor Use
+             Bit 4 = Full Screen Editor Default
+             Bit 5 = Scroll Message Body
+             Bit 6 = Use Short Message Headers
+             Bit 7 = Use Wide (79-column) Editor
+            */
+            let is_dirty = (packet_flags & (1 << 0)) != 0;
             let msg_clear = (packet_flags & (1 << 1)) != 0;
             let has_mail = (packet_flags & (1 << 2)) != 0;
             let dont_ask_fse = (packet_flags & (1 << 3)) != 0;
             let use_fsedefault = (packet_flags & (1 << 4)) != 0;
             let scroll_msg_body = (packet_flags & (1 << 5)) != 0;
-            let short_header = (packet_flags & (1 << 6)) != 0;
+            let long_msg_header = (packet_flags & (1 << 6)) == 0;
             let wide_editor = (packet_flags & (1 << 7)) != 0;
             data = &data[3..];
 
@@ -119,7 +132,7 @@ impl PcbUserRecord {
             let security_level = data[0];
             data = &data[1..];
 
-            let num_times_on = u16::from_le_bytes([data[0], data[1]]);
+            let num_times_on: u16 = u16::from_le_bytes([data[0], data[1]]);
             data = &data[2..];
             let page_len = data[0];
             data = &data[1..];
@@ -169,7 +182,13 @@ impl PcbUserRecord {
             data = &data[4..];
 
             // flags 2
+            let flags2 = data[0];
             data = &data[1..];
+
+            // Bit 0 = Chat Status - OFF=Available, ON=unavailable
+            let is_chat_available = (flags2 & (1 << 0)) == 0;
+            // Bit 1 = Short File Description
+            let short_file_descr = (flags2 & (1 << 1)) == 0;
 
             // resevered
             data = &data[8..];
@@ -193,9 +212,9 @@ impl PcbUserRecord {
                 dont_ask_fse,
                 use_fsedefault,
                 scroll_msg_body,
-                short_header,
+                long_msg_header,
                 wide_editor,
-
+                is_chat_available,
                 date_last_dir_read,
                 security_level,
                 num_times_on: num_times_on as usize,
@@ -213,6 +232,7 @@ impl PcbUserRecord {
                 ul_tot_upld_bytes: ul_tot_upld_bytes as u64,
                 delete_flag,
                 rec_num,
+                short_file_descr,
             };
 
             users.push(user);

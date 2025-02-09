@@ -1,15 +1,16 @@
 use std::sync::{Arc, Mutex};
 
-use crate::{cfg_entry_bool, cfg_entry_password, cfg_entry_text};
 use crossterm::event::KeyEvent;
-use icy_board_engine::icy_board::{user_base::Password, IcyBoard};
+use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
+    cfg_entry_bool, cfg_entry_text,
     config_menu::{ConfigEntry, ConfigMenu, ResultState},
     get_text,
+    icbconfigmenu::ICBConfigMenuUI,
     tab_page::{Page, PageMessage},
 };
 
-use super::ICBConfigMenuUI;
+use crate::cfg_entry_password;
 
 pub struct SysopInformation {
     menu: ICBConfigMenuUI,

@@ -6,14 +6,13 @@ use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
     config_menu::ResultState,
     get_text,
+    icbsetupmenu::IcbSetupMenuUI,
     select_menu::{MenuItem, SelectMenu},
     tab_page::{Page, PageMessage},
 };
 use new_user_files::NewUserFiles;
 use ratatui::{layout::Rect, Frame};
 use system_files::SystemFiles;
-
-use super::IcbSetupMenuUI;
 
 mod configuration_files;
 mod display_files;

@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
-    datetime::{IcbDoW, IcbTime},
+    datetime::{IcbDate, IcbDoW, IcbTime},
     icy_board::{commands::Position, icb_config::IcbColor, security_expr::SecurityExpression},
 };
 use ratatui::{
@@ -124,6 +124,7 @@ pub enum ListValue {
     U32(u32, u32, u32),
     /// float, cur_edit_string
     Float(f64, String),
+    Date(IcbDate, String),
     Time(IcbTime, String),
     DoW(IcbDoW, String),
     Bool(bool),
@@ -164,8 +165,8 @@ impl<T> ListItem<T> {
         }
     }
 
-    pub fn with_status(mut self, status: &str) -> Self {
-        self.status = status.to_string();
+    pub fn with_status(mut self, status: impl Into<String>) -> Self {
+        self.status = status.into();
         self
     }
 
@@ -265,6 +266,28 @@ impl<T> ListItem<T> {
         self
     }
 
+    pub fn with_update_date_value(mut self, update_value: &'static dyn Fn(&T, IcbDate) -> ()) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+            let ListValue::Date(b, _) = value else {
+                return;
+            };
+            update_value(val, b.clone());
+        });
+        self.update_value = Some(b);
+        self
+    }
+
+    pub fn with_update_time_value(mut self, update_value: &'static dyn Fn(&T, IcbTime) -> ()) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+            let ListValue::Time(b, _) = value else {
+                return;
+            };
+            update_value(val, b.clone());
+        });
+        self.update_value = Some(b);
+        self
+    }
+
     fn render_label(&self, left_area: Rect, frame: &mut Frame, selected: bool, in_edit: bool) {
         Text::from(self.title.clone())
             .alignment(self.label_alignment)
@@ -307,6 +330,7 @@ impl<T> ListItem<T> {
                 ListValue::Position(_, _, pos) => pos.x as usize,
 
                 ListValue::Time(_, _) => 5, // 00:00
+                ListValue::Date(_, _) => 8, // 00/00/00
                 ListValue::DoW(_, _) => 7,  // SMDMDFS
             }
         };
@@ -351,6 +375,15 @@ impl<T> ListItem<T> {
                     x: area.x,
                     y: area.y,
                     width: 5,
+                    height: 1,
+                };
+                Text::from(str.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
+            }
+            ListValue::Date(_val, str) => {
+                let area = Rect {
+                    x: area.x,
+                    y: area.y,
+                    width: 8,
                     height: 1,
                 };
                 Text::from(str.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
@@ -448,6 +481,17 @@ impl<T> ListItem<T> {
                     height: 1,
                 };
                 let field = TextField::new().with_max_len(5).with_value(str.clone());
+                frame.render_stateful_widget(field, area, &mut self.text_field_state);
+                self.text_field_state.set_cursor_position(frame);
+            }
+            ListValue::Date(_val, str) => {
+                let area = Rect {
+                    x: area.x,
+                    y: area.y,
+                    width: 8,
+                    height: 1,
+                };
+                let field = TextField::new().with_max_len(8).with_value(str.clone());
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
                 self.text_field_state.set_cursor_position(frame);
             }
@@ -584,6 +628,10 @@ impl<T> ListItem<T> {
             ListValue::Time(val, str) => {
                 self.text_field_state.handle_input(key, str);
                 *val = IcbTime::parse(str);
+            }
+            ListValue::Date(val, str) => {
+                self.text_field_state.handle_input(key, str);
+                *val = IcbDate::parse(str);
             }
             ListValue::DoW(val, str) => {
                 self.text_field_state.handle_input(key, str);

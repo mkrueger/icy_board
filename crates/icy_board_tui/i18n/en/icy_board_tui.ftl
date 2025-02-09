@@ -155,6 +155,8 @@ icb_setup_key_menu_help=↑ Up  ↓ Down  F1 Help  ␛ Back
 icb_setup_key_menu_edit_help=↑ Up  ↓ Down  F1 Help  F2 Edit this file  ␛ Back
 icb_setup_key_conf_list_help=↑ Up  ↓ Down  INS New  ␡ Delete  PgUp/Dn Move ␛ Back
 
+icb_setup_main_title=Main Menu
+icb_setup_main_use_label=Use /w ICB { $version}
 icb_setup_main_sysop_info=Sysop Information
 icb_setup_main_file_locs=File Locations
 icb_setup_main_con_info=Connection Information
@@ -1285,3 +1287,163 @@ accounting_payback_per_file-help=TODO
 accounting_payback_per_file_bytes=Per 1K-Bytes Uploaded
 accounting_payback_per_file_bytes-status=Per 1K-Bytes Uploaded
 accounting_payback_per_file_bytes-help=TODO
+
+# ICBord System Manager
+
+icb_sysmanager_main_title=User File Maintenance
+icb_sysmanager_main_edit_users=Edit Users File
+icb_sysmanager_main_edit_groups=Edit Groups
+
+user_editor_name=Name
+user_editor_name-status=Name
+user_editor_name-help=TODO
+
+user_editor_alias=Alias
+user_editor_alias-status=Alias
+user_editor_alias-help=TODO
+
+user_editor_password=Password
+user_editor_password-status=Password
+user_editor_password-help=TODO
+
+user_editor_security=Security
+user_editor_security-status=Security
+user_editor_security-help=TODO
+
+user_editor_city=City
+user_editor_city-status=City
+user_editor_city-help=TODO
+
+user_editor_bus_phone=B/D Phone
+user_editor_bus_phone-status=B/D Phone
+user_editor_bus_phone-help=TODO
+
+user_editor_home_phone=H/V Phone
+user_editor_home_phone-status=H/V Phone
+user_editor_home_phone-help=TODO
+
+user_editor_verify_answer=Verify Answer
+user_editor_verify_answer-status=Verify Answer
+user_editor_verify_answer-help=TODO
+
+user_editor_protocol=Protocol
+user_editor_protocol-status=Protocol
+user_editor_protocol-help=TODO
+
+user_editor_page_len=Page Len
+user_editor_page_len-status=Page Len
+user_editor_page_len-help=TODO
+
+user_editor_reg_ex_date=Reg Ex Date
+user_editor_reg_ex_date-status=Reg Ex Date
+user_editor_reg_ex_date-help=TODO
+
+user_editor_exp_sec=Expired Sec
+user_editor_exp_sec-status=Expired Sec
+user_editor_exp_sec-help=TODO
+
+user_editor_msg_clear=Msg clear
+user_editor_msg_clear-status=Msg clear
+user_editor_msg_clear-help=TODO
+
+user_editor_scroll_msg=Scroll msg
+user_editor_scroll_msg-status=Scroll msg
+user_editor_scroll_msg-help=TODO
+
+user_editor_fse_mode=Full Scrn editor
+user_editor_fse_mode-status=Full Scrn editor
+user_editor_fse_mode-help=TODO
+
+user_editor_use_short_filedescr=Short Desc
+user_editor_use_short_filedescr-status=Short Desc
+user_editor_use_short_filedescr-help=TODO
+
+user_editor_wide_editor=79-Column Editor
+user_editor_wide_editor-status=79-Column Editor
+user_editor_wide_editor-help=TODO
+
+user_editor_last_conference=Last in
+user_editor_last_conference-status=Last Conference the user was in
+user_editor_last_conference-help=TODO
+
+user_editor_long_msg_header=Long Headers
+user_editor_long_msg_header-status=Long Headers
+user_editor_long_msg_header-help=TODO
+
+user_editor_delete_user=Delete User
+user_editor_delete_user-status=Delete User
+user_editor_delete_user-help=TODO
+
+
+user_editor_chat_status=Chat Status
+user_editor_chat_status-status=Chat Status
+user_editor_chat_status-help=TODO
+
+user_editor_expert_mode=Expert
+user_editor_expert_mode-status=Expert
+user_editor_expert_mode-help=TODO
+
+user_editor_comment1=Comment1
+user_editor_comment1-status=User Comment
+user_editor_comment1-help=TODO
+
+user_editor_comment2=Comment2
+user_editor_comment2-status=Sysop Comment
+user_editor_comment2-help=TODO
+
+user_editor_adr1=Address #1
+user_editor_adr1-status=Address #1
+user_editor_adr1-help=TODO
+
+user_editor_adr2=Address #2
+user_editor_adr2-status=Address #2
+user_editor_adr2-help=TODO
+
+user_editor_state=State
+user_editor_state-status=State
+user_editor_state-help=TODO
+
+user_editor_zip=Zip Code
+user_editor_zip-status=Zip Code
+user_editor_zip-help=TODO
+
+
+user_editor_country=Country
+user_editor_country-status=Country
+user_editor_country-help=TODO
+
+user_editor_cmt_line1=Line 1
+user_editor_cmt_line1-status=Custom Comment Line 1
+user_editor_cmt_line1-help=TODO
+
+user_editor_cmt_line2=Line 2
+user_editor_cmt_line2-status=Custom Comment Line 2
+user_editor_cmt_line2-help=TODO
+
+user_editor_cmt_line3=Line 3
+user_editor_cmt_line3-status=Custom Comment Line 3
+user_editor_cmt_line3-help=TODO
+
+user_editor_cmt_line4=Line 4
+user_editor_cmt_line4-status=Custom Comment Line 4
+user_editor_cmt_line4-help=TODO
+
+user_editor_cmt_line5=Line 5
+user_editor_cmt_line5-status=Custom Comment Line 5
+user_editor_cmt_line5-help=TODO
+
+user_editor_gender=Gender
+user_editor_gender-status=Note: Could be stored in a bit
+user_editor_gender-help=TODO
+
+user_editor_birthdate=Birthdate
+user_editor_birthdate-status=Birthdate
+user_editor_birthdate-help=TODO
+
+user_editor_email=Email Address
+user_editor_email-status=Email
+user_editor_email-help=TODO
+
+user_editor_web=Web Address
+user_editor_web-status=Web
+user_editor_web-help=TODO

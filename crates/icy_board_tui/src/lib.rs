@@ -6,9 +6,12 @@ use crossterm::{
 };
 
 pub mod app;
+pub mod cfg_menu_macros;
 pub mod colors;
 pub mod config_menu;
 pub mod help_view;
+pub mod icbconfigmenu;
+pub mod icbsetupmenu;
 pub mod insert_table;
 pub mod pcb_line;
 pub mod position_editor;

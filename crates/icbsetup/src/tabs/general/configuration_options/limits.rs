@@ -1,14 +1,14 @@
 use std::sync::{Arc, Mutex};
 
-use crate::{cfg_entry_u16, cfg_entry_u8, tabs::ICBConfigMenuUI};
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
+    cfg_entry_u16, cfg_entry_u8,
     config_menu::{ConfigEntry, ConfigMenu, ResultState},
     get_text,
+    icbconfigmenu::ICBConfigMenuUI,
     tab_page::{Page, PageMessage},
 };
-
 pub struct Limits {
     menu: ICBConfigMenuUI,
 }

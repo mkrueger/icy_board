@@ -76,7 +76,7 @@ impl FromStr for Password {
     }
 }
 
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PasswordInfo {
     pub password: Password,
 
@@ -99,7 +99,7 @@ pub struct PasswordInfo {
     pub password_storage_method: PasswordStorageMethod,
 }
 
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct UserStats {
     /// First date on
     #[serde(default)]
@@ -204,7 +204,48 @@ pub enum FSEMode {
     Ask,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+impl FSEMode {
+    pub fn from_pcboard(s: &str) -> Self {
+        match s {
+            "Y" => FSEMode::Yes,
+            "N" => FSEMode::No,
+            _ => FSEMode::Ask,
+        }
+    }
+
+    pub fn to_char(&self) -> char {
+        match self {
+            FSEMode::Yes => 'Y',
+            FSEMode::No => 'N',
+            _ => 'A',
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+pub enum ChatStatus {
+    #[default]
+    Available,
+    Unavailable,
+}
+
+impl ChatStatus {
+    pub fn from_pcboard(s: &str) -> Self {
+        match s {
+            "U" => ChatStatus::Unavailable,
+            _ => ChatStatus::Available,
+        }
+    }
+
+    pub fn to_char(&self) -> char {
+        match self {
+            ChatStatus::Unavailable => 'U',
+            _ => 'A',
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct UserFlags {
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
@@ -235,6 +276,10 @@ pub struct UserFlags {
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
+    pub long_msg_header: bool,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
     pub wide_editor: bool,
 
     #[serde(default)]
@@ -254,7 +299,7 @@ pub struct UserFlags {
     pub use_alias: bool,
 }
 
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct User {
     /// Path to the user file
     pub path: Option<PathBuf>,
@@ -318,7 +363,7 @@ pub struct User {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub home_voice_phone: String,
 
-    pub birth_date: DateTime<Utc>,
+    pub birth_date: IcbDate,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -353,7 +398,8 @@ pub struct User {
     pub security_level: u8,
 
     #[serde(default)]
-    pub exp_date: DateTime<Utc>,
+    pub exp_date: IcbDate,
+
     /// Expired security level
     pub exp_security_level: u8,
 
@@ -383,6 +429,9 @@ pub struct User {
     pub bank: Option<BankUserInf>,
 
     pub stats: UserStats,
+
+    #[serde(default)]
+    pub chat_status: ChatStatus,
 }
 
 impl User {
@@ -509,7 +558,7 @@ impl User {
 
             date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
             gender,
-            birth_date: birth_date.to_utc_date_time(),
+            birth_date,
             email,
             web,
 
@@ -544,7 +593,7 @@ impl User {
             user_comment: u.user.user_comment.clone(),
             sysop_comment: u.user.sysop_comment.clone(),
             security_level: u.user.security_level as u8,
-            exp_date: u.user.exp_date.to_utc_date_time(),
+            exp_date: u.user.exp_date.clone(),
             exp_security_level: u.user.exp_security_level as u8,
             flags: UserFlags {
                 expert_mode: u.user.expert_mode,
@@ -561,7 +610,8 @@ impl User {
                     }
                 },
                 scroll_msg_body: u.user.scroll_msg_body,
-                use_short_filedescr: u.user.short_header,
+                use_short_filedescr: u.user.short_file_descr,
+                long_msg_header: u.user.long_msg_header,
                 wide_editor: u.user.wide_editor,
                 delete_flag: u.user.delete_flag,
                 use_graphics: true,
@@ -573,6 +623,11 @@ impl User {
             last_conference: u.user.last_conference,
             elapsed_time_on: u.user.elapsed_time_on,
             date_last_dir_read: u.user.date_last_dir_read.to_utc_date_time(),
+            chat_status: if u.user.is_chat_available {
+                ChatStatus::Available
+            } else {
+                ChatStatus::Unavailable
+            },
             language: String::new(),
             stats: UserStats {
                 first_date_on: first_date_on.to_utc_date_time(),

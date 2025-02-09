@@ -52,7 +52,7 @@ pub async fn create_callinfo_bbs(state: &IcyBoardState, path: &std::path::Path, 
         contents.push_str("REMOTE\r\n"); // LOCAL or REMOTE
     }
     contents.push_str(&format!("COM{}\r\n", DOOR_COM_PORT)); // COM Port
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().birth_date.format("%m/%d%/%y"))); // Birth Date
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().birth_date.to_country_date())); // Birth Date
     contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE)); // Com Port Speed
     contents.push_str("TRUE\r\n"); // Already Connected
     contents.push_str("Normal Connection \r\n"); // MNP/ARQ or Normal Connection

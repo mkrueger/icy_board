@@ -10,7 +10,7 @@ use std::{
 
 use crate::{executable::Executable, icy_board::user_base::UserBase, Res};
 use async_recursion::async_recursion;
-use chrono::{DateTime, Datelike, Local, Utc};
+use chrono::{DateTime, Local, Utc};
 use codepages::tables::UNICODE_TO_CP437;
 use dizbase::file_base::FileBase;
 use icy_engine::{ansi, OutputFormat, SaveOptions, ScreenPreperation};
@@ -1370,7 +1370,7 @@ impl IcyBoardState {
             }
             MacroCommand::ExpDate => {
                 if let Some(user) = &self.session.current_user {
-                    result = self.format_date(user.exp_date);
+                    result = self.format_date(user.exp_date.to_utc_date_time());
                 } else {
                     result = "NEVER".to_string();
                 }

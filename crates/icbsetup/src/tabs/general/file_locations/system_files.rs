@@ -6,12 +6,12 @@ use std::{
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
+    cfg_entry_path,
     config_menu::{ConfigEntry, ConfigMenu, ResultState},
     get_text,
+    icbconfigmenu::ICBConfigMenuUI,
     tab_page::{Page, PageMessage},
 };
-
-use crate::{cfg_entry_path, tabs::ICBConfigMenuUI};
 
 pub struct SystemFiles {
     menu: ICBConfigMenuUI,

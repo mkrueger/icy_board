@@ -3,14 +3,12 @@ use std::sync::{Arc, Mutex};
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
+    cfg_entry_bool, cfg_entry_u32, cfg_entry_u8,
     config_menu::{ConfigEntry, ConfigMenu, ResultState},
     get_text,
+    icbconfigmenu::ICBConfigMenuUI,
     tab_page::{Page, PageMessage},
 };
-
-use crate::{cfg_entry_bool, cfg_entry_u32, cfg_entry_u8};
-
-use super::ICBConfigMenuUI;
 
 pub struct SubscriptionInformation {
     menu: ICBConfigMenuUI,

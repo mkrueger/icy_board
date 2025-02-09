@@ -51,7 +51,7 @@ pub async fn create_door_sys(state: &IcyBoardState, path: &std::path::Path) -> R
     contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_downloads)); // User's total number of downloads
     contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.today_dnld_bytes / 1024)); // User's daily download kilobytes total
     contents.push_str(&format!("999999\r\n")); // Daily download kilobyte limit
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().birth_date.format("%m/%d/%y"))); // User's date of birth
+    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().birth_date.to_country_date())); // User's date of birth
     contents.push_str("C:\\HOME\r\n"); // Path to the user database files
     contents.push_str("C:\\MSGS\r\n"); // Path to the message database files
     contents.push_str(&format!("{}\r\n", state.get_board().await.config.sysop.name)); // Sysop name

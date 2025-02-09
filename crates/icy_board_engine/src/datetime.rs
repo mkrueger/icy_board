@@ -1,7 +1,7 @@
 use core::fmt;
 use std::str::FromStr;
 
-use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
+use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
 use serde::Deserialize;
 use toml::value::{Date, Datetime};
 #[derive(Debug, Clone, PartialEq)]
@@ -45,6 +45,16 @@ impl serde::Serialize for IcbDate {
             offset: None,
         }
         .serialize(serializer)
+    }
+}
+
+impl From<NaiveDateTime> for IcbDate {
+    fn from(date: NaiveDateTime) -> Self {
+        Self {
+            month: date.month() as u8,
+            day: date.day() as u8,
+            year: date.year() as u16,
+        }
     }
 }
 
@@ -95,20 +105,20 @@ impl IcbDate {
         }
     }
 
-    pub fn get_month(&self) -> u8 {
+    pub fn month(&self) -> u8 {
         self.month
     }
 
-    pub fn get_day(&self) -> u8 {
+    pub fn day(&self) -> u8 {
         self.day
     }
 
-    pub fn get_year(&self) -> u16 {
+    pub fn year(&self) -> u16 {
         self.year
     }
 
     /// Number of days from sunday
-    pub fn get_day_of_week(&self) -> u8 {
+    pub fn day_of_week(&self) -> u8 {
         self.to_utc_date_time().weekday().num_days_from_sunday() as u8
     }
 
@@ -195,6 +205,18 @@ impl IcbDate {
             ),
             Utc,
         )
+    }
+
+    pub fn to_local_date_time(&self) -> chrono::prelude::DateTime<chrono::prelude::Local> {
+        let dt = Local::now();
+        dt.with_year(self.year as i32)
+            .unwrap()
+            .with_month(self.month as u32)
+            .unwrap()
+            .with_day(self.day as u32)
+            .unwrap()
+            .with_time(NaiveTime::MIN)
+            .unwrap()
     }
 
     pub fn from_utc(date_time: chrono::prelude::DateTime<chrono::prelude::Utc>) -> Self {
@@ -466,5 +488,30 @@ impl serde::Serialize for IcbDoW {
         S: serde::Serializer,
     {
         self.to_string().serialize(serializer)
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    #[test]
+    fn test_date_parse() {
+        let date = super::IcbDate::parse("12-30-1976");
+        assert_eq!(date.to_country_date(), "12-30-1976");
+    }
+
+    #[test]
+    fn test_time_parse() {
+        let time = super::IcbTime::parse("12:30:01");
+        assert_eq!(time.to_string(), "12:30:01");
+    }
+
+    #[test]
+    fn test_utc_date_conversion() {
+        let date = super::IcbDate::parse("12-30-1976");
+        let utc = date.to_utc_date_time();
+
+        let date = super::IcbDate::from_utc(utc);
+        assert_eq!(utc, date.to_utc_date_time());
     }
 }

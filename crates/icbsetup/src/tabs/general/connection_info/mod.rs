@@ -5,14 +5,13 @@ use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
     config_menu::ResultState,
     get_text,
+    icbsetupmenu::IcbSetupMenuUI,
     select_menu::{MenuItem, SelectMenu},
     tab_page::{Page, PageMessage},
 };
 use ratatui::{layout::Rect, Frame};
 use secure_websockets::SecureWebsockets;
 use websockets::Websockets;
-
-use super::IcbSetupMenuUI;
 
 mod secure_websockets;
 mod ssh;

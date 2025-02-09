@@ -223,7 +223,7 @@ impl SecurityExpression {
 
                 U_AGE_FUNC => {
                     let age = if let Some(user) = &session.current_user {
-                        chrono::Utc::now().years_since(user.birth_date).unwrap_or(0)
+                        chrono::Utc::now().years_since(user.birth_date.to_utc_date_time()).unwrap_or(0)
                     } else {
                         0
                     };
@@ -245,7 +245,7 @@ impl SecurityExpression {
 
                 TIME_LEFT_FUNC => Ok(Value::Integer(session.minutes_left() as i64)),
 
-                DOW_FUNC => Ok(Value::Integer(IcbDate::today().get_day_of_week() as i64)),
+                DOW_FUNC => Ok(Value::Integer(IcbDate::today().day_of_week() as i64)),
                 _ => Err(format!("Invalid function {name}").into()),
             },
             SecurityExpression::Constant(constant) => Ok(constant.clone()),

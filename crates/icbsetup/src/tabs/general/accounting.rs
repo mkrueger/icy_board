@@ -1,15 +1,14 @@
 use std::sync::{Arc, Mutex};
 
-use crate::{cfg_entry_bool, cfg_entry_dow, cfg_entry_path, cfg_entry_time};
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
+    cfg_entry_bool, cfg_entry_dow, cfg_entry_path, cfg_entry_time,
     config_menu::{ConfigEntry, ConfigMenu, ResultState},
     get_text,
+    icbconfigmenu::ICBConfigMenuUI,
     tab_page::{Page, PageMessage},
 };
-
-use super::ICBConfigMenuUI;
 
 pub struct AccountingConfig {
     menu: ICBConfigMenuUI,

@@ -6,12 +6,12 @@ use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
     config_menu::ResultState,
     get_text,
+    icbsetupmenu::IcbSetupMenuUI,
     select_menu::{MenuItem, SelectMenu},
     tab_page::{Page, PageMessage},
 };
 use ratatui::{layout::Rect, Frame};
 
-use super::IcbSetupMenuUI;
 mod colors;
 mod config_switches;
 mod file_transfer;

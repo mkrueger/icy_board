@@ -4,10 +4,9 @@ use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState},
     get_text,
+    icbconfigmenu::ICBConfigMenuUI,
     tab_page::Page,
 };
-
-use crate::tabs::ICBConfigMenuUI;
 
 pub struct FunctionKeys {
     menu: ICBConfigMenuUI,

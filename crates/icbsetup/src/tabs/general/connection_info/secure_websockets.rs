@@ -3,12 +3,12 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::tabs::ICBConfigMenuUI;
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState},
     get_text,
+    icbconfigmenu::ICBConfigMenuUI,
     tab_page::{Page, PageMessage},
 };
 

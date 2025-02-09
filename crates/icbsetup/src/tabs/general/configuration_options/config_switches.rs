@@ -1,10 +1,11 @@
 use std::sync::{Arc, Mutex};
 
-use crate::{cfg_entry_bool, tabs::ICBConfigMenuUI};
 use icy_board_engine::icy_board::{icb_config::DisplayNewsBehavior, IcyBoard};
 use icy_board_tui::{
+    cfg_entry_bool,
     config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState},
     get_text,
+    icbconfigmenu::ICBConfigMenuUI,
     tab_page::Page,
 };
 

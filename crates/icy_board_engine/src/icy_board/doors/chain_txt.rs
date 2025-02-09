@@ -21,7 +21,9 @@ pub async fn create_chain_txt(state: &IcyBoardState, path: &std::path::Path) -> 
     contents.push_str("\r\n"); // User callsign (HAM radio)
     contents.push_str(&format!(
         "{}\r\n",
-        Utc::now().years_since(state.session.current_user.as_ref().unwrap().birth_date).unwrap_or(0)
+        Utc::now()
+            .years_since(state.session.current_user.as_ref().unwrap().birth_date.to_utc_date_time())
+            .unwrap_or(0)
     )); // Age
     contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().gender));
     contents.push_str("0\r\n"); // Users Gold

@@ -4,7 +4,6 @@ use crate::{
     icy_board::{icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
 };
-use chrono::Datelike;
 
 impl IcyBoardState {
     pub async fn view_settings(&mut self) -> Res<()> {
@@ -28,7 +27,7 @@ impl IcyBoardState {
 
         if user.exp_date.year() > 0 {
             self.display_text(IceText::ViewSettingsExpireDate, display_flags::DEFAULT).await?;
-            self.println(TerminalTarget::Both, &self.format_date(user.exp_date)).await?;
+            self.println(TerminalTarget::Both, &self.format_date(user.exp_date.to_utc_date_time())).await?;
             self.reset_color(TerminalTarget::Both).await?;
         }
         self.display_text(IceText::ViewSettingsNumberTimesOn, display_flags::DEFAULT).await?;
