@@ -28,7 +28,8 @@ There are data structures for almost all PCBoard data structures so making a BBS
   This is intended - all modern BBSes look the same. You can choose from a wide range of plugins and configuration options.
   Use it!
 
-[GettingStarted](docs/gettingstarted.md)
-[Differences](docs/differences.md)
-[PPL](docs/ppl.md)
+# Topics
+* [GettingStarted](docs/gettingstarted.md)
+* [Differences](docs/differences.md)
+* [PPL](docs/ppl.md)
 
