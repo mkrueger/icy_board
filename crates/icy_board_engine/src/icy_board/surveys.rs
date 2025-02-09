@@ -12,7 +12,7 @@ use super::{security_expr::SecurityExpression, IcyBoardSerializer, PCBoardRecord
 /// A survey is a question and answer pair.
 /// PCBoard calles them "Questionnairies" but we call them surveys.
 #[serde_as]
-#[derive(Clone, Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Survey {
     pub survey_file: PathBuf,
     pub answer_file: PathBuf,
@@ -23,7 +23,7 @@ pub struct Survey {
     pub required_security: SecurityExpression,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct SurveyList {
     #[serde(rename = "survey")]
     pub surveys: Vec<Survey>,

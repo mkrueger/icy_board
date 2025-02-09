@@ -1303,7 +1303,7 @@ pub async fn ayjtfiles(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
 
 pub async fn lang(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let language = vm.eval_expr(&args[0]).await?.as_int();
-    let lang = if let Some(lang) = vm.icy_board_state.board.lock().await.languages.languages.get(language as usize) {
+    let lang = if let Some(lang) = vm.icy_board_state.board.lock().await.languages.get(language as usize) {
         lang.extension.clone()
     } else {
         log::error!("PPE: lang(): Language not found: {}", language);

@@ -75,7 +75,7 @@ pub enum SecurityExpression {
 
 impl Default for SecurityExpression {
     fn default() -> Self {
-        SecurityExpression::Constant(Value::Bool(true))
+        SecurityExpression::Constant(Value::Integer(0))
     }
 }
 

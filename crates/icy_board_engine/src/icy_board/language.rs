@@ -1,11 +1,14 @@
-use std::path::Path;
+use std::{
+    ops::{Deref, DerefMut},
+    path::Path,
+};
 
 use crate::Res;
 use serde::{Deserialize, Serialize};
 
 use super::{IcyBoardSerializer, PCBoardImport, PCBoardTextImport};
 
-#[derive(Clone, Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Language {
     pub description: String,
     pub locale: String,
@@ -14,21 +17,28 @@ pub struct Language {
     pub no_char: char,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct SupportedLanguages {
     pub date_formats: Vec<(String, String)>,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(rename = "language")]
-    pub languages: Vec<Language>,
+    languages: Vec<Language>,
 }
-impl SupportedLanguages {
-    pub fn len(&self) -> usize {
-        self.languages.len()
+
+impl Deref for SupportedLanguages {
+    type Target = Vec<Language>;
+    fn deref(&self) -> &Self::Target {
+        &self.languages
     }
 }
 
+impl DerefMut for SupportedLanguages {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.languages
+    }
+}
 impl Default for SupportedLanguages {
     fn default() -> Self {
         Self {

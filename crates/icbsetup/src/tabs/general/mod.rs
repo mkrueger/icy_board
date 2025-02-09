@@ -21,7 +21,7 @@ use ratatui::{layout::Rect, text::Text, Frame};
 use subscription_information::SubscriptionInformation;
 mod accounting;
 mod board_configuration;
-mod conferences;
+pub mod conferences;
 mod configuration_options;
 mod connection_info;
 mod event_setup;

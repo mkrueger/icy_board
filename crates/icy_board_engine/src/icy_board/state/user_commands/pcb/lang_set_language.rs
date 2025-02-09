@@ -34,7 +34,7 @@ impl IcyBoardState {
         self.new_line().await?;
         let l = self.get_board().await.languages.clone();
         let mut cur_lang_str = String::new();
-        for (i, lang) in l.languages.iter().enumerate() {
+        for (i, lang) in l.iter().enumerate() {
             if lang.extension == cur_language {
                 cur_lang_str = format!("{}", i + 1);
                 languages.push(format!("=> ({}) {}", i + 1, lang.description));
@@ -65,11 +65,11 @@ impl IcyBoardState {
                 return Ok(language);
             }
             if let Ok(number) = language.parse::<usize>() {
-                if number > 0 && number <= l.languages.len() {
+                if number > 0 && number <= l.len() {
                     if number == 1 {
                         self.display_text(IceText::LanguageActive, display_flags::NEWLINE).await?;
                     }
-                    return Ok(l.languages[number - 1].extension.clone());
+                    return Ok(l[number - 1].extension.clone());
                 }
             }
             self.display_text(IceText::LanguageNotAvailable, display_flags::NEWLINE).await?;

@@ -211,6 +211,17 @@ impl<T> ListItem<T> {
         self
     }
 
+    pub fn with_update_combobox_value(mut self, update_value: &'static dyn Fn(&T, &ComboBox) -> ()) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+            let ListValue::ComboBox(b) = value else {
+                return;
+            };
+            update_value(val, b);
+        });
+        self.update_value = Some(b);
+        self
+    }
+
     pub fn with_update_bool_value(mut self, update_value: &'static dyn Fn(&T, bool) -> ()) -> Self {
         let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
             let ListValue::Bool(b) = value else {

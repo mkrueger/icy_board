@@ -17,7 +17,7 @@ use serde_with::{serde_as, DisplayFromStr};
 
 use super::{is_false, security_expr::SecurityExpression, user_base::Password, IcyBoardError, IcyBoardSerializer, PCBoardRecordImporter};
 
-#[derive(Serialize, Deserialize, Default, Clone, Copy, Debug)]
+#[derive(Serialize, Deserialize, Default, Clone, Copy, Debug, PartialEq)]
 pub enum SortOrder {
     NoSort,
     #[default]
@@ -57,7 +57,7 @@ pub enum SortDirection {
 /// A survey is a question and answer pair.
 /// PCBoard calles them "Questionnairies" but we call them surveys.
 #[serde_as]
-#[derive(Clone, Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct FileDirectory {
     pub name: String,
     pub path: PathBuf,
@@ -72,17 +72,10 @@ pub struct FileDirectory {
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub has_new_files: bool,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "is_false")]
-    pub is_readonly: bool,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub is_free: bool,
-
-    #[serde(default)]
-    #[serde(skip_serializing_if = "is_false")]
-    pub allow_ul_pwd: bool,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
@@ -93,14 +86,9 @@ pub struct FileDirectory {
     #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
     #[serde_as(as = "DisplayFromStr")]
     pub download_security: SecurityExpression,
-
-    #[serde(default)]
-    #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
-    #[serde_as(as = "DisplayFromStr")]
-    pub upload_security: SecurityExpression,
 }
 
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct DirectoryList {
     #[serde(rename = "area")]
     areas: Vec<FileDirectory>,
@@ -184,12 +172,9 @@ impl PCBoardRecordImporter<FileDirectory> for DirectoryList {
             password: Password::default(),
 
             has_new_files: false,
-            is_readonly: false,
             is_free: false,
-            allow_ul_pwd: false,
             list_security: SecurityExpression::default(),
             download_security: SecurityExpression::default(),
-            upload_security: SecurityExpression::default(),
         })
     }
 }

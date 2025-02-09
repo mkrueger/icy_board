@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
@@ -14,7 +15,9 @@ use icy_board_engine::{
 };
 use icy_board_tui::{
     config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
+    get_text, get_text_args,
     insert_table::InsertTable,
+    save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
 };
@@ -33,21 +36,22 @@ enum EditCommandMode {
 
 pub struct DoorEditor<'a> {
     path: std::path::PathBuf,
-    door_list: DoorList,
+    door_list_orig: DoorList,
+    door_list: Arc<Mutex<DoorList>>,
+
     menu: ConfigMenu<u32>,
     menu_state: ConfigMenuState,
     mode: EditCommandMode,
 
     insert_table: InsertTable<'a>,
-    command: Arc<Mutex<Vec<Door>>>,
-
     edit_config_state: ConfigMenuState,
-    edit_config: Option<ConfigMenu<u32>>,
+    edit_config: Option<ConfigMenu<(usize, Arc<Mutex<DoorList>>)>>,
+    save_dialog: Option<SaveChangesDialog>,
 }
 
 impl<'a> DoorEditor<'a> {
     pub(crate) fn new(path: &std::path::PathBuf) -> Res<Self> {
-        let mut door_list = if path.exists() {
+        let mut door_list_orig = if path.exists() {
             DoorList::load(&path)?
         } else {
             let mut door_list = DoorList::default();
@@ -55,11 +59,11 @@ impl<'a> DoorEditor<'a> {
             door_list
         };
 
-        if door_list.accounts.is_empty() {
-            door_list.accounts.push(DoorServerAccount::BBSLink(BBSLink::default()));
+        if door_list_orig.accounts.is_empty() {
+            door_list_orig.accounts.push(DoorServerAccount::BBSLink(BBSLink::default()));
         }
 
-        let DoorServerAccount::BBSLink(bbs_link) = &door_list.accounts[0];
+        let DoorServerAccount::BBSLink(bbs_link) = &door_list_orig.accounts[0];
         let l = 16;
         let items = vec![ConfigEntry::Group(
             "BBSLink credentials".to_string(),
@@ -71,14 +75,19 @@ impl<'a> DoorEditor<'a> {
         )];
 
         let menu = ConfigMenu { obj: 0, entry: items };
-        let command_arc = Arc::new(Mutex::new(door_list.doors.clone()));
-        let scroll_state = ScrollbarState::default().content_length(door_list.doors.len());
-        let content_length = door_list.doors.len();
-        let cmd2 = command_arc.clone();
+        let door_list = Arc::new(Mutex::new(door_list_orig.clone()));
+        let scroll_state = ScrollbarState::default().content_length(door_list_orig.doors.len());
+        let content_length = door_list_orig.doors.len();
+        let cmd2 = door_list.clone();
+
         let insert_table = InsertTable {
             scroll_state,
             table_state: TableState::default().with_selected(0),
-            headers: vec!["Door    ".to_string(), "Description".to_string(), "Type".to_string()],
+            headers: vec![
+                format!("{:<15}", get_text("doors_editor_header_door")),
+                format!("{:<33}", get_text("doors_editor_header_description")),
+                get_text("doors_editor_header_type"),
+            ],
             get_content: Box::new(move |_table, i, j| {
                 if *i >= cmd2.lock().unwrap().len() {
                     return Line::from("".to_string());
@@ -92,17 +101,17 @@ impl<'a> DoorEditor<'a> {
             }),
             content_length,
         };
-
         Ok(Self {
             path: path.clone(),
             door_list,
+            door_list_orig,
             menu,
             menu_state: ConfigMenuState::default(),
             insert_table,
-            command: command_arc,
             mode: EditCommandMode::Config,
             edit_config: None,
             edit_config_state: ConfigMenuState::default(),
+            save_dialog: None,
         })
     }
 
@@ -119,13 +128,25 @@ impl<'a> DoorEditor<'a> {
 impl<'a> Page for DoorEditor<'a> {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         Clear.render(area, frame.buffer_mut());
+        let conference_name = crate::tabs::conferences::get_cur_conference_name();
+        let title = get_text_args("doors_editor_title", HashMap::from([("conference".to_string(), conference_name)]));
+
         let block = Block::new()
             .title_alignment(Alignment::Center)
-            .title(Title::from(Span::from(" Edit Doors ").style(get_tui_theme().dialog_box_title)))
+            .title(Title::from(Span::from(title).style(get_tui_theme().dialog_box_title)))
             .style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
-            .border_type(BorderType::Double);
+            .border_set(icy_board_tui::BORDER_SET)
+            .title_bottom(Span::styled(
+                if self.mode == EditCommandMode::Config {
+                    get_text("doors_editor_key_help")
+                } else {
+                    get_text("doors_editor_key_help_door")
+                },
+                get_tui_theme().key_binding,
+            ));
+
         block.render(area, frame.buffer_mut());
 
         let vertical = Layout::vertical([Constraint::Length(6), Constraint::Fill(1)]);
@@ -146,11 +167,13 @@ impl<'a> Page for DoorEditor<'a> {
             .set_cursor_position(frame);
 
         if let Some(edit_config) = &mut self.edit_config {
-            let area = area.inner(Margin { vertical: 8, horizontal: 3 });
+            let area = area.inner(Margin { vertical: 7, horizontal: 3 });
             Clear.render(area, frame.buffer_mut());
             let block = Block::new()
                 .title_alignment(Alignment::Center)
-                .title(Title::from(Span::from(" Edit Door ").style(get_tui_theme().dialog_box_title)))
+                .title(Title::from(
+                    Span::from(get_text("doors_editor_edit_title")).style(get_tui_theme().dialog_box_title),
+                ))
                 .style(get_tui_theme().dialog_box)
                 .padding(Padding::new(2, 2, 1, 1))
                 .borders(Borders::ALL)
@@ -165,54 +188,36 @@ impl<'a> Page for DoorEditor<'a> {
                 .text_field_state
                 .set_cursor_position(frame);
         }
+        if let Some(save_changes) = &self.save_dialog {
+            save_changes.render(frame, area);
+        }
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
+        if self.save_dialog.is_some() {
+            let res = self.save_dialog.as_mut().unwrap().handle_key_press(key);
+            return match res {
+                icy_board_tui::save_changes_dialog::SaveChangesMessage::Cancel => {
+                    self.save_dialog = None;
+                    PageMessage::None
+                }
+                icy_board_tui::save_changes_dialog::SaveChangesMessage::Close => PageMessage::Close,
+                icy_board_tui::save_changes_dialog::SaveChangesMessage::Save => {
+                    if let Some(parent) = self.path.parent() {
+                        if !parent.exists() {
+                            std::fs::create_dir_all(parent).unwrap();
+                        }
+                    }
+                    self.door_list.lock().unwrap().save(&self.path).unwrap();
+                    PageMessage::Close
+                }
+                icy_board_tui::save_changes_dialog::SaveChangesMessage::None => PageMessage::None,
+            };
+        }
+
         if let Some(edit_config) = &mut self.edit_config {
             match key.code {
                 KeyCode::Esc => {
-                    /*
-                    let Some(selected_item) = self.insert_table.table_state.selected() else {
-                        return true;
-                    };
-                    for item in edit_config.iter() {
-                        match item.id.as_str() {
-                            "name" => {
-                                if let ListValue::Text(_, ref value) = item.value {
-                                    self.command.lock().unwrap()[selected_item].name = value.clone();
-                                }
-                            }
-                            "description" => {
-                                if let ListValue::Text(_, ref value) = item.value {
-                                    self.command.lock().unwrap()[selected_item].description = value.clone();
-                                }
-                            }
-                            "password" => {
-                                if let ListValue::Text(_, ref value) = item.value {
-                                    self.command.lock().unwrap()[selected_item].password = value.clone();
-                                }
-                            }
-                            "path" => {
-                                if let ListValue::Text(_, ref value) = item.value {
-                                    self.command.lock().unwrap()[selected_item].path = value.clone();
-                                }
-                            }
-                            "use_shell_execute" => {
-                                if let ListValue::Bool(ref value) = item.value {
-                                    self.command.lock().unwrap()[selected_item].use_shell_execute = *value;
-                                }
-                            }
-
-                            "door_type" => {
-                                if let ListValue::ComboBox(ref value) = item.value {
-                                    let value = value.cur_value.value.parse::<DoorType>().unwrap();
-                                    self.command.lock().unwrap()[selected_item].door_type = value;
-                                }
-                            }
-                            _ => {}
-                        }
-                    }*/
-
                     self.edit_config = None;
                     return PageMessage::None;
                 }
@@ -225,31 +230,11 @@ impl<'a> Page for DoorEditor<'a> {
 
         match key.code {
             KeyCode::Esc => {
-                /*/
-                for item in self.menu.iter() {
-                    if let ListValue::Text(_, value) = &item.value {
-                        match item.id.as_str() {
-                            "system_code" => {
-                                let DoorServerAccount::BBSLink(bbs_link) = &mut self.door_list.accounts[0];
-                                bbs_link.system_code = value.clone();
-                            }
-                            "auth_code" => {
-                                let DoorServerAccount::BBSLink(bbs_link) = &mut self.door_list.accounts[0];
-                                bbs_link.auth_code = value.clone();
-                            }
-                            "sheme_code" => {
-                                let DoorServerAccount::BBSLink(bbs_link) = &mut self.door_list.accounts[0];
-                                bbs_link.sheme_code = value.clone();
-                            }
-                            _ => {}
-                        }
-                    }
+                if self.door_list_orig == self.door_list.lock().unwrap().clone() {
+                    return PageMessage::Close;
                 }
-                    */
-                self.door_list.doors.clear();
-                self.door_list.doors.append(&mut self.command.lock().unwrap());
-                self.door_list.save(&self.path).unwrap();
-                return PageMessage::Close;
+                self.save_dialog = Some(SaveChangesDialog::new());
+                return PageMessage::None;
             }
 
             KeyCode::Tab => {
@@ -263,22 +248,25 @@ impl<'a> Page for DoorEditor<'a> {
             _ => match self.mode {
                 EditCommandMode::Table => match key.code {
                     KeyCode::Insert => {
-                        self.command.lock().unwrap().push(Door {
-                            name: format!("door{}", self.door_list.len() + 1),
-                            description: "".to_string(),
-                            password: "".to_string(),
-                            securiy_level: SecurityExpression::default(),
-                            use_shell_execute: false,
-                            door_type: DoorType::BBSlink,
-                            path: "".to_string(),
-                            drop_file: Default::default(),
-                        });
+                        let name = format!("door{}", self.door_list.lock().unwrap().len() + 1);
+                        if let Ok(lock) = &mut self.door_list.lock() {
+                            lock.push(Door {
+                                name,
+                                description: "".to_string(),
+                                password: "".to_string(),
+                                securiy_level: SecurityExpression::default(),
+                                use_shell_execute: false,
+                                door_type: DoorType::BBSlink,
+                                path: "".to_string(),
+                                drop_file: Default::default(),
+                            });
+                        }
                         self.insert_table.content_length += 1;
                     }
                     KeyCode::Delete => {
                         if let Some(selected_item) = self.insert_table.table_state.selected() {
-                            if selected_item < self.command.lock().unwrap().len() {
-                                self.command.lock().unwrap().remove(selected_item);
+                            if selected_item < self.door_list.lock().unwrap().len() {
+                                self.door_list.lock().unwrap().remove(selected_item);
                                 self.insert_table.content_length -= 1;
                             }
                         }
@@ -288,22 +276,44 @@ impl<'a> Page for DoorEditor<'a> {
                         self.edit_config_state = ConfigMenuState::default();
 
                         if let Some(selected_item) = self.insert_table.table_state.selected() {
-                            let cmd = self.command.lock().unwrap();
+                            let cmd = self.door_list.lock().unwrap();
                             let Some(action) = cmd.get(selected_item) else {
                                 return PageMessage::None;
                             };
                             self.edit_config = Some(ConfigMenu {
-                                obj: 0,
+                                obj: (selected_item, self.door_list.clone()),
                                 entry: vec![
-                                    ConfigEntry::Item(ListItem::new("Name".to_string(), ListValue::Text(30, action.name.clone())).with_label_width(16)),
                                     ConfigEntry::Item(
-                                        ListItem::new("Description".to_string(), ListValue::Text(30, action.description.clone())).with_label_width(16),
+                                        ListItem::new(get_text("door_editor_name"), ListValue::Text(30, action.name.clone()))
+                                            .with_label_width(16)
+                                            .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
+                                                list.lock().unwrap()[*i].name = value;
+                                            }),
                                     ),
-                                    ConfigEntry::Item(ListItem::new("Password".to_string(), ListValue::Text(30, action.password.clone())).with_label_width(16)),
-                                    ConfigEntry::Item(ListItem::new("Path".to_string(), ListValue::Text(30, action.path.clone())).with_label_width(16)),
+                                    ConfigEntry::Item(
+                                        ListItem::new(get_text("door_editor_description"), ListValue::Text(30, action.description.clone()))
+                                            .with_label_width(16)
+                                            .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
+                                                list.lock().unwrap()[*i].description = value;
+                                            }),
+                                    ),
+                                    ConfigEntry::Item(
+                                        ListItem::new(get_text("door_editor_password"), ListValue::Text(30, action.password.clone()))
+                                            .with_label_width(16)
+                                            .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
+                                                list.lock().unwrap()[*i].password = value;
+                                            }),
+                                    ),
+                                    ConfigEntry::Item(
+                                        ListItem::new(get_text("door_editor_path"), ListValue::Text(30, action.path.clone()))
+                                            .with_label_width(16)
+                                            .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
+                                                list.lock().unwrap()[*i].path = value;
+                                            }),
+                                    ),
                                     ConfigEntry::Item(
                                         ListItem::new(
-                                            "Door Type".to_string(),
+                                            get_text("door_editor_door_type"),
                                             ListValue::ComboBox(ComboBox {
                                                 cur_value: ComboBoxValue::new(format!("{}", action.door_type), format!("{}", action.door_type)),
                                                 first: 0,
@@ -313,10 +323,23 @@ impl<'a> Page for DoorEditor<'a> {
                                                     .collect::<Vec<ComboBoxValue>>(),
                                             }),
                                         )
-                                        .with_label_width(16),
+                                        .with_label_width(16)
+                                        .with_update_combobox_value(
+                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: &ComboBox| {
+                                                if value.cur_value.value == "BBSlink" {
+                                                    list.lock().unwrap()[*i].door_type = DoorType::BBSlink;
+                                                } else {
+                                                    list.lock().unwrap()[*i].door_type = DoorType::Local;
+                                                }
+                                            },
+                                        ),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new("Use Shell Execute".to_string(), ListValue::Bool(action.use_shell_execute)).with_label_width(16),
+                                        ListItem::new(get_text("door_editor_use_shell_execute"), ListValue::Bool(action.use_shell_execute))
+                                            .with_label_width(16)
+                                            .with_update_bool_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: bool| {
+                                                list.lock().unwrap()[*i].use_shell_execute = value;
+                                            }),
                                     ),
                                 ],
                             });

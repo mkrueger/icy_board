@@ -15,7 +15,7 @@ use crate::{
 use super::{security_expr::SecurityExpression, IcyBoardSerializer};
 
 #[serde_as]
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MessageArea {
     pub name: String,
     pub filename: PathBuf,
@@ -38,7 +38,7 @@ pub struct MessageArea {
     pub req_level_to_save_attach: SecurityExpression,
 }
 
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct AreaList {
     #[serde(rename = "area")]
     areas: Vec<MessageArea>,

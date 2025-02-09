@@ -1451,3 +1451,227 @@ user_editor_email-help=TODO
 user_editor_web=Web Address
 user_editor_web-status=Web
 user_editor_web-help=TODO
+
+# ICBSETUP -> Conferences > Edit DIRS.TOML
+
+dirs_editor_title=DIR.LST Editor { $conference }
+dirs_table_name_header=Name
+dirs_table_path_header=Path
+dirs_edit_directory_title=Edit Directory
+
+dirs_edit_name=Name
+dirs_edit_name-status=Name
+dirs_edit_name-help=TODO
+
+dirs_edit_path=Path
+dirs_edit_path-status=Path
+dirs_edit_path-help=TODO
+
+dirs_edit_password=Password
+dirs_edit_password-status=Password
+dirs_edit_password-help=TODO
+
+dirs_edit_sort=Sort
+dirs_edit_sort-status=Sort
+dirs_edit_sort-help=TODO
+
+dirs_edit_sort_asc=Sort ascending
+dirs_edit_sort_asc-status=Sort ascending
+dirs_edit_sort_asc-help=TODO
+
+dirs_edit_has_new_files=Has New Files
+dirs_edit_has_new_files-status=Has New Files
+dirs_edit_has_new_files-help=TODO
+
+dirs_edit_is_free=Is Free
+dirs_edit_is_free-status=Is Free
+dirs_edit_is_free-help=TODO
+
+dirs_edit_list_sec=List Security
+dirs_edit_list_sec-status=List Security
+dirs_edit_list_sec-help=TODO
+
+dirs_download_sec=Download Security
+dirs_download_sec-status=Download Security
+dirs_download_sec-help=TODO
+
+area_editor_title=AREA.LST Editor - { $conference }
+area_editor_edit_title=Edit Area
+
+area_editor_name=Name
+area_editor_name-status=Name
+area_editor_name-help=TODO
+
+area_editor_file=File
+area_editor_file-status=File
+area_editor_file-help=TODO
+
+area_editor_is_readonly=Is Read-Only
+area_editor_is_readonly-status=Is Read-Only
+area_editor_is_readonly-help=TODO
+
+area_editor_allow_aliases=Allow Aliases
+area_editor_allow_aliases-status=Allow Aliases
+area_editor_allow_aliases-help=TODO
+
+area_editor_list_sec=List Security
+area_editor_list_sec-status=List Security
+area_editor_list_sec-help=TODO
+
+area_editor_enter_sec=Enter Security
+area_editor_enter_sec-status=Enter Security
+area_editor_enter_sec-help=TODO
+
+area_editor_attach_sec=Attach Security
+area_editor_attach_sec-status=Attach Security
+area_editor_attach_sec-help=TODO
+
+doors_editor_title=DOORS File Editor { $conference }
+doors_editor_edit_title=Edit Door
+doors_editor_key_help=↑ Up  ↓ Down  Tab Edit Doors ␛ Back
+doors_editor_key_help_door=↑ Up  ↓ Down  INS New  ␡ Delete  Tab Edit BBSLINK ␛ Back
+
+doors_editor_header_door=Door
+doors_editor_header_description=Description
+doors_editor_header_type=Type
+
+door_editor_name=Name
+door_editor_name-status=Name
+door_editor_name-help=TODO
+
+door_editor_description=Description
+door_editor_description-status=Description
+door_editor_description-help=TODO
+
+door_editor_password=Password
+door_editor_password-status=Password
+door_editor_password-help=TODO
+
+door_editor_path=Path
+door_editor_path-status=Path
+door_editor_path-help=TODO
+
+door_editor_door_type=Door Type
+door_editor_door_type-status=Door Type
+door_editor_door_type-help=TODO
+
+door_editor_use_shell_execute=Use Shell Execute
+door_editor_use_shell_execute-status=Use Shell Execute
+door_editor_use_shell_execute-help=TODO
+
+lang_editor_title=Language Table
+
+lang_editor_header_language=Language
+lang_editor_header_ext=Extension
+lang_editor_header_locale=Locale
+lang_editor_header_yes=Yes
+lang_editor_header_no=No
+lang_editor_edit_lang=Edit Language
+
+lang_editor_edit_lang_label=Language
+lang_editor_edit_lang_label-status=Language
+lang_editor_edit_lang_label-help=TODO
+
+lang_editor_edit_extension=Extension
+lang_editor_edit_extension-status=Extension
+lang_editor_edit_extension-help=TODO
+
+lang_editor_edit_locale=Locale
+lang_editor_edit_locale-status=Locale
+lang_editor_edit_locale-help=TODO
+
+lang_editor_edit_yes_char=Yes Char
+lang_editor_edit_yes_char-status=Yes Char
+lang_editor_edit_yes_char-help=TODO
+
+lang_editor_edit_no_char=No Char
+lang_editor_edit_no_char-status=No Char
+lang_editor_edit_no_char-help=TODO
+
+surveys_editor_title=Surveys { $conference }
+survey_editor_editor=Edit Survey
+
+survey_editor_editor_header_question=Question
+survey_editor_editor_header_answer=Answer
+
+survey_editor_editor_file=Survey File
+survey_editor_editor_file-status=Survey File
+survey_editor_editor_file-help=TODO
+
+survey_editor_editor_answer_file=Answer File
+survey_editor_editor_answer_file-status=Answer File
+survey_editor_editor_answer_file-help=TODO
+
+survey_editor_editor_security=Security
+survey_editor_editor_security-status=Security
+survey_editor_editor_security-help=TODO
+
+sec_level_editor_title=Edit Security Levels
+sec_level_editor_editor=Edit Security Level
+
+sec_level_editor_security=Security
+sec_level_editor_security-status=Security
+sec_level_editor_security-help=TODO
+
+sec_level_editor_description=Description
+sec_level_editor_description-status=Description
+sec_level_editor_description-help=TODO
+
+sec_level_editor_password=Password
+sec_level_editor_password-status=Password
+sec_level_editor_password-help=TODO
+
+sec_level_editor_time_per_day=Time
+sec_level_editor_time_per_day-status=Time
+sec_level_editor_time_per_day-help=TODO
+
+sec_level_editor_daily_bytes=Daily KBytes
+sec_level_editor_daily_bytes-status=Daily KBytes
+sec_level_editor_daily_bytes-help=TODO
+
+sec_level_editor_file_ratio=File Ratio
+sec_level_editor_file_ratio-status=File Ratio
+sec_level_editor_file_ratio-help=TODO
+
+sec_level_editor_byte_ratio=Byte Ratio
+sec_level_editor_byte_ratio-status=Byte Ratio
+sec_level_editor_byte_ratio-help=TODO
+
+sec_level_editor_file_limit=File Limit
+sec_level_editor_file_limit-status=File Limit
+sec_level_editor_file_limit-help=TODO
+
+sec_level_editor_kb_limit=KByte Limit
+sec_level_editor_kb_limit-status=KByte Limit
+sec_level_editor_kb_limit-help=TODO
+
+
+sec_level_editor_file_credit=File Credit
+sec_level_editor_file_credit-status=File Credit
+sec_level_editor_file_credit-help=TODO
+
+
+sec_level_editor_kb_credit=KByte Credit
+sec_level_editor_kb_credit-status=KByte Credit
+sec_level_editor_kb_credit-help=TODO
+
+sec_level_editor_enforce_time=Enforce Time Limit
+sec_level_editor_enforce_time-status=Enforce Time Limit
+sec_level_editor_enforce_time-help=TODO
+
+
+sec_level_editor_allow_alias=Allow Alias
+sec_level_editor_allow_alias-status=Allow Alias
+sec_level_editor_allow_alias-help=TODO
+
+sec_level_force_read_mail=Force Read Mail
+sec_level_force_read_mail-status=Force Read Mail
+sec_level_force_read_mail-help=TODO
+
+sec_level_demo_acc=Demo Account
+sec_level_demo_acc-status=Demo Account
+sec_level_demo_acc-help=TODO
+
+sec_level_enable_acc=Enable Account
+sec_level_enable_acc-status=Enable Account
+sec_level_enable_acc-help=TODO

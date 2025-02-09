@@ -217,7 +217,7 @@ impl IcyBoardCreator {
         self.logger.start_action("Write default language definition file".to_string());
         config.paths.language_file = PathBuf::from("config/languages.toml");
         let mut lang = SupportedLanguages::default();
-        lang.languages.push(Language {
+        lang.push(Language {
             description: "English".to_string(),
             yes_char: 'Y',
             no_char: 'N',

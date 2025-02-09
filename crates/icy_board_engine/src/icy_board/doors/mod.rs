@@ -32,19 +32,19 @@ mod tribbs_sys;
 const DOOR_COM_PORT: u8 = 1;
 const DOOR_BPS_RATE: u32 = 57600;
 
-#[derive(Clone, Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct BBSLink {
     pub system_code: String,
     pub auth_code: String,
     pub sheme_code: String,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub enum DoorServerAccount {
     BBSLink(BBSLink),
 }
 
-#[derive(Clone, Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub enum DoorType {
     #[default]
     Local,
@@ -111,7 +111,7 @@ pub enum DropFile {
 }
 
 #[serde_as]
-#[derive(Clone, Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Door {
     pub name: String,
     pub description: String,
@@ -209,7 +209,7 @@ lazy_static::lazy_static! {
     pub static ref HAS_ACCESS: unicase::Ascii<String> = unicase::Ascii::new("HasAccess".to_string());
 }
 
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct DoorList {
     #[serde(rename = "account")]
     pub accounts: Vec<DoorServerAccount>,

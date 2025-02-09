@@ -13,7 +13,9 @@ use icy_board_engine::{
 };
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
+    get_text,
     insert_table::InsertTable,
+    save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
 };
@@ -26,18 +28,19 @@ use ratatui::{
 
 pub struct SecurityLevelEditor<'a> {
     path: std::path::PathBuf,
-    door_list: SecurityLevelDefinitions,
 
     insert_table: InsertTable<'a>,
-    sec_levels: Arc<Mutex<Vec<SecurityLevel>>>,
+    sec_levels_orig: SecurityLevelDefinitions,
+    sec_levels: Arc<Mutex<SecurityLevelDefinitions>>,
 
     edit_config_state: ConfigMenuState,
-    edit_config: Option<ConfigMenu<u32>>,
+    edit_config: Option<ConfigMenu<(usize, Arc<Mutex<SecurityLevelDefinitions>>)>>,
+    save_dialog: Option<SaveChangesDialog>,
 }
 
 impl<'a> SecurityLevelEditor<'a> {
     pub(crate) fn new(path: &std::path::PathBuf) -> Res<Self> {
-        let sec_levels = if path.exists() {
+        let sec_levels_orig = if path.exists() {
             SecurityLevelDefinitions::load(&path)?
         } else {
             let mut sec_levels = SecurityLevelDefinitions::default();
@@ -105,10 +108,10 @@ impl<'a> SecurityLevelEditor<'a> {
             ];
             sec_levels
         };
-        let command_arc = Arc::new(Mutex::new(sec_levels.levels.clone()));
-        let scroll_state = ScrollbarState::default().content_length(sec_levels.levels.len());
-        let content_length = sec_levels.levels.len();
-        let cmd2 = command_arc.clone();
+        let sec_levels = Arc::new(Mutex::new(sec_levels_orig.clone()));
+        let scroll_state = ScrollbarState::default().content_length(sec_levels_orig.levels.len());
+        let content_length = sec_levels_orig.levels.len();
+        let cmd2 = sec_levels.clone();
         let insert_table = InsertTable {
             scroll_state,
             table_state: TableState::default().with_selected(0),
@@ -126,14 +129,14 @@ impl<'a> SecurityLevelEditor<'a> {
             }),
             content_length,
         };
-
         Ok(Self {
             path: path.clone(),
-            door_list: sec_levels,
+            sec_levels_orig,
             insert_table,
-            sec_levels: command_arc,
+            sec_levels,
             edit_config: None,
             edit_config_state: ConfigMenuState::default(),
+            save_dialog: None,
         })
     }
 
@@ -167,23 +170,30 @@ impl<'a> SecurityLevelEditor<'a> {
 impl<'a> Page for SecurityLevelEditor<'a> {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         Clear.render(area, frame.buffer_mut());
+
         let block = Block::new()
             .title_alignment(Alignment::Center)
-            .title(Title::from(Span::from(" Edit Security Levels ").style(get_tui_theme().dialog_box_title)))
+            .title(Title::from(
+                Span::from(get_text("sec_level_editor_title")).style(get_tui_theme().dialog_box_title),
+            ))
             .style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
-            .border_type(BorderType::Double);
+            .border_set(icy_board_tui::BORDER_SET)
+            .title_bottom(Span::styled(get_text("icb_setup_key_conf_list_help"), get_tui_theme().key_binding));
         block.render(area, frame.buffer_mut());
         let area = area.inner(Margin { horizontal: 1, vertical: 1 });
         self.display_insert_table(frame, &area);
 
         if let Some(edit_config) = &mut self.edit_config {
-            let area = area.inner(Margin { vertical: 2, horizontal: 3 });
+            let mut area = area.inner(Margin { vertical: 2, horizontal: 3 });
+            area.height += 1;
             Clear.render(area, frame.buffer_mut());
             let block = Block::new()
                 .title_alignment(Alignment::Center)
-                .title(Title::from(Span::from(" Edit Security Level ").style(get_tui_theme().dialog_box_title)))
+                .title(Title::from(
+                    Span::from(get_text("sec_level_editor_editor")).style(get_tui_theme().dialog_box_title),
+                ))
                 .style(get_tui_theme().dialog_box)
                 .padding(Padding::new(2, 2, 1, 1))
                 .borders(Borders::ALL)
@@ -198,104 +208,35 @@ impl<'a> Page for SecurityLevelEditor<'a> {
                 .text_field_state
                 .set_cursor_position(frame);
         }
+        if let Some(save_changes) = &self.save_dialog {
+            save_changes.render(frame, area);
+        }
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
+        if self.save_dialog.is_some() {
+            let res = self.save_dialog.as_mut().unwrap().handle_key_press(key);
+            return match res {
+                icy_board_tui::save_changes_dialog::SaveChangesMessage::Cancel => {
+                    self.save_dialog = None;
+                    PageMessage::None
+                }
+                icy_board_tui::save_changes_dialog::SaveChangesMessage::Close => PageMessage::Close,
+                icy_board_tui::save_changes_dialog::SaveChangesMessage::Save => {
+                    if let Some(parent) = self.path.parent() {
+                        if !parent.exists() {
+                            std::fs::create_dir_all(parent).unwrap();
+                        }
+                    }
+                    self.sec_levels.lock().unwrap().save(&self.path).unwrap();
+                    PageMessage::Close
+                }
+                icy_board_tui::save_changes_dialog::SaveChangesMessage::None => PageMessage::None,
+            };
+        }
         if let Some(edit_config) = &mut self.edit_config {
             match key.code {
                 KeyCode::Esc => {
-                    /*
-                    let Some(selected_item) = self.insert_table.table_state.selected() else {
-                        return true;
-                    };
-                    for item in edit_config.iter() {
-                        match item.id.as_str() {
-                            "security" => {
-                                if let ListValue::U32(value, _, _) = item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].security = value as u8;
-                                }
-                            }
-                            "description" => {
-                                if let ListValue::Text(_, value) = &item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].description = value.to_string();
-                                }
-                            }
-                            "password" => {
-                                if let ListValue::Text(_, value) = &item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].password = value.to_string();
-                                }
-                            }
-                            "time_per_day" => {
-                                if let ListValue::U32(value, _, _) = item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].time_per_day = value as u32;
-                                }
-                            }
-                            "daily_file_kb_limit" => {
-                                if let ListValue::U32(value, _, _) = item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].daily_file_kb_limit = value as u64;
-                                }
-                            }
-
-                            "uldl_ratio" => {
-                                if let ListValue::U32(value, _, _) = item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].uldl_ratio = value as u32;
-                                }
-                            }
-                            "uldl_kb_ratio" => {
-                                if let ListValue::U32(value, _, _) = item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].uldl_kb_ratio = value as u32;
-                                }
-                            }
-                            "file_limit" => {
-                                if let ListValue::U32(value, _, _) = item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].file_limit = value as u64;
-                                }
-                            }
-                            "file_kb_limit" => {
-                                if let ListValue::U32(value, _, _) = item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].file_kb_limit = value as u64;
-                                }
-                            }
-                            "file_credit" => {
-                                if let ListValue::U32(value, _, _) = item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].file_credit = value as u64;
-                                }
-                            }
-                            "file_kb_credit" => {
-                                if let ListValue::U32(value, _, _) = item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].file_kb_credit = value as u64;
-                                }
-                            }
-                            "enforce_time_limit" => {
-                                if let ListValue::Bool(value) = item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].enforce_time_limit = value;
-                                }
-                            }
-                            "allow_alias" => {
-                                if let ListValue::Bool(value) = item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].allow_alias = value;
-                                }
-                            }
-                            "enforce_read_mail" => {
-                                if let ListValue::Bool(value) = item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].enforce_read_mail = value;
-                                }
-                            }
-                            "is_demo_account" => {
-                                if let ListValue::Bool(value) = item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].is_demo_account = value;
-                                }
-                            }
-                            "is_enabled" => {
-                                if let ListValue::Bool(value) = item.value {
-                                    self.sec_levels.lock().unwrap()[selected_item].is_enabled = value;
-                                }
-                            }
-                            _ => {
-                                panic!("Unknown item: {}", item.id);
-                            }
-                        }
-                    }*/
                     self.edit_config = None;
                     return PageMessage::None;
                 }
@@ -308,14 +249,15 @@ impl<'a> Page for SecurityLevelEditor<'a> {
 
         match key.code {
             KeyCode::Esc => {
-                self.door_list.levels.clear();
-                self.door_list.levels.append(&mut self.sec_levels.lock().unwrap());
-                self.door_list.save(&self.path).unwrap();
-                return PageMessage::Close;
+                if self.sec_levels_orig == self.sec_levels.lock().unwrap().clone() {
+                    return PageMessage::Close;
+                }
+                self.save_dialog = Some(SaveChangesDialog::new());
+                return PageMessage::None;
             }
             _ => match key.code {
-                KeyCode::Char('1') => self.move_up(),
-                KeyCode::Char('2') => self.move_down(),
+                KeyCode::PageUp => self.move_up(),
+                KeyCode::PageDown => self.move_down(),
 
                 KeyCode::Insert => {
                     self.sec_levels.lock().unwrap().push(SecurityLevel {
@@ -359,45 +301,140 @@ impl<'a> Page for SecurityLevelEditor<'a> {
                             return PageMessage::None;
                         };
                         self.edit_config = Some(ConfigMenu {
-                            obj: 0,
+                            obj: (selected_item, self.sec_levels.clone()),
                             entry: vec![
-                                ConfigEntry::Item(ListItem::new("Security".to_string(), ListValue::U32(action.security as u32, 0, 255)).with_label_width(16)),
                                 ConfigEntry::Item(
-                                    ListItem::new("Description".to_string(), ListValue::Text(30, action.description.clone())).with_label_width(16),
-                                ),
-                                ConfigEntry::Item(ListItem::new("Password".to_string(), ListValue::Text(30, action.password.clone())).with_label_width(16)),
-                                ConfigEntry::Item(
-                                    ListItem::new("Time".to_string(), ListValue::U32(action.time_per_day as u32, 0, u32::MAX)).with_label_width(16),
-                                ),
-                                ConfigEntry::Item(
-                                    ListItem::new("Daily KBytes".to_string(), ListValue::U32(action.daily_file_kb_limit as u32, 0, u32::MAX))
-                                        .with_label_width(16),
+                                    ListItem::new(get_text("sec_level_editor_security"), ListValue::U32(action.security as u32, 0, 255))
+                                        .with_label_width(16)
+                                        .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: u32| {
+                                            list.lock().unwrap()[*i].security = value as u8;
+                                        }),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new("File Ratio".to_string(), ListValue::U32(action.uldl_ratio as u32, 0, u32::MAX)).with_label_width(16),
+                                    ListItem::new(get_text("sec_level_editor_description"), ListValue::Text(30, action.description.clone()))
+                                        .with_label_width(16)
+                                        .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: String| {
+                                            list.lock().unwrap()[*i].description = value;
+                                        }),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new("Byte Ratio".to_string(), ListValue::U32(action.uldl_kb_ratio as u32, 0, u32::MAX)).with_label_width(16),
+                                    ListItem::new(get_text("sec_level_editor_password"), ListValue::Text(30, action.password.clone()))
+                                        .with_label_width(16)
+                                        .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: String| {
+                                            list.lock().unwrap()[*i].password = value;
+                                        }),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new("File Limit".to_string(), ListValue::U32(action.file_limit as u32, 0, u32::MAX)).with_label_width(16),
+                                    ListItem::new(
+                                        get_text("sec_level_editor_time_per_day"),
+                                        ListValue::U32(action.time_per_day as u32, 0, u32::MAX),
+                                    )
+                                    .with_label_width(16)
+                                    .with_update_u32_value(
+                                        &|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: u32| {
+                                            list.lock().unwrap()[*i].time_per_day = value;
+                                        },
+                                    ),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new("KByte Limit".to_string(), ListValue::U32(action.file_kb_limit as u32, 0, u32::MAX)).with_label_width(16),
+                                    ListItem::new(
+                                        get_text("sec_level_editor_daily_bytes"),
+                                        ListValue::U32(action.daily_file_kb_limit as u32, 0, u32::MAX),
+                                    )
+                                    .with_label_width(16)
+                                    .with_update_u32_value(
+                                        &|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: u32| {
+                                            list.lock().unwrap()[*i].daily_file_kb_limit = value as u64;
+                                        },
+                                    ),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new("File Credit".to_string(), ListValue::U32(action.file_credit as u32, 0, u32::MAX)).with_label_width(16),
+                                    ListItem::new(get_text("sec_level_editor_file_ratio"), ListValue::U32(action.uldl_ratio as u32, 0, u32::MAX))
+                                        .with_label_width(16)
+                                        .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: u32| {
+                                            list.lock().unwrap()[*i].uldl_ratio = value;
+                                        }),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new("KByte Credit".to_string(), ListValue::U32(action.file_kb_credit as u32, 0, u32::MAX)).with_label_width(16),
+                                    ListItem::new(
+                                        get_text("sec_level_editor_byte_ratio"),
+                                        ListValue::U32(action.uldl_kb_ratio as u32, 0, u32::MAX),
+                                    )
+                                    .with_label_width(16)
+                                    .with_update_u32_value(
+                                        &|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: u32| {
+                                            list.lock().unwrap()[*i].uldl_kb_ratio = value;
+                                        },
+                                    ),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new("Enforce Time Limit".to_string(), ListValue::Bool(action.enforce_time_limit)).with_label_width(16),
+                                    ListItem::new(get_text("sec_level_editor_file_limit"), ListValue::U32(action.file_limit as u32, 0, u32::MAX))
+                                        .with_label_width(16)
+                                        .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: u32| {
+                                            list.lock().unwrap()[*i].file_limit = value as u64;
+                                        }),
                                 ),
-                                ConfigEntry::Item(ListItem::new("Allow Alias".to_string(), ListValue::Bool(action.allow_alias)).with_label_width(16)),
-                                ConfigEntry::Item(ListItem::new("Force Read Mail".to_string(), ListValue::Bool(action.enforce_read_mail)).with_label_width(16)),
-                                ConfigEntry::Item(ListItem::new("Demo Account".to_string(), ListValue::Bool(action.is_demo_account)).with_label_width(16)),
-                                ConfigEntry::Item(ListItem::new("Enable Account".to_string(), ListValue::Bool(action.is_enabled)).with_label_width(16)),
+                                ConfigEntry::Item(
+                                    ListItem::new(get_text("sec_level_editor_kb_limit"), ListValue::U32(action.file_kb_limit as u32, 0, u32::MAX))
+                                        .with_label_width(16)
+                                        .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: u32| {
+                                            list.lock().unwrap()[*i].file_kb_limit = value as u64;
+                                        }),
+                                ),
+                                ConfigEntry::Item(
+                                    ListItem::new(get_text("sec_level_editor_file_credit"), ListValue::U32(action.file_credit as u32, 0, u32::MAX))
+                                        .with_label_width(16)
+                                        .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: u32| {
+                                            list.lock().unwrap()[*i].file_credit = value as u64;
+                                        }),
+                                ),
+                                ConfigEntry::Item(
+                                    ListItem::new(
+                                        get_text("sec_level_editor_kb_credit"),
+                                        ListValue::U32(action.file_kb_credit as u32, 0, u32::MAX),
+                                    )
+                                    .with_label_width(16)
+                                    .with_update_u32_value(
+                                        &|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: u32| {
+                                            list.lock().unwrap()[*i].file_kb_credit = value as u64;
+                                        },
+                                    ),
+                                ),
+                                ConfigEntry::Item(
+                                    ListItem::new(get_text("sec_level_editor_enforce_time"), ListValue::Bool(action.enforce_time_limit))
+                                        .with_label_width(16)
+                                        .with_update_bool_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: bool| {
+                                            list.lock().unwrap()[*i].enforce_time_limit = value;
+                                        }),
+                                ),
+                                ConfigEntry::Item(
+                                    ListItem::new(get_text("sec_level_editor_allow_alias"), ListValue::Bool(action.allow_alias))
+                                        .with_label_width(16)
+                                        .with_update_bool_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: bool| {
+                                            list.lock().unwrap()[*i].allow_alias = value;
+                                        }),
+                                ),
+                                ConfigEntry::Item(
+                                    ListItem::new(get_text("sec_level_force_read_mail"), ListValue::Bool(action.enforce_read_mail))
+                                        .with_label_width(16)
+                                        .with_update_bool_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: bool| {
+                                            list.lock().unwrap()[*i].enforce_read_mail = value;
+                                        }),
+                                ),
+                                ConfigEntry::Item(
+                                    ListItem::new(get_text("sec_level_demo_acc"), ListValue::Bool(action.is_demo_account))
+                                        .with_label_width(16)
+                                        .with_update_bool_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: bool| {
+                                            list.lock().unwrap()[*i].is_demo_account = value;
+                                        }),
+                                ),
+                                ConfigEntry::Item(
+                                    ListItem::new(get_text("sec_level_enable_acc"), ListValue::Bool(action.is_enabled))
+                                        .with_label_width(16)
+                                        .with_update_bool_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: bool| {
+                                            list.lock().unwrap()[*i].is_enabled = value;
+                                        }),
+                                ),
                             ],
                         });
                     } else {

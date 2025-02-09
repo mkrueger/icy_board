@@ -24,6 +24,13 @@ pub struct ConferenceEditor {
     menu: ConfigMenu<(usize, Arc<Mutex<IcyBoard>>)>,
 }
 
+static mut CUR_CONFERENCE: String = String::new();
+
+#[allow(static_mut_refs)]
+pub fn get_cur_conference_name() -> String {
+    unsafe { CUR_CONFERENCE.clone() }
+}
+
 impl ConferenceEditor {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>, num_conf: usize) -> Self {
         let conf_name = get_text_args("conf_name", HashMap::from([("number".to_string(), num_conf.to_string())]));
@@ -31,6 +38,9 @@ impl ConferenceEditor {
         let menu: ConfigMenu<(usize, Arc<Mutex<IcyBoard>>)> = {
             let ib = icy_board.lock().unwrap();
             let conf = ib.conferences.get(num_conf).unwrap();
+            unsafe {
+                CUR_CONFERENCE = if conf.name.is_empty() { conf_name.clone() } else { conf.name.clone() };
+            }
 
             let name_block_width = 27;
 
@@ -264,7 +274,7 @@ impl ConferenceEditor {
                         ConfigEntry::Item(
                             ListItem::new("".to_string(), ListValue::Path(conf.area_file.clone()))
                                 .with_edit_width(rpath_width)
-                                .with_path_editor(Box::new(crate::editors::messages::edit_areas))
+                                .with_path_editor(Box::new(crate::editors::areas::edit_areas))
                                 .with_update_path_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: PathBuf| {
                                     let mut ib = board.1.lock().unwrap();
                                     ib.conferences[board.0].area_file = value;

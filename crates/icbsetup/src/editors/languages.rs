@@ -13,7 +13,9 @@ use icy_board_engine::{
 };
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
+    get_text,
     insert_table::InsertTable,
+    save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
 };
@@ -28,33 +30,35 @@ pub struct LanguageListEditor<'a> {
     path: std::path::PathBuf,
 
     insert_table: InsertTable<'a>,
-    dir_list: Arc<Mutex<SupportedLanguages>>,
+    lang_list_orig: SupportedLanguages,
+    lang_list: Arc<Mutex<SupportedLanguages>>,
 
     edit_config_state: ConfigMenuState,
-    edit_config: Option<ConfigMenu<u32>>,
+    edit_config: Option<ConfigMenu<(usize, Arc<Mutex<SupportedLanguages>>)>>,
+    save_dialog: Option<SaveChangesDialog>,
 }
 
 impl<'a> LanguageListEditor<'a> {
     pub(crate) fn new(path: &std::path::PathBuf) -> Res<Self> {
-        let surveys = if path.exists() {
+        let lang_list_orig = if path.exists() {
             SupportedLanguages::load(&path)?
         } else {
             SupportedLanguages::default()
         };
-        let dir_list = Arc::new(Mutex::new(surveys.clone()));
-        let scroll_state = ScrollbarState::default().content_length(surveys.len());
-        let content_length = surveys.len();
-        let dl2 = dir_list.clone();
+        let lang_list = Arc::new(Mutex::new(lang_list_orig.clone()));
+        let scroll_state = ScrollbarState::default().content_length(lang_list_orig.len());
+        let content_length = lang_list_orig.len();
+        let dl2 = lang_list.clone();
         let insert_table = InsertTable {
             scroll_state,
             table_state: TableState::default().with_selected(0),
             headers: vec![
                 "".to_string(),
-                "Language            ".to_string(),
-                "Extension".to_string(),
-                "Locale".to_string(),
-                "Yes".to_string(),
-                "No".to_string(),
+                get_text("lang_editor_header_language"),
+                get_text("lang_editor_header_ext"),
+                get_text("lang_editor_header_locale"),
+                get_text("lang_editor_header_yes"),
+                get_text("lang_editor_header_no"),
             ],
             get_content: Box::new(move |_table, i, j| {
                 if *i >= dl2.lock().unwrap().len() {
@@ -62,11 +66,11 @@ impl<'a> LanguageListEditor<'a> {
                 }
                 match j {
                     0 => Line::from(format!("{})", *i + 1)),
-                    1 => Line::from(format!("{}", dl2.lock().unwrap().languages[*i].description)),
-                    2 => Line::from(format!("{}", dl2.lock().unwrap().languages[*i].extension)),
-                    3 => Line::from(format!("{}", dl2.lock().unwrap().languages[*i].locale)),
-                    4 => Line::from(format!("{}", dl2.lock().unwrap().languages[*i].yes_char)),
-                    5 => Line::from(format!("{}", dl2.lock().unwrap().languages[*i].no_char)),
+                    1 => Line::from(format!("{}", dl2.lock().unwrap()[*i].description)),
+                    2 => Line::from(format!("{}", dl2.lock().unwrap()[*i].extension)),
+                    3 => Line::from(format!("{}", dl2.lock().unwrap()[*i].locale)),
+                    4 => Line::from(format!("{}", dl2.lock().unwrap()[*i].yes_char)),
+                    5 => Line::from(format!("{}", dl2.lock().unwrap()[*i].no_char)),
                     _ => Line::from("".to_string()),
                 }
             }),
@@ -76,9 +80,11 @@ impl<'a> LanguageListEditor<'a> {
         Ok(Self {
             path: path.clone(),
             insert_table,
-            dir_list,
+            lang_list_orig,
+            lang_list,
             edit_config: None,
             edit_config_state: ConfigMenuState::default(),
+            save_dialog: None,
         })
     }
 
@@ -91,8 +97,8 @@ impl<'a> LanguageListEditor<'a> {
     fn move_up(&mut self) {
         if let Some(selected) = self.insert_table.table_state.selected() {
             if selected > 0 {
-                let mut levels = self.dir_list.lock().unwrap();
-                levels.languages.swap(selected, selected - 1);
+                let mut levels = self.lang_list.lock().unwrap();
+                levels.swap(selected, selected - 1);
                 self.insert_table.table_state.select(Some(selected - 1));
             }
         }
@@ -100,9 +106,9 @@ impl<'a> LanguageListEditor<'a> {
 
     fn move_down(&mut self) {
         if let Some(selected) = self.insert_table.table_state.selected() {
-            if selected + 1 < self.dir_list.lock().unwrap().len() {
-                let mut levels = self.dir_list.lock().unwrap();
-                levels.languages.swap(selected, selected + 1);
+            if selected + 1 < self.lang_list.lock().unwrap().len() {
+                let mut levels = self.lang_list.lock().unwrap();
+                levels.swap(selected, selected + 1);
                 self.insert_table.table_state.select(Some(selected + 1));
             }
         }
@@ -112,23 +118,29 @@ impl<'a> LanguageListEditor<'a> {
 impl<'a> Page for LanguageListEditor<'a> {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         Clear.render(area, frame.buffer_mut());
+        let title = get_text("lang_editor_title");
+
         let block = Block::new()
             .title_alignment(Alignment::Center)
-            .title(Title::from(Span::from(" Languages ").style(get_tui_theme().dialog_box_title)))
+            .title(Title::from(Span::from(title).style(get_tui_theme().dialog_box_title)))
             .style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
-            .border_type(BorderType::Double);
+            .border_set(icy_board_tui::BORDER_SET)
+            .title_bottom(Span::styled(get_text("icb_setup_key_conf_list_help"), get_tui_theme().key_binding));
         block.render(area, frame.buffer_mut());
         let area = area.inner(Margin { horizontal: 1, vertical: 1 });
         self.display_insert_table(frame, &area);
 
         if let Some(edit_config) = &mut self.edit_config {
-            let area = area.inner(Margin { vertical: 8, horizontal: 6 });
+            let mut area = area.inner(Margin { vertical: 6, horizontal: 6 });
+            area.height -= 2;
             Clear.render(area, frame.buffer_mut());
             let block = Block::new()
                 .title_alignment(Alignment::Center)
-                .title(Title::from(Span::from(" Edit Language ").style(get_tui_theme().dialog_box_title)))
+                .title(Title::from(
+                    Span::from(get_text("lang_editor_edit_lang")).style(get_tui_theme().dialog_box_title),
+                ))
                 .style(get_tui_theme().dialog_box)
                 .padding(Padding::new(2, 2, 1, 1))
                 .borders(Borders::ALL)
@@ -143,53 +155,37 @@ impl<'a> Page for LanguageListEditor<'a> {
                 .text_field_state
                 .set_cursor_position(frame);
         }
+
+        if let Some(save_changes) = &self.save_dialog {
+            save_changes.render(frame, area);
+        }
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
+        if self.save_dialog.is_some() {
+            let res = self.save_dialog.as_mut().unwrap().handle_key_press(key);
+            return match res {
+                icy_board_tui::save_changes_dialog::SaveChangesMessage::Cancel => {
+                    self.save_dialog = None;
+                    PageMessage::None
+                }
+                icy_board_tui::save_changes_dialog::SaveChangesMessage::Close => PageMessage::Close,
+                icy_board_tui::save_changes_dialog::SaveChangesMessage::Save => {
+                    if let Some(parent) = self.path.parent() {
+                        if !parent.exists() {
+                            std::fs::create_dir_all(parent).unwrap();
+                        }
+                    }
+                    self.lang_list.lock().unwrap().save(&self.path).unwrap();
+                    PageMessage::Close
+                }
+                icy_board_tui::save_changes_dialog::SaveChangesMessage::None => PageMessage::None,
+            };
+        }
+
         if let Some(edit_config) = &mut self.edit_config {
             match key.code {
                 KeyCode::Esc => {
-                    /*
-                    let Some(selected_item) = self.insert_table.table_state.selected() else {
-                        return true;
-                    };
-                    for item in edit_config.iter() {
-                        match item.id.as_str() {
-                            "description" => {
-                                if let ListValue::Text(_, text) = &item.value {
-                                    self.dir_list.lock().unwrap().languages[selected_item].description = text.to_string();
-                                }
-                            }
-
-                            "extension" => {
-                                if let ListValue::Text(_, text) = &item.value {
-                                    self.dir_list.lock().unwrap().languages[selected_item].extension = text.to_string();
-                                }
-                            }
-
-                            "locale" => {
-                                if let ListValue::Text(_, text) = &item.value {
-                                    self.dir_list.lock().unwrap().languages[selected_item].locale = text.to_string();
-                                }
-                            }
-
-                            "yes_char" => {
-                                if let ListValue::Text(_, text) = &item.value {
-                                    self.dir_list.lock().unwrap().languages[selected_item].yes_char = text.chars().next().unwrap_or('Y');
-                                }
-                            }
-
-                            "no_char" => {
-                                if let ListValue::Text(_, text) = &item.value {
-                                    self.dir_list.lock().unwrap().languages[selected_item].no_char = text.chars().next().unwrap_or('N');
-                                }
-                            }
-
-                            _ => {
-                                panic!("Unknown item: {}", item.id);
-                            }
-                        }
-                    }*/
                     self.edit_config = None;
                     return PageMessage::None;
                 }
@@ -202,55 +198,87 @@ impl<'a> Page for LanguageListEditor<'a> {
 
         match key.code {
             KeyCode::Esc => {
-                self.dir_list.lock().unwrap().save(&self.path).unwrap();
-                return PageMessage::Close;
+                if self.lang_list_orig == self.lang_list.lock().unwrap().clone() {
+                    return PageMessage::Close;
+                }
+                self.save_dialog = Some(SaveChangesDialog::new());
+                return PageMessage::None;
             }
-            _ => match key.code {
-                KeyCode::Char('1') => self.move_up(),
-                KeyCode::Char('2') => self.move_down(),
+            KeyCode::PageUp => self.move_up(),
+            KeyCode::PageDown => self.move_down(),
 
-                KeyCode::Insert => {
-                    self.dir_list.lock().unwrap().languages.push(Language::default());
-                    self.insert_table.content_length += 1;
-                }
-                KeyCode::Delete => {
-                    if let Some(selected_item) = self.insert_table.table_state.selected() {
-                        if selected_item < self.dir_list.lock().unwrap().len() {
-                            self.dir_list.lock().unwrap().languages.remove(selected_item);
-                            self.insert_table.content_length -= 1;
-                        }
+            KeyCode::Insert => {
+                self.lang_list.lock().unwrap().push(Language::default());
+                self.insert_table.content_length += 1;
+            }
+            KeyCode::Delete => {
+                if let Some(selected_item) = self.insert_table.table_state.selected() {
+                    if selected_item < self.lang_list.lock().unwrap().len() {
+                        self.lang_list.lock().unwrap().remove(selected_item);
+                        self.insert_table.content_length -= 1;
                     }
                 }
+            }
 
-                KeyCode::Enter => {
-                    self.edit_config_state = ConfigMenuState::default();
+            KeyCode::Enter => {
+                self.edit_config_state = ConfigMenuState::default();
 
-                    if let Some(selected_item) = self.insert_table.table_state.selected() {
-                        let cmd = self.dir_list.lock().unwrap();
-                        let Some(item) = cmd.languages.get(selected_item) else {
-                            return PageMessage::None;
-                        };
-                        self.edit_config = Some(ConfigMenu {
-                            obj: 0,
-                            entry: vec![
-                                ConfigEntry::Item(
-                                    ListItem::new("Language".to_string(), ListValue::Text(25, item.description.to_string())).with_label_width(16),
-                                ),
-                                ConfigEntry::Item(ListItem::new("Extension".to_string(), ListValue::Text(25, item.extension.to_string())).with_label_width(16)),
-                                ConfigEntry::Item(ListItem::new("Locale".to_string(), ListValue::Text(25, item.locale.to_string())).with_label_width(16)),
-                                ConfigEntry::Item(ListItem::new("Yes Char".to_string(), ListValue::Text(25, item.yes_char.to_string())).with_label_width(16)),
-                                ConfigEntry::Item(ListItem::new("No Char".to_string(), ListValue::Text(25, item.no_char.to_string())).with_label_width(16)),
-                            ],
-                        });
-                    } else {
-                        self.insert_table.handle_key_press(key).unwrap();
-                    }
-                }
-
-                _ => {
+                if let Some(selected_item) = self.insert_table.table_state.selected() {
+                    let cmd = self.lang_list.lock().unwrap();
+                    let Some(item) = cmd.get(selected_item) else {
+                        return PageMessage::None;
+                    };
+                    self.edit_config = Some(ConfigMenu {
+                        obj: (selected_item, self.lang_list.clone()),
+                        entry: vec![
+                            ConfigEntry::Item(
+                                ListItem::new(get_text("lang_editor_edit_lang_label"), ListValue::Text(25, item.description.to_string()))
+                                    .with_label_width(16)
+                                    .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SupportedLanguages>>), value: String| {
+                                        list.lock().unwrap()[*i].description = value;
+                                    }),
+                            ),
+                            ConfigEntry::Item(
+                                ListItem::new(get_text("lang_editor_edit_extension"), ListValue::Text(25, item.extension.to_string()))
+                                    .with_label_width(16)
+                                    .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SupportedLanguages>>), value: String| {
+                                        list.lock().unwrap()[*i].extension = value;
+                                    }),
+                            ),
+                            ConfigEntry::Item(
+                                ListItem::new(get_text("lang_editor_edit_locale"), ListValue::Text(25, item.locale.to_string()))
+                                    .with_label_width(16)
+                                    .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SupportedLanguages>>), value: String| {
+                                        list.lock().unwrap()[*i].locale = value;
+                                    }),
+                            ),
+                            ConfigEntry::Item(
+                                ListItem::new(get_text("lang_editor_edit_yes_char"), ListValue::Text(1, item.yes_char.to_string()))
+                                    .with_label_width(16)
+                                    .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SupportedLanguages>>), value: String| {
+                                        if let Some(c) = value.chars().next() {
+                                            list.lock().unwrap()[*i].yes_char = c;
+                                        }
+                                    }),
+                            ),
+                            ConfigEntry::Item(
+                                ListItem::new(get_text("lang_editor_edit_no_char"), ListValue::Text(1, item.no_char.to_string()))
+                                    .with_label_width(16)
+                                    .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SupportedLanguages>>), value: String| {
+                                        if let Some(c) = value.chars().next() {
+                                            list.lock().unwrap()[*i].no_char = c;
+                                        }
+                                    }),
+                            ),
+                        ],
+                    });
+                } else {
                     self.insert_table.handle_key_press(key).unwrap();
                 }
-            },
+            }
+            _ => {
+                self.insert_table.handle_key_press(key).unwrap();
+            }
         }
         PageMessage::None
     }

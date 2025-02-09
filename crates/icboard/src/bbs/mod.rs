@@ -62,7 +62,7 @@ pub async fn await_telnet_connections(con: Telnet, board: Arc<tokio::sync::Mutex
         bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
     }
 }
- /*
+/*
 pub async fn await_ssh_connections(_ssh: SSH, _board: Arc<tokio::sync::Mutex<IcyBoard>>, _bbs: Arc<Mutex<BBS>>) -> Res<()> {
        let addr = if ssh.address.is_empty() {
         format!("0.0.0.0:{}", ssh.port)

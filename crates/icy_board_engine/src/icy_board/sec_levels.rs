@@ -2,9 +2,10 @@ use super::IcyBoardSerializer;
 use super::{is_false, is_null_32, is_null_64, is_null_8, PCBoardImport, PCBoardTextImport};
 use crate::Res;
 use serde::{Deserialize, Serialize};
+use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
-#[derive(Clone, Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct SecurityLevel {
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -81,12 +82,25 @@ pub struct SecurityLevel {
     pub is_enabled: bool,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct SecurityLevelDefinitions {
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(rename = "level")]
     pub levels: Vec<SecurityLevel>,
+}
+
+impl Deref for SecurityLevelDefinitions {
+    type Target = Vec<SecurityLevel>;
+    fn deref(&self) -> &Self::Target {
+        &self.levels
+    }
+}
+
+impl DerefMut for SecurityLevelDefinitions {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.levels
+    }
 }
 
 impl SecurityLevelDefinitions {
