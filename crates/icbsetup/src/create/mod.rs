@@ -106,6 +106,9 @@ impl IcyBoardCreator {
         self.logger.start_action("Creating main configuration… at {}".to_string());
 
         let mut config = IcbConfig::new();
+        config.board.allow_iemsi = false;
+        config.login_server.telnet.port = 1337;
+        config.login_server.ssh.port = 1338;
 
         self.logger.start_action("Creating required paths.".to_string());
         fs::create_dir_all(&self.destination.join(&config.paths.help_path))?;

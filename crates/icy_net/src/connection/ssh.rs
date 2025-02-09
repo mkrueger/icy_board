@@ -68,6 +68,22 @@ impl Connection for SSHConnection {
         }
     }
 
+    async fn try_read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        match self.channel.make_reader().read(buf).await {
+            Ok(size) => Ok(size),
+            Err(e) => match e.kind() {
+                ErrorKind::ConnectionAborted | ErrorKind::NotConnected => {
+                    return Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into());
+                }
+                ErrorKind::WouldBlock => Ok(0),
+                _ => {
+                    log::error!("Error {:?} reading from SSH connection: {:?}", e.kind(), e);
+                    Ok(0)
+                }
+            },
+        }
+    }
+
     async fn send(&mut self, buf: &[u8]) -> crate::Result<()> {
         self.channel.make_writer().write_all(buf).await?;
         Ok(())
@@ -94,6 +110,30 @@ pub struct SshClient {
 }
 
 impl SshClient {
+    /*
+    pub async fn accept(tcp_stream: TcpStream) -> crate::Result<Self> {
+
+
+        let mut session: client::Handle<Client> = russh::client::connect_stream(config, tcp_stream, sh).await?;
+
+        let auth_res = session.authenticate_password(user, password).await?;
+        if !auth_res.success() {
+            return Err("Authentication failed".into());
+        }
+
+        Ok(Self { session })
+
+
+        Ok(Self {
+            tcp_stream,
+            caps: TermCaps {
+                window_size: (0, 0),
+                terminal: TerminalEmulation::Ansi,
+            },
+            state: ParserState::Data,
+        })
+    }*/
+
     async fn connect(addr: impl Into<String>, user: impl Into<String>, password: impl Into<String>) -> crate::Result<Self> {
         let mut addr: String = addr.into();
         if !addr.contains(':') {

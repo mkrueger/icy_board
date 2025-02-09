@@ -55,6 +55,26 @@ impl Connection for ChannelConnection {
         }
     }
 
+    async fn try_read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        if !self.buffer.is_empty() {
+            let len = self.buffer.len().min(buf.len());
+            buf[..len].copy_from_slice(&self.buffer.drain(..len).collect::<Vec<u8>>());
+            return Ok(len);
+        }
+        match self.rx.try_recv() {
+            Ok(data) => {
+                if data.is_empty() {
+                    return Ok(0);
+                }
+                let len = data.len().min(buf.len());
+                buf[..len].copy_from_slice(&data[..len]);
+                self.buffer.extend(data.into_iter().skip(len));
+                Ok(len)
+            }
+            _ => Ok(0),
+        }
+    }
+
     async fn send(&mut self, buf: &[u8]) -> crate::Result<()> {
         self.tx.send(buf.to_vec())?;
         Ok(())

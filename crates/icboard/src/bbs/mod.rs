@@ -11,23 +11,28 @@ use icy_board_engine::{
     },
     vm::TerminalTarget,
 };
-use icy_net::{telnet::TelnetConnection, termcap_detect::TerminalCaps, Connection, ConnectionType};
+use icy_net::{
+    telnet::TelnetConnection,
+    termcap_detect::TerminalCaps,
+    websocket::{accept_sec_websocket, accept_websocket},
+    Connection, ConnectionType,
+};
 use tokio::{net::TcpListener, sync::Mutex};
 
 use crate::menu_runner::PcbBoardCommand;
 
-pub async fn await_telnet_connections(telnet: Telnet, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
-    let addr = if telnet.address.is_empty() {
-        format!("0.0.0.0:{}", telnet.port)
+pub async fn await_telnet_connections(con: Telnet, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+    let addr = if con.address.is_empty() {
+        format!("0.0.0.0:{}", con.port)
     } else {
-        format!("{}:{}", telnet.address, telnet.port)
+        format!("{}:{}", con.address, con.port)
     };
     let listener = TcpListener::bind(addr).await?;
     loop {
         let (stream, _addr) = listener.accept().await?;
         let bbs2 = bbs.clone();
         let node = bbs.lock().await.create_new_node(ConnectionType::Telnet).await;
-        let node_list = bbs.lock().await.get_open_connections().await.clone();
+        let node_list: Arc<Mutex<Vec<Option<NodeState>>>> = bbs.lock().await.get_open_connections().await.clone();
         let board = board.clone();
         let handle = std::thread::Builder::new()
             .name("Telnet handle".to_string())
@@ -58,25 +63,23 @@ pub async fn await_telnet_connections(telnet: Telnet, board: Arc<tokio::sync::Mu
     }
 }
 
-pub fn await_ssh_connections(_ssh: SSH, _board: Arc<tokio::sync::Mutex<IcyBoard>>, _bbs: Arc<Mutex<BBS>>) -> Res<()> {
-    /*
-    let addr = if ssh.address.is_empty() {
-        format!("127.0.0.1:{}", ssh.port)
+pub async fn await_ssh_connections(_ssh: SSH, _board: Arc<tokio::sync::Mutex<IcyBoard>>, _bbs: Arc<Mutex<BBS>>) -> Res<()> {
+    /*    let addr = if ssh.address.is_empty() {
+        format!("0.0.0.0:{}", ssh.port)
     } else {
         format!("{}:{}", ssh.address, ssh.port)
     };
-    let listener = match TcpListener::bind(addr) {
-        Ok(listener) => listener,
-        Err(e) => panic!("could not read start TCP listener: {}", e),
-    };
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                let board = board.clone();
-                let node = bbs.lock().unwrap().create_new_node(ConnectionType::SSH);
-
-                let node_list = bbs.lock().unwrap().get_open_connections().clone();
-                let handle = thread::spawn(move || {
+    let listener = TcpListener::bind(addr).await?;
+    loop {
+        let (stream, _addr) = listener.accept().await?;
+        let bbs2 = bbs.clone();
+        let node = bbs.lock().await.create_new_node(ConnectionType::Telnet).await;
+        let node_list = bbs.lock().await.get_open_connections().await.clone();
+        let board = board.clone();
+        let handle: thread::JoinHandle<()> = std::thread::Builder::new()
+            .name("Telnet handle".to_string())
+            .spawn(move || {
+                tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
                     let orig_hook = std::panic::take_hook();
                     std::panic::set_hook(Box::new(move |panic_info| {
                         log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
@@ -84,102 +87,84 @@ pub fn await_ssh_connections(_ssh: SSH, _board: Arc<tokio::sync::Mutex<IcyBoard>
                         orig_hook(panic_info);
                     }));
 
-                    match TelnetConnection::accept(stream) {
+                    match SSH::accept(stream) {
                         Ok(connection) => {
                             // connection succeeded
-                            if let Err(err) = handle_client(board, node_list, node, Box::new(connection)) {
+                            if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
                                 log::error!("Error running backround client: {}", err);
                             }
                         }
                         Err(e) => {
-                            log::error!("ssh connection failed {}", e);
+                            log::error!("telnet connection failed {}", e);
                         }
                     }
-
-                    Ok(())
                 });
-                bbs.lock().unwrap().get_open_connections().lock().unwrap()[node].as_mut().unwrap().handle = Some(handle);
-            }
-            Err(e) => {
-                log::error!("connection failed {}", e);
-            }
-        }
-    }
-    drop(listener); */
+            })
+            .unwrap();
+        bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
+    }*/
     Ok(())
 }
 
-pub fn await_websocket_connections(_ssh: Websocket, _board: Arc<tokio::sync::Mutex<IcyBoard>>, _bbs: Arc<Mutex<BBS>>) -> Res<()> {
-    /*
-    let addr = if ssh.address.is_empty() {
-        format!("127.0.0.1:{}", ssh.port)
+pub async fn await_websocket_connections(con: Websocket, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+    let addr = if con.address.is_empty() {
+        format!("0.0.0.0:{}", con.port)
     } else {
-        format!("{}:{}", ssh.address, ssh.port)
+        format!("{}:{}", con.address, con.port)
     };
-    let listener = match TcpListener::bind(addr) {
-        Ok(listener) => listener,
-        Err(e) => panic!("could not read start TCP listener: {}", e),
-    };
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                let board = board.clone();
-                let node = bbs.lock().unwrap().create_new_node(ConnectionType::Websocket);
-
-                let node_list = bbs.lock().unwrap().get_open_connections().clone();
-                let handle = thread::spawn(move || {
-                    let orig_hook = std::panic::take_hook();
+    let listener = TcpListener::bind(&addr).await?;
+    loop {
+        let (stream, _addr) = listener.accept().await?;
+        let bbs2 = bbs.clone();
+        let node = bbs.lock().await.create_new_node(ConnectionType::Telnet).await;
+        let node_list = bbs.lock().await.get_open_connections().await.clone();
+        let board = board.clone();
+        let handle = std::thread::Builder::new()
+            .name("Websocket handle".to_string())
+            .spawn(move || {
+                tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+                    let orig_hook: Box<dyn Fn(&std::panic::PanicHookInfo<'_>) + Send + Sync> = std::panic::take_hook();
                     std::panic::set_hook(Box::new(move |panic_info| {
                         log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
                         log::error!("full info: {:?}", panic_info);
                         orig_hook(panic_info);
                     }));
 
-                    match accept_websocket(stream) {
+                    match accept_websocket(stream).await {
                         Ok(connection) => {
                             // connection succeeded
-                            if let Err(err) = handle_client(board, node_list, node, Box::new(connection)) {
+                            if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
                                 log::error!("Error running backround client: {}", err);
                             }
                         }
                         Err(e) => {
-                            log::error!("webserver connection failed {}", e);
+                            log::error!("telnet connection failed {}", e);
                         }
                     }
-                    Ok(())
                 });
-                bbs.lock().unwrap().get_open_connections().lock().unwrap()[node].as_mut().unwrap().handle = Some(handle);
-            }
-            Err(e) => {
-                log::error!("connection failed {}", e);
-            }
-        }
+            })
+            .unwrap();
+        bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
     }
-    drop(listener); */
-    Ok(())
 }
 
-pub fn await_securewebsocket_connections(_ssh: SecureWebsocket, _board: Arc<tokio::sync::Mutex<IcyBoard>>, _bbs: Arc<Mutex<BBS>>) -> Res<()> {
-    /*
-    let addr = if ssh.address.is_empty() {
-        format!("127.0.0.1:{}", ssh.port)
+pub async fn await_securewebsocket_connections(con: SecureWebsocket, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+    let addr = if con.address.is_empty() {
+        format!("0.0.0.0:{}", con.port)
     } else {
-        format!("{}:{}", ssh.address, ssh.port)
+        format!("{}:{}", con.address, con.port)
     };
-    let listener = match TcpListener::bind(addr) {
-        Ok(listener) => listener,
-        Err(e) => panic!("could not read start TCP listener: {}", e),
-    };
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                let board = board.clone();
-                let node = bbs.lock().unwrap().create_new_node(ConnectionType::SecureWebsocket);
-
-                let node_list = bbs.lock().unwrap().get_open_connections().clone();
-                let cp = ssh.cert_pem.clone();
-                let kp = ssh.key_pem.clone();
-                let handle = thread::spawn(move || {
+    let listener = TcpListener::bind(&addr).await?;
+    loop {
+        let (stream, _addr) = listener.accept().await?;
+        let bbs2 = bbs.clone();
+        let node: usize = bbs.lock().await.create_new_node(ConnectionType::Telnet).await;
+        let node_list = bbs.lock().await.get_open_connections().await.clone();
+        let board = board.clone();
+        let handle = std::thread::Builder::new()
+            .name("Secure Websocket handle".to_string())
+            .spawn(move || {
+                tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
                     let orig_hook = std::panic::take_hook();
                     std::panic::set_hook(Box::new(move |panic_info| {
                         log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
@@ -187,28 +172,22 @@ pub fn await_securewebsocket_connections(_ssh: SecureWebsocket, _board: Arc<toki
                         orig_hook(panic_info);
                     }));
 
-                    match accept_websocket_secure(stream, &cp, &kp) {
+                    match accept_sec_websocket(stream).await {
                         Ok(connection) => {
                             // connection succeeded
-                            if let Err(err) = handle_client(board, node_list, node, Box::new(connection)) {
+                            if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
                                 log::error!("Error running backround client: {}", err);
                             }
                         }
                         Err(e) => {
-                            log::error!("secure webserver connection failed {}", e);
+                            log::error!("telnet connection failed {}", e);
                         }
                     }
-                    Ok(())
                 });
-                bbs.lock().unwrap().get_open_connections().lock().unwrap()[node].as_mut().unwrap().handle = Some(handle);
-            }
-            Err(e) => {
-                log::error!("connection failed {}", e);
-            }
-        }
+            })
+            .unwrap();
+        bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
     }
-    drop(listener);*/
-    Ok(())
 }
 
 #[async_recursion(?Send)]

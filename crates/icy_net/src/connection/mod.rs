@@ -30,6 +30,7 @@ pub trait Connection: Send + Unpin {
     fn get_connection_type(&self) -> ConnectionType;
 
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize>;
+    async fn try_read(&mut self, buf: &mut [u8]) -> crate::Result<usize>;
 
     async fn send(&mut self, buf: &[u8]) -> crate::Result<()>;
 
@@ -68,6 +69,10 @@ impl Connection for NullConnection {
         ConnectionType::Raw
     }
     async fn read(&mut self, _buf: &mut [u8]) -> crate::Result<usize> {
+        Ok(0)
+    }
+
+    async fn try_read(&mut self, _buf: &mut [u8]) -> crate::Result<usize> {
         Ok(0)
     }
 

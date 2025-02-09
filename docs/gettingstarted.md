@@ -19,7 +19,7 @@ I recommend putting the bin/ directory in the path but you can just `cd bin` for
 First create a new BBS: `./icbsetup create FOO`
 Then start it: `./icyboard FOO`
 
-This will fire up a new call waiting screen where you can log in as sysop. 
+This will fire up a new call waiting screen where you can log in as sysop. By defaulut telnet is enabled on port 1337.
 
 NOTE: Ensure that your terminal screen is big enough - 80x25 at least.
 
@@ -77,3 +77,13 @@ an issue.
 Files can either be CP437 or UTF-8 - IcyBoard will do all conversions automatically. Note that UTF-8 requires the UTF-8 BOM. This is by design it's the only way to make a fast and correct decision about the file encoding.
 
 Note: UTF-8 is recommended for everything.
+
+# Importing old installations
+
+Importing old installatins is generally difficult mostly because of complex setup situations, PPEs and so on. However `icbsetup import PCBDAT.OLD <OUT_PATH>` will try to import old installations. 
+
+the importlog.txt contains all operations done and it should usually be enough to turn on an existing pcboard installation in icyboard.
+
+However it'll be required to update all PPEs one by one. Moving them to another directory, making file names relative etc.
+
+I'm interested in bugs & existing installations to improve the import process. But it should be a good starting point to update an existing PCBoard to Icy Board.

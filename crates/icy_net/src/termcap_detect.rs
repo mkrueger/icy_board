@@ -1,4 +1,7 @@
+use std::{os::unix::thread, time::Duration};
+
 use regex::Regex;
+use tokio::time::sleep;
 
 use crate::Connection;
 
@@ -33,8 +36,9 @@ impl TerminalCaps {
         let mut program = TerminalProgram::Unknown;
         let instant = std::time::Instant::now();
         while instant.elapsed().as_millis() < 100 {
-            let size = com.read(&mut buf).await?;
+            let size = com.try_read(&mut buf).await?;
             if size == 0 {
+                sleep(Duration::from_millis(10)).await;
                 continue;
             }
             let result = String::from_utf8_lossy(&buf[0..size]).to_string();
@@ -52,8 +56,9 @@ impl TerminalCaps {
         let instant = std::time::Instant::now();
         let mut term_size = (80, 25);
         while instant.elapsed().as_millis() < 100 {
-            let size = com.read(&mut buf).await?;
+            let size = com.try_read(&mut buf).await?;
             if size == 0 {
+                sleep(Duration::from_millis(10)).await;
                 continue;
             }
             let result = String::from_utf8_lossy(&buf[0..size]).to_string();
@@ -65,8 +70,9 @@ impl TerminalCaps {
         com.send(b"\x1B[!\x07\x07\x07").await?;
         let mut rip_version = None;
         while instant.elapsed().as_millis() < 100 {
-            let size = com.read(&mut buf).await?;
+            let size = com.try_read(&mut buf).await?;
             if size == 0 {
+                sleep(Duration::from_millis(10)).await;
                 continue;
             }
             let result = String::from_utf8_lossy(&buf[0..size]).to_string();
@@ -78,8 +84,9 @@ impl TerminalCaps {
         let instant = std::time::Instant::now();
         let mut is_utf8 = false;
         while instant.elapsed().as_millis() < 100 {
-            let size = com.read(&mut buf).await?;
+            let size = com.try_read(&mut buf).await?;
             if size == 0 {
+                sleep(Duration::from_millis(10)).await;
                 continue;
             }
             let result = String::from_utf8_lossy(&buf[0..size]).to_string();
@@ -88,7 +95,6 @@ impl TerminalCaps {
             }
             break;
         }
-
         Ok(Self {
             program,
             term_size,

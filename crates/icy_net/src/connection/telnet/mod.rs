@@ -259,19 +259,37 @@ impl Connection for TelnetConnection {
                 let result = self.parse(&mut buf[0..size]).await?;
                 Ok(result)
             }
-            Err(e) => {
-                log::error!("telnet error reading from TCP stream: {}", e);
-                match e.kind() {
-                    ErrorKind::ConnectionAborted | ErrorKind::NotConnected => {
-                        return Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into());
-                    }
-                    ErrorKind::WouldBlock => Ok(0),
-                    _ => {
-                        log::error!("Error {:?} reading from SSH connection: {:?}", e.kind(), e);
-                        Ok(0)
-                    }
+            Err(e) => match e.kind() {
+                ErrorKind::ConnectionAborted | ErrorKind::NotConnected => {
+                    log::error!("telnet error - connection aborted.");
+                    return Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into());
                 }
+                ErrorKind::WouldBlock => Ok(0),
+                _ => {
+                    log::error!("Error {:?} reading from SSH connection: {:?}", e.kind(), e);
+                    Ok(0)
+                }
+            },
+        }
+    }
+
+    async fn try_read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        match self.tcp_stream.try_read(buf) {
+            Ok(size) => {
+                let result = self.parse(&mut buf[0..size]).await?;
+                Ok(result)
             }
+            Err(e) => match e.kind() {
+                ErrorKind::ConnectionAborted | ErrorKind::NotConnected => {
+                    log::error!("telnet error - connection aborted.");
+                    return Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into());
+                }
+                ErrorKind::WouldBlock => Ok(0),
+                _ => {
+                    log::error!("Error {:?} reading from SSH connection: {:?}", e.kind(), e);
+                    Ok(0)
+                }
+            },
         }
     }
 

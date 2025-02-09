@@ -138,12 +138,14 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
 
                 let ssh_connection = board.lock().await.config.login_server.ssh.clone();
                 if ssh_connection.is_enabled {
-                    let bbs = bbs.clone();
+                    let bbs: Arc<Mutex<BBS>> = bbs.clone();
                     let board = board.clone();
                     std::thread::Builder::new()
                         .name("SSH connect".to_string())
                         .spawn(move || {
-                            let _ = await_ssh_connections(ssh_connection, board, bbs);
+                            tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+                                let _ = await_ssh_connections(ssh_connection, board, bbs).await;
+                            });
                         })
                         .unwrap();
                 }
@@ -155,7 +157,9 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                     std::thread::Builder::new()
                         .name("Websocket connect".to_string())
                         .spawn(move || {
-                            let _ = await_websocket_connections(websocket_connection, board, bbs);
+                            tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+                                let _ = await_websocket_connections(websocket_connection, board, bbs).await;
+                            });
                         })
                         .unwrap();
                 }
@@ -167,7 +171,9 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                     std::thread::Builder::new()
                         .name("Secure Websocket connect".to_string())
                         .spawn(move || {
-                            let _ = await_securewebsocket_connections(secure_websocket_connection, board, bbs);
+                            tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+                                let _ = await_securewebsocket_connections(secure_websocket_connection, board, bbs).await;
+                            });
                         })
                         .unwrap();
                 }

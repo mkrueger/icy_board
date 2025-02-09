@@ -103,6 +103,15 @@ impl Connection for SerialConnection {
         Ok(res)
     }
 
+    async fn try_read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        if !self.port.read_dsr().unwrap_or_default() {
+            return Ok(0);
+        }
+        let res = self.port.read(buf).await?;
+        //  println!("Read {:?} bytes", &buf[..res]);
+        Ok(res)
+    }
+
     async fn send(&mut self, buf: &[u8]) -> crate::Result<()> {
         self.port.write_all(buf).await?;
         Ok(())

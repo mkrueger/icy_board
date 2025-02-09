@@ -260,7 +260,7 @@ impl PCBoardImporter {
             color_configuration.file_new_file = IcbColor::Dos(color_file[start + 18]);
         }
 
-        let icb_cfg = IcbConfig {
+        let mut icb_cfg = IcbConfig {
             sysop: SysopInformation {
                 name: self.data.sysop_info.sysop.clone(),
                 password: Password::from_str(self.data.sysop_info.password.as_str()).unwrap(),
@@ -502,6 +502,9 @@ impl PCBoardImporter {
                 logoff_file: accounting_logoff_file,
             },
         };
+        icb_cfg.board.allow_iemsi = false;
+        icb_cfg.login_server.telnet.port = 1337;
+        icb_cfg.login_server.ssh.port = 1338;
 
         let destination = self.output_directory.join(icy_board_engine::DEFAULT_ICYBOARD_FILE);
         self.output.start_action(format!("Create main configuration {}…", destination.display()));
