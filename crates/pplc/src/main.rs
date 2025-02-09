@@ -29,9 +29,13 @@ struct Cli {
     #[argh(switch)]
     nowarnings: bool,
 
-    /// version number for the compiler, valid: 100, 200, 300, 310, 330 (default), 340
+    /// version number for the compiler, valid: 100, 200, 300, 310, 330, 340, 400 (default)
     #[argh(option)]
     version: Option<u16>,
+
+    /// version number for the language (defaults to version)
+    #[argh(option)]
+    lang_version: Option<u16>,
 
     /// specify the encoding of the file, defaults to autodetection
     #[argh(option)]
@@ -56,6 +60,8 @@ fn main() {
         return;
     }
 
+    let lang_version = if let Some(v) = arguments.lang_version { v } else { version };
+
     let file_name = if arguments.file.extension().is_none() {
         arguments.file.with_extension("pps")
     } else {
@@ -77,7 +83,7 @@ fn main() {
             println!();
             println!("Parsing...");
             let reg = UserTypeRegistry::icy_board_registry();
-            let (ast, errors) = parse_ast(PathBuf::from(&file_name), &src, &reg, encoding, version);
+            let (ast, errors) = parse_ast(PathBuf::from(&file_name), &src, &reg, encoding, lang_version);
             println!("Compiling...");
 
             if check_errors(errors.clone(), &arguments, &file_name, &src) {

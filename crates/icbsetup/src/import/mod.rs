@@ -222,7 +222,7 @@ impl PCBoardImporter {
         let newask_survey = self.convert_logon_surveys(&self.data.path.newreg_file.clone(), "art/newask_survey")?;
         let newask_answer = PathBuf::from("art/newask_answer");
 
-        self.convert_user_base(&self.data.path.usr_file.clone(), &self.data.path.inf_file.clone(), "home")?;
+        self.convert_user_base(&self.data.path.usr_file.clone(), &self.data.path.inf_file.clone(), "config/users.toml")?;
 
         let protocol_data_file = self.convert_data::<SupportedProtocols>(&self.data.path.protocol_data_file.clone(), "config/protocols.toml")?;
         let language_file = self.convert_data::<SupportedLanguages>(&self.data.path.pcml_dat_file.clone(), "config/languages.toml")?;
@@ -340,7 +340,7 @@ impl PCBoardImporter {
             color_configuration,
             board: BoardInformation {
                 name: self.data.board_name.clone(),
-                location: String::new(),
+                location: self.data.origin.clone(),
                 operator: String::new(),
                 notice: String::new(),
                 capabilities: String::new(),
@@ -363,7 +363,7 @@ impl PCBoardImporter {
                 security_file_path: PathBuf::from("art/secmsgs"),
                 command_display_path: PathBuf::from("art/cmd_display"),
                 tmp_work_path: PathBuf::from("tmp/"),
-                home_dir: PathBuf::from("home/"),
+                user_file: PathBuf::from("config/users.toml"),
                 caller_log,
                 icbtext,
                 conferences,
@@ -872,7 +872,7 @@ impl PCBoardImporter {
         if !resolved_file.exists() {
             self.output.warning(format!("File not found {}", resolved_file.display()));
             self.logger.log(&format!("File not found {}", resolved_file.display()));
-            return Ok(PathBuf::new());
+            return Ok(PathBuf::from(new_name));
         };
 
         let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
@@ -976,8 +976,7 @@ impl PCBoardImporter {
             user.stats.first_date_on = chrono::Utc::now();
             user_base.new_user(user);
         }
-        user_base.save_users(&destination)?;
-
+        user_base.save(&destination)?;
         Ok(PathBuf::from(new_rel_name))
     }
 
@@ -1399,7 +1398,7 @@ impl PCBoardImporter {
         if !new_entry.exists() {
             self.logger
                 .log(&format!("Warning, can't import questionaire  {}, doesn't exist.", new_entry.display()));
-            return Ok(PathBuf::new());
+            return Ok(PathBuf::from(arg));
         }
         if let Ok(str) = read_with_encoding_detection(&new_entry) {
             let mut out = String::new();
@@ -1432,13 +1431,15 @@ impl PCBoardImporter {
         }
         self.logger.log(&format!("\n=== Converting Accounting {} ===", source));
 
-        let Ok(list) = AccountingConfig::import_pcboard(&resolved_file) else {
+        let destination = self.output_directory.join(new_rel_name);
+        if let Ok(list) = AccountingConfig::import_pcboard(&resolved_file) {
+            list.save(&destination)?;
+        } else {
             self.logger.log(&format!("Warning, can't import accounting {}", resolved_file.display()));
             self.output.warning(format!("Warning, can't import accounting {}", resolved_file.display()));
-            return Ok(resolved_file);
-        };
-        let destination = self.output_directory.join(new_rel_name);
-        list.save(&destination)?;
+            let list = AccountingConfig::default();
+            list.save(&destination)?;
+        }
         Ok(PathBuf::from(new_rel_name))
     }
 }

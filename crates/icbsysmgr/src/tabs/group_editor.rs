@@ -54,11 +54,12 @@ impl GroupEditor {
     }
 
     fn render_scrollbar(&mut self, frame: &mut Frame, mut area: Rect) {
+        area.x += 1;
         area.y += 1;
         area.height -= 1;
         frame.render_stateful_widget(
             Scrollbar::default()
-                .style(get_tui_theme().dialog_box)
+                .style(get_tui_theme().dialog_box_scrollbar)
                 .orientation(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("▲"))
                 .thumb_symbol("█")
@@ -80,9 +81,9 @@ impl GroupEditor {
         let l = self.icy_board.lock().unwrap();
         let rows = l.groups.iter().enumerate().map(|(i, group)| {
             Row::new(vec![
-                Cell::from(format!("{:-3})", i + 1)),
-                Cell::from(group.name.clone()),
-                Cell::from(group.members.len().to_string()),
+                Cell::from(format!("{:-3})", i + 1)).style(get_tui_theme().item),
+                Cell::from(group.name.clone()).style(get_tui_theme().item),
+                Cell::from(group.members.len().to_string()).style(get_tui_theme().item),
             ])
         });
         let bar = " █ ";
@@ -228,7 +229,7 @@ impl Page for GroupEditor {
                 _ => {
                     self.conference_config.handle_key_press(key, &mut self.state);
                     self.save_groups();
-                    return PageMessage::Close;
+                    return PageMessage::None;
                 }
             }
         }

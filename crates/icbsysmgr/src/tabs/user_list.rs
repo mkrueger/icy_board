@@ -40,11 +40,12 @@ impl UserList {
     }
 
     fn render_scrollbar(&mut self, frame: &mut Frame, mut area: Rect) {
+        area.x += 1;
         area.y += 1;
         area.height -= 1;
         frame.render_stateful_widget(
             Scrollbar::default()
-                .style(get_tui_theme().dialog_box)
+                .style(get_tui_theme().dialog_box_scrollbar)
                 .orientation(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("▲"))
                 .thumb_symbol("█")
@@ -66,10 +67,10 @@ impl UserList {
         let l = self.icy_board.lock().unwrap();
         let rows = l.users.iter().enumerate().map(|(i, user)| {
             Row::new(vec![
-                Cell::from(format!("{:-3})", i + 1)),
-                Cell::from(user.name.clone()),
-                Cell::from(user.alias.clone()),
-                Cell::from(user.security_level.to_string()),
+                Cell::from(format!("{:-3})", i + 1)).style(get_tui_theme().item),
+                Cell::from(user.name.clone()).style(get_tui_theme().item),
+                Cell::from(user.alias.clone()).style(get_tui_theme().item),
+                Cell::from(user.security_level.to_string()).style(get_tui_theme().item),
             ])
         });
         let bar = " █ ";

@@ -45,7 +45,7 @@ impl ConferenceListEditor {
         area.x += 2;
         frame.render_stateful_widget(
             Scrollbar::default()
-                .style(get_tui_theme().dialog_box)
+                .style(get_tui_theme().dialog_box_scrollbar)
                 .orientation(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("▲"))
                 .thumb_symbol("█")
@@ -58,6 +58,7 @@ impl ConferenceListEditor {
 
     fn render_table(&mut self, frame: &mut Frame, area: Rect) {
         let l = self.icy_board.lock().unwrap();
+        log::info!("Conferences: {:?}", l.conferences.len());
         let mut rows = l
             .conferences
             .iter()
@@ -222,7 +223,7 @@ impl Page for ConferenceListEditor {
             KeyCode::Enter => {
                 if let Some(state) = self.table_state.selected() {
                     if state + 1 < self.icy_board.lock().unwrap().conferences.len() {
-                        return PageMessage::OpenSubPage(Box::new(ConferenceEditor::new(self.icy_board.clone(), state)));
+                        return PageMessage::OpenSubPage(Box::new(ConferenceEditor::new(self.icy_board.clone(), state + 1)));
                     } else {
                         let _ = std::io::stdout().write(&[0x07]);
                     }

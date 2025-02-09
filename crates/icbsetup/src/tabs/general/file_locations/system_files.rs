@@ -51,7 +51,8 @@ impl SystemFiles {
             let entry = vec![
                 ConfigEntry::Separator,
                 cfg_entry_path!("paths_conferences", label_width, paths, conferences, lock),
-                cfg_entry_path!("paths_home_dir", label_width, paths, home_dir, lock),
+                cfg_entry_path!("paths_users_file", label_width, paths, user_file, lock),
+                cfg_entry_path!("paths_group_file", label_width, paths, group_file, lock),
                 cfg_entry_path!("paths_caller_log", label_width, paths, caller_log, lock),
                 cfg_entry_path!("paths_statistic_file", label_width, paths, statistics_file, lock),
                 ConfigEntry::Separator,

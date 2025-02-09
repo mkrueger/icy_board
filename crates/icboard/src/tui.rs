@@ -243,8 +243,9 @@ impl Tui {
         let y = area.y as u16;
         area.y += area.height;
         area.height = 2;
-
-        self.draw_statusbar(frame, area, status_bar_info);
+        if area.y + area.height < frame.area().height {
+            self.draw_statusbar(frame, area, status_bar_info);
+        }
         let pos: icy_engine::Position = screen.caret.get_position();
         frame.set_cursor_position((area.x + pos.x as u16, y + pos.y as u16 - buffer.get_first_visible_line() as u16));
     }

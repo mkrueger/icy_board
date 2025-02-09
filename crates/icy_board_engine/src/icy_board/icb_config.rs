@@ -384,7 +384,7 @@ pub struct ConfigPaths {
     pub group_file: PathBuf,
 
     /// home directory for user files
-    pub home_dir: PathBuf,
+    pub user_file: PathBuf,
 
     pub caller_log: PathBuf,
 
@@ -807,7 +807,7 @@ impl IcbConfig {
                 conferences: PathBuf::from("config/conferences.toml"),
                 security_file_path: PathBuf::from("art/secmsgs/"),
                 command_display_path: PathBuf::from("art/cmd_display/"),
-                home_dir: PathBuf::from("home/"),
+                user_file: PathBuf::from("config/users.toml"),
                 caller_log: PathBuf::from("caller.log"),
 
                 welcome: PathBuf::new(),

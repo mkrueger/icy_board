@@ -595,7 +595,7 @@ impl IcyBoardState {
         } else {
             user_name.to_string()
         };
-        let home_dir = UserBase::get_user_home_dir(&self.resolve_path(&self.get_board().await.config.paths.home_dir), &name);
+        let home_dir = UserBase::get_user_home_dir(&self.resolve_path(&self.get_board().await.config.paths.user_file), &name);
 
         if !home_dir.exists() {
             log::error!("Homedir for user {} does not exist", user_name);

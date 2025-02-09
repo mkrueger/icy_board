@@ -329,8 +329,8 @@ sys_info_external_editor-status=External editor for sysop messages.
 sys_info_external_editor-help=TODO
 
 sys_info_theme=Color Theme
-sys_info_theme=Color Theme
-sys_info_theme=TODO
+sys_info_theme-status=Color Theme
+sys_info_theme-help=TODO
 
 use_real_name=Use Real Name
 use_real_name-status=Use the real name of the sysop.
@@ -831,9 +831,13 @@ paths_conferences=Name/Loc of Conference Data
 paths_conferences-status=Name/Loc of Conference Data
 paths_conferences-help=TODO
 
-paths_home_dir=Name/Loc of Home Directory
-paths_home_dir-status=Name/Loc of Home Directory
-paths_home_dir-help=TODO
+paths_users_file=Name/Loc of User File
+paths_users_file-status=Name/Loc of User File
+paths_users_file-help=TODO
+
+paths_group_file=Name/Loc of Group File
+paths_group_file-status=Name/Loc of Group File
+paths_group_file-help=TODO
 
 paths_caller_log=Name/Loc of Caller Log
 paths_caller_log-status=Name/Loc of Caller Log

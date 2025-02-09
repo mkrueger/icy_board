@@ -183,17 +183,10 @@ impl IcyBoard {
             println!("Error loading user base: {} from {}", e, load_path.display());
             e
         })?;*/
-        let mut users = UserBase::default();
 
-        let load_path = get_path(parent_path, &config.paths.home_dir);
-        if !load_path.exists() {
-            fs::create_dir_all(&load_path).map_err(|e| {
-                log::error!("Error creating home directory: {} from {}", e, load_path.display());
-                e
-            })?;
-        }
-        users.load_users(&load_path).map_err(|e| {
-            log::error!("Error loading users: {} from {}", e, load_path.display());
+        let users_path = get_path(parent_path, &config.paths.user_file);
+        let users = UserBase::load(&users_path).map_err(|e| {
+            log::error!("Error loading users: {} from {}", e, users_path.display());
             e
         })?;
 
@@ -324,13 +317,9 @@ impl IcyBoard {
         Ok(())
     }
 
-    pub fn get_homedir(&self) -> PathBuf {
-        PathBuf::from(self.resolve_file(&self.config.paths.home_dir))
-    }
-
     pub fn save_userbase(&mut self) -> Res<()> {
-        let home_dir = self.get_homedir();
-        if let Err(e) = self.users.save_users(&home_dir) {
+        let users_file = PathBuf::from(self.resolve_file(&self.config.paths.user_file));
+        if let Err(e) = self.users.save(&users_file) {
             log::error!("Error saving user base: {}", e);
             Err(e)
         } else {
@@ -357,7 +346,7 @@ impl IcyBoard {
         // Line 24
         pcb_dat.path.help_loc = self.resolve_file(&self.config.paths.help_path).to_string_lossy().to_string();
         // Line 25
-        pcb_dat.path.sec_loc = self.resolve_file(&self.config.paths.home_dir).to_string_lossy().to_string();
+        pcb_dat.path.sec_loc = self.resolve_file(&self.config.paths.user_file).to_string_lossy().to_string();
 
         // Line 31
         let base_loc = file.parent().unwrap();
@@ -568,7 +557,7 @@ impl IcyBoard {
     }
 
     pub fn set_user(&mut self, new_user: User, i: usize) -> Res<()> {
-        let home_dir = UserBase::get_user_home_dir(&self.config.paths.home_dir, new_user.get_name());
+        let home_dir = UserBase::get_user_home_dir(&self.config.paths.user_file, new_user.get_name());
         std::fs::create_dir_all(&home_dir).unwrap();
         let user_txt = toml::to_string(&new_user)?;
         fs::write(home_dir.join("user.toml"), user_txt)?;

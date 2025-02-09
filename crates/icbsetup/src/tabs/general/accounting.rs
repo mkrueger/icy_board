@@ -19,7 +19,7 @@ impl AccountingConfig {
         let menu = {
             let icy_board2 = icy_board.clone();
             let lock: std::sync::MutexGuard<'_, IcyBoard> = icy_board.lock().unwrap();
-            let label_width = 37;
+            let label_width = 38;
             let sysop_info: Vec<ConfigEntry<Arc<Mutex<IcyBoard>>>> = vec![
                 ConfigEntry::Separator,
                 cfg_entry_bool!("accounting_enabled", label_width, accounting, enabled, lock),

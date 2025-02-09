@@ -8,7 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{executable::Executable, icy_board::user_base::UserBase, Res};
+use crate::{executable::Executable, Res};
 use async_recursion::async_recursion;
 use chrono::{DateTime, Local, Utc};
 use codepages::tables::UNICODE_TO_CP437;
@@ -842,8 +842,7 @@ impl IcyBoardState {
             for u in 0..board.users.len() {
                 if board.users[u].get_name() == user.get_name() {
                     board.set_user(user.clone(), u)?;
-                    let home_dir = UserBase::get_user_home_dir(&board.get_homedir(), &user.name);
-                    user.save(&home_dir)?;
+                    board.save_userbase()?;
                     return Ok(());
                 }
             }

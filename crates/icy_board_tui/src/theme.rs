@@ -28,6 +28,7 @@ pub struct Theme {
 
     pub dialog_box: Style,
     pub dialog_box_title: Style,
+    pub dialog_box_scrollbar: Style,
 
     pub menu_box: Style,
     pub menu_box_title: Style,
@@ -65,6 +66,7 @@ pub static CLASSIC_THEME: Theme = Theme {
 
     dialog_box: Style::new().bg(DOS_BLACK).fg(DOS_BLUE),
     dialog_box_title: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_RED),
+    dialog_box_scrollbar: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
 
     menu_box: Style::new().bg(DOS_BLACK).fg(DOS_RED),
     menu_box_title: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
@@ -82,7 +84,6 @@ pub static CLASSIC_THEME: Theme = Theme {
     true_value: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GREEN),
     false_value: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_RED),
     edit_value: Style::new().bg(DOS_RED).fg(DOS_WHITE),
-    table_header: Style::new().bg(DOS_BLACK).fg(DOS_RED),
 
     status_line_text: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
     menu_title: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
@@ -90,8 +91,11 @@ pub static CLASSIC_THEME: Theme = Theme {
     config_title: Style::new().bg(DOS_BLACK).fg(DOS_RED),
     filter_text: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
     description_text: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
+
     table: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GREEN),
     table_inactive: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),
+    table_header: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
+
     help_box: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
 
     text_field_text: Style::new().bg(DOS_RED).fg(DOS_WHITE),
@@ -117,6 +121,7 @@ pub static DEFAULT_THEME: Theme = Theme {
 
     dialog_box: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),
     dialog_box_title: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
+    dialog_box_scrollbar: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
 
     menu_box: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),
     menu_box_title: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),

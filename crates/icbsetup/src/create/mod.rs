@@ -123,7 +123,6 @@ impl IcyBoardCreator {
         fs::create_dir_all(&self.destination.join(&config.paths.tmp_work_path))?;
         fs::create_dir_all(&self.destination.join(&config.paths.security_file_path))?;
         fs::create_dir_all(&self.destination.join(&config.paths.command_display_path))?;
-        fs::create_dir_all(&self.destination.join(&config.paths.home_dir))?;
         config.paths.security_file_path = PathBuf::from("art/secmsgs");
         fs::create_dir_all(&self.destination.join(&config.paths.security_file_path))?;
 
@@ -245,7 +244,7 @@ impl IcyBoardCreator {
         user.stats.first_date_on = chrono::Utc::now();
         let mut user_base = UserBase::default();
         user_base.new_user(user);
-        user_base.save_users(&self.destination.join(&config.paths.home_dir))?;
+        user_base.save(&self.destination.join(&config.paths.user_file))?;
 
         config.save(&self.destination.join(icy_board_engine::DEFAULT_ICYBOARD_FILE))?;
 

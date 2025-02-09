@@ -280,6 +280,7 @@ impl SecurityExpression {
     pub fn user_can_access(&self, session: &Session) -> bool {
         match self.eval(session) {
             Ok(Value::Bool(b)) => b,
+            Ok(Value::Integer(i)) => session.cur_security >= i as u8,
             Ok(_) => {
                 log::error!("expression didn't evaluate to bool ({})", self);
                 false

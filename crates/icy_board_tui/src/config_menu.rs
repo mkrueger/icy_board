@@ -652,13 +652,28 @@ impl<T> ListItem<T> {
                 }
             }
             ListValue::Bool(b) => {
-                *b = !*b;
+                match key.code {
+                    KeyCode::BackTab | KeyCode::Left | KeyCode::Tab | KeyCode::Right | KeyCode::Char(' ') => {
+                        *b = !*b;
+                    }
+                    _ => {}
+                }
                 return ResultState::default();
             }
             ListValue::ValueList(cur_value, list) => {
                 for (i, l) in list.iter().enumerate() {
                     if l.value == *cur_value {
-                        *cur_value = list[(i + 1) % list.len()].value.clone();
+                        match key.code {
+                            KeyCode::BackTab | KeyCode::Left => {
+                                *cur_value = list[(i + list.len() - 1) % list.len()].value.clone();
+                                return ResultState::default();
+                            }
+                            KeyCode::Tab | KeyCode::Right => {
+                                *cur_value = list[(i + 1) % list.len()].value.clone();
+                                return ResultState::default();
+                            }
+                            _ => {}
+                        }
                         return ResultState::default();
                     }
                 }
@@ -776,7 +791,7 @@ impl<T> ConfigMenu<T> {
 
         frame.render_stateful_widget(
             Scrollbar::default()
-                .style(get_tui_theme().dialog_box)
+                .style(get_tui_theme().dialog_box_scrollbar)
                 .orientation(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("▲"))
                 .thumb_symbol("█")

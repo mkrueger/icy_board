@@ -13,7 +13,7 @@ use super::{
     icb_config::{PasswordStorageMethod, DEFAULT_PCBOARD_DATE_FORMAT},
     is_false, is_null_16, is_null_64,
     user_inf::{AccountUserInf, BankUserInf, QwkConfigUserInf},
-    PcbUser,
+    IcyBoardSerializer, PcbUser,
 };
 
 #[derive(Clone, PartialEq)]
@@ -682,8 +682,6 @@ impl User {
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct UserBase {
-    #[serde(skip_deserializing)]
-    #[serde(skip_serializing)]
     users: Vec<User>,
 }
 
@@ -709,64 +707,15 @@ impl UserBase {
         self.users.len() - 1
     }
 
-    pub fn load_users(&mut self, home_dir: &Path) -> Res<()> {
-        let read_dir = fs::read_dir(&home_dir).map_err(|e| {
-            log::error!("Error loading home directories {} from {}", e, home_dir.display());
-            e
-        })?;
-        for name in read_dir.flatten() {
-            if !name.path().is_dir() {
-                continue;
-            }
-            let user_file = name.path().join("user.toml");
-            if !user_file.exists() {
-                log::error!("Can't read user file for {} ", name.path().display());
-                continue;
-            }
-            let user_txt = fs::read_to_string(&user_file)?;
-            let mut user: User = toml::from_str(&user_txt)?;
-            user.path = Some(user_file);
-            self.users.push(user);
-        }
-        self.users.sort_by(|a, b| a.stats.first_date_on.cmp(&b.stats.first_date_on));
-
-        Ok(())
-    }
-
-    pub fn save_users(&self, home_dir: &Path) -> Res<()> {
-        std::fs::create_dir_all(&home_dir)?;
-        for user in &self.users {
-            user.save(home_dir)?;
-        }
-        Ok(())
-    }
-
     pub fn get_user_home_dir(home_dir: &Path, user_name: &str) -> PathBuf {
         home_dir.join(user_name.to_ascii_lowercase().replace(' ', "_"))
     }
 }
-/*
+
 impl IcyBoardSerializer for UserBase {
     const FILE_TYPE: &'static str = "user base";
-
-    fn load<P: AsRef<std::path::Path>>(path: &P) -> crate::Res<Self> {
-        let mut res = load_internal::<Self, P>(path)?;
-        Ok(res)
-    }
-
-    fn save<P: AsRef<std::path::Path>>(&self, path: &P) -> crate::Res<()> {
-        std::fs::create_dir_all(&self.home_dir)?;
-        for user in &self.users {
-            let home_dir = self.home_dir.join(user.get_name().to_ascii_lowercase().replace(' ', "_"));
-            std::fs::create_dir_all(&home_dir)?;
-            let user_txt = toml::to_string(user)?;
-            fs::write(home_dir.join("user.toml"), user_txt)?;
-        }
-        save_internal::<Self, P>(self, path)?;
-        Ok(())
-    }
 }
-*/
+
 impl Index<usize> for UserBase {
     type Output = User;
     fn index(&self, i: usize) -> &User {

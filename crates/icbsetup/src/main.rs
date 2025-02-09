@@ -10,7 +10,7 @@ use import::{console_logger::ConsoleLogger, PCBoardImporter};
 use semver::Version;
 use std::{
     fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{self, exit},
     sync::{Arc, Mutex},
 };
@@ -81,27 +81,6 @@ struct PPEConvert {
 }
 
 fn main() -> Result<()> {
-    fern::Dispatch::new()
-        // Perform allocation-free log formatting
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "[{} {} {}] {}",
-                Local::now().format("%Y-%m-%d %H:%M:%S"),
-                record.level(),
-                record.target(),
-                message
-            ))
-        })
-        // Add blanket level filter -
-        .level(log::LevelFilter::Info)
-        // - and per-module overrides
-        .level_for("hyper", log::LevelFilter::Info)
-        // Output to stdout, files, and other Dispatch configurations
-        .chain(fern::log_file("icbsetup.log").unwrap())
-        // Apply globally
-        .apply()
-        .unwrap();
-
     let arguments: Cli = argh::from_env();
 
     match &arguments.command {
@@ -137,7 +116,6 @@ fn main() -> Result<()> {
             }
             return Ok(());
         }
-
         Some(Commands::PPEConvert(PPEConvert { path })) => {
             println!("Converting PPE data files in {}", path.display());
             println!("Caution - this command is used for converting CP437 to UTF-8 in a directory.");
@@ -196,7 +174,7 @@ fn main() -> Result<()> {
         print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
         exit(1);
     };
-
+    init_log(&file.parent().unwrap().join("icbsetup.log"));
     match IcyBoard::load(&file) {
         Ok(icy_board) => {
             let terminal = &mut term::init()?;
@@ -214,6 +192,29 @@ fn main() -> Result<()> {
             exit(1);
         }
     }
+}
+
+fn init_log(path: &Path) {
+    fern::Dispatch::new()
+        // Perform allocation-free log formatting
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{} {} {}] {}",
+                Local::now().format("%Y-%m-%d %H:%M:%S"),
+                record.level(),
+                record.target(),
+                message
+            ))
+        })
+        // Add blanket level filter -
+        .level(log::LevelFilter::Info)
+        // - and per-module overrides
+        .level_for("hyper", log::LevelFilter::Info)
+        // Output to stdout, files, and other Dispatch configurations
+        .chain(fern::log_file(path).unwrap())
+        // Apply globally
+        .apply()
+        .unwrap();
 }
 
 fn convert_file(entry: PathBuf) {

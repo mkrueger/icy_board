@@ -83,9 +83,7 @@ async fn main() -> Res<()> {
 
 async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
     let stuffed = arguments.key.clone().unwrap_or_default();
-
     let config_file = file.with_extension("toml");
-
     let log_file = config_file.with_extension("log");
     fern::Dispatch::new()
         // Perform allocation-free log formatting
