@@ -35,6 +35,7 @@ fn is_null_64(b: impl std::borrow::Borrow<u64>) -> bool {
 fn is_null_32(b: impl std::borrow::Borrow<u32>) -> bool {
     *b.borrow() == 0
 }
+
 impl Fingerprint {
     pub fn new(file_name: String, crc: u32, crc_file_size: u64) -> Self {
         Self {

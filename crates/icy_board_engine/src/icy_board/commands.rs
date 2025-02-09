@@ -4,7 +4,7 @@ use crate::Res;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::{serde_as, DisplayFromStr};
 
-use super::{security_expr::SecurityExpression, IcyBoardSerializer, PCBoardRecordImporter};
+use super::{is_null_64, security_expr::SecurityExpression, IcyBoardSerializer, PCBoardRecordImporter};
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug, Default)]
 pub enum CommandType {
@@ -520,6 +520,10 @@ pub struct Position {
 }
 
 impl Position {
+    pub fn is_default(&self) -> bool {
+        *self == Position::default()
+    }
+
     pub fn parse(txt: &str) -> Self {
         let mut parts = txt.split(',');
         let x = parts.next().unwrap_or("0").trim().parse().unwrap_or(0);
@@ -571,6 +575,12 @@ pub enum AutoRun {
     Loop,
 }
 
+impl AutoRun {
+    pub fn is_default(&self) -> bool {
+        matches!(self, AutoRun::Disabled)
+    }
+}
+
 impl FromStr for AutoRun {
     type Err = String;
 
@@ -596,6 +606,7 @@ impl AutoRun {
 #[derive(Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct Command {
     #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub display: String,
 
     #[serde(default)]
@@ -603,15 +614,18 @@ pub struct Command {
     pub lighbar_display: String,
 
     #[serde(default)]
+    #[serde(skip_serializing_if = "Position::is_default")]
     pub position: Position,
 
     #[serde(default)]
     pub keyword: String,
 
     #[serde(default)]
+    #[serde(skip_serializing_if = "AutoRun::is_default")]
     pub auto_run: AutoRun,
 
     #[serde(default)]
+    #[serde(skip_serializing_if = "is_null_64")]
     pub autorun_time: u64,
 
     #[serde(default)]
@@ -635,6 +649,12 @@ pub enum ActionTrigger {
     Selection,
 }
 
+impl ActionTrigger {
+    pub fn is_default(&self) -> bool {
+        matches!(self, ActionTrigger::Activation)
+    }
+}
+
 #[derive(Serialize, Clone, Deserialize, Default, PartialEq)]
 pub struct CommandAction {
     pub command_type: CommandType,
@@ -643,6 +663,8 @@ pub struct CommandAction {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub parameter: String,
 
+    #[serde(default)]
+    #[serde(skip_serializing_if = "ActionTrigger::is_default")]
     pub trigger: ActionTrigger,
 }
 

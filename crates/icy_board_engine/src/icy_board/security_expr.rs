@@ -64,7 +64,7 @@ impl Display for Value {
     }
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq)]
 pub enum SecurityExpression {
     UnaryExpression(UnaryOp, Box<SecurityExpression>),
     BinaryExpression(BinaryOp, Box<SecurityExpression>, Box<SecurityExpression>),
@@ -100,6 +100,30 @@ impl FromStr for SecurityExpression {
         }
         let mut a = Token::lexer(s).peekable();
         Ok(bool_oper(&mut a)?)
+    }
+}
+
+impl From<String> for SecurityExpression {
+    fn from(s: String) -> Self {
+        SecurityExpression::from_str(&s).unwrap_or_default()
+    }
+}
+
+impl<'de> Deserialize<'de> for SecurityExpression {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        String::deserialize(deserializer).map(Self::from)
+    }
+}
+
+impl serde::Serialize for SecurityExpression {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.to_string().serialize(serializer)
     }
 }
 

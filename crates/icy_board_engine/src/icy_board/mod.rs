@@ -634,7 +634,6 @@ pub fn is_null_64(b: impl std::borrow::Borrow<u64>) -> bool {
 pub fn is_null_32(b: impl std::borrow::Borrow<u32>) -> bool {
     *b.borrow() == 0
 }
-
 pub fn is_null_16(b: impl std::borrow::Borrow<u16>) -> bool {
     *b.borrow() == 0
 }
