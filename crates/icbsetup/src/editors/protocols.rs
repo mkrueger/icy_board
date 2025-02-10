@@ -125,7 +125,7 @@ impl<'a> Page for ProtocolEditor<'a> {
         self.display_insert_table(frame, &area);
 
         if let Some(edit_config) = &mut self.edit_config {
-            let mut area = area.inner(Margin { vertical: 6, horizontal: 3 });
+            let area = area.inner(Margin { vertical: 6, horizontal: 3 });
             Clear.render(area, frame.buffer_mut());
             let block = Block::new()
                 .title_alignment(Alignment::Center)

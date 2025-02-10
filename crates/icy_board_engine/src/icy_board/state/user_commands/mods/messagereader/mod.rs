@@ -195,7 +195,9 @@ impl IcyBoardState {
         if only_personal {
             for msg in message_base.iter().flatten() {
                 if let Some(to) = msg.get_to() {
-                    if to == &self.session.alias_name || to == &self.session.user_name {
+                    let mut to = to.clone();
+                    to.make_ascii_uppercase();
+                    if to == self.session.alias_name.to_ascii_uppercase() || to == self.session.user_name.to_ascii_uppercase() {
                         messages.push(msg.message_number);
                     }
                 }

@@ -367,6 +367,11 @@ impl IcyBoardState {
                 self.read_email().await?;
             }
 
+            CommandType::WriteEmail => {
+                // @W
+                self.write_email().await?;
+            }
+
             CommandType::RunPPE => {
                 // PPE
                 if !cmd_action.parameter.is_empty() {

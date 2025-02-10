@@ -653,6 +653,16 @@ fn generate_protocol_data(protocol_data_file: &PathBuf) -> Res<()> {
         recv_command: TransferProtocolType::ZModem8k,
     });
 
+    protocols.push(Protocol {
+        is_enabled: true,
+        is_batch: true,
+        is_bi_directional: false,
+        char_code: "N".to_string(),
+        description: "None".to_string(),
+        send_command: TransferProtocolType::None,
+        recv_command: TransferProtocolType::None,
+    });
+
     protocols.save(protocol_data_file)?;
     Ok(())
 }

@@ -641,7 +641,6 @@ impl IcyBoardState {
         }
         self.session.num_lines_printed += 1;
         if self.session.page_len > 0 && self.session.num_lines_printed >= self.session.page_len as usize {
-            log::info!("Page length reached: {} --- {}", self.session.page_len, self.session.num_lines_printed);
             if self.session.disp_options.non_stop() {
                 self.session.more_requested = true;
                 return Ok(());
