@@ -41,11 +41,33 @@ pub enum TransferProtocolType {
     External(String),
 }
 
+#[derive(Default)]
+struct Empty {}
+
+#[async_trait]
+impl Protocol for Empty {
+    async fn update_transfer(&mut self, _com: &mut dyn Connection, _transfer_state: &mut TransferState) -> crate::Result<()> {
+        Ok(())
+    }
+
+    async fn initiate_send(&mut self, _com: &mut dyn Connection, _files: &[PathBuf]) -> crate::Result<TransferState> {
+        Ok(TransferState::new("None".to_string()))
+    }
+
+    async fn initiate_recv(&mut self, _com: &mut dyn Connection) -> crate::Result<TransferState> {
+        Ok(TransferState::new("None".to_string()))
+    }
+
+    async fn cancel_transfer(&mut self, _com: &mut dyn Connection) -> crate::Result<()> {
+        Ok(())
+    }
+}
+
 impl TransferProtocolType {
     pub fn create(&self) -> Box<dyn Protocol> {
         match self {
-            TransferProtocolType::None => todo!(),
-            TransferProtocolType::ASCII => todo!(),
+            TransferProtocolType::None => Box::new(Empty::default()),
+            TransferProtocolType::ASCII => Box::new(Empty::default()),
             TransferProtocolType::XModem => Box::new(XYmodem::new(XYModemVariant::XModem)),
             TransferProtocolType::XModemCRC => Box::new(XYmodem::new(XYModemVariant::XModemCRC)),
             TransferProtocolType::XModem1k => Box::new(XYmodem::new(XYModemVariant::XModem1k)),
@@ -54,7 +76,7 @@ impl TransferProtocolType {
             TransferProtocolType::YModemG => Box::new(XYmodem::new(XYModemVariant::YModemG)),
             TransferProtocolType::ZModem => Box::new(Zmodem::new(1024)),
             TransferProtocolType::ZModem8k => Box::new(Zmodem::new(8 * 1024)),
-            TransferProtocolType::External(_) => todo!(),
+            TransferProtocolType::External(_) => Box::new(Empty::default()),
         }
     }
 }

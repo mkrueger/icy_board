@@ -1164,10 +1164,10 @@ impl IcyBoardState {
                     sysop_bytes.push(b'.');
                 }
             }
-            if self.user_screen.caret.get_position() < pos {
-                self.session.num_lines_printed = 0;
-            }
             if *c == '\n' {
+                if self.user_screen.caret.get_position() < pos {
+                    self.session.num_lines_printed = 0;
+                }
                 self.write_chars_internal(target, &user_bytes, &sysop_bytes).await?;
                 user_bytes.clear();
                 sysop_bytes.clear();
