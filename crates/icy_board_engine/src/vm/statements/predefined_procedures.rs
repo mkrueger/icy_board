@@ -177,7 +177,15 @@ pub async fn resetdisp(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
 /// # Errors
 /// Errors if the variable is not found.
 pub async fn startdisp(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    // TODO?: unused
+    let channel = vm.eval_expr(&args[0]).await?.as_int();
+    vm.icy_board_state.session.start_display();
+    const FORCE_NS: i32 = 1;
+    const FORCE_COUNTLINES: i32 = 2;
+    if channel == FORCE_NS {
+        vm.icy_board_state.session.non_stop_on();
+    } else if channel == FORCE_COUNTLINES {
+        vm.icy_board_state.session.non_stop_off();
+    }
     Ok(())
 }
 

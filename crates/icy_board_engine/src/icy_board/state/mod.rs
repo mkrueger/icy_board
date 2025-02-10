@@ -318,6 +318,10 @@ impl Session {
     fn reset_num_lines(&mut self) {
         self.num_lines_printed = 0;
     }
+
+    pub fn start_display(&mut self) {
+        self.reset_num_lines();
+    }
 }
 
 impl Default for Session {
@@ -670,6 +674,7 @@ impl IcyBoardState {
     }
 
     pub async fn run_executable<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>, executable: Executable) -> Res<()> {
+        self.session.start_display();
         let path = PathBuf::from(file_name.as_ref());
         let parent = path.parent().unwrap().to_str().unwrap().to_string();
         let mut io = DiskIO::new(&parent, answer_file);
@@ -1165,9 +1170,6 @@ impl IcyBoardState {
                 }
             }
             if *c == '\n' {
-                if self.user_screen.caret.get_position() < pos {
-                    self.session.num_lines_printed = 0;
-                }
                 self.write_chars_internal(target, &user_bytes, &sysop_bytes).await?;
                 user_bytes.clear();
                 sysop_bytes.clear();
