@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf, str::FromStr};
 
 pub mod xymodem;
 use serde::Deserialize;
@@ -27,6 +27,7 @@ pub trait Protocol {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum TransferProtocolType {
+    None,
     ASCII,
     XModem,
     XModemCRC,
@@ -43,6 +44,7 @@ pub enum TransferProtocolType {
 impl TransferProtocolType {
     pub fn create(&self) -> Box<dyn Protocol> {
         match self {
+            TransferProtocolType::None => todo!(),
             TransferProtocolType::ASCII => todo!(),
             TransferProtocolType::XModem => Box::new(XYmodem::new(XYModemVariant::XModem)),
             TransferProtocolType::XModemCRC => Box::new(XYmodem::new(XYModemVariant::XModemCRC)),
@@ -54,6 +56,55 @@ impl TransferProtocolType {
             TransferProtocolType::ZModem8k => Box::new(Zmodem::new(8 * 1024)),
             TransferProtocolType::External(_) => todo!(),
         }
+    }
+}
+
+impl Display for TransferProtocolType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            TransferProtocolType::None => "",
+            TransferProtocolType::ASCII => ASC_STR,
+            TransferProtocolType::XModem => XMODEM_STR,
+            TransferProtocolType::XModemCRC => XMODEMCRC_STR,
+            TransferProtocolType::XModem1k => XMODEM1K_STR,
+            TransferProtocolType::XModem1kG => XMODEM1KG_STR,
+            TransferProtocolType::YModem => YMODEM_STR,
+            TransferProtocolType::YModemG => YMODEMG_STR,
+            TransferProtocolType::ZModem => ZMODEM_STR,
+            TransferProtocolType::ZModem8k => ZMODEM8K_STR,
+            TransferProtocolType::External(s) => s,
+        };
+        write!(f, "{}", s)
+    }
+}
+
+impl FromStr for TransferProtocolType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let res = if s.starts_with('@') {
+            match s.to_ascii_lowercase().as_str() {
+                ASC_STR => TransferProtocolType::ASCII,
+                XMODEM_STR => TransferProtocolType::XModem,
+                XMODEMCRC_STR => TransferProtocolType::XModemCRC,
+                XMODEM1K_STR => TransferProtocolType::XModem1k,
+                XMODEM1KG_STR => TransferProtocolType::XModem1kG,
+                YMODEM_STR => TransferProtocolType::YModem,
+                YMODEMG_STR => TransferProtocolType::YModemG,
+                ZMODEM_STR => TransferProtocolType::ZModem,
+                ZMODEM8K_STR => TransferProtocolType::ZModem8k,
+                _ => TransferProtocolType::None,
+            }
+        } else {
+            TransferProtocolType::External(s.to_string())
+        };
+        Ok(res)
+    }
+}
+
+impl From<String> for TransferProtocolType {
+    fn from(s: String) -> Self {
+        TransferProtocolType::from_str(&s).unwrap_or_default()
     }
 }
 
@@ -83,24 +134,7 @@ impl<'de> Deserialize<'de> for TransferProtocolType {
     where
         D: serde::Deserializer<'de>,
     {
-        String::deserialize(deserializer).map(|s| {
-            if s.starts_with('@') {
-                match s.as_str().to_lowercase().as_str() {
-                    ASC_STR => TransferProtocolType::ASCII,
-                    XMODEM_STR => TransferProtocolType::XModem,
-                    XMODEMCRC_STR => TransferProtocolType::XModemCRC,
-                    XMODEM1K_STR => TransferProtocolType::XModem1k,
-                    XMODEM1KG_STR => TransferProtocolType::XModem1kG,
-                    YMODEM_STR => TransferProtocolType::YModem,
-                    YMODEMG_STR => TransferProtocolType::YModemG,
-                    ZMODEM_STR => TransferProtocolType::ZModem,
-                    ZMODEM8K_STR => TransferProtocolType::ZModem8k,
-                    _ => TransferProtocolType::ZModem,
-                }
-            } else {
-                TransferProtocolType::External(s)
-            }
-        })
+        String::deserialize(deserializer).map(TransferProtocolType::from)
     }
 }
 
@@ -109,19 +143,6 @@ impl serde::Serialize for TransferProtocolType {
     where
         S: serde::Serializer,
     {
-        let s = match self {
-            TransferProtocolType::ASCII => ASC_STR,
-            TransferProtocolType::XModem => XMODEM_STR,
-            TransferProtocolType::XModemCRC => XMODEMCRC_STR,
-            TransferProtocolType::XModem1k => XMODEM1K_STR,
-            TransferProtocolType::XModem1kG => XMODEM1KG_STR,
-            TransferProtocolType::YModem => YMODEM_STR,
-            TransferProtocolType::YModemG => YMODEMG_STR,
-            TransferProtocolType::ZModem => ZMODEM_STR,
-            TransferProtocolType::ZModem8k => ZMODEM8K_STR,
-            TransferProtocolType::External(s) => s,
-        };
-
-        s.serialize(serializer)
+        self.to_string().serialize(serializer)
     }
 }

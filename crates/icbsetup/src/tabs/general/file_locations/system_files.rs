@@ -60,6 +60,7 @@ impl SystemFiles {
                 cfg_entry_path!("paths_tmp_files", label_width, paths, tmp_work_path, lock),
                 cfg_entry_path!("paths_help_path", label_width, paths, help_path, lock),
                 cfg_entry_path!("paths_security_file_path", label_width, paths, security_file_path, lock),
+                cfg_entry_path!("paths_email_msg_base", label_width, paths, email_msgbase, lock).with_editable(false),
                 cfg_entry_path!("paths_command_display_path", label_width, paths, command_display_path, lock),
             ];
             ConfigMenu { obj: icy_board.clone(), entry }

@@ -150,7 +150,7 @@ impl IcyBoardState {
             }
         }
 
-        self.read_msgs_from_base(message_base).await
+        self.read_msgs_from_base(message_base, false).await
     }
 }
 

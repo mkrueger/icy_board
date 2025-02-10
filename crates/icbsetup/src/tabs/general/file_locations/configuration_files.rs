@@ -31,7 +31,14 @@ impl ConfigurationFiles {
                     Box::new(crate::editors::sec_editor::edit_sec),
                     lock
                 ),
-                cfg_entry_path!("paths_protocol_data_file", label_width, paths, protocol_data_file, lock),
+                cfg_entry_path!(
+                    "paths_protocol_data_file",
+                    label_width,
+                    paths,
+                    protocol_data_file,
+                    Box::new(crate::editors::protocols::edit_protocols),
+                    lock
+                ),
                 cfg_entry_path!("paths_language_file", label_width, paths, language_file, Box::new(edit_languages), lock),
                 cfg_entry_path!("paths_command_file", label_width, paths, command_file, lock),
                 ConfigEntry::Separator,

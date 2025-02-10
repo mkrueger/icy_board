@@ -863,6 +863,10 @@ paths_security_file_path=Location of Login Security Files
 paths_security_file_path-status=Location of Login Login Security Files
 paths_security_file_path-help=TODO
 
+paths_email_msg_base=Location of Email Message Base
+paths_email_msg_base-status=Location of Email Message Base
+paths_email_msg_base-help=TODO
+
 paths_command_display_path=Location of Command Display Files
 paths_command_display_path-status=Location of Command Display Files
 paths_command_display_path-help=TODO
@@ -1609,6 +1613,10 @@ survey_editor_editor_security-help=TODO
 sec_level_editor_title=Edit Security Levels
 sec_level_editor_editor=Edit Security Level
 
+sec_level_header_security=Security
+sec_level_header_description=Description
+sec_level_header_time=Time
+
 sec_level_editor_security=Security
 sec_level_editor_security-status=Security
 sec_level_editor_security-help=TODO
@@ -1675,3 +1683,37 @@ sec_level_demo_acc-help=TODO
 sec_level_enable_acc=Enable Account
 sec_level_enable_acc-status=Enable Account
 sec_level_enable_acc-help=TODO
+
+protocol_editor_title=Transfer Protocols
+protocol_editor_editor=Edit Protocol
+
+protocol_editor_header_char_code=Use
+protocol_editor_header_description=Description
+
+protocol_editor_is_enabled=Enabled
+protocol_editor_is_enabled-status=Enabled
+protocol_editor_is_enabled-help=TODO
+
+protocol_editor_is_batch=Batch
+protocol_editor_is_batch-status=Batch
+protocol_editor_is_batch-help=TODO
+
+protocol_editor_bidirectional=Bidirectional
+protocol_editor_bidirectional-status=Bidirectional
+protocol_editor_bidirectional-help=TODO
+
+protocol_editor_char_code=Use
+protocol_editor_char_code-status=Use
+protocol_editor_char_code-help=TODO
+
+protocol_editor_description=Description
+protocol_editor_description-status=Description
+protocol_editor_description-help=TODO
+
+protocol_editor_send_cmd=Send Command
+protocol_editor_send_cmd-status=Send Command
+protocol_editor_send_cmd-help=TODO
+
+protocol_editor_recv_cmd=Receive Command
+protocol_editor_recv_cmd-status=Receive Command
+protocol_editor_recv_cmd-help=TODO

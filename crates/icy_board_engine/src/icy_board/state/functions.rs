@@ -3,10 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{
-    icy_board::{user_base::UserBase, IcyBoardError},
-    Res,
-};
+use crate::Res;
 use async_recursion::async_recursion;
 use codepages::tables::CP437_TO_UNICODE;
 use icy_engine::IceMode;
@@ -563,7 +560,7 @@ impl IcyBoardState {
             self.get_email_msgbase(&user_name).await
         } else {
             let msg_base = self.get_board().await.conferences[conf as usize].areas[area as usize].filename.clone();
-            let msg_base = self.resolve_path(&msg_base);
+            let msg_base: PathBuf = self.resolve_path(&msg_base);
             if msg_base.with_extension("jhr").exists() {
                 JamMessageBase::open(msg_base)
             } else {
@@ -590,22 +587,11 @@ impl IcyBoardState {
     }
 
     pub async fn get_email_msgbase(&mut self, user_name: &str) -> Res<JamMessageBase> {
-        let name = if user_name == self.session.sysop_name {
-            self.get_board().await.users[0].get_name().to_string()
-        } else {
-            user_name.to_string()
-        };
-        let home_dir = UserBase::get_user_home_dir(&self.resolve_path(&self.get_board().await.config.paths.user_file), &name);
-
-        if !home_dir.exists() {
-            log::error!("Homedir for user {} does not exist", user_name);
-            self.display_text(IceText::MessageBaseError, display_flags::NEWLINE).await?;
-            return Err(IcyBoardError::HomeDirMissing(user_name.to_string()).into());
+        let name = self.get_board().await.config.paths.email_msgbase.clone();
+        let mut msg_base = self.resolve_path(&name);
+        if msg_base.is_dir() {
+            msg_base = msg_base.join("email");
         }
-
-        let msg_dir = home_dir.join("msg");
-        fs::create_dir_all(&msg_dir)?;
-        let msg_base = msg_dir.join("email");
         Ok(if msg_base.with_extension("jhr").exists() {
             JamMessageBase::open(msg_base)?
         } else {

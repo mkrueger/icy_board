@@ -112,10 +112,15 @@ impl<'a> SecurityLevelEditor<'a> {
         let scroll_state = ScrollbarState::default().content_length(sec_levels_orig.levels.len());
         let content_length = sec_levels_orig.levels.len();
         let cmd2 = sec_levels.clone();
+
         let insert_table = InsertTable {
             scroll_state,
             table_state: TableState::default().with_selected(0),
-            headers: vec!["Security    ".to_string(), "Description".to_string(), "Time".to_string()],
+            headers: vec![
+                get_text("sec_level_header_security"),
+                get_text("sec_level_header_description"),
+                get_text("sec_level_header_time"),
+            ],
             get_content: Box::new(move |_table, i, j| {
                 if *i >= cmd2.lock().unwrap().len() {
                     return Line::from("".to_string());

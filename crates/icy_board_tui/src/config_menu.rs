@@ -139,6 +139,7 @@ pub struct ListItem<T> {
     label_width: u16,
     label_alignment: Alignment,
     edit_width: u16,
+    editable: bool,
     pub status: String,
     pub text_field_state: TextfieldState,
     pub value: ListValue,
@@ -162,7 +163,17 @@ impl<T> ListItem<T> {
             help: String::new(),
             edit_width: 0,
             path_editor: None,
+            editable: true,
         }
+    }
+
+    pub fn editable(&self) -> bool {
+        self.editable
+    }
+
+    pub fn with_editable(mut self, editable: bool) -> Self {
+        self.editable = editable;
+        self
     }
 
     pub fn with_status(mut self, status: impl Into<String>) -> Self {
@@ -738,6 +749,16 @@ impl<T> ConfigEntry<T> {
             ConfigEntry::Table(_rows, _items) => 0,
             ConfigEntry::Label(_) | ConfigEntry::Separator => 0,
         }
+    }
+
+    pub fn with_editable(mut self, editable: bool) -> Self {
+        match &mut self {
+            ConfigEntry::Item(item) => {
+                item.editable = editable;
+            }
+            _ => {}
+        }
+        self
     }
 
     fn measure_value(&self, area: Rect) -> u16 {

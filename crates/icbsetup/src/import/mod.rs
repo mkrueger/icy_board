@@ -364,6 +364,7 @@ impl PCBoardImporter {
                 command_display_path: PathBuf::from("art/cmd_display"),
                 tmp_work_path: PathBuf::from("tmp/"),
                 user_file: PathBuf::from("config/users.toml"),
+                email_msgbase: PathBuf::from("config/email"),
                 caller_log,
                 icbtext,
                 conferences,

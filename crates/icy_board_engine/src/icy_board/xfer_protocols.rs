@@ -8,7 +8,7 @@ use crate::Res;
 use icy_net::protocol::TransferProtocolType;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Protocol {
     #[serde(rename = "enabled")]
     #[serde(skip_serializing_if = "is_true")]
@@ -21,6 +21,11 @@ pub struct Protocol {
     pub is_batch: bool,
 
     #[serde(default)]
+    #[serde(rename = "bidirectional")]
+    #[serde(skip_serializing_if = "is_false")]
+    pub is_bi_directional: bool,
+
+    #[serde(default)]
     pub char_code: String,
 
     #[serde(default)]
@@ -31,12 +36,12 @@ pub struct Protocol {
     pub recv_command: TransferProtocolType,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct SupportedProtocols {
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(rename = "protocol")]
-    pub protocols: Vec<Protocol>,
+    protocols: Vec<Protocol>,
 }
 
 impl SupportedProtocols {
@@ -114,12 +119,13 @@ impl PCBoardTextImport for SupportedProtocols {
                 'Z' => (true, true, TransferProtocolType::ZModem),
                 _ => (false, true, TransferProtocolType::External("todo".to_string())),
             };
-
+            let is_bi_directional = false;
             res.protocols.push(Protocol {
                 description,
                 char_code: char_code.to_string(),
                 is_enabled,
                 is_batch,
+                is_bi_directional,
                 send_command: command.clone(),
                 recv_command: command,
             });

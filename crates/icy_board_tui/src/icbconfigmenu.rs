@@ -42,7 +42,7 @@ impl ICBConfigMenuUI {
         if let Some(item) = self.menu.get_item(self.state.selected) {
             if let ListValue::Path(path) = &item.value {
                 let path = self.menu.obj.lock().unwrap().resolve_file(path);
-                if path.exists() && path.is_file() {
+                if path.exists() && path.is_file() && item.editable() {
                     bottom_text = get_text("icb_setup_key_menu_edit_help");
                 }
             }
@@ -95,7 +95,7 @@ impl ICBConfigMenuUI {
     pub fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         if let Some(item) = self.menu.get_item(self.state.selected) {
             if let ListValue::Path(path) = &item.value {
-                if key.code == crossterm::event::KeyCode::F(2) {
+                if key.code == crossterm::event::KeyCode::F(2) && item.editable() {
                     let path = self.menu.obj.lock().unwrap().resolve_file(path);
                     if let Some(editor) = &item.path_editor {
                         return editor(self.menu.obj.clone(), path);

@@ -177,7 +177,7 @@ impl MessageViewer {
         );
         state.print(TerminalTarget::Both, &txt).await?;
         state.reset_color(TerminalTarget::Both).await?;
-
+        state.session.num_lines_printed += 5;
         Ok(())
     }
 
@@ -187,16 +187,33 @@ impl MessageViewer {
 }
 
 impl IcyBoardState {
-    pub async fn read_msgs_from_base(&mut self, mut message_base: JamMessageBase) -> Res<()> {
+    pub async fn read_msgs_from_base(&mut self, mut message_base: JamMessageBase, only_personal: bool) -> Res<()> {
         let viewer = MessageViewer::load(&self.display_text)?;
-
+        let mut base_number = message_base.base_messagenumber();
+        let mut active_messages = message_base.active_messages();
+        let mut messages = Vec::new();
+        if only_personal {
+            for msg in message_base.iter().flatten() {
+                if let Some(to) = msg.get_to() {
+                    if to == &self.session.alias_name || to == &self.session.user_name {
+                        messages.push(msg.message_number);
+                    }
+                }
+            }
+            if !messages.is_empty() {
+                base_number = messages.first().unwrap_or(&0).to_owned();
+            } else {
+                base_number = 0;
+            }
+            active_messages = messages.len() as u32;
+        }
         while !self.session.disp_options.abort_printout {
             let prompt = if self.session.expert_mode {
                 IceText::MessageReadCommandExpert
             } else {
                 IceText::MessageReadCommand
             };
-            self.session.op_text = format!("{}-{}", message_base.base_messagenumber(), message_base.active_messages());
+            self.session.op_text = format!("{}-{}", base_number, active_messages);
 
             let text = self
                 .input_field(
@@ -213,6 +230,10 @@ impl IcyBoardState {
             }
 
             if let Ok(number) = text.parse::<u32>() {
+                if only_personal && !messages.contains(&number) {
+                    self.display_text(IceText::NoMailFound, display_flags::NEWLINE).await?;
+                    continue;
+                }
                 self.read_message_number(&mut message_base, &viewer, number, None).await?;
             }
         }

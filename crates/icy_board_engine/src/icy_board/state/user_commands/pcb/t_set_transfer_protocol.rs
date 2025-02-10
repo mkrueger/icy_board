@@ -59,18 +59,6 @@ impl IcyBoardState {
             }
         }
 
-        if "N" == cur_protocol {
-            protocols.push(format!(
-                "=> (N) {}",
-                self.get_board().await.default_display_text.get_display_text(IceText::None).unwrap().text
-            ));
-        } else {
-            protocols.push(format!(
-                "   (N) {}",
-                self.get_board().await.default_display_text.get_display_text(IceText::None).unwrap().text
-            ));
-        }
-
         self.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
         for line in protocols {
             self.print(TerminalTarget::Both, &line).await?;

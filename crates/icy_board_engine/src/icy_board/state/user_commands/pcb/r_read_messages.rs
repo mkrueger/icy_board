@@ -26,7 +26,7 @@ impl IcyBoardState {
             let msgbase_file_resolved = self.get_board().await.resolve_file(message_base_file);
             match JamMessageBase::open(&msgbase_file_resolved) {
                 Ok(message_base) => {
-                    self.read_msgs_from_base(message_base).await?;
+                    self.read_msgs_from_base(message_base, false).await?;
                     return Ok(());
                 }
                 Err(err) => {

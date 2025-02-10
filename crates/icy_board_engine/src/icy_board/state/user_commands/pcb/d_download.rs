@@ -48,7 +48,7 @@ impl IcyBoardState {
         let mut goodbye_after_dl = false;
         let mut do_dl = true;
         loop {
-            for p in &self.get_board().await.protocols.protocols {
+            for p in self.get_board().await.protocols.iter() {
                 if p.is_enabled && p.char_code == protocol_str {
                     p_descr = p.description.clone();
                     protocol = Some(p.send_command.clone());

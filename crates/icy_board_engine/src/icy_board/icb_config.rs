@@ -319,6 +319,8 @@ pub struct ConfigPaths {
     /// Shown during login process
     pub security_file_path: PathBuf,
 
+    pub email_msgbase: PathBuf,
+
     /// Command display files are shown to the user before a command is executed
     /// file name == command name
     pub command_display_path: PathBuf,
@@ -808,6 +810,7 @@ impl IcbConfig {
                 security_file_path: PathBuf::from("art/secmsgs/"),
                 command_display_path: PathBuf::from("art/cmd_display/"),
                 user_file: PathBuf::from("config/users.toml"),
+                email_msgbase: PathBuf::from("config/email"),
                 caller_log: PathBuf::from("caller.log"),
 
                 welcome: PathBuf::new(),

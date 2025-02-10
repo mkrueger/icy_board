@@ -80,7 +80,7 @@ impl IcyBoardState {
 
         let protocol_str: String = self.session.current_user.as_ref().unwrap().protocol.clone();
         let mut protocol = None;
-        for p in &self.get_board().await.protocols.protocols {
+        for p in self.get_board().await.protocols.iter() {
             if p.is_enabled && p.char_code == protocol_str {
                 protocol = Some(p.send_command.clone());
                 break;
@@ -89,6 +89,7 @@ impl IcyBoardState {
 
         if let Some(protocol) = protocol {
             let mut prot: Box<dyn Protocol> = match protocol {
+                TransferProtocolType::None => todo!(),
                 TransferProtocolType::ASCII => todo!(),
                 TransferProtocolType::XModem => Box::new(XYmodem::new(XYModemVariant::XModem)),
                 TransferProtocolType::XModemCRC => Box::new(XYmodem::new(XYModemVariant::XModemCRC)),
