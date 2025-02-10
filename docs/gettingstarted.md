@@ -43,13 +43,13 @@ Basically the file Layout is:
 |icyboard.log | Log File |
 |art/| All ANSIS go in there | 
 |art/help/| Help Files | 
-|config/| All config files are here | 
+|main/| All other bbs files are here | 
 |conferences/| Conference data (files/messages) |
 |tmp/| Generated Files for backwards compatiblity |
 
 The log file is very important. If something goes wrong it's likely that the log file tells you why.
 
-## Config files
+## main/ files 
 
 | File | Description|
 | --- | --- |
@@ -66,6 +66,7 @@ The log file is very important. If something goes wrong it's likely that the log
 |tcan_email.txt| Forbidden emails |
 |tcan_uploads.txt| Forbidden upload file names |
 |vip_user.txt| Users where the sysop is informed about a login |
+|email.*| Email message base |
 
 *NOTE: The location & name of all files can be changed in the main icboard.toml.*
 
