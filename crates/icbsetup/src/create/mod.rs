@@ -100,7 +100,7 @@ impl IcyBoardCreator {
     pub fn create(&mut self) -> Res<()> {
         self.logger.start_action(format!("Creating IcyBoard at {}", self.destination.display()));
         fs::create_dir_all(&self.destination)?;
-        fs::create_dir_all(&self.destination.join("config"))?;
+        fs::create_dir_all(&self.destination.join("main"))?;
         fs::create_dir_all(&self.destination.join("art/help"))?;
 
         self.logger.start_action("Creating main configuration… at {}".to_string());
@@ -133,38 +133,38 @@ impl IcyBoardCreator {
         DEFAULT_DISPLAY_TEXT.save(&self.destination.join(&config.paths.icbtext))?;
 
         self.logger.start_action("Write trashcan files…".to_string());
-        config.paths.trashcan_upload_files = PathBuf::from("config/tcan_uploads.txt");
+        config.paths.trashcan_upload_files = PathBuf::from("main/tcan_uploads.txt");
         fs::write(
             &self.destination.join(&config.paths.trashcan_upload_files),
             include_str!("../../data/tcan_uploads.txt"),
         )?;
 
-        config.paths.trashcan_user = PathBuf::from("config/tcan_user.txt");
+        config.paths.trashcan_user = PathBuf::from("main/tcan_user.txt");
         fs::write(&self.destination.join(&config.paths.trashcan_user), include_str!("../../data/tcan_users.txt"))?;
 
-        config.paths.trashcan_email = PathBuf::from("config/tcan_email.txt");
+        config.paths.trashcan_email = PathBuf::from("main/tcan_email.txt");
         fs::write(&self.destination.join(&config.paths.trashcan_email), include_str!("../../data/tcan_email.txt"))?;
-        config.paths.trashcan_passwords = PathBuf::from("config/tcan_passwords.txt");
+        config.paths.trashcan_passwords = PathBuf::from("main/tcan_passwords.txt");
         fs::write(
             &self.destination.join(&config.paths.trashcan_passwords),
             include_str!("../../data/tcan_passwords.txt"),
         )?;
-        config.paths.vip_users = PathBuf::from("config/vip_users.txt");
+        config.paths.vip_users = PathBuf::from("main/vip_users.txt");
         fs::write(&self.destination.join(&config.paths.vip_users), include_str!("../../data/vip_users.txt"))?;
 
         self.logger.start_action("Write protocol data files…".to_string());
-        config.paths.protocol_data_file = PathBuf::from("config/protocols.toml");
+        config.paths.protocol_data_file = PathBuf::from("main/protocols.toml");
         generate_protocol_data(&self.destination.join(&config.paths.protocol_data_file))?;
 
         self.logger.start_action("Write security data files…".to_string());
-        config.paths.pwrd_sec_level_file = PathBuf::from("config/security_levels.toml");
+        config.paths.pwrd_sec_level_file = PathBuf::from("main/security_levels.toml");
         generate_security_level_data(&self.destination.join(&config.paths.pwrd_sec_level_file))?;
 
         self.logger.start_action("Write default conferences".to_string());
         self.generate_default_conference(&self.destination.join(&config.paths.conferences))?;
 
         self.logger.start_action("Write default command file".to_string());
-        config.paths.command_file = PathBuf::from("config/commands.toml");
+        config.paths.command_file = PathBuf::from("main/commands.toml");
 
         let mut cmd_list = CommandList::default();
         add_default_commands(&get_default_data(), &mut cmd_list);
@@ -211,11 +211,11 @@ impl IcyBoardCreator {
         )?;
 
         self.logger.start_action("Write default statistics file".to_string());
-        config.paths.statistics_file = PathBuf::from("config/statistics.toml");
+        config.paths.statistics_file = PathBuf::from("main/statistics.toml");
         Statistics::default().save(&self.destination.join(&config.paths.statistics_file))?;
 
         self.logger.start_action("Write default language definition file".to_string());
-        config.paths.language_file = PathBuf::from("config/languages.toml");
+        config.paths.language_file = PathBuf::from("main/languages.toml");
         let mut lang = SupportedLanguages::default();
         lang.push(Language {
             description: "English".to_string(),
@@ -226,7 +226,7 @@ impl IcyBoardCreator {
         lang.save(&self.destination.join(&config.paths.language_file))?;
 
         self.logger.start_action("Write default groups file".to_string());
-        config.paths.group_file = PathBuf::from("config/groups");
+        config.paths.group_file = PathBuf::from("main/groups");
         let mut list = GroupList::default();
         list.add_group("sysop", "System Operators");
         list.add_group("users", "Common Users");

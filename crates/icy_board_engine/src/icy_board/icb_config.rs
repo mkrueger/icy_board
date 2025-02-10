@@ -805,12 +805,12 @@ impl IcbConfig {
             paths: ConfigPaths {
                 help_path: PathBuf::from("art/help/"),
                 tmp_work_path: PathBuf::from("tmp/"),
-                icbtext: PathBuf::from("config/icbtext.toml"),
-                conferences: PathBuf::from("config/conferences.toml"),
+                icbtext: PathBuf::from("main/icbtext.toml"),
+                conferences: PathBuf::from("main/conferences.toml"),
                 security_file_path: PathBuf::from("art/secmsgs/"),
                 command_display_path: PathBuf::from("art/cmd_display/"),
-                user_file: PathBuf::from("config/users.toml"),
-                email_msgbase: PathBuf::from("config/email"),
+                user_file: PathBuf::from("main/users.toml"),
+                email_msgbase: PathBuf::from("main/email"),
                 caller_log: PathBuf::from("caller.log"),
 
                 welcome: PathBuf::new(),

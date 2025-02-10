@@ -184,14 +184,14 @@ impl PCBoardImporter {
             file_name.chars().next().unwrap_or_default().is_ascii_digit()
         })?;
 
-        let icbtext = self.convert_pcbtext(&(self.data.path.text_loc.clone() + "/PCBTEXT"), "config/icbtext")?;
-        // let bad_users = self.convert_trashcan(&self.data.path.tcan_file.clone(), "config/tcan_user.txt")?;
-        let trashcan_upload_files = self.convert_trashcan(&self.data.path.tcan_file.clone(), "config/tcan_user.txt")?;
-        let tcan_email = self.create_file(include_str!("../../data/tcan_email.txt"), "config/tcan_email.txt")?;
-        let tcan_passwords = self.create_file(include_str!("../../data/tcan_passwords.txt"), "config/tcan_passwords.txt")?;
-        let vip_users = self.create_file(include_str!("../../data/vip_users.txt"), "config/vip_users.txt")?;
+        let icbtext = self.convert_pcbtext(&(self.data.path.text_loc.clone() + "/PCBTEXT"), "main/icbtext")?;
+        // let bad_users = self.convert_trashcan(&self.data.path.tcan_file.clone(), "main/tcan_user.txt")?;
+        let trashcan_upload_files = self.convert_trashcan(&self.data.path.tcan_file.clone(), "main/tcan_user.txt")?;
+        let tcan_email = self.create_file(include_str!("../../data/tcan_email.txt"), "main/tcan_email.txt")?;
+        let tcan_passwords = self.create_file(include_str!("../../data/tcan_passwords.txt"), "main/tcan_passwords.txt")?;
+        let vip_users = self.create_file(include_str!("../../data/vip_users.txt"), "main/vip_users.txt")?;
 
-        let group_file = self.create_group_file("config/groups")?;
+        let group_file = self.create_group_file("main/groups")?;
 
         let welcome = self.convert_display_file(&self.data.path.welcome_file.clone(), "art/welcome")?;
         let newuser = self.convert_display_file(&self.data.path.newuser_file.clone(), "art/newuser")?;
@@ -200,7 +200,7 @@ impl PCBoardImporter {
         let expired = self.convert_display_file(&self.data.path.expired_file.clone(), "art/expired")?;
         let caller_log = self.convert_display_file(&self.data.path.clr_file.clone(), "caller.log")?;
 
-        let accounting_config_file = self.convert_accounting_cfg(&self.data.account_config.clone(), "config/accounting_cfg.toml")?;
+        let accounting_config_file = self.convert_accounting_cfg(&self.data.account_config.clone(), "main/accounting_cfg.toml")?;
         let accounting_holiday_list_file = self.convert_display_file(&self.data.holidays_file.clone(), "art/acc_holidays")?;
         let accounting_info_file = self.convert_display_file(&self.data.account_info.clone(), "art/acc_info")?;
         let accounting_warning_file = self.convert_display_file(&&self.data.account_warn.clone(), "art/acc_warn")?;
@@ -222,15 +222,15 @@ impl PCBoardImporter {
         let newask_survey = self.convert_logon_surveys(&self.data.path.newreg_file.clone(), "art/newask_survey")?;
         let newask_answer = PathBuf::from("art/newask_answer");
 
-        self.convert_user_base(&self.data.path.usr_file.clone(), &self.data.path.inf_file.clone(), "config/users.toml")?;
+        self.convert_user_base(&self.data.path.usr_file.clone(), &self.data.path.inf_file.clone(), "main/users.toml")?;
 
-        let protocol_data_file = self.convert_data::<SupportedProtocols>(&self.data.path.protocol_data_file.clone(), "config/protocols.toml")?;
-        let language_file = self.convert_data::<SupportedLanguages>(&self.data.path.pcml_dat_file.clone(), "config/languages.toml")?;
-        let security_level_file = self.convert_data::<SecurityLevelDefinitions>(&self.data.path.pwrd_file.clone(), "config/security_levels.toml")?;
-        let command_file = self.convert_default_cmd_lst(&self.data.path.cmd_lst.clone(), "config/commands.toml")?;
-        let statistics_file = self.convert_data::<Statistics>(&self.data.path.stats_file.clone(), "config/statistics.toml")?;
+        let protocol_data_file = self.convert_data::<SupportedProtocols>(&self.data.path.protocol_data_file.clone(), "main/protocols.toml")?;
+        let language_file = self.convert_data::<SupportedLanguages>(&self.data.path.pcml_dat_file.clone(), "main/languages.toml")?;
+        let security_level_file = self.convert_data::<SecurityLevelDefinitions>(&self.data.path.pwrd_file.clone(), "main/security_levels.toml")?;
+        let command_file = self.convert_default_cmd_lst(&self.data.path.cmd_lst.clone(), "main/commands.toml")?;
+        let statistics_file = self.convert_data::<Statistics>(&self.data.path.stats_file.clone(), "main/statistics.toml")?;
 
-        let conferences = self.convert_conferences(&self.data.path.conference_file.clone(), "config/conferences.toml")?;
+        let conferences = self.convert_conferences(&self.data.path.conference_file.clone(), "main/conferences.toml")?;
 
         let color_file = self.resolve_file(&self.data.path.color_file);
 
@@ -363,8 +363,8 @@ impl PCBoardImporter {
                 security_file_path: PathBuf::from("art/secmsgs"),
                 command_display_path: PathBuf::from("art/cmd_display"),
                 tmp_work_path: PathBuf::from("tmp/"),
-                user_file: PathBuf::from("config/users.toml"),
-                email_msgbase: PathBuf::from("config/email"),
+                user_file: PathBuf::from("main/users.toml"),
+                email_msgbase: PathBuf::from("main/email"),
                 caller_log,
                 icbtext,
                 conferences,
@@ -621,8 +621,8 @@ impl PCBoardImporter {
             "conferences",
             "conferences/main",
             "ppe",
-            "config",
-            "config/menus",
+            "main",
+            "main/menus",
             "art",
             "art/cmd_display",
             "art/secmsgs",
@@ -767,7 +767,7 @@ impl PCBoardImporter {
                     let imported_menu = Menu::import_pcboard(&resolved_file)?;
                     let menu_path = self
                         .output_directory
-                        .join("config/menus")
+                        .join("main/menus")
                         .join(resolved_file.file_name().unwrap().to_ascii_lowercase());
                     imported_menu.save(&menu_path)?;
                     self.converted_files.insert(upper_file_name.clone(), menu_path.to_str().unwrap().to_string());

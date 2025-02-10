@@ -294,8 +294,6 @@ impl GenericVariableData {
                     );
                     return None;
                 }
-                println!("generate array !!!");
-
                 return Some(GenericVariableData::Dim2(vec![vec![base_value; matrix_size + 1]; vector_size + 1]));
             }
             3 => {
@@ -309,7 +307,6 @@ impl GenericVariableData {
                     );
                     return None;
                 }
-                println!("generate array !!!");
                 return Some(GenericVariableData::Dim3(vec![
                     vec![vec![base_value; cube_size + 1]; matrix_size + 1];
                     vector_size + 1
