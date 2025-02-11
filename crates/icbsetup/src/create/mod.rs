@@ -118,7 +118,7 @@ impl IcyBoardCreator {
         options.modern_terminal_output = true;
 
         for hlp in HELP_FILES.iter() {
-            let buffer = Buffer::from_bytes(&path, true, &hlp.1, None, None).unwrap();
+            let mut buffer = Buffer::from_bytes(&path, true, &hlp.1, None, None).unwrap();
             let bytes = buffer.to_bytes("pcb", &options).unwrap();
             fs::write(&self.destination.join(&config.paths.help_path).join(hlp.0).with_extension("pcb"), &bytes)?;
         }

@@ -16,7 +16,7 @@ use icy_net::{
     telnet::{TelnetConnection, TermCaps, TerminalEmulation},
     Connection,
 };
-use rand::distributions::{Alphanumeric, DistString};
+use rand::distr::{Alphanumeric, SampleString};
 use regex::Regex;
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -196,7 +196,7 @@ impl IcyBoardState {
 
     pub async fn run_bbslink_door(&mut self, bbslink: &BBSLink, door: &Door) -> Res<()> {
         log::info!("Running door: {}, requesting token", door.path);
-        let x_key = Alphanumeric.sample_string(&mut rand::thread_rng(), 12);
+        let x_key = Alphanumeric.sample_string(&mut rand::rng(), 12);
         let token = reqwest::get(format!("https://games.bbslink.net/token.php?{x_key}")).await?.text().await?;
         log::info!("got token {}, sending credentials", token);
         /* Not sure why this doesn't work:

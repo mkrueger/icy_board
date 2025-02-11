@@ -24,3 +24,4 @@ color-eyre = { workspace = true }
 itertools = { workspace = true }
 substring = { workspace = true }
 strum = { workspace = true }
+strum_macros = { workspace = true }

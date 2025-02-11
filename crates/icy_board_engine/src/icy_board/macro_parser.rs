@@ -1,7 +1,7 @@
 use std::{error::Error, str::FromStr};
 
 use logos::Logos;
-use strum::EnumIter;
+use strum_macros::EnumIter;
 
 #[derive(Debug, PartialEq, EnumIter)]
 pub enum MacroCommand {

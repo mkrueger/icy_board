@@ -367,8 +367,8 @@ pub async fn random(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
         return Ok(VariableValue::new_int(0));
     }
 
-    let mut rng = rand::thread_rng();
-    Ok(VariableValue::new_int(rng.gen_range(0..upper)))
+    let mut rng = rand::rng();
+    Ok(VariableValue::new_int(rng.random_range(0..upper)))
 }
 
 pub async fn date(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1173,9 +1173,8 @@ pub async fn u_inconf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 pub async fn peekdw(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function 'peekdw' !");
-    let mut rng = rand::thread_rng();
-
-    Ok(VariableValue::new_int(rng.gen()))
+    let mut rng = rand::rng();
+    Ok(VariableValue::new_int(rng.random()))
 }
 pub async fn dbglevel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.icy_board_state.debug_level))

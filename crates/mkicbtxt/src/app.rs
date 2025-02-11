@@ -17,7 +17,7 @@ use ratatui::{
     prelude::*,
     widgets::{block::Title, *},
 };
-use strum::{Display, FromRepr};
+use strum_macros::{Display, FromRepr};
 
 use crate::tabs::*;
 

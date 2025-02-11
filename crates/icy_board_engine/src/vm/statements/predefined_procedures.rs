@@ -897,7 +897,7 @@ pub async fn savescrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 }
 
 pub async fn restscrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    if let Some(screen) = &vm.stored_screen {
+    if let Some(screen) = &mut vm.stored_screen {
         let mut options = SaveOptions::default();
         options.screen_preparation = ScreenPreperation::ClearScreen;
         options.save_sauce = false;

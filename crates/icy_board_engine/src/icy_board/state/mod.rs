@@ -1843,7 +1843,7 @@ impl IcyBoardState {
     }
 
     async fn show_broadcast(&mut self, msg: String) -> Res<()> {
-        let buf = self.user_screen.buffer.flat_clone(false);
+        let mut buf = self.user_screen.buffer.flat_clone(false);
         let pos = self.user_screen.caret.get_position();
         self.set_activity(NodeStatus::NodeMessage).await;
         self.new_line().await?;
@@ -1858,7 +1858,7 @@ impl IcyBoardState {
         options.screen_preparation = ScreenPreperation::ClearScreen;
         options.save_sauce = false;
         options.modern_terminal_output = true;
-        let res = icy_engine::formats::PCBoard::default().to_bytes(&buf, &options)?;
+        let res = icy_engine::formats::PCBoard::default().to_bytes(&mut buf, &options)?;
         let res = unsafe { String::from_utf8_unchecked(res) };
         self.print(TerminalTarget::Both, &res).await?;
         self.gotoxy(TerminalTarget::Both, pos.x, pos.y).await?;
@@ -1870,7 +1870,7 @@ impl IcyBoardState {
         options.screen_preparation = icy_engine::ScreenPreperation::ClearScreen;
         options.save_sauce = false;
         options.modern_terminal_output = true;
-        let res = icy_engine::formats::PCBoard::default().to_bytes(&self.user_screen.buffer, &options)?;
+        let res = icy_engine::formats::PCBoard::default().to_bytes(&mut self.user_screen.buffer, &options)?;
         let res = unsafe { String::from_utf8_unchecked(res) };
         self.print(TerminalTarget::Sysop, &res).await?;
         let p = self.user_screen.caret.get_position();
