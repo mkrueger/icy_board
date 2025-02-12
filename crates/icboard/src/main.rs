@@ -30,7 +30,7 @@ use tui::{print_exit_screen, Tui};
 
 use crate::bbs::{await_securewebsocket_connections, await_websocket_connections};
 
-mod bbs;
+pub mod bbs;
 mod call_wait_screen;
 mod icy_engine_output;
 pub mod menu_runner;
@@ -38,6 +38,9 @@ mod node_monitoring_screen;
 mod system_statistics_screen;
 mod terminal_thread;
 mod tui;
+
+#[cfg(test)]
+mod tests;
 
 static mut SHOW_TOTAL_STATS: bool = true;
 

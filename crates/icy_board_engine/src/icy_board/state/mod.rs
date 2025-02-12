@@ -8,7 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{executable::Executable, Res};
+use crate::{executable::Executable, vm::expressions::fix_casing, Res};
 use async_recursion::async_recursion;
 use chrono::{DateTime, Local, Utc};
 use codepages::tables::UNICODE_TO_CP437;
@@ -1402,7 +1402,7 @@ impl IcyBoardState {
             }
             MacroCommand::FBytes | MacroCommand::FFiles | MacroCommand::FileCredit | MacroCommand::FileRatio => {}
             MacroCommand::First => {
-                result = self.session.get_first_name();
+                result = fix_casing(self.session.get_first_name());
             }
 
             MacroCommand::FirstU => {

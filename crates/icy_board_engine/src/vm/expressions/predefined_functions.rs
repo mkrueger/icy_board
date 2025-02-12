@@ -1948,7 +1948,7 @@ pub async fn setmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
 }
 
 /// Should be the same logic than the one in pcboard.
-fn fix_casing(param: String) -> String {
+pub fn fix_casing(param: String) -> String {
     let mut res = String::new();
     let mut first_char = true;
     let mut param = param.to_ascii_lowercase().chars().collect::<Vec<char>>();

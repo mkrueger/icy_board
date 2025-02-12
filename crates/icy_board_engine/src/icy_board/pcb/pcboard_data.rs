@@ -703,7 +703,7 @@ pub fn read_bool(reader: &mut BufReader<File>, encoding: Encoding) -> Res<bool> 
 /// # Errors
 pub fn read_int(reader: &mut BufReader<File>, encoding: Encoding) -> Res<i32> {
     let line = read_line(reader, encoding)?;
-    Ok(line.parse::<i32>()?)
+    Ok(line.parse::<i32>().unwrap_or(0))
 }
 
 /// # Errors
@@ -1087,7 +1087,7 @@ impl PcbBoardData {
         ret.uucp_time_zone = read_line(&mut reader, encoding)?;
         ret.uucp_separator = read_line(&mut reader, encoding)?;
         ret.organization = read_line(&mut reader, encoding)?;
-        ret.uucp_high_ascii = read_line(&mut reader, encoding)?.chars().next().unwrap();
+        ret.uucp_high_ascii = read_line(&mut reader, encoding)?.chars().next().unwrap_or('C');
         ret.uucp_email_conf = read_int(&mut reader, encoding)?;
         ret.uucp_junk_conf = read_int(&mut reader, encoding)?;
         ret.uucp_bang_domain = read_bool(&mut reader, encoding)?;

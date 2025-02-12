@@ -56,10 +56,9 @@ use qfile::{QFilePath, QTraitSync};
 use relative_path::{PathExt, RelativePathBuf};
 use walkdir::WalkDir;
 
-use self::{default_commands::add_default_commands, import_log::ImportLog};
+use self::import_log::ImportLog;
 
 pub mod console_logger;
-pub mod default_commands;
 pub mod import_log;
 
 pub trait OutputLogger {
@@ -1097,19 +1096,19 @@ impl PCBoardImporter {
     }
 
     fn convert_default_cmd_lst(&mut self, file: &str, new_rel_name: &str) -> Res<PathBuf> {
-        let mut res = if file.is_empty() {
-            CommandList::default()
+        let res = if file.is_empty() {
+            CommandList::generate_pcboard_defaults()
         } else {
             let resolved_file = self.resolve_file(file);
             let resolved_file = PathBuf::from(&resolved_file);
             if resolved_file.exists() {
-                CommandList::import_pcboard(&resolved_file)?
+                let mut res = CommandList::import_pcboard(&resolved_file)?;
+                res.commands.extend_from_slice(&CommandList::generate_pcboard_defaults().commands);
+                res
             } else {
-                CommandList::default()
+                CommandList::generate_pcboard_defaults()
             }
         };
-
-        add_default_commands(&self.data, &mut res);
 
         let destination = self.output_directory.join(new_rel_name);
         if let Err(err) = res.save(&destination) {

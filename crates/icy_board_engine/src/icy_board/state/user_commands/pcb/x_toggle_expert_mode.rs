@@ -12,6 +12,9 @@ impl IcyBoardState {
                 expert_mode = true;
             } else if token == "OFF" {
                 expert_mode = false;
+            } else {
+                self.new_line().await?;
+                return Ok(());
             }
         }
         self.session.expert_mode = expert_mode;
@@ -19,14 +22,11 @@ impl IcyBoardState {
             user.flags.expert_mode = expert_mode;
         }
         if expert_mode {
-            self.display_text(
-                IceText::ViewSettingsExpertModeOn,
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
-            )
-            .await?;
+            self.display_text(IceText::ExpertmodeOn, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER)
+                .await?;
         } else {
             self.display_text(
-                IceText::ViewSettingsExpertModeOff,
+                IceText::ExpertmodeOff,
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
             )
             .await?;

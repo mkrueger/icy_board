@@ -36,7 +36,7 @@ pub struct Protocol {
     pub recv_command: TransferProtocolType,
 }
 
-#[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct SupportedProtocols {
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -77,6 +77,111 @@ impl SupportedProtocols {
             }
         }
         None
+    }
+
+    /// Generate a default set of protocols
+    pub fn generate_pcboard_defaults() -> Self {
+        let mut protocols = Vec::new();
+        protocols.push(Protocol {
+            is_enabled: true,
+            is_batch: false,
+            is_bi_directional: false,
+            char_code: "A".to_string(),
+            description: "Ascii".to_string(),
+            send_command: TransferProtocolType::ASCII,
+            recv_command: TransferProtocolType::ASCII,
+        });
+
+        protocols.push(Protocol {
+            is_enabled: true,
+            is_batch: false,
+            is_bi_directional: false,
+            char_code: "X".to_string(),
+            description: "Xmodem/Checksum".to_string(),
+            send_command: TransferProtocolType::XModem,
+            recv_command: TransferProtocolType::XModem,
+        });
+
+        protocols.push(Protocol {
+            is_enabled: true,
+            is_batch: false,
+            is_bi_directional: false,
+            char_code: "C".to_string(),
+            description: "Xmodem/CRC".to_string(),
+            send_command: TransferProtocolType::XModemCRC,
+            recv_command: TransferProtocolType::XModemCRC,
+        });
+
+        protocols.push(Protocol {
+            is_enabled: true,
+            is_batch: false,
+            is_bi_directional: false,
+            char_code: "O".to_string(),
+            description: "1K-Xmodem       (a.k.a. non-BATCH Ymodem)".to_string(),
+            send_command: TransferProtocolType::XModem1k,
+            recv_command: TransferProtocolType::XModem1k,
+        });
+
+        protocols.push(Protocol {
+            is_enabled: true,
+            is_batch: false,
+            is_bi_directional: false,
+            char_code: "F".to_string(),
+            description: "1K-Xmodem/G     (a.k.a. non-BATCH Ymodem/G)".to_string(),
+            send_command: TransferProtocolType::XModem1kG,
+            recv_command: TransferProtocolType::XModem1kG,
+        });
+
+        protocols.push(Protocol {
+            is_enabled: true,
+            is_batch: true,
+            is_bi_directional: false,
+            char_code: "Y".to_string(),
+            description: "Ymodem BATCH".to_string(),
+            send_command: TransferProtocolType::YModem,
+            recv_command: TransferProtocolType::YModem,
+        });
+
+        protocols.push(Protocol {
+            is_enabled: true,
+            is_batch: true,
+            is_bi_directional: false,
+            char_code: "G".to_string(),
+            description: "Ymodem/G BATCH".to_string(),
+            send_command: TransferProtocolType::YModemG,
+            recv_command: TransferProtocolType::YModemG,
+        });
+
+        protocols.push(Protocol {
+            is_enabled: true,
+            is_batch: true,
+            is_bi_directional: false,
+            char_code: "Z".to_string(),
+            description: "Zmodem (batch)".to_string(),
+            send_command: TransferProtocolType::ZModem,
+            recv_command: TransferProtocolType::ZModem,
+        });
+
+        protocols.push(Protocol {
+            is_enabled: true,
+            is_batch: true,
+            is_bi_directional: false,
+            char_code: "8".to_string(),
+            description: "Zmodem 8k (batch)".to_string(),
+            send_command: TransferProtocolType::ZModem8k,
+            recv_command: TransferProtocolType::ZModem8k,
+        });
+
+        protocols.push(Protocol {
+            is_enabled: true,
+            is_batch: true,
+            is_bi_directional: false,
+            char_code: "N".to_string(),
+            description: "None".to_string(),
+            send_command: TransferProtocolType::None,
+            recv_command: TransferProtocolType::None,
+        });
+        Self { protocols }
     }
 }
 

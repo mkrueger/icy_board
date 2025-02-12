@@ -14,21 +14,19 @@ use icy_board_engine::{
         icb_text::DEFAULT_DISPLAY_TEXT,
         language::{Language, SupportedLanguages},
         message_area::{AreaList, MessageArea},
-        pcboard_data::{PCBSysopSecurityLevels, UserSecurityLevels},
         sec_levels::{SecurityLevel, SecurityLevelDefinitions},
         statistics::Statistics,
         surveys::{Survey, SurveyList},
         user_base::{Password, PasswordInfo, User, UserBase},
-        xfer_protocols::{Protocol, SupportedProtocols},
+        xfer_protocols::SupportedProtocols,
         IcyBoardSerializer,
     },
     Res,
 };
 use icy_engine::{Buffer, SaveOptions};
-use icy_net::protocol::TransferProtocolType;
 use jamjam::{jam::JamMessageBase, util::echmoail::EchomailAddress};
 
-use crate::import::{console_logger::ConsoleLogger, default_commands::add_default_commands, OutputLogger};
+use crate::import::{console_logger::ConsoleLogger, OutputLogger};
 
 pub struct IcyBoardCreator {
     destination: PathBuf,
@@ -166,8 +164,7 @@ impl IcyBoardCreator {
         self.logger.start_action("Write default command file".to_string());
         config.paths.command_file = PathBuf::from("main/commands.toml");
 
-        let mut cmd_list = CommandList::default();
-        add_default_commands(&get_default_data(), &mut cmd_list);
+        let cmd_list = CommandList::generate_pcboard_defaults();
         cmd_list.save(&self.destination.join(&config.paths.command_file))?;
 
         self.logger.start_action("Write default art files".to_string());
@@ -433,89 +430,6 @@ https://github.com/mkrueger/icy_tools
         ))
 }
 
-fn get_default_data() -> icy_board_engine::icy_board::pcboard_data::PcbBoardData {
-    icy_board_engine::icy_board::pcboard_data::PcbBoardData {
-        sysop_security: PCBSysopSecurityLevels {
-            sysop: 110,
-            read_all_comments: 110,
-            read_all_mail: 110,
-            copy_move_messages: 110,
-            enter_at_vars_in_messages: 110,
-            edit_any_message: 110,
-            not_update_msg_read_status: 110,
-            use_broadcast_command: 110,
-            view_private_uploads: 110,
-            enter_generic_message: 110,
-            edit_message_headers: 110,
-            protect_unprotect_messages: 110,
-            overwrite_uploads: 110,
-            set_pack_out_date_on_messages: 110,
-            see_all_return_receipt_messages: 110,
-            subs: 110,
-            edit_all: 110,
-            read_only: 110,
-            sec_15: 110,
-            unused0: 110,
-            keep_msg: 110,
-            seeretrcpt: 110,
-            sec_1_view_caller_log: 110,
-            sec_2_view_usr_list: 110,
-            sec_3_pack_renumber_msg: 110,
-            sec_4_recover_deleted_msg: 110,
-            sec_5_list_message_hdr: 110,
-            sec_6_view_any_file: 110,
-            sec_7_user_maint: 110,
-            sec_8_pack_usr_file: 110,
-            sec_9_exit_to_dos: 110,
-            sec_10_shelled_dos_func: 110,
-            sec_11_view_other_nodes: 110,
-            sec_12_logoff_alt_node: 110,
-            sec_13_drop_alt_node_to_dos: 110,
-            sec_14_drop_to_dos: 110,
-        },
-
-        user_levels: UserSecurityLevels {
-            cmd_a: 10,
-            cmd_b: 10,
-            cmd_c: 10,
-            cmd_d: 10,
-            cmd_e: 10,
-            cmd_f: 10,
-            cmd_g: 10,
-            cmd_h: 10,
-            cmd_i: 10,
-            cmd_j: 10,
-            cmd_k: 10,
-            cmd_l: 10,
-            cmd_m: 10,
-            cmd_n: 10,
-            cmd_o: 10,
-            cmd_p: 10,
-            cmd_q: 10,
-            cmd_r: 10,
-            cmd_s: 10,
-            cmd_t: 10,
-            cmd_u: 10,
-            cmd_v: 10,
-            cmd_w: 10,
-            cmd_x: 10,
-            cmd_y: 10,
-            cmd_z: 10,
-            cmd_chat: 10,
-            cmd_open_door: 10,
-            cmd_test_file: 10,
-            cmd_show_user_list: 10,
-            cmd_who: 10,
-            batch_file_transfer: 10,
-            edit_own_messages: 10,
-            agree_to_register: 10,
-            refuse_to_register: 10,
-        },
-
-        ..Default::default()
-    }
-}
-
 fn generate_security_level_data(security_file_path: &PathBuf) -> Res<()> {
     let mut sec_level = SecurityLevelDefinitions::default();
 
@@ -561,108 +475,6 @@ fn generate_security_level_data(security_file_path: &PathBuf) -> Res<()> {
 }
 
 fn generate_protocol_data(protocol_data_file: &PathBuf) -> Res<()> {
-    let mut protocols = SupportedProtocols::default();
-
-    protocols.push(Protocol {
-        is_enabled: true,
-        is_batch: false,
-        is_bi_directional: false,
-        char_code: "A".to_string(),
-        description: "Ascii".to_string(),
-        send_command: TransferProtocolType::ASCII,
-        recv_command: TransferProtocolType::ASCII,
-    });
-
-    protocols.push(Protocol {
-        is_enabled: true,
-        is_batch: false,
-        is_bi_directional: false,
-        char_code: "X".to_string(),
-        description: "Xmodem/Checksum".to_string(),
-        send_command: TransferProtocolType::XModem,
-        recv_command: TransferProtocolType::XModem,
-    });
-
-    protocols.push(Protocol {
-        is_enabled: true,
-        is_batch: false,
-        is_bi_directional: false,
-        char_code: "C".to_string(),
-        description: "Xmodem/CRC".to_string(),
-        send_command: TransferProtocolType::XModemCRC,
-        recv_command: TransferProtocolType::XModemCRC,
-    });
-
-    protocols.push(Protocol {
-        is_enabled: true,
-        is_batch: false,
-        is_bi_directional: false,
-        char_code: "O".to_string(),
-        description: "1K-Xmodem       (a.k.a. non-BATCH Ymodem)".to_string(),
-        send_command: TransferProtocolType::XModem1k,
-        recv_command: TransferProtocolType::XModem1k,
-    });
-
-    protocols.push(Protocol {
-        is_enabled: true,
-        is_batch: false,
-        is_bi_directional: false,
-        char_code: "F".to_string(),
-        description: "1K-Xmodem/G     (a.k.a. non-BATCH Ymodem/G)".to_string(),
-        send_command: TransferProtocolType::XModem1kG,
-        recv_command: TransferProtocolType::XModem1kG,
-    });
-
-    protocols.push(Protocol {
-        is_enabled: true,
-        is_batch: true,
-        is_bi_directional: false,
-        char_code: "Y".to_string(),
-        description: "Ymodem BATCH".to_string(),
-        send_command: TransferProtocolType::YModem,
-        recv_command: TransferProtocolType::YModem,
-    });
-
-    protocols.push(Protocol {
-        is_enabled: true,
-        is_batch: true,
-        is_bi_directional: false,
-        char_code: "G".to_string(),
-        description: "Ymodem/G BATCH".to_string(),
-        send_command: TransferProtocolType::YModemG,
-        recv_command: TransferProtocolType::YModemG,
-    });
-
-    protocols.push(Protocol {
-        is_enabled: true,
-        is_batch: true,
-        is_bi_directional: false,
-        char_code: "Z".to_string(),
-        description: "Zmodem (batch)".to_string(),
-        send_command: TransferProtocolType::ZModem,
-        recv_command: TransferProtocolType::ZModem,
-    });
-
-    protocols.push(Protocol {
-        is_enabled: true,
-        is_batch: true,
-        is_bi_directional: false,
-        char_code: "8".to_string(),
-        description: "Zmodem 8k (batch)".to_string(),
-        send_command: TransferProtocolType::ZModem8k,
-        recv_command: TransferProtocolType::ZModem8k,
-    });
-
-    protocols.push(Protocol {
-        is_enabled: true,
-        is_batch: true,
-        is_bi_directional: false,
-        char_code: "N".to_string(),
-        description: "None".to_string(),
-        send_command: TransferProtocolType::None,
-        recv_command: TransferProtocolType::None,
-    });
-
-    protocols.save(protocol_data_file)?;
+    SupportedProtocols::generate_pcboard_defaults().save(protocol_data_file)?;
     Ok(())
 }

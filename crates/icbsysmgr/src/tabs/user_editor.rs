@@ -72,9 +72,9 @@ impl UserEditor {
                         .with_status(get_text("user_editor_security-status"))
                         .with_help(get_text("user_editor_security-help"))
                         .with_label_width(label_width)
-                        .with_update_text_value(&|board: &Arc<Mutex<User>>, value: String| {
+                        .with_update_u32_value(&|board: &Arc<Mutex<User>>, value: u32| {
                             let mut user = board.lock().unwrap();
-                            user.password.password = Password::PlainText(value);
+                            user.security_level = value as u8;
                         }),
                 ),
                 ConfigEntry::Separator,
