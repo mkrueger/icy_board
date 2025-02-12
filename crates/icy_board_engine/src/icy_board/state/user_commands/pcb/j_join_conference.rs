@@ -7,9 +7,11 @@ use crate::Res;
 impl IcyBoardState {
     pub async fn join_conference_cmd(&mut self) -> Res<()> {
         if self.get_board().await.conferences.is_empty() {
-            self.display_text(IceText::NoConferenceAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
-                .await?;
-            self.press_enter().await?;
+            self.display_text(
+                IceText::NoConferenceAvailable,
+                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL,
+            )
+            .await?;
             return Ok(());
         }
         let mut text = if let Some(token) = self.session.tokens.pop_front() {
@@ -116,10 +118,6 @@ impl IcyBoardState {
                     .await?;
             }
         }
-
-        self.new_line().await?;
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 }

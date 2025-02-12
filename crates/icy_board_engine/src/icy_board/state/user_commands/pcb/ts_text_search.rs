@@ -16,8 +16,6 @@ impl IcyBoardState {
     pub async fn text_search(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::HandlingMail).await;
         let Ok(Some(area)) = self.show_message_areas(self.session.current_conference_number).await else {
-            self.press_enter().await?;
-            self.display_current_menu = true;
             return Ok(());
         };
 
@@ -35,15 +33,13 @@ impl IcyBoardState {
             .await?
         };
         if search_text.is_empty() {
-            self.press_enter().await?;
-            self.display_current_menu = true;
             return Ok(());
         }
         self.text_search_in_area(&search_text, area).await
     }
 
     async fn text_search_in_area(&mut self, search_text: &str, area: usize) -> Res<()> {
-        let message_base_file = &self.session.current_conference.areas[area].filename;
+        let message_base_file = &self.session.current_conference.areas.as_ref().unwrap()[area].filename;
         let msgbase_file_resolved = self.get_board().await.resolve_file(message_base_file);
         match JamMessageBase::open(&msgbase_file_resolved) {
             Ok(mut message_base) => {
@@ -62,8 +58,6 @@ impl IcyBoardState {
                     .await?
                 };
                 if msg_search_from.is_empty() {
-                    self.press_enter().await?;
-                    self.display_current_menu = true;
                     return Ok(());
                 }
                 let mut start = msg_search_from.parse::<u32>()?.max(message_base.base_messagenumber());
@@ -79,8 +73,6 @@ impl IcyBoardState {
                     }
                     start += 1;
                 }
-                self.press_enter().await?;
-                self.display_current_menu = true;
                 Ok(())
             }
             Err(err) => {
@@ -95,9 +87,6 @@ impl IcyBoardState {
 
                 self.display_text(IceText::PathErrorInSystemConfiguration, display_flags::NEWLINE | display_flags::LFAFTER)
                     .await?;
-
-                self.press_enter().await?;
-                self.display_current_menu = true;
                 Ok(())
             }
         }

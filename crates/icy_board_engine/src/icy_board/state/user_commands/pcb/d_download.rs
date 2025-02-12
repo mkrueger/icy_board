@@ -26,9 +26,6 @@ impl IcyBoardState {
                 .await?;
 
             if download_tagged == self.session.no_char.to_uppercase().to_string() {
-                self.new_line().await?;
-                self.press_enter().await?;
-                self.display_current_menu = true;
                 return Ok(());
             }
         }
@@ -36,8 +33,6 @@ impl IcyBoardState {
         self.flag_files_cmd(true).await?;
 
         if self.session.flagged_files.is_empty() {
-            self.press_enter().await?;
-            self.display_current_menu = true;
             return Ok(());
         }
 
@@ -122,8 +117,6 @@ impl IcyBoardState {
                         log::error!("File not found: {:?}", f);
                         self.session.op_text = f.file_name().unwrap().to_string_lossy().to_string();
                         self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE).await?;
-                        self.new_line().await?;
-                        self.press_enter().await?;
                         return Ok(());
                     }
                 }
@@ -158,8 +151,6 @@ impl IcyBoardState {
                 self.goodbye().await?;
             }
         }
-        self.new_line().await?;
-        self.press_enter().await?;
         Ok(())
     }
 

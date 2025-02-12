@@ -9,9 +9,6 @@ impl IcyBoardState {
         let welcome_screen = self.get_board().await.config.paths.welcome.clone();
         let welcome_screen = self.resolve_path(&welcome_screen);
         self.display_file(&welcome_screen).await?;
-        self.new_line().await?;
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 }

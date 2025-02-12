@@ -9,7 +9,10 @@ use jamjam::jam::JamMessageBase;
 
 impl IcyBoardState {
     pub async fn restore_message(&mut self) -> Res<()> {
-        let message_base_file = &self.session.current_conference.areas[0].filename;
+        let Some(areas) = &self.session.current_conference.areas else {
+            return Ok(());
+        };
+        let message_base_file = &areas[0].filename;
         let msgbase_file_resolved = self.get_board().await.resolve_file(message_base_file);
 
         match JamMessageBase::open(&msgbase_file_resolved) {
@@ -34,8 +37,6 @@ impl IcyBoardState {
                     self.try_to_restore_message(&message_base, number).await?;
                 }
 
-                self.press_enter().await?;
-                self.display_current_menu = true;
                 Ok(())
             }
             Err(err) => {
@@ -52,8 +53,6 @@ impl IcyBoardState {
                 self.display_text(IceText::PathErrorInSystemConfiguration, display_flags::NEWLINE | display_flags::LFAFTER)
                     .await?;
 
-                self.press_enter().await?;
-                self.display_current_menu = true;
                 Ok(())
             }
         }

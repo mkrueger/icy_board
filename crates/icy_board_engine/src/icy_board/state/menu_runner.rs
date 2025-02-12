@@ -17,47 +17,21 @@ use crate::{
 use super::{functions::MASK_COMMAND, IcyBoardState};
 
 impl IcyBoardState {
-    pub async fn ask_run_command(&mut self) -> Res<()> {
-        self.set_activity(super::NodeStatus::Available).await;
-        if self.display_current_menu && !self.session.expert_mode {
-            self.display_current_menu().await?;
-            if self.session.request_logoff {
-                return Ok(());
-            }
-            self.display_current_menu = false;
-        }
-        let command = self
-            .input_field(
-                IceText::CommandPrompt,
-                40,
-                MASK_COMMAND,
-                "",
-                None,
-                display_flags::UPCASE | display_flags::NEWLINE,
-            )
-            .await?;
-        if command.len() > 5 {
-            self.saved_cmd = command.clone();
-        }
-        if command.is_empty() {
-            return Ok(());
-        }
-        self.run_single_command(true, command).await
-    }
-
     #[async_recursion(?Send)]
-    pub async fn run_single_command(&mut self, _via_cmd_list: bool, command: String) -> Res<()> {
-        self.session.push_tokens(&command);
+    pub async fn run_single_command(&mut self, _via_cmd_list: bool) -> Res<bool> {
         if let Some(command) = self.session.tokens.pop_front() {
             if let Some(action) = self.try_find_command(&command).await {
                 return self.dispatch_command(&command, &action).await;
             }
             log::warn!("Command not found: '{}'", command);
-            self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFAFTER | display_flags::LFBEFORE)
-                .await?;
+            self.display_text(
+                IceText::InvalidEntry,
+                display_flags::NEWLINE | display_flags::LFAFTER | display_flags::LFBEFORE | display_flags::BELL,
+            )
+            .await?;
         }
         self.session.tokens.clear();
-        Ok(())
+        Ok(false)
     }
 
     async fn autorun_commands(&mut self, mnu: &Menu, auto_run: AutoRun, cur_sec: u64) -> Res<()> {
@@ -177,16 +151,16 @@ impl IcyBoardState {
         Ok(())
     }
 
-    async fn dispatch_command(&mut self, command_str: &str, command: &Command) -> Res<()> {
+    async fn dispatch_command(&mut self, command_str: &str, command: &Command) -> Res<bool> {
         if !self.check_sec(command_str, &command.security).await? {
-            return Ok(());
+            return Ok(true);
         }
         for cmd_action in &command.actions {
             self.run_action(command, cmd_action).await?;
         }
         self.session.tokens.clear();
 
-        Ok(())
+        Ok(true)
     }
 
     async fn run_action(&mut self, command: &Command, cmd_action: &CommandAction) -> Res<()> {
@@ -202,37 +176,61 @@ impl IcyBoardState {
             CommandType::RefreshDisplayString => {
                 self.display_cmd_str(command, false).await?;
             }
-            CommandType::RedisplayCommand => {
-                // !
-                self.redisplay_cmd()?;
-            }
             CommandType::AbandonConference => {
+                let sec = self.session.user_command_level.cmd_a.clone();
+                if !self.check_sec("A", &sec).await? {
+                    return Ok(());
+                }
                 // A
                 self.abandon_conference().await?;
             }
             CommandType::BulletinList => {
+                let sec = self.session.user_command_level.cmd_b.clone();
+                if !self.check_sec("B", &sec).await? {
+                    return Ok(());
+                }
                 // B
                 self.show_bulletins().await?;
             }
             CommandType::CommentToSysop => {
+                let sec = self.session.user_command_level.cmd_c.clone();
+                if !self.check_sec("C", &sec).await? {
+                    return Ok(());
+                }
                 // C
                 self.comment_to_sysop().await?;
             }
 
             CommandType::Download => {
+                let sec = self.session.user_command_level.cmd_d.clone();
+                if !self.check_sec("D", &sec).await? {
+                    return Ok(());
+                }
                 // D
                 self.download().await?;
             }
             CommandType::FlagFiles => {
+                let sec = self.session.user_command_level.cmd_d.clone();
+                if !self.check_sec("FLAG", &sec).await? {
+                    return Ok(());
+                }
                 // FLAG
                 self.flag_files_cmd(false).await?;
             }
             CommandType::EnterMessage => {
+                let sec = self.session.user_command_level.cmd_e.clone();
+                if !self.check_sec("E", &sec).await? {
+                    return Ok(());
+                }
                 // E
                 self.enter_message().await?;
             }
 
             CommandType::FileDirectory => {
+                let sec = self.session.user_command_level.cmd_f.clone();
+                if !self.check_sec("F", &sec).await? {
+                    return Ok(());
+                }
                 // F
                 self.show_file_directories().await?;
             }
@@ -243,84 +241,160 @@ impl IcyBoardState {
             }
             CommandType::Bye => {
                 // BYE
-                self.bye_cmd().await?;
+                self.bye_cmd(false).await?;
             }
             CommandType::Help => {
+                let sec = self.session.user_command_level.cmd_h.clone();
+                if !self.check_sec("H", &sec).await? {
+                    return Ok(());
+                }
                 // H
                 self.show_help_cmd().await?;
             }
             CommandType::InitialWelcome => {
+                let sec = self.session.user_command_level.cmd_i.clone();
+                if !self.check_sec("I", &sec).await? {
+                    return Ok(());
+                }
                 // I
                 self.initial_welcome().await?;
             }
             CommandType::JoinConference => {
+                let sec = self.session.user_command_level.cmd_j.clone();
+                if !self.check_sec("J", &sec).await? {
+                    return Ok(());
+                }
                 // J
                 self.join_conference_cmd().await?;
             }
             CommandType::DeleteMessage => {
+                let sec = self.session.user_command_level.cmd_k.clone();
+                if !self.check_sec("K", &sec).await? {
+                    return Ok(());
+                }
                 // K
                 self.delete_message().await?;
             }
             CommandType::LocateFile => {
+                let sec = self.session.user_command_level.cmd_l.clone();
+                if !self.check_sec("L", &sec).await? {
+                    return Ok(());
+                }
                 // L
                 self.find_files_cmd().await?;
             }
             CommandType::ToggleGraphics => {
+                let sec = self.session.user_command_level.cmd_m.clone();
+                if !self.check_sec("M", &sec).await? {
+                    return Ok(());
+                }
                 // M
                 self.toggle_graphics().await?;
             }
             CommandType::NewFileScan => {
+                let sec = self.session.user_command_level.cmd_n.clone();
+                if !self.check_sec("N", &sec).await? {
+                    return Ok(());
+                }
                 // N
                 if let Some(user) = &self.session.current_user {
                     self.find_new_files(user.stats.last_on.into()).await?;
                 }
             }
             CommandType::PageSysop => {
+                let sec = self.session.user_command_level.cmd_o.clone();
+                if !self.check_sec("O", &sec).await? {
+                    return Ok(());
+                }
                 // O
                 self.page_sysop_command().await?;
             }
             CommandType::SetPageLength => {
+                let sec = self.session.user_command_level.cmd_p.clone();
+                if !self.check_sec("P", &sec).await? {
+                    return Ok(());
+                }
                 // P
                 self.set_page_len_command().await?;
             }
             CommandType::QuickMessageScan => {
+                let sec = self.session.user_command_level.cmd_q.clone();
+                if !self.check_sec("Q", &sec).await? {
+                    return Ok(());
+                }
                 // Q
                 self.quick_message_scan().await?;
             }
             CommandType::ReadMessages => {
+                let sec = self.session.user_command_level.cmd_r.clone();
+                if !self.check_sec("R", &sec).await? {
+                    return Ok(());
+                }
                 // R
                 self.read_messages().await?;
             }
             CommandType::Survey => {
+                let sec = self.session.user_command_level.cmd_s.clone();
+                if !self.check_sec("S", &sec).await? {
+                    return Ok(());
+                }
                 // S
                 self.take_survey().await?;
             }
             CommandType::SetTransferProtocol => {
+                let sec = self.session.user_command_level.cmd_t.clone();
+                if !self.check_sec("T", &sec).await? {
+                    return Ok(());
+                }
                 // T
                 self.set_transfer_protocol().await?;
             }
             CommandType::UploadFile => {
+                let sec = self.session.user_command_level.cmd_u.clone();
+                if !self.check_sec("R", &sec).await? {
+                    return Ok(());
+                }
                 // U
                 self.upload_file().await?;
             }
             CommandType::ViewSettings => {
+                let sec = self.session.user_command_level.cmd_v.clone();
+                if !self.check_sec("V", &sec).await? {
+                    return Ok(());
+                }
                 // V
                 self.view_settings().await?;
             }
 
             CommandType::WriteSettings => {
+                let sec = self.session.user_command_level.cmd_w.clone();
+                if !self.check_sec("W", &sec).await? {
+                    return Ok(());
+                }
                 // W
                 self.write_settings().await?;
             }
             CommandType::ExpertMode => {
+                let sec = self.session.user_command_level.cmd_x.clone();
+                if !self.check_sec("X", &sec).await? {
+                    return Ok(());
+                }
                 // X
                 self.set_expert_mode().await?;
             }
             CommandType::YourMailScan => {
+                let sec = self.session.user_command_level.cmd_y.clone();
+                if !self.check_sec("Y", &sec).await? {
+                    return Ok(());
+                }
                 // Y
                 self.your_mail_scan().await?;
             }
             CommandType::ZippyDirectoryScan => {
+                let sec = self.session.user_command_level.cmd_z.clone();
+                if !self.check_sec("Z", &sec).await? {
+                    return Ok(());
+                }
                 // Z
                 self.zippy_directory_scan().await?;
             }
@@ -336,6 +410,10 @@ impl IcyBoardState {
                 self.display_news().await?;
             }
             CommandType::UserList => {
+                let sec = self.session.user_command_level.cmd_show_user_list.clone();
+                if !self.check_sec("USER", &sec).await? {
+                    return Ok(());
+                }
                 // USER
                 self.show_user_list_cmd().await?;
             }
@@ -348,31 +426,75 @@ impl IcyBoardState {
                 self.toggle_alias().await?;
             }
             CommandType::WhoIsOnline => {
+                let sec = self.session.user_command_level.cmd_who.clone();
+                if !self.check_sec("WHO", &sec).await? {
+                    return Ok(());
+                }
                 // WHO
                 self.who_display_nodes().await?;
             }
 
             CommandType::OpenDoor => {
+                let sec = self.session.user_command_level.cmd_open_door.clone();
+                if !self.check_sec("DOOR", &sec).await? {
+                    return Ok(());
+                }
                 // DOOR/OPEN
                 self.open_door().await?;
             }
 
+            CommandType::TestFile => {
+                let sec = self.session.user_command_level.cmd_test_file.clone();
+                if !self.check_sec("TEST", &sec).await? {
+                    return Ok(());
+                }
+                self.println(TerminalTarget::Both, "TODO TEST_FILE").await?;
+                // TODO
+                // self.test_file().await?;
+            }
+
+            CommandType::GroupChat => {
+                let sec = self.session.user_command_level.cmd_chat.clone();
+                if !self.check_sec("CHAT", &sec).await? {
+                    return Ok(());
+                }
+                self.println(TerminalTarget::Both, "TODO CHAIT").await?;
+                // TODO
+                // self.group_chat().await?;
+            }
+
             CommandType::RestoreMessage => {
+                let sec = self.session.sysop_command_level.sec_4_recover_deleted_msg.clone();
+                if !self.check_sec("CHAT", &sec).await? {
+                    return Ok(());
+                }
                 // 4
                 self.restore_message().await?;
             }
 
             CommandType::ReadEmail => {
+                let sec = self.session.user_command_level.cmd_r.clone();
+                if !self.check_sec("@", &sec).await? {
+                    return Ok(());
+                }
                 // @
                 self.read_email().await?;
             }
 
             CommandType::WriteEmail => {
+                let sec = self.session.user_command_level.cmd_e.clone();
+                if !self.check_sec("@W", &sec).await? {
+                    return Ok(());
+                }
                 // @W
                 self.write_email().await?;
             }
 
             CommandType::RunPPE => {
+                let sec = self.session.sysop_command_level.sec_10_shelled_dos_func.clone();
+                if !self.check_sec("PPE", &sec).await? {
+                    return Ok(());
+                }
                 // PPE
                 if !cmd_action.parameter.is_empty() {
                     self.session.push_tokens(&cmd_action.parameter);
@@ -381,11 +503,19 @@ impl IcyBoardState {
             }
 
             CommandType::TextSearch => {
+                let sec = self.session.user_command_level.cmd_r.clone();
+                if !self.check_sec("TS", &sec).await? {
+                    return Ok(());
+                }
                 // TS
                 self.text_search().await?;
             }
 
             CommandType::Broadcast => {
+                let sec = self.session.sysop_command_level.use_broadcast_command.clone();
+                if !self.check_sec("PPE", &sec).await? {
+                    return Ok(());
+                }
                 // BR
                 self.broadcast_command().await?;
             }

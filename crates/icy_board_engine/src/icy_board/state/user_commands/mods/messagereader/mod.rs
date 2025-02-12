@@ -173,11 +173,13 @@ impl MessageViewer {
         let txt = self.format_hdr_text(
             &self.confarea.text,
             &state.session.current_conference.name,
-            &state.session.current_conference.areas[area].name,
+            &state.session.current_conference.areas.as_ref().unwrap()[area].name,
         );
         state.print(TerminalTarget::Both, &txt).await?;
         state.reset_color(TerminalTarget::Both).await?;
-        state.session.num_lines_printed += 5;
+        if state.session.disp_options.count_lines {
+            state.session.num_lines_printed += 5;
+        }
         Ok(())
     }
 
@@ -239,8 +241,6 @@ impl IcyBoardState {
                 self.read_message_number(&mut message_base, &viewer, number, None).await?;
             }
         }
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 

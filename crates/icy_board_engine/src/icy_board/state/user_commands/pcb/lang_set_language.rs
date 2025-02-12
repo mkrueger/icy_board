@@ -24,8 +24,6 @@ impl IcyBoardState {
             }
             self.save_current_user().await?;
         }
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 

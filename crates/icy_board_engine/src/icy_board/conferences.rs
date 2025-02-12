@@ -15,6 +15,7 @@ use crate::{
 };
 
 use super::{
+    bulletins::BullettinList,
     commands::Command,
     doors::DoorList,
     file_directory::DirectoryList,
@@ -22,6 +23,7 @@ use super::{
     message_area::{AreaList, MessageArea},
     pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader},
     security_expr::SecurityExpression,
+    surveys::SurveyList,
     user_base::Password,
     IcyBoardSerializer,
 };
@@ -208,13 +210,19 @@ pub struct Conference {
     pub commands: Vec<Command>,
 
     #[serde(skip)]
-    pub areas: AreaList,
+    pub areas: Option<AreaList>,
 
     #[serde(skip)]
-    pub directories: DirectoryList,
+    pub directories: Option<DirectoryList>,
 
     #[serde(skip)]
-    pub doors: DoorList,
+    pub doors: Option<DoorList>,
+
+    #[serde(skip)]
+    pub bulletins: Option<BullettinList>,
+
+    #[serde(skip)]
+    pub surveys: Option<SurveyList>,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_f64")]
@@ -307,9 +315,11 @@ impl ConferenceBase {
                 dir_file: PathBuf::from(&c.dir_file),
                 area_menu: PathBuf::from("area"),
                 area_file: PathBuf::from("area.toml"),
-                areas: AreaList::default(),
-                directories: DirectoryList::default(),
-                doors: DoorList::default(),
+                areas: None,
+                directories: None,
+                doors: None,
+                bulletins: None,
+                surveys: None,
                 show_intro_in_scan: d.show_intro_on_ra,
                 sec_request_rr: SecurityExpression::from_req_security(d.ret_receipt_level),
                 sec_carbon_copy: SecurityExpression::from_req_security(d.carbon_level),
@@ -400,13 +410,22 @@ impl UserDataValue for Conference {
             return Ok(VariableValue::new_bool(self.required_security.user_can_access(&vm.icy_board_state.session)));
         }
         if *name == *FILE_AREAS {
-            return Ok(VariableValue::new_int(self.directories.len() as i32));
+            if let Some(res) = &self.directories {
+                return Ok(VariableValue::new_bool(!res.is_empty()));
+            }
+            return Ok(VariableValue::new_int(0));
         }
         if *name == *MESSAGE_AREAS {
-            return Ok(VariableValue::new_int(self.areas.len() as i32));
+            if let Some(res) = &self.areas {
+                return Ok(VariableValue::new_bool(!res.is_empty()));
+            }
+            return Ok(VariableValue::new_int(0));
         }
         if *name == *DOORS {
-            return Ok(VariableValue::new_int(self.doors.len() as i32));
+            if let Some(res) = &self.doors {
+                return Ok(VariableValue::new_bool(!res.is_empty()));
+            }
+            return Ok(VariableValue::new_int(0));
         }
 
         log::error!("Invalid user data call on Conference ({})", name);
@@ -429,16 +448,18 @@ impl UserDataValue for Conference {
             return Ok(VariableValue::new_bool(res));
         }
         if *name == *GET_FILE_AREA {
-            let area = arguments[0].as_int();
-            if let Some(res) = self.directories.get(area as usize) {
-                vm.user_data.push(Box::new((*res).clone()));
-                return Ok(VariableValue {
-                    data: VariableData::from_int(0),
-                    generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
-                    vtype: VariableType::UserData(FILE_DIRECTORY_ID as u8),
-                });
+            if let Some(dir) = &self.directories {
+                let area = arguments[0].as_int();
+                if let Some(res) = dir.get(area as usize) {
+                    vm.user_data.push(Box::new((*res).clone()));
+                    return Ok(VariableValue {
+                        data: VariableData::from_int(0),
+                        generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
+                        vtype: VariableType::UserData(FILE_DIRECTORY_ID as u8),
+                    });
+                }
+                log::error!("PPL: File area not found ({})", area);
             }
-            log::error!("PPL: File area not found ({})", area);
 
             vm.user_data.push(Box::new(FileDirectory::default()));
             return Ok(VariableValue {
@@ -449,15 +470,17 @@ impl UserDataValue for Conference {
         }
         if *name == *GET_MSG_AREA {
             let area = arguments[0].as_int();
-            if let Some(res) = self.areas.get(area as usize) {
-                vm.user_data.push(Box::new((*res).clone()));
-                return Ok(VariableValue {
-                    data: VariableData::from_int(0),
-                    generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
-                    vtype: VariableType::UserData(MESSAGE_AREA_ID as u8),
-                });
+            if let Some(areas) = &self.areas {
+                if let Some(res) = areas.get(area as usize) {
+                    vm.user_data.push(Box::new((*res).clone()));
+                    return Ok(VariableValue {
+                        data: VariableData::from_int(0),
+                        generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
+                        vtype: VariableType::UserData(MESSAGE_AREA_ID as u8),
+                    });
+                }
+                log::error!("PPL: Message area not found ({})", area);
             }
-            log::error!("PPL: Message area not found ({})", area);
 
             vm.user_data.push(Box::new(MessageArea::default()));
             return Ok(VariableValue {
@@ -469,15 +492,17 @@ impl UserDataValue for Conference {
 
         if *name == *GET_DOOR {
             let door = arguments[0].as_int();
-            if let Some(res) = self.doors.get(door as usize) {
-                vm.user_data.push(Box::new((*res).clone()));
-                return Ok(VariableValue {
-                    data: VariableData::from_int(0),
-                    generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
-                    vtype: VariableType::UserData(DOOR_ID as u8),
-                });
+            if let Some(doors) = &self.doors {
+                if let Some(res) = doors.get(door as usize) {
+                    vm.user_data.push(Box::new((*res).clone()));
+                    return Ok(VariableValue {
+                        data: VariableData::from_int(0),
+                        generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
+                        vtype: VariableType::UserData(DOOR_ID as u8),
+                    });
+                }
+                log::error!("PPL: Door not found ({})", door);
             }
-            log::error!("PPL: Door not found ({})", door);
 
             vm.user_data.push(Box::new(Door::default()));
             return Ok(VariableValue {

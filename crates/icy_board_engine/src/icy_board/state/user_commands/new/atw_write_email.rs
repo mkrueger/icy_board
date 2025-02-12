@@ -34,8 +34,6 @@ impl IcyBoardState {
             self.session.op_text = to;
             self.display_text(IceText::NotInUsersFile, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL)
                 .await?;
-            self.press_enter().await?;
-            self.display_current_menu = true;
             return Ok(());
         }
 
@@ -52,15 +50,11 @@ impl IcyBoardState {
 
         if subject.is_empty() {
             self.new_line().await?;
-            self.press_enter().await?;
-            self.display_current_menu = true;
             return Ok(());
         };
 
         self.write_message(-1, -1, &to, &subject, false, IceText::SavingMessage).await?;
 
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 }

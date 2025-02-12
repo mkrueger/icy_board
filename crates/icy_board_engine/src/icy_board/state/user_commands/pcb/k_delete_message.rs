@@ -10,7 +10,7 @@ use jamjam::jam::JamMessageBase;
 
 impl IcyBoardState {
     pub async fn delete_message(&mut self) -> Res<()> {
-        let message_base_file = &self.session.current_conference.areas[0].filename;
+        let message_base_file = &self.session.current_conference.areas.as_ref().unwrap()[0].filename;
         let msgbase_file_resolved = self.get_board().await.resolve_file(message_base_file);
 
         match JamMessageBase::open(&msgbase_file_resolved) {
@@ -34,9 +34,6 @@ impl IcyBoardState {
                 if let Ok(number) = msg.parse::<u32>() {
                     self.try_to_kill_message(&message_base, number).await?;
                 }
-
-                self.press_enter().await?;
-                self.display_current_menu = true;
                 Ok(())
             }
             Err(err) => {
@@ -52,9 +49,6 @@ impl IcyBoardState {
 
                 self.display_text(IceText::PathErrorInSystemConfiguration, display_flags::NEWLINE | display_flags::LFAFTER)
                     .await?;
-
-                self.press_enter().await?;
-                self.display_current_menu = true;
                 Ok(())
             }
         }

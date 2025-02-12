@@ -79,11 +79,6 @@ impl IcyBoardState {
 
         self.display_text(IceText::ViewSettingsGraphicsMode, display_flags::NEWLINE).await?;
         self.reset_color(TerminalTarget::Both).await?;
-
-        self.new_line().await?;
-        self.press_enter().await?;
-        self.display_current_menu = true;
-
         Ok(())
     }
 }

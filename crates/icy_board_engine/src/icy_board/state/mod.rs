@@ -30,14 +30,12 @@ use self::functions::display_flags;
 
 use super::{
     bbs::{BBSMessage, BBS},
-    bulletins::BullettinList,
     conferences::Conference,
-    icb_config::{IcbColor, DEFAULT_PCBOARD_DATE_FORMAT},
+    icb_config::{IcbColor, SysopCommandLevels, UserCommandLevels, DEFAULT_PCBOARD_DATE_FORMAT},
     icb_text::{IcbTextFile, IcbTextStyle, IceText},
     macro_parser::{Macro, MacroCommand},
-    surveys::SurveyList,
     user_base::{FSEMode, Password, User},
-    IcyBoard, IcyBoardSerializer,
+    IcyBoard,
 };
 
 #[derive(Clone, Copy, PartialEq, Default)]
@@ -66,6 +64,8 @@ pub struct DisplayOptions {
 
     ///  flag indicating whether or not the user aborted the display of data via ^K / ^X or answering no to a MORE? prompt
     pub abort_printout: bool,
+    ///  flag if last printout was aborted
+    pub was_aborted: bool,
 
     pub display_text: bool,
     pub show_on_screen: bool,
@@ -74,12 +74,32 @@ pub struct DisplayOptions {
 
     // Enable CTRL-X / CTRL-K checking for display_files
     pub allow_break: bool,
+
+    /// If current command should be in non-stop mode
+    pub non_stop_during_cmd: bool,
+
+    /// If last printout was in non-stop mode
+    pub was_non_stop: bool,
+
+    pub count_lines: bool,
 }
 
 impl DisplayOptions {
     pub fn reset_printout(&mut self) {
         self.is_non_stop = false;
         self.abort_printout = false;
+        self.auto_more = false;
+    }
+
+    pub fn check_display_status(&mut self) {
+        if self.non_stop_during_cmd {
+            self.non_stop_during_cmd = false;
+            self.was_non_stop = true;
+        }
+        if self.abort_printout {
+            self.abort_printout = false;
+            self.was_aborted = true;
+        }
         self.auto_more = false;
     }
 
@@ -99,6 +119,10 @@ impl Default for DisplayOptions {
             show_on_screen: true,
             in_file_list: None,
             allow_break: true,
+            non_stop_during_cmd: false,
+            was_non_stop: false,
+            was_aborted: false,
+            count_lines: true,
         }
     }
 }
@@ -130,6 +154,9 @@ pub struct Session {
     pub caller_number: usize,
     pub is_local: bool,
     pub paged_sysop: bool,
+
+    pub user_command_level: UserCommandLevels,
+    pub sysop_command_level: SysopCommandLevels,
 
     pub login_date: DateTime<Utc>,
 
@@ -206,6 +233,8 @@ pub struct Session {
 impl Session {
     pub fn new() -> Self {
         Self {
+            user_command_level: UserCommandLevels::default(),
+            sysop_command_level: SysopCommandLevels::default(),
             disp_options: DisplayOptions::default(),
             current_conference_number: 0,
             current_conference: Conference::default(),
@@ -279,10 +308,13 @@ impl Session {
         self.last_new_line_y = i32::MAX;
     }
 
-    pub fn push_tokens(&mut self, command: &str) {
+    pub fn push_tokens(&mut self, command: &str) -> usize {
+        let mut res = 0;
         for cmd in crate::tokens::tokenize(command) {
             self.tokens.push_back(cmd.to_string());
+            res += 1;
         }
+        res
     }
 
     pub fn get_username_or_alias(&self) -> String {
@@ -507,6 +539,8 @@ impl IcyBoardState {
             panic!("Node number {node} out of range");
         }
         let mut session = Session::new();
+        session.user_command_level = board.lock().await.config.user_command_level.clone();
+        session.sysop_command_level = board.lock().await.config.sysop_command_level.clone();
         session.caller_number = board.lock().await.statistics.cur_caller_number() as usize;
         session.date_format = board.lock().await.config.board.date_format.clone();
         let display_text: IcbTextFile = board.lock().await.default_display_text.clone();
@@ -643,8 +677,13 @@ impl IcyBoardState {
         if self.session.disp_options.non_stop() {
             return Ok(());
         }
-        self.session.num_lines_printed += 1;
+        if self.session.disp_options.count_lines {
+            self.session.num_lines_printed += 1;
+        }
         if self.session.page_len > 0 && self.session.num_lines_printed >= self.session.page_len as usize {
+            if self.session.disp_options.abort_printout {
+                return Ok(());
+            }
             if self.session.disp_options.non_stop() {
                 self.session.more_requested = true;
                 return Ok(());
@@ -707,16 +746,6 @@ impl IcyBoardState {
         }
         // self.char_buffer.push_back(KeyChar::new(KeySource::StuffedHidden, '\n'));
         Ok(())
-    }
-
-    pub async fn load_bullettins(&self) -> Res<BullettinList> {
-        let path = self.get_board().await.resolve_file(&self.session.current_conference.blt_file);
-        BullettinList::load(&path)
-    }
-
-    pub async fn load_surveys(&self) -> Res<SurveyList> {
-        let path = self.get_board().await.resolve_file(&self.session.current_conference.survey_file);
-        SurveyList::load(&path)
     }
 
     pub async fn get_pcbdat(&self) -> Res<String> {
@@ -1428,7 +1457,26 @@ impl IcyBoardState {
             }
             MacroCommand::HighMSGNum => result = self.session.high_msg_num.to_string(),
             MacroCommand::IName => {}
-            MacroCommand::InConf => result = self.session.current_conference.name.to_string(),
+            MacroCommand::InConf => {
+                if self.session.current_conference_number == 0 {
+                    if let Ok(main_board_txt) = self.display_text.get_display_text(IceText::Mainboard) {
+                        result = format!("{} ", main_board_txt.text);
+                    } else {
+                        log::error!("Mainboard text not found");
+                    }
+                } else {
+                    if let Ok(main_board_txt) = self.display_text.get_display_text(IceText::Conference) {
+                        result = format!(
+                            "{} ({}){} ",
+                            self.session.current_conference.name.to_string(),
+                            self.session.current_conference_number,
+                            main_board_txt.text
+                        );
+                    } else {
+                        log::error!("Conference text not found");
+                    }
+                }
+            }
             MacroCommand::LogDate => result = self.format_date(self.session.login_date),
             MacroCommand::LogTime => result = self.format_time(self.session.login_date),
             MacroCommand::LastDateOn => {
@@ -1474,8 +1522,10 @@ impl IcyBoardState {
             MacroCommand::NoChar => result = self.session.no_char.to_string(),
             MacroCommand::Node => result = self.node.to_string(),
             MacroCommand::NumBLT => {
-                if let Ok(bullettins) = self.load_bullettins().await {
+                if let Some(bullettins) = &self.session.current_conference.bulletins {
                     result = bullettins.len().to_string();
+                } else {
+                    result = "0".to_string();
                 }
             }
             MacroCommand::NumCalls => {
@@ -1483,21 +1533,35 @@ impl IcyBoardState {
             }
             MacroCommand::NumConf => result = self.get_board().await.conferences.len().to_string(),
             MacroCommand::NumDir => {
-                result = self.session.current_conference.directories.len().to_string();
+                if let Some(dirs) = &self.session.current_conference.directories {
+                    result = dirs.len().to_string();
+                } else {
+                    result = "0".to_string();
+                }
             }
             MacroCommand::DirName => {
-                result = self.session.current_conference.directories[self.session.current_file_directory]
-                    .name
-                    .to_string();
+                if let Some(dirs) = &self.session.current_conference.directories {
+                    result = dirs[self.session.current_file_directory].name.to_string();
+                } else {
+                    result = String::new();
+                }
             }
             MacroCommand::DirNum => {
-                result = self.session.current_conference.directories.len().to_string();
+                result = self.session.current_file_directory.to_string();
             }
             MacroCommand::Area => {
-                result = self.session.current_conference.areas[self.session.current_message_area].name.to_string();
+                if let Some(areas) = &self.session.current_conference.areas {
+                    result = areas[self.session.current_message_area].name.to_string();
+                } else {
+                    result = String::new();
+                }
             }
             MacroCommand::NumArea => {
-                result = self.session.current_conference.areas.len().to_string();
+                if let Some(areas) = &self.session.current_conference.areas {
+                    result = areas.len().to_string();
+                } else {
+                    result = "0".to_string();
+                }
             }
             MacroCommand::NumTimesOn => {
                 if let Some(user) = &self.session.current_user {
@@ -1640,7 +1704,7 @@ impl IcyBoardState {
                 }
             }
             MacroCommand::Hangup => {
-                let _ = self.bye_cmd().await;
+                let _ = self.bye_cmd(false).await;
                 return None;
             }
             MacroCommand::SwitchColor(color) => {
@@ -2038,6 +2102,13 @@ impl IcyBoardState {
 
     pub async fn new_line(&mut self) -> Res<()> {
         self.write_chars(TerminalTarget::Both, &['\r', '\n']).await
+    }
+
+    pub async fn fresh_line(&mut self) -> Res<()> {
+        if self.user_screen.caret.get_position().x > 0 {
+            self.new_line().await?;
+        }
+        Ok(())
     }
 
     pub fn format_date(&self, date_time: DateTime<Utc>) -> String {

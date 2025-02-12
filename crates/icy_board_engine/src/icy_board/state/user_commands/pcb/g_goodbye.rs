@@ -18,7 +18,7 @@ impl IcyBoardState {
         if self.board.lock().await.config.system_control.guard_logoff || is_flagged {
             if let Some(token) = self.session.tokens.pop_front() {
                 if token.eq_ignore_ascii_case(&self.session.yes_char.to_string()) {
-                    self.bye_cmd().await?;
+                    self.bye_cmd(false).await?;
                     return Ok(());
                 }
             };
@@ -42,24 +42,26 @@ impl IcyBoardState {
             }
         }
 
-        self.bye_cmd().await?;
+        self.bye_cmd(false).await?;
         Ok(())
     }
 
-    pub async fn bye_cmd(&mut self) -> Res<()> {
-        let survey = {
-            let board = self.get_board().await;
-            Survey {
-                survey_file: board.resolve_file(&board.config.paths.logoff_survey),
-                answer_file: board.resolve_file(&board.config.paths.logoff_answer),
-                required_security: SecurityExpression::default(),
-            }
-        };
+    pub async fn bye_cmd(&mut self, auto_logoff: bool) -> Res<()> {
+        if !auto_logoff {
+            let survey = {
+                let board = self.get_board().await;
+                Survey {
+                    survey_file: board.resolve_file(&board.config.paths.logoff_survey),
+                    answer_file: board.resolve_file(&board.config.paths.logoff_answer),
+                    required_security: SecurityExpression::default(),
+                }
+            };
 
-        if !self.session.is_sysop && survey.survey_file.exists() {
-            // skip the survey question.
-            self.session.tokens.push_front(self.session.yes_char.to_string());
-            self.start_survey(&survey).await?;
+            if !self.session.is_sysop && survey.survey_file.exists() {
+                // skip the survey question.
+                self.session.tokens.push_front(self.session.yes_char.to_string());
+                self.start_survey(&survey).await?;
+            }
         }
         self.display_text(IceText::ThanksForCalling, display_flags::NEWLINE | display_flags::LFBEFORE)
             .await?;

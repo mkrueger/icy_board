@@ -320,8 +320,6 @@ impl IcyBoardState {
             display_flags::NEWLINE | display_flags::LFAFTER | display_flags::LFBEFORE,
         )
         .await?;
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 

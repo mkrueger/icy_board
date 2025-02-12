@@ -23,8 +23,6 @@ impl IcyBoardState {
         self.set_activity(NodeStatus::HandlingMail).await;
 
         let Ok(Some(area)) = self.show_message_areas(self.session.current_conference_number).await else {
-            self.press_enter().await?;
-            self.display_current_menu = true;
             return Ok(());
         };
         self.quick_message_scan_in_area(area).await
@@ -32,7 +30,7 @@ impl IcyBoardState {
 
     #[async_recursion(?Send)]
     async fn quick_message_scan_in_area(&mut self, area: usize) -> Res<()> {
-        let message_base_file = &self.session.current_conference.areas[area].filename;
+        let message_base_file = &self.session.current_conference.areas.as_ref().unwrap()[area].filename;
         let msgbase_file_resolved = self.get_board().await.resolve_file(message_base_file);
         match JamMessageBase::open(&msgbase_file_resolved) {
             Ok(message_base) => {
@@ -52,9 +50,6 @@ impl IcyBoardState {
 
                 self.display_text(IceText::PathErrorInSystemConfiguration, display_flags::NEWLINE | display_flags::LFAFTER)
                     .await?;
-
-                self.press_enter().await?;
-                self.display_current_menu = true;
                 Ok(())
             }
         }
@@ -96,7 +91,8 @@ impl IcyBoardState {
         self.display_text(IceText::Scanning, display_flags::DEFAULT).await?;
         let conf = format!(
             "{}/{}",
-            self.session.current_conference.name, self.session.current_conference.areas[area as usize].name
+            self.session.current_conference.name,
+            self.session.current_conference.areas.as_ref().unwrap()[area as usize].name
         );
         self.println(TerminalTarget::Both, &conf).await?;
 

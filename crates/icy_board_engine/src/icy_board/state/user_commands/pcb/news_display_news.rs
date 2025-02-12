@@ -8,9 +8,6 @@ impl IcyBoardState {
         if !self.display_file(&news_file).await? {
             self.display_text(IceText::NoNews, display_flags::NEWLINE).await?;
         }
-        self.new_line().await?;
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 }

@@ -1,7 +1,5 @@
-use std::collections::HashMap;
-
-use crate::Res;
 use icy_board_engine::icy_board::state::IcyBoardState;
+use std::collections::HashMap;
 
 mod login;
 
@@ -20,9 +18,5 @@ impl PcbBoardCommand {
             saved_cmd: String::new(),
             autorun_times: HashMap::new(),
         }
-    }
-
-    pub async fn do_command(&mut self) -> Res<()> {
-        self.state.ask_run_command().await
     }
 }

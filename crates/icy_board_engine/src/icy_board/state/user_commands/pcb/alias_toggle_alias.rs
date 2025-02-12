@@ -25,8 +25,7 @@ impl IcyBoardState {
 
         let msg = if self.session.use_alias { IceText::AliasOn } else { IceText::AliasOff };
         self.display_text(msg, display_flags::NEWLINE | display_flags::LFAFTER).await?;
-        self.press_enter().await?;
-        self.display_current_menu = true;
+
         Ok(())
     }
 }

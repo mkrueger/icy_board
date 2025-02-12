@@ -1,29 +1,93 @@
 use std::{path::PathBuf, sync::Arc, thread};
 
 use icy_board_engine::icy_board::{
-    bbs::BBS, commands::CommandList, icb_text::DEFAULT_DISPLAY_TEXT, read_data_with_encoding_detection, user_base::User, xfer_protocols::SupportedProtocols,
+    bbs::BBS,
+    bulletins::{Bullettin, BullettinList},
+    commands::CommandList,
+    conferences::Conference,
+    read_data_with_encoding_detection,
+    user_base::User,
+    xfer_protocols::SupportedProtocols,
     IcyBoard,
 };
 use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
 
 use crate::bbs::{handle_client, LoginOptions};
 
+// !
+#[test]
+fn test_last_cmd() {
+    let output = test_output("ABCDE\n!\n".to_string(), |_| {});
+    assert_eq!(output, "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mABCDE\n\n.\u{1b}[1;31mInvalid Entry!  Please try again, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m!\n\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mABCDE");
+}
+
+#[test]
+fn test_last_cmd_empty() {
+    let output = test_output("ABCD\n!\n".to_string(), |_| {});
+    assert_eq!(output, "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mABCD\n\n.\u{1b}[1;31mInvalid Entry!  Please try again, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m!\n\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m");
+}
+
+// A
+#[test]
+fn test_abandon_empty_confs() {
+    let output = test_output("A\n".to_string(), |_| {});
+    assert_eq!(output, "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mA\n\n.\u{1b}[1;31mSorry, Sysop, no Conferences are presently available!\n\n\u{1b}[32mPress (Enter) to continue? \u{1b}[0m");
+}
+
+// B
+#[test]
+fn test_blt_empty() {
+    let output = test_output("B\n".to_string(), |_| {});
+    assert_eq!(output, "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mB\n\n.\u{1b}[1;31mSorry, Sysop, no Bulletins are presently available.\n\n\u{1b}[32mPress (Enter) to continue? \u{1b}[0m");
+}
+
+fn setup_conference(board: &mut IcyBoard) {
+    let mut bulletins = BullettinList::default();
+    bulletins.push(Bullettin {
+        file: PathBuf::from("src/tests/main/blt1"),
+        ..Default::default()
+    });
+    bulletins.push(Bullettin {
+        file: PathBuf::from("src/tests/main/blt2"),
+        ..Default::default()
+    });
+
+    board.conferences.push(Conference {
+        name: "TESTCONF".to_string(),
+        bulletins: Some(bulletins),
+        blt_menu: PathBuf::from("src/tests/main/blt_menu"),
+        ..Default::default()
+    });
+}
+
+#[test]
+fn test_blt() {
+    let output = test_output("B\n".to_string(), |board| {
+        setup_conference(board);
+    });
+    assert_eq!(output, "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mB\n1) BLT1 2) BLT2\n\u{1b}[1;33m(H)elp, (1-2), Bulletin List Command? \u{1b}[0m");
+}
+
+// X
 #[test]
 fn test_extended_mode_toggle() {
     let output = test_output("x\nx\n".to_string(), |_| {});
-    assert_eq!(output, "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Command? \u{1b}[0mX\n\n\u{1b}[1;37mExpert mode is now on, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Command? \u{1b}[0mX\n\n\u{1b}[1;37mExpert mode is now off, Sysop ...\n\n\u{1b}[32mPress (Enter) to continue? \u{1b}[0m");
+    assert_eq!(output, "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mX\n\n\u{1b}[1;37mExpert mode is now on, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mX\n\n\u{1b}[1;37mExpert mode is now off, Sysop ...\n\n\u{1b}[32mPress (Enter) to continue? \u{1b}[0m");
 }
 
 #[test]
 fn test_extended_mode_on() {
     let output = test_output("x on\n".to_string(), |_| {});
-    assert_eq!(output, "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Command? \u{1b}[0mX ON\n\n\u{1b}[1;37mExpert mode is now on, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Command? \u{1b}[0m");
+    assert_eq!(output, "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mX ON\n\n\u{1b}[1;37mExpert mode is now on, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m");
 }
 
 #[test]
 fn test_extended_mode_invalid() {
     let output = test_output("x invalid\n".to_string(), |_| {});
-    assert_eq!(output, "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Command? \u{1b}[0mX ON\n\n\u{1b}[1;37mExpert mode is now on, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Command? \u{1b}[0m");
+    assert_eq!(
+        output,
+        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mX INVALID\n\n\u{1b}[1;32mPress (Enter) to continue? \u{1b}[0m"
+    );
 }
 
 #[test]
@@ -31,16 +95,16 @@ fn test_extended_mode_off() {
     let output = test_output("X OFF\n".to_string(), |_| {});
     assert_eq!(
         output,
-        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Command? \u{1b}[0mX INVALID\n\n\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Command? \u{1b}[0m"
+        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mX OFF\n\n\u{1b}[1;37mExpert mode is now off, Sysop ...\n\n\u{1b}[32mPress (Enter) to continue? \u{1b}[0m"
     );
 }
 
 #[test]
-fn test_cmd_file() {
+fn test_extended_mode_cmd_file() {
     let output = test_output("x on\n".to_string(), |board| {
         board.config.paths.command_display_path = PathBuf::from("src/tests/cmd_files".to_string());
     });
-    assert_eq!(output, "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Command? \u{1b}[0mX ON\nXCMDFILE\n\u{1b}[1;37mExpert mode is now on, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Command? \u{1b}[0m");
+    assert_eq!(output, "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mX ON\nXCMDFILE\n\u{1b}[1;37mExpert mode is now on, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m");
 }
 
 fn test_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
@@ -51,7 +115,7 @@ fn test_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
 
         icy_board.commands = CommandList::generate_pcboard_defaults();
         icy_board.protocols = SupportedProtocols::generate_pcboard_defaults();
-        icy_board.default_display_text = DEFAULT_DISPLAY_TEXT.clone();
+        icy_board.default_display_text = icy_board_engine::icy_board::icb_text::DEFAULT_DISPLAY_TEXT.clone();
         icy_board.users.new_user(User {
             name: "SYSOP".to_string(),
             security_level: 255,

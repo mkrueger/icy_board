@@ -24,7 +24,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 impl IcyBoardState {
     pub async fn open_door(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::RunningDoor).await;
-        let doors = self.session.current_conference.doors.clone();
+        let doors = self.session.current_conference.doors.as_ref().unwrap().clone();
         if doors.is_empty() {
             self.display_text(
                 IceText::NoDOORSAvailable,
@@ -58,9 +58,6 @@ impl IcyBoardState {
         };
 
         if text.is_empty() {
-            self.new_line().await?;
-            self.press_enter().await?;
-            self.display_current_menu = true;
             return Ok(());
         }
 
@@ -84,9 +81,6 @@ impl IcyBoardState {
 
         self.display_text(IceText::InvalidDOOR, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER)
             .await?;
-
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 
@@ -261,7 +255,6 @@ impl IcyBoardState {
                     display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
                 )
                 .await?;
-                self.press_enter().await?;
             }
             Err(e) => {
                 log::error!("Error opening door : {}", e);

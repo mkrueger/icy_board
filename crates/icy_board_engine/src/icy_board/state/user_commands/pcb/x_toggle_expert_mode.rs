@@ -13,7 +13,6 @@ impl IcyBoardState {
             } else if token == "OFF" {
                 expert_mode = false;
             } else {
-                self.new_line().await?;
                 return Ok(());
             }
         }
@@ -22,17 +21,12 @@ impl IcyBoardState {
             user.flags.expert_mode = expert_mode;
         }
         if expert_mode {
-            self.display_text(IceText::ExpertmodeOn, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER)
+            self.display_text(IceText::ExpertmodeOn, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
         } else {
-            self.display_text(
-                IceText::ExpertmodeOff,
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
-            )
-            .await?;
-            self.press_enter().await?;
+            self.display_text(IceText::ExpertmodeOff, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
         }
-        self.display_current_menu = true;
         Ok(())
     }
 }

@@ -26,12 +26,11 @@ use chrono::Local;
 impl IcyBoardState {
     pub async fn take_survey(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::TakeSurvey).await;
-
-        let surveys = self.load_surveys().await?;
+        let surveys = self.session.current_conference.surveys.clone().unwrap_or_default();
         if surveys.is_empty() {
             self.display_text(
                 IceText::NoSurveysAvailable,
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER | display_flags::BELL,
+                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL,
             )
             .await?;
             return Ok(());
@@ -63,8 +62,6 @@ impl IcyBoardState {
                 if number > 0 {
                     if let Some(survey) = surveys.get(number - 1) {
                         self.start_survey(&survey).await?;
-                        self.press_enter().await?;
-                        self.display_current_menu = true;
                         break;
                     } else {
                         self.display_text(

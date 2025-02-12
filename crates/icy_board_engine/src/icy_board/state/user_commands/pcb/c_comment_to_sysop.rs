@@ -28,10 +28,6 @@ impl IcyBoardState {
             .await?;
 
         if leave_comment.is_empty() || leave_comment.chars().next().unwrap() == self.session.no_char {
-            self.new_line().await?;
-            self.press_enter().await?;
-            self.display_current_menu = true;
-
             return Ok(());
         };
 
@@ -64,8 +60,6 @@ impl IcyBoardState {
         )
         .await?;
 
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 

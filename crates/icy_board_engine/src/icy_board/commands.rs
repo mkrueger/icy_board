@@ -96,9 +96,6 @@ pub enum CommandType {
     RefreshDisplayString,
 
     // user commands
-    /// ! command
-    RedisplayCommand,
-
     /// A command
     AbandonConference,
 
@@ -258,7 +255,6 @@ impl Display for CommandType {
             CommandType::StuffTextSilent => write!(f, "StuffTextSilent"),
             CommandType::StuffFile => write!(f, "StuffFile"),
             CommandType::StuffFileSilent => write!(f, "StuffFileSilent"),
-            CommandType::RedisplayCommand => write!(f, "(!)\tRedisplayCommand"),
             CommandType::AbandonConference => write!(f, "(A)\tAbandonConference"),
             CommandType::BulletinList => write!(f, "(B)\tBulletinList"),
             CommandType::CommentToSysop => write!(f, "(C)\tCommentToSysop"),
@@ -333,7 +329,6 @@ impl FromStr for CommandType {
             "StuffTextSilent" => Ok(CommandType::StuffTextSilent),
             "StuffFile" => Ok(CommandType::StuffFile),
             "StuffFileSilent" => Ok(CommandType::StuffFileSilent),
-            "RedisplayCommand" => Ok(CommandType::RedisplayCommand),
             "AbandonConference" => Ok(CommandType::AbandonConference),
             "BulletinList" => Ok(CommandType::BulletinList),
             "CommentToSysop" => Ok(CommandType::CommentToSysop),
@@ -406,7 +401,6 @@ impl CommandType {
             CommandType::StuffTextSilent,
             CommandType::StuffFile,
             CommandType::StuffFileSilent,
-            CommandType::RedisplayCommand,
             CommandType::AbandonConference,
             CommandType::BulletinList,
             CommandType::CommentToSysop,
@@ -462,7 +456,6 @@ impl CommandType {
 
     pub fn get_help(self) -> &'static str {
         match self {
-            CommandType::RedisplayCommand => "hlp!",
             CommandType::AbandonConference => "hlpa",
             CommandType::BulletinList => "hlpb",
             CommandType::CommentToSysop => "hlpc",
@@ -695,7 +688,6 @@ fn convert_cmd(name: &str, cmd_type: CommandType, security: i32) -> Command {
 impl CommandList {
     pub fn generate_pcboard_defaults() -> Self {
         let commands = vec![
-            convert_cmd("!", CommandType::RedisplayCommand, 0),
             convert_cmd("A", CommandType::AbandonConference, 0),
             convert_cmd("B", CommandType::BulletinList, 0),
             convert_cmd("C", CommandType::CommentToSysop, 0),

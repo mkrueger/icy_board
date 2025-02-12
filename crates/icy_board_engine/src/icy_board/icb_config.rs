@@ -8,7 +8,7 @@ use super::{
     is_false, is_null_16, is_null_32, is_null_8, login_server::LoginServer, security_expr::SecurityExpression, user_base::Password, IcyBoardSerializer,
 };
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct SysopCommandLevels {
     /// Sysop Security Level
     pub sysop: u8,
@@ -46,7 +46,7 @@ pub struct SysopCommandLevels {
     pub sec_14_drop_alt_node_to_dos: SecurityExpression,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct UserCommandLevels {
     pub cmd_a: SecurityExpression,
     pub cmd_b: SecurityExpression,

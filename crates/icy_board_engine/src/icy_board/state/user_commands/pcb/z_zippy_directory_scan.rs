@@ -13,10 +13,9 @@ use crate::{
 
 impl IcyBoardState {
     pub async fn zippy_directory_scan(&mut self) -> Res<()> {
-        if self.session.current_conference.directories.is_empty() {
+        if self.session.current_conference.directories.as_ref().unwrap().is_empty() {
             self.display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
-            self.press_enter().await?;
             return Ok(());
         }
         let search_pattern = if let Some(token) = self.session.tokens.pop_front() {
@@ -33,8 +32,6 @@ impl IcyBoardState {
             .await?
         };
         if search_pattern.is_empty() {
-            self.press_enter().await?;
-            self.display_current_menu = true;
             return Ok(());
         }
 
@@ -56,16 +53,17 @@ impl IcyBoardState {
             .await?
         };
         if search_area.is_empty() {
-            self.press_enter().await?;
-            self.display_current_menu = true;
             return Ok(());
         }
 
         let mut joined = false;
         if search_area == "A" {
             self.session.cancel_batch = false;
-            for area in 0..self.session.current_conference.directories.len() {
-                if self.session.current_conference.directories[area].list_security.user_can_access(&self.session) {
+            for area in 0..self.session.current_conference.directories.as_ref().unwrap().len() {
+                if self.session.current_conference.directories.as_ref().unwrap()[area]
+                    .list_security
+                    .user_can_access(&self.session)
+                {
                     self.pattern_search_file_area(area, search_pattern.clone()).await?;
                 }
                 if self.session.cancel_batch {
@@ -74,8 +72,8 @@ impl IcyBoardState {
             }
             joined = true;
         } else if let Ok(number) = search_area.parse::<i32>() {
-            if 1 <= number && (number as usize) <= self.session.current_conference.directories.len() {
-                let area = &self.session.current_conference.directories[number as usize - 1];
+            if 1 <= number && (number as usize) <= self.session.current_conference.directories.as_ref().unwrap().len() {
+                let area = &self.session.current_conference.directories.as_ref().unwrap()[number as usize - 1];
 
                 if area.list_security.user_can_access(&self.session) {
                     self.pattern_search_file_area(number as usize - 1, search_pattern).await?;
@@ -90,21 +88,20 @@ impl IcyBoardState {
             self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::NOTBLANK)
                 .await?;
         }
-
-        self.new_line().await?;
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 
     async fn pattern_search_file_area(&mut self, area: usize, search_pattern: String) -> Res<()> {
-        let file_base_path = self.resolve_path(&self.session.current_conference.directories[area].path);
+        let file_base_path = self.resolve_path(&self.session.current_conference.directories.as_ref().unwrap()[area].path);
 
         self.display_text(IceText::ScanningDirectory, display_flags::DEFAULT).await?;
         self.print(TerminalTarget::Both, &format!(" {} ", area + 1)).await?;
         self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
-        self.print(TerminalTarget::Both, &format!("({})", self.session.current_conference.directories[area].name))
-            .await?;
+        self.print(
+            TerminalTarget::Both,
+            &format!("({})", self.session.current_conference.directories.as_ref().unwrap()[area].name),
+        )
+        .await?;
         self.new_line().await?;
 
         let files = {

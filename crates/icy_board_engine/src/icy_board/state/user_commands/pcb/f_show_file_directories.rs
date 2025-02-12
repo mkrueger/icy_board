@@ -20,10 +20,7 @@ impl IcyBoardState {
         self.session.non_stop_off();
         self.session.more_requested = false;
 
-        if self.session.current_conference.directories.is_empty() {
-            self.display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
-                .await?;
-            self.press_enter().await?;
+        if self.session.current_conference.directories.is_none() || self.session.current_conference.directories.as_ref().unwrap().is_empty() {
             return Ok(());
         }
         let mut redisplay_menu = true;
@@ -63,8 +60,8 @@ impl IcyBoardState {
             }
             let mut joined = false;
             if let Ok(number) = directory_number.parse::<i32>() {
-                if 1 <= number && (number as usize) <= self.session.current_conference.directories.len() {
-                    let area = &self.session.current_conference.directories[number as usize - 1];
+                if 1 <= number && (number as usize) <= self.session.current_conference.directories.as_ref().unwrap().len() {
+                    let area = &self.session.current_conference.directories.as_ref().unwrap()[number as usize - 1];
                     if area.list_security.user_can_access(&self.session) {
                         self.display_file_area(&area.path.to_path_buf()).await?;
                         self.new_line().await?;
@@ -121,9 +118,6 @@ impl IcyBoardState {
                 }
             }
         }
-        self.new_line().await?;
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 

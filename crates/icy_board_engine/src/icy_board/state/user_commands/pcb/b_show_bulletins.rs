@@ -9,12 +9,11 @@ use crate::{icy_board::state::IcyBoardState, Res};
 impl IcyBoardState {
     pub async fn show_bulletins(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::ReadBulletins).await;
-
-        let bulletins = self.load_bullettins().await?;
+        let bulletins = self.session.current_conference.bulletins.clone().unwrap_or_default();
         if bulletins.is_empty() {
             self.display_text(
                 IceText::NoBulletinsAvailable,
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER | display_flags::BELL,
+                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL,
             )
             .await?;
             return Ok(());
@@ -71,9 +70,6 @@ impl IcyBoardState {
                 }
             }
         }
-
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 }

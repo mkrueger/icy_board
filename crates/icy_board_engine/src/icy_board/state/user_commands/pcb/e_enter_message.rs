@@ -21,8 +21,6 @@ impl IcyBoardState {
         self.set_activity(NodeStatus::EnterMessage).await;
         let conf = self.session.current_conference_number;
         let Ok(Some(area)) = self.show_message_areas(conf).await else {
-            self.press_enter().await?;
-            self.display_current_menu = true;
             return Ok(());
         };
 
@@ -53,9 +51,6 @@ impl IcyBoardState {
             .await?;
 
         if subject.is_empty() {
-            self.new_line().await?;
-            self.press_enter().await?;
-            self.display_current_menu = true;
             return Ok(());
         };
 
@@ -68,9 +63,6 @@ impl IcyBoardState {
             IceText::SavingMessage,
         )
         .await?;
-
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 }

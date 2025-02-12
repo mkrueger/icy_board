@@ -10,8 +10,6 @@ impl IcyBoardState {
     pub async fn read_messages(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::HandlingMail).await;
         let Ok(Some(area)) = self.show_message_areas(self.session.current_conference_number).await else {
-            self.press_enter().await?;
-            self.display_current_menu = true;
             return Ok(());
         };
         self.read_messages_in_area(area).await
@@ -22,7 +20,7 @@ impl IcyBoardState {
         let mut tries = 0;
         while tries < 2 {
             tries += 1;
-            let message_base_file = &self.session.current_conference.areas[area].filename;
+            let message_base_file = &self.session.current_conference.areas.as_ref().unwrap()[area].filename;
             let msgbase_file_resolved = self.get_board().await.resolve_file(message_base_file);
             match JamMessageBase::open(&msgbase_file_resolved) {
                 Ok(message_base) => {
@@ -48,8 +46,6 @@ impl IcyBoardState {
                 }
             }
         }
-        self.press_enter().await?;
-        self.display_current_menu = true;
         return Ok(());
     }
 }

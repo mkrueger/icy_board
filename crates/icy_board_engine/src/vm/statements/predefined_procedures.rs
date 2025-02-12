@@ -607,18 +607,20 @@ pub async fn join(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 pub async fn quest(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let nr = vm.eval_expr(&args[0]).await?.as_int();
-    let surveys = vm.icy_board_state.load_surveys().await?;
-    if let Some(survey) = surveys.get(nr as usize) {
-        vm.icy_board_state.start_survey(survey).await?;
+    if let Some(surveys) = &vm.icy_board_state.session.current_conference.surveys {
+        if let Some(survey) = surveys.get(nr as usize) {
+            vm.icy_board_state.start_survey(&survey.clone()).await?;
+        }
     }
     Ok(())
 }
 
 pub async fn blt(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let nr = vm.eval_expr(&args[0]).await?.as_int();
-    let bulletins = vm.icy_board_state.load_bullettins().await?;
-    if let Some(bulletin) = bulletins.get(nr as usize) {
-        vm.icy_board_state.display_file(&bulletin.file).await?;
+    if let Some(bulletins) = &vm.icy_board_state.session.current_conference.bulletins {
+        if let Some(bulletin) = bulletins.get(nr as usize) {
+            vm.icy_board_state.display_file(&bulletin.file.clone()).await?;
+        }
     }
     Ok(())
 }
@@ -1656,7 +1658,9 @@ pub async fn qwklimits(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
 pub async fn command(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let via_cmd_list = vm.eval_expr(&args[0]).await?.as_bool();
     let command_line = vm.eval_expr(&args[1]).await?.as_string();
-    vm.icy_board_state.run_single_command(via_cmd_list, command_line).await
+    vm.icy_board_state.session.push_tokens(&command_line);
+    vm.icy_board_state.run_single_command(via_cmd_list).await?;
+    Ok(())
 }
 
 pub async fn uselmrs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {

@@ -1423,7 +1423,7 @@ pub async fn pcbmac(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 }
 pub async fn actmsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let area = vm.icy_board_state.session.current_message_area;
-    let msg_base = vm.icy_board_state.session.current_conference.areas[area].filename.clone();
+    let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].filename.clone();
     let msg_base = vm.resolve_file(&msg_base).await;
     match jamjam::jam::JamMessageBase::open(msg_base) {
         Ok(base) => Ok(VariableValue::new_int(base.active_messages() as i32)),

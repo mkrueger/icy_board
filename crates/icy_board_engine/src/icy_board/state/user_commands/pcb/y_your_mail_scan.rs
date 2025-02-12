@@ -129,9 +129,6 @@ impl IcyBoardState {
         if msgs == 0 && scan.skip_zero {
             self.display_text(IceText::NoMailFound, display_flags::NEWLINE).await?;
         }
-        self.new_line().await?;
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 
@@ -169,7 +166,7 @@ impl IcyBoardState {
         let alias = BString::from(self.session.alias_name.clone());
         let mut msg_from = 0;
         let mut msg_to = 0;
-        for area in conf.areas.iter() {
+        for area in conf.areas.as_ref().unwrap().iter() {
             let path = self.resolve_path(&area.filename);
             let Ok(msg_base) = JamMessageBase::open(&path) else {
                 log::info!("can't open message base: {:?}", path);

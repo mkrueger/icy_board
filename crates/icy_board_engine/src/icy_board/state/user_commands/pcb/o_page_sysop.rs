@@ -25,9 +25,6 @@ impl IcyBoardState {
         }
 
         self.page_sysop().await?;
-        self.new_line().await?;
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 }

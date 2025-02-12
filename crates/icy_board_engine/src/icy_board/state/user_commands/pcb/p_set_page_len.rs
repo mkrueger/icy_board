@@ -32,8 +32,6 @@ impl IcyBoardState {
                 user.page_len = page_len;
             }
         }
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 }

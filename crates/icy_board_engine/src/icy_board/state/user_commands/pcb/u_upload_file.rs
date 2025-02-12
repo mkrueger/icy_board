@@ -22,8 +22,6 @@ impl IcyBoardState {
                 display_flags::NEWLINE | display_flags::BELL | display_flags::LFBEFORE,
             )
             .await?;
-            self.new_line().await?;
-            self.press_enter().await?;
             return Ok(());
         }
 
@@ -39,8 +37,6 @@ impl IcyBoardState {
             .await?;
 
         if file_name.is_empty() {
-            self.new_line().await?;
-            self.press_enter().await?;
             return Ok(());
         }
         let mut goodbye_after_upload = false;
@@ -59,8 +55,6 @@ impl IcyBoardState {
 
             match input.as_str() {
                 "A" => {
-                    self.new_line().await?;
-                    self.press_enter().await?;
                     return Ok(());
                 }
                 "G" => {
@@ -132,8 +126,6 @@ impl IcyBoardState {
         if goodbye_after_upload {
             self.goodbye().await?;
         }
-        self.new_line().await?;
-        self.press_enter().await?;
         Ok(())
     }
 }

@@ -503,7 +503,7 @@ impl IcyBoardState {
     #[async_recursion(?Send)]
     pub async fn show_message_areas(&mut self, conference: u16) -> Res<Option<usize>> {
         let menu = self.get_board().await.conferences[conference as usize].area_menu.clone();
-        let areas = self.get_board().await.conferences[conference as usize].areas.clone();
+        let areas = self.get_board().await.conferences[conference as usize].areas.clone().unwrap_or_default();
 
         self.set_activity(NodeStatus::EnterMessage).await;
         self.session.non_stop_off();
@@ -559,7 +559,9 @@ impl IcyBoardState {
             let user_name = msg.get_to().unwrap().to_string();
             self.get_email_msgbase(&user_name).await
         } else {
-            let msg_base = self.get_board().await.conferences[conf as usize].areas[area as usize].filename.clone();
+            let msg_base = self.get_board().await.conferences[conf as usize].areas.as_ref().unwrap()[area as usize]
+                .filename
+                .clone();
             let msg_base: PathBuf = self.resolve_path(&msg_base);
             if msg_base.with_extension("jhr").exists() {
                 JamMessageBase::open(msg_base)

@@ -4,8 +4,10 @@ use std::{
 };
 
 use crate::Res;
+use bulletins::BullettinList;
 use codepages::tables::write_with_bom;
 use qfile::QTraitSync;
+use surveys::SurveyList;
 use thiserror::Error;
 
 use crate::vm::errors::IcyError;
@@ -259,34 +261,34 @@ impl IcyBoard {
         };
 
         for conf in board.conferences.iter_mut() {
-            let message_area_file = if conf.area_file.is_absolute() {
+            let area_file = if conf.area_file.is_absolute() {
                 conf.area_file.clone()
             } else {
                 board.root_path.join(&conf.area_file)
             };
-            if message_area_file.exists() {
-                match AreaList::load(&message_area_file) {
+            if area_file.exists() {
+                match AreaList::load(&area_file) {
                     Ok(areas) => {
-                        conf.areas = areas;
+                        conf.areas = Some(areas);
                     }
                     Err(err) => {
-                        log::error!("Error loading message areas {}: {}", message_area_file.display(), err);
+                        log::error!("Error loading message areas {}: {}", area_file.display(), err);
                     }
                 }
             }
 
-            let file_area_file = if conf.dir_file.is_absolute() {
+            let dir_file = if conf.dir_file.is_absolute() {
                 conf.dir_file.clone()
             } else {
                 board.root_path.join(&conf.dir_file)
             };
-            if file_area_file.exists() {
-                match DirectoryList::load(&file_area_file) {
+            if dir_file.exists() {
+                match DirectoryList::load(&dir_file) {
                     Ok(directories) => {
-                        conf.directories = directories;
+                        conf.directories = Some(directories);
                     }
                     Err(err) => {
-                        log::error!("Error loading file areas {}: {}", file_area_file.display(), err);
+                        log::error!("Error loading file areas {}: {}", dir_file.display(), err);
                     }
                 }
             }
@@ -299,10 +301,42 @@ impl IcyBoard {
             if doors_file.exists() {
                 match DoorList::load(&doors_file) {
                     Ok(doors) => {
-                        conf.doors = doors;
+                        conf.doors = Some(doors);
                     }
                     Err(err) => {
                         log::error!("loading door files {}: {}", doors_file.display(), err);
+                    }
+                }
+            }
+
+            let blt_file = if conf.blt_file.is_absolute() {
+                conf.blt_file.clone()
+            } else {
+                board.root_path.join(&conf.blt_file)
+            };
+            if blt_file.exists() {
+                match BullettinList::load(&blt_file) {
+                    Ok(blts) => {
+                        conf.bulletins = Some(blts);
+                    }
+                    Err(err) => {
+                        log::error!("loading door files {}: {}", blt_file.display(), err);
+                    }
+                }
+            }
+
+            let survey_file = if conf.survey_file.is_absolute() {
+                conf.survey_file.clone()
+            } else {
+                board.root_path.join(&conf.survey_file)
+            };
+            if survey_file.exists() {
+                match SurveyList::load(&survey_file) {
+                    Ok(surveys) => {
+                        conf.surveys = Some(surveys);
+                    }
+                    Err(err) => {
+                        log::error!("loading door files {}: {}", survey_file.display(), err);
                     }
                 }
             }

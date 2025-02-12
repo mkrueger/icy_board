@@ -51,14 +51,11 @@ impl IcyBoardState {
             }
             let am = self.session.disp_options.non_stop();
             self.session.non_stop_off();
-            let res = self.display_file(&help_loc).await?;
+            self.display_file(&help_loc).await?;
             if am {
                 self.session.non_stop_on();
             } else {
                 self.session.non_stop_off();
-            }
-            if res {
-                self.press_enter().await?;
             }
         }
         Ok(())

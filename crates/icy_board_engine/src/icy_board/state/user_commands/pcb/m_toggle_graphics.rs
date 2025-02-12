@@ -68,8 +68,6 @@ impl IcyBoardState {
             };
             self.display_text(msg, display_flags::NEWLINE | display_flags::LFAFTER).await?;
         }
-        self.press_enter().await?;
-        self.display_current_menu = true;
         Ok(())
     }
 }

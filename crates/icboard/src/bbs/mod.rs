@@ -5,8 +5,12 @@ use async_recursion::async_recursion;
 use icy_board_engine::{
     icy_board::{
         bbs::BBS,
+        icb_text::IceText,
         login_server::{SecureWebsocket, Telnet, Websocket},
-        state::{IcyBoardState, NodeState},
+        state::{
+            functions::{display_flags, MASK_COMMAND},
+            IcyBoardState, NodeState, NodeStatus,
+        },
         IcyBoard,
     },
     vm::TerminalTarget,
@@ -204,6 +208,7 @@ pub async fn handle_client(
     let mut logged_in = false;
     let mut local = false;
 
+    let mut num_tries = 0;
     if !stuffed_chars.is_empty() {
         state.stuff_keyboard_buffer(stuffed_chars, true)?;
     }
@@ -243,24 +248,105 @@ pub async fn handle_client(
             }
         }
     }
+
+    let mut press_enter = cmd.state.session.num_lines_printed > 3;
     loop {
-        if let Err(err) = cmd.do_command().await {
-            cmd.state.session.disp_options.reset_printout();
-            // print error message to user, if possible
-            if cmd.state.set_color(TerminalTarget::Both, 4.into()).await.is_ok() {
-                cmd.state
-                    .print(icy_board_engine::vm::TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err))
-                    .await?;
-                cmd.state.reset_color(TerminalTarget::Both).await?;
+        if num_tries > 15 {
+            cmd.state
+                .display_text(
+                    IceText::ExcessiveErrors,
+                    display_flags::NEWLINE | display_flags::BELL | display_flags::LFBEFORE | display_flags::LOGIT,
+                )
+                .await?;
+            cmd.state.bye_cmd(true).await?;
+            return Ok(());
+        }
+
+        if cmd.state.session.disp_options.abort_printout {
+            cmd.state.session.disp_options.check_display_status();
+        }
+
+        if num_tries == 0 && !cmd.state.session.expert_mode {
+            if press_enter && cmd.state.session.num_lines_printed > 0 {
+                cmd.state.new_line().await?;
+                cmd.state.press_enter().await?;
+                cmd.state.session.disp_options.check_display_status();
+            }
+            cmd.state.display_current_menu().await?;
+            num_tries = 1;
+        }
+        cmd.state.session.num_lines_printed = 0;
+        cmd.state.fresh_line().await?;
+        if num_tries == 0 {
+            cmd.state.new_line().await?;
+        }
+
+        /* TODO: Check for mail.
+                if let Some(user) = cmd.state.session.current_user {
+                    if cmd.state.board.lock().await.config.message.prompt_to_read_mail && cmd.state.session.has_mail {
+
+                    }
+                }
+        */
+        cmd.state.set_activity(NodeStatus::Available).await;
+        let command = cmd
+            .state
+            .input_field(
+                IceText::CommandPrompt,
+                40,
+                MASK_COMMAND,
+                "",
+                None,
+                display_flags::UPCASE | display_flags::NEWLINE | display_flags::STACKED,
+            )
+            .await?;
+
+        if command.starts_with('!') {
+            if command.len() == 1 && !cmd.state.saved_cmd.is_empty() {
+                let str = cmd.state.saved_cmd.clone();
+                cmd.state.stuff_keyboard_buffer(&str, true)?;
+            }
+            continue;
+        }
+        if command.len() >= 5 {
+            cmd.state.saved_cmd = command.clone();
+        }
+
+        let num_tokens = cmd.state.session.push_tokens(&command);
+        if num_tokens == 0 {
+            press_enter = false;
+            num_tries += 1;
+            continue;
+        }
+        press_enter = true;
+
+        match cmd.state.run_single_command(true).await {
+            Ok(cmd_run) => {
+                if cmd_run {
+                    num_tries = 0;
+                } else {
+                    num_tries += 1;
+                }
+            }
+            Err(err) => {
+                cmd.state.session.disp_options.reset_printout();
+                // print error message to user, if possible
+                if cmd.state.set_color(TerminalTarget::Both, 4.into()).await.is_ok() {
+                    cmd.state
+                        .print(icy_board_engine::vm::TerminalTarget::Both, &format!("\r\nError: {}\r\n\r\n", err))
+                        .await?;
+                    cmd.state.reset_color(TerminalTarget::Both).await?;
+                }
             }
         }
+
         cmd.state.session.disp_options.reset_printout();
         if cmd.state.session.request_logoff {
             cmd.state.connection.shutdown().await?;
             cmd.state.save_current_user().await?;
             return Ok(());
         }
-        thread::sleep(Duration::from_millis(20));
+        thread::sleep(Duration::from_millis(10));
     }
 }
 
