@@ -11,7 +11,7 @@ use crate::{
     Res,
 };
 
-use super::Signature;
+use super::{MsgAreaIdValue, Signature};
 
 #[derive(Clone, Copy, PartialEq, Debug, Default, Eq, Hash)]
 #[allow(dead_code)]
@@ -74,6 +74,8 @@ pub enum VariableType {
 
     Table,
 
+    MessageAreaID,
+
     UserData(u8),
 }
 
@@ -105,6 +107,7 @@ impl From<VariableType> for u8 {
             VariableType::Procedure => 16,
             VariableType::DDate => 17,
             VariableType::Table => 18,
+            VariableType::MessageAreaID => 19,
             VariableType::UserData(b) => b,
             VariableType::None => 255,
         }
@@ -165,6 +168,7 @@ impl VariableType {
             VariableType::Procedure => "PROCEDURE".to_string(),
             VariableType::DDate => "DDATE".to_string(),
             VariableType::Table => "TABLE".to_string(),
+            VariableType::MessageAreaID => "MSGAREAID".to_string(),
             VariableType::UserData(u) => format!("USERDATA({})", u),
             VariableType::None => "NONE".to_string(),
         };
@@ -176,25 +180,26 @@ impl fmt::Display for VariableType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             VariableType::None => write!(f, "None"),
-            VariableType::Boolean => write!(f, "Boolean"),   // BOOL 0 = false, 1 = true
-            VariableType::Unsigned => write!(f, "Unsigned"), // u32
-            VariableType::Date => write!(f, "Date"),         // 2*u8 - julian date
-            VariableType::EDate => write!(f, "EDate"),       // 2*u8 - julian date
-            VariableType::Integer => write!(f, "Integer"),   // i32
-            VariableType::Money => write!(f, "Money"),       // i32 - x/100 Dollar x%100 Cents
-            VariableType::Float => write!(f, "Real"),        // f32
-            VariableType::String => write!(f, "String"),     // String without \0 and maximum length of 255 (Pascal like)
-            VariableType::Time => write!(f, "Time"),         // u32 - Seconds elapsed since midnight
-            VariableType::Byte => write!(f, "Byte"),         // u8
-            VariableType::Word => write!(f, "Word"),         // u16
-            VariableType::SByte => write!(f, "SByte"),       // i8
-            VariableType::SWord => write!(f, "SWord"),       // i16
-            VariableType::BigStr => write!(f, "BigStr"),     // String (max 2kb)
-            VariableType::Double => write!(f, "Double"),     // f65
-            VariableType::Function => write!(f, "FUNC"),     // 2*u8
-            VariableType::Procedure => write!(f, "PROC"),    // 2*u8
-            VariableType::DDate => write!(f, "DDate"),       // i32
-            VariableType::Table => write!(f, "Table"),       // Generic key-value table
+            VariableType::Boolean => write!(f, "Boolean"),         // BOOL 0 = false, 1 = true
+            VariableType::Unsigned => write!(f, "Unsigned"),       // u32
+            VariableType::Date => write!(f, "Date"),               // 2*u8 - julian date
+            VariableType::EDate => write!(f, "EDate"),             // 2*u8 - julian date
+            VariableType::Integer => write!(f, "Integer"),         // i32
+            VariableType::Money => write!(f, "Money"),             // i32 - x/100 Dollar x%100 Cents
+            VariableType::Float => write!(f, "Real"),              // f32
+            VariableType::String => write!(f, "String"),           // String without \0 and maximum length of 255 (Pascal like)
+            VariableType::Time => write!(f, "Time"),               // u32 - Seconds elapsed since midnight
+            VariableType::Byte => write!(f, "Byte"),               // u8
+            VariableType::Word => write!(f, "Word"),               // u16
+            VariableType::SByte => write!(f, "SByte"),             // i8
+            VariableType::SWord => write!(f, "SWord"),             // i16
+            VariableType::BigStr => write!(f, "BigStr"),           // String (max 2kb)
+            VariableType::Double => write!(f, "Double"),           // f65
+            VariableType::Function => write!(f, "FUNC"),           // 2*u8
+            VariableType::Procedure => write!(f, "PROC"),          // 2*u8
+            VariableType::DDate => write!(f, "DDate"),             // i32
+            VariableType::Table => write!(f, "Table"),             // Generic key-value table
+            VariableType::MessageAreaID => write!(f, "MsgAreaID"), // 2*u8
             VariableType::UserData(u) => write!(f, "UserData({})", u),
         }
     }
@@ -224,7 +229,7 @@ pub union VariableData {
     pub u64_value: u64,
     pub function_value: FunctionValue,
     pub procedure_value: ProcedureValue,
-
+    pub message_id_value: MsgAreaIdValue,
     pub std_struct: StdStruct,
 }
 unsafe impl Send for VariableData {}
@@ -870,6 +875,16 @@ impl VariableValue {
         }
     }
 
+    pub fn new_msg_id(conference: i32, area: i32) -> Self {
+        Self {
+            vtype: VariableType::MessageAreaID,
+            data: VariableData {
+                message_id_value: MsgAreaIdValue { conference, area },
+            },
+            generic_data: GenericVariableData::None,
+        }
+    }
+
     pub fn new_vector(variable_type: VariableType, vec: Vec<VariableValue>) -> Self {
         Self {
             vtype: variable_type,
@@ -1133,6 +1148,9 @@ impl VariableValue {
             }
             VariableType::SWord => {
                 return unsafe { self.data.sword_value as i32 };
+            }
+            VariableType::MessageAreaID => {
+                return unsafe { self.data.message_id_value.conference as i32 };
             }
             _ => {
                 panic!("Unsupported type: {:?}", self.vtype);
@@ -1436,6 +1454,16 @@ impl VariableValue {
         }
     }
 
+    /// Returns (conference, area) for a message id
+    pub fn as_msg_id(&self) -> (i32, i32) {
+        match self.vtype {
+            VariableType::MessageAreaID => return unsafe { (self.data.message_id_value.conference, self.data.message_id_value.area) },
+            _ => {
+                return (self.as_int(), 0);
+            }
+        }
+    }
+
     #[must_use]
     pub fn get_hour(&self) -> Self {
         VariableValue::new_int(unsafe { (self.data.time_value % (24 * 60 * 60)) / (60 * 60) })
@@ -1648,6 +1676,9 @@ impl VariableValue {
             }
             VariableType::Table => {
                 panic!("Not supported for tables.")
+            }
+            VariableType::MessageAreaID => {
+                data.int_value = self.as_int();
             }
             VariableType::Function => {
                 panic!("Can't convert to function")

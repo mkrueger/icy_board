@@ -1035,20 +1035,31 @@ hint-function-pcbaccstat=
 
 hint-function-derrmsg=returns last DBase error text
 hint-function-account=Returns amount of credits charged for services corresponding to the field parameter.
+message_header_constants= 
+ MESSAGE HEADER FIELD ACCESS CONSTANTS
+ 
+ | Field | hex | dec | Field Description |
+ | :--- | :--- | :--- | :--- |
+ | `HDR_ACTIVE`   | `0x0E` | `14`  | Message active flag field |
+ | `HDR_BLOCKS`   | `0x04` | `4`   | Number of 128 byte blocks in message |
+ | `HDR_DATE`     | `0x05` | `5`   | Date message was written |
+ | `HDR_ECHO`     | `0x0F` | `15`  | Echoed message flag
+ | `HDR_FROM`     | `0x0B` | `11`  | Who the message is from |
+ | `HDR_MSGNUM`   | `0x02` | `2`   | Message number | 
+ | `HDR_MSGREF`   | `0x03` | `3`   | Reference message |
+ | `HDR_PWD`      | `0x0D` | `13`  | Message password |
+ | `HDR_REPLY`    | `0x0A` | `10`  | Message reply flag |
+ | `HDR_RPLYDATE` | `0x08` | `8`   | Reply message date |
+ | `HDR_RPLYTIME` | `0x09` | `9`   | Reply message time |
+ | `HDR_STATUS`   | `0x01` | `1`   | Message status |
+ | `HDR_SUBJ`     | `0x0C` | `12`  | Message subject |
+ | `HDR_TIME`     | `0x06` | `6`   | Message time |
+ | `HDR_TO`       | `0x07` | `7`   | Receiver of the message |
+ 
 hint-function-scanmsghdr=
     Returns the first message number in the message base which matches the search criteria.
 
-    MESSAGE HEADER FIELD ACCESS CONSTANTS
-    Field	hex	dec	Field Description
-    —————–	——	—–	—————————————-
-    HDRACTIVE | 0x0E | 14 | Message active flag field | | HDRBLOCKS	0x04	4	Number of 128 byte blocks in message
-    HDRDATE | 0x05 | 5 | Date message was written | | HDRECHO	0x0F	15	Echoed message flag
-    HDRFROM | 0x0B | 11 | Who the message is from | | HDRMSGNUM	0x02	2	Message number
-    HDRMSGREF | 0x03 | 3 | Reference message | | HDRPWD	0x0D	13	Message password
-    HDRREPLY | 0x0A | 10 | Message reply flag | | HDRRPLYDATE	0x08	8	Reply message date
-    HDRRPLYTIME | 0x09 | 9 | Reply message time | | HDRSTATUS	0x01	1	Message status
-    HDRSUBJ | 0x0C | 12 | Message subject | | HDRTIME	0x06	6	Message time
-
+    { message_header_constants }
 hint-function-checkrip=Returns `TRUE` if the terminal has RIP.
 hint-function-ripver=
     Returns a string containing the RIP version. If no RIP is available "0" is returned.
@@ -1280,6 +1291,8 @@ hint-function-getmsghdr=
     Returns the value of the specified field.
 
     ### Fields
+
+    { message_header_constants }
 hint-function-setmsghdr=
     ### Parameters
     @1 = An integer expression stating the conference number of the message base.

@@ -173,6 +173,10 @@ impl VariableSpecifier {
         self.dimensions[2].get_dimension()
     }
 
+    pub fn visit<T: Default, V: super::AstVisitor<T>>(&self, visitor: &mut V) -> T {
+        visitor.visit_variable_specifier(self)
+    }
+
     #[must_use]
     pub fn visit_mut<V: AstVisitorMut>(&self, visitor: &mut V) -> Self {
         visitor.visit_variable_specifier(self)

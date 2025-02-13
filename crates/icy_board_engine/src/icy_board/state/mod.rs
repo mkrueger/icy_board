@@ -228,6 +228,8 @@ pub struct Session {
     pub highest_msg_read: u32,
 
     pub term_caps: TerminalCaps,
+
+    pub search_text: String,
 }
 
 impl Session {
@@ -287,6 +289,7 @@ impl Session {
             last_msg_read: 0,
             highest_msg_read: 0,
             term_caps: TerminalCaps::LOCAL,
+            search_text: String::new(),
         }
     }
 
@@ -353,6 +356,11 @@ impl Session {
 
     pub fn start_display(&mut self) {
         self.reset_num_lines();
+    }
+
+    fn parse_search_text(&self, search: String) -> Option<String> {
+        // TODO
+        Some(search)
     }
 }
 
@@ -1704,7 +1712,7 @@ impl IcyBoardState {
                 }
             }
             MacroCommand::Hangup => {
-                let _ = self.bye_cmd(false).await;
+                let _ = self.logoff_user(false).await;
                 return None;
             }
             MacroCommand::SwitchColor(color) => {

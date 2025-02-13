@@ -20,11 +20,15 @@ impl IcyBoardState {
             String::new()
         };
 
-        let protocol = self.ask_protocols(&cur_protocol).await?;
-        if !protocol.is_empty() {
-            let selected_protocol = protocol.to_ascii_uppercase();
+        let protocol = if let Some(token) = self.session.tokens.pop_front() {
+            token
+        } else {
+            self.ask_protocols(&cur_protocol).await?
+        };
 
-            self.display_text(IceText::DefaultProtocol, display_flags::DEFAULT).await?;
+        if !protocol.is_empty() {
+            let selected_protocol: String = protocol.to_ascii_uppercase();
+
             let mut txt = String::new();
             for protocol in self.get_board().await.protocols.iter() {
                 if &protocol.char_code == &selected_protocol {
@@ -33,12 +37,13 @@ impl IcyBoardState {
                 }
             }
             if let Some(user) = &mut self.session.current_user {
-                user.protocol = selected_protocol;
+                if user.protocol != selected_protocol {
+                    user.protocol = selected_protocol;
+                    self.display_text(IceText::DefaultProtocol, display_flags::LFBEFORE).await?;
+                    self.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
+                    self.println(TerminalTarget::Both, &txt).await?;
+                }
             }
-            self.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
-            self.print(TerminalTarget::Both, &txt).await?;
-            self.new_line().await?;
-            self.new_line().await?;
         }
         Ok(())
     }

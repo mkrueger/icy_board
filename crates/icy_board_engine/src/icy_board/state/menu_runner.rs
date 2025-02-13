@@ -207,7 +207,7 @@ impl IcyBoardState {
                     return Ok(());
                 }
                 // D
-                self.download().await?;
+                self.download(true).await?;
             }
             CommandType::FlagFiles => {
                 let sec = self.session.user_command_level.cmd_d.clone();
@@ -241,7 +241,7 @@ impl IcyBoardState {
             }
             CommandType::Bye => {
                 // BYE
-                self.bye_cmd(false).await?;
+                self.bye_cmd().await?;
             }
             CommandType::Help => {
                 let sec = self.session.user_command_level.cmd_h.clone();

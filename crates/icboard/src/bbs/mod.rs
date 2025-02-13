@@ -194,7 +194,6 @@ pub async fn await_securewebsocket_connections(con: SecureWebsocket, board: Arc<
     }
 }
 
-#[async_recursion(?Send)]
 pub async fn handle_client(
     bbs: Arc<tokio::sync::Mutex<BBS>>,
     board: Arc<tokio::sync::Mutex<IcyBoard>>,
@@ -204,7 +203,12 @@ pub async fn handle_client(
     login_options: Option<LoginOptions>,
     stuffed_chars: &str,
 ) -> Res<()> {
-    let mut state = IcyBoardState::new(bbs, board, node_state, node, connection).await;
+    let state = IcyBoardState::new(bbs, board, node_state, node, connection).await;
+    internal_handle_client(state, login_options, stuffed_chars).await
+}
+
+#[async_recursion(?Send)]
+pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Option<LoginOptions>, stuffed_chars: &str) -> Res<()> {
     let mut logged_in = false;
     let mut local = false;
 
@@ -258,7 +262,7 @@ pub async fn handle_client(
                     display_flags::NEWLINE | display_flags::BELL | display_flags::LFBEFORE | display_flags::LOGIT,
                 )
                 .await?;
-            cmd.state.bye_cmd(true).await?;
+            cmd.state.logoff_user(true).await?;
             return Ok(());
         }
 
@@ -297,7 +301,7 @@ pub async fn handle_client(
                 MASK_COMMAND,
                 "",
                 None,
-                display_flags::UPCASE | display_flags::NEWLINE | display_flags::STACKED,
+                display_flags::NEWLINE | display_flags::STACKED,
             )
             .await?;
 

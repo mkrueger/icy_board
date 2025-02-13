@@ -12,28 +12,32 @@ use crate::{
 };
 
 impl IcyBoardState {
-    pub async fn download(&mut self) -> Res<()> {
-        if !self.session.flagged_files.is_empty() {
-            let download_tagged = self
-                .input_field(
-                    IceText::DownloadTagged,
-                    1,
-                    "",
-                    &"",
-                    Some(self.session.yes_char.to_string()),
-                    display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::YESNO | display_flags::FIELDLEN,
-                )
-                .await?;
+    pub async fn download(&mut self, ask_flagged_files: bool) -> Res<()> {
+        if ask_flagged_files {
+            if !self.session.flagged_files.is_empty() {
+                let download_tagged = self
+                    .input_field(
+                        IceText::DownloadTagged,
+                        1,
+                        "",
+                        &"",
+                        Some(self.session.yes_char.to_string()),
+                        display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::YESNO | display_flags::FIELDLEN,
+                    )
+                    .await?;
 
-            if download_tagged == self.session.no_char.to_uppercase().to_string() {
+                if download_tagged == self.session.no_char.to_uppercase().to_string() {
+                    return Ok(());
+                }
+            }
+
+            self.flag_files_cmd(true).await?;
+
+            if self.session.flagged_files.is_empty() {
                 return Ok(());
             }
-        }
-
-        self.flag_files_cmd(true).await?;
-
-        if self.session.flagged_files.is_empty() {
-            return Ok(());
+        } else {
+            self.new_line().await?;
         }
 
         let mut protocol_str: String = self.session.current_user.as_ref().unwrap().protocol.clone();

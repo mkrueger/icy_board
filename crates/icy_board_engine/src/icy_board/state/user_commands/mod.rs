@@ -1,3 +1,3 @@
 mod mods;
 mod new;
-mod pcb;
+pub mod pcb;

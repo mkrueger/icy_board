@@ -52,13 +52,10 @@ impl<'a, 'b> AstVisitor<PPEExpr> for ExpressionCompiler<'a, 'b> {
 
     fn visit_function_call_expression(&mut self, call: &crate::ast::FunctionCallExpression) -> PPEExpr {
         let arguments = call.get_arguments().iter().map(|e| e.visit(self)).collect();
-        let function_type = self
-            .compiler
-            .semantic_visitor
-            .function_type_lookup
-            .get(&call.get_expression().get_span().start)
-            .unwrap();
-
+        let Some(function_type) = self.compiler.semantic_visitor.function_type_lookup.get(&call.get_expression().get_span().start) else {
+            log::error!("function not found at: {} ({})", call.get_expression().get_span().start, call.get_expression());
+            return PPEExpr::Value(0);
+        };
         match function_type {
             SemanticInfo::PredefinedFunc(op_code) => {
                 return PPEExpr::PredefinedFunctionCall(

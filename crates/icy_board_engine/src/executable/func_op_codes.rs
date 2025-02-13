@@ -305,6 +305,7 @@ pub enum FuncOpCode {
     MemberReference = -291,
     MemberCall = -292,
     NewConfInfo = -293,
+    AreaId = -294,
 }
 
 pub const LAST_FUNC: i16 = -293;
@@ -360,7 +361,7 @@ impl FunctionDefinition {
     }
 }
 lazy_static::lazy_static! {
-    pub static ref FUNCTION_DEFINITIONS: [FunctionDefinition; 297] = [
+    pub static ref FUNCTION_DEFINITIONS: [FunctionDefinition; 298] = [
         FunctionDefinition {
             name: "END",
             version: 100,
@@ -3069,6 +3070,18 @@ lazy_static::lazy_static! {
             args: None,
             arg_descr: 0x01,
         },
+        FunctionDefinition {
+            name: "AreaId",
+            version: 400,
+            opcode: FuncOpCode::AreaId,
+            return_type: VariableType::MessageAreaID,
+            args: Some(vec![
+                ArgumentDefinition::new("conf", VariableType::Integer),
+                ArgumentDefinition::new("area", VariableType::Integer)
+            ]),
+            arg_descr: 0x02,
+        },
+
         // ALIASES (need to be last in the list)
         FunctionDefinition {
             name: "ToString",

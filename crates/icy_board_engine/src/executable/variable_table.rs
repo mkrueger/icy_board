@@ -135,6 +135,12 @@ pub struct ProcedureValue {
     pub pass_flags: u16,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct MsgAreaIdValue {
+    pub conference: i32,
+    pub area: i32,
+}
+
 impl ProcedureValue {
     pub fn to_data(self) -> VariableData {
         let mut res = VariableData::default();

@@ -3,7 +3,8 @@ use std::path::PathBuf;
 
 use dashmap::DashMap;
 use icy_board_engine::ast::{
-    walk_function_declaration, walk_function_implementation, walk_predefined_call_statement, Ast, AstVisitor, Constant, ConstantExpression, Expression,
+    walk_function_declaration, walk_function_implementation, walk_predefined_call_statement, walk_variable_declaration_statement, Ast, AstVisitor, Constant,
+    ConstantExpression, Expression,
 };
 use icy_board_engine::executable::{FunctionDefinition, FUNCTION_DEFINITIONS, LAST_PPLC};
 use icy_board_engine::parser::{parse_ast, Encoding, UserTypeRegistry};
@@ -446,6 +447,7 @@ impl AstVisitor<()> for TooltipVisitor {
         if var_decl.get_type_token().span.contains(&self.offset) {
             self.tooltip = get_type_hover(var_decl.get_variable_type());
         }
+        walk_variable_declaration_statement(self, var_decl);
     }
 
     fn visit_parameter_specifier(&mut self, param: &icy_board_engine::ast::ParameterSpecifier) {

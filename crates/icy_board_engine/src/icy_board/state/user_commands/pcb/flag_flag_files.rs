@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use dizbase::file_base::pattern::{MatchOptions, Pattern};
 use humanize_bytes::humanize_bytes_decimal;
 
@@ -58,7 +60,7 @@ impl IcyBoardState {
                 return Ok(());
             }
 
-            for (file, size) in flagged {
+            for (file, _size) in flagged {
                 if self.session.disp_options.abort_printout {
                     break;
                 }
@@ -68,35 +70,44 @@ impl IcyBoardState {
                         .await?;
                     continue;
                 }
-
-                let name = file.file_name().unwrap().to_string_lossy().to_string();
-
-                if self.session.flagged_files.len() >= self.session.batch_limit {
-                    self.session.op_text = name;
-                    self.display_text(IceText::BatchLimitReached, display_flags::NEWLINE).await?;
-                    continue;
-                }
-
-                if self.session.flagged_files.contains(&file) {
-                    self.session.op_text = name;
-                    self.display_text(IceText::DuplicateBatchFile, display_flags::NEWLINE).await?;
-                    continue;
-                }
-                self.session.flagged_files.push(file);
-
-                let count = self.session.flagged_files.len();
-                self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
-                let nr: String = format!("({})", count);
-                self.println(
-                    TerminalTarget::Both,
-                    &format!("{:<6}{:<12} {}", nr, name, humanize_bytes_decimal!(size).to_string()),
-                )
-                .await?;
-                self.reset_color(TerminalTarget::Both).await?;
+                self.add_flagged_file(file, false, true).await?;
             }
 
             self.session.disp_options.in_file_list = saved_list;
         }
+        Ok(())
+    }
+
+    pub async fn add_flagged_file(&mut self, file: impl Into<PathBuf>, force: bool, show_duplicates: bool) -> Res<()> {
+        let file = file.into();
+        let name = file.file_name().unwrap().to_string_lossy().to_string();
+
+        if !force && self.session.flagged_files.len() >= self.session.batch_limit {
+            self.session.op_text = name;
+            self.display_text(IceText::BatchLimitReached, display_flags::NEWLINE).await?;
+            return Ok(());
+        }
+
+        if self.session.flagged_files.contains(&file) {
+            if show_duplicates {
+                self.session.op_text = name;
+                self.display_text(IceText::DuplicateBatchFile, display_flags::NEWLINE).await?;
+            }
+            return Ok(());
+        }
+        let size = if let Ok(md) = file.metadata() { md.len() } else { 0 };
+        self.session.flagged_files.push(file);
+
+        let count = self.session.flagged_files.len();
+        self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
+        let nr: String = format!("({})", count);
+        self.println(
+            TerminalTarget::Both,
+            &format!("{:<6}{:<12} {}", nr, name, humanize_bytes_decimal!(size).to_string()),
+        )
+        .await?;
+        self.reset_color(TerminalTarget::Both).await?;
+
         Ok(())
     }
 }

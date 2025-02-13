@@ -35,9 +35,35 @@ const KEYWORDS: [&str; 18] = [
     "ENDPROC",
     "ENDFUNC",
 ];
-const TYPES: [&str; 26] = [
-    "BOOLEAN", "DATE", "DDATE", "INTEGER", "SDWORD", "LONG", "MONEY", "STRING", "TIME", "BIGSTR", "EDATE", "REAL", "FLOAT", "DREAL", "DOUBLE", "UNSIGNED",
-    "DWORD", "UDWORD", "BYTE", "UBYTE", "WORD", "UWORD", "SBYTE", "SHORT", "SWORD", "INT",
+
+const TYPES: [&str; 27] = [
+    "BOOLEAN",
+    "DATE",
+    "DDATE",
+    "INTEGER",
+    "SDWORD",
+    "LONG",
+    "MONEY",
+    "STRING",
+    "TIME",
+    "BIGSTR",
+    "EDATE",
+    "REAL",
+    "FLOAT",
+    "DREAL",
+    "DOUBLE",
+    "UNSIGNED",
+    "DWORD",
+    "UDWORD",
+    "BYTE",
+    "UBYTE",
+    "WORD",
+    "UWORD",
+    "SBYTE",
+    "SHORT",
+    "SWORD",
+    "INT",
+    "MSGAREAID",
 ];
 
 /// return (need_to_continue_search, founded reference)

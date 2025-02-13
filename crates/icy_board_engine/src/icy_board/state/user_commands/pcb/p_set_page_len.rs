@@ -20,7 +20,7 @@ impl IcyBoardState {
                 &MASK_NUM,
                 CommandType::SetPageLength.get_help(),
                 Some(self.session.page_len.to_string()),
-                display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
+                display_flags::FIELDLEN | display_flags::NEWLINE,
             )
             .await?
         };
@@ -29,7 +29,11 @@ impl IcyBoardState {
             let page_len = page_len.parse::<u16>().unwrap_or_default();
             self.session.page_len = page_len;
             if let Some(user) = &mut self.session.current_user {
-                user.page_len = page_len;
+                if user.page_len != page_len {
+                    user.page_len = page_len;
+                    self.session.op_text = page_len.to_string();
+                    self.display_text(IceText::PageLengthSetTo, display_flags::NEWLINE).await?;
+                }
             }
         }
         Ok(())

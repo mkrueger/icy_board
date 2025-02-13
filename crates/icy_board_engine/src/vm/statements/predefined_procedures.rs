@@ -1261,7 +1261,7 @@ pub async fn flag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 pub async fn download(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let files = vm.eval_expr(&args[0]).await?.as_string();
     vm.icy_board_state.session.push_tokens(&files);
-    vm.icy_board_state.download().await?;
+    vm.icy_board_state.download(true).await?;
     Ok(())
 }
 

@@ -1,0 +1,22 @@
+name = "SYSOP"
+birth_date = 0000-01-01
+security_level = 255
+exp_date = 0000-01-01
+exp_security_level = 0
+protocol = ""
+page_len = 0
+date_last_dir_read = "1970-01-01T00:00:00Z"
+chat_status = "Available"
+
+[password]
+password = ""
+last_change = "1970-01-01T00:00:00Z"
+expire_date = "1970-01-01T00:00:00Z"
+
+[flags]
+fse_mode = "Yes"
+
+[stats]
+first_date_on = "1970-01-01T00:00:00Z"
+last_on = "2025-02-13T14:22:13.521798739Z"
+num_times_on = 1

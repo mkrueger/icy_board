@@ -97,7 +97,7 @@ impl IcyBoardState {
                         self.find_new_files(self.session.current_user.as_ref().unwrap().stats.last_on.into()).await?;
                     }
                     "D" => {
-                        self.download().await?;
+                        self.download(true).await?;
                     }
                     "V" => {
                         self.view_file().await?;

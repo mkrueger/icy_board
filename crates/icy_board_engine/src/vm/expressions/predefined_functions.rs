@@ -7,6 +7,7 @@ use std::{env, fs};
 use crate::ast::constant::STACK_LIMIT;
 use crate::datetime::{IcbDate, IcbTime};
 use crate::executable::{GenericVariableData, PPEExpr, VariableData, VariableType, VariableValue};
+use crate::icy_board::conferences::ConferenceType;
 use crate::icy_board::macro_parser::Macro;
 use crate::icy_board::read_with_encoding_detection;
 use crate::icy_board::security_expr::SecurityExpression;
@@ -16,10 +17,27 @@ use crate::icy_board::user_base::Password;
 use crate::parser::CONFERENCE_ID;
 use crate::vm::{TerminalTarget, VirtualMachine};
 use crate::Res;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use icy_engine::{update_crc32, Position, TextPane};
+use jamjam::jam::JamMessageBase;
 use radix_fmt::radix;
 use rand::Rng; // 0.8.5
+
+const HDR_ACTIVE: i32 = 0x0E;
+const HDR_BLOCKS: i32 = 0x04;
+const HDR_DATE: i32 = 0x05;
+const HDR_ECHO: i32 = 0x0F;
+const HDR_FROM: i32 = 0x0B;
+const HDR_MSGNUM: i32 = 0x02;
+const HDR_MSGREF: i32 = 0x03;
+const HDR_PWD: i32 = 0x0D;
+const HDR_REPLY: i32 = 0x0A;
+const HDR_RPLYDATE: i32 = 0x08;
+const HDR_RPLYTIME: i32 = 0x09;
+const HDR_STATUS: i32 = 0x01;
+const HDR_SUBJ: i32 = 0x0C;
+const HDR_TIME: i32 = 0x06;
+const HDR_TO: i32 = 0x07;
 
 /// Should never be called. But some op codes are invalid as function call (like plus or function call)
 /// and are handled by it's own `PPEExpressions` and will point to this function.
@@ -1367,11 +1385,27 @@ pub async fn kbdfilusued(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<V
 }
 
 pub async fn lomsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.session.low_msg_num as i32))
+    let area = 0;
+    let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].filename.clone();
+    match JamMessageBase::open(vm.resolve_file(&msg_base).await) {
+        Ok(base) => Ok(VariableValue::new_int(base.base_messagenumber() as i32)),
+        Err(err) => {
+            log::error!("LOMSGNUM can't open message base in area {area}: {err}");
+            Ok(VariableValue::new_int(0))
+        }
+    }
 }
 
 pub async fn himsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.session.high_msg_num as i32))
+    let area = 0;
+    let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].filename.clone();
+    match JamMessageBase::open(vm.resolve_file(&msg_base).await) {
+        Ok(base) => Ok(VariableValue::new_int((base.base_messagenumber() + base.active_messages()) as i32)),
+        Err(err) => {
+            log::error!("HIMSGNUM can't open message base in area {area}: {err}");
+            Ok(VariableValue::new_int(0))
+        }
+    }
 }
 
 pub async fn drivespace(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1724,7 +1758,7 @@ pub async fn get_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             4 => Ok(VariableValue::new_bool(conference.allow_view_conf_members)),
             5 => Ok(VariableValue::new_bool(conference.private_uploads)),
             6 => Ok(VariableValue::new_bool(conference.private_msgs)),
-            7 => Ok(VariableValue::new_bool(false)), // conference.echo_mail
+            7 => Ok(VariableValue::new_bool(conference.echo_mail_in_conference)),
             8 => Ok(VariableValue::new_int(conference.required_security.level() as i32)),
             9 => Ok(VariableValue::new_int(conference.add_conference_security)),
             10 => Ok(VariableValue::new_int(conference.add_conference_time as i32)),
@@ -1748,30 +1782,30 @@ pub async fn get_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             28 => Ok(VariableValue::new_string(conference.dir_menu.to_string_lossy().to_string())),
             29 => Ok(VariableValue::new_string(conference.dir_file.to_string_lossy().to_string())),
             30 => Ok(VariableValue::new_string(conference.attachment_location.to_string_lossy().to_string())), // PthNameLoc ???
-            31 => Ok(VariableValue::new_bool(false)),                                                          // force echo
-            32 => Ok(VariableValue::new_bool(false)),                                                          // read only
+            31 => Ok(VariableValue::new_bool(conference.force_echomail)),                                      // force echo
+            32 => Ok(VariableValue::new_bool(conference.is_read_only)),                                        // read only
             33 => Ok(VariableValue::new_bool(conference.private_msgs)),
-            34 => Ok(VariableValue::new_int(0)),      // ret receipt level
-            35 => Ok(VariableValue::new_bool(false)), // record origin
-            36 => Ok(VariableValue::new_bool(false)), // prompt for routing
+            34 => Ok(VariableValue::new_int(0)),                              // ret receipt level
+            35 => Ok(VariableValue::new_bool(conference.record_origin)),      // record origin
+            36 => Ok(VariableValue::new_bool(conference.prompt_for_routing)), // prompt for routing
             37 => Ok(VariableValue::new_bool(conference.allow_aliases)),
-            38 => Ok(VariableValue::new_bool(false)),                                      // show intro  on ra
+            38 => Ok(VariableValue::new_bool(conference.show_intro_in_scan)), //  show intro  on ra
             39 => Ok(VariableValue::new_int(conference.required_security.level() as i32)), // req level to enter mail
             40 => Ok(VariableValue::new_string(conference.password.to_string())),
             41 => Ok(VariableValue::new_string(conference.intro_file.to_string_lossy().to_string())),
             42 => Ok(VariableValue::new_string(conference.attachment_location.to_string_lossy().to_string())),
             43 => Ok(VariableValue::new_string(String::new())),                      // reg flags
             44 => Ok(VariableValue::new_byte(conference.required_security.level())), // attach level
-            45 => Ok(VariableValue::new_byte(0)),                                    // carbon limit
+            45 => Ok(VariableValue::new_byte(conference.carbon_list_limit)),         // carbon limit
             46 => Ok(VariableValue::new_string(conference.command_file.to_string_lossy().to_string())),
-            47 => Ok(VariableValue::new_bool(true)),  // old index
-            48 => Ok(VariableValue::new_bool(true)),  // long to names
-            49 => Ok(VariableValue::new_byte(0)),     // carbon level
-            50 => Ok(VariableValue::new_byte(0)),     // conf type
-            51 => Ok(VariableValue::new_int(0)),      // export ptr
-            52 => Ok(VariableValue::new_double(0.0)), // charge time
-            53 => Ok(VariableValue::new_double(0.0)), // charge msg read
-            54 => Ok(VariableValue::new_double(0.0)), // charge msg write
+            47 => Ok(VariableValue::new_bool(false)),                              // old index
+            48 => Ok(VariableValue::new_bool(conference.long_to_names)),           // long to names
+            49 => Ok(VariableValue::new_byte(0)),                                  // carbon level
+            50 => Ok(VariableValue::new_byte(conference.conference_type.to_u8())), // conf type
+            51 => Ok(VariableValue::new_int(0)),                                   // export ptr
+            52 => Ok(VariableValue::new_double(conference.charge_time)),           // charge time
+            53 => Ok(VariableValue::new_double(conference.charge_msg_read)),       // charge msg read
+            54 => Ok(VariableValue::new_double(conference.charge_msg_write)),      // charge msg write
             _ => Ok(VariableValue::new_int(-1)),
         }
     } else {
@@ -1788,7 +1822,7 @@ pub async fn set_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             4 => conference.allow_view_conf_members = value.as_bool(),
             5 => conference.private_uploads = value.as_bool(),
             6 => conference.private_msgs = value.as_bool(),
-            7 => (), // conference.echo_mail
+            7 => conference.echo_mail_in_conference = value.as_bool(),
             8 => conference.required_security = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
             9 => conference.add_conference_security = value.as_int(),
             10 => conference.add_conference_time = value.as_int() as u16,
@@ -1812,14 +1846,14 @@ pub async fn set_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             28 => conference.dir_menu = PathBuf::from_str(&value.as_string())?,
             29 => conference.dir_file = PathBuf::from_str(&value.as_string())?,
             30 => conference.attachment_location = PathBuf::from_str(&value.as_string())?,
-            31 => (), // force echo
-            32 => (), // read only
+            31 => conference.force_echomail = value.as_bool(),
+            32 => conference.is_read_only = value.as_bool(),
             33 => conference.private_msgs = value.as_bool(),
             34 => (), // ret receipt level
-            35 => (), // record origin
-            36 => (), // prompt for routing
+            35 => conference.record_origin = value.as_bool(),
+            36 => conference.prompt_for_routing = value.as_bool(),
             37 => conference.allow_aliases = value.as_bool(),
-            38 => (), // show intro  on ra
+            38 => conference.show_intro_in_scan = value.as_bool(),
             39 => conference.required_security = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
             40 => conference.password = Password::PlainText(value.as_string()),
             41 => conference.intro_file = PathBuf::from_str(&value.as_string())?,
@@ -1829,13 +1863,13 @@ pub async fn set_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             45 => (), // conference.carbon_limit = value.as_byte(),
             46 => conference.command_file = PathBuf::from_str(&value.as_string())?,
             47 => (), // old index
-            48 => (), // long to names
+            48 => conference.long_to_names = value.as_bool(),
             49 => (), // conference.carbon_level = value.as_byte(),
-            50 => (), // conference.conf_type = value.as_byte(),
+            50 => conference.conference_type = ConferenceType::from_u8(value.as_byte()),
             51 => (), // conference.export_ptr = value.as_int(),
-            52 => (), // conference.charge_time = value.as_double(),
-            53 => (), // conference.charge_msg_read = value.as_double(),
-            54 => (), // conference.charge_msg_write = value.as_double(),
+            52 => conference.charge_time = value.as_double(),
+            53 => conference.charge_msg_read = value.as_double(),
+            54 => conference.charge_msg_write = value.as_double(),
             _ => (),
         }
     }
@@ -1939,12 +1973,89 @@ pub async fn getbankbal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
     panic!("TODO")
 }
 pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let (conf, area) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let msg_num = vm.eval_expr(&args[1]).await?.as_int() as u32;
+    let field_num = vm.eval_expr(&args[2]).await?.as_int();
+
+    let msg_base = vm.icy_board_state.get_board().await.conferences[conf as usize].areas.as_ref().unwrap()[area as usize]
+        .filename
+        .clone();
+    let base = JamMessageBase::open(vm.resolve_file(&msg_base).await)?;
+    if let Ok(header) = base.read_header(msg_num) {
+        return match field_num {
+            HDR_ACTIVE => Ok(VariableValue::new_bool(!header.is_deleted())),
+            HDR_BLOCKS => Ok(VariableValue::new_int((header.txt_len / 128) as i32)),
+            HDR_DATE => {
+                let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
+                let date = IcbDate::from_utc(date_time);
+                Ok(VariableValue::new_date(date.to_pcboard_date()))
+            }
+            HDR_ECHO => {
+                // TODO
+                Ok(VariableValue::new_bool(false))
+            }
+            HDR_FROM => {
+                if let Some(from) = header.get_from() {
+                    Ok(VariableValue::new_string(from.to_string()))
+                } else {
+                    Ok(VariableValue::new_string(String::new()))
+                }
+            }
+            HDR_MSGNUM => Ok(VariableValue::new_int(header.message_number as i32)),
+            HDR_MSGREF => Ok(VariableValue::new_int(header.reply_to as i32)),
+            HDR_PWD => Ok(VariableValue::new_int(header.password_crc as i32)),
+            HDR_REPLY => Ok(VariableValue::new_int(header.reply_to as i32)),
+            HDR_RPLYDATE => {
+                // TODO
+                Ok(VariableValue::new_int(0))
+            }
+            HDR_RPLYTIME => {
+                // TODO
+                Ok(VariableValue::new_int(0))
+            }
+            HDR_STATUS => {
+                // TODO
+                Ok(VariableValue::new_int(0))
+            }
+            HDR_SUBJ => {
+                if let Some(subj) = header.get_subject() {
+                    Ok(VariableValue::new_string(subj.to_string()))
+                } else {
+                    Ok(VariableValue::new_string(String::new()))
+                }
+            }
+            HDR_TIME => {
+                let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
+                let date = IcbTime::from_naive(date_time.naive_local());
+                Ok(VariableValue::new_time(date.to_pcboard_time()))
+            }
+            HDR_TO => {
+                if let Some(to) = header.get_to() {
+                    Ok(VariableValue::new_string(to.to_string()))
+                } else {
+                    Ok(VariableValue::new_string(String::new()))
+                }
+            }
+            _ => {
+                log::error!("PPL: Invalid message header field {field_num}");
+                Ok(VariableValue::new_string(String::new()))
+            }
+        };
+    }
+
+    log::error!("Can't read header {msg_num} from {conf}:{area}");
+    return Ok(VariableValue::new_bool(false));
 }
+
 pub async fn setmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
+}
+
+pub async fn area_id(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let conference = vm.eval_expr(&args[0]).await?.as_int();
+    let area = vm.eval_expr(&args[1]).await?.as_int();
+    Ok(VariableValue::new_msg_id(conference, area))
 }
 
 /// Should be the same logic than the one in pcboard.

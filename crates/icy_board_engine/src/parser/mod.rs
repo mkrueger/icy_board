@@ -513,9 +513,9 @@ lazy_static::lazy_static! {
 
         m.insert(unicase::Ascii::new("DOUBLE".to_string()), VariableType::Double);
         m.insert(unicase::Ascii::new("DREAL".to_string()), VariableType::Double);
+
+        m.insert(unicase::Ascii::new("MSGAREAID".to_string()), VariableType::MessageAreaID);
         m
-
-
     };
 
 }

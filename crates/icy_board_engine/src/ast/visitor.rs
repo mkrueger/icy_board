@@ -136,7 +136,16 @@ pub trait AstVisitor<T: Default>: Sized {
     }
 
     // visit declarations
+
+    fn visit_variable_specifier(&mut self, var: &VariableSpecifier) -> T {
+        if let Some(initializer) = var.get_initalizer() {
+            initializer.visit(self);
+        }
+        T::default()
+    }
+
     fn visit_variable_declaration_statement(&mut self, var_decl: &VariableDeclarationStatement) -> T {
+        walk_variable_declaration_statement(self, var_decl);
         T::default()
     }
     fn visit_procedure_declaration(&mut self, proc_decl: &ProcedureDeclarationAstNode) -> T {
@@ -172,6 +181,12 @@ pub trait AstVisitor<T: Default>: Sized {
     fn visit_main(&mut self, main: &BlockStatement) -> T {
         walk_block_stmt(self, main);
         T::default()
+    }
+}
+
+pub fn walk_variable_declaration_statement<T: Default, V: AstVisitor<T>>(visitor: &mut V, var_decl: &VariableDeclarationStatement) {
+    for var in var_decl.get_variables() {
+        var.visit(visitor);
     }
 }
 

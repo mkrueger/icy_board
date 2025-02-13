@@ -1,3 +1,5 @@
+use chrono::Utc;
+
 use crate::{
     icy_board::{
         icb_text::IceText,
@@ -18,7 +20,7 @@ impl IcyBoardState {
         if self.board.lock().await.config.system_control.guard_logoff || is_flagged {
             if let Some(token) = self.session.tokens.pop_front() {
                 if token.eq_ignore_ascii_case(&self.session.yes_char.to_string()) {
-                    self.bye_cmd(false).await?;
+                    self.logoff_user(false).await?;
                     return Ok(());
                 }
             };
@@ -42,11 +44,18 @@ impl IcyBoardState {
             }
         }
 
-        self.bye_cmd(false).await?;
+        self.logoff_user(false).await?;
         Ok(())
     }
 
-    pub async fn bye_cmd(&mut self, auto_logoff: bool) -> Res<()> {
+    pub async fn bye_cmd(&mut self) -> Res<()> {
+        self.set_activity(NodeStatus::LogoffPending).await;
+        self.displaycmdfile("bye").await?;
+        self.logoff_user(false).await?;
+        Ok(())
+    }
+
+    pub async fn logoff_user(&mut self, auto_logoff: bool) -> Res<()> {
         if !auto_logoff {
             let survey = {
                 let board = self.get_board().await;
@@ -63,6 +72,9 @@ impl IcyBoardState {
                 self.start_survey(&survey).await?;
             }
         }
+        self.session.op_text = (Utc::now() - self.session.login_date).num_minutes().to_string();
+        self.display_text(IceText::MinutesUsed, display_flags::NEWLINE | display_flags::LFBEFORE)
+            .await?;
         self.display_text(IceText::ThanksForCalling, display_flags::NEWLINE | display_flags::LFBEFORE)
             .await?;
         self.reset_color(TerminalTarget::Both).await?;

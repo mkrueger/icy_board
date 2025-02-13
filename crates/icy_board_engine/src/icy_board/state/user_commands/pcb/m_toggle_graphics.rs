@@ -66,7 +66,7 @@ impl IcyBoardState {
             } else {
                 IceText::GraphicsOff
             };
-            self.display_text(msg, display_flags::NEWLINE | display_flags::LFAFTER).await?;
+            self.display_text(msg, display_flags::NEWLINE | display_flags::LFBEFORE).await?;
         }
         Ok(())
     }
