@@ -9,7 +9,6 @@ INTEGER CONF = CurConf()
 INTEGER LOW = LOMSGNUM()
 INTEGER HIGH = HiMsgNum()
 STRING FROM(10), SUBJ(10), TO(10), DATETXT(10)
-INTEGER MSG_MAP(10)
 INTEGER FirstMsg = 0
 INTEGER Cursor = 0
 
@@ -27,31 +26,6 @@ ReDim FROM, MAX_MSGS
 ReDim SUBJ, MAX_MSGS
 ReDim TO, MAX_MSGS
 ReDim DATETXT, MAX_MSGS
-ReDim MSG_MAP, MAX_MSGS
-
-boolean found_first
-INTEGER msg_num = 0
-INTEGER I = LOW
-WHILE I < HIGH DO
-  IF GetMsgHdr(CONF, I, HDR_ACTIVE) != 225 THEN 
-    I += 1;
-    CONTINUE
-  ENDIF
-  FROM[msg_num] = GetMsgHdr(CONF, I, HDR_FROM)
-  SUBJ[msg_num] = GetMsgHdr(CONF, I, HDR_SUBJ)
-  TO[msg_num]   = GetMsgHdr(CONF, I, HDR_TO)
-  DATETXT[msg_num] = STRING(GetMsgHdr(CONF, I, HDR_DATE))
-  MSG_MAP[msg_num] = I
-  I += 1;
-  msg_num += 1;
-  IF found_first THEN
-    CONTINUE
-  ELSE 
-    found_first = true
-    LOW = msg_num
-  ENDIF
-ENDWHILE
-HIGH = msg_num
 
 Cls
 DispFile PPEPath() + "screen.pcb", GRAPH
@@ -59,7 +33,6 @@ DrawMsgArea()
 DrawMsgText()
   
 LOOP
-  
   STRING CH = InKey()
   SELECT CASE CH 
     CASE Chr(27)
@@ -88,33 +61,38 @@ ENDLOOP
 END
 
 PROCEDURE DrawMsgArea()
+  INTEGER I
   FOR I = 0 TO Lines
     AnsiPos AreaX, AreaY + I
-    INTEGER o = FirstMsg + I
-    IF o > HIGH - LOW  THEN
+    INTEGER O = FirstMsg + I
+    IF O > HIGH - LOW  THEN
       ClrEOL
       CONTINUE
     ENDIF
 
-    IF o == Cursor THEN
+    IF O == Cursor THEN
       Color 11
       Print ">"
     ELSE
       Color 7
       Print " "
     ENDIF
-    INTEGER MSG_NUM = MSG_MAP[FirstMsg + I]
-    STRING s = Left(StripATX(SUBJ[o]), 36)
-    STRING f = Left(StripATX(FROM[o]), 12)
-    STRING t = Left(StripATX(TO[o]), 12)
-    Print Right(STRING(MSG_NUM), 4), " ", s, " ", f, " ", t, " ", DATETXT[o]
+    INTEGER MSG_NUM = LOW + O
+
+    IF FROM[O] == "" THEN 
+      FROM[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_FROM)), 12) + " "
+      SUBJ[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_SUBJ)), 36) + " "
+      TO[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_TO)), 12) + " "
+      DATETXT[O] = STRING(GetMsgHdr(CONF, MSG_NUM, HDR_DATE))
+    ENDIF
+    Print Right(STRING(MSG_NUM), 4), " ", SUBJ[o], FROM[o], TO[o], DATETXT[O]
   NEXT  
 ENDPROC
 
 PROCEDURE DrawMsgText()
   STRING line
   STRING MsgFile = PPEPath() + "msgtxt." + STRING(PCBNode())
-  MsgToFile CONF, MSG_MAP[Cursor], MsgFile 
+  MsgToFile CONF, LOW + Cursor, MsgFile 
   IF !Exist(MsgFile) THEN
     LOG "Message file " + MsgFile + "  doesn't exists", true
     ClrMsgArea()
@@ -132,7 +110,7 @@ PROCEDURE DrawMsgText()
     IF line == "Message Body:" BREAK
   ENDLOOP
 
-  INTEGER msg_line
+  INTEGER msg_line = 0
   Color 7
   LOOP  
     FGet 1, line
@@ -156,6 +134,7 @@ PROCEDURE DrawMsgText()
 ENDPROC
 
 PROCEDURE ClrMsgArea()
+  INTEGER I
   FOR I = 0 TO Lines
     AnsiPos 1, MsgStartY + I
     ClrEOL
