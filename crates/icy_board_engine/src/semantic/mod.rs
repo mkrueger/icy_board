@@ -915,11 +915,17 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
                     }
                 }
             }
-            crate::executable::StatementSignature::VariableArguments(_, allow_empty) => {
-                if !allow_empty && call_stmt.get_arguments().is_empty() {
+            crate::executable::StatementSignature::VariableArguments(_, min, max) => {
+                if call_stmt.get_arguments().len() < min {
                     self.errors.lock().unwrap().report_error(
                         call_stmt.get_identifier_token().span.clone(),
-                        CompilationErrorType::TooFewArguments(call_stmt.get_identifier().to_string()),
+                        CompilationErrorType::TooFewArguments(call_stmt.get_identifier().to_string(), min),
+                    );
+                }
+                if max > 0 && call_stmt.get_arguments().len() > max {
+                    self.errors.lock().unwrap().report_error(
+                        call_stmt.get_identifier_token().span.clone(),
+                        CompilationErrorType::TooManyArguments(call_stmt.get_identifier().to_string(), max),
                     );
                 }
             }

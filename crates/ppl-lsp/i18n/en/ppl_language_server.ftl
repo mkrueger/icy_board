@@ -511,63 +511,7 @@ hint-statement-confinfo=
     
     @3 = New value to store in field
 
-    ### Fields
-    | Value | Purpose | Type |
-    | ---: | :--- | :--- |
-    |1| Conference Name | STRING |
-    |2| Public Conference|BOOLEAN |
-    |3| Auto Rejoin|BOOLEAN |
-    |4| View Other Users|BOOLEAN |
-    |5| Make Uploads Private|BOOLEAN |
-    |6| Make All Messages Private|BOOLEAN |
-    |7| Echo Mail in Conf|BOOLEAN |
-    |8| Required Security if public|INTEGER |
-    |9| Additional Conference Security|INTEGER |
-    |10| Additional Conference Time| INTEGER |
-    |11| Number of Message Blocks| INTEGER |
-    |12| Name/Loc of MSGS File| STRING |
-    |13| Name/Loc of Users's Menu| STRING |
-    |14| Name/Loc of Sysops Menu| STRING |
-    |15| Name/Loc of NEWS file.| STRING |
-    |16| Public Upload Sort| INTEGER |
-    |17| Name/Loc upload DIR file| STRING |
-    |18| Location of Public Uploads| STRING |
-    |19| Private Upload Sort| INTEGER |
-    |20| Name/Loc Private Upload DIR file| STRING |
-    |21| Location of private uploads| STRING |
-    |22| Doors Menu| STRING |
-    |23| Doors File| STRING |
-    |24| Bulletin Menu| STRING |
-    |25| Bulletin File| STRING |
-    |26| Script Menu| STRING |
-    |27| Script File| STRING |
-    |28| Directories Menu| STRING |
-    |29| Directories File| STRING |
-    |30| Download Paths File| STRING |
-    |31| Force Echo on All Messages| BOOLEAN |
-    |32| Make Conference Read Only| BOOLEAN |
-    |33| Disallow Private Messages| BOOLEAN |
-    |34| Level to Request Return Receipt| INTEGER |
-    |35| Place Origin Info In Messages| BOOLEAN |
-    |36| Prompt For Route info| BOOLEAN |
-    |37| Allow Aliases to be used| BOOLEAN |
-    |38| Show INTRO in 'R A' Scan| BOOLEAN |
-    |39| Level to Enter a Message| INTEGER |
-    |40| Password to Join if Private;| STRING |
-    |41| Name/Loc of Conf INTRO File| STRING |
-    |42| Location for Attachments| STRING |
-    |43| Auto-Register Flags| STRING |
-    |44| Level to Save File Attachment| BYTE |
-    |45| Carbon Copy List Limit| BYTE |
-    |46| Conf-Specific CMD.LST File| STRING |
-    |47| Maintain Old MSGS.NDX File| BOOLEAN |
-    |48| Allow Internet (long) TO: Names| BOOLEAN |
-    |49| Level to Enter Carbon List Msgs| BYTE |
-    |50| Type of NetMail Conference| BYTE |
-    |51| Last Message Exported| INTEGER |
-    |52| Charge Per Minute| DREAL |
-    |53| Charge per Message Read| DREAL |
-    |54| Charge per Message Written| DREAL |
+    { conference_access_constants }
 
 hint-statement-adjtubytes=
     This statement can be used to adjust a users total uploads bytes
@@ -1035,27 +979,7 @@ hint-function-pcbaccstat=
 
 hint-function-derrmsg=returns last DBase error text
 hint-function-account=Returns amount of credits charged for services corresponding to the field parameter.
-message_header_constants= 
- MESSAGE HEADER FIELD ACCESS CONSTANTS
- 
- | Field | hex | dec | Field Description |
- | :--- | :--- | :--- | :--- |
- | `HDR_ACTIVE`   | `0x0E` | `14`  | Message active flag field |
- | `HDR_BLOCKS`   | `0x04` | `4`   | Number of 128 byte blocks in message |
- | `HDR_DATE`     | `0x05` | `5`   | Date message was written |
- | `HDR_ECHO`     | `0x0F` | `15`  | Echoed message flag
- | `HDR_FROM`     | `0x0B` | `11`  | Who the message is from |
- | `HDR_MSGNUM`   | `0x02` | `2`   | Message number | 
- | `HDR_MSGREF`   | `0x03` | `3`   | Reference message |
- | `HDR_PWD`      | `0x0D` | `13`  | Message password |
- | `HDR_REPLY`    | `0x0A` | `10`  | Message reply flag |
- | `HDR_RPLYDATE` | `0x08` | `8`   | Reply message date |
- | `HDR_RPLYTIME` | `0x09` | `9`   | Reply message time |
- | `HDR_STATUS`   | `0x01` | `1`   | Message status |
- | `HDR_SUBJ`     | `0x0C` | `12`  | Message subject |
- | `HDR_TIME`     | `0x06` | `6`   | Message time |
- | `HDR_TO`       | `0x07` | `7`   | Receiver of the message |
- 
+
 hint-function-scanmsghdr=
     Returns the first message number in the message base which matches the search criteria.
 
@@ -1129,64 +1053,8 @@ hint-function-confinfo=
     @1 = The conference number to get information about
     @2 = Conference field to modify. (See note)
 
-    ### Fields
-    | Value | Purpose | Type |
-    | ---: | :--- | :--- |
-    |1| Conference Name | STRING |
-    |2| Public Conference|BOOLEAN |
-    |3| Auto Rejoin|BOOLEAN |
-    |4| View Other Users|BOOLEAN |
-    |5| Make Uploads Private|BOOLEAN |
-    |6| Make All Messages Private|BOOLEAN |
-    |7| Echo Mail in Conf|BOOLEAN |
-    |8| Required Security if public|INTEGER |
-    |9| Additional Conference Security|INTEGER |
-    |10| Additional Conference Time| INTEGER |
-    |11| Number of Message Blocks| INTEGER |
-    |12| Name/Loc of MSGS File| STRING |
-    |13| Name/Loc of Users's Menu| STRING |
-    |14| Name/Loc of Sysops Menu| STRING |
-    |15| Name/Loc of NEWS file.| STRING |
-    |16| Public Upload Sort| INTEGER |
-    |17| Name/Loc upload DIR file| STRING |
-    |18| Location of Public Uploads| STRING |
-    |19| Private Upload Sort| INTEGER |
-    |20| Name/Loc Private Upload DIR file| STRING |
-    |21| Location of private uploads| STRING |
-    |22| Doors Menu| STRING |
-    |23| Doors File| STRING |
-    |24| Bulletin Menu| STRING |
-    |25| Bulletin File| STRING |
-    |26| Script Menu| STRING |
-    |27| Script File| STRING |
-    |28| Directories Menu| STRING |
-    |29| Directories File| STRING |
-    |30| Download Paths File| STRING |
-    |31| Force Echo on All Messages| BOOLEAN |
-    |32| Make Conference Read Only| BOOLEAN |
-    |33| Disallow Private Messages| BOOLEAN |
-    |34| Level to Request Return Receipt| INTEGER |
-    |35| Place Origin Info In Messages| BOOLEAN |
-    |36| Prompt For Route info| BOOLEAN |
-    |37| Allow Aliases to be used| BOOLEAN |
-    |38| Show INTRO in 'R A' Scan| BOOLEAN |
-    |39| Level to Enter a Message| INTEGER |
-    |40| Password to Join if Private;| STRING |
-    |41| Name/Loc of Conf INTRO File| STRING |
-    |42| Location for Attachments| STRING |
-    |43| Auto-Register Flags| STRING |
-    |44| Level to Save File Attachment| BYTE |
-    |45| Carbon Copy List Limit| BYTE |
-    |46| Conf-Specific CMD.LST File| STRING |
-    |47| Maintain Old MSGS.NDX File| BOOLEAN |
-    |48| Allow Internet (long) TO: Names| BOOLEAN |
-    |49| Level to Enter Carbon List Msgs| BYTE |
-    |50| Type of NetMail Conference| BYTE |
-    |51| Last Message Exported| INTEGER |
-    |52| Charge Per Minute| DREAL |
-    |53| Charge per Message Read| DREAL |
-    |54| Charge per Message Written| DREAL |
-
+    { conference_access_constants }
+    
 hint-function-tinkey=
     ### Parameters
     @1 = Number of clock ticks to wait for input.
@@ -1289,8 +1157,6 @@ hint-function-getmsghdr=
 
     ### Returns
     Returns the value of the specified field.
-
-    ### Fields
 
     { message_header_constants }
 hint-function-setmsghdr=
@@ -1429,3 +1295,86 @@ hint-const-s_db=Parameter passed to `FCREATE/FOPEN/FAPPEND` to deny read and wri
 hint-const-s_dn=Parameter passed to `FCREATE/FOPEN/FAPPEND` to allow read and write (deny none) access from other processes
 hint-const-s_dr=Parameter passed to `FCREATE/FOPEN/FAPPEND` to deny read access from other processes
 hint-const-s_dw=Parameter passed to `FCREATE/FOPEN/FAPPEND` to deny write access from other processes
+
+
+# Tables 
+
+message_header_constants= 
+ ### Message Header Field Access Constants
+ 
+ | Field | hex | dec | Field Description |
+ | :--- | :--- | :--- | :--- |
+ | `HDR_ACTIVE`   | `0x0E` | `14`  | Message active flag field |
+ | `HDR_BLOCKS`   | `0x04` | `4`   | Number of 128 byte blocks in message |
+ | `HDR_DATE`     | `0x05` | `5`   | Date message was written |
+ | `HDR_ECHO`     | `0x0F` | `15`  | Echoed message flag
+ | `HDR_FROM`     | `0x0B` | `11`  | Who the message is from |
+ | `HDR_MSGNUM`   | `0x02` | `2`   | Message number | 
+ | `HDR_MSGREF`   | `0x03` | `3`   | Reference message |
+ | `HDR_PWD`      | `0x0D` | `13`  | Message password |
+ | `HDR_REPLY`    | `0x0A` | `10`  | Message reply flag |
+ | `HDR_RPLYDATE` | `0x08` | `8`   | Reply message date |
+ | `HDR_RPLYTIME` | `0x09` | `9`   | Reply message time |
+ | `HDR_STATUS`   | `0x01` | `1`   | Message status |
+ | `HDR_SUBJ`     | `0x0C` | `12`  | Message subject |
+ | `HDR_TIME`     | `0x06` | `6`   | Message time |
+ | `HDR_TO`       | `0x07` | `7`   | Receiver of the message |
+ 
+conference_access_constants=
+ ### Fields
+ | Value | Purpose | Type |
+ | ---: | :--- | :--- |
+ |1| Conference Name | STRING |
+ |2| Public Conference|BOOLEAN |
+ |3| Auto Rejoin|BOOLEAN |
+ |4| View Other Users|BOOLEAN |
+ |5| Make Uploads Private|BOOLEAN |
+ |6| Make All Messages Private|BOOLEAN |
+ |7| Echo Mail in Conf|BOOLEAN |
+ |8| Required Security if public|INTEGER |
+ |9| Additional Conference Security|INTEGER |
+ |10| Additional Conference Time| INTEGER |
+ |11| Number of Message Blocks| INTEGER |
+ |12| Name/Loc of MSGS File| STRING |
+ |13| Name/Loc of Users's Menu| STRING |
+ |14| Name/Loc of Sysops Menu| STRING |
+ |15| Name/Loc of NEWS file.| STRING |
+ |16| Public Upload Sort| INTEGER |
+ |17| Name/Loc upload DIR file| STRING |
+ |18| Location of Public Uploads| STRING |
+ |19| Private Upload Sort| INTEGER |
+ |20| Name/Loc Private Upload DIR file| STRING |
+ |21| Location of private uploads| STRING |
+ |22| Doors Menu| STRING |
+ |23| Doors File| STRING |
+ |24| Bulletin Menu| STRING |
+ |25| Bulletin File| STRING |
+ |26| Script Menu| STRING |
+ |27| Script File| STRING |
+ |28| Directories Menu| STRING |
+ |29| Directories File| STRING |
+ |30| Download Paths File| STRING |
+ |31| Force Echo on All Messages| BOOLEAN |
+ |32| Make Conference Read Only| BOOLEAN |
+ |33| Disallow Private Messages| BOOLEAN |
+ |34| Level to Request Return Receipt| INTEGER |
+ |35| Place Origin Info In Messages| BOOLEAN |
+ |36| Prompt For Route info| BOOLEAN |
+ |37| Allow Aliases to be used| BOOLEAN |
+ |38| Show INTRO in 'R A' Scan| BOOLEAN |
+ |39| Level to Enter a Message| INTEGER |
+ |40| Password to Join if Private;| STRING |
+ |41| Name/Loc of Conf INTRO File| STRING |
+ |42| Location for Attachments| STRING |
+ |43| Auto-Register Flags| STRING |
+ |44| Level to Save File Attachment| BYTE |
+ |45| Carbon Copy List Limit| BYTE |
+ |46| Conf-Specific CMD.LST File| STRING |
+ |47| Maintain Old MSGS.NDX File| BOOLEAN |
+ |48| Allow Internet (long) TO: Names| BOOLEAN |
+ |49| Level to Enter Carbon List Msgs| BYTE |
+ |50| Type of NetMail Conference| BYTE |
+ |51| Last Message Exported| INTEGER |
+ |52| Charge Per Minute| DREAL |
+ |53| Charge per Message Read| DREAL |
+ |54| Charge per Message Written| DREAL |

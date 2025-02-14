@@ -166,6 +166,9 @@ impl IcyBoardState {
     async fn run_action(&mut self, command: &Command, cmd_action: &CommandAction) -> Res<()> {
         self.session.non_stop_off();
         match cmd_action.command_type {
+            CommandType::StuffText => {
+                self.session.push_tokens(&cmd_action.parameter);
+            }
             CommandType::GotoXY => {
                 let pos = crate::icy_board::commands::Position::parse(&cmd_action.parameter);
                 self.gotoxy(TerminalTarget::Both, 1 + pos.x as i32, 1 + pos.y as i32).await?;

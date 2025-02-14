@@ -1,8 +1,8 @@
 use icy_board_engine::{
     ast::{
         walk_binary_expression, walk_block_stmt, walk_for_stmt, walk_function_call_expression, walk_function_implementation, walk_if_stmt, walk_if_then_stmt,
-        walk_let_stmt, walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation, walk_repeat_until_stmt, walk_select_stmt,
-        walk_variable_declaration_statement, walk_while_do_stmt, walk_while_stmt, Ast, AstVisitor, Constant, ConstantExpression, Expression,
+        walk_let_stmt, walk_loop_stmt, walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation, walk_repeat_until_stmt,
+        walk_select_stmt, walk_variable_declaration_statement, walk_while_do_stmt, walk_while_stmt, Ast, AstVisitor, Constant, ConstantExpression, Expression,
         IdentifierExpression, ParameterSpecifier,
     },
     executable::FunctionDefinition,
@@ -219,6 +219,12 @@ impl AstVisitor<()> for SemanticTokenVisitor {
         self.highlight_token(while_do.get_do_token(), SemanticTokenType::KEYWORD);
         walk_while_do_stmt(self, while_do);
         self.highlight_token(while_do.get_endwhile_token(), SemanticTokenType::KEYWORD);
+    }
+
+    fn visit_loop_statement(&mut self, loop_stmt: &icy_board_engine::ast::LoopStatement) -> () {
+        self.highlight_token(loop_stmt.get_loop_token(), SemanticTokenType::KEYWORD);
+        self.highlight_token(loop_stmt.get_endloop_token(), SemanticTokenType::KEYWORD);
+        walk_loop_stmt(self, loop_stmt);
     }
 
     fn visit_repeat_until_statement(&mut self, repeat_until_stmt: &icy_board_engine::ast::RepeatUntilStatement) {

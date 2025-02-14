@@ -618,7 +618,7 @@ impl VariableTable {
             },
             super::PPECommand::PredefinedCall(id, args) => match id.sig {
                 super::StatementSignature::Invalid => {}
-                super::StatementSignature::ArgumentsWithVariable(var_arg, _) | super::StatementSignature::VariableArguments(var_arg, _) => {
+                super::StatementSignature::ArgumentsWithVariable(var_arg, _) | super::StatementSignature::VariableArguments(var_arg, _, _) => {
                     if var_arg > 0 {
                         self.report_usage(&args[var_arg - 1]);
                     }

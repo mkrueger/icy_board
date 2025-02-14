@@ -709,7 +709,7 @@ pub fn read_int(reader: &mut BufReader<File>, encoding: Encoding) -> Res<i32> {
 /// # Errors
 pub fn read_hex(reader: &mut BufReader<File>, encoding: Encoding) -> Res<i32> {
     let line = read_line(reader, encoding)?;
-    Ok(i32::from_str_radix(&line, 16)?)
+    Ok(i32::from_str_radix(&line, 16).unwrap_or(0))
 }
 
 /// # Panics

@@ -223,6 +223,7 @@ impl JamMessageBase {
         let header_path = self.file_name.with_extension(extensions::HEADER_DATA);
         let header_file = OpenOptions::new().create(true).write(true).open(header_path)?;
         let mut writer = BufWriter::new(header_file);
+        println!("Writing header {:?}", self.header_info);
         self.header_info.update(&mut writer)?;
         writer.flush()?;
         Ok(())

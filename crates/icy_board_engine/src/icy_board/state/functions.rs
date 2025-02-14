@@ -64,7 +64,7 @@ lazy_static::lazy_static! {
 
 pub const MASK_COMMAND: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;':,.<>?/\\\" ";
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum PPECallType {
     PPE,
     Menu,
@@ -83,42 +83,39 @@ impl PPECall {
             return None;
         }
         let mut iter = line.chars();
-        let first_ch = iter.next().unwrap();
+        let first_ch = iter.next().unwrap_or_default();
 
-        if first_ch == '!' || first_ch == '%' || first_ch == '$' {
-            let call_type = match first_ch {
-                '!' => PPECallType::PPE,
-                '$' => PPECallType::Menu,
-                _ => PPECallType::File,
-            };
-            let mut arguments = Vec::new();
-            let mut arg = String::new();
+        let call_type = match first_ch {
+            '!' => PPECallType::PPE,
+            '$' => PPECallType::Menu,
+            '%' => PPECallType::File,
+            _ => return None,
+        };
+        let mut arguments = Vec::new();
+        let mut arg = String::new();
 
-            for ch in iter {
-                if ch == ' ' || ch == '_' {
-                    if !arg.is_empty() {
-                        arguments.push(arg);
-                        arg = String::new();
-                    }
-                    if ch == '_' {
-                        break;
-                    }
-                    continue;
+        for ch in iter {
+            if ch == ' ' || ch == '_' {
+                if !arg.is_empty() {
+                    arguments.push(arg);
+                    arg = String::new();
                 }
-                arg.push(ch);
+                if ch == '_' {
+                    break;
+                }
+                continue;
             }
-
-            if !arg.is_empty() {
-                arguments.push(arg);
-            }
-            Some(Self {
-                call_type,
-                file: arguments[0].clone(),
-                arguments: arguments[1..].to_vec(),
-            })
-        } else {
-            None
+            arg.push(ch);
         }
+
+        if !arg.is_empty() {
+            arguments.push(arg);
+        }
+        Some(Self {
+            call_type,
+            file: arguments[0].clone(),
+            arguments: arguments[1..].to_vec(),
+        })
     }
 }
 

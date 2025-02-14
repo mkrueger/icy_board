@@ -1,7 +1,7 @@
 use std::{env, fs, thread, time::Duration};
 
 use crate::{
-    datetime::IcbDate,
+    datetime::{IcbDate, IcbTime},
     executable::{PPEExpr, VariableType, VariableValue},
     icy_board::{
         icb_config::IcbColor,
@@ -16,7 +16,7 @@ use bstr::BString;
 use chrono::{DateTime, Utc};
 use codepages::tables::CP437_TO_UNICODE;
 use icy_engine::{BufferType, OutputFormat, SaveOptions, ScreenPreperation};
-use jamjam::jam::JamMessage;
+use jamjam::jam::{JamMessage, JamMessageBase};
 
 use crate::{
     icy_board::icb_text::IceText,
@@ -844,7 +844,7 @@ pub async fn closecap(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 }
 
 pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let conf = vm.eval_expr(&args[0]).await?.as_int();
+    let (conf, area) = vm.eval_expr(&args[0]).await?.as_msg_id();
     let to = vm.eval_expr(&args[1]).await?.as_string();
     let from = vm.eval_expr(&args[2]).await?.as_string();
     let subject = vm.eval_expr(&args[3]).await?.as_string();
@@ -870,21 +870,7 @@ pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     }
 
     if conf >= 0 {
-        if let Ok(area_opt) = vm.icy_board_state.show_message_areas(conf as u16).await {
-            match area_opt {
-                Some(area) => {
-                    vm.icy_board_state
-                        .send_message(conf as i32, area as i32, message, IceText::SavingMessage)
-                        .await?;
-                }
-                None => {
-                    vm.icy_board_state
-                        .display_text(IceText::MessageAborted, display_flags::LFBEFORE | display_flags::NEWLINE)
-                        .await?;
-                    log::error!("Message area not found: {}", conf);
-                }
-            }
-        }
+        vm.icy_board_state.send_message(conf, area, message, IceText::SavingMessage).await?;
     } else {
         vm.icy_board_state.send_message(-1, 0, message, IceText::SavingMessage).await?;
     }
@@ -1648,8 +1634,75 @@ pub async fn recordusage(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<(
     panic!("TODO")
 }
 pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("msgtofile not implemented statement!");
-    panic!("TODO")
+    let (conference, area) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let msg_number = vm.eval_expr(&args[1]).await?.as_int();
+    let file_name = vm.eval_expr(&args[2]).await?.as_string();
+
+    let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area as usize]
+        .filename
+        .clone();
+    match JamMessageBase::open(vm.resolve_file(&msg_base).await) {
+        Ok(base) => {
+            match base.read_header(msg_number as u32) {
+                Ok(header) => {
+                    match base.read_msg_text(&header) {
+                        Ok(msg_text) => {
+                            let mut msg = String::new();
+                            msg.push_str(&format!("          Status: {}\n", '+'));
+                            msg.push_str(&format!("  Message Number: {}\n", header.message_number));
+                            msg.push_str(&format!("Reference Number: {}\n", 0));
+                            msg.push_str(&format!("Number of blocks: {}\n", msg.len() / 128));
+
+                            let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
+                            let date = IcbDate::from_utc(date_time);
+                            let time = IcbTime::from_naive(date_time.naive_local());
+                            msg.push_str(&format!("            Date: {}\n", date));
+                            msg.push_str(&format!("            Time: {}\n", time));
+                            msg.push_str(&format!(
+                                "              To: {}\n",
+                                if let Some(s) = header.get_to() { s.to_string() } else { String::new() }
+                            ));
+                            msg.push_str(&format!("           Reply: {}\n", ""));
+                            msg.push_str(&format!("   Time of reply: {}\n", ""));
+                            msg.push_str(&format!("           Reply: {}\n", ""));
+                            msg.push_str(&format!(
+                                "            From: {}\n",
+                                if let Some(s) = header.get_from() { s.to_string() } else { String::new() }
+                            ));
+                            msg.push_str(&format!(
+                                "         Subject: {}\n",
+                                if let Some(s) = header.get_subject() { s.to_string() } else { String::new() }
+                            ));
+                            msg.push_str(&format!("        Password: {}\n", header.password_crc));
+                            msg.push_str(&format!("          Active: {}\n", if header.is_deleted() { 225 } else { 226 }));
+                            msg.push_str(&format!("            Echo:{}\n", ""));
+                            msg.push_str(&format!("  Extended headers: {}\n", 0));
+                            //  Todo: Extended headers
+                            msg.push_str("Message Body:\n");
+                            msg.push_str(&msg_text.to_string());
+                            if let Err(err) = fs::write(file_name, msg) {
+                                log::error!("MSGTOFILE can't write message text {msg_number} in area {area}: {err}");
+                                return Ok(());
+                            }
+                            return Ok(());
+                        }
+                        Err(err) => {
+                            log::error!("MSGTOFILE can't read message text {msg_number} in area {area}: {err}");
+                            return Ok(());
+                        }
+                    }
+                }
+                Err(err) => {
+                    log::error!("MSGTOFILE can't read message header {msg_number} in area {area}: {err}");
+                    return Ok(());
+                }
+            }
+        }
+        Err(err) => {
+            log::error!("MSGTOFILE can't open message base in area {area}: {err}");
+            return Ok(());
+        }
+    }
 }
 pub async fn qwklimits(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("qwklimits not implemented statement!");

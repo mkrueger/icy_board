@@ -1400,7 +1400,7 @@ pub async fn himsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     let area = 0;
     let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].filename.clone();
     match JamMessageBase::open(vm.resolve_file(&msg_base).await) {
-        Ok(base) => Ok(VariableValue::new_int((base.base_messagenumber() + base.active_messages()) as i32)),
+        Ok(base) => Ok(VariableValue::new_int((base.base_messagenumber() + base.active_messages() - 1) as i32)),
         Err(err) => {
             log::error!("HIMSGNUM can't open message base in area {area}: {err}");
             Ok(VariableValue::new_int(0))
@@ -1973,17 +1973,28 @@ pub async fn getbankbal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
     panic!("TODO")
 }
 pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let (conf, area) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_id();
     let msg_num = vm.eval_expr(&args[1]).await?.as_int() as u32;
     let field_num = vm.eval_expr(&args[2]).await?.as_int();
 
-    let msg_base = vm.icy_board_state.get_board().await.conferences[conf as usize].areas.as_ref().unwrap()[area as usize]
-        .filename
-        .clone();
+    let msg_base = {
+        let board = vm.icy_board_state.get_board().await;
+        let Some(conf) = board.conferences[conf_num as usize].areas.as_ref() else {
+            log::error!("Can't read conference {conf_num}");
+            return Ok(VariableValue::new_bool(false));
+        };
+        let Some(area) = conf.get(area_num as usize) else {
+            log::error!("Can't read area {area_num} from {conf_num}");
+            return Ok(VariableValue::new_bool(false));
+        };
+        area.filename.clone()
+    };
+
+    log::info!("Reading header {msg_num} from {}", msg_base.display());
     let base = JamMessageBase::open(vm.resolve_file(&msg_base).await)?;
     if let Ok(header) = base.read_header(msg_num) {
         return match field_num {
-            HDR_ACTIVE => Ok(VariableValue::new_bool(!header.is_deleted())),
+            HDR_ACTIVE => Ok(VariableValue::new_int(if header.is_deleted() { 226 } else { 225 })),
             HDR_BLOCKS => Ok(VariableValue::new_int((header.txt_len / 128) as i32)),
             HDR_DATE => {
                 let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
@@ -2026,8 +2037,8 @@ pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
             }
             HDR_TIME => {
                 let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
-                let date = IcbTime::from_naive(date_time.naive_local());
-                Ok(VariableValue::new_time(date.to_pcboard_time()))
+                let time = IcbTime::from_naive(date_time.naive_local());
+                Ok(VariableValue::new_time(time.to_pcboard_time()))
             }
             HDR_TO => {
                 if let Some(to) = header.get_to() {
@@ -2043,7 +2054,7 @@ pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
         };
     }
 
-    log::error!("Can't read header {msg_num} from {conf}:{area}");
+    log::error!("Can't read header {msg_num} from {conf_num}:{area_num}");
     return Ok(VariableValue::new_bool(false));
 }
 

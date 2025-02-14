@@ -13,8 +13,8 @@ pub enum StatementSignature {
     /// The first usize is the variable - 0 for none, second is the number of arguments
     ArgumentsWithVariable(usize, usize),
 
-    /// The first i32 is a variable, 0 for none, second argument is if at empty arguments are allowd (=true means "PRINTLN" is valid)
-    VariableArguments(usize, bool),
+    /// The first i32 is a variable, 0 for none, second argument is minimum number of arguments, third maximum
+    VariableArguments(usize, usize, usize),
 
     /// 3 arguments, first expression, after that a single i16 for the table number of a variable, third an expression
     SpecialCaseDlockg,
@@ -479,8 +479,8 @@ impl StatementDefinition {
                 let sig_args;
                 if let Some(args) = &self.args {
                     res.push_str(" ");
-                    if let StatementSignature::VariableArguments(_, allow_empty) = self.sig {
-                        if allow_empty {
+                    if let StatementSignature::VariableArguments(_, argc, _) = self.sig {
+                        if argc == 0 {
                             res.push_str("[");
                         }
                         res.push_str(&args.iter().map(|arg| format_argument_type_last(arg)).collect::<Vec<String>>().join(", "));
@@ -488,7 +488,7 @@ impl StatementDefinition {
                         res.push_str("[, ");
                         res.push_str(&format_argument_type_last(args.iter().last().unwrap()));
                         res.push_str("]*");
-                        if allow_empty {
+                        if argc == 0 {
                             res.push_str("]");
                         }
                     } else {
@@ -604,7 +604,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            sig: StatementSignature::VariableArguments(0, false),
+            sig: StatementSignature::VariableArguments(0, 0, 0),
         },
         StatementDefinition {
             name: "PrintLn",
@@ -613,7 +613,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            sig: StatementSignature::VariableArguments(0, true),
+            sig: StatementSignature::VariableArguments(0, 1, 0),
         },
         StatementDefinition {
             name: "IF",
@@ -725,7 +725,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("chnl", VariableType::Integer),
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            sig: StatementSignature::VariableArguments(0, false),
+            sig: StatementSignature::VariableArguments(0, 1, 0),
         },
         StatementDefinition {
             name: "FPutLn",
@@ -735,7 +735,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("chnl", VariableType::Integer),
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            sig: StatementSignature::VariableArguments(0, true),
+            sig: StatementSignature::VariableArguments(0, 0, 0),
         },
         StatementDefinition {
             name: "ResetDisp",
@@ -1087,7 +1087,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("var", VariableType::None),
             ]),
-            sig: StatementSignature::VariableArguments(0, false),
+            sig: StatementSignature::VariableArguments(0, 1, 0),
         },
         StatementDefinition {
             name: "Pop",
@@ -1450,7 +1450,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            sig: StatementSignature::VariableArguments(0, false),
+            sig: StatementSignature::VariableArguments(0, 1, 0),
         },
         StatementDefinition {
             name: "SPrintLN",
@@ -1459,7 +1459,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            sig: StatementSignature::VariableArguments(0, true),
+            sig: StatementSignature::VariableArguments(0, 0, 0),
         },
         StatementDefinition {
             name: "MPrint",
@@ -1468,7 +1468,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            sig: StatementSignature::VariableArguments(0, false),
+            sig: StatementSignature::VariableArguments(0, 1, 0),
         },
         StatementDefinition {
             name: "MPrintLn",
@@ -1477,7 +1477,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            sig: StatementSignature::VariableArguments(0, true),
+            sig: StatementSignature::VariableArguments(0, 0, 0),
         },
         StatementDefinition {
             name: "Rename",
@@ -1621,7 +1621,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            sig: StatementSignature::VariableArguments(0, false),
+            sig: StatementSignature::VariableArguments(0, 1, 0),
         },
         StatementDefinition {
             name: "FDPutLn",
@@ -1630,7 +1630,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            sig: StatementSignature::VariableArguments(0, true),
+            sig: StatementSignature::VariableArguments(0, 0, 0),
         },
         StatementDefinition {
             name: "FDPutPad",
@@ -1694,7 +1694,7 @@ lazy_static::lazy_static! {
             version: 200,
             opcode: OpCode::REDIM,
             args: None,
-            sig: StatementSignature::VariableArguments(1, false),
+            sig: StatementSignature::VariableArguments(1, 2, 4),
         },
         StatementDefinition {
             name: "Append",
@@ -1890,7 +1890,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            sig: StatementSignature::VariableArguments(0, false),
+            sig: StatementSignature::VariableArguments(0, 1, 0),
         },
         StatementDefinition {
             name: "PrFoundLn",
@@ -1899,7 +1899,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            sig: StatementSignature::VariableArguments(0, true),
+            sig: StatementSignature::VariableArguments(0, 0, 0),
         },
         StatementDefinition {
             name: "TPAGet",

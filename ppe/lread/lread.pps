@@ -1,0 +1,139 @@
+DECLARE PROCEDURE DrawMsgArea()
+DECLARE PROCEDURE DrawMsgText()
+
+INTEGER AreaX, AreaY, Lines
+INTEGER MsgStartY
+
+INTEGER CONF = CurConf()
+INTEGER LOW = LOMSGNUM()
+INTEGER HIGH = HiMsgNum()
+STRING FROM(10), SUBJ(10), TO(10), DATETXT(10)
+INTEGER MSG_MAP(10)
+INTEGER I
+INTEGER FirstMsg = 0
+INTEGER Cursor = 0
+
+FOpen 1, PPEPath()+ "lread.cfg", O_RD, S_DB
+
+FGet 1, AreaX
+FGet 1, AreaY
+FGet 1, Lines
+FGet 1, MsgStartY
+Lines -= 1
+FClose 1
+
+ReDim FROM, HIGH - LOW + 1
+ReDim SUBJ, HIGH - LOW + 1
+ReDim TO, HIGH - LOW + 1
+ReDim DATETXT, HIGH - LOW + 1
+ReDim MSG_MAP, HIGH - LOW + 1
+
+boolean found_first
+INTEGER msg_num = 0
+WHILE I < HIGH DO
+  FROM(msg_num) = Left(GetMsgHdr(CONF, I, HDR_FROM), 12)
+  SUBJ(msg_num) = Left(GetMsgHdr(CONF, I, HDR_SUBJ), 36)
+  TO(msg_num)   = Left(GetMsgHdr(CONF, I, HDR_TO), 12)
+  DATETXT(msg_num) = STRING(GetMsgHdr(CONF, I, HDR_DATE))
+  MSG_MAP(msg_num) = I
+  I += 1;
+  IF DATETXT(msg_num) != "" THEN
+    IF found_first THEN
+      CONTINUE
+    ELSE 
+      found_first = true
+      LOW = msg_num
+    ENDIF
+  ENDIF
+  I += 1
+ENDWHILE
+HIGH = msg_num
+
+Cls
+DispFile PPEPath() + "screen.pcb", GRAPH
+DrawMsgArea()
+DrawMsgText()
+  
+LOOP
+  
+  STRING CH = InKey()
+  if CH == Chr(27) BREAK 
+
+  IF CH == "UP" THEN
+    IF Cursor > 0 THEN
+      Cursor -= 1
+      IF Cursor < FirstMsg THEN
+        FirstMsg = Cursor
+      ENDIF
+      DrawMsgArea()
+      DrawMsgText()
+    ENDIF
+  ENDIF
+
+  IF CH == "DOWN" THEN
+    IF Cursor < HIGH - LOW THEN
+      Cursor += 1
+      IF Cursor >= FirstMsg + Lines THEN
+        FirstMsg = Cursor - Lines + 1
+      ENDIF
+      DrawMsgArea()
+      DrawMsgText()
+    ENDIF
+  ENDIF
+ENDLOOP
+
+END
+
+PROCEDURE DrawMsgArea()
+  FOR I = 0 TO Lines
+    AnsiPos AreaX, AreaY + I
+    INTEGER o = FirstMsg + I
+    IF o > HIGH - LOW  THEN
+      ClrEOL
+      CONTINUE
+    ENDIF
+
+    IF o == Cursor THEN
+      Color 11
+      Print ">"
+    ELSE
+      Print " "
+    ENDIF
+    
+    Print Right(STRING(I), 4), " ",  SUBJ(o), " ", FROM(o), " ", TO(o), " ", DATETXT(o)
+    IF o == Cursor THEN
+      DefColor
+    ENDIF
+  NEXT  
+ENDPROC
+
+PROCEDURE DrawMsgText()
+  STRING line
+  STRING MsgFile = PPEPath() + "msgtxt." + STRING(PCBNode())
+  MsgToFile CONF, MSG_MAP[Low + Cursor], MsgFile 
+  FOpen 1, MsgFile, O_RD, S_DB
+  
+  LOOP  
+    FGet 1, line
+    IF FErr(1) RETURN
+    IF line == "Message Body:" BREAK
+  ENDLOOP
+
+  INTEGER msg_line
+  LOOP  
+    FGet 1, line
+    IF FErr(1) || msg_line + MsgStartY > 23 BREAK
+    AnsiPos 1, MsgStartY + msg_line
+    ClrEOL
+    AnsiPos 1, MsgStartY + msg_line
+    PRINT line
+    msg_line += 1
+  ENDLOOP
+  FClose 1
+  Delete MsgFile
+  WHILE msg_line <= 23 - MsgStartY DO
+    AnsiPos 1, MsgStartY + msg_line
+    ClrEOL
+    msg_line += 1
+  ENDWHILE
+ENDPROC

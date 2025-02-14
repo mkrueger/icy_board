@@ -260,8 +260,7 @@ impl ConferenceBase {
         let mut confs = Vec::new();
         for (i, c) in conferences.iter().enumerate() {
             let d = &add_conferences[i];
-
-            let general_area = MessageArea {
+            let general_area: MessageArea = MessageArea {
                 name: "General".to_string(),
                 filename: PathBuf::from(&c.message_file),
                 is_read_only: d.read_only,

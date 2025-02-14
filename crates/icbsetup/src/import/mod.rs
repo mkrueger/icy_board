@@ -24,7 +24,6 @@ use icy_board_engine::{
         bulletins::BullettinList,
         commands::CommandList,
         conferences::ConferenceBase,
-        convert_to_utf8,
         file_directory::DirectoryList,
         group_list::GroupList,
         icb_config::{
@@ -104,15 +103,19 @@ impl PCBoardImporter {
                 let source_directory = path.clone();
                 output.start_action(format!("Importing PCBoard from base path {}\n", source_directory.display()));
 
-                path.push(help_loc.file_name().unwrap());
+                path.push(help_loc.file_name().unwrap_or_default());
                 if !path.exists() {
                     return Err(Box::new(IcyBoardError::Error("Can't resolve C: file".to_string())));
                 }
 
                 //let len = to_str().unwrap().len();
-                let k = help_loc.parent().unwrap().to_str().unwrap().to_string();
-                let v = file_path.parent().unwrap().to_path_buf().to_str().unwrap().to_string();
-                paths.insert(k, v);
+                if let Some(k) = help_loc.parent() {
+                    if let Some(v) = file_path.parent() {
+                        let k = k.to_str().unwrap_or_default().to_string();
+                        let v = v.to_path_buf().to_str().unwrap_or_default().to_string();
+                        paths.insert(k, v);
+                    }
+                }
 
                 let mut map_paths = HashMap::new();
                 map_paths.insert(upper.clone() + "\\PPE", output_directory.join("ppe"));
@@ -146,7 +149,9 @@ impl PCBoardImporter {
             .collect();
         // hack for "/path" - assume that PCB is on the same drive & top level dir (like C:\PCB)
         if s.starts_with("/") {
-            s = format!("{}/..{}", self.resolve_paths.values().next().unwrap(), s);
+            if let Some(path) = self.resolve_paths.values().next() {
+                s = format!("{}/..{}", path, s);
+            }
         }
 
         for (k, v) in &self.resolve_paths {
@@ -525,8 +530,10 @@ impl PCBoardImporter {
 
         let conf = self.resolve_file(conference_file);
         if !conf.exists() {
-            self.output.warning(format!("Can't find conference file {}", conf.display()));
-            self.logger.log(&format!("Can't find conference file {}", conf.display()).as_str());
+            self.output
+                .warning(format!("Can't find conference file {}/{}", conf.display(), conference_file));
+            self.logger
+                .log(&format!("Can't find conference file {}/{}", conf.display(), conference_file).as_str());
             return Ok(PathBuf::new());
         }
         let conferences = PcbConferenceHeader::import_pcboard(&conf, self.data.num_conf as usize)?;
@@ -662,7 +669,7 @@ impl PCBoardImporter {
                         for (i, entry) in text_file.iter_mut().enumerate() {
                             entry.text = self.scan_pcb_text_line_for_commands(&entry.text, i)?;
                         }
-                        let destination = PathBuf::from(
+                        let destination: PathBuf = PathBuf::from(
                             destination
                                 .with_extension(entry.path().extension().unwrap_or_default().to_ascii_lowercase())
                                 .to_string_lossy()
@@ -750,7 +757,7 @@ impl PCBoardImporter {
     }
 
     fn convert_file(&mut self, resolved_file: PathBuf) -> Res<String> {
-        let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
+        let upper_file_name = resolved_file.to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(file.clone());
         }
@@ -764,43 +771,39 @@ impl PCBoardImporter {
                 }
                 "MNU" => {
                     let imported_menu = Menu::import_pcboard(&resolved_file)?;
-                    let menu_path = self
-                        .output_directory
-                        .join("main/menus")
-                        .join(resolved_file.file_name().unwrap().to_ascii_lowercase());
+                    let fname = format!("main/menus/{}", resolved_file.file_name().unwrap().to_ascii_lowercase().to_string_lossy());
+                    let menu_path = self.output_directory.join(&fname);
                     imported_menu.save(&menu_path)?;
-                    self.converted_files.insert(upper_file_name.clone(), menu_path.to_str().unwrap().to_string());
+                    self.converted_files.insert(upper_file_name.clone(), fname);
                     let out_path = menu_path.file_name().unwrap().to_str().unwrap().to_string();
                     self.logger.translated_file(&resolved_file, &menu_path);
                     return Ok(out_path);
                 }
-                _ => {
-                    let out_path = self
-                        .output_directory
-                        .parent()
-                        .unwrap()
-                        .join("gen")
-                        .join(resolved_file.file_name().unwrap().to_ascii_lowercase());
-                    self.converted_files.insert(upper_file_name.clone(), out_path.to_str().unwrap().to_string());
-
-                    match self.import_and_scan_file(&resolved_file, &out_path) {
-                        Err(err) => {
-                            self.logger.log_boxed_error(&*err);
-                            return Ok(resolved_file.to_str().unwrap().to_string());
-                        }
-                        _ => {}
-                    }
-                    return Ok(out_path.to_str().unwrap().to_string());
-                }
+                _ => {}
             }
         }
 
-        let output_path = self.output_directory.join("gen").join(resolved_file.file_name().unwrap().to_ascii_lowercase());
+        let rel_name = format!("gen/{}", resolved_file.file_name().unwrap().to_ascii_lowercase().to_string_lossy());
+        self.converted_files.insert(upper_file_name.clone(), rel_name.clone());
+
+        let output_path = self.output_directory.join(&rel_name);
+        match self.import_and_scan_file(&resolved_file, &output_path) {
+            Err(err) => {
+                self.logger.log_boxed_error(&*err);
+                return Ok(resolved_file.to_str().unwrap().to_string());
+            }
+            _ => {}
+        }
+        return Ok(rel_name);
+
+        /*
+        let rel_name = format!("gen/{}", resolved_file.file_name().unwrap().to_ascii_lowercase().to_string_lossy());
+        let output_path = self.output_directory.join(&rel_name);
         convert_to_utf8(&resolved_file, &output_path)?;
-        self.converted_files.insert(upper_file_name.clone(), output_path.to_str().unwrap().to_string());
+        self.converted_files.insert(upper_file_name.clone(), rel_name);
         let out_path = output_path.file_name().unwrap().to_str().unwrap().to_string();
         self.logger.converted_file(&resolved_file, &output_path, true);
-        Ok(out_path)
+        Ok(out_path)*/
     }
 
     pub fn import_and_scan_file<P: AsRef<Path>, Q: AsRef<Path>>(&mut self, from: &P, to: &Q) -> Res<()> {
@@ -815,7 +818,8 @@ impl PCBoardImporter {
         let mut import = String::new();
 
         for (i, line) in in_string.lines().enumerate() {
-            import.push_str(&self.scan_line_for_commands(line, i)?);
+            let line_txt = self.scan_line_for_commands(line, i)?;
+            import.push_str(&line_txt);
             import.push('\n');
         }
 
@@ -878,7 +882,7 @@ impl PCBoardImporter {
             return Ok(PathBuf::from(new_name));
         };
 
-        let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
+        let upper_file_name = resolved_file.to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             self.logger.log(&format!("already converted ({})", file));
             return Ok(PathBuf::from(file));
@@ -1036,7 +1040,7 @@ impl PCBoardImporter {
         };
 
         let resolved_file = self.resolve_file(attach_dir.to_str().unwrap());
-        let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
+        let upper_file_name = resolved_file.to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
         }
@@ -1122,21 +1126,19 @@ impl PCBoardImporter {
             return Ok(PathBuf::new());
         }
         let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
-        let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
+        let upper_file_name = resolved_file.to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
         }
 
         if !resolved_file.is_file() {
             self.converted_files.insert(upper_file_name.clone(), String::new());
-
             self.logger.log(&format!("Can't find message base {}", resolved_file.display()));
             self.output.warning(format!("Can't find message base {}", resolved_file.display()));
             return Ok(PathBuf::new());
         }
 
         self.output.start_action(format!("Convert message base {}…", resolved_file.display()));
-
         let destination = dest_path.join(resolved_file.file_name().unwrap().to_ascii_lowercase());
 
         jamjam::conversion::convert_pcboard_to_jam(&resolved_file, &destination, &EchomailAddress::default())?;
@@ -1144,9 +1146,7 @@ impl PCBoardImporter {
         self.logger
             .log(&format!("Converted message base {} -> {}", resolved_file.display(), destination.display()));
         let new_rel_name = PathBuf::from(output.to_string().to_lowercase()).join(resolved_file.file_name().unwrap().to_ascii_lowercase());
-
         self.converted_files.insert(upper_file_name.clone(), new_rel_name.to_str().unwrap().to_string());
-
         Ok(new_rel_name)
     }
 
@@ -1157,7 +1157,7 @@ impl PCBoardImporter {
             return Ok(PathBuf::new());
         }
         let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
-        let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
+        let upper_file_name = resolved_file.to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
         }
@@ -1219,7 +1219,7 @@ impl PCBoardImporter {
             return Ok(PathBuf::new());
         }
         let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
-        let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
+        let upper_file_name = resolved_file.to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
         }
@@ -1321,7 +1321,7 @@ impl PCBoardImporter {
             return Ok(PathBuf::new());
         }
         let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
-        let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
+        let upper_file_name = resolved_file.to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
         }
@@ -1361,7 +1361,7 @@ impl PCBoardImporter {
             return Ok(PathBuf::new());
         }
         let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
-        let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
+        let upper_file_name = resolved_file.to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
         }
@@ -1428,7 +1428,7 @@ impl PCBoardImporter {
 
         let src_file = PathBuf::from(source);
         let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
-        let upper_file_name = resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase();
+        let upper_file_name = resolved_file.to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
         }

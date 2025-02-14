@@ -629,7 +629,7 @@ impl<'a> PPEVisitor<()> for VariableConstantVisitor<'a> {
         match def.sig {
             crate::executable::StatementSignature::Invalid => {}
             crate::executable::StatementSignature::ArgumentsWithVariable(_, _) => {}
-            crate::executable::StatementSignature::VariableArguments(_, _) => {}
+            crate::executable::StatementSignature::VariableArguments(_, _, _) => {}
             crate::executable::StatementSignature::SpecialCaseDlockg => {}
             crate::executable::StatementSignature::SpecialCaseDcreate => {}
             crate::executable::StatementSignature::SpecialCaseSort => {
