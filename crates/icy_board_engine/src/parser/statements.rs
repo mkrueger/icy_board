@@ -407,7 +407,6 @@ impl<'a> Parser<'a> {
         self.next_token();
         let Some(case_expr) = self.parse_expression() else {
             self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
-
             return None;
         };
         self.next_token();
@@ -420,7 +419,6 @@ impl<'a> Parser<'a> {
         while self.get_cur_token() == Some(Token::Case) {
             let inner_case_token = self.save_spanned_token();
             self.next_token();
-
             let mut case_specifiers = Vec::new();
             if let Some(cs) = self.parse_case_specifier() {
                 case_specifiers.push(cs);
@@ -491,10 +489,8 @@ impl<'a> Parser<'a> {
     fn parse_case_specifier(&mut self) -> Option<crate::ast::CaseSpecifier> {
         let Some(expr) = self.parse_expression() else {
             self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
-
             return None;
         };
-
         if self.get_cur_token() == Some(Token::DotDot) {
             self.next_token();
             let Some(to) = self.parse_expression() else {

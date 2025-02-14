@@ -10,6 +10,7 @@ use icy_board_engine::{
     datetime::{IcbDoW, IcbTime},
     icy_board::{
         accounting_cfg::AccountingConfig,
+        commands::CommandType,
         doors::DoorList,
         icb_config::{
             AccountingOptions, ConfigSwitches, EventOptions, FileTransferOptions, LimitOptions, MessageOptions, SystemControlOptions, UserCommandLevels,
@@ -1107,6 +1108,17 @@ impl PCBoardImporter {
             let resolved_file = PathBuf::from(&resolved_file);
             if resolved_file.exists() {
                 let mut res = CommandList::import_pcboard(&resolved_file)?;
+
+                for cmd in res.iter_mut() {
+                    for act in cmd.actions.iter_mut() {
+                        if act.command_type == CommandType::RunPPE {
+                            let mut line = self.scan_line_for_commands(&format!("!{}", act.parameter), 0).unwrap();
+                            line.remove(0);
+                            act.parameter = line;
+                        }
+                    }
+                }
+
                 res.commands.extend_from_slice(&CommandList::generate_pcboard_defaults().commands);
                 res
             } else {

@@ -12,7 +12,7 @@ use crate::{
 
 use super::{attributes, JamMessageBase};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct JamMessageHeader {
     /// <J><A><M> followed by <NUL>
     //pub signature: u32,
@@ -490,7 +490,7 @@ impl From<SubfieldType> for u32 {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MessageSubfield {
     field_type: SubfieldType,
     content: BString,

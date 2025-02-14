@@ -235,7 +235,7 @@ impl IcyBoardState {
                     return Ok(());
                 }
                 // F
-                self.show_file_directories().await?;
+                self.show_file_directories_cmd().await?;
             }
 
             CommandType::Goodbye => {

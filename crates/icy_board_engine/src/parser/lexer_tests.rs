@@ -282,3 +282,20 @@ fn test_dotdot() {
     assert_eq!(Token::Const(Constant::Integer(1, NumberFormat::Default)), lex.next_token().unwrap());
     assert_eq!(Token::DotDot, lex.next_token().unwrap());
 }
+
+#[test]
+fn test_case_number() {
+    let src = "CASE 1";
+    let mut lex = Lexer::new(
+        PathBuf::from("."),
+        LAST_PPLC,
+        src,
+        Encoding::Utf8,
+        Arc::new(Mutex::new(ErrorRepoter::default())),
+    );
+    assert_eq!(Token::Case, lex.next_token().unwrap());
+    assert_eq!(0..4, lex.span());
+
+    assert_eq!(Token::Const(Constant::Integer(1, NumberFormat::Default)), lex.next_token().unwrap());
+    assert_eq!(5..6, lex.span());
+}

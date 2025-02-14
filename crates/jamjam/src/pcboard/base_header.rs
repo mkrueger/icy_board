@@ -14,7 +14,7 @@ pub struct PCBoardMessageBaseHeader {
     pub active_msgs: u32,
 
     /// Number of callers for this conference.
-    /// Note that PCBoard only allows 1 messege base per conference.
+    /// Note that PCBoard only allows 1 message base per conference.
     pub callers: u32,
 
     pub lock_status: [u8; 6],

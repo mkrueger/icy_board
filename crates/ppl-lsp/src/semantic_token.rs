@@ -198,15 +198,28 @@ impl AstVisitor<()> for SemanticTokenVisitor {
     fn visit_select_statement(&mut self, select_stmt: &icy_board_engine::ast::SelectStatement) {
         self.highlight_token(select_stmt.get_select_token(), SemanticTokenType::KEYWORD);
         self.highlight_token(select_stmt.get_case_token(), SemanticTokenType::KEYWORD);
-        self.highlight_token(select_stmt.get_endselect_token(), SemanticTokenType::KEYWORD);
 
-        select_stmt.get_case_blocks().iter().for_each(|case| {
-            self.highlight_token(case.get_case_token(), SemanticTokenType::KEYWORD);
-        });
+        select_stmt.get_expression().visit(self);
+
+        for case_block in select_stmt.get_case_blocks() {
+            self.highlight_token(case_block.get_case_token(), SemanticTokenType::KEYWORD);
+            for specifier in case_block.get_case_specifiers() {
+                specifier.visit(self);
+            }
+            for stmt in case_block.get_statements() {
+                stmt.visit(self);
+            }
+        }
+
         if let Some(default_token) = select_stmt.get_default_token() {
             self.highlight_token(default_token, SemanticTokenType::KEYWORD);
         }
-        walk_select_stmt(self, select_stmt);
+
+        for stmt in select_stmt.get_default_statements() {
+            stmt.visit(self);
+        }
+
+        self.highlight_token(select_stmt.get_endselect_token(), SemanticTokenType::KEYWORD);
     }
 
     fn visit_while_statement(&mut self, while_stmt: &icy_board_engine::ast::WhileStatement) {

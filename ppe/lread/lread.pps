@@ -1,4 +1,5 @@
 DECLARE PROCEDURE DrawMsgArea()
+DECLARE PROCEDURE ClrMsgArea()
 DECLARE PROCEDURE DrawMsgText()
 
 INTEGER AreaX, AreaY, Lines
@@ -9,7 +10,6 @@ INTEGER LOW = LOMSGNUM()
 INTEGER HIGH = HiMsgNum()
 STRING FROM(10), SUBJ(10), TO(10), DATETXT(10)
 INTEGER MSG_MAP(10)
-INTEGER I
 INTEGER FirstMsg = 0
 INTEGER Cursor = 0
 
@@ -22,30 +22,34 @@ FGet 1, MsgStartY
 Lines -= 1
 FClose 1
 
-ReDim FROM, HIGH - LOW + 1
-ReDim SUBJ, HIGH - LOW + 1
-ReDim TO, HIGH - LOW + 1
-ReDim DATETXT, HIGH - LOW + 1
-ReDim MSG_MAP, HIGH - LOW + 1
+INTEGER MAX_MSGS = HIGH - LOW + 1
+ReDim FROM, MAX_MSGS
+ReDim SUBJ, MAX_MSGS
+ReDim TO, MAX_MSGS
+ReDim DATETXT, MAX_MSGS
+ReDim MSG_MAP, MAX_MSGS
 
 boolean found_first
 INTEGER msg_num = 0
+INTEGER I = LOW
 WHILE I < HIGH DO
-  FROM(msg_num) = Left(GetMsgHdr(CONF, I, HDR_FROM), 12)
-  SUBJ(msg_num) = Left(GetMsgHdr(CONF, I, HDR_SUBJ), 36)
-  TO(msg_num)   = Left(GetMsgHdr(CONF, I, HDR_TO), 12)
-  DATETXT(msg_num) = STRING(GetMsgHdr(CONF, I, HDR_DATE))
-  MSG_MAP(msg_num) = I
-  I += 1;
-  IF DATETXT(msg_num) != "" THEN
-    IF found_first THEN
-      CONTINUE
-    ELSE 
-      found_first = true
-      LOW = msg_num
-    ENDIF
+  IF GetMsgHdr(CONF, I, HDR_ACTIVE) != 225 THEN 
+    I += 1;
+    CONTINUE
   ENDIF
-  I += 1
+  FROM[msg_num] = GetMsgHdr(CONF, I, HDR_FROM)
+  SUBJ[msg_num] = GetMsgHdr(CONF, I, HDR_SUBJ)
+  TO[msg_num]   = GetMsgHdr(CONF, I, HDR_TO)
+  DATETXT[msg_num] = STRING(GetMsgHdr(CONF, I, HDR_DATE))
+  MSG_MAP[msg_num] = I
+  I += 1;
+  msg_num += 1;
+  IF found_first THEN
+    CONTINUE
+  ELSE 
+    found_first = true
+    LOW = msg_num
+  ENDIF
 ENDWHILE
 HIGH = msg_num
 
@@ -57,29 +61,28 @@ DrawMsgText()
 LOOP
   
   STRING CH = InKey()
-  if CH == Chr(27) BREAK 
-
-  IF CH == "UP" THEN
-    IF Cursor > 0 THEN
-      Cursor -= 1
-      IF Cursor < FirstMsg THEN
-        FirstMsg = Cursor
+  SELECT CASE CH 
+    CASE Chr(27)
+      BREAK
+    CASE "UP"
+      IF Cursor > 0 THEN
+        Cursor -= 1
+        IF Cursor < FirstMsg THEN
+          FirstMsg = Cursor
+        ENDIF
+        DrawMsgArea()
+        DrawMsgText()
       ENDIF
-      DrawMsgArea()
-      DrawMsgText()
-    ENDIF
-  ENDIF
-
-  IF CH == "DOWN" THEN
-    IF Cursor < HIGH - LOW THEN
+    CASE "DOWN"
+      IF Cursor < HIGH - LOW THEN
       Cursor += 1
-      IF Cursor >= FirstMsg + Lines THEN
-        FirstMsg = Cursor - Lines + 1
+      IF Cursor > FirstMsg + Lines THEN
+        FirstMsg = Cursor - Lines 
       ENDIF
       DrawMsgArea()
       DrawMsgText()
     ENDIF
-  ENDIF
+  ENDSELECT
 ENDLOOP
 
 END
@@ -97,22 +100,32 @@ PROCEDURE DrawMsgArea()
       Color 11
       Print ">"
     ELSE
+      Color 7
       Print " "
     ENDIF
-    
-    Print Right(STRING(I), 4), " ",  SUBJ(o), " ", FROM(o), " ", TO(o), " ", DATETXT(o)
-    IF o == Cursor THEN
-      DefColor
-    ENDIF
+    INTEGER MSG_NUM = MSG_MAP[FirstMsg + I]
+    STRING s = Left(StripATX(SUBJ[o]), 36)
+    STRING f = Left(StripATX(FROM[o]), 12)
+    STRING t = Left(StripATX(TO[o]), 12)
+    Print Right(STRING(MSG_NUM), 4), " ", s, " ", f, " ", t, " ", DATETXT[o]
   NEXT  
 ENDPROC
 
 PROCEDURE DrawMsgText()
   STRING line
   STRING MsgFile = PPEPath() + "msgtxt." + STRING(PCBNode())
-  MsgToFile CONF, MSG_MAP[Low + Cursor], MsgFile 
+  MsgToFile CONF, MSG_MAP[Cursor], MsgFile 
+  IF !Exist(MsgFile) THEN
+    LOG "Message file " + MsgFile + "  doesn't exists", true
+    ClrMsgArea()
+    RETURN 
+  ENDIF
   FOpen 1, MsgFile, O_RD, S_DB
-  
+  IF FErr(1) THEN
+    LOG "Error reading message text", true
+    ClrMsgArea()
+    RETURN
+  ENDIF
   LOOP  
     FGet 1, line
     IF FErr(1) RETURN
@@ -120,12 +133,16 @@ PROCEDURE DrawMsgText()
   ENDLOOP
 
   INTEGER msg_line
+  Color 7
   LOOP  
     FGet 1, line
     IF FErr(1) || msg_line + MsgStartY > 23 BREAK
     AnsiPos 1, MsgStartY + msg_line
-    ClrEOL
-    AnsiPos 1, MsgStartY + msg_line
+    IF LEN(line) > 79 THEN 
+      line = Left(line, 79)
+    ELSE 
+      ClrEOL
+    ENDIF
     PRINT line
     msg_line += 1
   ENDLOOP
@@ -136,4 +153,11 @@ PROCEDURE DrawMsgText()
     ClrEOL
     msg_line += 1
   ENDWHILE
+ENDPROC
+
+PROCEDURE ClrMsgArea()
+  FOR I = 0 TO Lines
+    AnsiPos 1, MsgStartY + I
+    ClrEOL
+  NEXT
 ENDPROC

@@ -1,4 +1,8 @@
-use std::{fmt::Display, str::FromStr};
+use std::{
+    fmt::Display,
+    ops::{Deref, DerefMut},
+    str::FromStr,
+};
 
 use crate::Res;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -667,6 +671,19 @@ pub struct CommandList {
     pub commands: Vec<Command>,
 }
 
+impl Deref for CommandList {
+    type Target = Vec<Command>;
+    fn deref(&self) -> &Self::Target {
+        &self.commands
+    }
+}
+
+impl DerefMut for CommandList {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.commands
+    }
+}
+
 fn convert_cmd(name: &str, cmd_type: CommandType, security: i32) -> Command {
     Command {
         keyword: name.to_string(),
@@ -750,16 +767,17 @@ impl PCBoardRecordImporter<Command> for CommandList {
         let name = crate::tables::import_cp437_string(&data[..15], true);
         let security = data[15];
 
-        let uc = name.to_uppercase();
+        let parameter = crate::tables::import_cp437_string(&data[16..56], true);
+
+        let uc = parameter.to_uppercase();
         let command_type = if uc.ends_with(".MNU") {
             CommandType::Menu
-        } else if uc.ends_with(".PPE") {
+        } else if uc.contains(".PPE") {
             CommandType::RunPPE
         } else {
             CommandType::StuffText
         };
 
-        let parameter = crate::tables::import_cp437_string(&data[16..56], true);
         Ok(Command {
             keyword: name,
             display: "".to_string(),

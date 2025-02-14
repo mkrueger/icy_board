@@ -14,7 +14,7 @@ use crate::{
 };
 
 impl IcyBoardState {
-    pub async fn show_file_directories(&mut self) -> Res<()> {
+    pub async fn show_file_directories_cmd(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::Available).await;
 
         self.session.non_stop_off();

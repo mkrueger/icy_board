@@ -70,15 +70,7 @@ pub trait AstVisitor<T: Default>: Sized {
         T::default()
     }
     fn visit_case_specifier(&mut self, case_specfier: &CaseSpecifier) -> T {
-        match case_specfier {
-            CaseSpecifier::Expression(expr) => {
-                expr.visit(self);
-            }
-            CaseSpecifier::FromTo(from, to) => {
-                from.visit(self);
-                to.visit(self);
-            }
-        }
+        walk_case_specifier(self, case_specfier);
         T::default()
     }
 
@@ -181,6 +173,18 @@ pub trait AstVisitor<T: Default>: Sized {
     fn visit_main(&mut self, main: &BlockStatement) -> T {
         walk_block_stmt(self, main);
         T::default()
+    }
+}
+
+pub fn walk_case_specifier<T: Default, V: AstVisitor<T>>(visitor: &mut V, case_specfier: &CaseSpecifier) {
+    match case_specfier {
+        CaseSpecifier::Expression(expr) => {
+            expr.visit(visitor);
+        }
+        CaseSpecifier::FromTo(from, to) => {
+            from.visit(visitor);
+            to.visit(visitor);
+        }
     }
 }
 

@@ -14,7 +14,7 @@ use crate::{
 };
 use bstr::BString;
 use chrono::{DateTime, Utc};
-use codepages::tables::CP437_TO_UNICODE;
+use codepages::tables::{write_with_bom, CP437_TO_UNICODE};
 use icy_engine::{BufferType, OutputFormat, SaveOptions, ScreenPreperation};
 use jamjam::jam::{JamMessage, JamMessageBase};
 
@@ -626,8 +626,10 @@ pub async fn blt(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn dir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("dir not implemented statement!");
-    panic!("TODO")
+    let arg = vm.eval_expr(&args[0]).await?.as_string();
+    vm.icy_board_state.session.push_tokens(&arg);
+    vm.icy_board_state.show_file_directories_cmd().await?;
+    Ok(())
 }
 
 pub async fn kbdstuff(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -1680,7 +1682,7 @@ pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
                             //  Todo: Extended headers
                             msg.push_str("Message Body:\n");
                             msg.push_str(&msg_text.to_string());
-                            if let Err(err) = fs::write(file_name, msg) {
+                            if let Err(err) = write_with_bom(&file_name, &msg) {
                                 log::error!("MSGTOFILE can't write message text {msg_number} in area {area}: {err}");
                                 return Ok(());
                             }

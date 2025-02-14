@@ -15,6 +15,7 @@ thiserror = { workspace = true }
 log = { workspace = true }
 chrono = { workspace = true }
 bstr = { workspace = true }
+codepages = { workspace = true }
 
 rayon = { workspace = true }
 rand = { workspace = true }

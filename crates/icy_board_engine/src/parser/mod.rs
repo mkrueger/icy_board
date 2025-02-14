@@ -285,24 +285,27 @@ impl<'a> Parser<'a> {
 
             if is_else {
                 let start = self.lex.span().start;
+                let end = self.lex.span().end;
                 if let Some(lookahed) = self.lex.next_token() {
                     if lookahed == Token::If {
                         self.cur_token = Some(Spanned::new(Token::ElseIf, start..self.lex.span().end));
                     } else {
-                        self.lookahead_token = Some(Spanned::new(lookahed, start..self.lex.span().end));
+                        self.lookahead_token = Some(Spanned::new(lookahed, end..self.lex.span().end));
                     }
                 }
             } else if is_case {
                 let start = self.lex.span().start;
+                let end = self.lex.span().end;
                 if let Some(lookahed) = self.lex.next_token() {
                     if lookahed == Token::Else {
                         self.cur_token = Some(Spanned::new(Token::Default, start..self.lex.span().end));
                     } else {
-                        self.lookahead_token = Some(Spanned::new(lookahed, start..self.lex.span().end));
+                        self.lookahead_token = Some(Spanned::new(lookahed, end..self.lex.span().end));
                     }
                 }
             } else if is_end {
                 let start = self.lex.span().start;
+                let end = self.lex.span().end;
                 if let Some(lookahed) = self.lex.next_token() {
                     match lookahed {
                         Token::If => {
@@ -323,10 +326,10 @@ impl<'a> Parser<'a> {
                         _ => {
                             let set_lookahad = if let Token::Identifier(id) = &lookahed {
                                 if *id == *PROC_TOKEN {
-                                    self.cur_token = Some(Spanned::new(Token::EndProc, start..self.lex.span().end));
+                                    self.cur_token = Some(Spanned::new(Token::EndProc, end..self.lex.span().end));
                                     false
                                 } else if *id == *FUNC_TOKEN {
-                                    self.cur_token = Some(Spanned::new(Token::EndFunc, start..self.lex.span().end));
+                                    self.cur_token = Some(Spanned::new(Token::EndFunc, end..self.lex.span().end));
                                     false
                                 } else {
                                     true
@@ -336,7 +339,7 @@ impl<'a> Parser<'a> {
                             };
 
                             if set_lookahad {
-                                self.lookahead_token = Some(Spanned::new(lookahed, start..self.lex.span().end));
+                                self.lookahead_token = Some(Spanned::new(lookahed, end..self.lex.span().end));
                             }
                         }
                     }

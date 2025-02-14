@@ -44,7 +44,8 @@ pub fn convert_pcboard_to_jam(pcboard_path: &Path, jam_dest_path: &Path, aka: &E
 
     let mut jam_messages = BTreeMap::new();
     let mut message_ids = HashMap::new();
-
+    let mut cur_msg = 0;
+    let mut number_map = HashMap::new();
     for msg_result in pcb_base.iter() {
         let msg = msg_result?;
         let attribute = get_jam_attributes(&msg);
@@ -91,23 +92,27 @@ pub fn convert_pcboard_to_jam(pcboard_path: &Path, jam_dest_path: &Path, aka: &E
             }
         }
 
-        let new_msg = JamMessage::new(msg.header.msg_number, aka)
-            .with_reply_to(msg.header.reply_to)
+        number_map.insert(msg.header.msg_number, cur_msg);
+        let new_msg = JamMessage::new(cur_msg, aka)
+            .with_reply_to(*number_map.get(&msg.header.reply_to).unwrap_or(&0))
             .with_date_time(time.and_utc())
-            .with_text(msg.text)
+            .with_text(codepages::tables::get_utf8(&msg.text).into())
             .with_attributes(attribute)
             .with_password(&msg.header.password)
-            .with_from(from)
-            .with_to(to.clone())
-            .with_subject(subj.clone());
-        message_ids.insert(msg.header.msg_number, new_msg.get_msgid_crc());
-        jam_messages.insert(msg.header.msg_number, new_msg);
+            .with_from(codepages::tables::get_utf8(&from).into())
+            .with_to(codepages::tables::get_utf8(&to).into())
+            .with_subject(codepages::tables::get_utf8(&subj).into());
+        if new_msg.is_deleted() {
+            continue;
+        }
+        message_ids.insert(cur_msg, new_msg.get_msgid_crc());
+        jam_messages.insert(cur_msg, new_msg);
+        cur_msg += 1;
     }
 
     // Setting reply information for each message.
     // TODO: reply_next
     // Does it even make any sense at all?
-
     let mut reply_next = Vec::new();
     for (i, msg) in &mut jam_messages {
         let reply_to = msg.get_reply_to();
