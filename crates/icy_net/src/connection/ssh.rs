@@ -2,12 +2,13 @@
 use async_trait::async_trait;
 use russh::{client::Msg, *};
 use russh_keys::*;
-use std::{borrow::Cow, io::ErrorKind, sync::Arc, time::Duration};
+use std::{borrow::Cow, collections::HashMap, io::ErrorKind, sync::Arc, time::Duration};
 
 use crate::{telnet::TermCaps, Connection, ConnectionType};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
+    sync::Mutex,
 };
 
 pub struct SSHConnection {
@@ -39,10 +40,6 @@ impl SSHConnection {
 
     fn default_port() -> u16 {
         22
-    }
-
-    pub fn accept(_tcp_stream: TcpStream) -> crate::Result<Self> {
-        todo!("SSHConnection::accept");
     }
 }
 
@@ -95,6 +92,12 @@ impl Connection for SSHConnection {
     }
 }
 
+#[derive(Clone)]
+struct Server {
+    clients: Arc<Mutex<HashMap<usize, (ChannelId, russh::server::Handle)>>>,
+    id: usize,
+}
+
 struct Client {}
 
 impl russh::client::Handler for Client {
@@ -110,30 +113,6 @@ pub struct SshClient {
 }
 
 impl SshClient {
-    /*
-    pub async fn accept(tcp_stream: TcpStream) -> crate::Result<Self> {
-
-
-        let mut session: client::Handle<Client> = russh::client::connect_stream(config, tcp_stream, sh).await?;
-
-        let auth_res = session.authenticate_password(user, password).await?;
-        if !auth_res.success() {
-            return Err("Authentication failed".into());
-        }
-
-        Ok(Self { session })
-
-
-        Ok(Self {
-            tcp_stream,
-            caps: TermCaps {
-                window_size: (0, 0),
-                terminal: TerminalEmulation::Ansi,
-            },
-            state: ParserState::Data,
-        })
-    }*/
-
     async fn connect(addr: impl Into<String>, user: impl Into<String>, password: impl Into<String>) -> crate::Result<Self> {
         let mut addr: String = addr.into();
         if !addr.contains(':') {

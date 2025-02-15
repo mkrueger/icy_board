@@ -94,6 +94,9 @@ pub enum IcyBoardError {
 
     #[error("Error opening home directory ({0})")]
     HomeDirMissing(String),
+
+    #[error("Error node not found ({0})")]
+    NodeNotFound(usize),
 }
 
 pub struct IcyBoard {

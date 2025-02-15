@@ -139,7 +139,6 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                         .unwrap();
                 }
 
-                /*
                 let ssh_connection = board.lock().await.config.login_server.ssh.clone();
                 if ssh_connection.is_enabled {
                     let bbs: Arc<Mutex<BBS>> = bbs.clone();
@@ -148,11 +147,11 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                         .name("SSH connect".to_string())
                         .spawn(move || {
                             tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                                let _ = await_ssh_connections(ssh_connection, board, bbs).await;
+                                let _ = bbs::ssh::await_ssh_connections(ssh_connection, board, bbs).await;
                             });
                         })
                         .unwrap();
-                }*/
+                }
 
                 let websocket_connection = board.lock().await.config.login_server.websocket.clone();
                 if websocket_connection.is_enabled {

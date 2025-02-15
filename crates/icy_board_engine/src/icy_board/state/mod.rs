@@ -676,7 +676,9 @@ impl IcyBoardState {
             self.session.current_conference_number = conference;
             let c = self.get_board().await.conferences[conference as usize].clone();
             self.session.current_conference = c;
-            self.node_state.lock().await[self.node].as_mut().unwrap().cur_conference = self.session.current_conference_number;
+            if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+                state.cur_conference = self.session.current_conference_number;
+            }
         }
     }
 
@@ -811,10 +813,10 @@ impl IcyBoardState {
 
     async fn shutdown_connections(&mut self) {
         let _ = self.connection.shutdown();
-
-        let node_state = &mut self.node_state.lock().await;
-        if let Some(sysop_connection) = &mut node_state[self.node].as_mut().unwrap().sysop_connection {
-            let _ = sysop_connection.shutdown();
+        if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+            if let Some(sysop_connection) = &mut state.sysop_connection {
+                let _ = sysop_connection.shutdown();
+            }
         }
     }
 
@@ -822,8 +824,10 @@ impl IcyBoardState {
         let old_language = self.session.language.clone();
 
         self.session.cur_user_id = user_number as i32;
-        self.node_state.lock().await[self.node].as_mut().unwrap().cur_user = user_number as i32;
-        self.node_state.lock().await[self.node].as_mut().unwrap().graphics_mode = self.session.disp_options.grapics_mode;
+        if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+            state.cur_user = user_number as i32;
+            state.graphics_mode = self.session.disp_options.grapics_mode;
+        }
         if user_number >= self.get_board().await.users.len() {
             log::error!("User number {} is out of range", user_number);
             return Err(IcyBoardError::UserNumberInvalid(user_number).into());
@@ -998,12 +1002,20 @@ impl IcyBoardState {
             NodeStatus::DropDOSNow => IceText::DropDOSNow,
         };
         let txt = self.display_text.get_display_text(text).unwrap();
-        self.node_state.lock().await[self.node].as_mut().unwrap().operation = txt.text;
-        self.node_state.lock().await[self.node].as_mut().unwrap().status = node_status;
+        if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+            state.operation = txt.text;
+            state.status = node_status;
+        } else {
+            log::error!("Node {} not found", self.node);
+        }
     }
 
     pub async fn set_grapics_mode(&mut self, mode: GraphicsMode) {
-        self.node_state.lock().await[self.node].as_mut().unwrap().graphics_mode = mode;
+        if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+            state.graphics_mode = mode;
+        } else {
+            log::error!("Node {} not found", self.node);
+        }
         self.session.disp_options.grapics_mode = mode;
     }
 
@@ -1750,9 +1762,13 @@ impl IcyBoardState {
         let mut sysop_connection;
         let bbs_channel;
         {
-            let node_state = &mut self.node_state.lock().await;
-            sysop_connection = node_state[self.node].as_mut().unwrap().sysop_connection.take();
-            bbs_channel = node_state[self.node].as_mut().unwrap().bbs_channel.take();
+            if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+                sysop_connection = state.sysop_connection.take();
+                bbs_channel = state.bbs_channel.take();
+            } else {
+                log::error!("Node {} not found", self.node);
+                return Err(Box::new(IcyBoardError::NodeNotFound(self.node)));
+            }
         }
 
         let mut user_key_data = [0; 1];
@@ -1764,10 +1780,15 @@ impl IcyBoardState {
             let mut sysop_key_data = [0; 1];
             tokio::select! {
                 msg = bbs_channel.recv() => {
-                    self.node_state.lock().await[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
+                    if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+                        state.bbs_channel = Some(bbs_channel);
+                    }
                     match msg {
                         Some(BBSMessage::SysopLogout) => {
-                            self.node_state.lock().await[self.node].as_mut().unwrap().sysop_connection = None;
+                            if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+                                state.sysop_connection = None;
+                            }
+
                         }
                         Some(BBSMessage::SysopLogin) => {
                             self.print_sysop_screen().await?;
@@ -1782,8 +1803,10 @@ impl IcyBoardState {
                 size = sysop_connection.read(&mut sysop_key_data) => {
                     match size {
                         Ok(1) => {
-                            self.node_state.lock().await[self.node].as_mut().unwrap().sysop_connection = Some(sysop_connection);
-                            self.node_state.lock().await[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
+                            if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+                                state.sysop_connection = Some(sysop_connection);
+                                state.bbs_channel = Some(bbs_channel);
+                            }
                             if target == TerminalTarget::User {
                                 self.char_buffer.push_back(KeyChar::new(KeySource::Sysop, sysop_key_data[0] as char));
                                 return Ok(None);
@@ -1798,8 +1821,10 @@ impl IcyBoardState {
                 }
                 size2 = self.connection.read(&mut user_key_data) => {
                     if let Ok(1) = size2 {
-                        self.node_state.lock().await[self.node].as_mut().unwrap().sysop_connection = Some(sysop_connection);
-                        self.node_state.lock().await[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
+                        if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+                            state.sysop_connection = Some(sysop_connection);
+                            state.bbs_channel = Some(bbs_channel);
+                        }
                         if target == TerminalTarget::Sysop {
                             self.char_buffer.push_back(KeyChar::new(KeySource::User, user_key_data[0] as char));
                             return Ok(None);
@@ -1808,15 +1833,19 @@ impl IcyBoardState {
                     }
                 }
                 _ = sleep(Duration::from_millis(100)) => {
-                    self.node_state.lock().await[self.node].as_mut().unwrap().sysop_connection = Some(sysop_connection);
-                    self.node_state.lock().await[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
+                    if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+                        state.sysop_connection = Some(sysop_connection);
+                        state.bbs_channel = Some(bbs_channel);
+                    }
                     return Ok(None);
                 }
             }
         } else {
             tokio::select! {
                 msg = bbs_channel.recv() => {
-                    self.node_state.lock().await[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
+                    if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+                        state.bbs_channel = Some(bbs_channel);
+                    }
                     match msg {
                         Some(BBSMessage::SysopLogout) => {
                             // Ignore
@@ -1834,7 +1863,9 @@ impl IcyBoardState {
                 }
                 size2 = self.connection.read(&mut user_key_data) => {
                     if let Ok(1) = size2 {
-                        self.node_state.lock().await[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
+                        if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+                            state.bbs_channel = Some(bbs_channel);
+                        }
                         if target == TerminalTarget::Sysop {
                             // No sysop, only user
                             return Ok(None);
@@ -1843,7 +1874,9 @@ impl IcyBoardState {
                     }
                 }
                 _ = sleep(Duration::from_millis(100)) => {
-                    self.node_state.lock().await[self.node].as_mut().unwrap().bbs_channel = Some(bbs_channel);
+                    if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+                        state.bbs_channel = Some(bbs_channel);
+                    }
                     return Ok(None);
                 }
 

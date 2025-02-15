@@ -25,6 +25,8 @@ use tokio::{net::TcpListener, sync::Mutex};
 
 use crate::menu_runner::PcbBoardCommand;
 
+pub mod ssh;
+
 pub async fn await_telnet_connections(con: Telnet, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
     let addr = if con.address.is_empty() {
         format!("0.0.0.0:{}", con.port)
@@ -66,49 +68,6 @@ pub async fn await_telnet_connections(con: Telnet, board: Arc<tokio::sync::Mutex
         bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
     }
 }
-/*
-pub async fn await_ssh_connections(_ssh: SSH, _board: Arc<tokio::sync::Mutex<IcyBoard>>, _bbs: Arc<Mutex<BBS>>) -> Res<()> {
-       let addr = if ssh.address.is_empty() {
-        format!("0.0.0.0:{}", ssh.port)
-    } else {
-        format!("{}:{}", ssh.address, ssh.port)
-    };
-    let listener = TcpListener::bind(addr).await?;
-    loop {
-        let (stream, _addr) = listener.accept().await?;
-        let bbs2 = bbs.clone();
-        let node = bbs.lock().await.create_new_node(ConnectionType::Telnet).await;
-        let node_list = bbs.lock().await.get_open_connections().await.clone();
-        let board = board.clone();
-        let handle: thread::JoinHandle<()> = std::thread::Builder::new()
-            .name("Telnet handle".to_string())
-            .spawn(move || {
-                tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                    let orig_hook = std::panic::take_hook();
-                    std::panic::set_hook(Box::new(move |panic_info| {
-                        log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
-                        log::error!("full info: {:?}", panic_info);
-                        orig_hook(panic_info);
-                    }));
-
-                    match SSH::accept(stream) {
-                        Ok(connection) => {
-                            // connection succeeded
-                            if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
-                                log::error!("Error running backround client: {}", err);
-                            }
-                        }
-                        Err(e) => {
-                            log::error!("telnet connection failed {}", e);
-                        }
-                    }
-                });
-            })
-            .unwrap();
-        bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
-    }
-    Ok(())
-}*/
 
 pub async fn await_websocket_connections(con: Websocket, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
     let addr = if con.address.is_empty() {
