@@ -24,7 +24,7 @@ impl IcyBoardState {
                 )
                 .await?;
             self.session.more_requested = false;
-            self.session.reset_num_lines();
+            self.session.disp_options.no_change();
             self.session.push_tokens(&input);
             match self.session.tokens.pop_front().unwrap_or_default().to_ascii_uppercase().as_str() {
                 "F" | "FL" | "FLA" | "FLAG" => {
@@ -39,7 +39,7 @@ impl IcyBoardState {
                     return Ok(());
                 }
                 "NS" => {
-                    self.session.non_stop_on();
+                    self.session.disp_options.force_non_stop();
                     return Ok(());
                 }
                 "N" => {

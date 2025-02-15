@@ -25,6 +25,7 @@ impl PcbBoardCommand {
 
         self.state.reset_color(TerminalTarget::Both).await?;
         self.state.clear_screen(TerminalTarget::Both).await?;
+        self.state.session.disp_options.count_lines = false;
         self.state.session.login_date = chrono::Utc::now();
 
         // intial_welcome

@@ -1,5 +1,5 @@
 use crate::icy_board::commands::CommandType;
-use crate::icy_board::state::functions::MASK_COMMAND;
+use crate::icy_board::state::functions::{pwd_flags, MASK_ALNUM, MASK_COMMAND};
 use crate::icy_board::state::IcyBoardState;
 use crate::icy_board::{icb_text::IceText, state::functions::display_flags};
 use crate::Res;
@@ -14,109 +14,144 @@ impl IcyBoardState {
             .await?;
             return Ok(());
         }
-        let mut text = if let Some(token) = self.session.tokens.pop_front() {
-            token
-        } else {
-            let mnu = self.get_board().await.config.paths.conf_join_menu.clone();
-            let mnu = self.resolve_path(&mnu);
+        let mut display_menu = true;
+        loop {
+            let mut quick_join = false;
+            let mut search = false;
+            let mut conf_num = -1;
+            if self.session.tokens.is_empty() {
+                if display_menu {
+                    display_menu = false;
+                    self.session.disp_options.no_change();
+                    let mnu = self.get_board().await.config.paths.conf_join_menu.clone();
+                    let mnu = self.resolve_path(&mnu);
+                    self.display_menu(&mnu).await?;
+                    self.new_line().await?;
+                }
 
-            self.display_menu(&mnu).await?;
-            self.new_line().await?;
-
-            self.input_field(
-                IceText::JoinConferenceNumber,
-                40,
-                MASK_COMMAND,
-                CommandType::JoinConference.get_help(),
-                None,
-                display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
-            )
-            .await?
-        };
-
-        if !text.is_empty() {
-            let mut joined = false;
-            let conferences = self.get_board().await.conferences.clone();
-
-            let quick_join = if text.eq_ignore_ascii_case("Q") {
-                text = if let Some(token) = self.session.tokens.pop_front() {
-                    token
-                } else {
-                    self.input_field(
+                let str = self
+                    .input_field(
                         IceText::JoinConferenceNumber,
                         40,
                         MASK_COMMAND,
                         CommandType::JoinConference.get_help(),
                         None,
-                        display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
+                        display_flags::UPCASE | display_flags::STACKED | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,
                     )
-                    .await?
-                };
-                true
-            } else {
-                false
-            };
-
-            if text.eq_ignore_ascii_case("S") {
-                let text_to_scan = if let Some(token) = self.session.tokens.pop_front() {
-                    token
-                } else {
+                    .await?;
+                self.session.push_tokens(&str);
+            }
+            if self.session.tokens.is_empty() {
+                break;
+            }
+            let mut search_text = String::new();
+            let mut last_token = String::new();
+            for token in &self.session.tokens {
+                last_token = token.clone();
+                match token.as_str() {
+                    "Q" => {
+                        quick_join = true;
+                    }
+                    "S" => {
+                        search = true;
+                    }
+                    token => {
+                        if search || quick_join {
+                            search_text.push_str(token);
+                            search_text.push(' ');
+                        } else {
+                            if let Ok(num) = token.parse::<i32>() {
+                                conf_num = num;
+                            } else {
+                                let token = token.to_ascii_uppercase();
+                                if token == "MAIN" || token == "MAIN BOARD" {
+                                    conf_num = 0;
+                                } else {
+                                    for (i, conf) in self.get_board().await.conferences.iter().enumerate() {
+                                        if conf.name.to_ascii_uppercase() == token {
+                                            conf_num = i as i32;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            self.session.tokens.clear();
+            if conf_num < 0 && search {
+                let text = if search_text.is_empty() {
                     self.input_field(
                         IceText::TextToScanFor,
                         40,
-                        MASK_COMMAND,
-                        &CommandType::TextSearch.get_help(),
+                        &MASK_ALNUM,
+                        CommandType::JoinConference.get_help(),
                         None,
-                        display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
+                        display_flags::UPCASE | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,
                     )
                     .await?
-                };
-                let text_to_scan = text_to_scan.to_ascii_uppercase();
-                for (i, c) in conferences.iter().enumerate() {
-                    if c.name.to_ascii_uppercase().contains(&text_to_scan) {
-                        self.println(crate::vm::TerminalTarget::Both, &format!("{}) {}", i, c.name)).await?;
-                    }
-                }
-                text = if let Some(token) = self.session.tokens.pop_front() {
-                    token
                 } else {
-                    self.input_field(
-                        IceText::JoinConferenceNumber,
-                        40,
-                        MASK_COMMAND,
-                        "",
-                        None,
-                        display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
-                    )
-                    .await?
+                    search_text.pop();
+                    search_text
                 };
-            }
-
-            if let Ok(number) = text.parse::<u16>() {
-                if (number as usize) <= conferences.len() {
-                    self.join_conference(number, quick_join).await;
-
-                    joined = true;
+                if text.is_empty() {
+                    break;
                 }
-            } else {
-                for (i, c) in conferences.iter().enumerate() {
-                    if c.name.eq_ignore_ascii_case(&text) || c.name.eq_ignore_ascii_case(&text.replace('_', " ")) {
-                        self.join_conference(i as u16, quick_join).await;
-                        joined = true;
-                        break;
+                let text = text.to_ascii_uppercase();
+                let c = self.get_board().await.conferences.iter().map(|c| c.name.clone()).collect::<Vec<String>>();
+                for (i, c) in c.iter().enumerate() {
+                    if c.to_ascii_uppercase().contains(&text) {
+                        self.println(crate::vm::TerminalTarget::Both, &format!("{}) {}", i, c)).await?;
+                        if self.session.disp_options.abort_printout {
+                            break;
+                        }
                     }
                 }
+                continue;
             }
 
-            if joined {
+            if conf_num == self.session.current_conference_number as i32 {
+                return Ok(());
+            }
+
+            let Some(conference) = self.get_board().await.conferences.get(conf_num as usize).cloned() else {
+                self.session.op_text = last_token;
+                self.display_text(IceText::InvalidConferenceNumber, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
+                continue;
+            };
+
+            if !conference.required_security.user_can_access(&self.session) {
+                self.session.op_text = conference.name.clone();
+                self.display_text(IceText::NotRegisteredInConference, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
+                continue;
+            }
+
+            if !conference.password.is_empty() {
+                if !self
+                    .check_password(IceText::PasswordToJoin, pwd_flags::PLAIN, |pwd| conference.password.is_valid(pwd))
+                    .await?
+                {
+                    self.display_text(IceText::DeniedWrongPassword, display_flags::NEWLINE | display_flags::LFBEFORE)
+                        .await?;
+                    return Ok(());
+                }
+            }
+
+            if conf_num == 0 {
                 self.session.op_text = format!("{} ({})", self.session.current_conference.name, self.session.current_conference_number);
-                self.display_text(IceText::ConferenceJoined, display_flags::NEWLINE | display_flags::NOTBLANK)
+                self.join_conference(conf_num as u16, quick_join).await;
+                self.display_text(IceText::ConferenceAbandoned, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
             } else {
-                self.session.op_text = text;
-                self.display_text(IceText::InvalidConferenceNumber, display_flags::NEWLINE | display_flags::NOTBLANK)
+                self.join_conference(conf_num as u16, quick_join).await;
+                self.session.op_text = format!("{} ({})", self.session.current_conference.name, self.session.current_conference_number);
+                self.display_text(IceText::ConferenceJoined, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
             }
+            break;
         }
         Ok(())
     }

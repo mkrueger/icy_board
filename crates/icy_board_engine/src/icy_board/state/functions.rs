@@ -207,7 +207,7 @@ impl IcyBoardState {
     }
 
     pub async fn display_file_with_error<P: AsRef<Path>>(&mut self, file_name: &P, display_error: bool) -> Res<bool> {
-        self.session.reset_num_lines();
+        self.session.disp_options.no_change();
         self.session.disp_options.abort_printout = false;
         let resolved_name = self.get_board().await.resolve_file(file_name);
         // lookup language/security/graphics mode
@@ -281,7 +281,7 @@ impl IcyBoardState {
             return Ok(String::new());
         }
 
-        self.session.reset_num_lines();
+        self.session.disp_options.no_change();
 
         // we've data from a PPE here, so take that input and return it.
         // ignoring all other settings.
@@ -446,14 +446,11 @@ impl IcyBoardState {
 
         let help_loc = self.get_board().await.config.paths.help_path.clone();
         let help_loc = help_loc.join(help);
-        let am = self.session.disp_options.non_stop();
-        self.session.non_stop_off();
+
+        let tmp = self.session.disp_options.count_lines;
+        self.session.disp_options.no_change();
         self.display_file(&help_loc).await?;
-        if am {
-            self.session.non_stop_on();
-        } else {
-            self.session.non_stop_off();
-        }
+        self.session.disp_options.count_lines = tmp;
         Ok(())
     }
 
@@ -483,7 +480,7 @@ impl IcyBoardState {
                 self.session.last_password = pwd;
                 return Ok(true);
             }
-            if (flags & pwd_flags::SHOW_WRONG_PWD_MSG) != 0 {
+            if (flags & pwd_flags::PLAIN) == 0 && (flags & pwd_flags::SHOW_WRONG_PWD_MSG) != 0 {
                 self.display_text(IceText::WrongPasswordEntered, display_flags::NEWLINE).await?;
             }
             tries += 1;
@@ -491,9 +488,11 @@ impl IcyBoardState {
         if let Some(user) = &mut self.session.current_user {
             user.stats.num_password_failures += 1;
         }
-        self.session.op_text = self.session.get_username_or_alias();
-        self.display_text(IceText::PasswordFailure, display_flags::NEWLINE | display_flags::LFAFTER)
-            .await?;
+        if (flags & pwd_flags::PLAIN) == 0 {
+            self.session.op_text = self.session.get_username_or_alias();
+            self.display_text(IceText::PasswordFailure, display_flags::NEWLINE | display_flags::LFAFTER)
+                .await?;
+        }
         Ok(false)
     }
 
@@ -503,7 +502,7 @@ impl IcyBoardState {
         let areas = self.get_board().await.conferences[conference as usize].areas.clone().unwrap_or_default();
 
         self.set_activity(NodeStatus::EnterMessage).await;
-        self.session.non_stop_off();
+        self.session.disp_options.no_change();
         self.session.more_requested = false;
 
         if areas.is_empty() {
@@ -604,4 +603,6 @@ const MASK_PASSWORD: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 
 pub mod pwd_flags {
     pub const SHOW_WRONG_PWD_MSG: u32 = 0x00001;
+    /// Don't show any text
+    pub const PLAIN: u32 = 0x00002;
 }

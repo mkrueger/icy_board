@@ -49,14 +49,10 @@ impl IcyBoardState {
             if !found {
                 help_loc = help_loc.join(help_cmd.to_ascii_lowercase());
             }
-            let am = self.session.disp_options.non_stop();
-            self.session.non_stop_off();
+            let am = self.session.disp_options.count_lines;
+            self.session.disp_options.force_count_lines();
             self.display_file(&help_loc).await?;
-            if am {
-                self.session.non_stop_on();
-            } else {
-                self.session.non_stop_off();
-            }
+            self.session.disp_options.count_lines = am;
         }
         Ok(())
     }

@@ -37,6 +37,7 @@ impl IcyBoardState {
         let display_current_menu = self.session.tokens.is_empty();
         if display_current_menu {
             let file = self.session.current_conference.doors_menu.clone();
+            self.session.disp_options.no_change();
             self.display_menu(&file).await?;
         }
         let text = if let Some(token) = self.session.tokens.pop_front() {

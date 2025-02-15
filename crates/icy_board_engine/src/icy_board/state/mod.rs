@@ -57,8 +57,7 @@ pub struct DisplayOptions {
     /// If true, the more prompt is automatically answered after 10 seconds.
     pub auto_more: bool,
 
-    /// If true, the output is not paused by the more prompt.
-    is_non_stop: bool,
+    pub count_lines: bool,
 
     pub grapics_mode: GraphicsMode,
 
@@ -81,14 +80,26 @@ pub struct DisplayOptions {
     /// If last printout was in non-stop mode
     pub was_non_stop: bool,
 
-    pub count_lines: bool,
+    pub num_lines_printed: usize,
 }
 
 impl DisplayOptions {
-    pub fn reset_printout(&mut self) {
-        self.is_non_stop = false;
-        self.abort_printout = false;
-        self.auto_more = false;
+    pub fn force_count_lines(&mut self) {
+        self.count_lines = true;
+        self.num_lines_printed = 0;
+    }
+    pub fn force_non_stop(&mut self) {
+        self.count_lines = false;
+        self.num_lines_printed = 0;
+    }
+
+    pub fn no_change(&mut self) {
+        if self.non_stop_during_cmd {
+            self.count_lines = false;
+        } else {
+            self.count_lines = true;
+            self.num_lines_printed = 0;
+        }
     }
 
     pub fn check_display_status(&mut self) {
@@ -102,10 +113,6 @@ impl DisplayOptions {
         }
         self.auto_more = false;
     }
-
-    pub fn non_stop(&self) -> bool {
-        self.is_non_stop
-    }
 }
 
 impl Default for DisplayOptions {
@@ -114,7 +121,6 @@ impl Default for DisplayOptions {
             auto_more: false,
             abort_printout: false,
             grapics_mode: GraphicsMode::Graphics,
-            is_non_stop: false,
             display_text: true,
             show_on_screen: true,
             in_file_list: None,
@@ -123,6 +129,7 @@ impl Default for DisplayOptions {
             was_non_stop: false,
             was_aborted: false,
             count_lines: true,
+            num_lines_printed: 0,
         }
     }
 }
@@ -172,7 +179,6 @@ pub struct Session {
     pub op_text: String,
     pub use_alias: bool,
 
-    pub num_lines_printed: usize,
     pub last_new_line_y: i32,
 
     pub request_logoff: bool,
@@ -246,7 +252,6 @@ impl Session {
             cur_security: 0,
             caller_number: 0,
             cur_groups: Vec::new(),
-            num_lines_printed: 0,
             security_violations: 0,
             current_message_area: 0,
             current_file_directory: 0,
@@ -293,30 +298,14 @@ impl Session {
         }
     }
 
-    pub fn non_stop_on(&mut self) {
-        if self.disp_options.is_non_stop {
-            return;
-        }
-        self.disp_options.is_non_stop = true;
-        self.reset_num_lines();
-        self.last_new_line_y = i32::MAX;
-    }
-
-    pub fn non_stop_off(&mut self) {
-        if !self.disp_options.is_non_stop {
-            return;
-        }
-        self.disp_options.is_non_stop = false;
-        self.reset_num_lines();
-        self.last_new_line_y = i32::MAX;
-    }
-
     pub fn push_tokens(&mut self, command: &str) -> usize {
         let mut res = 0;
         for cmd in crate::tokens::tokenize(command) {
             self.tokens.push_back(cmd.to_string());
             res += 1;
         }
+        self.disp_options.non_stop_during_cmd = false;
+        self.disp_options.no_change();
         res
     }
 
@@ -349,13 +338,6 @@ impl Session {
     }
     pub fn seconds_left(&self) -> i32 {
         self.time_limit * 60
-    }
-    fn reset_num_lines(&mut self) {
-        self.num_lines_printed = 0;
-    }
-
-    pub fn start_display(&mut self) {
-        self.reset_num_lines();
     }
 
     fn parse_search_text(&self, search: String) -> Option<String> {
@@ -628,7 +610,7 @@ impl IcyBoardState {
     }
 
     pub async fn clear_screen(&mut self, target: TerminalTarget) -> Res<()> {
-        self.session.reset_num_lines();
+        self.session.disp_options.no_change();
         match self.session.disp_options.grapics_mode {
             GraphicsMode::Ctty | GraphicsMode::Avatar => {
                 // form feed character
@@ -684,17 +666,14 @@ impl IcyBoardState {
 
     #[async_recursion(?Send)]
     async fn next_line(&mut self) -> Res<()> {
-        if self.session.disp_options.non_stop() {
-            return Ok(());
-        }
         if self.session.disp_options.count_lines {
-            self.session.num_lines_printed += 1;
+            self.session.disp_options.num_lines_printed += 1;
         }
-        if self.session.page_len > 0 && self.session.num_lines_printed >= self.session.page_len as usize {
+        if self.session.page_len > 0 && self.session.disp_options.num_lines_printed >= self.session.page_len as usize {
             if self.session.disp_options.abort_printout {
                 return Ok(());
             }
-            if self.session.disp_options.non_stop() {
+            if !self.session.disp_options.count_lines {
                 self.session.more_requested = true;
                 return Ok(());
             }
@@ -723,7 +702,7 @@ impl IcyBoardState {
     }
 
     pub async fn run_executable<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>, executable: Executable) -> Res<()> {
-        self.session.start_display();
+        self.session.disp_options.no_change();
         let path = PathBuf::from(file_name.as_ref());
         let parent = path.parent().unwrap().to_str().unwrap().to_string();
         let mut io = DiskIO::new(&parent, answer_file);
@@ -1604,11 +1583,11 @@ impl IcyBoardState {
                 return Some(result);
             }
             MacroCommand::POFF => {
-                self.session.non_stop_on();
+                self.session.disp_options.force_non_stop();
                 return None;
             }
             MacroCommand::PON => {
-                self.session.non_stop_off();
+                self.session.disp_options.force_count_lines();
                 return None;
             }
             MacroCommand::ProLTR => {
@@ -2122,7 +2101,7 @@ impl IcyBoardState {
                     return Ok(());
                 }
                 "NS" => {
-                    self.session.non_stop_on();
+                    self.session.disp_options.force_non_stop();
                     return Ok(());
                 }
                 "N" => {
@@ -2135,7 +2114,6 @@ impl IcyBoardState {
     }
 
     pub async fn press_enter(&mut self) -> Res<()> {
-        self.session.non_stop_on();
         self.session.more_requested = false;
         self.input_field(IceText::PressEnter, 0, "", "", None, display_flags::ERASELINE).await?;
         Ok(())

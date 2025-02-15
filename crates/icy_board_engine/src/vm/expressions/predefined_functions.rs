@@ -1296,10 +1296,10 @@ pub async fn confmw(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
     panic!("TODO")
 }
 pub async fn lprinted(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.session.num_lines_printed as i32))
+    Ok(VariableValue::new_int(vm.icy_board_state.session.disp_options.num_lines_printed as i32))
 }
 pub async fn isnonstop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_bool(vm.icy_board_state.session.disp_options.non_stop()))
+    Ok(VariableValue::new_bool(!vm.icy_board_state.session.disp_options.count_lines))
 }
 pub async fn errcorrect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     // No longer an issue:

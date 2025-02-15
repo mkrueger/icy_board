@@ -39,6 +39,7 @@ impl IcyBoardState {
         loop {
             if display_current_menu {
                 let file = self.session.current_conference.survey_menu.clone();
+                self.session.disp_options.no_change();
                 self.display_file(&file).await?;
                 display_current_menu = false;
             }

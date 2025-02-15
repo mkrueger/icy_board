@@ -32,6 +32,7 @@ impl IcyBoardState {
                 if user.page_len != page_len {
                     user.page_len = page_len;
                     self.session.op_text = page_len.to_string();
+                    self.session.disp_options.no_change();
                     self.display_text(IceText::PageLengthSetTo, display_flags::NEWLINE).await?;
                 }
             }

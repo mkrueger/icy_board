@@ -23,7 +23,7 @@ impl IcyBoardState {
             )
             .await?
         };
-
+        self.session.disp_options.no_change();
         self.display_text(IceText::UsersHeader, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::NOTBLANK)
             .await?;
         self.display_text(IceText::UserScanLine, display_flags::NOTBLANK).await?;

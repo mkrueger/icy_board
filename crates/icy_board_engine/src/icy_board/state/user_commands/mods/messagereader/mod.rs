@@ -178,7 +178,7 @@ impl MessageViewer {
         state.print(TerminalTarget::Both, &txt).await?;
         state.reset_color(TerminalTarget::Both).await?;
         if state.session.disp_options.count_lines {
-            state.session.num_lines_printed += 5;
+            state.session.disp_options.num_lines_printed += 5;
         }
         Ok(())
     }

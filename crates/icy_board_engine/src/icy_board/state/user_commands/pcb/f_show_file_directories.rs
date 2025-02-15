@@ -17,7 +17,7 @@ impl IcyBoardState {
     pub async fn show_file_directories_cmd(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::Available).await;
 
-        self.session.non_stop_off();
+        self.session.disp_options.no_change();
         self.session.more_requested = false;
 
         if self.session.current_conference.directories.is_none() || self.session.current_conference.directories.as_ref().unwrap().is_empty() {
@@ -59,6 +59,8 @@ impl IcyBoardState {
                 break;
             }
             let mut joined = false;
+            self.session.disp_options.no_change();
+
             if let Ok(number) = directory_number.parse::<i32>() {
                 if 1 <= number && (number as usize) <= self.session.current_conference.directories.as_ref().unwrap().len() {
                     let area = &self.session.current_conference.directories.as_ref().unwrap()[number as usize - 1];
@@ -107,7 +109,7 @@ impl IcyBoardState {
                         return Ok(());
                     }
                     "NS" => {
-                        self.session.non_stop_on();
+                        self.session.disp_options.force_count_lines();
                         continue;
                     }
                     "R" => {
@@ -118,6 +120,9 @@ impl IcyBoardState {
                 }
             }
         }
+        // no prompt after displaying bulletins
+        self.session.disp_options.count_lines = false;
+
         Ok(())
     }
 
@@ -152,11 +157,12 @@ impl IcyBoardState {
         let mut list = FileList::new(file_base_path.clone(), files);
         list.display_file_list(self).await?;
 
-        if self.session.num_lines_printed > 0 {
+        if self.session.disp_options.num_lines_printed > 0 {
             self.filebase_more().await?;
         }
-        self.session.non_stop_off();
         self.session.more_requested = false;
+        // no prompt after displaying bulletins
+        self.session.disp_options.count_lines = false;
         Ok(())
     }
 }

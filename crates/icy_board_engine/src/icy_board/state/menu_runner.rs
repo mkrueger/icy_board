@@ -79,7 +79,7 @@ impl IcyBoardState {
             self.move_lightbar(mnu, &mut x, current_item).await?;
 
             self.session.last_new_line_y = self.display_screen().caret.get_position().y;
-            self.session.reset_num_lines();
+            self.session.disp_options.no_change();
             let pos = self.get_caret_position();
             for (i, command) in mnu.commands.iter().enumerate() {
                 if command.display.is_empty() {
@@ -97,7 +97,7 @@ impl IcyBoardState {
             if command.is_empty() {
                 if !mnu.commands[current_item].lighbar_display.is_empty() {
                     self.session.last_new_line_y = self.display_screen().caret.get_position().y;
-                    self.session.reset_num_lines();
+                    self.session.disp_options.no_change();
                     self.dispatch_command(&command, &mnu.commands[current_item]).await?;
                     continue;
                 }
@@ -107,7 +107,7 @@ impl IcyBoardState {
                 let cmd = mnu.commands.iter().find(|cmd| cmd.keyword.eq_ignore_ascii_case(&command_str));
                 if let Some(cmd) = cmd {
                     self.session.last_new_line_y = self.display_screen().caret.get_position().y;
-                    self.session.reset_num_lines();
+                    self.session.disp_options.no_change();
                     self.dispatch_command(&command_str, &cmd).await?;
                     self.session.tokens.clear();
                     continue;
@@ -115,7 +115,7 @@ impl IcyBoardState {
 
                 if let Some(command) = self.try_find_command(&command_str).await {
                     self.session.last_new_line_y = self.display_screen().caret.get_position().y;
-                    self.session.reset_num_lines();
+                    self.session.disp_options.no_change();
                     self.dispatch_command(&command_str, &command).await?;
                     self.session.tokens.clear();
                     continue;
@@ -146,7 +146,7 @@ impl IcyBoardState {
             self.run_menu(&mnu).await?;
             return Ok(());
         }
-
+        self.session.disp_options.no_change();
         self.display_file_with_error(&file, false).await?;
         Ok(())
     }
@@ -164,7 +164,6 @@ impl IcyBoardState {
     }
 
     async fn run_action(&mut self, command: &Command, cmd_action: &CommandAction) -> Res<()> {
-        self.session.non_stop_off();
         match cmd_action.command_type {
             CommandType::StuffText => {
                 self.session.push_tokens(&cmd_action.parameter);
@@ -578,8 +577,15 @@ impl IcyBoardState {
             return Ok(true);
         }
         */
+        let non_stop = self.session.disp_options.non_stop_during_cmd;
 
-        self.display_file_with_error(&file, false).await
+        let res = self.display_file_with_error(&file, false).await?;
+        if non_stop {
+            self.session.disp_options.force_non_stop();
+            self.session.disp_options.non_stop_during_cmd = true;
+        }
+
+        Ok(res)
     }
 
     async fn move_lightbar(&mut self, mnu: &Menu, current_item: &mut usize, new_item: usize) -> Res<()> {

@@ -20,6 +20,7 @@ mod cmd_b;
 mod cmd_bye;
 mod cmd_c;
 mod cmd_g;
+mod cmd_j;
 mod cmd_m;
 mod cmd_p;
 mod cmd_t;
@@ -47,6 +48,13 @@ pub fn setup_conference(board: &mut IcyBoard) {
     });
     bulletins.push(Bullettin {
         file: PathBuf::from("src/tests/main/blt2"),
+        ..Default::default()
+    });
+
+    board.conferences.push(Conference {
+        name: "Main Board".to_string(),
+        bulletins: Some(bulletins.clone()),
+        blt_menu: PathBuf::from("src/tests/main/blt_menu"),
         ..Default::default()
     });
 

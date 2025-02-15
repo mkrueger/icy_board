@@ -25,9 +25,10 @@ impl IcyBoardState {
         }
         let mut display_current_menu = self.session.tokens.is_empty();
         loop {
-            self.session.non_stop_off();
+            self.session.disp_options.force_count_lines();
             if display_current_menu {
                 let file = self.session.current_conference.blt_menu.clone();
+                self.session.disp_options.no_change();
                 self.display_file(&file).await?;
                 display_current_menu = false;
             }
@@ -79,7 +80,7 @@ impl IcyBoardState {
                         files.extend(0..bulletins.len() as i32);
                     }
                     "NS" => {
-                        self.session.non_stop_on();
+                        self.session.disp_options.force_count_lines();
                     }
                     _ => {
                         if let Ok(number) = text.parse::<i32>() {
@@ -111,7 +112,7 @@ impl IcyBoardState {
                     files.extend(0..bulletins.len() as i32);
                 }
             }
-
+            self.session.disp_options.no_change();
             for i in files {
                 if let Some(b) = bulletins.get(i as usize) {
                     if new_files {
@@ -136,6 +137,9 @@ impl IcyBoardState {
                 }
             }
             self.session.search_text.clear();
+            // no prompt after displaying bulletins
+            self.session.disp_options.count_lines = false;
+
             if download_blt {
                 self.download(false).await?;
             }

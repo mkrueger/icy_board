@@ -184,7 +184,10 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
         }
         local = login_options.local;
     }
+
     let mut cmd = PcbBoardCommand::new(state);
+
+    cmd.state.session.disp_options.force_count_lines();
     cmd.state.session.term_caps = if local {
         TerminalCaps::LOCAL
     } else {
@@ -212,7 +215,8 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
         }
     }
 
-    let mut press_enter = cmd.state.session.num_lines_printed > 3;
+    let mut press_enter = cmd.state.session.disp_options.num_lines_printed > 3;
+    cmd.state.session.disp_options.count_lines = false;
     loop {
         if num_tries > 15 {
             cmd.state
@@ -228,9 +232,8 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
         if cmd.state.session.disp_options.abort_printout {
             cmd.state.session.disp_options.check_display_status();
         }
-
         if num_tries == 0 && !cmd.state.session.expert_mode {
-            if press_enter && cmd.state.session.num_lines_printed > 0 {
+            if press_enter && cmd.state.session.disp_options.num_lines_printed > 0 {
                 cmd.state.new_line().await?;
                 cmd.state.press_enter().await?;
                 cmd.state.session.disp_options.check_display_status();
@@ -238,7 +241,7 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
             cmd.state.display_current_menu().await?;
             num_tries = 1;
         }
-        cmd.state.session.num_lines_printed = 0;
+        cmd.state.session.disp_options.num_lines_printed = 0;
         cmd.state.fresh_line().await?;
         if num_tries == 0 {
             cmd.state.new_line().await?;
@@ -292,7 +295,7 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
                 }
             }
             Err(err) => {
-                cmd.state.session.disp_options.reset_printout();
+                cmd.state.session.disp_options.force_count_lines();
                 // print error message to user, if possible
                 if cmd.state.set_color(TerminalTarget::Both, 4.into()).await.is_ok() {
                     cmd.state
@@ -303,7 +306,6 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
             }
         }
 
-        cmd.state.session.disp_options.reset_printout();
         if cmd.state.session.request_logoff {
             cmd.state.connection.shutdown().await?;
             cmd.state.save_current_user().await?;

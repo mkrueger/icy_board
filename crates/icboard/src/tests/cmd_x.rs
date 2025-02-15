@@ -20,7 +20,7 @@ fn test_extended_mode_invalid() {
     let output = test_output("x invalid\n".to_string(), |_| {});
     assert_eq!(
         output,
-        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mx invalid\n\n\u{1b}[1;32mPress (Enter) to continue? \u{1b}[0m"
+        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mx invalid\n\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m"
     );
 }
 
