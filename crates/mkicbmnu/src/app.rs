@@ -16,7 +16,7 @@ pub fn new_main_window<'a>(icy_board: IcyBoard, mnu: Arc<Mutex<Menu>>, full_scre
 
     let icy_board = Arc::new(Mutex::new(icy_board));
 
-    let general_tab = GeneralTab::new(icy_board.clone(), mnu.clone());
+    let general_tab = GeneralTab::new(mnu.clone());
     let command_tab = CommandsTab::new(icy_board, mnu.clone());
     App {
         full_screen,

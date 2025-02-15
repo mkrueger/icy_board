@@ -5,10 +5,7 @@ use std::{
 };
 
 use crossterm::event::KeyEvent;
-use icy_board_engine::icy_board::{
-    menu::{Menu, MenuType},
-    IcyBoard,
-};
+use icy_board_engine::icy_board::menu::{Menu, MenuType};
 use icy_board_tui::{
     config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, EditMode, ListItem, ListValue, ResultState},
     tab_page::TabPage,
@@ -22,14 +19,12 @@ use ratatui::{
 
 pub struct GeneralTab {
     state: ConfigMenuState,
-    config: ConfigMenu<Arc<Mutex<IcyBoard>>>,
-    menu: Arc<Mutex<Menu>>,
+    config: ConfigMenu<Arc<Mutex<Menu>>>,
     original: Menu,
-    _icy_board: Arc<Mutex<IcyBoard>>,
 }
 
 impl GeneralTab {
-    pub fn new(icy_board: Arc<Mutex<IcyBoard>>, menu: Arc<Mutex<Menu>>) -> Self {
+    pub fn new(menu: Arc<Mutex<Menu>>) -> Self {
         let info_width = 16;
         let original = menu.lock().unwrap().clone();
         let items = if let Ok(mnu) = menu.lock() {
@@ -37,17 +32,26 @@ impl GeneralTab {
                 ConfigEntry::Item(
                     ListItem::new("Title".to_string(), ListValue::Text(25, mnu.title.clone()))
                         .with_status("Enter the title of the menu.")
-                        .with_label_width(info_width),
+                        .with_label_width(info_width)
+                        .with_update_text_value(&|mnu: &Arc<Mutex<Menu>>, value: String| {
+                            mnu.lock().unwrap().title = value;
+                        }),
                 ),
                 ConfigEntry::Item(
                     ListItem::new("Display File".to_string(), ListValue::Path(mnu.display_file.clone()))
                         .with_status("The menu background file to display.")
-                        .with_label_width(info_width),
+                        .with_label_width(info_width)
+                        .with_update_path_value(&|mnu: &Arc<Mutex<Menu>>, value: std::path::PathBuf| {
+                            mnu.lock().unwrap().display_file = value;
+                        }),
                 ),
                 ConfigEntry::Item(
                     ListItem::new("Help File".to_string(), ListValue::Path(mnu.help_file.clone()))
                         .with_status("The help file to display.")
-                        .with_label_width(info_width),
+                        .with_label_width(info_width)
+                        .with_update_path_value(&|mnu: &Arc<Mutex<Menu>>, value: std::path::PathBuf| {
+                            mnu.lock().unwrap().help_file = value;
+                        }),
                 ),
                 ConfigEntry::Item(
                     ListItem::new(
@@ -62,84 +66,36 @@ impl GeneralTab {
                         }),
                     )
                     .with_status("The type of the menu.")
-                    .with_label_width(info_width),
+                    .with_label_width(info_width)
+                    .with_update_combobox_value(&|mnu: &Arc<Mutex<Menu>>, value: &ComboBox| {
+                        let menu_type = match value.cur_value.value.as_str() {
+                            "Hotkey" => MenuType::Hotkey,
+                            "Lightbar" => MenuType::Lightbar,
+                            _ => MenuType::Command,
+                        };
+                        mnu.lock().unwrap().menu_type = menu_type;
+                    }),
                 ),
                 ConfigEntry::Item(
                     ListItem::new("Prompt".to_string(), ListValue::Text(25, mnu.prompt.clone()))
                         .with_status("The prompt for the menu.")
-                        .with_label_width(info_width),
+                        .with_label_width(info_width)
+                        .with_update_text_value(&|mnu: &Arc<Mutex<Menu>>, value: String| {
+                            mnu.lock().unwrap().prompt = value;
+                        }),
                 ),
             ]
         } else {
             panic!();
         };
-        /*
-
-        format!("{:?}", mnu.menu_type), MenuType::iter().map(|x| format!("{:?}", x)).collect::<Vec<String>>()))
-        .with_status("The type of the menu.")
-        .with_label_width(info_width),
-        */
         Self {
             state: ConfigMenuState::default(),
             config: ConfigMenu {
-                obj: icy_board.clone(),
+                obj: menu,
                 entry: vec![ConfigEntry::Group(String::new(), items)],
             },
-            menu,
             original,
-            _icy_board: icy_board,
         }
-    }
-
-    fn write_back(&self) {
-        /*
-        let ConfigEntry::Group(_, items) = &self.config.entry[0] else {
-            return;
-        };
-        for entry in items {
-            match entry {
-                ConfigEntry::Item(item) => match item.id.as_str() {
-                    "title" => {
-                        if let ListValue::Text(_, ref value) = item.value {
-                            if let Ok(mut mnu) = self.menu.lock() {
-                                mnu.title = value.to_string();
-                            }
-                        }
-                    }
-                    "display_file" => {
-                        if let ListValue::Path(value) = &item.value {
-                            if let Ok(mut mnu) = self.menu.lock() {
-                                mnu.display_file = value.clone();
-                            }
-                        }
-                    }
-                    "help_file" => {
-                        if let ListValue::Path(value) = &item.value {
-                            if let Ok(mut mnu) = self.menu.lock() {
-                                mnu.help_file = value.clone();
-                            }
-                        }
-                    }
-                    "prompt" => {
-                        if let ListValue::Text(_, ref value) = item.value {
-                            if let Ok(mut mnu) = self.menu.lock() {
-                                mnu.prompt = value.to_string();
-                            }
-                        }
-                    }
-                    "menu_type" => {
-                        if let ListValue::ComboBox(value) = &item.value {
-                            if let Ok(mut mnu) = self.menu.lock() {
-                                mnu.menu_type = MenuType::from_str(&value.cur_value.value).unwrap();
-                            }
-                        }
-                    }
-
-                    _ => {}
-                },
-                _ => {}
-            }
-        }*/
     }
 }
 
@@ -148,11 +104,9 @@ impl TabPage for GeneralTab {
         "General".to_string()
     }
     fn is_dirty(&self) -> bool {
-        self.menu.lock().unwrap().clone() != self.original
+        self.config.obj.lock().unwrap().clone() != self.original
     }
-    fn has_control(&self) -> bool {
-        true
-    }
+
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         let width = (2 + 50 + 2).min(area.width) as u16;
 
@@ -175,25 +129,6 @@ impl TabPage for GeneralTab {
 
     fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
         let res = self.config.handle_key_press(key, &mut self.state);
-
-        /*
-        if !self.state.in_edit {
-            match key.code {
-                KeyCode::Char('k') | KeyCode::Up => self.prev(),
-                KeyCode::Char('j') | KeyCode::Down => self.next(),
-                _ => {}
-            }
-            return ResultState {
-                cursor: None,
-                status_line: self.config.items[self.state.selected].status.clone(),
-            };
-        }
-
-        let res = self.config.handle_key_press(key, &self.state);
-        if res.cursor.is_none() {
-            self.state.in_edit = false;
-        }*/
-        self.write_back();
         res
     }
 

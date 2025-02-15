@@ -130,15 +130,15 @@ impl<'a> App<'a> {
         }
 
         match key.code {
-            KeyCode::Char('q') | KeyCode::Esc => {
+            KeyCode::Esc => {
                 if self.tabs.iter().any(|t| t.is_dirty()) {
                     self.mode = Mode::RequestQuit;
                 } else {
                     self.mode = Mode::Quit;
                 }
             }
-            KeyCode::Char('h') | KeyCode::BackTab => self.prev_tab(),
-            KeyCode::Char('l') | KeyCode::Tab => self.next_tab(),
+            KeyCode::BackTab => self.prev_tab(),
+            KeyCode::Tab => self.next_tab(),
             KeyCode::F(1) => {
                 self.help_state.text = self.get_tab().get_help();
                 self.mode = Mode::ShowHelp;

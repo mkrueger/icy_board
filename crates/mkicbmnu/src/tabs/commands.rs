@@ -117,10 +117,6 @@ impl<'a> TabPage for CommandsTab<'a> {
         self.insert_table.render_table(frame, area);
     }
 
-    fn has_control(&self) -> bool {
-        self.edit_cmd_dialog.is_some()
-    }
-
     fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
         if let Some(dialog) = &mut self.edit_cmd_dialog {
             if let Ok(false) = dialog.handle_key_press(key) {
@@ -133,16 +129,17 @@ impl<'a> TabPage for CommandsTab<'a> {
             return ResultState::status_line(String::new());
         }
         match key.code {
-            KeyCode::Char('1') => self.move_up(),
-            KeyCode::Char('2') => self.move_down(),
-            KeyCode::Char('i') | KeyCode::Insert => self.insert(),
-            KeyCode::Char('r') | KeyCode::Delete => self.remove(),
+            KeyCode::PageUp => self.move_up(),
+            KeyCode::PageDown => self.move_down(),
+            KeyCode::Insert => self.insert(),
+            KeyCode::Delete => self.remove(),
 
-            KeyCode::Char('d') | KeyCode::Enter => {
+            KeyCode::Enter => {
                 if let Some(selected) = self.insert_table.table_state.selected() {
-                    let cmd = self.menu.lock().unwrap().commands[selected].clone();
-                    let m = self.menu.clone();
-                    self.edit_cmd_dialog = Some(EditCommandDialog::new(self.icy_board.clone(), m, cmd, selected + 1));
+                    if let Some(cmd) = self.menu.lock().unwrap().commands.get(selected) {
+                        let m = self.menu.clone();
+                        self.edit_cmd_dialog = Some(EditCommandDialog::new(self.icy_board.clone(), m, cmd.clone(), selected + 1));
+                    }
                     return ResultState::status_line(String::new());
                 }
             }
