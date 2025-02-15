@@ -604,7 +604,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            sig: StatementSignature::VariableArguments(0, 0, 0),
+            sig: StatementSignature::VariableArguments(0, 1, 0),
         },
         StatementDefinition {
             name: "PrintLn",
@@ -613,7 +613,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            sig: StatementSignature::VariableArguments(0, 1, 0),
+            sig: StatementSignature::VariableArguments(0, 0, 0),
         },
         StatementDefinition {
             name: "IF",
