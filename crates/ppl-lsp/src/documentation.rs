@@ -430,6 +430,7 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
         FuncOpCode::GetMsgHdr => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-getmsghdr")),
         FuncOpCode::SetMsgHdr => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-setmsghdr")),
         FuncOpCode::NewConfInfo => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-newconfinfo")),
+        FuncOpCode::AreaId => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-areaid")),
         _ => None,
     }
 }

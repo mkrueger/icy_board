@@ -1180,6 +1180,7 @@ hint-function-setmsghdr=
     header then it will insert the message to the end of the message
     base.
 hint-function-newconfinfo=todo
+hint-function-areaid=Generates a tuple conference/area to identify a message base.
 
 hint-const-true=BOOLEAN `TRUE` value
 hint-const-false=BOOLEAN `FALSE` value
