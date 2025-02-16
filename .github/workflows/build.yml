@@ -44,7 +44,7 @@ jobs:
          bin/mkicbmnu
          bin/mkicbtxt
          bin/pplc
-         bin/pppld
+         bin/ppld
          bin/ppl-language-server
          file_id.diz
          INSTALL.txt
@@ -84,7 +84,7 @@ jobs:
          bin/mkicbmnu.exe
          bin/mkicbtxt.exe
          bin/pplc.exe
-         bin/pppld.exe
+         bin/ppld.exe
          bin/ppl-language-server.exe
          file_id.diz
          INSTALL.txt
@@ -142,7 +142,7 @@ jobs:
          aarch64-apple-darwin/bin/mkicbmnu
          aarch64-apple-darwin/bin/mkicbtxt
          aarch64-apple-darwin/bin/pplc
-         aarch64-apple-darwin/bin/pppld
+         aarch64-apple-darwin/bin/ppld
          aarch64-apple-darwin/bin/ppl-language-server
          file_id.diz
          INSTALL.txt
@@ -158,7 +158,7 @@ jobs:
          x86_64-apple-darwin/bin/mkicbmnu
          x86_64-apple-darwin/bin/mkicbtxt
          x86_64-apple-darwin/bin/pplc
-         x86_64-apple-darwin/bin/pppld
+         x86_64-apple-darwin/bin/ppld
          x86_64-apple-darwin/bin/ppl-language-server
          file_id.diz
          INSTALL.txt
