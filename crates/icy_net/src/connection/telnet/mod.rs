@@ -45,7 +45,7 @@ pub enum TerminalEmulation {
     Mode7,
     Rip,
     Skypix,
-    IGS,
+    AtariST,
 }
 
 #[derive(Debug, Clone)]
@@ -126,7 +126,7 @@ impl TelnetConnection {
                                     TerminalEmulation::Avatar => buf.extend_from_slice(b"AVATAR"),
                                     TerminalEmulation::Rip => buf.extend_from_slice(b"RIP"),
                                     TerminalEmulation::Skypix => buf.extend_from_slice(b"SKYPIX"),
-                                    TerminalEmulation::IGS => buf.extend_from_slice(b"IGS"),
+                                    TerminalEmulation::AtariST => buf.extend_from_slice(b"ATARIST"),
                                     TerminalEmulation::Mode7 => buf.extend_from_slice(b"MODE7"),
                                 }
                                 buf.extend([telnet_cmd::IAC, telnet_cmd::SE]);
