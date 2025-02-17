@@ -18,6 +18,7 @@ use crate::Res;
 use async_recursion::async_recursion;
 use icy_engine::rip::to_base_36;
 use icy_engine::Buffer;
+use jamjam::jam::msg_header::JamMessageHeader;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::mem;
@@ -166,6 +167,7 @@ pub struct VirtualMachine<'a> {
 
     pub file_list: VecDeque<String>,
     pub user: User,
+    pub cached_msg_header: Option<(i32, i32, JamMessageHeader)>,
 }
 
 impl<'a> VirtualMachine<'a> {
@@ -823,6 +825,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
                 file_list: VecDeque::new(),
                 user,
                 use_lmrs: true,
+                cached_msg_header: None,
             };
 
             vm.run().await?;

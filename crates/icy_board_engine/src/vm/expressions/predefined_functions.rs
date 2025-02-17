@@ -19,6 +19,7 @@ use crate::vm::{TerminalTarget, VirtualMachine};
 use crate::Res;
 use chrono::{DateTime, Utc};
 use icy_engine::{update_crc32, Position, TextPane};
+use jamjam::jam::msg_header::JamMessageHeader;
 use jamjam::jam::JamMessageBase;
 use radix_fmt::radix;
 use rand::Rng; // 0.8.5
@@ -1972,9 +1973,15 @@ pub async fn getbankbal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
 }
 pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_id();
-    let msg_num = vm.eval_expr(&args[1]).await?.as_int() as u32;
     let field_num = vm.eval_expr(&args[2]).await?.as_int();
 
+    if let Some((cn, an, header)) = &vm.cached_msg_header {
+        if conf_num == *cn && area_num == *an {
+            return get_field(field_num, header);
+        }
+    }
+
+    let msg_num = vm.eval_expr(&args[1]).await?.as_int() as u32;
     let msg_base = {
         let board = vm.icy_board_state.get_board().await;
         let Some(conf) = board.conferences[conf_num as usize].areas.as_ref() else {
@@ -1991,68 +1998,9 @@ pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
     let base = JamMessageBase::open(vm.resolve_file(&msg_base).await)?;
     match base.read_header(msg_num) {
         Ok(header) => {
-            return match field_num {
-                HDR_ACTIVE => Ok(VariableValue::new_int(if header.is_deleted() { 226 } else { 225 })),
-                HDR_BLOCKS => Ok(VariableValue::new_int((header.txt_len / 128) as i32)),
-                HDR_DATE => {
-                    let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
-                    let date = IcbDate::from_utc(date_time);
-                    Ok(VariableValue::new_date(date.to_pcboard_date()))
-                }
-                HDR_ECHO => {
-                    // TODO
-                    Ok(VariableValue::new_bool(false))
-                }
-                HDR_FROM => {
-                    if let Some(from) = header.get_from() {
-                        Ok(VariableValue::new_string(from.to_string()))
-                    } else {
-                        Ok(VariableValue::new_string(String::new()))
-                    }
-                }
-                HDR_MSGNUM => Ok(VariableValue::new_int(header.message_number as i32)),
-                HDR_MSGREF => Ok(VariableValue::new_int(header.reply_to as i32)),
-                HDR_PWD => Ok(VariableValue::new_int(header.password_crc as i32)),
-                HDR_REPLY => Ok(VariableValue::new_int(header.reply_to as i32)),
-                HDR_RPLYDATE => {
-                    // TODO
-                    Ok(VariableValue::new_int(0))
-                }
-                HDR_RPLYTIME => {
-                    // TODO
-                    Ok(VariableValue::new_int(0))
-                }
-                HDR_STATUS => {
-                    // TODO
-                    Ok(VariableValue::new_int(0))
-                }
-                HDR_SUBJ => {
-                    if let Some(subj) = header.get_subject() {
-                        Ok(VariableValue::new_string(subj.to_string()))
-                    } else {
-                        Ok(VariableValue::new_string(String::new()))
-                    }
-                }
-                HDR_TIME => {
-                    let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
-                    let time = IcbTime::from_naive(date_time.naive_local());
-                    Ok(VariableValue::new_time(time.to_pcboard_time()))
-                }
-                HDR_TO => {
-                    if let Some(to) = header.get_to() {
-                        Ok(VariableValue::new_string(to.to_string()))
-                    } else {
-                        Ok(VariableValue::new_string(String::new()))
-                    }
-                }
-                _ => {
-                    log::error!("PPL: Invalid message header field {field_num}");
-                    if field_num == HDR_ACTIVE {
-                        return Ok(VariableValue::new_int(226));
-                    }
-                    Ok(VariableValue::new_string(String::new()))
-                }
-            };
+            let res = get_field(field_num, &header);
+            vm.cached_msg_header = Some((conf_num, area_num, header));
+            res
         }
         Err(err) => {
             log::error!("Can't read header {msg_num} from {conf_num}:{area_num} ({})", err);
@@ -2064,7 +2012,73 @@ pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
     }
 }
 
+fn get_field(field_num: i32, header: &JamMessageHeader) -> Res<VariableValue> {
+    match field_num {
+        HDR_ACTIVE => Ok(VariableValue::new_int(if header.is_deleted() { 226 } else { 225 })),
+        HDR_BLOCKS => Ok(VariableValue::new_int((header.txt_len / 128) as i32)),
+        HDR_DATE => {
+            let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
+            let date = IcbDate::from_utc(date_time);
+            Ok(VariableValue::new_date(date.to_pcboard_date()))
+        }
+        HDR_ECHO => {
+            // TODO
+            Ok(VariableValue::new_bool(false))
+        }
+        HDR_FROM => {
+            if let Some(from) = header.get_from() {
+                Ok(VariableValue::new_string(from.to_string()))
+            } else {
+                Ok(VariableValue::new_string(String::new()))
+            }
+        }
+        HDR_MSGNUM => Ok(VariableValue::new_int(header.message_number as i32)),
+        HDR_MSGREF => Ok(VariableValue::new_int(header.reply_to as i32)),
+        HDR_PWD => Ok(VariableValue::new_int(header.password_crc as i32)),
+        HDR_REPLY => Ok(VariableValue::new_int(header.reply_to as i32)),
+        HDR_RPLYDATE => {
+            // TODO
+            Ok(VariableValue::new_int(0))
+        }
+        HDR_RPLYTIME => {
+            // TODO
+            Ok(VariableValue::new_int(0))
+        }
+        HDR_STATUS => {
+            // TODO
+            Ok(VariableValue::new_int(0))
+        }
+        HDR_SUBJ => {
+            if let Some(subj) = header.get_subject() {
+                Ok(VariableValue::new_string(subj.to_string()))
+            } else {
+                Ok(VariableValue::new_string(String::new()))
+            }
+        }
+        HDR_TIME => {
+            let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
+            let time = IcbTime::from_naive(date_time.naive_local());
+            Ok(VariableValue::new_time(time.to_pcboard_time()))
+        }
+        HDR_TO => {
+            if let Some(to) = header.get_to() {
+                Ok(VariableValue::new_string(to.to_string()))
+            } else {
+                Ok(VariableValue::new_string(String::new()))
+            }
+        }
+        _ => {
+            log::error!("PPL: Invalid message header field {field_num}");
+            if field_num == HDR_ACTIVE {
+                return Ok(VariableValue::new_int(226));
+            }
+            Ok(VariableValue::new_string(String::new()))
+        }
+    }
+}
+
 pub async fn setmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    vm.cached_msg_header = None;
     log::error!("not implemented function!");
     panic!("TODO")
 }
