@@ -212,7 +212,7 @@ impl<'a> Parser<'a> {
         let next_identifier_token = if let Some(Token::Identifier(next_id)) = &self.get_cur_token() {
             let start_id = identifier_token.token.get_identifier();
             if *next_id != start_id {
-                self.errors
+                self.error_reporter
                     .lock()
                     .unwrap()
                     .report_warning(self.lex.span(), ParserWarningType::NextIdentifierInvalid(start_id, self.save_token()));
@@ -520,7 +520,10 @@ impl<'a> Parser<'a> {
                 Some(Statement::Comment(CommentAstNode::new(cmt)))
             }
             Some(Token::UseFuncs(_, _)) => {
-                self.errors.lock().unwrap().report_warning(self.lex.span(), ParserWarningType::UsefuncsIgnored);
+                self.error_reporter
+                    .lock()
+                    .unwrap()
+                    .report_warning(self.lex.span(), ParserWarningType::UsefuncsIgnored);
                 self.next_token();
                 None
             }

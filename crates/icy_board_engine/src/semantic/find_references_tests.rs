@@ -1,9 +1,12 @@
 use core::panic;
-use std::path::PathBuf;
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use crate::{
     executable::LAST_PPLC,
-    parser::{parse_ast, Encoding, UserTypeRegistry},
+    parser::{parse_ast, Encoding, ErrorReporter, UserTypeRegistry},
 };
 
 use super::SemanticVisitor;
@@ -137,7 +140,8 @@ fn find_references(arg: &str) {
         txt.push(ch);
     }
     let reg = UserTypeRegistry::default();
-    let (ast, errors) = parse_ast(PathBuf::from("."), &txt, &reg, Encoding::Utf8, LAST_PPLC);
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let ast = parse_ast(PathBuf::from("."), errors.clone(), &txt, &reg, Encoding::Utf8, LAST_PPLC);
     let mut visitor = SemanticVisitor::new(LAST_PPLC, errors.clone(), &reg);
     ast.visit(&mut visitor);
 

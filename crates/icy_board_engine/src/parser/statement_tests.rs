@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use crate::{
     ast::{
@@ -12,12 +15,13 @@ use crate::{
 
 use super::{
     lexer::{Spanned, Token},
-    Encoding, Parser, UserTypeRegistry,
+    Encoding, ErrorReporter, Parser, UserTypeRegistry,
 };
 
 fn parse_statement(input: &str, assert_eof: bool) -> Statement {
     let reg = UserTypeRegistry::default();
-    let mut parser = Parser::new(PathBuf::from("."), &reg, input, Encoding::Utf8, LAST_PPLC);
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let mut parser = Parser::new(PathBuf::from("."), errors, &reg, input, Encoding::Utf8, LAST_PPLC);
     parser.next_token();
     match parser.parse_statement() {
         Some(stmt) => {
@@ -27,7 +31,7 @@ fn parse_statement(input: &str, assert_eof: bool) -> Statement {
             stmt
         }
         None => {
-            for error in &parser.errors.lock().unwrap().errors {
+            for error in &parser.error_reporter.lock().unwrap().errors {
                 println!("{}", error.error);
             }
             panic!("Error");

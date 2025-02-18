@@ -5,6 +5,8 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
+codepages = { workspace = true }
+icy_engine = { workspace = true }
 icy_board_engine = { workspace = true }
 
 lazy_static = { workspace = true }
@@ -15,3 +17,6 @@ crossterm = { workspace = true }
 
 ariadne = { workspace = true }
 unicase = { workspace = true }
+toml = { workspace = true }
+serde = { workspace = true }
+walkdir = { workspace = true }

@@ -13,7 +13,7 @@ use crate::{
     executable::{Executable, ExpressionNegator, OpCode, PPECommand, PPEExpr, PPEScript, VariableType},
     parser::{
         lexer::{Spanned, Token},
-        ErrorRepoter, UserTypeRegistry,
+        ErrorReporter, UserTypeRegistry,
     },
     semantic::{LookupVariabeleTable, SemanticVisitor},
 };
@@ -108,7 +108,7 @@ pub struct PPECompiler<'a> {
 }
 
 impl<'a> PPECompiler<'a> {
-    pub fn new(language_version: u16, type_registry: &'a UserTypeRegistry, errors: Arc<Mutex<ErrorRepoter>>) -> Self {
+    pub fn new(language_version: u16, type_registry: &'a UserTypeRegistry, errors: Arc<Mutex<ErrorReporter>>) -> Self {
         let semantic_visitor = SemanticVisitor::new(language_version, errors, type_registry);
         Self {
             lookup_table: LookupVariabeleTable::default(),
@@ -129,38 +129,45 @@ impl<'a> PPECompiler<'a> {
     /// # Panics
     ///
     /// Panics if .
-    pub fn compile(&mut self, prg: &Ast) {
-        let prg = prg.visit_mut(&mut AstTransformationVisitor::new(true));
-        // println!("{}", prg);
-        prg.visit(&mut self.semantic_visitor);
+    pub fn compile(&mut self, asts: &[&Ast]) {
+        let mut visted = Vec::new();
+        for prg in asts {
+            let prg = prg.visit_mut(&mut AstTransformationVisitor::new(true));
+            // println!("{}", prg);
+            prg.visit(&mut self.semantic_visitor);
+            visted.push(prg);
+        }
+
         self.lookup_table = self.semantic_visitor.generate_variable_table();
-        for d in &prg.nodes {
-            match d {
-                AstNode::Function(_func) => {}
-                AstNode::Procedure(_proc) => {}
-                AstNode::FunctionDeclaration(_func) => {}
-                AstNode::ProcedureDeclaration(_proc) => {}
-                AstNode::TopLevelStatement(stmt) => {
-                    // may get transformed by the ast transformer.
-                    if let Statement::Block(block) = stmt {
+        for prg in visted {
+            for d in &prg.nodes {
+                match d {
+                    AstNode::Function(_func) => {}
+                    AstNode::Procedure(_proc) => {}
+                    AstNode::FunctionDeclaration(_func) => {}
+                    AstNode::ProcedureDeclaration(_proc) => {}
+                    AstNode::TopLevelStatement(stmt) => {
+                        // may get transformed by the ast transformer.
+                        if let Statement::Block(block) = stmt {
+                            for s in block.get_statements() {
+                                self.compile_add_statement(s);
+                            }
+                        }
+                    }
+                    AstNode::Main(block) => {
                         for s in block.get_statements() {
                             self.compile_add_statement(s);
                         }
                     }
                 }
-                AstNode::Main(block) => {
-                    for s in block.get_statements() {
-                        self.compile_add_statement(s);
-                    }
-                }
             }
-        }
 
-        if self.commands.statements.is_empty() || self.commands.statements.last().unwrap().command != PPECommand::End {
-            self.commands.add_statement(&mut self.cur_offset, PPECommand::End);
-        }
+            if self.commands.statements.is_empty() || self.commands.statements.last().unwrap().command != PPECommand::End {
+                self.commands.add_statement(&mut self.cur_offset, PPECommand::End);
+            }
 
-        self.compile_functions(&prg);
+            self.compile_functions(&prg);
+        }
         self.fill_labels();
     }
 

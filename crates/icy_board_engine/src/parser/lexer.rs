@@ -14,7 +14,7 @@ use std::{
 use thiserror::Error;
 use unicase::Ascii;
 
-use super::{Encoding, ErrorRepoter};
+use super::{Encoding, ErrorReporter};
 
 #[derive(Error, Default, Debug, Clone, PartialEq)]
 pub enum LexingErrorType {
@@ -308,7 +308,7 @@ pub struct Lexer {
     encoding: Encoding,
     text: Vec<char>,
 
-    errors: Arc<Mutex<ErrorRepoter>>,
+    errors: Arc<Mutex<ErrorReporter>>,
     lexer_state: LexerState,
     token_start: usize,
     token_end: usize,
@@ -395,7 +395,7 @@ lazy_static::lazy_static! {
 }
 
 impl Lexer {
-    pub fn new(file: PathBuf, version: u16, text: &str, encoding: Encoding, errors: Arc<Mutex<ErrorRepoter>>) -> Self {
+    pub fn new(file: PathBuf, version: u16, text: &str, encoding: Encoding, errors: Arc<Mutex<ErrorReporter>>) -> Self {
         Self {
             lookup_table: if version < 350 { &*TOKEN_LOOKUP_TABLE } else { &*TOKEN_LOOKUP_TABLE_350 },
             file,

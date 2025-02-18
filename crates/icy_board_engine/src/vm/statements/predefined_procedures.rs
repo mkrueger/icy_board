@@ -14,7 +14,7 @@ use crate::{
 };
 use bstr::BString;
 use chrono::{DateTime, Utc};
-use codepages::tables::{write_with_bom, CP437_TO_UNICODE};
+use codepages::tables::{write_utf8_with_bom, CP437_TO_UNICODE};
 use icy_engine::{BufferType, OutputFormat, SaveOptions, ScreenPreperation};
 use jamjam::jam::{JamMessage, JamMessageBase};
 
@@ -1683,7 +1683,7 @@ pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
                             //  Todo: Extended headers
                             msg.push_str("Message Body:\n");
                             msg.push_str(&msg_text.to_string());
-                            if let Err(err) = write_with_bom(&file_name, &msg) {
+                            if let Err(err) = write_utf8_with_bom(&file_name, &msg) {
                                 log::error!("MSGTOFILE can't write message text {msg_number} in area {area}: {err}");
                                 return Ok(());
                             }

@@ -19,7 +19,7 @@ use crate::{
     parser::{
         self,
         lexer::{Spanned, Token},
-        ErrorRepoter, ParserErrorType, UserTypeRegistry,
+        ErrorReporter, ParserErrorType, UserTypeRegistry,
     },
 };
 
@@ -166,7 +166,7 @@ pub struct SemanticVisitor<'a> {
     version: u16,
     pub type_registry: &'a UserTypeRegistry,
 
-    pub errors: Arc<Mutex<ErrorRepoter>>,
+    pub errors: Arc<Mutex<ErrorReporter>>,
     pub references: Vec<(ReferenceType, References)>,
 
     /// Maps member references -> user type IDs
@@ -321,7 +321,7 @@ impl LookupVariabeleTable {
 }
 
 impl<'a> SemanticVisitor<'a> {
-    pub fn new(version: u16, errors: Arc<Mutex<ErrorRepoter>>, type_registry: &'a UserTypeRegistry) -> Self {
+    pub fn new(version: u16, errors: Arc<Mutex<ErrorReporter>>, type_registry: &'a UserTypeRegistry) -> Self {
         let mut result = Self {
             version,
             errors,

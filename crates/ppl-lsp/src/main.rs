@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use dashmap::DashMap;
 use icy_board_engine::ast::{
@@ -7,7 +8,7 @@ use icy_board_engine::ast::{
     ConstantExpression, Expression,
 };
 use icy_board_engine::executable::{FunctionDefinition, FUNCTION_DEFINITIONS, LAST_PPLC};
-use icy_board_engine::parser::{parse_ast, Encoding, UserTypeRegistry};
+use icy_board_engine::parser::{parse_ast, Encoding, ErrorReporter, UserTypeRegistry};
 use icy_board_engine::semantic::SemanticVisitor;
 use ppl_language_server::completion::get_completion;
 use ppl_language_server::documentation::{get_const_hover, get_function_hover, get_statement_hover, get_type_hover};
@@ -371,7 +372,8 @@ impl Backend {
         let uri = params.uri.to_string();
         self.document_map.insert(uri.clone(), rope.clone());
         let reg = UserTypeRegistry::default();
-        let (ast, errors) = parse_ast(PathBuf::from(uri.clone()), &params.text, &reg, Encoding::Utf8, LAST_PPLC);
+        let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+        let ast = parse_ast(PathBuf::from(uri.clone()), errors.clone(), &params.text, &reg, Encoding::Utf8, LAST_PPLC);
 
         let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, errors, &reg);
 

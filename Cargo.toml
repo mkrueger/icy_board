@@ -35,7 +35,7 @@ icy_board_engine = { path = "crates/icy_board_engine" }
 icy_engine = { git ="https://github.com/mkrueger/icy_tools" }
  
 lazy_static = "1.5.0"
-semver = "1.0.23"
+semver = { version ="1.0.23", features = ["serde"] }
 thiserror = "2.0.11"
 argh = "0.1.12"
 crossterm = "0.28.1"

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use icy_board_engine::{
     ast::Ast,
     executable::LAST_PPLC,
-    parser::{lexer::Spanned, ErrorRepoter, UserTypeRegistry},
+    parser::{lexer::Spanned, ErrorReporter, UserTypeRegistry},
     semantic::SemanticVisitor,
 };
 
@@ -15,7 +15,7 @@ pub enum ReferenceSymbol {
 pub fn get_reference(ast: &Ast, offset: usize, include_self: bool) -> Vec<Spanned<String>> {
     let mut reference_list = vec![];
     let mut reg = UserTypeRegistry::default();
-    let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorRepoter::default())), &mut reg);
+    let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorReporter::default())), &mut reg);
     ast.visit(&mut semantic_visitor);
 
     for (_, refs) in &semantic_visitor.references {

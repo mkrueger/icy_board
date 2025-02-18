@@ -1,0 +1,9 @@
+[package]
+name = "lread"
+version = "0.1.0"
+language_version = 350
+authors = ["Mike Krüger <mkrueger@posteo.de>"]
+
+[data]
+text_files = ["lread.cfg"]
+art_files = ["data/screen.icy"]

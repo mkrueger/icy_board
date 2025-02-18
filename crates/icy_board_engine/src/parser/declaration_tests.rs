@@ -1,18 +1,22 @@
-use std::{path::PathBuf, vec};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    vec,
+};
 
 use crate::{
     ast::{AstNode, FunctionDeclarationAstNode, ParameterSpecifier, ProcedureDeclarationAstNode, VariableDeclarationStatement, VariableSpecifier},
     executable::{VariableType, LAST_PPLC},
 };
 
-use super::{Encoding, Parser, UserTypeRegistry};
+use super::{Encoding, ErrorReporter, Parser, UserTypeRegistry};
 
 fn parse_ast_node(input: &str, assert_eof: bool) -> AstNode {
     let reg = UserTypeRegistry::default();
-
-    let mut parser = Parser::new(PathBuf::from("."), &reg, input, Encoding::Utf8, LAST_PPLC);
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let mut parser = Parser::new(PathBuf::from("."), errors, &reg, input, Encoding::Utf8, LAST_PPLC);
     parser.next_token();
-    let res = parser.parse_ast_node().unwrap();
+    let res: AstNode = parser.parse_ast_node().unwrap();
     if assert_eof {
         assert!(parser.get_cur_token().is_none(), "Expected EOF, but got {:?}", parser.get_cur_token());
     }

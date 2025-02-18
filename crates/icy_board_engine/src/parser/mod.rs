@@ -217,7 +217,7 @@ impl UserTypeRegistry {
 }
 
 pub struct Parser<'a> {
-    pub errors: Arc<Mutex<ErrorRepoter>>,
+    pub error_reporter: Arc<Mutex<ErrorReporter>>,
 
     pub type_registry: &'a UserTypeRegistry,
     lang_version: u16,
@@ -241,12 +241,17 @@ lazy_static::lazy_static! {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(file: PathBuf, type_registry: &'a UserTypeRegistry, text: &str, encoding: Encoding, lang_version: u16) -> Self {
-        let errors = Arc::new(Mutex::new(ErrorRepoter::default()));
-
-        let lex = Lexer::new(file, lang_version, text, encoding, errors.clone());
+    pub fn new(
+        file: PathBuf,
+        error_reporter: Arc<Mutex<ErrorReporter>>,
+        type_registry: &'a UserTypeRegistry,
+        text: &str,
+        encoding: Encoding,
+        lang_version: u16,
+    ) -> Self {
+        let lex = Lexer::new(file, lang_version, text, encoding, error_reporter.clone());
         Parser {
-            errors,
+            error_reporter,
             lang_version,
             cur_token: None,
             lookahead_token: None,
@@ -376,7 +381,7 @@ impl<'a> Parser<'a> {
     }
 
     fn report_error(&mut self, span: std::ops::Range<usize>, save_token: ParserErrorType) {
-        self.errors.lock().unwrap().report_error(span, save_token);
+        self.error_reporter.lock().unwrap().report_error(span, save_token);
         while self.get_cur_token().is_some() && self.get_cur_token() != Some(Token::Eol) && !matches!(self.get_cur_token(), Some(Token::Comment(_, _))) {
             self.next_token();
         }
@@ -407,13 +412,13 @@ impl<'a> Parser<'a> {
             }
             Token::UseFuncs(_, _) => {
                 if self.use_funcs {
-                    self.errors
+                    self.error_reporter
                         .lock()
                         .unwrap()
                         .report_warning(self.lex.span(), ParserWarningType::UsefuncsAlreadySet);
                 }
                 if self.got_statement {
-                    self.errors
+                    self.error_reporter
                         .lock()
                         .unwrap()
                         .report_error(self.lex.span(), ParserErrorType::UsefuncAfterStatement);
@@ -802,7 +807,7 @@ impl<'a> Parser<'a> {
             }
             let endproc_token = self.save_spanned_token();
             if endproc_token.token == Token::EndFunc {
-                self.errors
+                self.error_reporter
                     .lock()
                     .unwrap()
                     .report_warning(endproc_token.span.clone(), ParserWarningType::ProcedureClosedWithEndFunc);
@@ -903,7 +908,7 @@ impl<'a> Parser<'a> {
 
             let endfunc_token = self.save_spanned_token();
             if endfunc_token.token == Token::EndProc {
-                self.errors
+                self.error_reporter
                     .lock()
                     .unwrap()
                     .report_warning(endfunc_token.span.clone(), ParserWarningType::FunctionClosedWithEndProc);
@@ -932,9 +937,17 @@ impl<'a> Parser<'a> {
 /// # Panics
 ///
 /// Panics if .
-pub fn parse_ast(file_name: PathBuf, input: &str, user_types: &UserTypeRegistry, encoding: Encoding, version: u16) -> (Ast, Arc<Mutex<ErrorRepoter>>) {
+pub fn parse_ast(
+    file_name: PathBuf,
+    error_reporter: Arc<Mutex<ErrorReporter>>,
+    input: &str,
+    user_types: &UserTypeRegistry,
+    encoding: Encoding,
+    version: u16,
+) -> Ast {
+    error_reporter.lock().unwrap().set_file_name(&file_name);
     let mut nodes = Vec::new();
-    let mut parser = Parser::new(file_name.clone(), user_types, input, encoding, version);
+    let mut parser = Parser::new(file_name.clone(), error_reporter, user_types, input, encoding, version);
     parser.next_token();
     parser.skip_eol();
 
@@ -944,36 +957,44 @@ pub fn parse_ast(file_name: PathBuf, input: &str, user_types: &UserTypeRegistry,
         }
     }
 
-    (
-        Ast {
-            nodes,
-            file_name,
-            require_user_variables: parser.require_user_variables,
-        },
-        parser.errors.clone(),
-    )
+    Ast {
+        nodes,
+        file_name,
+        require_user_variables: parser.require_user_variables,
+    }
 }
 
 pub struct ErrorContainer {
     pub error: Box<dyn std::error::Error + Send + Sync>,
     pub span: core::ops::Range<usize>,
+    pub file_name: PathBuf,
 }
 
 #[derive(Default)]
-pub struct ErrorRepoter {
+pub struct ErrorReporter {
+    cur_file: PathBuf,
     pub errors: Vec<ErrorContainer>,
     pub warnings: Vec<ErrorContainer>,
 }
 
-impl ErrorRepoter {
+impl ErrorReporter {
+    pub fn set_file_name(&mut self, file_name: &Path) {
+        self.cur_file = file_name.to_path_buf();
+    }
+
     pub fn report_error<T: std::error::Error + 'static + Send + Sync>(&mut self, span: core::ops::Range<usize>, error: T) {
-        self.errors.push(ErrorContainer { error: Box::new(error), span });
+        self.errors.push(ErrorContainer {
+            error: Box::new(error),
+            span,
+            file_name: self.cur_file.clone(),
+        });
     }
 
     pub fn report_warning<T: std::error::Error + 'static + Send + Sync>(&mut self, span: core::ops::Range<usize>, warning: T) {
         self.warnings.push(ErrorContainer {
             error: Box::new(warning),
             span,
+            file_name: self.cur_file.clone(),
         });
     }
 

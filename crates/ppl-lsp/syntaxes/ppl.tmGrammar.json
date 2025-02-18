@@ -1,0 +1,108 @@
+{
+  "scopeName": "source.pps",
+  "patterns": [
+    {
+			"comment": "Line comments",
+			"begin": "^\\s*(;|'|\\*)",
+			"beginCaptures": {
+				"0": {
+					"name": "punctuation.definition.comment.ppl"
+				}
+			},
+			"end": "$",
+			"name": "comment.line.ppl"
+		},
+    {
+			"comment": "String literals",
+			"begin": "\"",
+			"beginCaptures": {
+				"0": {
+					"name": "punctuation.definition.string.begin.ppl"
+				}
+			},
+			"end": "\"",
+			"endCaptures": {
+				"0": {
+					"name": "punctuation.definition.string.end.ppl"
+				}
+			},
+			"name": "string.quoted.double.ppl",
+			"patterns": [
+				{
+					"include": "#string_escaped_char"
+				}
+			]
+		},
+    {
+			"comment": "Floating-point literals",
+			"match": "(\\.\\d+([Ee][-+]\\d+)?i?)\\b|\\b\\d+\\.\\d*(([Ee][-+]\\d+)?i?\\b)?",
+			"name": "constant.numeric.floating-point.ppl"
+		},
+		{
+			"comment": "Integers",
+			"match": "\\b((0x[0-9a-fA-F]+)|(0[0-7]+i?)|(\\d+([Ee]\\d+)?i?)|(\\d+[Ee][-+]\\d+i?))|@[0-9a-fA-F][0-9a-fA-F]\\b",
+			"name": "constant.numeric.integer.ppl"
+		},
+    {
+			"comment": "Language constants",
+			"match": "(?i)\\b(TRUE|FALSE|STK_LIMIT|ATTACH_LIM_P|ATTACH_LIM_U|ACC_CUR_BAL|F_NET|CMAXMSGS|MAXMSGS|CUR_USER|NO_USER|ACC_STAT|ACC_TIME|ACC_MSGREAD|ACC_MSGWRITE|DEFS|BELL|LOGIT|LOGITLEFT|AUTO|ECHODOTS|ERASELINE|FIELDLEN|GUIDE|HIGHASCII|LFAFTER|LFBEFORE|NEWLINE|NOCLEAR|STACKED|UPCASE|WORDWRAP|YESNO|NEWBALANCE|CHRG_CALL|CHRG_TIME|CHRG_PEAKTIME|CHRG_CHAT|CHRG_MSGREAD|CHRG_MSGCAP|CHRG_MSGWRITE|CHRG_MSGECHOED|CHRG_MSGPRIVATE|CHRG_DOWNFILE|CHRG_DOWNBYTES|PAY_UPFILE|PAY_UPBYTES|WARNLEVEL|CRC_FILE|CRC_STR|START_BAL|START_SESSION|DEB_CALL|DEB_TIME|DEB_MSGREAD|DEB_MSGCAP|DEB_MSGWRITE|DEB_MSGECHOED|DEB_MSGPRIVATE|DEB_DOWNFILE|DEB_DOWNBYTES|DEB_CHAT|DEB_TPU|DEB_SPECIAL|CRED_UPFILE|CRED_UPBYTES|CRED_SPECIAL|SEC_DROP|F_EXP|F_MW|F_REG|F_SEL|F_SYS|FCL|FNS|NC|GRAPH|SEC|LANG|HDR_ACTIVE|HDR_BLOCKS|HDR_DATE|HDR_ECHO|HDR_FROM|HDR_MSGNUM|HDR_MSGREF|HDR_PWD|HDR_REPLY|HDR_RPLYDATE|HDR_RPLYTIME|HDR_STATUS|HDR_SUBJ|HDR_TIME|HDR_TO|O_RD|O_RW|O_WR|SEEK_CUR|SEEK_END|SEEK_SET|S_DB|S_DN|S_DR|S_DW)\\b",
+			"name": "constant.language.ppl"
+		}
+    ,
+    {
+			"comment": "Keywords",
+			"match": "(?i)\\b(LET|WHILE|ENDWHILE|IF|THEN|DO|ELSE|ELSEIF|ENDIF|FOR|NEXT|BREAK|CONTINUE|RETURN|GOSUB|GOTO|SELECT|CASE|DEFAULT|ENDSELECT|DECLARE|FUNCTION|PROCEDURE|ENDPROC|ENDFUNC|REPEAT|UNTIL|LOOP|ENDLOOP)\\b",
+			"name": "keyword.control.ppl"
+		},
+    {
+			"comment": "Keywords",
+			"match": "(?i)\\b(INTEGER|SDWORD|LONG|STRING|BIGSTR|BOOLEAN|DATE|DDATE|EDATE|TIME|MONEY|WORD|UWORD|SWORD|INT|BYTE|UBYTE|UNSIGNED|DWORD|UDWORD|SBYTE|SHORT|REAL|FLOAT|DOUBLE|DREAL|MSGAREAID)\\b",
+			"name": "keyword.type.ppl"
+		},
+
+    {
+      "comment": "Operator",
+			"patterns": [
+				{
+					"match": "\\-\\-",
+					"name": "keyword.operator.decrement.ppl"
+				},
+				{
+					"match": "\\+\\+",
+					"name": "keyword.operator.increment.ppl"
+				},
+				{
+					"match": "(==|!=|<=|>=)",
+					"name": "keyword.operator.comparison.ppl"
+				},
+				{
+					"match": "(&|\\||!)",
+					"name": "keyword.operator.logical.ppl"
+				},
+				{
+					"match": "(=|\\+=|\\-=|\\|=|%=|\\*=|/=|&=)",
+					"name": "keyword.operator.assignment.go"
+				},
+				{
+					"match": "(\\+|\\-|\\*|/|%|^)",
+					"name": "keyword.operator.arithmetic.go"
+				}
+      ]
+    }
+  ],
+  "repository": {
+      "string_escaped_char": {
+      "patterns": [
+        {
+          "match": "\\\\([0-7]{3}|[abfnrtv\\\\'\"]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8})",
+          "name": "constant.character.escape.go"
+        },
+        {
+          "match": "\\\\[^0-7xuUabfnrtv\\'\"]",
+          "name": "invalid.illegal.unknown-escape.go"
+        }
+      ]
+    }
+  }
+
+}

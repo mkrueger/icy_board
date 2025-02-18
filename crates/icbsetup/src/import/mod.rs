@@ -5,7 +5,7 @@ use std::{
     str::FromStr,
 };
 
-use codepages::tables::write_with_bom;
+use codepages::tables::write_utf8_with_bom;
 use icy_board_engine::{
     datetime::{IcbDoW, IcbTime},
     icy_board::{
@@ -824,7 +824,7 @@ impl PCBoardImporter {
             import.push('\n');
         }
 
-        write_with_bom(to, &import)?;
+        write_utf8_with_bom(to, &import)?;
         self.logger.converted_file(from.as_ref(), to.as_ref(), true);
         Ok(())
     }
@@ -1426,7 +1426,7 @@ impl PCBoardImporter {
                 out.push('\n');
             }
             let new_name = self.output_directory.join(arg);
-            write_with_bom(&new_name, &out)?;
+            write_utf8_with_bom(&new_name, &out)?;
             self.logger.log(&format!("Wrote logon survey to {}", new_name.display()));
         }
 

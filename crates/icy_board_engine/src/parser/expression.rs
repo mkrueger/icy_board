@@ -26,7 +26,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Or) => BinOp::Or,
                 Some(Token::And) => BinOp::And,
                 _ => {
-                    self.errors
+                    self.error_reporter
                         .lock()
                         .unwrap()
                         .report_error(self.save_token_span(), ParserErrorType::UnexpectedError);
@@ -61,7 +61,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Eq) => BinOp::Eq,
                 Some(Token::NotEq) => BinOp::NotEq,
                 _ => {
-                    self.errors
+                    self.error_reporter
                         .lock()
                         .unwrap()
                         .report_error(self.save_token_span(), ParserErrorType::UnexpectedError);
@@ -88,7 +88,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Add) => BinOp::Add,
                 Some(Token::Sub) => BinOp::Sub,
                 _ => {
-                    self.errors
+                    self.error_reporter
                         .lock()
                         .unwrap()
                         .report_error(self.save_token_span(), ParserErrorType::UnexpectedError);
@@ -115,7 +115,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Div) => BinOp::Div,
                 Some(Token::Mod) => BinOp::Mod,
                 _ => {
-                    self.errors
+                    self.error_reporter
                         .lock()
                         .unwrap()
                         .report_error(self.save_token_span(), ParserErrorType::UnexpectedError);
@@ -184,7 +184,7 @@ impl<'a> Parser<'a> {
 
                 while self.get_cur_token() != Some(Token::RPar) {
                     let Some(value) = self.parse_expression() else {
-                        self.errors
+                        self.error_reporter
                             .lock()
                             .unwrap()
                             .report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
@@ -203,7 +203,7 @@ impl<'a> Parser<'a> {
                 }
 
                 if self.get_cur_token() != Some(Token::RPar) {
-                    self.errors
+                    self.error_reporter
                         .lock()
                         .unwrap()
                         .report_error(self.save_token_span(), ParserErrorType::MissingCloseParens(self.save_token()));
@@ -244,7 +244,7 @@ impl<'a> Parser<'a> {
 
                     while self.get_cur_token() != Some(Token::RBracket) {
                         let Some(value) = self.parse_expression() else {
-                            self.errors
+                            self.error_reporter
                                 .lock()
                                 .unwrap()
                                 .report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
@@ -263,7 +263,7 @@ impl<'a> Parser<'a> {
                     }
 
                     if self.get_cur_token() != Some(Token::RBracket) {
-                        self.errors
+                        self.error_reporter
                             .lock()
                             .unwrap()
                             .report_error(self.save_token_span(), ParserErrorType::MissingCloseBracket(self.save_token()));
@@ -286,7 +286,7 @@ impl<'a> Parser<'a> {
             Token::LPar => {
                 self.next_token();
                 let Some(expr) = self.parse_expression() else {
-                    self.errors
+                    self.error_reporter
                         .lock()
                         .unwrap()
                         .report_error(self.save_token_span(), ParserErrorType::ExpressionExpected(self.save_token()));
@@ -294,7 +294,7 @@ impl<'a> Parser<'a> {
                 };
                 let ret = ParensExpression::create_empty_expression(expr);
                 if self.get_cur_token() != Some(Token::RPar) {
-                    self.errors
+                    self.error_reporter
                         .lock()
                         .unwrap()
                         .report_error(self.save_token_span(), ParserErrorType::MissingCloseParens(self.save_token()));
@@ -311,7 +311,7 @@ impl<'a> Parser<'a> {
                 while self.get_cur_token() != Some(Token::RBrace) {
                     self.skip_eol_and_comments();
                     let Some(expr) = self.parse_expression() else {
-                        self.errors
+                        self.error_reporter
                             .lock()
                             .unwrap()
                             .report_error(self.save_token_span(), ParserErrorType::ExpressionExpected(self.save_token()));
@@ -328,7 +328,7 @@ impl<'a> Parser<'a> {
                             continue;
                         }
                         _ => {
-                            self.errors
+                            self.error_reporter
                                 .lock()
                                 .unwrap()
                                 .report_error(self.save_token_span(), ParserErrorType::CommaOrRBraceExpected);
@@ -350,7 +350,7 @@ impl<'a> Parser<'a> {
                 self.next_token();
                 let identifier_token = self.save_spanned_token();
                 if !matches!(identifier_token.token, Token::Identifier(_)) {
-                    self.errors
+                    self.error_reporter
                         .lock()
                         .unwrap()
                         .report_error(self.save_token_span(), ParserErrorType::IdentifierExpected(self.save_token()));

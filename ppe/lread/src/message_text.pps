@@ -1,0 +1,45 @@
+
+PROCEDURE DrawMsgText()
+  STRING line
+  STRING MsgFile = PPEPath() + "msgtxt." + STRING(PCBNode())
+  MsgToFile CONF, LOW + Cursor, MsgFile 
+
+  IF !Exist(MsgFile) THEN
+    LOG "Message file " + MsgFile + "  doesn't exists", true
+    ClrMsgArea()
+    RETURN 
+  ENDIF
+  FOpen 1, MsgFile, O_RD, S_DB
+  IF FErr(1) THEN
+    LOG "Error reading message text", true
+    ClrMsgArea()
+    RETURN
+  ENDIF
+  LOOP  
+    FGet 1, line
+    IF FErr(1) RETURN
+    IF line == "Message Body:" BREAK
+  ENDLOOP
+
+  INTEGER msg_line = 0
+  Color 7
+  LOOP  
+    FGet 1, line
+    IF FErr(1) || msg_line + MsgStartY > 23 BREAK
+    AnsiPos 1, MsgStartY + msg_line
+    IF LEN(line) > 79 THEN 
+      line = Left(line, 79)
+    ELSE 
+      ClrEOL
+    ENDIF
+    PRINT line
+    msg_line += 1
+  ENDLOOP
+  FClose 1
+  Delete MsgFile
+  WHILE msg_line <= 23 - MsgStartY DO
+    AnsiPos 1, MsgStartY + msg_line
+    ClrEOL
+    msg_line += 1
+  ENDWHILE
+ENDPROC

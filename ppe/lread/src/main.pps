@@ -1,0 +1,54 @@
+INTEGER CONF = CurConf()
+INTEGER LOW = LOMSGNUM()
+INTEGER HIGH = HiMsgNum()
+STRING FROM(10), SUBJ(10), TO(10), DATETXT(10)
+INTEGER FirstMsg = 0
+INTEGER Cursor = 0
+INTEGER AreaX, AreaY, Lines
+INTEGER MsgStartY
+
+FOpen 1, PPEPath()+ "lread.cfg", O_RD, S_DB
+
+FGet 1, AreaX
+FGet 1, AreaY
+FGet 1, Lines
+FGet 1, MsgStartY
+Lines -= 1
+FClose 1
+
+INTEGER MAX_MSGS = HIGH - LOW + 1
+ReDim FROM, MAX_MSGS
+ReDim SUBJ, MAX_MSGS
+ReDim TO, MAX_MSGS
+ReDim DATETXT, MAX_MSGS
+
+Cls
+DispFile PPEPath() + "screen.pcb", GRAPH
+DrawMsgArea()
+DrawMsgText()
+  
+LOOP
+  STRING CH = InKey()
+  SELECT CASE CH 
+    CASE Chr(27)
+      BREAK
+    CASE "UP"
+      IF Cursor > 0 THEN
+        Cursor -= 1
+        IF Cursor < FirstMsg THEN
+          FirstMsg = Cursor
+        ENDIF
+        DrawMsgArea()
+        DrawMsgText()
+      ENDIF
+    CASE "DOWN"
+      IF Cursor < HIGH - LOW THEN
+      Cursor += 1
+      IF Cursor > FirstMsg + Lines THEN
+        FirstMsg = Cursor - Lines 
+      ENDIF
+      DrawMsgArea()
+      DrawMsgText()
+    ENDIF
+  ENDSELECT
+ENDLOOP

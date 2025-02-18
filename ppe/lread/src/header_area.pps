@@ -1,0 +1,37 @@
+
+PROCEDURE DrawMsgArea()
+  INTEGER I
+  FOR I = 0 TO Lines
+    AnsiPos AreaX, AreaY + I
+    INTEGER O = FirstMsg + I
+    IF O > HIGH - LOW THEN
+      ClrEOL
+      CONTINUE
+    ENDIF
+
+    IF O == Cursor THEN
+      Color 11
+      Print ">"
+    
+      Color 7
+      Print " "
+    ENDIF
+    INTEGER MSG_NUM = LOW + O
+
+    IF FROM[O] == "" THEN 
+      FROM[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_FROM)), 12) + " "
+      SUBJ[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_SUBJ)), 36) + " "
+      TO[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_TO)), 12) + " "
+      DATETXT[O] = STRING(GetMsgHdr(CONF, MSG_NUM, HDR_DATE))
+    ENDIF
+    Print Right(STRING(MSG_NUM), 4), " ", SUBJ[o], FROM[o], TO[o], DATETXT[O]
+  NEXT  
+ENDPROC
+
+PROCEDURE ClrMsgArea()
+  INTEGER I
+  FOR I = 0 TO Lines
+    AnsiPos 1, MsgStartY + I
+    ClrEOL
+  NEXT
+ENDPROC

@@ -16,7 +16,7 @@ use crate::{
         DeserializationError, DeserializationErrorType, EntryType, Executable, OpCode, PPECommand, PPEExpr, PPEScript, PPEVisitor, StatementDefinition,
         TableEntry, VariableType, LAST_PPLC,
     },
-    parser::{lexer::Token, ErrorRepoter, UserTypeRegistry},
+    parser::{lexer::Token, ErrorReporter, UserTypeRegistry},
     semantic::SemanticVisitor,
     Res,
 };
@@ -541,7 +541,7 @@ pub fn decompile(executable: Executable, raw: bool) -> Res<(Ast, Vec<DecompilerI
             let mut ast = d.decompile()?;
 
             let reg = UserTypeRegistry::default();
-            let errors: Arc<std::sync::Mutex<crate::parser::ErrorRepoter>> = Arc::new(Mutex::new(ErrorRepoter::default()));
+            let errors: Arc<std::sync::Mutex<crate::parser::ErrorReporter>> = Arc::new(Mutex::new(ErrorReporter::default()));
             let mut visitor = SemanticVisitor::new(LAST_PPLC, errors.clone(), &reg);
             ast.visit(&mut visitor);
 

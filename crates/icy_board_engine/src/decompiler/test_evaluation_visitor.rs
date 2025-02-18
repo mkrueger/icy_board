@@ -1,18 +1,22 @@
-use std::path::PathBuf;
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use crate::{
     ast::Expression,
     executable::LAST_PPLC,
-    parser::{Encoding, Parser, UserTypeRegistry},
+    parser::{Encoding, ErrorReporter, Parser, UserTypeRegistry},
 };
 
 use super::evaluation_visitor::OptimizationVisitor;
 
 fn parse_expression(input: &str) -> Expression {
     let reg = UserTypeRegistry::default();
-    let mut parser = Parser::new(PathBuf::from("."), &reg, input, Encoding::Utf8, LAST_PPLC);
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let mut parser = Parser::new(PathBuf::from("."), errors, &reg, input, Encoding::Utf8, LAST_PPLC);
     parser.next_token();
-    let res = parser.parse_expression().unwrap();
+    let res: Expression = parser.parse_expression().unwrap();
     assert_eq!(parser.get_cur_token(), None);
     res
 }

@@ -27,7 +27,8 @@
 					".pps",
 					".ppd",
 					".ppx"
-				]
+				],
+				"configuration": "./language-configuration.json"
 			}
 		],
 		"configuration": {
@@ -161,7 +162,17 @@
 					"AskForProgramName": "extension.mock-debug.getProgramName"
 				}
 			}
-		]
+		],
+		"grammars": [
+			{
+				"language": "ppl",
+				"scopeName": "source.pps",
+				"path": "./syntaxes/ppl.tmGrammar.json"
+			}
+		],
+		"code-runner.executorMap": {
+			"ppl": "pplc $fileName && icboard --ppe $fileNameWithoutExt"
+		}
 	},
 	"scripts": {
 		"postinstall": "cd client && pnpm i",

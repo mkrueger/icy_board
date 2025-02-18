@@ -1,7 +1,7 @@
 use app::new_main_window;
 use argh::FromArgs;
 use chrono::Local;
-use codepages::tables::write_with_bom;
+use codepages::tables::write_utf8_with_bom;
 use color_eyre::Result;
 use create::IcyBoardCreator;
 use icy_board_engine::icy_board::{read_with_encoding_detection, IcyBoard};
@@ -219,7 +219,7 @@ fn init_log(path: &Path) {
 
 fn convert_file(entry: PathBuf) {
     if let Ok(data) = read_with_encoding_detection(&entry) {
-        if write_with_bom(&entry, &data).is_err() {
+        if write_utf8_with_bom(&entry, &data).is_err() {
             println!("Error writing {}", entry.display());
         }
     }

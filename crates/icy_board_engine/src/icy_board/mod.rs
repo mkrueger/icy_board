@@ -5,7 +5,7 @@ use std::{
 
 use crate::Res;
 use bulletins::BullettinList;
-use codepages::tables::write_with_bom;
+use codepages::tables::write_utf8_with_bom;
 use qfile::QTraitSync;
 use surveys::SurveyList;
 use thiserror::Error;
@@ -699,7 +699,7 @@ pub fn read_data_with_encoding_detection(data: &[u8]) -> Res<String> {
 
 pub fn convert_to_utf8<P: AsRef<Path>, Q: AsRef<Path>>(from: &P, to: &Q) -> Res<()> {
     let import = read_with_encoding_detection(from)?;
-    write_with_bom(to, &import)?;
+    write_utf8_with_bom(to, &import)?;
     Ok(())
 }
 

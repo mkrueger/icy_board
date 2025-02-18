@@ -8,7 +8,7 @@ use crate::{
     executable::LAST_PPLC,
     parser::{
         lexer::{CommentType, Lexer, Token},
-        Encoding, ErrorRepoter,
+        Encoding, ErrorReporter,
     },
 };
 
@@ -25,7 +25,7 @@ fn get_token(src: &str) -> Token {
         LAST_PPLC,
         src,
         Encoding::Utf8,
-        Arc::new(Mutex::new(ErrorRepoter::default())),
+        Arc::new(Mutex::new(ErrorReporter::default())),
     );
     match lex.next_token() {
         Some(t) => t,
@@ -36,7 +36,7 @@ fn get_token(src: &str) -> Token {
 }
 
 fn get_token_ver(src: &str, ver: u16) -> Token {
-    let mut lex = Lexer::new(PathBuf::from("."), ver, src, Encoding::Utf8, Arc::new(Mutex::new(ErrorRepoter::default())));
+    let mut lex = Lexer::new(PathBuf::from("."), ver, src, Encoding::Utf8, Arc::new(Mutex::new(ErrorReporter::default())));
     match lex.next_token() {
         Some(t) => t,
         None => {
@@ -58,7 +58,7 @@ fn test_string() {
         LAST_PPLC,
         src,
         Encoding::Utf8,
-        Arc::new(Mutex::new(ErrorRepoter::default())),
+        Arc::new(Mutex::new(ErrorReporter::default())),
     );
 
     assert_eq!(Token::Const(Constant::String("Hello World".to_string())), lex.next_token().unwrap());
@@ -124,7 +124,7 @@ fn test_identifier() {
         LAST_PPLC,
         src,
         Encoding::Utf8,
-        Arc::new(Mutex::new(ErrorRepoter::default())),
+        Arc::new(Mutex::new(ErrorReporter::default())),
     );
 
     assert_eq!(Token::Identifier(unicase::Ascii::new("Hello".to_string())), lex.next_token().unwrap());
@@ -173,7 +173,7 @@ fn test_eol() {
         LAST_PPLC,
         src,
         Encoding::Utf8,
-        Arc::new(Mutex::new(ErrorRepoter::default())),
+        Arc::new(Mutex::new(ErrorReporter::default())),
     );
 
     assert_eq!(Token::Identifier(unicase::Ascii::new("A".to_string())), lex.next_token().unwrap());
@@ -191,7 +191,7 @@ fn test_colon_eol() {
         LAST_PPLC,
         src,
         Encoding::Utf8,
-        Arc::new(Mutex::new(ErrorRepoter::default())),
+        Arc::new(Mutex::new(ErrorReporter::default())),
     );
 
     assert_eq!(Token::Identifier(unicase::Ascii::new("A".to_string())), lex.next_token().unwrap());
@@ -232,7 +232,7 @@ fn test_skip() {
         LAST_PPLC,
         src,
         Encoding::Utf8,
-        Arc::new(Mutex::new(ErrorRepoter::default())),
+        Arc::new(Mutex::new(ErrorReporter::default())),
     );
 
     assert_eq!(Token::Identifier(unicase::Ascii::new("Hello".to_string())), lex.next_token().unwrap());
@@ -244,7 +244,7 @@ fn test_skip() {
         LAST_PPLC,
         src,
         Encoding::Utf8,
-        Arc::new(Mutex::new(ErrorRepoter::default())),
+        Arc::new(Mutex::new(ErrorReporter::default())),
     );
 
     assert_eq!(Token::Identifier(unicase::Ascii::new("Hello".to_string())), lex.next_token().unwrap());
@@ -276,7 +276,7 @@ fn test_dotdot() {
         LAST_PPLC,
         src,
         Encoding::Utf8,
-        Arc::new(Mutex::new(ErrorRepoter::default())),
+        Arc::new(Mutex::new(ErrorReporter::default())),
     );
 
     assert_eq!(Token::Const(Constant::Integer(1, NumberFormat::Default)), lex.next_token().unwrap());
@@ -291,7 +291,7 @@ fn test_case_number() {
         LAST_PPLC,
         src,
         Encoding::Utf8,
-        Arc::new(Mutex::new(ErrorRepoter::default())),
+        Arc::new(Mutex::new(ErrorReporter::default())),
     );
     assert_eq!(Token::Case, lex.next_token().unwrap());
     assert_eq!(0..4, lex.span());

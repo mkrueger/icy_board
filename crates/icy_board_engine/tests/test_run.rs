@@ -1,10 +1,15 @@
-use std::{env, path::PathBuf, sync::Arc, thread};
+use std::{
+    env,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    thread,
+};
 
 use icy_board_engine::{
     compiler::PPECompiler,
     executable::{Executable, LAST_PPLC},
     icy_board::{bbs::BBS, read_data_with_encoding_detection, state::IcyBoardState, user_base::User},
-    parser::{Encoding, UserTypeRegistry},
+    parser::{Encoding, ErrorReporter, UserTypeRegistry},
 };
 use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
 
@@ -35,10 +40,11 @@ fn test_compiler() {
 fn run_test(file_name: &str, input: &str, expected_output: &str) {
     println!("Test {}...", file_name);
     let reg = UserTypeRegistry::default();
-    let (ast, errors) = icy_board_engine::parser::parse_ast(PathBuf::from(&file_name), input, &reg, Encoding::Utf8, LAST_PPLC);
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let ast = icy_board_engine::parser::parse_ast(PathBuf::from(&file_name), errors.clone(), input, &reg, Encoding::Utf8, LAST_PPLC);
     check_errors(errors.clone());
     let mut compiler = PPECompiler::new(LAST_PPLC, &reg, errors.clone());
-    compiler.compile(&ast);
+    compiler.compile(&[&ast]);
     check_errors(errors.clone());
 
     match compiler.create_executable(LAST_PPLC) {
@@ -111,7 +117,7 @@ fn run_test(file_name: &str, input: &str, expected_output: &str) {
     }
 }
 
-fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser::ErrorRepoter>>) {
+fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser::ErrorReporter>>) {
     if errors.lock().unwrap().has_errors() {
         for err in &errors.lock().unwrap().errors {
             println!("ERROR: {}", err.error);

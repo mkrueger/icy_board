@@ -1,11 +1,16 @@
-use std::{env, path::PathBuf, sync::Arc, thread};
+use std::{
+    env,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    thread,
+};
 
 use icy_board_engine::{
     compiler::PPECompiler,
     decompiler::decompile,
     executable::Executable,
     icy_board::{bbs::BBS, read_data_with_encoding_detection, state::IcyBoardState},
-    parser::{Encoding, UserTypeRegistry},
+    parser::{Encoding, ErrorReporter, UserTypeRegistry},
 };
 use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
 
@@ -43,9 +48,10 @@ fn test_legacy_ppe_roundtrip() {
 
         let reg = UserTypeRegistry::default();
         let input = dec_ast.to_string();
-        let (ast, errors) = icy_board_engine::parser::parse_ast(PathBuf::from(&file_name), &input, &reg, Encoding::Utf8, version);
+        let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+        let ast = icy_board_engine::parser::parse_ast(PathBuf::from(&file_name), errors.clone(), &input, &reg, Encoding::Utf8, version);
         let mut compiler = PPECompiler::new(version, &reg, errors.clone());
-        compiler.compile(&ast);
+        compiler.compile(&[&ast]);
         check_errors(errors.clone());
         println!("success.");
         match compiler.create_executable(version) {
@@ -104,7 +110,7 @@ fn run_executable(file_name: &str, executable: &Executable) -> String {
     result.replace("\r\n", "\n")
 }
 
-fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser::ErrorRepoter>>) {
+fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser::ErrorReporter>>) {
     if errors.lock().unwrap().has_errors() {
         for err in &errors.lock().unwrap().errors {
             println!("ERROR: {}", err.error);

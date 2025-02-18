@@ -196,9 +196,10 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
 
     if let Some(login_options) = &login_options {
         if let Some(ppe) = &login_options.ppe {
-            let _ = cmd.state.run_ppe(&ppe, None);
-            let _ = cmd.state.press_enter();
-            let _ = cmd.state.hangup();
+            if let Err(err) = cmd.state.run_ppe(&ppe, None).await {
+                log::error!("error running PPE: {}", err);
+            };
+            let _ = cmd.state.press_enter().await;
             return Ok(());
         }
     }
