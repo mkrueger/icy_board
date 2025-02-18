@@ -1,4 +1,3 @@
-
 PROCEDURE DrawMsgArea()
   INTEGER I
   FOR I = 0 TO Lines

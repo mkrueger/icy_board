@@ -1,4 +1,3 @@
-
 PROCEDURE DrawMsgText()
   STRING line
   STRING MsgFile = PPEPath() + "msgtxt." + STRING(PCBNode())

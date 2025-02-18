@@ -72,6 +72,8 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
     let mut reg = UserTypeRegistry::default();
     let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorReporter::default())), &mut reg);
     ast.visit(&mut semantic_visitor);
+    semantic_visitor.finish();
+
     ast.visit(&mut map);
 
     if map.items.is_empty() {

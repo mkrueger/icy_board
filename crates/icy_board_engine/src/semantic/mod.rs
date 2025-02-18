@@ -809,6 +809,64 @@ impl<'a> SemanticVisitor<'a> {
             );
         }
     }
+
+    pub fn finish(&mut self) {
+        for (rt, r) in &mut self.references.iter() {
+            if matches!(rt, ReferenceType::Label(_)) {
+                if r.declaration.is_none() {
+                    self.errors.lock().unwrap().report_error(
+                        r.usages.first().unwrap().span.clone(),
+                        CompilationErrorType::LabelNotFound(r.usages.first().unwrap().token.to_string()),
+                    );
+                } else if r.usages.is_empty() {
+                    if let Some(declaration) = &r.declaration {
+                        if ":~BEGIN~" == declaration.token || declaration.token.starts_with(":*(") {
+                            continue;
+                        }
+                    }
+                    self.errors.lock().unwrap().report_warning(
+                        r.declaration.as_ref().unwrap().span.clone(),
+                        CompilationWarningType::UnusedLabel(r.declaration.as_ref().unwrap().token.to_string()),
+                    );
+                }
+                continue;
+            }
+
+            let Some(decl) = &r.declaration else {
+                continue;
+            };
+
+            if r.variable_type == VariableType::Function || r.variable_type == VariableType::Procedure {
+                if r.implementation.is_none() {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(decl.span.clone(), CompilationErrorType::MissingImplementation(decl.token.to_string()));
+                }
+                if r.usages.is_empty() {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_warning(decl.span.clone(), CompilationErrorType::UnusedFunction(decl.token.to_string()));
+                }
+            } else if matches!(rt, ReferenceType::Variable(_)) && r.usages.is_empty() {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_warning(decl.span.clone(), CompilationErrorType::UnusedVariable(decl.token.to_string()));
+            }
+        }
+
+        // search if any user variables are used.
+        if !self.require_user_variables {
+            for (i, user_var) in USER_VARIABLES.iter().enumerate() {
+                if user_var.version <= self.version && !self.references[i].1.usages.is_empty() {
+                    self.require_user_variables = true;
+                    break;
+                }
+            }
+        }
+    }
 }
 
 impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
@@ -1436,61 +1494,7 @@ impl<'a> AstVisitor<VariableType> for SemanticVisitor<'a> {
             }
         }
 
-        for (rt, r) in &mut self.references.iter() {
-            if matches!(rt, ReferenceType::Label(_)) {
-                if r.declaration.is_none() {
-                    self.errors.lock().unwrap().report_error(
-                        r.usages.first().unwrap().span.clone(),
-                        CompilationErrorType::LabelNotFound(r.usages.first().unwrap().token.to_string()),
-                    );
-                } else if r.usages.is_empty() {
-                    if let Some(declaration) = &r.declaration {
-                        if ":~BEGIN~" == declaration.token || declaration.token.starts_with(":*(") {
-                            continue;
-                        }
-                    }
-                    self.errors.lock().unwrap().report_warning(
-                        r.declaration.as_ref().unwrap().span.clone(),
-                        CompilationWarningType::UnusedLabel(r.declaration.as_ref().unwrap().token.to_string()),
-                    );
-                }
-                continue;
-            }
-
-            let Some(decl) = &r.declaration else {
-                continue;
-            };
-
-            if r.variable_type == VariableType::Function || r.variable_type == VariableType::Procedure {
-                if r.implementation.is_none() {
-                    self.errors
-                        .lock()
-                        .unwrap()
-                        .report_error(decl.span.clone(), CompilationErrorType::MissingImplementation(decl.token.to_string()));
-                }
-                if r.usages.is_empty() {
-                    self.errors
-                        .lock()
-                        .unwrap()
-                        .report_warning(decl.span.clone(), CompilationErrorType::UnusedFunction(decl.token.to_string()));
-                }
-            } else if matches!(rt, ReferenceType::Variable(_)) && r.usages.is_empty() {
-                self.errors
-                    .lock()
-                    .unwrap()
-                    .report_warning(decl.span.clone(), CompilationErrorType::UnusedVariable(decl.token.to_string()));
-            }
-        }
-
-        // search if any user variables are used.
-        if !self.require_user_variables {
-            for (i, user_var) in USER_VARIABLES.iter().enumerate() {
-                if user_var.version <= self.version && !self.references[i].1.usages.is_empty() {
-                    self.require_user_variables = true;
-                    break;
-                }
-            }
-        }
+        
         VariableType::None
     }
 }

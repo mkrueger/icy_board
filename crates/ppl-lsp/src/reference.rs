@@ -17,7 +17,8 @@ pub fn get_reference(ast: &Ast, offset: usize, include_self: bool) -> Vec<Spanne
     let mut reg = UserTypeRegistry::default();
     let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorReporter::default())), &mut reg);
     ast.visit(&mut semantic_visitor);
-
+    semantic_visitor.finish();
+    
     for (_, refs) in &semantic_visitor.references {
         if refs.contains(offset) {
             if let Some(decl) = &refs.declaration {

@@ -113,9 +113,6 @@ fn main() {
         return;
     }
 
-    let reg = UserTypeRegistry::icy_board_registry();
-    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-
     println!();
     println!("Parsing...");
 
@@ -128,85 +125,8 @@ fn main() {
     } else {
         Encoding::Detect
     };
-
-    let mut asts = Vec::new();
-    match load_with_encoding(&PathBuf::from(&file_name), encoding) {
-        Ok(src) => {
-            let ast = parse_ast(PathBuf::from(&file_name), errors.clone(), &src, &reg, encoding, lang_version);
-            asts.push((ast, src));
-            if check_errors(errors.clone(), &arguments, &asts) {
-                std::process::exit(1);
-            }
-        }
-        Err(err) => {
-            execute!(
-                stdout(),
-                SetAttribute(Attribute::Bold),
-                SetForegroundColor(Color::Red),
-                Print("ERROR: ".to_string()),
-                SetAttribute(Attribute::Reset),
-                SetAttribute(Attribute::Bold),
-                Print(format!("{}", err)),
-                SetAttribute(Attribute::Reset),
-            )
-            .unwrap();
-            println!();
-            println!();
-            std::process::exit(1);
-        }
-    }
-
-    let mut compiler: PPECompiler<'_> = PPECompiler::new(version, &reg, errors.clone());
-    compiler.compile(&[&asts[0].0]);
-    if check_errors(errors.clone(), &arguments, &asts) {
-        std::process::exit(1);
-    }
-
-    match compiler.create_executable(version) {
-        Ok(executable) => {
-            if arguments.disassemble {
-                println!();
-                executable.print_variable_table();
-                println!();
-                let mut visitor = icy_board_engine::executable::disassembler::DisassembleVisitor::new(&executable);
-                visitor.generate_statement_data = true;
-                compiler.get_script().visit(&mut visitor);
-                println!();
-                println!("Generated:");
-                executable.print_script_buffer_dump();
-                println!();
-                return;
-            }
-            let bin = executable.to_buffer().unwrap();
-            let out_file_name = Path::new(&file_name).with_extension("ppe");
-            let len = bin.len();
-            fs::write(&out_file_name, bin).expect("Unable to write file");
-            let lines = asts[0].1.lines().count();
-            println!(
-                "{} lines, {} chars compiled. {} bytes written to {:?}",
-                lines,
-                asts[0].1.len(),
-                len,
-                &out_file_name
-            );
-        }
-        Err(err) => {
-            execute!(
-                stdout(),
-                SetAttribute(Attribute::Bold),
-                SetForegroundColor(Color::Red),
-                Print("ERROR: ".to_string()),
-                SetAttribute(Attribute::Reset),
-                SetAttribute(Attribute::Bold),
-                Print(format!("{}", err)),
-                SetAttribute(Attribute::Reset),
-            )
-            .unwrap();
-            println!();
-            println!();
-            std::process::exit(1);
-        }
-    }
+    let out_file_name = Path::new(&file_name).with_extension("ppe");
+    compile_files(&arguments, version, encoding, lang_version, vec![PathBuf::from(&file_name)], &out_file_name);
 }
 
 fn compile_toml(file_name: &PathBuf, arguments: &Cli, version: u16) -> Res<()> {
@@ -214,52 +134,21 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli, version: u16) -> Res<()> {
     let config: Config = toml::from_str(&toml_str)?;
 
     let base_path = file_name.parent().unwrap();
-    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     let encoding: Encoding = Encoding::Detect;
     let lang_version = config.package.language_version();
-
-    let reg = UserTypeRegistry::icy_board_registry();
-    let mut asts = Vec::new();
-    println!();
-    println!("Parsing...");
+    
+    let mut files = Vec::new();
 
     for entry in walkdir::WalkDir::new(&base_path.join("src")).into_iter().flatten() {
         if !entry.path().is_file() {
             continue;
         }
-        let src_file = entry.path().to_path_buf();
-        match load_with_encoding(&src_file, encoding) {
-            Ok(src) => {
-                let ast = parse_ast(src_file.clone(), errors.clone(), &src, &reg, encoding, lang_version);
-                asts.push((ast, src));
-                if check_errors(errors.clone(), &arguments, &asts) {
-                    std::process::exit(1);
-                }
-            }
-            Err(err) => {
-                execute!(
-                    stdout(),
-                    SetAttribute(Attribute::Bold),
-                    SetForegroundColor(Color::Red),
-                    Print("ERROR: ".to_string()),
-                    SetAttribute(Attribute::Reset),
-                    SetAttribute(Attribute::Bold),
-                    Print(format!("{}", err)),
-                    SetAttribute(Attribute::Reset),
-                )
-                .unwrap();
-                println!();
-                println!();
-                std::process::exit(1);
+        if let Some(ext) = entry.path().extension() {
+            if ext != "pps" {
+                continue;
             }
         }
-    }
-
-    println!("Compiling...");
-    let mut compiler = PPECompiler::new(version, &reg, errors.clone());
-    compiler.compile(&asts.iter().map(|(ast, _)| ast).collect::<Vec<&Ast>>());
-    if check_errors(errors.clone(), &arguments, &asts) {
-        std::process::exit(1);
+        files.push(entry.path().to_path_buf());
     }
 
     let path = match version {
@@ -275,31 +164,7 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli, version: u16) -> Res<()> {
     let target_path = base_path.join("target").join(path);
     fs::create_dir_all(&target_path).expect("Unable to create target directory");
     let out_file_name = target_path.join(config.package.name()).with_extension("ppe");
-    match compiler.create_executable(version) {
-        Ok(executable) => {
-            let bin = executable.to_buffer().unwrap();
-            //let len = bin.len();
-            fs::write(&out_file_name, bin).expect("Unable to write file");
-            //let lines = src.lines().count();
-            //println!("{} lines, {} chars compiled. {} bytes written to {:?}", lines, src.len(), len, &out_file_name);
-        }
-        Err(err) => {
-            execute!(
-                stdout(),
-                SetAttribute(Attribute::Bold),
-                SetForegroundColor(Color::Red),
-                Print("ERROR: ".to_string()),
-                SetAttribute(Attribute::Reset),
-                SetAttribute(Attribute::Bold),
-                Print(format!("{}", err)),
-                SetAttribute(Attribute::Reset),
-            )
-            .unwrap();
-            println!();
-            println!();
-            std::process::exit(1);
-        }
-    }
+    compile_files(arguments, version, encoding, lang_version, files, &out_file_name);
     println!("Copying data files...");
     for file in config.data.art_files {
         let src_file = base_path.join(&file);
@@ -339,6 +204,103 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli, version: u16) -> Res<()> {
     }
 
     Ok(())
+}
+
+fn compile_files(arguments: &Cli, version: u16, encoding: Encoding, lang_version: u16, mut files: Vec<PathBuf>, out_file_name: &Path) {
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    
+    files.sort_by(|a, b| 
+        if a.file_stem().unwrap() == "main" { 
+            std::cmp::Ordering::Less
+        } else if b.file_stem().unwrap() == "main" {
+            std::cmp::Ordering::Greater
+        } else {
+            a.cmp(b)
+        }
+    );
+    for f in &files {
+        println!("Compiling: {:?}", f.display());
+    }
+
+    let reg = UserTypeRegistry::icy_board_registry();
+    let mut asts = Vec::new();
+    println!();
+    println!("Parsing...");
+
+    for src_file in files {
+        match load_with_encoding(&src_file, encoding) {
+            Ok(src) => {
+                let ast = parse_ast(src_file.to_path_buf(), errors.clone(), &src, &reg, encoding, lang_version);
+                asts.push((ast, src));
+                if check_errors(errors.clone(), &arguments, &asts) {
+                    std::process::exit(1);
+                }
+            }
+            Err(err) => {
+                execute!(
+                    stdout(),
+                    SetAttribute(Attribute::Bold),
+                    SetForegroundColor(Color::Red),
+                    Print("ERROR: ".to_string()),
+                    SetAttribute(Attribute::Reset),
+                    SetAttribute(Attribute::Bold),
+                    Print(format!("{}", err)),
+                    SetAttribute(Attribute::Reset),
+                )
+                .unwrap();
+                println!();
+                println!();
+                std::process::exit(1);
+            }
+        }
+    }
+
+    println!("Compiling...");
+    let mut compiler = PPECompiler::new(version, &reg, errors.clone());
+    compiler.compile(&asts.iter().map(|(ast, _)| ast).collect::<Vec<&Ast>>());
+    if check_errors(errors.clone(), &arguments, &asts) {
+        std::process::exit(1);
+    }
+
+    match compiler.create_executable(version) {
+        Ok(executable) => {
+            if arguments.disassemble {
+                println!();
+                executable.print_variable_table();
+                println!();
+                let mut visitor = icy_board_engine::executable::disassembler::DisassembleVisitor::new(&executable);
+                visitor.generate_statement_data = true;
+                compiler.get_script().visit(&mut visitor);
+                println!();
+                println!("Generated:");
+                executable.print_script_buffer_dump();
+                println!();
+                return;
+            }
+            
+            let bin = executable.to_buffer().unwrap();
+            //let len = bin.len();
+            fs::write(out_file_name, bin).expect("Unable to write file");
+            //let lines = src.lines().count();
+            //println!("{} lines, {} chars compiled. {} bytes written to {:?}", lines, src.len(), len, &out_file_name);
+        }
+        Err(err) => {
+            execute!(
+                stdout(),
+                SetAttribute(Attribute::Bold),
+                SetForegroundColor(Color::Red),
+                Print("ERROR: ".to_string()),
+                SetAttribute(Attribute::Reset),
+                SetAttribute(Attribute::Bold),
+                Print(format!("{}", err)),
+                SetAttribute(Attribute::Reset),
+            )
+            .unwrap();
+            println!();
+            println!();
+            std::process::exit(1);
+        }
+    }
 }
 
 fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser::ErrorReporter>>, arguments: &Cli, src: &[(Ast, String)]) -> bool {

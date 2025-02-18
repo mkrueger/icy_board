@@ -144,7 +144,10 @@ fn find_references(arg: &str) {
     let ast = parse_ast(PathBuf::from("."), errors.clone(), &txt, &reg, Encoding::Utf8, LAST_PPLC);
     let mut visitor = SemanticVisitor::new(LAST_PPLC, errors.clone(), &reg);
     ast.visit(&mut visitor);
+    visitor.finish();
 
+    visitor.finish();
+    
     if !errors.lock().unwrap().errors.is_empty() {
         for e in &errors.lock().unwrap().errors {
             println!("{}", e.error);

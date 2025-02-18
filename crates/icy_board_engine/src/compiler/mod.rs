@@ -132,14 +132,17 @@ impl<'a> PPECompiler<'a> {
     pub fn compile(&mut self, asts: &[&Ast]) {
         let mut visted = Vec::new();
         for prg in asts {
+            self.semantic_visitor.errors.lock().unwrap().set_file_name(&prg.file_name);
             let prg = prg.visit_mut(&mut AstTransformationVisitor::new(true));
             // println!("{}", prg);
             prg.visit(&mut self.semantic_visitor);
             visted.push(prg);
         }
+        self.semantic_visitor.finish();
 
         self.lookup_table = self.semantic_visitor.generate_variable_table();
         for prg in visted {
+            self.semantic_visitor.errors.lock().unwrap().set_file_name(&prg.file_name);
             for d in &prg.nodes {
                 match d {
                     AstNode::Function(_func) => {}

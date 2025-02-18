@@ -376,8 +376,8 @@ impl Backend {
         let ast = parse_ast(PathBuf::from(uri.clone()), errors.clone(), &params.text, &reg, Encoding::Utf8, LAST_PPLC);
 
         let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, errors, &reg);
-
         ast.visit(&mut semantic_visitor);
+        semantic_visitor.finish();
 
         let semantic_tokens = semantic_token_from_ast(&ast);
 
