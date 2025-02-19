@@ -375,10 +375,7 @@ impl LanguageServer for Backend {
 
                     let _ = process::Command::new("sh")
                         .arg("-c")
-                        .arg(format!(
-                            "gnome-terminal -- icboard --ppe {} /home/mkrueger/icy_shadow_bbs",
-                            target_file.display()
-                        ))
+                        .arg(format!("gnome-terminal -- icboard --ppe {}", target_file.display()))
                         .spawn();
                 }
             }
