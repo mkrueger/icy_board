@@ -4,7 +4,11 @@ use ariadne::{Label, Report, ReportKind};
 use codepages::tables::{write_cp437, write_utf8_with_bom};
 use icy_board_engine::{
     ast::Ast,
-    compiler::{workspace::Workspace, PPECompiler},
+    compiler::{
+        workspace::{Package, Workspace},
+        PPECompiler,
+    },
+    executable::LAST_PPLC,
     icy_board::read_with_encoding_detection,
     parser::{load_with_encoding, parse_ast, Encoding, ErrorReporter, UserTypeRegistry},
     Res,
@@ -18,7 +22,7 @@ use crossterm::{
 use icy_engine::{Buffer, SaveOptions};
 use semver::Version;
 use std::{
-    fs,
+    fs::{self},
     io::stdout,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -43,9 +47,13 @@ struct Cli {
     #[argh(option)]
     lang_version: Option<u16>,
 
-    /// specify the encoding of the file, defaults to autodetection
-    #[argh(option)]
+    /// specify the encoding of the file (cp437 = true, utf8 = false), defaults to autodetection
+    #[argh(switch)]
     cp437: Option<bool>,
+
+    /// create & init new ppl package in target directory
+    #[argh(switch)]
+    init: bool,
 
     /// file[.pps] to compile (extension defaults to .pps if not specified)
     #[argh(positional)]
@@ -63,6 +71,35 @@ fn main() {
     let valid_versions: Vec<u16> = vec![100, 200, 300, 310, 320, 330, 340, 400];
     if !valid_versions.contains(&version) {
         println!("Invalid version number valid values {valid_versions:?}");
+        return;
+    }
+
+    if arguments.init {
+        let Some(file) = arguments.file.clone() else {
+            println!("No target directory specified.");
+            return;
+        };
+
+        if file.exists() {
+            println!("Target directory already exists.");
+            return;
+        }
+        let src_dir = file.join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+        fs::write(&src_dir.join("main.pps"), "PRINTLN \"Hello, World!\"").unwrap();
+
+        let ws = Workspace {
+            file_name: file.clone(),
+            package: Package {
+                name: file.file_name().unwrap().to_str().unwrap().to_string(),
+                version: Version::new(0, 1, 0),
+                language_version: Some(LAST_PPLC),
+                authors: None,
+            },
+            data: None,
+        };
+        ws.save(file.join("ppl.toml")).unwrap();
+        println!("Created new ppl package in {}", file.display());
         return;
     }
 
@@ -141,40 +178,45 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli, version: u16) -> Res<()> {
     let out_file_name = target_path.join(workspace.package.name()).with_extension("ppe");
     compile_files(arguments, version, encoding, lang_version, files, &out_file_name);
     println!("Copying data files...");
-    for file in workspace.data.art_files {
-        let src_file = base_path.join(&file);
-        let out_file = target_path.join(&file);
-        fs::create_dir_all(out_file.parent().unwrap())?;
+    if let Some(data) = &workspace.data {
+        if let Some(art_files) = &data.art_files {
+            for file in art_files {
+                let src_file = base_path.join(&file);
+                let out_file = target_path.join(&file);
+                fs::create_dir_all(out_file.parent().unwrap())?;
 
-        if src_file.extension().unwrap() == "icy" {
-            let data = fs::read(&src_file)?;
-            let mut buffer = Buffer::from_bytes(&src_file, true, &data, None, None).unwrap();
-            let mut options = SaveOptions::default();
-            options.modern_terminal_output = version > 340;
-            let bytes = buffer.to_bytes("pcb", &options).unwrap();
-            let out_file: PathBuf = out_file.with_extension("pcb");
-            fs::write(out_file, bytes)?;
-            continue;
+                if src_file.extension().unwrap() == "icy" {
+                    let data = fs::read(&src_file)?;
+                    let mut buffer = Buffer::from_bytes(&src_file, true, &data, None, None).unwrap();
+                    let mut options = SaveOptions::default();
+                    options.modern_terminal_output = version > 340;
+                    let bytes = buffer.to_bytes("pcb", &options).unwrap();
+                    let out_file: PathBuf = out_file.with_extension("pcb");
+                    fs::write(out_file, bytes)?;
+                    continue;
+                }
+
+                let txt = read_with_encoding_detection(&src_file)?;
+                if version <= 340 {
+                    write_cp437(&out_file, &txt)?;
+                } else {
+                    write_utf8_with_bom(&out_file, &txt)?;
+                }
+            }
         }
+        if let Some(text_files) = &data.text_files {
+            for file in text_files {
+                let src_file = base_path.join(&file);
+                let out_file = target_path.join(&file);
+                fs::create_dir_all(out_file.parent().unwrap())?;
+                let txt = read_with_encoding_detection(&src_file)?;
 
-        let txt = read_with_encoding_detection(&src_file)?;
-        if version <= 340 {
-            write_cp437(&out_file, &txt)?;
-        } else {
-            write_utf8_with_bom(&out_file, &txt)?;
-        }
-    }
-
-    for file in workspace.data.text_files {
-        let src_file = base_path.join(&file);
-        let out_file = target_path.join(&file);
-        fs::create_dir_all(out_file.parent().unwrap())?;
-        let txt = read_with_encoding_detection(&src_file)?;
-
-        if version <= 340 {
-            write_cp437(&out_file, &txt)?;
-        } else {
-            write_utf8_with_bom(&out_file, &txt)?;
+                if version <= 340 {
+                    write_cp437(&out_file, &txt)?;
+                } else {
+                    write_utf8_with_bom(&out_file, &txt)?;
+                }
+            }
         }
     }
 

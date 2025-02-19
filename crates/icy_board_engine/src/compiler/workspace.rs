@@ -4,16 +4,16 @@ use std::{
 };
 
 use semver::Version;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{executable::LAST_PPLC, Res};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Package {
-    name: String,
-    version: Version,
-    language_version: u16,
-    authors: Vec<String>,
+    pub name: String,
+    pub version: Version,
+    pub language_version: Option<u16>,
+    pub authors: Option<Vec<String>>,
 }
 
 impl Package {
@@ -25,28 +25,27 @@ impl Package {
         &self.version
     }
 
-    pub fn authors(&self) -> &Vec<String> {
+    pub fn authors(&self) -> &Option<Vec<String>> {
         &self.authors
     }
 
     pub fn language_version(&self) -> u16 {
-        self.language_version
+        self.language_version.unwrap_or(LAST_PPLC)
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct PackageData {
-    pub text_files: Vec<String>,
-    pub art_files: Vec<String>,
+    pub text_files: Option<Vec<String>>,
+    pub art_files: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Workspace {
     #[serde(skip)]
     pub file_name: PathBuf,
-
     pub package: Package,
-    pub data: PackageData,
+    pub data: Option<PackageData>,
 }
 
 impl Workspace {
@@ -55,14 +54,11 @@ impl Workspace {
             file_name: PathBuf::new(),
             package: Package {
                 name: String::new(),
-                version: Version::new(0, 0, 0),
-                language_version: LAST_PPLC,
-                authors: Vec::new(),
+                version: Version::new(0, 1, 0),
+                language_version: Some(LAST_PPLC),
+                authors: None,
             },
-            data: PackageData {
-                text_files: Vec::new(),
-                art_files: Vec::new(),
-            },
+            data: None,
         }
     }
 
@@ -71,6 +67,12 @@ impl Workspace {
         let mut res: Workspace = toml::from_str(&toml_str)?;
         res.file_name = file_name.as_ref().to_path_buf();
         Ok(res)
+    }
+
+    pub fn save<P: AsRef<Path>>(&self, file_name: P) -> Res<()> {
+        let toml_str = toml::to_string(self)?;
+        fs::write(file_name.as_ref(), toml_str)?;
+        Ok(())
     }
 
     pub fn get_target_path(&self, version: u16) -> PathBuf {
