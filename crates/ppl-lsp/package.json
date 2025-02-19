@@ -170,9 +170,12 @@
 				"path": "./syntaxes/ppl.tmGrammar.json"
 			}
 		],
-		"code-runner.executorMap": {
-			"ppl": "pplc $fileName && icboard --ppe $fileNameWithoutExt"
-		}
+		"commands": [
+			{
+				"command": "ppl-lsp-vscode.run",
+				"title": "PPL: Run PPE in IcyBoard"
+			}
+		]
 	},
 	"scripts": {
 		"postinstall": "cd client && pnpm i",

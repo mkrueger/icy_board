@@ -107,6 +107,8 @@ I think it improves the language and it's open for discussion. Note that some al
 
 #### PPL 4.0
 
+DECLARE FUNCTION/PROCEDURE is now no longer needed anymore.
+
 New Constructs (Language Version 350):
 
 New loops

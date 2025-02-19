@@ -69,8 +69,8 @@ const TYPES: [&str; 27] = [
 /// return (need_to_continue_search, founded reference)
 pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
     let mut map = CompletionVisitor::new(offset);
-    let mut reg = UserTypeRegistry::default();
-    let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorReporter::default())), &mut reg);
+    let reg = UserTypeRegistry::default();
+    let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorReporter::default())), reg);
     ast.visit(&mut semantic_visitor);
     semantic_visitor.finish();
 
@@ -122,7 +122,7 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
 
         for (rt, r) in semantic_visitor.references {
             if matches!(rt, ReferenceType::Procedure(_)) {
-                if let Some(decl) = &r.declaration {
+                if let Some((_, decl)) = &r.declaration {
                     map.items.push(CompletionItem {
                         label: decl.token.to_string(),
                         insert_text: Some(decl.token.to_string()),
@@ -133,7 +133,7 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
                 }
             }
             if matches!(rt, ReferenceType::Variable(_)) {
-                if let Some(decl) = &r.declaration {
+                if let Some((_, decl)) = &r.declaration {
                     map.items.push(CompletionItem {
                         label: decl.token.to_string(),
                         insert_text: Some(decl.token.to_string()),
@@ -147,7 +147,7 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
     } else {
         for (rt, r) in &semantic_visitor.references {
             if matches!(rt, ReferenceType::Function(_)) {
-                if let Some(decl) = &r.declaration {
+                if let Some((_, decl)) = &r.declaration {
                     map.items.push(CompletionItem {
                         label: decl.token.to_string(),
                         insert_text: Some(decl.token.to_string()),
@@ -159,7 +159,7 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
             }
 
             if matches!(rt, ReferenceType::Variable(_)) {
-                if let Some(decl) = &r.declaration {
+                if let Some((_, decl)) = &r.declaration {
                     map.items.push(CompletionItem {
                         label: decl.token.to_string(),
                         insert_text: Some(decl.token.to_string()),

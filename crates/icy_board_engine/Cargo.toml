@@ -22,6 +22,7 @@ serde_with = "3.8.1"
 tokio = { workspace = true }
 semver = { workspace = true }
 regex = { workspace = true }
+walkdir = { workspace = true }
 
 unicase = { workspace = true }
 rand = { workspace = true }

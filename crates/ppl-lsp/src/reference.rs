@@ -1,45 +1,36 @@
-use std::sync::{Arc, Mutex};
+use std::path::PathBuf;
 
-use icy_board_engine::{
-    ast::Ast,
-    executable::LAST_PPLC,
-    parser::{lexer::Spanned, ErrorReporter, UserTypeRegistry},
-    semantic::SemanticVisitor,
-};
+use icy_board_engine::{ast::Ast, parser::lexer::Spanned, semantic::SemanticVisitor};
 
 #[derive(Debug, Clone)]
 pub enum ReferenceSymbol {
     Founded(Spanned<String>),
     Founding(usize),
 }
-pub fn get_reference(ast: &Ast, offset: usize, include_self: bool) -> Vec<Spanned<String>> {
+pub fn get_reference(ast: &Ast, offset: usize, semantic_visitor: &SemanticVisitor, include_self: bool) -> Vec<(PathBuf, Spanned<String>)> {
     let mut reference_list = vec![];
-    let mut reg = UserTypeRegistry::default();
-    let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorReporter::default())), &mut reg);
-    ast.visit(&mut semantic_visitor);
-    semantic_visitor.finish();
-    
+
     for (_, refs) in &semantic_visitor.references {
-        if refs.contains(offset) {
-            if let Some(decl) = &refs.declaration {
+        if refs.contains(&ast.file_name, offset) {
+            if let Some((p, decl)) = &refs.declaration {
                 if include_self || !decl.span.contains(&offset) {
-                    reference_list.push(decl.clone());
+                    reference_list.push((p.clone(), decl.clone()));
                 }
             }
-            if let Some(decl) = &refs.implementation {
+            if let Some((p, decl)) = &refs.implementation {
                 if include_self || !decl.span.contains(&offset) {
-                    reference_list.push(decl.clone());
+                    reference_list.push((p.clone(), decl.clone()));
                 }
             }
-            for r in &refs.usages {
+            for (p, r) in &refs.usages {
                 if include_self || !r.span.contains(&offset) {
-                    reference_list.push(r.clone());
+                    reference_list.push((p.clone(), r.clone()));
                 }
             }
 
-            for r in &refs.return_types {
+            for (p, r) in &refs.return_types {
                 if include_self || !r.span.contains(&offset) {
-                    reference_list.push(r.clone());
+                    reference_list.push((p.clone(), r.clone()));
                 }
             }
         }

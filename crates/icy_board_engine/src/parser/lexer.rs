@@ -317,7 +317,62 @@ pub struct Lexer {
 }
 
 lazy_static::lazy_static! {
-    static ref TOKEN_LOOKUP_TABLE: HashMap<unicase::Ascii<String>, Token> = {
+    static ref TOKEN_LOOKUP_TABLE_100: HashMap<unicase::Ascii<String>, Token> = {
+        let mut m = HashMap::new();
+        m.insert(unicase::Ascii::new("if".to_string()), Token::If);
+        m.insert(unicase::Ascii::new("let".to_string()), Token::Let);
+        m.insert(unicase::Ascii::new("while".to_string()), Token::While);
+        m.insert(unicase::Ascii::new("endwhile".to_string()), Token::EndWhile);
+        m.insert(unicase::Ascii::new("else".to_string()), Token::Else);
+        m.insert(unicase::Ascii::new("elseif".to_string()), Token::ElseIf);
+        m.insert(unicase::Ascii::new("endif".to_string()), Token::EndIf);
+        m.insert(unicase::Ascii::new("for".to_string()), Token::For);
+        m.insert(unicase::Ascii::new("next".to_string()), Token::Next);
+        m.insert(unicase::Ascii::new("endfor".to_string()), Token::Next);
+
+        m.insert(unicase::Ascii::new("break".to_string()), Token::Break);
+        m.insert(unicase::Ascii::new("continue".to_string()), Token::Continue);
+        m.insert(unicase::Ascii::new("return".to_string()), Token::Return);
+
+        m.insert(unicase::Ascii::new("gosub".to_string()), Token::Gosub);
+        m.insert(unicase::Ascii::new("goto".to_string()), Token::Goto);
+
+        for c in &BUILTIN_CONSTS {
+            m.insert(unicase::Ascii::new(c.name.to_string()), Token::Const(Constant::Builtin(c)));
+        }
+        m
+    };
+
+    static ref TOKEN_LOOKUP_TABLE_200: HashMap<unicase::Ascii<String>, Token> = {
+        let mut m = HashMap::new();
+        m.insert(unicase::Ascii::new("if".to_string()), Token::If);
+        m.insert(unicase::Ascii::new("let".to_string()), Token::Let);
+        m.insert(unicase::Ascii::new("while".to_string()), Token::While);
+        m.insert(unicase::Ascii::new("endwhile".to_string()), Token::EndWhile);
+        m.insert(unicase::Ascii::new("else".to_string()), Token::Else);
+        m.insert(unicase::Ascii::new("elseif".to_string()), Token::ElseIf);
+        m.insert(unicase::Ascii::new("endif".to_string()), Token::EndIf);
+        m.insert(unicase::Ascii::new("for".to_string()), Token::For);
+        m.insert(unicase::Ascii::new("next".to_string()), Token::Next);
+        m.insert(unicase::Ascii::new("endfor".to_string()), Token::Next);
+
+        m.insert(unicase::Ascii::new("break".to_string()), Token::Break);
+        m.insert(unicase::Ascii::new("continue".to_string()), Token::Continue);
+        m.insert(unicase::Ascii::new("return".to_string()), Token::Return);
+
+        m.insert(unicase::Ascii::new("gosub".to_string()), Token::Gosub);
+        m.insert(unicase::Ascii::new("goto".to_string()), Token::Goto);
+        m.insert(unicase::Ascii::new("select".to_string()), Token::Select);
+        m.insert(unicase::Ascii::new("case".to_string()), Token::Case);
+        m.insert(unicase::Ascii::new("default".to_string()), Token::Default);
+        m.insert(unicase::Ascii::new("endselect".to_string()), Token::EndSelect);
+
+        for c in &BUILTIN_CONSTS {
+            m.insert(unicase::Ascii::new(c.name.to_string()), Token::Const(Constant::Builtin(c)));
+        }
+        m
+    };
+    static ref TOKEN_LOOKUP_TABLE_300: HashMap<unicase::Ascii<String>, Token> = {
         let mut m = HashMap::new();
         m.insert(unicase::Ascii::new("if".to_string()), Token::If);
         m.insert(unicase::Ascii::new("let".to_string()), Token::Let);
@@ -351,6 +406,7 @@ lazy_static::lazy_static! {
         }
         m
     };
+
     static ref TOKEN_LOOKUP_TABLE_350: HashMap<unicase::Ascii<String>, Token> = {
         let mut m = HashMap::new();
         m.insert(unicase::Ascii::new("if".to_string()), Token::If);
@@ -397,7 +453,15 @@ lazy_static::lazy_static! {
 impl Lexer {
     pub fn new(file: PathBuf, version: u16, text: &str, encoding: Encoding, errors: Arc<Mutex<ErrorReporter>>) -> Self {
         Self {
-            lookup_table: if version < 350 { &*TOKEN_LOOKUP_TABLE } else { &*TOKEN_LOOKUP_TABLE_350 },
+            lookup_table: if version < 200 {
+                &*TOKEN_LOOKUP_TABLE_100
+            } else if version < 300 {
+                &*TOKEN_LOOKUP_TABLE_200
+            } else if version < 350 {
+                &*TOKEN_LOOKUP_TABLE_300
+            } else {
+                &*TOKEN_LOOKUP_TABLE_350
+            },
             file,
             lang_version: version,
             encoding,

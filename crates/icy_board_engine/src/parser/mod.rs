@@ -225,7 +225,7 @@ pub struct Parser<'a> {
 
     cur_token: Option<Spanned<Token>>,
     lookahead_token: Option<Spanned<Token>>,
-
+    type_hashes: &'static HashMap<unicase::Ascii<String>, VariableType>,
     lex: Lexer,
 
     // parser state
@@ -258,7 +258,13 @@ impl<'a> Parser<'a> {
             lex,
             require_user_variables: false,
             type_registry,
-
+            type_hashes: if lang_version >= 400 {
+                &TYPE_HASHES_400
+            } else if lang_version >= 200 {
+                &TYPE_HASHES
+            } else {
+                &TYPE_HASHES_100
+            },
             use_funcs: false,
             parsed_begin: false,
             got_statement: false,
@@ -479,7 +485,65 @@ impl<'a> Parser<'a> {
 }
 
 lazy_static::lazy_static! {
+
+    static ref TYPE_HASHES_100: HashMap<unicase::Ascii<String>, VariableType> = {
+        let mut m = HashMap::new();
+        m.insert(unicase::Ascii::new("INTEGER".to_string()), VariableType::Integer);
+        m.insert(unicase::Ascii::new("STRING".to_string()), VariableType::String);
+        m.insert(unicase::Ascii::new("BOOLEAN".to_string()), VariableType::Boolean);
+        m.insert(unicase::Ascii::new("DATE".to_string()), VariableType::Date);
+        m.insert(unicase::Ascii::new("TIME".to_string()), VariableType::Time);
+        m.insert(unicase::Ascii::new("MONEY".to_string()), VariableType::Money);
+        m
+    };
+
     static ref TYPE_HASHES: HashMap<unicase::Ascii<String>, VariableType> = {
+        let mut m = HashMap::new();
+        m.insert(unicase::Ascii::new("INTEGER".to_string()), VariableType::Integer);
+        m.insert(unicase::Ascii::new("SDWORD".to_string()), VariableType::Integer);
+        m.insert(unicase::Ascii::new("LONG".to_string()), VariableType::Integer);
+
+        m.insert(unicase::Ascii::new("STRING".to_string()), VariableType::String);
+        m.insert(unicase::Ascii::new("BIGSTR".to_string()), VariableType::BigStr);
+
+        m.insert(unicase::Ascii::new("BOOLEAN".to_string()), VariableType::Boolean);
+
+        m.insert(unicase::Ascii::new("DATE".to_string()), VariableType::Date);
+
+        m.insert(unicase::Ascii::new("DDATE".to_string()), VariableType::DDate);
+
+        m.insert(unicase::Ascii::new("EDATE".to_string()), VariableType::EDate);
+
+        m.insert(unicase::Ascii::new("TIME".to_string()), VariableType::Time);
+
+        m.insert(unicase::Ascii::new("MONEY".to_string()), VariableType::Money);
+
+        m.insert(unicase::Ascii::new("WORD".to_string()), VariableType::Word);
+        m.insert(unicase::Ascii::new("UWORD".to_string()), VariableType::Word);
+
+        m.insert(unicase::Ascii::new("SWORD".to_string()), VariableType::SWord);
+        m.insert(unicase::Ascii::new("INT".to_string()), VariableType::SWord);
+
+        m.insert(unicase::Ascii::new("BYTE".to_string()), VariableType::Byte);
+        m.insert(unicase::Ascii::new("UBYTE".to_string()), VariableType::Byte);
+
+        m.insert(unicase::Ascii::new("UNSIGNED".to_string()), VariableType::Unsigned);
+        m.insert(unicase::Ascii::new("DWORD".to_string()), VariableType::Unsigned);
+        m.insert(unicase::Ascii::new("UDWORD".to_string()), VariableType::Unsigned);
+
+        m.insert(unicase::Ascii::new("SBYTE".to_string()), VariableType::SByte);
+        m.insert(unicase::Ascii::new("SHORT".to_string()), VariableType::SByte);
+
+        m.insert(unicase::Ascii::new("REAL".to_string()), VariableType::Float);
+        m.insert(unicase::Ascii::new("FLOAT".to_string()), VariableType::Float);
+
+        m.insert(unicase::Ascii::new("DOUBLE".to_string()), VariableType::Double);
+        m.insert(unicase::Ascii::new("DREAL".to_string()), VariableType::Double);
+        m
+    };
+
+
+    static ref TYPE_HASHES_400: HashMap<unicase::Ascii<String>, VariableType> = {
         let mut m = HashMap::new();
         m.insert(unicase::Ascii::new("INTEGER".to_string()), VariableType::Integer);
         m.insert(unicase::Ascii::new("SDWORD".to_string()), VariableType::Integer);
@@ -532,7 +596,7 @@ impl<'a> Parser<'a> {
     pub fn get_variable_type(&self) -> Option<VariableType> {
         if let Some(token) = &self.cur_token {
             if let Token::Identifier(id) = &token.token {
-                if let Some(vt) = TYPE_HASHES.get(id) {
+                if let Some(vt) = self.type_hashes.get(id) {
                     return Some(*vt);
                 }
                 if let Some(ut) = self.type_registry.get_type(id) {
@@ -978,6 +1042,9 @@ pub struct ErrorReporter {
 }
 
 impl ErrorReporter {
+    pub fn file_name(&self) -> &Path {
+        &self.cur_file
+    }
     pub fn set_file_name(&mut self, file_name: &Path) {
         self.cur_file = file_name.to_path_buf();
     }

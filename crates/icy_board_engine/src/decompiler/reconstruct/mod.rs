@@ -19,7 +19,7 @@ mod select_case;
 mod unused_label_visitor;
 mod while_do;
 
-pub fn reconstruct_block<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
+pub fn reconstruct_block(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
     optimize_block(visitor, statements);
 }
 
@@ -29,18 +29,18 @@ fn _optimize_argument(arg: &mut Expression) {
     }
 }
 
-pub fn optimize_loops<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
+pub fn optimize_loops(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
     scan_for_next(visitor, statements);
     scan_do_while(visitor, statements);
 }
 
-fn optimize_block<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
+fn optimize_block(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
     optimize_loops(visitor, statements);
     optimize_ifs(visitor, statements);
     scan_select_statements(statements);
 }
 
-fn optimize_ifs<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
+fn optimize_ifs(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
     scan_negated_if(visitor, statements);
     scan_if(visitor, statements);
     if_else::scan_if_else(visitor, statements);
@@ -76,7 +76,7 @@ fn scan_goto(statements: &[Statement], from: usize, label: &unicase::Ascii<Strin
 // replace with:
 // IF !COND STMT
 // :SKIP
-fn scan_negated_if<'a>(_visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
+fn scan_negated_if(_visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
     // scan:
     // IF (COND) GOTO SKIP
     // STATEMENTS..
@@ -109,7 +109,7 @@ fn scan_negated_if<'a>(_visitor: &SemanticVisitor<'a>, statements: &mut Vec<Stat
     }
 }
 
-fn scan_if<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
+fn scan_if(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
     // scan:
     // IF (COND) GOTO SKIP
     // STATEMENTS..
@@ -138,7 +138,7 @@ fn scan_if<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
                     return false;
                 }
                 let end_label = format!(":{}", endif_label.get_label());
-                if let Some(decl) = &r.declaration {
+                if let Some((_, decl)) = &r.declaration {
                     if decl.token == end_label {
                         return r.usages.len() == 1;
                     }

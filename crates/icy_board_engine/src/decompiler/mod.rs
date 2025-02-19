@@ -542,10 +542,10 @@ pub fn decompile(executable: Executable, raw: bool) -> Res<(Ast, Vec<DecompilerI
 
             let reg = UserTypeRegistry::default();
             let errors: Arc<std::sync::Mutex<crate::parser::ErrorReporter>> = Arc::new(Mutex::new(ErrorReporter::default()));
-            let mut visitor = SemanticVisitor::new(LAST_PPLC, errors.clone(), &reg);
+            let mut visitor = SemanticVisitor::new(LAST_PPLC, errors.clone(), reg);
             ast.visit(&mut visitor);
             visitor.finish();
-            
+
             if !raw {
                 for node in &mut ast.nodes {
                     match node {

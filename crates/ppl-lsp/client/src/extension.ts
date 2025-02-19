@@ -64,7 +64,6 @@ export async function activate(context: ExtensionContext) {
     },
     traceOutputChannel,
   };
-
   // Create the language client and start the client.
   client = new LanguageClient("ppl-language-server", "ppl language server", serverOptions, clientOptions);
   // activateInlayHints(context);

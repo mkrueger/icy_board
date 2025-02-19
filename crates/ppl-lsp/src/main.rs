@@ -1,13 +1,16 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::{mem, process};
 
 use dashmap::DashMap;
 use icy_board_engine::ast::{
     walk_function_declaration, walk_function_implementation, walk_predefined_call_statement, walk_variable_declaration_statement, Ast, AstVisitor, Constant,
     ConstantExpression, Expression,
 };
+use icy_board_engine::compiler::workspace::Workspace;
 use icy_board_engine::executable::{FunctionDefinition, FUNCTION_DEFINITIONS, LAST_PPLC};
+use icy_board_engine::icy_board::read_data_with_encoding_detection;
 use icy_board_engine::parser::{parse_ast, Encoding, ErrorReporter, UserTypeRegistry};
 use icy_board_engine::semantic::SemanticVisitor;
 use ppl_language_server::completion::get_completion;
@@ -23,17 +26,26 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
-#[derive(Debug)]
 struct Backend {
     client: Client,
-    ast_map: DashMap<String, Ast>,
-    document_map: DashMap<String, Rope>,
-    semantic_token_map: DashMap<String, Vec<ImCompleteSemanticToken>>,
+
+    workspace: Mutex<Workspace>,
+    workspace_visitor: Mutex<SemanticVisitor>,
+    workspace_map: DashMap<Url, Ast>,
+
+    ast_map: Arc<Mutex<HashMap<Url, (Ast, SemanticVisitor)>>>,
+    document_map: DashMap<Url, Rope>,
+    semantic_token_map: DashMap<Url, Vec<ImCompleteSemanticToken>>,
 }
 
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
-    async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
+    async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
+        if let Some(root) = params.root_uri {
+            if let Ok(root) = root.to_file_path() {
+                self.load_workspace(root);
+            }
+        }
         Ok(InitializeResult {
             server_info: None,
             offset_encoding: None,
@@ -51,7 +63,7 @@ impl LanguageServer for Backend {
                 }),
 
                 execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: vec!["pplc".to_string(), "pplx".to_string()],
+                    commands: vec!["ppl-lsp-vscode.run".to_string()],
                     work_done_progress_options: Default::default(),
                 }),
 
@@ -62,6 +74,7 @@ impl LanguageServer for Backend {
                     }),
                     file_operations: None,
                 }),
+
                 semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(
                     SemanticTokensRegistrationOptions {
                         text_document_registration_options: {
@@ -92,6 +105,7 @@ impl LanguageServer for Backend {
             },
         })
     }
+
     async fn initialized(&self, _: InitializedParams) {
         self.client.log_message(MessageType::INFO, "initialized!").await;
     }
@@ -101,11 +115,10 @@ impl LanguageServer for Backend {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        self.client.log_message(MessageType::INFO, "file opened!").await;
         self.on_change(TextDocumentItem {
             uri: params.text_document.uri,
             text: params.text_document.text,
-            version: params.text_document.version,
+            //version: params.text_document.version,
         })
         .await
     }
@@ -114,9 +127,9 @@ impl LanguageServer for Backend {
         self.on_change(TextDocumentItem {
             uri: params.text_document.uri,
             text: std::mem::take(&mut params.content_changes[0].text),
-            version: params.text_document.version,
+            // version: params.text_document.version,
         })
-        .await
+        .await;
     }
 
     async fn did_save(&self, _: DidSaveTextDocumentParams) {
@@ -126,89 +139,90 @@ impl LanguageServer for Backend {
         let uri = params.text_document.uri;
 
         self.client.publish_diagnostics(uri.clone(), Vec::new(), None).await;
-        self.ast_map.remove(uri.as_str());
-        self.semantic_token_map.remove(uri.to_string().as_str());
+        self.ast_map.lock().unwrap().remove(&uri);
+        self.semantic_token_map.remove(&uri);
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
         let _ = params;
-        let result = async {
-            let uri = params.text_document_position_params.text_document.uri;
-            let ast = self.ast_map.get(uri.as_str())?;
-            let rope = self.document_map.get(uri.as_str())?;
+        let uri = params.text_document_position_params.text_document.uri;
+        self.get_ast(&uri, |ast, _semantic_visitor| {
+            let rope = self.document_map.get(&uri)?;
 
             let position = params.text_document_position_params.position;
             let char = rope.try_line_to_char(position.line as usize).ok()?;
             let offset = char + position.character as usize;
 
             get_tooltip(&ast, offset)
-        }
-        .await;
-        Ok(result)
+        })
     }
 
     async fn goto_definition(&self, params: GotoDefinitionParams) -> Result<Option<GotoDefinitionResponse>> {
-        let definition = async {
-            let uri = params.text_document_position_params.text_document.uri;
-            let ast = self.ast_map.get(uri.as_str())?;
-            let rope = self.document_map.get(uri.as_str())?;
+        let uri2 = params.text_document_position_params.text_document.uri.clone();
+        let uri = params.text_document_position_params.text_document.uri;
+        let res = self.get_ast(&uri, |ast, visitor| {
+            let rope = self.document_map.get(&uri2)?;
 
             let position = params.text_document_position_params.position;
             let char = rope.try_line_to_char(position.line as usize).ok()?;
             let offset = char + position.character as usize;
-            let span = get_definition(&ast, offset);
-            self.client.log_message(MessageType::INFO, &format!("{:?}, ", span)).await;
-            span.and_then(|r| {
+            if let Some((path, r)) = get_definition(&ast, visitor, offset) {
                 let start_position = offset_to_position(r.span.start, &rope)?;
                 let end_position = offset_to_position(r.span.end, &rope)?;
-
                 let range = Range::new(start_position, end_position);
-
-                Some(GotoDefinitionResponse::Scalar(Location::new(uri, range)))
-            })
+                if let Ok(path) = Url::from_file_path(&path) {
+                    return Some(GotoDefinitionResponse::Scalar(Location::new(path, range)));
+                }
+            }
+            None
+        });
+        if let Ok(Some(r)) = &res {
+            self.client.log_message(MessageType::INFO, format!("{:?}!", r)).await;
         }
-        .await;
-        Ok(definition)
+
+        res
     }
 
     async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
-        let reference_list = || -> Option<Vec<Location>> {
-            let uri = params.text_document_position.text_document.uri;
-            let ast = self.ast_map.get(&uri.to_string())?;
-            let rope = self.document_map.get(&uri.to_string())?;
+        let uri = params.text_document_position.text_document.uri;
+        let Some(rope) = self.document_map.get(&uri) else {
+            return Ok(None);
+        };
 
-            let position = params.text_document_position.position;
-            let char = rope.try_line_to_char(position.line as usize).ok()?;
-            let offset = char + position.character as usize;
-            let reference_list = get_reference(&ast, offset, true);
+        let position = params.text_document_position.position;
+        let Ok(char) = rope.try_line_to_char(position.line as usize) else {
+            return Ok(None);
+        };
+        let offset = char + position.character as usize;
+
+        self.get_ast(&uri, |ast, visitor| {
+            let reference_list = get_reference(&ast, offset, visitor, true);
             let ret = reference_list
                 .into_iter()
-                .filter_map(|r| {
+                .filter_map(|(path, r)| {
+                    let uri2 = Url::from_file_path(&path).ok()?;
+                    let rope = self.document_map.get(&uri2)?;
                     let start_position = offset_to_position(r.span.start, &rope)?;
                     let end_position = offset_to_position(r.span.end, &rope)?;
 
                     let range = Range::new(start_position, end_position);
-
-                    Some(Location::new(uri.clone(), range))
+                    Some(Location::new(uri2.clone(), range))
                 })
                 .collect::<Vec<_>>();
             Some(ret)
-        }();
-        Ok(reference_list)
+        })
     }
 
     async fn semantic_tokens_full(&self, params: SemanticTokensParams) -> Result<Option<SemanticTokensResult>> {
-        let uri = params.text_document.uri.to_string();
-        self.client.log_message(MessageType::LOG, "semantic_token_full").await;
-        let semantic_tokens = || -> Option<Vec<SemanticToken>> {
-            let mut im_complete_tokens = self.semantic_token_map.get_mut(&uri)?;
-            let rope = self.document_map.get(&uri)?;
-            let ast = self.ast_map.get(&uri)?;
-            let extends_tokens = semantic_token_from_ast(&ast);
+        let uri = params.text_document.uri;
+        let mut im_complete_tokens = self.semantic_token_map.get_mut(&uri).unwrap();
+        let rope = self.document_map.get(&uri).unwrap();
+        let tokens = self.get_ast(&uri, |ast, _| {
+            let extends_tokens = semantic_token_from_ast(ast);
             im_complete_tokens.extend(extends_tokens);
-            im_complete_tokens.sort_by(|a, b| a.start.cmp(&b.start));
+            im_complete_tokens.sort_by(|a: &ImCompleteSemanticToken, b| a.start.cmp(&b.start));
             let mut pre_line = 0;
-            let mut pre_start = 0;
+            let mut pre_start: u32 = 0;
             let semantic_tokens = im_complete_tokens
                 .iter()
                 .filter_map(|token| {
@@ -230,8 +244,8 @@ impl LanguageServer for Backend {
                 })
                 .collect::<Vec<_>>();
             Some(semantic_tokens)
-        }();
-        if let Some(semantic_token) = semantic_tokens {
+        })?;
+        if let Some(semantic_token) = tokens {
             return Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
                 result_id: None,
                 data: semantic_token,
@@ -241,7 +255,7 @@ impl LanguageServer for Backend {
     }
 
     async fn semantic_tokens_range(&self, params: SemanticTokensRangeParams) -> Result<Option<SemanticTokensRangeResult>> {
-        let uri = params.text_document.uri.to_string();
+        let uri = params.text_document.uri;
         let semantic_tokens = || -> Option<Vec<SemanticToken>> {
             let im_complete_tokens = self.semantic_token_map.get(&uri)?;
             let rope = self.document_map.get(&uri)?;
@@ -277,9 +291,8 @@ impl LanguageServer for Backend {
     }
 
     async fn inlay_hint(&self, params: tower_lsp::lsp_types::InlayHintParams) -> Result<Option<Vec<InlayHint>>> {
-        self.client.log_message(MessageType::INFO, "inlay hint").await;
         let uri = &params.text_document.uri;
-        if let Some(_program) = self.ast_map.get(uri.as_str()) {}
+        if self.get_ast(uri, |_, _| {}).is_err() {}
         let inlay_hint_list = Vec::new();
         Ok(Some(inlay_hint_list))
     }
@@ -287,46 +300,47 @@ impl LanguageServer for Backend {
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
-        let completions = || -> Option<Vec<CompletionItem>> {
-            let rope = self.document_map.get(&uri.to_string())?;
-            let ast = self.ast_map.get(&uri.to_string())?;
+        let rope = self.document_map.get(&uri).unwrap();
+        let completions = self.get_ast(&uri, |ast, _| {
             let char = rope.try_line_to_char(position.line as usize).ok()?;
             let offset = char + position.character as usize;
             let completions = get_completion(&ast, offset);
 
             Some(completions)
-        }();
+        })?;
         Ok(completions.map(CompletionResponse::Array))
     }
 
     async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
-        let workspace_edit = || -> Option<WorkspaceEdit> {
-            let uri = params.text_document_position.text_document.uri;
-            let ast = self.ast_map.get(&uri.to_string())?;
-            let rope = self.document_map.get(&uri.to_string())?;
-
+        let uri2 = params.text_document_position.text_document.uri.clone();
+        let uri = params.text_document_position.text_document.uri;
+        let workspace_edit = self.get_ast(&uri, |ast: &Ast, visitor| {
+            let rope = self.document_map.get(&uri2)?;
             let position = params.text_document_position.position;
             let char = rope.try_line_to_char(position.line as usize).ok()?;
             let offset = char + position.character as usize;
-            let reference_list = get_reference(&ast, offset, true);
+            let reference_list = get_reference(&ast, offset, visitor, true);
             let new_name = params.new_name;
             if !reference_list.is_empty() {
-                let edit_list = reference_list
-                    .into_iter()
-                    .filter_map(|r| {
-                        let start_position = offset_to_position(r.span.start, &rope)?;
-                        let end_position = offset_to_position(r.span.end, &rope)?;
-                        Some(TextEdit::new(Range::new(start_position, end_position), new_name.clone()))
-                    })
-                    .collect::<Vec<_>>();
                 let mut map = HashMap::new();
-                map.insert(uri, edit_list);
+
+                for (path, r) in reference_list {
+                    let start_position = offset_to_position(r.span.start, &rope)?;
+                    let end_position = offset_to_position(r.span.end, &rope)?;
+                    let uri2 = Url::from_file_path(&path).ok()?;
+                    if !map.contains_key(&uri2) {
+                        map.insert(uri2.clone(), Vec::new());
+                    }
+                    map.get_mut(&uri2)
+                        .unwrap()
+                        .push(TextEdit::new(Range::new(start_position, end_position), new_name.clone()));
+                }
                 let workspace_edit = WorkspaceEdit::new(map);
                 Some(workspace_edit)
             } else {
                 None
             }
-        }();
+        })?;
         Ok(workspace_edit)
     }
 
@@ -334,7 +348,7 @@ impl LanguageServer for Backend {
         self.client.log_message(MessageType::INFO, "configuration changed!").await;
     }
 
-    async fn did_change_workspace_folders(&self, _: DidChangeWorkspaceFoldersParams) {
+    async fn did_change_workspace_folders(&self, _params: DidChangeWorkspaceFoldersParams) {
         self.client.log_message(MessageType::INFO, "workspace folders changed!").await;
     }
 
@@ -342,13 +356,35 @@ impl LanguageServer for Backend {
         self.client.log_message(MessageType::INFO, "watched files have changed!").await;
     }
 
-    async fn execute_command(&self, _: ExecuteCommandParams) -> Result<Option<Value>> {
+    async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<Value>> {
         self.client.log_message(MessageType::INFO, "command executed!").await;
 
-        match self.client.apply_edit(WorkspaceEdit::default()).await {
-            Ok(res) if res.applied => self.client.log_message(MessageType::INFO, "applied").await,
-            Ok(_) => self.client.log_message(MessageType::INFO, "rejected").await,
-            Err(err) => self.client.log_message(MessageType::ERROR, err).await,
+        match params.command.as_str() {
+            "ppl-lsp-vscode.run" => {
+                let ws_file = self.workspace.lock().unwrap().file_name.clone();
+                if ws_file.exists() {
+                    self.client.log_message(MessageType::INFO, "compile workspace!").await;
+
+                    let output = process::Command::new("pplc").arg(ws_file).output().expect("failed to execute process");
+                    if let Ok(output) = String::from_utf8(output.stdout) {
+                        self.client.log_message(MessageType::INFO, format!("{}", output)).await;
+                    }
+                    let out_file = self.workspace.lock().unwrap().package.name().to_string();
+                    let target_file = self.workspace.lock().unwrap().get_target_path(LAST_PPLC).join(out_file).with_extension("ppe");
+                    self.client.log_message(MessageType::INFO, format!("Execute:{}", target_file.display())).await;
+
+                    let _ = process::Command::new("sh")
+                        .arg("-c")
+                        .arg(format!(
+                            "gnome-terminal -- icboard --ppe {} /home/mkrueger/icy_shadow_bbs",
+                            target_file.display()
+                        ))
+                        .spawn();
+                }
+            }
+            _ => {
+                self.client.log_message(MessageType::INFO, "unknown command!").await;
+            }
         }
 
         Ok(None)
@@ -363,49 +399,161 @@ struct InlayHintParams {
 struct TextDocumentItem {
     uri: Url,
     text: String,
-    version: i32,
 }
 
 impl Backend {
+    fn load_workspace(&self, roo_path: PathBuf) {
+        let ws_file = roo_path.join("ppl.toml");
+        if ws_file.exists() {
+            if let Ok(ws) = Workspace::load(ws_file) {
+                let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorReporter::default())), UserTypeRegistry::default());
+                for file in ws.get_files() {
+                    let content = read_data_with_encoding_detection(&std::fs::read(&file).unwrap()).unwrap();
+                    let ast = parse_ast(
+                        file.clone(),
+                        semantic_visitor.errors.clone(),
+                        &content,
+                        &UserTypeRegistry::default(),
+                        Encoding::Utf8,
+                        LAST_PPLC,
+                    );
+                    ast.visit(&mut semantic_visitor);
+                    self.workspace_map.insert(Url::from_file_path(file).unwrap(), ast);
+                }
+                semantic_visitor.finish();
+
+                let mut state = self.workspace.lock().unwrap();
+                let _ = mem::replace(&mut *state, ws);
+            }
+        }
+    }
+
+    pub fn get_ast<T>(&self, uri: &Url, f: impl FnOnce(&Ast, &SemanticVisitor) -> T) -> Result<T> {
+        if let Some(ast) = self.workspace_map.get(uri) {
+            return Ok(f(&ast, &self.workspace_visitor.lock().unwrap()));
+        }
+
+        if let Some(result) = self.ast_map.lock().unwrap().get(uri) {
+            Ok(f(&result.0, &result.1))
+        } else {
+            Err(tower_lsp::jsonrpc::Error::internal_error())
+        }
+    }
+
     async fn on_change(&self, params: TextDocumentItem) {
-        let rope = ropey::Rope::from_str(&params.text);
-        let uri = params.uri.to_string();
+        let rope: Rope = ropey::Rope::from_str(&params.text);
+        let uri = params.uri;
         self.document_map.insert(uri.clone(), rope.clone());
-        let reg = UserTypeRegistry::default();
-        let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-        let ast = parse_ast(PathBuf::from(uri.clone()), errors.clone(), &params.text, &reg, Encoding::Utf8, LAST_PPLC);
+        self.client.publish_diagnostics(uri.clone(), Vec::new(), None).await;
 
-        let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, errors, &reg);
-        ast.visit(&mut semantic_visitor);
-        semantic_visitor.finish();
+        if self.workspace_map.get(&uri).is_some() {
+            let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorReporter::default())), UserTypeRegistry::default());
+            for file in self.workspace.lock().unwrap().get_files() {
+                let name = file.to_string_lossy().to_string();
+                let cur_uri = Url::from_file_path(name).unwrap();
 
-        let semantic_tokens = semantic_token_from_ast(&ast);
+                if uri == cur_uri {
+                    let ast = parse_ast(
+                        file.clone(),
+                        semantic_visitor.errors.clone(),
+                        &params.text,
+                        &UserTypeRegistry::default(),
+                        Encoding::Utf8,
+                        LAST_PPLC,
+                    );
+                    let semantic_tokens: Vec<ImCompleteSemanticToken> = semantic_token_from_ast(&ast);
+                    self.semantic_token_map.insert(cur_uri.clone(), semantic_tokens);
+                    self.workspace_map.insert(cur_uri.clone(), ast);
+                } else if self.workspace_map.get(&cur_uri).is_none() {
+                    let content = read_data_with_encoding_detection(&std::fs::read(&file).unwrap()).unwrap();
+                    let ast = parse_ast(
+                        file.clone(),
+                        semantic_visitor.errors.clone(),
+                        &content,
+                        &UserTypeRegistry::default(),
+                        Encoding::Utf8,
+                        LAST_PPLC,
+                    );
+                    let semantic_tokens = semantic_token_from_ast(&ast);
+                    self.semantic_token_map.insert(cur_uri.clone(), semantic_tokens);
+                    self.workspace_map.insert(cur_uri.clone(), ast);
+                }
 
-        let mut diagnostics = Vec::new();
+                if let Some(ast) = self.workspace_map.get(&cur_uri) {
+                    semantic_visitor.errors.lock().unwrap().set_file_name(&ast.file_name);
+                    ast.visit(&mut semantic_visitor);
+                }
+            }
+            semantic_visitor.finish();
+            self.add_diagnostics(&semantic_visitor).await;
+            {
+                let mut state: std::sync::MutexGuard<'_, SemanticVisitor> = self.workspace_visitor.lock().unwrap();
+                let _ = mem::replace(&mut *state, semantic_visitor);
+            }
+        } else {
+            let reg: UserTypeRegistry = UserTypeRegistry::default();
+            let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+            let path = uri.to_file_path().unwrap();
+            let ast = parse_ast(path, errors.clone(), &params.text, &reg, Encoding::Utf8, LAST_PPLC);
 
+            let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, errors, reg);
+            ast.visit(&mut semantic_visitor);
+            semantic_visitor.finish();
+
+            let semantic_tokens: Vec<ImCompleteSemanticToken> = semantic_token_from_ast(&ast);
+            self.semantic_token_map.insert(uri.clone(), semantic_tokens);
+
+            self.add_diagnostics(&semantic_visitor).await;
+
+            self.ast_map.lock().unwrap().insert(uri, (ast, semantic_visitor));
+            // self.client
+            //     .log_message(MessageType::INFO, &format!("{:?}", semantic_tokens))
+            //     .await;
+        }
+    }
+
+    async fn add_diagnostics(&self, semantic_visitor: &SemanticVisitor) {
+        let mut diagnostics = HashMap::new();
         for err in &semantic_visitor.errors.lock().unwrap().errors {
+            let uri = Url::from_file_path(err.file_name.clone()).unwrap();
+            let Some(rope) = self.document_map.get(&uri) else {
+                continue;
+            };
+
             let start_position = offset_to_position(err.span.start, &rope).unwrap_or(Position::new(0, 0));
             let end_position = offset_to_position(err.span.end, &rope).unwrap_or(Position::new(0, 0));
             let mut diag = Diagnostic::new_simple(Range::new(start_position, end_position), format!("{}", err.error));
+            //diag.source = Some(uri.clone());
             diag.severity = Some(DiagnosticSeverity::ERROR);
-            diagnostics.push(diag);
+            if !diagnostics.contains_key(&uri) {
+                diagnostics.insert(uri.clone(), Vec::new());
+            }
+            diagnostics.get_mut(&uri).unwrap().push(diag);
         }
         for err in &semantic_visitor.errors.lock().unwrap().warnings {
+            let uri = Url::from_file_path(err.file_name.clone()).unwrap();
+            let Some(rope) = self.document_map.get(&uri) else {
+                continue;
+            };
             let start_position = offset_to_position(err.span.start, &rope).unwrap_or(Position::new(0, 0));
             let end_position = offset_to_position(err.span.end, &rope).unwrap_or(Position::new(0, 0));
             let mut diag = Diagnostic::new_simple(Range::new(start_position, end_position), format!("{}", err.error));
-            diag.source = Some(uri.clone());
+            //diag.source = Some(uri.clone());
             diag.severity = Some(DiagnosticSeverity::WARNING);
-            diagnostics.push(diag);
+            if !diagnostics.contains_key(&uri) {
+                diagnostics.insert(uri.clone(), Vec::new());
+            }
+            diagnostics.get_mut(&uri).unwrap().push(diag);
         }
 
-        self.client.publish_diagnostics(params.uri.clone(), diagnostics, Some(params.version)).await;
+        for (uri, diagnostics) in diagnostics {
+            self.client.log_message(MessageType::INFO, format!("Add Diagnostics for {} !", uri)).await;
+            for d in &diagnostics {
+                self.client.log_message(MessageType::INFO, format!("{} !", d.message)).await;
+            }
 
-        self.ast_map.insert(params.uri.to_string(), ast);
-        // self.client
-        //     .log_message(MessageType::INFO, &format!("{:?}", semantic_tokens))
-        //     .await;
-        self.semantic_token_map.insert(params.uri.to_string(), semantic_tokens);
+            self.client.publish_diagnostics(uri, diagnostics, None).await;
+        }
     }
 }
 
@@ -418,9 +566,16 @@ async fn main() {
 
     let (service, socket) = LspService::build(|client| Backend {
         client,
-        ast_map: DashMap::new(),
+        ast_map: Arc::new(Mutex::new(HashMap::new())),
         document_map: DashMap::new(),
         semantic_token_map: DashMap::new(),
+        workspace: Mutex::new(Workspace::new()),
+        workspace_visitor: Mutex::new(SemanticVisitor::new(
+            LAST_PPLC,
+            Arc::new(Mutex::new(ErrorReporter::default())),
+            UserTypeRegistry::default(),
+        )),
+        workspace_map: DashMap::new(),
     })
     .finish();
 

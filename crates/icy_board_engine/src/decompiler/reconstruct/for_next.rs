@@ -3,7 +3,7 @@ use crate::{
     semantic::SemanticVisitor,
 };
 
-pub fn scan_for_next<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
+pub fn scan_for_next(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
     // FOR Header:
     // LET VAR001 = [START]
     // :LABEL002

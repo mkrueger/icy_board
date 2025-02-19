@@ -21,6 +21,7 @@ use crate::{
 use self::expr_compiler::ExpressionCompiler;
 
 pub mod expr_compiler;
+pub mod workspace;
 
 #[derive(Error, Debug)]
 pub enum CompilationErrorType {
@@ -95,9 +96,9 @@ struct LabelDescriptor {
     pub offset: usize,
 }
 
-pub struct PPECompiler<'a> {
+pub struct PPECompiler {
     lookup_table: LookupVariabeleTable,
-    semantic_visitor: SemanticVisitor<'a>,
+    semantic_visitor: SemanticVisitor,
 
     cur_offset: usize,
 
@@ -107,8 +108,8 @@ pub struct PPECompiler<'a> {
     commands: PPEScript,
 }
 
-impl<'a> PPECompiler<'a> {
-    pub fn new(language_version: u16, type_registry: &'a UserTypeRegistry, errors: Arc<Mutex<ErrorReporter>>) -> Self {
+impl PPECompiler {
+    pub fn new(language_version: u16, type_registry: UserTypeRegistry, errors: Arc<Mutex<ErrorReporter>>) -> Self {
         let semantic_visitor = SemanticVisitor::new(language_version, errors, type_registry);
         Self {
             lookup_table: LookupVariabeleTable::default(),

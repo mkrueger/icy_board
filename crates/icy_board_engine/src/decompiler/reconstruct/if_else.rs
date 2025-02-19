@@ -75,7 +75,7 @@ BOOLEAN BOOL002
 :LABEL002
 */
 
-pub fn scan_if_else<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
+pub fn scan_if_else(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
     let mut i = 0;
     while i + 1 < statements.len() {
         let start = i;

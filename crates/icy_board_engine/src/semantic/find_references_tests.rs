@@ -142,12 +142,13 @@ fn find_references(arg: &str) {
     let reg = UserTypeRegistry::default();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     let ast = parse_ast(PathBuf::from("."), errors.clone(), &txt, &reg, Encoding::Utf8, LAST_PPLC);
-    let mut visitor = SemanticVisitor::new(LAST_PPLC, errors.clone(), &reg);
+
+    let mut visitor = SemanticVisitor::new(LAST_PPLC, errors.clone(), reg);
     ast.visit(&mut visitor);
     visitor.finish();
 
     visitor.finish();
-    
+
     if !errors.lock().unwrap().errors.is_empty() {
         for e in &errors.lock().unwrap().errors {
             println!("{}", e.error);
@@ -156,17 +157,17 @@ fn find_references(arg: &str) {
     }
     for (_rt, refs) in &visitor.references {
         if refs.usages.len() + refs.return_types.len() == spans.len() {
-            if let Some(decl) = &refs.declaration {
+            if let Some((_, decl)) = &refs.declaration {
                 if decl.span == declaration_span {
                     assert_eq!(declaration_span, decl.span);
-                } else if let Some(decl) = &refs.implementation {
+                } else if let Some((_, decl)) = &refs.implementation {
                     assert_eq!(declaration_span, decl.span);
                 } else {
                     panic!("declaration {:?} not found was: {:?}", declaration_span, decl.span);
                 }
             }
 
-            for r in refs.usages.iter().chain(refs.return_types.iter()) {
+            for (_, r) in refs.usages.iter().chain(refs.return_types.iter()) {
                 assert!(spans.contains(&r.span));
             }
             return;

@@ -27,10 +27,10 @@ ReDim TO, MAX_MSGS
 ReDim DATETXT, MAX_MSGS
 
 Cls
-DispFile PPEPath() + "screen.pcb", GRAPH
+DispFile PPEPath() + "data\screen.pcb", GRAPH
 DrawMsgArea()
 DrawMsgText()
-  
+   
 LOOP
   STRING CH = InKey()
   SELECT CASE CH 

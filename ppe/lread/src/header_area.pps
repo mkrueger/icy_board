@@ -6,7 +6,7 @@ PROCEDURE DrawMsgArea()
     IF O > HIGH - LOW THEN
       ClrEOL
       CONTINUE
-    ENDIF
+    ENDIF 
 
     IF O == Cursor THEN
       Color 11

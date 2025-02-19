@@ -43,7 +43,7 @@ fn run_test(file_name: &str, input: &str, expected_output: &str) {
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     let ast = icy_board_engine::parser::parse_ast(PathBuf::from(&file_name), errors.clone(), input, &reg, Encoding::Utf8, LAST_PPLC);
     check_errors(errors.clone());
-    let mut compiler = PPECompiler::new(LAST_PPLC, &reg, errors.clone());
+    let mut compiler = PPECompiler::new(LAST_PPLC, reg, errors.clone());
     compiler.compile(&[&ast]);
     check_errors(errors.clone());
 

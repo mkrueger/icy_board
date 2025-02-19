@@ -50,7 +50,7 @@ fn test_legacy_ppe_roundtrip() {
         let input = dec_ast.to_string();
         let errors = Arc::new(Mutex::new(ErrorReporter::default()));
         let ast = icy_board_engine::parser::parse_ast(PathBuf::from(&file_name), errors.clone(), &input, &reg, Encoding::Utf8, version);
-        let mut compiler = PPECompiler::new(version, &reg, errors.clone());
+        let mut compiler = PPECompiler::new(version, reg, errors.clone());
         compiler.compile(&[&ast]);
         check_errors(errors.clone());
         println!("success.");

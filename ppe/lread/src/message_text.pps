@@ -8,12 +8,14 @@ PROCEDURE DrawMsgText()
     ClrMsgArea()
     RETURN 
   ENDIF
+ 
   FOpen 1, MsgFile, O_RD, S_DB
   IF FErr(1) THEN
     LOG "Error reading message text", true
     ClrMsgArea()
     RETURN
   ENDIF
+  
   LOOP  
     FGet 1, line
     IF FErr(1) RETURN

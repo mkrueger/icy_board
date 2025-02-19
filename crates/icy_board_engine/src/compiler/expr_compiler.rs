@@ -6,11 +6,11 @@ use crate::{
 
 use super::PPECompiler;
 
-pub struct ExpressionCompiler<'a, 'b> {
-    pub compiler: &'a mut PPECompiler<'b>,
+pub struct ExpressionCompiler<'a> {
+    pub compiler: &'a mut PPECompiler,
 }
 
-impl<'a, 'b> AstVisitor<PPEExpr> for ExpressionCompiler<'a, 'b> {
+impl<'a> AstVisitor<PPEExpr> for ExpressionCompiler<'a> {
     fn visit_identifier_expression(&mut self, identifier: &crate::ast::IdentifierExpression) -> PPEExpr {
         if let Some(decl) = self.compiler.lookup_table.lookup_variable(identifier.get_identifier()) {
             return PPEExpr::Value(decl.header.id);
@@ -52,7 +52,7 @@ impl<'a, 'b> AstVisitor<PPEExpr> for ExpressionCompiler<'a, 'b> {
 
     fn visit_function_call_expression(&mut self, call: &crate::ast::FunctionCallExpression) -> PPEExpr {
         let arguments = call.get_arguments().iter().map(|e| e.visit(self)).collect();
-        let Some(function_type) = self.compiler.semantic_visitor.function_type_lookup.get(&call.get_expression().get_span().start) else {
+        let Some(function_type) = self.compiler.semantic_visitor.function_type_lookup.get(&call.id) else {
             log::error!("function not found at: {} ({})", call.get_expression().get_span().start, call.get_expression());
             return PPEExpr::Value(0);
         };

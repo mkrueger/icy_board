@@ -437,8 +437,11 @@ impl fmt::Display for ParensExpression {
     }
 }
 
+static mut FUNC_CALL_ID: u64 = 0;
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionCallExpression {
+    pub id: u64,
     expression: Box<Expression>,
     lpar_token: Spanned<Token>,
     arguments: Vec<Expression>,
@@ -448,6 +451,10 @@ pub struct FunctionCallExpression {
 impl FunctionCallExpression {
     pub fn new(expression: Expression, leftpar_token: Spanned<Token>, arguments: Vec<Expression>, rightpar_token: Spanned<Token>) -> Self {
         Self {
+            id: unsafe {
+                FUNC_CALL_ID = FUNC_CALL_ID.wrapping_add(1).max(1);
+                FUNC_CALL_ID
+            },
             expression: Box::new(expression),
             lpar_token: leftpar_token,
             arguments,
@@ -457,6 +464,10 @@ impl FunctionCallExpression {
 
     pub fn empty(expression: Expression, arguments: Vec<Expression>) -> Self {
         Self {
+            id: unsafe {
+                FUNC_CALL_ID = FUNC_CALL_ID.wrapping_add(1);
+                FUNC_CALL_ID
+            },
             expression: Box::new(expression),
             lpar_token: Spanned::create_empty(Token::LPar),
             arguments,

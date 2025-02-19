@@ -19,7 +19,7 @@ WHILE (1) DO
   PRINT "Hello World!"
 ENDWHILE
 */
-pub fn scan_do_while<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
+pub fn scan_do_while(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
     scan_do_while_case2(visitor, statements);
 
     let mut i = 0;
@@ -96,7 +96,7 @@ WHILE (TRUE) DO
   PRINT "Hello World!"
 ENDWHILE
 */
-fn scan_do_while_case2<'a>(visitor: &SemanticVisitor<'a>, statements: &mut Vec<Statement>) {
+fn scan_do_while_case2(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
     let mut i = 0;
     while i + 4 < statements.len() {
         let Statement::Label(while_continue_label) = statements[i].clone() else {
