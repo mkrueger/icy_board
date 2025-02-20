@@ -207,7 +207,6 @@ impl IcyBoardState {
     }
 
     pub async fn display_file_with_error<P: AsRef<Path>>(&mut self, file_name: &P, display_error: bool) -> Res<bool> {
-        self.session.disp_options.no_change();
         self.session.disp_options.abort_printout = false;
         let resolved_name = self.get_board().await.resolve_file(file_name);
         // lookup language/security/graphics mode

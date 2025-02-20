@@ -14,3 +14,23 @@ CASE 4..10
 DEFAULT
     PRINTLN "OK"
 END SELECT
+
+STRING CH = "H"
+
+SELECT CASE CH
+    CASE Chr(27)
+      BREAK
+    CASE "H", "h"
+      PRINTLN "OK"
+    CASE "UP"
+      IF TRUE THEN
+        IF FALSE THEN
+            PRINTLN "2"
+        ENDIF
+        PRINTLN "1"
+      ENDIF
+    CASE "DOWN"
+      IF CH == "e" THEN
+         PRINTLN "3"
+      ENDIF
+END SELECT

@@ -192,34 +192,36 @@ impl AstVisitorMut for AstTransformationVisitor {
         for case_block in select_stmt.get_case_blocks() {
             let next_case_label = self.next_label();
 
+            let mut condition = ConstantExpression::create_empty_expression(Constant::Boolean(false));
+
             for spec in case_block.get_case_specifiers() {
-                match spec {
+                let cond = match spec {
                     crate::ast::CaseSpecifier::Expression(spec_expr) => {
-                        statements.push(IfStatement::create_empty_statement(
-                            BinaryExpression::create_empty_expression(crate::ast::BinOp::NotEq, expr.clone(), *spec_expr.clone()),
-                            GotoStatement::create_empty_statement(next_case_label.clone()),
-                        ));
+                        BinaryExpression::create_empty_expression(crate::ast::BinOp::NotEq, expr.clone(), *spec_expr.clone())
                     }
-                    crate::ast::CaseSpecifier::FromTo(from_expr, to_expr) => {
-                        statements.push(IfStatement::create_empty_statement(
-                            BinaryExpression::create_empty_expression(
-                                crate::ast::BinOp::Or,
-                                BinaryExpression::create_empty_expression(crate::ast::BinOp::Greater, *from_expr.clone(), expr.clone()),
-                                BinaryExpression::create_empty_expression(crate::ast::BinOp::Greater, expr.clone(), *to_expr.clone()),
-                            ),
-                            GotoStatement::create_empty_statement(next_case_label.clone()),
-                        ));
-                    }
+                    crate::ast::CaseSpecifier::FromTo(from_expr, to_expr) => BinaryExpression::create_empty_expression(
+                        crate::ast::BinOp::Or,
+                        BinaryExpression::create_empty_expression(crate::ast::BinOp::Greater, *from_expr.clone(), expr.clone()),
+                        BinaryExpression::create_empty_expression(crate::ast::BinOp::Greater, expr.clone(), *to_expr.clone()),
+                    ),
+                };
+                if matches!(condition, Expression::Const(_)) {
+                    condition = cond;
+                } else {
+                    condition = BinaryExpression::create_empty_expression(crate::ast::BinOp::And, condition, cond);
                 }
             }
+
+            statements.push(IfStatement::create_empty_statement(
+                condition,
+                GotoStatement::create_empty_statement(next_case_label.clone()),
+            ));
 
             statements.extend(case_block.get_statements().iter().map(|s| s.visit_mut(self)));
             statements.push(GotoStatement::create_empty_statement(case_exit_label.clone()));
             statements.push(LabelStatement::create_empty_statement(next_case_label.clone()));
         }
-
         statements.extend(select_stmt.get_default_statements().iter().map(|s| s.visit_mut(self)));
-
         statements.push(LabelStatement::create_empty_statement(case_exit_label.clone()));
 
         Statement::Block(BlockStatement::empty(statements))

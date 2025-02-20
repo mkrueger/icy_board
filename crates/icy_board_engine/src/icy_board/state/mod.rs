@@ -2096,6 +2096,7 @@ impl IcyBoardState {
                     display_flags::UPCASE | display_flags::STACKED | display_flags::ERASELINE,
                 )
                 .await?;
+            self.session.disp_options.no_change();
             match result.as_str() {
                 "Y" | "" => {
                     return Ok(());
