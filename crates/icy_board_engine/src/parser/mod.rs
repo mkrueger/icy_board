@@ -249,7 +249,7 @@ impl<'a> Parser<'a> {
         encoding: Encoding,
         lang_version: u16,
     ) -> Self {
-        let lex = Lexer::new(file, lang_version, text, encoding, error_reporter.clone());
+        let lex: Lexer = Lexer::new(file, lang_version, text, encoding, error_reporter.clone());
         Parser {
             error_reporter,
             lang_version,

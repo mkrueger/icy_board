@@ -15,10 +15,11 @@ use icy_board_engine::parser::{parse_ast, Encoding, ErrorReporter, UserTypeRegis
 use icy_board_engine::semantic::SemanticVisitor;
 use ppl_language_server::completion::get_completion;
 use ppl_language_server::documentation::{get_const_hover, get_function_hover, get_statement_hover, get_type_hover};
+use ppl_language_server::formatting::FormattingVisitor;
 use ppl_language_server::jump_definition::get_definition;
 use ppl_language_server::reference::get_reference;
 use ppl_language_server::semantic_token::{semantic_token_from_ast, LEGEND_TYPE};
-use ppl_language_server::ImCompleteSemanticToken;
+use ppl_language_server::{offset_to_position, ImCompleteSemanticToken};
 use ropey::Rope;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -101,6 +102,7 @@ impl LanguageServer for Backend {
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
                 rename_provider: Some(OneOf::Left(true)),
+                document_range_formatting_provider: Some(OneOf::Left(true)),
                 ..ServerCapabilities::default()
             },
         })
@@ -356,9 +358,33 @@ impl LanguageServer for Backend {
         self.client.log_message(MessageType::INFO, "watched files have changed!").await;
     }
 
-    async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<Value>> {
-        self.client.log_message(MessageType::INFO, "command executed!").await;
+    async fn range_formatting(&self, params: DocumentRangeFormattingParams) -> Result<Option<Vec<TextEdit>>> {
+        let uri = params.text_document.uri;
+        let Some(rope) = self.document_map.get(&uri) else {
+            return Ok(None);
+        };
+        self.client.log_message(MessageType::INFO, "format !").await;
+        let indent_str = if params.options.insert_spaces {
+            " ".repeat(params.options.tab_size as usize)
+        } else {
+            "\t".to_string()
+        };
+        let mut result = self.get_ast(&uri, |ast, _| {
+            let mut visitor: FormattingVisitor<'_> = FormattingVisitor {
+                edits: Vec::new(),
+                rope: &rope,
+                options: Default::default(),
+                indent: 0,
+                indent_str,
+            };
+            ast.visit(&mut visitor);
+            visitor.edits
+        })?;
+        result.sort_by(|a, b| b.range.start.cmp(&a.range.start));
+        Ok(Some(result))
+    }
 
+    async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<Value>> {
         match params.command.as_str() {
             "ppl-lsp-vscode.run" => {
                 let ws_file = self.workspace.lock().unwrap().file_name.clone();
@@ -445,7 +471,8 @@ impl Backend {
 
         if self.workspace_map.get(&uri).is_some() {
             let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorReporter::default())), UserTypeRegistry::default());
-            for file in self.workspace.lock().unwrap().get_files() {
+            let files = self.workspace.lock().unwrap().get_files();
+            for file in files {
                 let name = file.to_string_lossy().to_string();
                 let cur_uri = Url::from_file_path(name).unwrap();
 
@@ -462,6 +489,7 @@ impl Backend {
                     self.semantic_token_map.insert(cur_uri.clone(), semantic_tokens);
                     self.workspace_map.insert(cur_uri.clone(), ast);
                 } else if self.workspace_map.get(&cur_uri).is_none() {
+                    self.client.publish_diagnostics(cur_uri.clone(), Vec::new(), None).await;
                     let content = read_data_with_encoding_detection(&std::fs::read(&file).unwrap()).unwrap();
                     let ast = parse_ast(
                         file.clone(),
@@ -651,11 +679,4 @@ fn get_tooltip(ast: &Ast, offset: usize) -> Option<Hover> {
     let mut visitor = TooltipVisitor { tooltip: None, offset };
     ast.visit(&mut visitor);
     visitor.tooltip
-}
-
-fn offset_to_position(offset: usize, rope: &Rope) -> Option<Position> {
-    let line = rope.try_char_to_line(offset).ok()?;
-    let first_char_of_line = rope.try_line_to_char(line).ok()?;
-    let column = offset - first_char_of_line;
-    Some(Position::new(line as u32, column as u32))
 }

@@ -5,5 +5,11 @@ language_version = 350
 authors = ["Mike Krüger <mkrueger@posteo.de>"]
 
 [data]
-text_files = ["lread.cfg"]
-art_files = ["data/screen.icy"]
+text_files = [
+    "lread.cfg"
+]
+art_files = [
+    "data/screen.icy",
+    "data/help.icy",
+    "data/reader.icy"
+]

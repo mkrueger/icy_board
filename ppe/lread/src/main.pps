@@ -1,6 +1,7 @@
 DECLARE PROCEDURE DrawMsgText()
 DECLARE PROCEDURE DrawMsgArea()
 DECLARE PROCEDURE ClrMsgArea()
+DECLARE PROCEDURE ShowHelp()
 
 INTEGER CONF = CurConf()
 INTEGER LOW = LOMSGNUM()
@@ -8,16 +9,23 @@ INTEGER HIGH = HiMsgNum()
 STRING FROM(10), SUBJ(10), TO(10), DATETXT(10)
 INTEGER FirstMsg = 0
 INTEGER Cursor = 0
-INTEGER AreaX, AreaY, Lines
-INTEGER MsgStartY
+STRING LINE
 
-FOpen 1, PPEPath()+ "lread.cfg", O_RD, S_DB
+FOpen 1, PPEPath() + "lread.cfg", O_RD, S_DB
 
-FGet 1, AreaX
-FGet 1, AreaY
-FGet 1, Lines
-FGet 1, MsgStartY
-Lines -= 1
+FGet 1, LINE
+TOKENIZE LINE
+
+INTEGER AreaX = ToInt(GETTOKEN())
+INTEGER AreaY = ToInt(GETTOKEN())
+INTEGER Lines = ToInt(GETTOKEN())
+
+FGet 1, LINE
+TOKENIZE LINE
+
+INTEGER MsgStartX = ToInt(GETTOKEN())
+INTEGER MsgStartY = ToInt(GETTOKEN())
+
 FClose 1
 
 INTEGER MAX_MSGS = HIGH - LOW + 1
@@ -26,33 +34,40 @@ ReDim SUBJ, MAX_MSGS
 ReDim TO, MAX_MSGS
 ReDim DATETXT, MAX_MSGS
 
+:Redisplay
 Cls
+StartDisp FNS
 DispFile PPEPath() + "data\screen.pcb", GRAPH
 DrawMsgArea()
 DrawMsgText()
    
 LOOP
-  STRING CH = InKey()
-  SELECT CASE CH 
+    STRING CH = InKey()
+    SELECT CASE CH
     CASE Chr(27)
-      BREAK
+        BREAK
+    CASE "H", "h"
+        ShowHelp()
+        goto Redisplay
     CASE "UP"
-      IF Cursor > 0 THEN
-        Cursor -= 1
-        IF Cursor < FirstMsg THEN
-          FirstMsg = Cursor
+        IF Cursor > 0 THEN
+            Cursor -= 1
+            IF Cursor < FirstMsg THEN
+                FirstMsg = Cursor
+            ENDIF
+            DrawMsgArea()
+            DrawMsgText()
         ENDIF
-        DrawMsgArea()
-        DrawMsgText()
-      ENDIF
     CASE "DOWN"
-      IF Cursor < HIGH - LOW THEN
-      Cursor += 1
-      IF Cursor > FirstMsg + Lines THEN
-        FirstMsg = Cursor - Lines 
-      ENDIF
-      DrawMsgArea()
-      DrawMsgText()
-    ENDIF
-  ENDSELECT
+        IF Cursor < HIGH - LOW THEN
+            Cursor += 1
+            IF Cursor > FirstMsg + Lines THEN
+                FirstMsg = Cursor - Lines 
+            ENDIF
+            DrawMsgArea()
+            DrawMsgText()
+        ENDIF
+    ENDSELECT
+    AnsiPos 1, 1
+    Print CH
 ENDLOOP

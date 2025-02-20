@@ -1,0 +1,302 @@
+use icy_board_engine::ast::{AstVisitor, BinaryExpression, Expression, FunctionImplementation, ProcedureImplementation, UnaryExpression};
+use ropey::Rope;
+use tower_lsp::lsp_types::{Position, Range, TextEdit};
+
+use crate::offset_to_position;
+
+pub struct FormattingOptions {
+    pub space_around_binop: bool,
+}
+
+impl Default for FormattingOptions {
+    fn default() -> Self {
+        Self { space_around_binop: true }
+    }
+}
+
+pub struct FormattingVisitor<'a> {
+    pub edits: Vec<TextEdit>,
+    pub rope: &'a Rope,
+    pub options: FormattingOptions,
+    pub indent: usize,
+    pub indent_str: String,
+}
+
+impl<'a> FormattingVisitor<'a> {
+    fn ensure_text_or_newline(&mut self, start: std::ops::Range<usize>, arg: &str) {
+        let from = offset_to_position(start.start, &self.rope).unwrap();
+        let to = offset_to_position(start.end, &self.rope).unwrap();
+
+        if let Some(slice) = self.rope.get_slice(start.start..start.end) {
+            if let Some(str) = slice.as_str() {
+                for c in str.chars() {
+                    if c != ' ' && c != '\t' {
+                        return;
+                    }
+                }
+            }
+        }
+
+        self.edits.push(TextEdit {
+            range: Range::new(from, to),
+            new_text: arg.to_string(),
+        });
+    }
+
+    fn indent(&mut self, span: core::ops::Range<usize>) {
+        let start = span.start;
+        let line: usize = self.rope.try_char_to_line(start).unwrap();
+        if let Some(line_span) = self.rope.get_line(line) {
+            if let Some(slice) = line_span.as_str() {
+                let chars = slice.chars().collect::<Vec<char>>();
+                let mut i = 0;
+                while i < chars.len() {
+                    if chars[i] != ' ' && chars[i] != '\t' {
+                        break;
+                    }
+                    i += 1;
+                }
+
+                let mut indent_str = String::new();
+                for _ in 0..self.indent {
+                    indent_str.push_str(&self.indent_str);
+                }
+
+                self.edits.push(TextEdit {
+                    range: Range::new(Position::new(line as u32, 0), Position::new(line as u32, i as u32)),
+                    new_text: indent_str,
+                });
+            }
+        }
+    }
+
+    fn ensure_space_before(&mut self, start: usize) {
+        let line: usize = self.rope.try_char_to_line(start).unwrap();
+        let start_line_offset = self.rope.line_to_char(line);
+        let char_in_line = start - start_line_offset;
+
+        if let Some(line_span) = self.rope.get_line(line) {
+            if let Some(slice) = line_span.as_str() {
+                let chars = slice.chars().collect::<Vec<char>>();
+                let mut i: usize = char_in_line - 1;
+                while i > 0 {
+                    if chars[i] != ' ' && chars[i] != '\t' {
+                        break;
+                    }
+                    i -= 1;
+                }
+                if i == 0 {
+                    return;
+                }
+                self.edits.push(TextEdit {
+                    range: Range::new(Position::new(line as u32, i as u32 + 1), Position::new(line as u32, char_in_line as u32)),
+                    new_text: if chars[i] == '(' { String::new() } else { " ".to_string() },
+                });
+            }
+        }
+    }
+
+    fn ensure_no_space_after(&mut self, start: usize) {
+        let line: usize = self.rope.try_char_to_line(start).unwrap();
+        let start_line_offset = self.rope.line_to_char(line);
+        let char_in_line = start - start_line_offset;
+
+        if let Some(line_span) = self.rope.get_line(line) {
+            if let Some(slice) = line_span.as_str() {
+                let chars = slice.chars().collect::<Vec<char>>();
+                let mut i: usize = char_in_line;
+                while i < chars.len() {
+                    if chars[i] != ' ' && chars[i] != '\t' {
+                        break;
+                    }
+                    i += 1;
+                }
+                self.edits.push(TextEdit {
+                    range: Range::new(Position::new(line as u32, char_in_line as u32), Position::new(line as u32, i as u32)),
+                    new_text: String::new(),
+                });
+            }
+        }
+    }
+
+    fn format_arguments(&mut self, get_arguments: &[Expression]) {
+        for arg in get_arguments {
+            self.ensure_space_before(arg.get_span().start);
+            arg.visit(self);
+            self.ensure_no_space_after(arg.get_span().end);
+        }
+    }
+}
+
+impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
+    fn visit_unary_expression(&mut self, unary: &UnaryExpression) {
+        let op_end = unary.get_op_token().span.end;
+        let expr_start = unary.get_expression().get_span().start;
+        self.ensure_text_or_newline(op_end..expr_start, "");
+
+        unary.get_expression().visit(self)
+    }
+
+    fn visit_binary_expression(&mut self, binary: &BinaryExpression) {
+        let left_end = binary.get_left_expression().get_span().end;
+        let start = binary.get_op_token().span.start;
+
+        let end = binary.get_op_token().span.end;
+        let right_start = binary.get_right_expression().get_span().start;
+        if self.options.space_around_binop {
+            self.ensure_text_or_newline(left_end..start, " ");
+            self.ensure_text_or_newline(end..right_start, " ");
+        } else {
+            self.ensure_text_or_newline(left_end..start, "");
+            self.ensure_text_or_newline(end..right_start, "");
+        }
+
+        icy_board_engine::ast::walk_binary_expression(self, binary);
+    }
+
+    fn visit_function_call_expression(&mut self, call: &icy_board_engine::ast::FunctionCallExpression) -> () {
+        call.get_expression().visit(self);
+        self.format_arguments(call.get_arguments());
+    }
+
+    fn visit_procedure_call_statement(&mut self, call: &icy_board_engine::ast::ProcedureCallStatement) -> () {
+        self.format_arguments(call.get_arguments());
+    }
+
+    fn visit_predefined_call_statement(&mut self, call: &icy_board_engine::ast::PredefinedCallStatement) -> () {
+        self.format_arguments(call.get_arguments());
+    }
+
+    fn visit_if_then_statement(&mut self, if_then: &icy_board_engine::ast::IfThenStatement) {
+        if_then.get_condition().visit(self);
+        self.indent += 1;
+        for stmt in if_then.get_statements() {
+            self.indent(stmt.get_span());
+            stmt.visit(self);
+        }
+        self.indent -= 1;
+
+        for stmt in if_then.get_else_if_blocks() {
+            self.indent(stmt.get_elseif_token().span.clone());
+            stmt.get_condition().visit(self);
+            self.indent += 1;
+            for stmt in stmt.get_statements() {
+                self.indent(stmt.get_span());
+                stmt.visit(self);
+            }
+            self.indent -= 1;
+        }
+
+        if let Some(else_block) = if_then.get_else_block() {
+            self.indent(else_block.get_else_token().span.clone());
+            self.indent += 1;
+            for stmt in else_block.get_statements() {
+                self.indent(stmt.get_span());
+                stmt.visit(self);
+            }
+            self.indent -= 1;
+        }
+        self.indent(if_then.get_endif_token().span.clone());
+    }
+
+    fn visit_select_statement(&mut self, select_stmt: &icy_board_engine::ast::SelectStatement) {
+        select_stmt.get_expression().visit(self);
+
+        for case_block in select_stmt.get_case_blocks() {
+            self.indent(case_block.get_case_token().span.clone());
+            for specifier in case_block.get_case_specifiers() {
+                specifier.visit(self);
+            }
+            self.indent += 1;
+            for stmt in case_block.get_statements() {
+                self.indent(stmt.get_span());
+                stmt.visit(self);
+            }
+            self.indent -= 1;
+        }
+        if let Some(dt) = select_stmt.get_default_token() {
+            self.indent(dt.span.clone());
+        }
+
+        self.indent += 1;
+        for stmt in select_stmt.get_default_statements() {
+            self.indent(stmt.get_span());
+            stmt.visit(self);
+        }
+        self.indent -= 1;
+        self.indent(select_stmt.get_endselect_token().span.clone());
+    }
+
+    fn visit_for_statement(&mut self, for_stmt: &icy_board_engine::ast::ForStatement) {
+        for_stmt.get_start_expr().visit(self);
+        for_stmt.get_end_expr().visit(self);
+        if let Some(step) = for_stmt.get_step_expr() {
+            step.visit(self);
+        }
+        self.indent += 1;
+        for stmt in for_stmt.get_statements() {
+            self.indent(stmt.get_span());
+            stmt.visit(self);
+        }
+        self.indent -= 1;
+        self.indent(for_stmt.get_next_token().span.clone());
+    }
+
+    fn visit_while_do_statement(&mut self, while_do_stmt: &icy_board_engine::ast::WhileDoStatement) {
+        while_do_stmt.get_condition().visit(self);
+        self.indent += 1;
+        for stmt in while_do_stmt.get_statements() {
+            self.indent(stmt.get_span());
+            stmt.visit(self);
+        }
+        self.indent -= 1;
+        self.indent(while_do_stmt.get_endwhile_token().span.clone());
+    }
+
+    fn visit_repeat_until_statement(&mut self, repeat_until_stmt: &icy_board_engine::ast::RepeatUntilStatement) {
+        self.indent += 1;
+        for stmt in repeat_until_stmt.get_statements() {
+            self.indent(stmt.get_span());
+            stmt.visit(self);
+        }
+        self.indent -= 1;
+        self.indent(repeat_until_stmt.get_until_token().span.clone());
+        repeat_until_stmt.get_condition().visit(self);
+    }
+
+    fn visit_loop_statement(&mut self, loop_stmt: &icy_board_engine::ast::LoopStatement) {
+        self.indent += 1;
+        for stmt in loop_stmt.get_statements() {
+            self.indent(stmt.get_span());
+            stmt.visit(self);
+        }
+        self.indent -= 1;
+        self.indent(loop_stmt.get_endloop_token().span.clone());
+    }
+
+    fn visit_function_implementation(&mut self, function: &FunctionImplementation) {
+        for p in function.get_parameters() {
+            p.visit(self);
+        }
+        self.indent += 1;
+        for stmt in function.get_statements() {
+            self.indent(stmt.get_span());
+            stmt.visit(self);
+        }
+        self.indent -= 1;
+        self.indent(function.get_endfunc_token().span.clone());
+    }
+
+    fn visit_procedure_implementation(&mut self, procedure: &ProcedureImplementation) {
+        for p in procedure.get_parameters() {
+            p.visit(self);
+        }
+        self.indent += 1;
+        for stmt in procedure.get_statements() {
+            self.indent(stmt.get_span());
+            stmt.visit(self);
+        }
+        self.indent -= 1;
+        self.indent(procedure.get_endproc_token().span.clone());
+    }
+}

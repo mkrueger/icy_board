@@ -3,6 +3,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use toml::Spanned;
+
 use crate::{
     ast::{constant::NumberFormat, Constant},
     executable::LAST_PPLC,
@@ -29,6 +31,22 @@ fn get_token(src: &str) -> Token {
     );
     match lex.next_token() {
         Some(t) => t,
+        None => {
+            panic!("Error")
+        }
+    }
+}
+
+fn get_spanned_token(src: &str) -> Spanned<Token> {
+    let mut lex = Lexer::new(
+        PathBuf::from("."),
+        LAST_PPLC,
+        src,
+        Encoding::Utf8,
+        Arc::new(Mutex::new(ErrorReporter::default())),
+    );
+    match lex.next_token() {
+        Some(t) => Spanned::new(lex.span(), t),
         None => {
             panic!("Error")
         }
@@ -79,7 +97,11 @@ fn test_op() {
 
     //assert_eq!(Token::Mul, get_token("*"));
     assert_eq!(Token::Div, get_token("/"));
-    assert_eq!(Token::Add, get_token("+"));
+
+    let t = get_spanned_token(" + ");
+    assert_eq!(Token::Add, *t.get_ref());
+    assert_eq!(1..2, t.span());
+
     assert_eq!(Token::Sub, get_token("-"));
 
     assert_eq!(Token::NotEq, get_token("<>"));

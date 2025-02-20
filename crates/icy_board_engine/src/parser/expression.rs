@@ -1,7 +1,7 @@
 use super::{lexer::Token, Parser};
 use crate::{
     ast::{
-        ArrayInitializerExpression, BinOp, BinaryExpression, ConstantExpression, Expression, FunctionCallExpression, IdentifierExpression, IndexerExpression,
+        ArrayInitializerExpression, BinaryExpression, ConstantExpression, Expression, FunctionCallExpression, IdentifierExpression, IndexerExpression,
         MemberReferenceExpression, ParensExpression, UnaryExpression,
     },
     parser::ParserErrorType,
@@ -15,28 +15,19 @@ impl<'a> Parser<'a> {
     fn parse_bool(&mut self) -> Option<Expression> {
         // it's correct on the upper level - it's very unusual
         if self.get_cur_token() == Some(Token::Not) {
+            let token = self.save_spanned_token();
             self.next_token();
             let expr = self.parse_bool()?;
-            return Some(UnaryExpression::create_empty_expression(crate::ast::UnaryOp::Not, expr));
+            return Some(Expression::Unary(UnaryExpression::new(token, expr)));
         }
 
         let mut expr = self.parse_comparison()?;
         while self.get_cur_token() == Some(Token::Or) || self.get_cur_token() == Some(Token::And) {
-            let op = match self.get_cur_token() {
-                Some(Token::Or) => BinOp::Or,
-                Some(Token::And) => BinOp::And,
-                _ => {
-                    self.error_reporter
-                        .lock()
-                        .unwrap()
-                        .report_error(self.save_token_span(), ParserErrorType::UnexpectedError);
-                    return None;
-                }
-            };
+            let op_token = self.save_spanned_token();
             self.next_token();
             let right = self.parse_comparison();
             if let Some(e) = right {
-                expr = BinaryExpression::create_empty_expression(op, expr, e);
+                expr = Expression::Binary(BinaryExpression::new(expr, op_token, e));
             } else {
                 return None;
             }
@@ -53,26 +44,11 @@ impl<'a> Parser<'a> {
             || self.get_cur_token() == Some(Token::Eq)
             || self.get_cur_token() == Some(Token::NotEq)
         {
-            let op = match self.get_cur_token() {
-                Some(Token::Greater) => BinOp::Greater,
-                Some(Token::GreaterEq) => BinOp::GreaterEq,
-                Some(Token::Lower) => BinOp::Lower,
-                Some(Token::LowerEq) => BinOp::LowerEq,
-                Some(Token::Eq) => BinOp::Eq,
-                Some(Token::NotEq) => BinOp::NotEq,
-                _ => {
-                    self.error_reporter
-                        .lock()
-                        .unwrap()
-                        .report_error(self.save_token_span(), ParserErrorType::UnexpectedError);
-                    return None;
-                }
-            };
+            let op_token = self.save_spanned_token();
             self.next_token();
-
             let right = self.parse_term();
             if let Some(e) = right {
-                expr = BinaryExpression::create_empty_expression(op, expr, e);
+                expr = Expression::Binary(BinaryExpression::new(expr, op_token, e));
             } else {
                 return None;
             }
@@ -84,21 +60,11 @@ impl<'a> Parser<'a> {
     fn parse_term(&mut self) -> Option<Expression> {
         let mut expr = self.parse_factor()?;
         while self.get_cur_token() == Some(Token::Add) || self.get_cur_token() == Some(Token::Sub) {
-            let op = match self.get_cur_token() {
-                Some(Token::Add) => BinOp::Add,
-                Some(Token::Sub) => BinOp::Sub,
-                _ => {
-                    self.error_reporter
-                        .lock()
-                        .unwrap()
-                        .report_error(self.save_token_span(), ParserErrorType::UnexpectedError);
-                    return None;
-                }
-            };
+            let op_token = self.save_spanned_token();
             self.next_token();
             let right = self.parse_factor();
             if let Some(e) = right {
-                expr = BinaryExpression::create_empty_expression(op, expr, e);
+                expr = Expression::Binary(BinaryExpression::new(expr, op_token, e));
             } else {
                 return None;
             }
@@ -110,23 +76,11 @@ impl<'a> Parser<'a> {
     fn parse_factor(&mut self) -> Option<Expression> {
         let mut expr = self.parse_pow()?;
         while self.get_cur_token() == Some(Token::Mul) || self.get_cur_token() == Some(Token::Div) || self.get_cur_token() == Some(Token::Mod) {
-            let op = match self.get_cur_token() {
-                Some(Token::Mul) => BinOp::Mul,
-                Some(Token::Div) => BinOp::Div,
-                Some(Token::Mod) => BinOp::Mod,
-                _ => {
-                    self.error_reporter
-                        .lock()
-                        .unwrap()
-                        .report_error(self.save_token_span(), ParserErrorType::UnexpectedError);
-                    return None;
-                }
-            };
+            let op_token = self.save_spanned_token();
             self.next_token();
-
             let right = self.parse_pow();
             if let Some(e) = right {
-                expr = BinaryExpression::create_empty_expression(op, expr, e);
+                expr = Expression::Binary(BinaryExpression::new(expr, op_token, e));
             } else {
                 return None;
             }
@@ -137,10 +91,10 @@ impl<'a> Parser<'a> {
     fn parse_pow(&mut self) -> Option<Expression> {
         let mut expr = self.parse_unary()?;
         while self.get_cur_token() == Some(Token::PoW) {
-            self.next_token();
+            let token = self.next_token().unwrap();
             let right = self.parse_unary();
-            if let Some(e) = right {
-                expr = BinaryExpression::create_empty_expression(BinOp::PoW, expr, e);
+            if let Some(right_expression) = right {
+                expr = Expression::Binary(BinaryExpression::new(expr, token, right_expression));
             } else {
                 return None;
             }
@@ -150,24 +104,27 @@ impl<'a> Parser<'a> {
 
     fn parse_unary(&mut self) -> Option<Expression> {
         if self.get_cur_token() == Some(Token::Add) {
+            let token = self.save_spanned_token();
             self.next_token();
             let expr = self.parse_unary();
             if let Some(e) = expr {
-                return Some(UnaryExpression::create_empty_expression(crate::ast::UnaryOp::Plus, e));
+                return Some(Expression::Unary(UnaryExpression::new(token, e)));
             }
         }
         if self.get_cur_token() == Some(Token::Sub) {
+            let token = self.save_spanned_token();
             self.next_token();
             let expr = self.parse_unary();
             if let Some(e) = expr {
-                return Some(UnaryExpression::create_empty_expression(crate::ast::UnaryOp::Minus, e));
+                return Some(Expression::Unary(UnaryExpression::new(token, e)));
             }
         }
         if self.get_cur_token() == Some(Token::Not) {
+            let token = self.save_spanned_token();
             self.next_token();
             let expr = self.parse_unary();
             if let Some(e) = expr {
-                return Some(UnaryExpression::create_empty_expression(crate::ast::UnaryOp::Not, e));
+                return Some(Expression::Unary(UnaryExpression::new(token, e)));
             }
         }
         self.parse_function_call_expression()
@@ -284,7 +241,7 @@ impl<'a> Parser<'a> {
             }
 
             Token::LPar => {
-                self.next_token();
+                let lpar = self.next_token().unwrap();
                 let Some(expr) = self.parse_expression() else {
                     self.error_reporter
                         .lock()
@@ -292,7 +249,6 @@ impl<'a> Parser<'a> {
                         .report_error(self.save_token_span(), ParserErrorType::ExpressionExpected(self.save_token()));
                     return None;
                 };
-                let ret = ParensExpression::create_empty_expression(expr);
                 if self.get_cur_token() != Some(Token::RPar) {
                     self.error_reporter
                         .lock()
@@ -300,7 +256,8 @@ impl<'a> Parser<'a> {
                         .report_error(self.save_token_span(), ParserErrorType::MissingCloseParens(self.save_token()));
                     return None;
                 }
-                self.next_token();
+                let rpar_token = self.next_token().unwrap();
+                let ret = Expression::Parens(ParensExpression::new(lpar, expr, rpar_token));
                 Some(ret)
             }
 

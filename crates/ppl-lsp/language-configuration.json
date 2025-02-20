@@ -31,11 +31,11 @@
 	"wordPattern": "(-?\\d*\\.\\d\\w*)|([^\\`\\~\\!\\@\\#\\%\\^\\&\\*\\(\\)\\-\\=\\+\\[\\{\\]\\}\\\\\\|\\;\\:\\'\\\"\\,\\.\\<\\>\\/\\?\\s]+)",
 	"indentationRules": {
 		"increaseIndentPattern": {
-            "pattern": "^\\s*(IF.+THEN|PROCEDURE\\s.*|FUNCTION\\s.*|WHILE.+DO|FOR\\s.*|LOOP\\s.*|REPEAT\\s.*|SELECT.+CASE|CASE|DEFAULT|ELSE)$",
+            "pattern": "^\\s*(IF.+THEN$|PROCEDURE\\s.*$|FUNCTION\\s.*$|WHILE.+DO$|FOR\\s.*$|LOOP\\s.*$|REPEAT\\s.*$|SELECT\\s+CASE|CASE|DEFAULT$|ELSE$)",
             "flags" : "i"
         },
 		"decreaseIndentPattern": {
-            "pattern": "^\\s*ENDIF|ENDPROC|ENDFUNC|ENDWHILE|ENDLOOP|ENDSELECT|CASE|DEFAULT|NEXT|UNTIL|ELSE",
+            "pattern": "^\\s*ENDIF|ENDPROC|ENDFUNC|ENDWHILE|ENDLOOP|ENDSELECT|DEFAULT|NEXT|UNTIL|ELSE|CASE",
             "flags" : "i"
         }
 	}
