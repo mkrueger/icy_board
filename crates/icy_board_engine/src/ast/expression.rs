@@ -727,7 +727,7 @@ impl BinaryExpression {
             Token::GreaterEq => BinOp::GreaterEq,
             Token::And => BinOp::And,
             Token::Or => BinOp::Or,
-            _ => panic!("Expected binary operator"),
+            _ => panic!("Expected binary operator got {:?}", self.op_token.token),
         }
     }
 

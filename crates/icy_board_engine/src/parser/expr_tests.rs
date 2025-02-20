@@ -20,7 +20,7 @@ fn parse_expression(input: &str) -> Expression {
 
 fn check_expression(input: &str, check: &Expression) {
     let expr = parse_expression(input);
-    assert!(expr.is_similar(check), "Expression {expr:?} is not similar to {check:?}");
+    assert!(expr.is_similar(check), "Expression {expr} is not similar to {check}");
 }
 
 fn _check_error(input: &str) {

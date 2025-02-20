@@ -91,10 +91,11 @@ impl<'a> Parser<'a> {
     fn parse_pow(&mut self) -> Option<Expression> {
         let mut expr = self.parse_unary()?;
         while self.get_cur_token() == Some(Token::PoW) {
-            let token = self.next_token().unwrap();
+            let op_token = self.save_spanned_token();
+            self.next_token();
             let right = self.parse_unary();
             if let Some(right_expression) = right {
-                expr = Expression::Binary(BinaryExpression::new(expr, token, right_expression));
+                expr = Expression::Binary(BinaryExpression::new(expr, op_token, right_expression));
             } else {
                 return None;
             }
@@ -183,12 +184,12 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_primary(&mut self) -> Option<Expression> {
-        let t = self.cur_token.clone()?;
+        let cur_token = self.cur_token.clone()?;
 
-        let expr = match &t.token {
+        let expr = match &cur_token.token {
             Token::Const(c) => {
                 self.next_token();
-                Some(Expression::Const(ConstantExpression::new(t.clone(), c.clone())))
+                Some(Expression::Const(ConstantExpression::new(cur_token.clone(), c.clone())))
             }
             Token::Identifier(_id) => {
                 let identifier_token = self.save_spanned_token();
@@ -241,7 +242,7 @@ impl<'a> Parser<'a> {
             }
 
             Token::LPar => {
-                let lpar = self.next_token().unwrap();
+                self.next_token();
                 let Some(expr) = self.parse_expression() else {
                     self.error_reporter
                         .lock()
@@ -249,15 +250,16 @@ impl<'a> Parser<'a> {
                         .report_error(self.save_token_span(), ParserErrorType::ExpressionExpected(self.save_token()));
                     return None;
                 };
-                if self.get_cur_token() != Some(Token::RPar) {
+                let rpar_token = self.save_spanned_token();
+                if rpar_token.token != Token::RPar {
                     self.error_reporter
                         .lock()
                         .unwrap()
                         .report_error(self.save_token_span(), ParserErrorType::MissingCloseParens(self.save_token()));
                     return None;
                 }
-                let rpar_token = self.next_token().unwrap();
-                let ret = Expression::Parens(ParensExpression::new(lpar, expr, rpar_token));
+                self.next_token();
+                let ret = Expression::Parens(ParensExpression::new(cur_token, expr, rpar_token));
                 Some(ret)
             }
 
@@ -303,7 +305,7 @@ impl<'a> Parser<'a> {
 
         if self.get_cur_token() == Some(Token::Dot) {
             if let Some(expr) = expr {
-                let dot_token = self.save_spanned_token();
+                let dot_token: super::lexer::Spanned<Token> = self.save_spanned_token();
                 self.next_token();
                 let identifier_token = self.save_spanned_token();
                 if !matches!(identifier_token.token, Token::Identifier(_)) {
