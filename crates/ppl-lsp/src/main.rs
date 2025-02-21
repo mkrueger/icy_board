@@ -670,11 +670,18 @@ impl AstVisitor<()> for TooltipVisitor {
                     self.tooltip = get_type_hover(param.get_variable_type());
                 }
             }
-            ParameterSpecifier::Function(_) => {
-                todo!("Implement ParameterSpecifier::Function")
+            ParameterSpecifier::Function(f) => {
+                if f.get_return_type_token().span.contains(&self.offset) {
+                    self.tooltip = get_type_hover(f.get_return_type());
+                }
+                for p in f.get_parameters() {
+                    p.visit(self);
+                }
             }
-            ParameterSpecifier::Procedure(_) => {
-                todo!("Implement ParameterSpecifier::Procedure")
+            ParameterSpecifier::Procedure(f) => {
+                for p in f.get_parameters() {
+                    p.visit(self);
+                }
             }
         }
     }

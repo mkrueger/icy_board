@@ -53,11 +53,14 @@ impl SemanticTokenVisitor {
                     }
                     self.highlight_token(p.get_type_token(), SemanticTokenType::TYPE);
                 }
-                ParameterSpecifier::Function(_) => {
-                    todo!("Implement ParameterSpecifier::Function")
+                ParameterSpecifier::Function(f) => {
+                    self.highlight_token(f.get_function_token(), SemanticTokenType::KEYWORD);
+                    self.higlight_parameters(f.get_parameters());
+                    self.highlight_token(f.get_return_type_token(), SemanticTokenType::TYPE);
                 }
-                ParameterSpecifier::Procedure(_) => {
-                    todo!("Implement ParameterSpecifier::Procedure")
+                ParameterSpecifier::Procedure(p) => {
+                    self.highlight_token(p.get_procedure_token(), SemanticTokenType::KEYWORD);
+                    self.higlight_parameters(p.get_parameters());
                 }
             }
         }

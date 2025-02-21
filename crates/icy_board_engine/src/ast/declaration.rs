@@ -698,7 +698,7 @@ impl FunctionParameterSpecifier {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ProcedureParameterSpecifier {
-    function_token: Spanned<Token>,
+    procedure_token: Spanned<Token>,
     identifier_token: Spanned<Token>,
     leftpar_token: Spanned<Token>,
     parameters: Vec<ParameterSpecifier>,
@@ -708,14 +708,14 @@ pub struct ProcedureParameterSpecifier {
 impl ProcedureParameterSpecifier {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        function_token: Spanned<Token>,
+        procedure_token: Spanned<Token>,
         identifier_token: Spanned<Token>,
         leftpar_token: Spanned<Token>,
         parameters: Vec<ParameterSpecifier>,
         rightpar_token: Spanned<Token>,
     ) -> Self {
         Self {
-            function_token,
+            procedure_token,
             identifier_token,
             leftpar_token,
             parameters,
@@ -725,7 +725,7 @@ impl ProcedureParameterSpecifier {
 
     pub fn empty(identifier: unicase::Ascii<String>, parameters: Vec<ParameterSpecifier>) -> Self {
         Self {
-            function_token: Spanned::create_empty(Token::Function),
+            procedure_token: Spanned::create_empty(Token::Function),
             identifier_token: Spanned::create_empty(Token::Identifier(identifier)),
             leftpar_token: Spanned::create_empty(Token::LPar),
             parameters,
@@ -733,8 +733,8 @@ impl ProcedureParameterSpecifier {
         }
     }
 
-    pub fn get_function_token(&self) -> &Spanned<Token> {
-        &self.function_token
+    pub fn get_procedure_token(&self) -> &Spanned<Token> {
+        &self.procedure_token
     }
 
     pub fn get_identifier_token(&self) -> &Spanned<Token> {
