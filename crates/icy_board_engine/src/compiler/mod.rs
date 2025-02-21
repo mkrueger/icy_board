@@ -81,6 +81,12 @@ pub enum CompilationErrorType {
 
     #[error("Too many arguments ({0}:{1})")]
     TooManyArguments(String, usize),
+
+    #[error("Function expected")]
+    FunctionExpected,
+
+    #[error("Procedure expected")]
+    ProcedureExpected,
 }
 
 #[derive(Error, Debug)]

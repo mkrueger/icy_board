@@ -206,6 +206,8 @@ pub struct SemanticVisitor {
 
     cur_func_impl: usize,
     cur_func_call: u64,
+
+    last_lookup_index: usize,
 }
 
 #[derive(Default)]
@@ -358,6 +360,7 @@ impl SemanticVisitor {
             cur_func_call: 0,
             cur_func_impl: 0,
             function_containers: Vec::new(),
+            last_lookup_index: 0,
         };
         for user_var in USER_VARIABLES.iter() {
             if user_var.version <= version {
@@ -783,6 +786,7 @@ impl SemanticVisitor {
         }
 
         if let Some(idx) = self.global_lookup.variable_lookup.get(id) {
+            self.last_lookup_index = *idx;
             return Some(*idx);
         }
         None
@@ -1018,6 +1022,77 @@ impl SemanticVisitor {
             }
         }
     }
+
+    fn check_arg_types(&mut self, call_parameters: &[ParameterSpecifier], arguments: &[Expression]) {
+        for i in 0..call_parameters.len() {
+            match &call_parameters[i] {
+                ParameterSpecifier::Function(f) => {
+                    let vt: VariableType = arguments[i].visit(self);
+                    if vt != VariableType::Function {
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(arguments[i].get_span().clone(), CompilationErrorType::FunctionExpected);
+                    }
+
+                    for container in &self.function_containers {
+                        if container.id == self.last_lookup_index {
+                            if let FunctionDeclaration::Procedure(decl) = &container.functions {
+                                println!("cont len {} {} ", f.get_parameters().len(), decl.get_identifier());
+                                if f.get_parameters().len() < decl.get_parameters().len() {
+                                    self.errors.lock().unwrap().report_error(
+                                        arguments[i].get_span().clone(),
+                                        CompilationErrorType::TooFewArguments(container.name.to_string(), call_parameters.len()),
+                                    );
+                                }
+                                if f.get_parameters().len() > decl.get_parameters().len() {
+                                    self.errors.lock().unwrap().report_error(
+                                        arguments[i].get_span().clone(),
+                                        CompilationErrorType::TooManyArguments(container.name.to_string(), call_parameters.len()),
+                                    );
+                                }
+                            } else {
+                                panic!("Invalid function type");
+                            }
+                            break;
+                        }
+                    }
+                }
+                ParameterSpecifier::Procedure(p) => {
+                    let vt = arguments[i].visit(self);
+                    if vt != VariableType::Procedure {
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(arguments[i].get_span().clone(), CompilationErrorType::ProcedureExpected);
+                    }
+                    for container in &self.function_containers {
+                        if container.id == self.last_lookup_index {
+                            if let FunctionDeclaration::Procedure(decl) = &container.functions {
+                                println!("cont len {} {} ", p.get_parameters().len(), decl.get_identifier());
+                                if p.get_parameters().len() < decl.get_parameters().len() {
+                                    self.errors.lock().unwrap().report_error(
+                                        arguments[i].get_span().clone(),
+                                        CompilationErrorType::TooFewArguments(container.name.to_string(), call_parameters.len()),
+                                    );
+                                }
+                                if p.get_parameters().len() > decl.get_parameters().len() {
+                                    self.errors.lock().unwrap().report_error(
+                                        arguments[i].get_span().clone(),
+                                        CompilationErrorType::TooManyArguments(container.name.to_string(), call_parameters.len()),
+                                    );
+                                }
+                            } else {
+                                panic!("Invalid function type");
+                            }
+                            break;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 impl AstVisitor<VariableType> for SemanticVisitor {
@@ -1034,18 +1109,15 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             let identifier = identifier.get_identifier_token();
             if self.cur_func_call > 0 {
                 if let ReferenceType::Function(func_idx) = rt {
-                    println!("Function call: {} -> {}", self.cur_func_call, *func_idx);
                     self.function_type_lookup.insert(self.cur_func_call, SemanticInfo::FunctionReference(*func_idx));
                 } else if let ReferenceType::Variable(func_idx) = rt {
                     self.function_type_lookup.insert(self.cur_func_call, SemanticInfo::VariableReference(*func_idx));
                 }
             }
-
             r.usages.push((
                 self.errors.lock().unwrap().file_name().to_path_buf(),
                 Spanned::new(identifier.token.to_string(), identifier.span.clone()),
             ));
-
             r.variable_type
         } else {
             if self.version < 350 || self.cur_func_call == 0 {
@@ -1488,8 +1560,9 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
             if matches!(self.references[idx].0, ReferenceType::Function(_)) {
                 let f = self.function_containers.iter().find(|p| p.name == call.get_identifier()).unwrap();
-                if let FunctionDeclaration::Function(f) = &f.functions {
+                if let FunctionDeclaration::Function(f) = &f.functions.clone() {
                     self.check_arg_count(f.get_parameters().len(), call.get_arguments().len(), call.get_identifier_token());
+                    self.check_arg_types(f.get_parameters(), call.get_arguments());
                 }
 
                 self.add_reference_to(call.get_identifier_token(), idx);
@@ -1499,13 +1572,15 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             if matches!(self.references[idx].0, ReferenceType::Procedure(_)) {
                 let func_container = self.function_containers.iter().find(|p| p.name == call.get_identifier()).unwrap();
 
-                if let FunctionDeclaration::Procedure(f) = &func_container.functions {
+                if let FunctionDeclaration::Procedure(f) = &func_container.functions.clone() {
                     let arg_count = call.get_arguments().len();
                     let par_len = f.get_parameters().len();
 
                     let arg_count = arg_count.min(par_len);
                     let pass_flags = f.get_pass_flags();
                     self.check_arg_count(par_len, arg_count, call.get_identifier_token());
+                    self.check_arg_types(f.get_parameters(), call.get_arguments());
+
                     for i in 0..arg_count {
                         if pass_flags & (1 << i) != 0 {
                             self.check_argument_is_variable(i, &call.get_arguments()[i]);

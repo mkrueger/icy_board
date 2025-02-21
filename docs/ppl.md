@@ -162,6 +162,18 @@ WHILE IsValid() PRINTLN "Success."
 Note: With "lang" version >=350 'Quit' and 'Loop' are no longer synonyms for 'break' and 'continue'. Existing sources should be easily adapted.
 But never saw them in the wild.
 
+##### Procedure parameters
+
+It's now possible to use procedures as parameters.
+
+Example:
+```
+PROCEDURE PrintHello(PROCEDURE f())
+    PRINT "Hello "
+    f()
+ENDPROC
+```
+
 ##### Language Version 400
 
 Language Version breaks compatibility with older PCBoards.
