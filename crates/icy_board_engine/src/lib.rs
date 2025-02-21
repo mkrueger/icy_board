@@ -24,6 +24,7 @@ pub mod crypt;
 pub mod datetime;
 pub mod decompiler;
 pub mod executable;
+pub mod formatting;
 pub mod parser;
 pub mod semantic;
 pub mod tables;

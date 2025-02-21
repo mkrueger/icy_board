@@ -1,0 +1,4 @@
+LOOP
+    PRINTLN "Foo"
+    PRINTLN "BAR"
+ENDLOOP

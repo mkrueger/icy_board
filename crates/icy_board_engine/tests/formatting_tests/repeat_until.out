@@ -1,0 +1,4 @@
+REPEAT
+    PRINTLN "Foo"
+    PRINTLN "BAR"
+UNTIL false

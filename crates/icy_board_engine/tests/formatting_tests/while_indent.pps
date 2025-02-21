@@ -1,0 +1,4 @@
+WHILE TRUE DO
+PRINTLN "Foo"
+                PRINTLN "BAR"
+ENDWHILE

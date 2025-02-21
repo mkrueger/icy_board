@@ -1,0 +1,4 @@
+FOR A = 1 TO 10
+    PRINTLN A
+    PRINTLN "BAR"
+NEXT

@@ -1,0 +1,4 @@
+PROCEDURE Foo()
+PRINTLN "Foo"
+                PRINTLN "BAR"
+ENDPROC

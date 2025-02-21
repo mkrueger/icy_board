@@ -10,12 +10,13 @@ use icy_board_engine::ast::{
 };
 use icy_board_engine::compiler::workspace::Workspace;
 use icy_board_engine::executable::{FunctionDefinition, FUNCTION_DEFINITIONS, LAST_PPLC};
+use icy_board_engine::formatting::FormattingVisitor;
 use icy_board_engine::icy_board::read_data_with_encoding_detection;
 use icy_board_engine::parser::{parse_ast, Encoding, ErrorReporter, UserTypeRegistry};
 use icy_board_engine::semantic::SemanticVisitor;
 use ppl_language_server::completion::get_completion;
 use ppl_language_server::documentation::{get_const_hover, get_function_hover, get_statement_hover, get_type_hover};
-use ppl_language_server::formatting::FormattingVisitor;
+use ppl_language_server::formatting::VSCodeFormattingBackend;
 use ppl_language_server::jump_definition::get_definition;
 use ppl_language_server::reference::get_reference;
 use ppl_language_server::semantic_token::{semantic_token_from_ast, LEGEND_TYPE};
@@ -364,21 +365,20 @@ impl LanguageServer for Backend {
             return Ok(None);
         };
         self.client.log_message(MessageType::INFO, "format !").await;
-        let indent_str = if params.options.insert_spaces {
-            " ".repeat(params.options.tab_size as usize)
-        } else {
-            "\t".to_string()
-        };
         let mut result = self.get_ast(&uri, |ast, _| {
-            let mut visitor: FormattingVisitor<'_> = FormattingVisitor {
+            let mut backend = VSCodeFormattingBackend {
                 edits: Vec::new(),
                 rope: &rope,
-                options: Default::default(),
-                indent: 0,
-                indent_str,
             };
+            let options = icy_board_engine::formatting::FormattingOptions {
+                space_around_binop: true,
+                insert_spaces: params.options.insert_spaces,
+                tab_size: params.options.tab_size as usize,
+                ..Default::default()
+            };
+            let mut visitor: FormattingVisitor<'_> = FormattingVisitor::new(&mut backend, &options);
             ast.visit(&mut visitor);
-            visitor.edits
+            backend.edits
         })?;
         result.sort_by(|a, b| b.range.start.cmp(&a.range.start));
         Ok(Some(result))

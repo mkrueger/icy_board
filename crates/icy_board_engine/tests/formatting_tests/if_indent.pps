@@ -1,0 +1,15 @@
+IF TRUE THEN
+PRINTLN "Foo"
+                PRINTLN "BAR"
+END IF
+
+IF TRUE THEN
+PRINTLN "Foo"
+        PRINTLN "BAR"
+ELSEIF (FALSE) THEN
+            PRINTLN "Foo"
+PRINTLN "BAR"
+ELSE
+            PRINTLN "Foo"
+                PRINTLN "BAR"
+END IF

@@ -9,6 +9,7 @@ use icy_board_engine::{
         PPECompiler,
     },
     executable::LAST_PPLC,
+    formatting::{FormattingOptions, FormattingVisitor, StringFormattingBackend},
     icy_board::read_with_encoding_detection,
     parser::{load_with_encoding, parse_ast, Encoding, ErrorReporter, UserTypeRegistry},
     Res,
@@ -54,6 +55,14 @@ struct Cli {
     /// create & init new ppl package in target directory
     #[argh(switch)]
     init: bool,
+
+    /// formats source file instead of compile
+    #[argh(switch)]
+    format: bool,
+
+    /// checks source/package for errors without compiling
+    #[argh(switch)]
+    check: bool,
 
     /// file[.pps] to compile (extension defaults to .pps if not specified)
     #[argh(positional)]
@@ -161,7 +170,15 @@ fn main() {
         Encoding::Detect
     };
     let out_file_name = Path::new(&file_name).with_extension("ppe");
-    compile_files(&arguments, version, encoding, lang_version, vec![PathBuf::from(&file_name)], &out_file_name);
+    compile_files(
+        &arguments,
+        version,
+        encoding,
+        lang_version,
+        vec![PathBuf::from(&file_name)],
+        &out_file_name,
+        FormattingOptions::default(),
+    );
 }
 
 fn compile_toml(file_name: &PathBuf, arguments: &Cli, version: u16) -> Res<()> {
@@ -176,7 +193,7 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli, version: u16) -> Res<()> {
     fs::create_dir_all(&target_path).expect("Unable to create target directory");
 
     let out_file_name = target_path.join(workspace.package.name()).with_extension("ppe");
-    compile_files(arguments, version, encoding, lang_version, files, &out_file_name);
+    compile_files(arguments, version, encoding, lang_version, files, &out_file_name, FormattingOptions::default());
     println!("Copying data files...");
     if let Some(data) = &workspace.data {
         if let Some(art_files) = &data.art_files {
@@ -223,7 +240,7 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli, version: u16) -> Res<()> {
     Ok(())
 }
 
-fn compile_files(arguments: &Cli, version: u16, encoding: Encoding, lang_version: u16, files: Vec<PathBuf>, out_file_name: &Path) {
+fn compile_files(arguments: &Cli, version: u16, encoding: Encoding, lang_version: u16, files: Vec<PathBuf>, out_file_name: &Path, options: FormattingOptions) {
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
 
     for f in &files {
@@ -239,6 +256,46 @@ fn compile_files(arguments: &Cli, version: u16, encoding: Encoding, lang_version
         match load_with_encoding(&src_file, encoding) {
             Ok(src) => {
                 let ast = parse_ast(src_file.to_path_buf(), errors.clone(), &src, &reg, encoding, lang_version);
+                if arguments.format || arguments.check {
+                    let mut backend = StringFormattingBackend {
+                        text: src.chars().collect(),
+                        edits: Vec::new(),
+                    };
+                    let mut visitor = FormattingVisitor::new(&mut backend, &options);
+                    ast.visit(&mut visitor);
+                    if !backend.edits.is_empty() {
+                        backend.edits.sort_by_key(|(range, _)| range.start);
+                        for (range, edit) in backend.edits.iter().rev() {
+                            backend.text.splice(range.clone(), edit.chars());
+                        }
+                        let formatted_text = backend.text.iter().collect::<String>();
+                        if arguments.check {
+                            println!("Diff in {}", src_file.display());
+                            for diff in diff::lines(&src, &formatted_text) {
+                                match diff {
+                                    diff::Result::Left(l) => execute!(
+                                        stdout(),
+                                        SetForegroundColor(Color::Red),
+                                        Print(format!("-{}", l)),
+                                        SetAttribute(Attribute::Reset),
+                                    )
+                                    .unwrap(),
+                                    diff::Result::Both(l, _) => println!(" {}", l),
+                                    diff::Result::Right(r) => execute!(
+                                        stdout(),
+                                        SetForegroundColor(Color::Green),
+                                        Print(format!("-{}", r)),
+                                        SetAttribute(Attribute::Reset),
+                                    )
+                                    .unwrap(),
+                                }
+                            }
+                        } else {
+                            fs::write(&src_file, formatted_text).unwrap();
+                        }
+                    }
+                    continue;
+                }
                 asts.push((ast, src));
                 if check_errors(errors.clone(), &arguments, &asts) {
                     std::process::exit(1);
@@ -261,6 +318,9 @@ fn compile_files(arguments: &Cli, version: u16, encoding: Encoding, lang_version
                 std::process::exit(1);
             }
         }
+    }
+    if arguments.format {
+        return;
     }
 
     println!("Compiling...");

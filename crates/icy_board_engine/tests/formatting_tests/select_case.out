@@ -1,0 +1,10 @@
+SELECT CASE A
+CASE 1
+    PRINTLN "A is 1"
+CASE 2
+    PRINTLN "A is 2"
+CASE 3
+    PRINTLN "A is 3"
+CASE ELSE
+    PRINTLN "A is something else"
+END SELECT
