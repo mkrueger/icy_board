@@ -1038,7 +1038,6 @@ impl SemanticVisitor {
                     for container in &self.function_containers {
                         if container.id == self.last_lookup_index {
                             if let FunctionDeclaration::Procedure(decl) = &container.functions {
-                                println!("cont len {} {} ", f.get_parameters().len(), decl.get_identifier());
                                 if f.get_parameters().len() < decl.get_parameters().len() {
                                     self.errors.lock().unwrap().report_error(
                                         arguments[i].get_span().clone(),
@@ -1069,7 +1068,6 @@ impl SemanticVisitor {
                     for container in &self.function_containers {
                         if container.id == self.last_lookup_index {
                             if let FunctionDeclaration::Procedure(decl) = &container.functions {
-                                println!("cont len {} {} ", p.get_parameters().len(), decl.get_identifier());
                                 if p.get_parameters().len() < decl.get_parameters().len() {
                                     self.errors.lock().unwrap().report_error(
                                         arguments[i].get_span().clone(),
