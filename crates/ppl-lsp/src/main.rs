@@ -371,7 +371,7 @@ impl LanguageServer for Backend {
                 rope: &rope,
             };
 
-            let options = self.workspace.lock().unwrap().formatting.clone();
+            let options = self.workspace.lock().unwrap().formatting().clone();
             let mut visitor: FormattingVisitor<'_> = FormattingVisitor::new(&mut backend, &options);
             ast.visit(&mut visitor);
             backend.edits
@@ -590,7 +590,7 @@ async fn main() {
         ast_map: Arc::new(Mutex::new(HashMap::new())),
         document_map: DashMap::new(),
         semantic_token_map: DashMap::new(),
-        workspace: Mutex::new(Workspace::new()),
+        workspace: Mutex::new(Workspace::default()),
         workspace_visitor: Mutex::new(SemanticVisitor::new(
             LAST_PPLC,
             Arc::new(Mutex::new(ErrorReporter::default())),

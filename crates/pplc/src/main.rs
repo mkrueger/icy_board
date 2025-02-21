@@ -97,16 +97,13 @@ fn main() {
         fs::create_dir_all(&src_dir).unwrap();
         fs::write(&src_dir.join("main.pps"), "PRINTLN \"Hello, World!\"").unwrap();
 
-        let ws = Workspace {
-            file_name: file.clone(),
-            package: Package {
-                name: file.file_name().unwrap().to_str().unwrap().to_string(),
-                version: Version::new(0, 1, 0),
-                language_version: Some(LAST_PPLC),
-                authors: None,
-            },
-            data: None,
-            formatting: FormattingOptions::default(),
+        let mut ws = Workspace::default();
+        ws.file_name = file.clone();
+        ws.package = Package {
+            name: file.file_name().unwrap().to_str().unwrap().to_string(),
+            version: Version::new(0, 1, 0),
+            language_version: Some(LAST_PPLC),
+            authors: None,
         };
         ws.save(file.join("ppl.toml")).unwrap();
         println!("Created new ppl package in {}", file.display());
@@ -194,7 +191,15 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli, version: u16) -> Res<()> {
     fs::create_dir_all(&target_path).expect("Unable to create target directory");
 
     let out_file_name = target_path.join(workspace.package.name()).with_extension("ppe");
-    compile_files(arguments, version, encoding, lang_version, files, &out_file_name, workspace.formatting.clone());
+    compile_files(
+        arguments,
+        version,
+        encoding,
+        lang_version,
+        files,
+        &out_file_name,
+        workspace.formatting().clone(),
+    );
     println!("Copying data files...");
     if let Some(data) = &workspace.data {
         if let Some(art_files) = &data.art_files {
@@ -269,6 +274,7 @@ fn compile_files(arguments: &Cli, version: u16, encoding: Encoding, lang_version
                             backend.text.splice(range.clone(), edit.chars());
                         }
                         let formatted_text = backend.text.iter().collect::<String>();
+                        let mut last_line = 0;
                         if arguments.check {
                             let lines = diff::lines(&src, &formatted_text);
                             if lines.iter().any(|l| matches!(l, diff::Result::Left(_) | diff::Result::Right(_))) {
@@ -278,7 +284,7 @@ fn compile_files(arguments: &Cli, version: u16, encoding: Encoding, lang_version
                                     let mut block_end = false;
 
                                     if i + 1 < lines.len() {
-                                        if !matches!(lines[i + 1], diff::Result::Both(_, _)) {
+                                        if matches!(lines[i], diff::Result::Both(_, _)) && !matches!(lines[i + 1], diff::Result::Both(_, _)) {
                                             block_start = true;
                                             block_end = false;
                                         } else if i > 0 && !matches!(lines[i - 1], diff::Result::Both(_, _)) {
@@ -286,28 +292,40 @@ fn compile_files(arguments: &Cli, version: u16, encoding: Encoding, lang_version
                                         }
                                     }
                                     match diff {
-                                        diff::Result::Left(l) => execute!(
-                                            stdout(),
-                                            Print(format!("{i:>3}:")),
-                                            SetForegroundColor(Color::Red),
-                                            Print(format!("-{}\n", l)),
-                                            SetAttribute(Attribute::Reset),
-                                        )
-                                        .unwrap(),
+                                        diff::Result::Left(l) => {
+                                            last_line = i;
+
+                                            execute!(
+                                                stdout(),
+                                                Print(format!("{i:>3}:")),
+                                                SetForegroundColor(Color::Red),
+                                                Print(format!("-{}\n", l)),
+                                                SetAttribute(Attribute::Reset),
+                                            )
+                                            .unwrap()
+                                        }
                                         diff::Result::Both(l, _) => {
                                             exit_code = 1;
                                             if block_start || block_end {
+                                                if last_line + 1 < i {
+                                                    println!();
+                                                }
+                                                last_line = i;
                                                 println!("{i:>3}: {}", l)
                                             };
                                         }
-                                        diff::Result::Right(r) => execute!(
-                                            stdout(),
-                                            Print(format!("{i:>3}:")),
-                                            SetForegroundColor(Color::Green),
-                                            Print(format!("-{}\n", r)),
-                                            SetAttribute(Attribute::Reset),
-                                        )
-                                        .unwrap(),
+                                        diff::Result::Right(r) => {
+                                            last_line = i;
+
+                                            execute!(
+                                                stdout(),
+                                                Print(format!("{i:>3}:")),
+                                                SetForegroundColor(Color::Green),
+                                                Print(format!("-{}\n", r)),
+                                                SetAttribute(Attribute::Reset),
+                                            )
+                                            .unwrap()
+                                        }
                                     }
                                 }
                             }

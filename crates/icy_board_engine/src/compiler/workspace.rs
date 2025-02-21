@@ -46,11 +46,10 @@ pub struct Workspace {
     pub file_name: PathBuf,
     pub package: Package,
     pub data: Option<PackageData>,
-    pub formatting: FormattingOptions,
+    formatting: Option<FormattingOptions>,
 }
-
-impl Workspace {
-    pub fn new() -> Self {
+impl Default for Workspace {
+    fn default() -> Self {
         Self {
             file_name: PathBuf::new(),
             package: Package {
@@ -60,8 +59,13 @@ impl Workspace {
                 authors: None,
             },
             data: None,
-            formatting: FormattingOptions::default(),
+            formatting: None,
         }
+    }
+}
+impl Workspace {
+    pub fn formatting(&self) -> &FormattingOptions {
+        self.formatting.as_ref().unwrap_or(&FormattingOptions::DEFAULT)
     }
 
     pub fn load<P: AsRef<Path>>(file_name: P) -> Res<Self> {

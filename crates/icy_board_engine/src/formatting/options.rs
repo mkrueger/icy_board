@@ -22,10 +22,18 @@ pub struct FormattingOptions {
 
 impl Default for FormattingOptions {
     fn default() -> Self {
-        Self {
-            space_around_binop: true,
-            insert_spaces: true,
-            tab_size: 4,
-        }
+        Self::DEFAULT.clone()
+    }
+}
+
+impl FormattingOptions {
+    pub const DEFAULT: Self = Self {
+        space_around_binop: true,
+        insert_spaces: true,
+        tab_size: 4,
+    };
+
+    pub fn new() -> Self {
+        Self::default()
     }
 }
