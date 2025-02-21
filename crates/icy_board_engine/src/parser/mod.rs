@@ -7,8 +7,7 @@ use std::{
 
 use crate::{
     ast::{
-        Ast, AstNode, BlockStatement, CommentAstNode, Constant, DimensionSpecifier, FunctionDeclarationAstNode, FunctionImplementation, ParameterSpecifier,
-        ProcedureDeclarationAstNode, ProcedureImplementation, Statement, VariableSpecifier,
+        Ast, AstNode, BlockStatement, CommentAstNode, Constant, DimensionSpecifier, FunctionDeclarationAstNode, FunctionImplementation, ParameterSpecifier, ProcedureDeclarationAstNode, ProcedureImplementation, Statement, VariableParameterSpecifier, VariableSpecifier
     },
     compiler::user_data::{UserData, UserDataRegistry},
     executable::{FuncOpCode, FunctionDefinition, OpCode, StatementDefinition, VariableType},
@@ -736,7 +735,7 @@ impl<'a> Parser<'a> {
                 let type_token = self.save_spanned_token();
                 self.next_token();
                 let info = self.parse_var_info(true);
-                parameters.push(ParameterSpecifier::new(var_token, type_token, var_type, info));
+                parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::new(var_token, type_token, var_type, info)));
             } else {
                 self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
                 return None;
@@ -844,7 +843,7 @@ impl<'a> Parser<'a> {
                     self.next_token();
 
                     let info = self.parse_var_info(false);
-                    parameters.push(ParameterSpecifier::new(var_token, type_token, var_type, info));
+                    parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::new(var_token, type_token, var_type, info)));
                 } else {
                     self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
                     return None;
@@ -937,7 +936,7 @@ impl<'a> Parser<'a> {
                     self.next_token();
 
                     let info = self.parse_var_info(false);
-                    parameters.push(ParameterSpecifier::new(None, type_token, var_type, info));
+                    parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, type_token, var_type, info)));
                 } else {
                     self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
                     return None;

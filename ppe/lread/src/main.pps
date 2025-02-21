@@ -52,6 +52,9 @@ LOOP
     SELECT CASE CH
     CASE Chr(27)
         BREAK
+    CASE Chr(13)
+        ReadMsg()
+        goto Redisplay
     CASE "H", "h"
         ShowHelp()
         goto Redisplay
@@ -83,5 +86,4 @@ LOOP
         FirstTxtLine += MsgY2 - MsgY1;
         DrawMsgText()
     ENDSELECT
-    AnsiPos 1, 1
 ENDLOOP

@@ -1,6 +1,6 @@
 use crate::formatting::FormattingOptions;
 
-use super::{AstVisitor, BlockStatement, Statement};
+use super::{AstVisitor, BlockStatement, ParameterSpecifier, Statement};
 
 #[repr(u8)]
 #[derive(PartialEq, Debug, Default)]
@@ -488,24 +488,35 @@ impl AstVisitor<()> for OutputVisitor {
         self.output_function(proc_decl.get_identifier());
         self.output.push('(');
         for (i, arg) in proc_decl.get_parameters().iter().enumerate() {
-            if arg.is_var() {
-                self.output_keyword("Var");
-                self.output.push(' ');
-            }
-            self.output_keyword(arg.get_variable_type().to_string().as_str());
-            if let Some(variable) = arg.get_variable() {
-                self.output.push(' ');
-                self.output(variable.get_identifier());
+            match arg {
+                ParameterSpecifier::Variable(arg) => {
+                    if arg.is_var() {
+                        self.output_keyword("Var");
+                        self.output.push(' ');
+                    }
+                    self.output_keyword(arg.get_variable_type().to_string().as_str());
+                    if let Some(variable) = arg.get_variable() {
+                        self.output.push(' ');
+                        self.output(variable.get_identifier());
 
-                if !variable.get_dimensions().is_empty() {
-                    self.output.push('(');
-                    for (j, dim) in variable.get_dimensions().iter().enumerate() {
-                        self.output.push_str(dim.get_dimension().to_string().as_str());
-                        if j < variable.get_dimensions().len() - 1 {
-                            self.output.push_str(", ");
+                        if !variable.get_dimensions().is_empty() {
+                            self.output.push('(');
+                            for (j, dim) in variable.get_dimensions().iter().enumerate() {
+                                self.output.push_str(dim.get_dimension().to_string().as_str());
+                                if j < variable.get_dimensions().len() - 1 {
+                                    self.output.push_str(", ");
+                                }
+                            }
+                            self.output.push(')');
                         }
                     }
-                    self.output.push(')');
+                }
+                
+                ParameterSpecifier::Function(_) => {
+                    todo!("Implement ParameterSpecifier::Function")
+                }
+                ParameterSpecifier::Procedure(_) => {
+                    todo!("Implement ParameterSpecifier::Procedure")
                 }
             }
 
@@ -521,25 +532,36 @@ impl AstVisitor<()> for OutputVisitor {
         self.output_function(func_decl.get_identifier());
         self.output.push('(');
         for (i, arg) in func_decl.get_parameters().iter().enumerate() {
-            if arg.is_var() {
-                self.output_keyword("Var");
-                self.output.push(' ');
-            }
-            self.output_keyword(arg.get_variable_type().to_string().as_str());
-            if let Some(variable) = arg.get_variable() {
-                self.output.push(' ');
-                self.output(variable.get_identifier());
+            match arg {
+                ParameterSpecifier::Variable(arg) => {
+                    if arg.is_var() {
+                        self.output_keyword("Var");
+                        self.output.push(' ');
+                    }
+                    self.output_keyword(arg.get_variable_type().to_string().as_str());
+                    if let Some(variable) = arg.get_variable() {
+                        self.output.push(' ');
+                        self.output(variable.get_identifier());
 
-                if !variable.get_dimensions().is_empty() {
-                    self.output.push('(');
-                    for (j, dim) in variable.get_dimensions().iter().enumerate() {
-                        self.output.push_str(dim.get_dimension().to_string().as_str());
-                        if j < variable.get_dimensions().len() - 1 {
-                            self.output.push_str(", ");
+                        if !variable.get_dimensions().is_empty() {
+                            self.output.push('(');
+                            for (j, dim) in variable.get_dimensions().iter().enumerate() {
+                                self.output.push_str(dim.get_dimension().to_string().as_str());
+                                if j < variable.get_dimensions().len() - 1 {
+                                    self.output.push_str(", ");
+                                }
+                            }
+                            self.output.push(')');
                         }
                     }
-                    self.output.push(')');
                 }
+                ParameterSpecifier::Function(_) => {
+                    todo!("Implement ParameterSpecifier::Function")
+                }
+                ParameterSpecifier::Procedure(_) => {
+                    todo!("Implement ParameterSpecifier::Procedure")
+                }
+
             }
             if i < func_decl.get_parameters().len() - 1 {
                 self.output.push_str(", ");
@@ -554,24 +576,34 @@ impl AstVisitor<()> for OutputVisitor {
         self.output_function(function.get_identifier());
         self.output.push('(');
         for (i, arg) in function.get_parameters().iter().enumerate() {
-            if arg.is_var() {
-                self.output_keyword("Var");
-                self.output.push(' ');
-            }
-            self.output_keyword(arg.get_variable_type().to_string().as_str());
-            if let Some(variable) = arg.get_variable() {
-                self.output.push(' ');
-                self.output(variable.get_identifier());
+            match arg {
+                ParameterSpecifier::Variable(arg) => {
+                    if arg.is_var() {
+                        self.output_keyword("Var");
+                        self.output.push(' ');
+                    }
+                    self.output_keyword(arg.get_variable_type().to_string().as_str());
+                    if let Some(variable) = arg.get_variable() {
+                        self.output.push(' ');
+                        self.output(variable.get_identifier());
 
-                if !variable.get_dimensions().is_empty() {
-                    self.output.push('(');
-                    for (j, dim) in variable.get_dimensions().iter().enumerate() {
-                        self.output.push_str(dim.get_dimension().to_string().as_str());
-                        if j < variable.get_dimensions().len() - 1 {
-                            self.output.push_str(", ");
+                        if !variable.get_dimensions().is_empty() {
+                            self.output.push('(');
+                            for (j, dim) in variable.get_dimensions().iter().enumerate() {
+                                self.output.push_str(dim.get_dimension().to_string().as_str());
+                                if j < variable.get_dimensions().len() - 1 {
+                                    self.output.push_str(", ");
+                                }
+                            }
+                            self.output.push(')');
                         }
                     }
-                    self.output.push(')');
+                }
+                ParameterSpecifier::Function(_) => {
+                    todo!("Implement ParameterSpecifier::Function")
+                }
+                ParameterSpecifier::Procedure(_) => {
+                    todo!("Implement ParameterSpecifier::Procedure")
                 }
             }
 
@@ -597,25 +629,36 @@ impl AstVisitor<()> for OutputVisitor {
         self.output_function(procedure.get_identifier());
         self.output.push('(');
         for (i, arg) in procedure.get_parameters().iter().enumerate() {
-            if arg.is_var() {
-                self.output_keyword("Var");
-                self.output.push(' ');
-            }
-            self.output_keyword(arg.get_variable_type().to_string().as_str());
-            if let Some(variable) = arg.get_variable() {
-                self.output.push(' ');
-                self.output(variable.get_identifier());
+            match arg {
+                ParameterSpecifier::Variable(arg) => {
+                    if arg.is_var() {
+                        self.output_keyword("Var");
+                        self.output.push(' ');
+                    }
+                    self.output_keyword(arg.get_variable_type().to_string().as_str());
+                    if let Some(variable) = arg.get_variable() {
+                        self.output.push(' ');
+                        self.output(variable.get_identifier());
 
-                if !variable.get_dimensions().is_empty() {
-                    self.output.push('(');
-                    for (j, dim) in variable.get_dimensions().iter().enumerate() {
-                        self.output.push_str(dim.get_dimension().to_string().as_str());
-                        if j < variable.get_dimensions().len() - 1 {
-                            self.output.push_str(", ");
+                        if !variable.get_dimensions().is_empty() {
+                            self.output.push('(');
+                            for (j, dim) in variable.get_dimensions().iter().enumerate() {
+                                self.output.push_str(dim.get_dimension().to_string().as_str());
+                                if j < variable.get_dimensions().len() - 1 {
+                                    self.output.push_str(", ");
+                                }
+                            }
+                            self.output.push(')');
                         }
                     }
-                    self.output.push(')');
                 }
+                ParameterSpecifier::Function(_) => {
+                    todo!("Implement ParameterSpecifier::Function")
+                }
+                ParameterSpecifier::Procedure(_) => {
+                    todo!("Implement ParameterSpecifier::Procedure")
+                }
+
             }
 
             if i < procedure.get_parameters().len() - 1 {

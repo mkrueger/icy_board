@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    ast::{AstNode, FunctionDeclarationAstNode, ParameterSpecifier, ProcedureDeclarationAstNode, VariableDeclarationStatement, VariableSpecifier},
+    ast::{AstNode, FunctionDeclarationAstNode, ParameterSpecifier, ProcedureDeclarationAstNode, VariableDeclarationStatement, VariableParameterSpecifier, VariableSpecifier},
     executable::{VariableType, LAST_PPLC},
 };
 
@@ -42,22 +42,22 @@ fn test_proc_declarations() {
         "DECLARE PROCEDURE PROC001(BYTE B)",
         &ProcedureDeclarationAstNode::empty_node(
             unicase::Ascii::new("PROC001".to_string()),
-            vec![ParameterSpecifier::empty(
+            vec![ParameterSpecifier::Variable(VariableParameterSpecifier::empty(
                 false,
                 VariableType::Byte,
                 Some(VariableSpecifier::empty(unicase::Ascii::new("B".to_string()), vec![])),
-            )],
+            ))],
         ),
     );
     check_ast_node(
         "DECLARE PROCEDURE PROC001(VAR BYTE B)",
         &ProcedureDeclarationAstNode::empty_node(
             unicase::Ascii::new("PROC001".to_string()),
-            vec![ParameterSpecifier::empty(
+            vec![ParameterSpecifier::Variable(VariableParameterSpecifier::empty(
                 true,
                 VariableType::Byte,
                 Some(VariableSpecifier::empty(unicase::Ascii::new("B".to_string()), vec![])),
-            )],
+            ))],
         ),
     );
 }
@@ -68,7 +68,7 @@ fn test_proc_without_name() {
         "DECLARE PROCEDURE PROC001(BYTE)",
         &ProcedureDeclarationAstNode::empty_node(
             unicase::Ascii::new("PROC001".to_string()),
-            vec![ParameterSpecifier::empty(false, VariableType::Byte, None)],
+            vec![ParameterSpecifier::Variable(VariableParameterSpecifier::empty(false, VariableType::Byte, None))],
         ),
     );
 }
@@ -94,11 +94,11 @@ fn test_func_declarations() {
         "DECLARE FUNCTION FUNC001(BYTE B) INTEGER",
         &FunctionDeclarationAstNode::empty_node(
             unicase::Ascii::new("FUNC001".to_string()),
-            vec![ParameterSpecifier::empty(
+            vec![ParameterSpecifier::Variable(VariableParameterSpecifier::empty(
                 false,
                 VariableType::Byte,
                 Some(VariableSpecifier::empty(unicase::Ascii::new("B".to_string()), vec![])),
-            )],
+            ))],
             VariableType::Integer,
         ),
     );

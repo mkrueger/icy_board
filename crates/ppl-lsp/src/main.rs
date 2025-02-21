@@ -6,7 +6,7 @@ use std::{mem, process};
 use dashmap::DashMap;
 use icy_board_engine::ast::{
     walk_function_declaration, walk_function_implementation, walk_predefined_call_statement, walk_variable_declaration_statement, Ast, AstVisitor, Constant,
-    ConstantExpression, Expression,
+    ConstantExpression, Expression, ParameterSpecifier,
 };
 use icy_board_engine::compiler::workspace::Workspace;
 use icy_board_engine::executable::{FunctionDefinition, FUNCTION_DEFINITIONS, LAST_PPLC};
@@ -664,8 +664,19 @@ impl AstVisitor<()> for TooltipVisitor {
     }
 
     fn visit_parameter_specifier(&mut self, param: &icy_board_engine::ast::ParameterSpecifier) {
-        if param.get_type_token().span.contains(&self.offset) {
-            self.tooltip = get_type_hover(param.get_variable_type());
+        match param {
+            ParameterSpecifier::Variable(param) => {
+                if param.get_type_token().span.contains(&self.offset) {
+                    self.tooltip = get_type_hover(param.get_variable_type());
+                }
+            }
+            ParameterSpecifier::Function(_) => {
+                todo!("Implement ParameterSpecifier::Function")
+            }
+            ParameterSpecifier::Procedure(_) => {
+                todo!("Implement ParameterSpecifier::Procedure")
+            }
+
         }
     }
 

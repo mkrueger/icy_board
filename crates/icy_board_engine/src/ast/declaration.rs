@@ -261,14 +261,50 @@ impl VariableDeclarationStatement {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct ParameterSpecifier {
+pub enum ParameterSpecifier {
+    Variable(VariableParameterSpecifier),
+    Function(FunctionParameterSpecifier),
+    Procedure(ProcedureParameterSpecifier),
+}
+
+impl ParameterSpecifier {
+
+    pub fn is_var(&self) -> bool {
+        if let ParameterSpecifier::Variable(var) = self {
+            var.is_var()
+        } else {
+            false
+        }
+    }
+
+    pub fn is_similar(&self, check: &ParameterSpecifier) -> bool {
+        match (self, check) {
+            (ParameterSpecifier::Variable(var), ParameterSpecifier::Variable(check_var)) => var.is_similar(check_var),
+            (ParameterSpecifier::Function(func), ParameterSpecifier::Function(check_func)) => func.is_similar(check_func),
+            (ParameterSpecifier::Procedure(proc), ParameterSpecifier::Procedure(check_proc)) => proc.is_similar(check_proc),
+            _ => false,
+        }
+    }
+
+    #[must_use]
+    pub fn visit_mut<V: AstVisitorMut>(&self, visitor: &mut V) -> Self {
+        visitor.visit_parameter_specifier(self)
+    }
+
+    pub fn visit<T: Default, V: super::AstVisitor<T>>(&self, visitor: &mut V) -> T {
+        visitor.visit_parameter_specifier(self)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct VariableParameterSpecifier {
     var_token: Option<Spanned<Token>>,
     type_token: Spanned<Token>,
     variable_type: VariableType,
     variable: Option<VariableSpecifier>,
 }
 
-impl ParameterSpecifier {
+impl VariableParameterSpecifier {
     pub fn new(var_token: Option<Spanned<Token>>, type_token: Spanned<Token>, variable_type: VariableType, variable: Option<VariableSpecifier>) -> Self {
         Self {
             var_token,
@@ -318,15 +354,25 @@ impl ParameterSpecifier {
     pub fn create_empty_statement(variable_type: VariableType, variables: Vec<VariableSpecifier>) -> Statement {
         Statement::VariableDeclaration(VariableDeclarationStatement::empty(variable_type, variables))
     }
-
-    #[must_use]
-    pub fn visit_mut<V: AstVisitorMut>(&self, visitor: &mut V) -> Self {
-        visitor.visit_parameter_specifier(self)
+    
+    fn is_similar(&self, p2: &VariableParameterSpecifier) -> bool {
+        if self.get_variable_type() != p2.get_variable_type() {
+            return false;
+        }
+        if let Some(p1) = self.get_variable() {
+            if let Some(p2) = p2.get_variable() {
+                if !p1.is_similar(p2) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        } else if p2.get_variable().is_some() {
+            return false;
+        }
+        return true;
     }
 
-    pub fn visit<T: Default, V: super::AstVisitor<T>>(&self, visitor: &mut V) -> T {
-        visitor.visit_parameter_specifier(self)
-    }
 }
 
 impl fmt::Display for VariableDeclarationStatement {
@@ -540,3 +586,212 @@ impl FunctionDeclarationAstNode {
         super::AstNode::FunctionDeclaration(FunctionDeclarationAstNode::empty(identifier, parameters, return_type))
     }
 }
+
+
+
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct FunctionParameterSpecifier {
+    function_token: Spanned<Token>,
+    identifier_token: Spanned<Token>,
+    leftpar_token: Spanned<Token>,
+    parameters: Vec<ParameterSpecifier>,
+    rightpar_token: Spanned<Token>,
+    return_type_token: Spanned<Token>,
+    return_type: VariableType,
+}
+
+impl FunctionParameterSpecifier {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        function_token: Spanned<Token>,
+        identifier_token: Spanned<Token>,
+        leftpar_token: Spanned<Token>,
+        parameters: Vec<ParameterSpecifier>,
+        rightpar_token: Spanned<Token>,
+        return_type_token: Spanned<Token>,
+        return_type: VariableType,
+    ) -> Self {
+        Self {
+            function_token,
+            identifier_token,
+            leftpar_token,
+            parameters,
+            rightpar_token,
+            return_type_token,
+            return_type,
+        }
+    }
+
+    pub fn empty(identifier: unicase::Ascii<String>, parameters: Vec<ParameterSpecifier>, return_type: VariableType) -> Self {
+        Self {
+            function_token: Spanned::create_empty(Token::Function),
+            identifier_token: Spanned::create_empty(Token::Identifier(identifier)),
+            leftpar_token: Spanned::create_empty(Token::LPar),
+            parameters,
+            rightpar_token: Spanned::create_empty(Token::RPar),
+            return_type_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(return_type.to_string()))),
+            return_type,
+        }
+    }
+
+    pub fn get_function_token(&self) -> &Spanned<Token> {
+        &self.function_token
+    }
+
+    pub fn get_identifier_token(&self) -> &Spanned<Token> {
+        &self.identifier_token
+    }
+
+    /// Returns a reference to the get identifier of this [`ForStatement`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if .
+    pub fn get_identifier(&self) -> &unicase::Ascii<String> {
+        if let Token::Identifier(id) = &self.identifier_token.token {
+            return id;
+        }
+        panic!("Expected identifier token")
+    }
+
+    pub fn set_identifier(&mut self, new_id: unicase::Ascii<String>) {
+        if let Token::Identifier(id) = &mut self.identifier_token.token {
+            *id = new_id;
+        }
+    }
+
+    pub fn get_leftpar_token(&self) -> &Spanned<Token> {
+        &self.leftpar_token
+    }
+
+    pub fn get_parameters(&self) -> &Vec<ParameterSpecifier> {
+        &self.parameters
+    }
+
+    pub fn get_parameters_mut(&mut self) -> &mut Vec<ParameterSpecifier> {
+        &mut self.parameters
+    }
+
+    pub fn get_rightpar_token(&self) -> &Spanned<Token> {
+        &self.rightpar_token
+    }
+
+    pub fn get_return_type_token(&self) -> &Spanned<Token> {
+        &self.return_type_token
+    }
+
+    pub fn get_return_type(&self) -> VariableType {
+        self.return_type
+    }
+    
+    fn is_similar(&self, check_func: &FunctionParameterSpecifier) -> bool {
+        if self.get_return_type() != check_func.get_return_type() {
+            return false;
+        }
+        if self.get_parameters().len() != check_func.get_parameters().len() {
+            return false;
+        }
+        for (i, param) in self.get_parameters().iter().enumerate() {
+            if !param.is_similar(&check_func.get_parameters()[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ProcedureParameterSpecifier {
+    function_token: Spanned<Token>,
+    identifier_token: Spanned<Token>,
+    leftpar_token: Spanned<Token>,
+    parameters: Vec<ParameterSpecifier>,
+    rightpar_token: Spanned<Token>,
+}
+
+impl ProcedureParameterSpecifier {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        function_token: Spanned<Token>,
+        identifier_token: Spanned<Token>,
+        leftpar_token: Spanned<Token>,
+        parameters: Vec<ParameterSpecifier>,
+        rightpar_token: Spanned<Token>,
+    ) -> Self {
+        Self {
+            function_token,
+            identifier_token,
+            leftpar_token,
+            parameters,
+            rightpar_token,
+        }
+    }
+
+    pub fn empty(identifier: unicase::Ascii<String>, parameters: Vec<ParameterSpecifier>) -> Self {
+        Self {
+            function_token: Spanned::create_empty(Token::Function),
+            identifier_token: Spanned::create_empty(Token::Identifier(identifier)),
+            leftpar_token: Spanned::create_empty(Token::LPar),
+            parameters,
+            rightpar_token: Spanned::create_empty(Token::RPar),
+        }
+    }
+
+    pub fn get_function_token(&self) -> &Spanned<Token> {
+        &self.function_token
+    }
+
+    pub fn get_identifier_token(&self) -> &Spanned<Token> {
+        &self.identifier_token
+    }
+
+    /// Returns a reference to the get identifier of this [`ForStatement`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if .
+    pub fn get_identifier(&self) -> &unicase::Ascii<String> {
+        if let Token::Identifier(id) = &self.identifier_token.token {
+            return id;
+        }
+        panic!("Expected identifier token")
+    }
+
+    pub fn set_identifier(&mut self, new_id: unicase::Ascii<String>) {
+        if let Token::Identifier(id) = &mut self.identifier_token.token {
+            *id = new_id;
+        }
+    }
+
+    pub fn get_leftpar_token(&self) -> &Spanned<Token> {
+        &self.leftpar_token
+    }
+
+    pub fn get_parameters(&self) -> &Vec<ParameterSpecifier> {
+        &self.parameters
+    }
+
+    pub fn get_parameters_mut(&mut self) -> &mut Vec<ParameterSpecifier> {
+        &mut self.parameters
+    }
+
+    pub fn get_rightpar_token(&self) -> &Spanned<Token> {
+        &self.rightpar_token
+    }
+    
+    fn is_similar(&self, check_func: &ProcedureParameterSpecifier) -> bool {
+        if self.get_parameters().len() != check_func.get_parameters().len() {
+            return false;
+        }
+        for (i, param) in self.get_parameters().iter().enumerate() {
+            if !param.is_similar(&check_func.get_parameters()[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+

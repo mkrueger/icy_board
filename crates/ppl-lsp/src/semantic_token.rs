@@ -46,10 +46,20 @@ impl SemanticTokenVisitor {
 
     fn higlight_parameters(&mut self, parameters: &[ParameterSpecifier]) {
         for p in parameters {
-            if let Some(var) = p.get_var_token() {
-                self.highlight_token(var, SemanticTokenType::KEYWORD);
+            match p {
+                ParameterSpecifier::Variable(p) => {
+                    if let Some(var) = p.get_var_token() {
+                        self.highlight_token(var, SemanticTokenType::KEYWORD);
+                    }
+                    self.highlight_token(p.get_type_token(), SemanticTokenType::TYPE);
+                }
+                ParameterSpecifier::Function(_) => {
+                    todo!("Implement ParameterSpecifier::Function")
+                }
+                ParameterSpecifier::Procedure(_) => {
+                    todo!("Implement ParameterSpecifier::Procedure")
+                }
             }
-            self.highlight_token(p.get_type_token(), SemanticTokenType::TYPE);
         }
     }
 }

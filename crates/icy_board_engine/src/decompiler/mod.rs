@@ -7,10 +7,7 @@ use reconstruct::strip_unused_labels;
 
 use crate::{
     ast::{
-        constant::NumberFormat, Ast, AstNode, BinOp, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression,
-        FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement,
-        IndexerExpression, LabelStatement, LetStatement, ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement,
-        ProcedureDeclarationAstNode, ProcedureImplementation, Statement, UnaryExpression, UnaryOp, VariableDeclarationStatement, VariableSpecifier,
+        constant::NumberFormat, Ast, AstNode, BinOp, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IndexerExpression, LabelStatement, LetStatement, ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, Statement, UnaryExpression, UnaryOp, VariableDeclarationStatement, VariableParameterSpecifier, VariableSpecifier
     },
     executable::{
         DeserializationError, DeserializationErrorType, EntryType, Executable, OpCode, PPECommand, PPEExpr, PPEScript, PPEVisitor, StatementDefinition,
@@ -471,11 +468,11 @@ impl Decompiler {
                     _ => {}
                 }
                 let is_var = pass_flags & (1 << i) != 0;
-                parameters.push(ParameterSpecifier::empty(
+                parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::empty(
                     is_var,
                     param.header.variable_type,
                     Some(VariableSpecifier::empty(unicase::Ascii::new(param.name.clone()), dimensions)),
-                ));
+                )));
             }
 
             parameters

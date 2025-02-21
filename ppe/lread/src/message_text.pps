@@ -33,6 +33,7 @@ PROCEDURE DrawMsgText()
         IF FErr(1) THEN 
             FirstTxtLine = I - (MsgY2 - MsgY1)
             if FirstTxtLine <  FirstTxtLine FirstTxtLine = 0
+            FClose 1
             GOTO Restart
         ENDIF
     NEXT

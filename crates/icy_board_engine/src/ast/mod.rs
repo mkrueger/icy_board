@@ -89,18 +89,7 @@ impl AstNode {
                 }
 
                 for (p1, p2) in f1.get_parameters().iter().zip(f2.get_parameters()) {
-                    if p1.get_variable_type() != p2.get_variable_type() {
-                        return false;
-                    }
-                    if let Some(p1) = p1.get_variable() {
-                        if let Some(p2) = p2.get_variable() {
-                            if !p1.is_similar(p2) {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    } else if p2.get_variable().is_some() {
+                    if !p1.is_similar(p2) {
                         return false;
                     }
                 }
@@ -116,18 +105,7 @@ impl AstNode {
                 }
 
                 for (p1, p2) in p1.get_parameters().iter().zip(p2.get_parameters()) {
-                    if p1.get_variable_type() != p2.get_variable_type() {
-                        return false;
-                    }
-                    if let Some(p1) = p1.get_variable() {
-                        if let Some(p2) = p2.get_variable() {
-                            if !p1.is_similar(p2) {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    } else if p2.get_variable().is_some() {
+                    if !p1.is_similar(p2) {
                         return false;
                     }
                 }
@@ -143,20 +121,10 @@ impl AstNode {
                 }
 
                 for (p1, p2) in f1.get_parameters().iter().zip(f2.get_parameters()) {
-                    if p1.get_variable_type() != p2.get_variable_type() {
+                    if !p1.is_similar(p2) {
                         return false;
                     }
-                    if let Some(p1) = p1.get_variable() {
-                        if let Some(p2) = p2.get_variable() {
-                            if !p1.is_similar(p2) {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    } else if p2.get_variable().is_some() {
-                        return false;
-                    }
+                    
                 }
                 for (s1, s2) in f1.get_statements().iter().zip(f2.get_statements()) {
                     if !s1.is_similar(s2) {
@@ -176,18 +144,7 @@ impl AstNode {
                 }
 
                 for (p1, p2) in p1.get_parameters().iter().zip(p2.get_parameters()) {
-                    if p1.get_variable_type() != p2.get_variable_type() {
-                        return false;
-                    }
-                    if let Some(p1) = p1.get_variable() {
-                        if let Some(p2) = p2.get_variable() {
-                            if !p1.is_similar(p2) {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    } else if p2.get_variable().is_some() {
+                    if !p1.is_similar(p2) {
                         return false;
                     }
                 }

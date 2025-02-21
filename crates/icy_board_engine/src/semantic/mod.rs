@@ -9,7 +9,7 @@ use crate::{
         walk_function_implementation, walk_indexer_expression, walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation,
         AstVisitor, CommentAstNode, Constant, ConstantExpression, Expression, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation,
         GosubStatement, GotoStatement, IdentifierExpression, LabelStatement, LetStatement, ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement,
-        ProcedureDeclarationAstNode, ProcedureImplementation, VariableDeclarationStatement,
+        ProcedureDeclarationAstNode, ProcedureImplementation, VariableDeclarationStatement, VariableParameterSpecifier,
     },
     compiler::{user_data::UserDataMemberRegistry, CompilationErrorType, CompilationWarningType},
     executable::{
@@ -763,27 +763,39 @@ impl SemanticVisitor {
 
     fn add_parameters(&mut self, parameters: &[ParameterSpecifier]) {
         for param in parameters {
-            let id = self.references.len();
-            self.add_declaration(
-                ReferenceType::Variable(id),
-                param.get_variable_type(),
-                param.get_variable().as_ref().unwrap().get_identifier_token(),
-            );
-            self.references[id].1.header = Some(VarHeader {
-                id,
-                variable_type: param.get_variable_type(),
-                dim: 0,
-                vector_size: 0,
-                matrix_size: 0,
-                cube_size: 0,
-                flags: 0,
-            });
+            match param {
+                ParameterSpecifier::Variable(param) => {
+                    let id = self.references.len();
+                    self.add_declaration(
+                        ReferenceType::Variable(id),
+                        param.get_variable_type(),
+                        param.get_variable().as_ref().unwrap().get_identifier_token(),
+                    );
+                    self.references[id].1.header = Some(VarHeader {
+                        id,
+                        variable_type: param.get_variable_type(),
+                        dim: 0,
+                        vector_size: 0,
+                        matrix_size: 0,
+                        cube_size: 0,
+                        flags: 0,
+                    });
 
-            self.local_variable_lookup
-                .as_mut()
-                .unwrap()
-                .variable_lookup
-                .insert(unicase::Ascii::new(param.get_variable().as_ref().unwrap().get_identifier().to_string()), id);
+                    self.local_variable_lookup
+                        .as_mut()
+                        .unwrap()
+                        .variable_lookup
+                        .insert(unicase::Ascii::new(param.get_variable().as_ref().unwrap().get_identifier().to_string()), id);
+                }
+                ParameterSpecifier::Function(_) => {
+                    todo!("Implement ParameterSpecifier::Function")
+                }
+                ParameterSpecifier::Procedure(_) => {
+                    todo!("Implement ParameterSpecifier::Procedure")
+                }
+
+            }
+            
         }
     }
 
@@ -1204,7 +1216,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             ident.get_identifier().clone(),
                             call.get_arguments()
                                 .iter()
-                                .map(|_a| ParameterSpecifier::empty(false, VariableType::None, None))
+                                .map(|_a| ParameterSpecifier::Variable(VariableParameterSpecifier::empty(false, VariableType::None, None)))
                                 .collect(),
                             VariableType::None,
                         )),
@@ -1416,7 +1428,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         call.get_identifier().clone(),
                         call.get_arguments()
                             .iter()
-                            .map(|_a| ParameterSpecifier::empty(false, VariableType::None, None))
+                            .map(|_a| ParameterSpecifier::Variable(VariableParameterSpecifier::empty(false, VariableType::None, None)))
                             .collect(),
                     )),
                     lookup: VariableLookups::default(),
