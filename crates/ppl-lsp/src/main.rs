@@ -428,11 +428,13 @@ impl LanguageServer for Backend {
                         .arg(format!("gnome-terminal -- icboard --ppe {}", target_file.display()))
                         .spawn()
                     {
-                        let mut state = self.cur_process.lock().unwrap();
+                        let mut state: std::sync::MutexGuard<'_, Option<process::Child>> = self.cur_process.lock().unwrap();
                         if let Some(mut child) = mem::replace(&mut *state, Some(process)) {
                             child.kill().unwrap();
                         }
                     }
+                } else {
+                    self.client.log_message(MessageType::ERROR, "no workspace open!").await;
                 }
             }
             _ => {

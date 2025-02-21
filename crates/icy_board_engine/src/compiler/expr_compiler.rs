@@ -72,7 +72,6 @@ impl<'a> AstVisitor<PPEExpr> for ExpressionCompiler<'a> {
             SemanticInfo::FunctionReference(idx) => {
                 let reference_index = self.compiler.semantic_visitor.function_containers[*idx].id;
                 let table_index = self.compiler.semantic_visitor.references[reference_index].1.variable_table_index;
-                println!("Function reference: {}", table_index);
                 return PPEExpr::FunctionCall(table_index, arguments);
             }
             SemanticInfo::VariableReference(reference_index) => {

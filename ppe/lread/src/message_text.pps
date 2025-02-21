@@ -48,6 +48,7 @@ PROCEDURE DrawMsgText()
         PRINT line
         msg_line += 1
     ENDWHILE
+    
     FClose 1
     While MsgY1 + msg_line <= MsgY2 DO
         AnsiPos MsgX1, MsgY1 + msg_line
