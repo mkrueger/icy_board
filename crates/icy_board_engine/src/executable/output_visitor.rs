@@ -1,13 +1,23 @@
-use crate::executable::OpCode;
+use crate::{executable::OpCode, formatting::FormattingOptions};
 
 use super::{FunctionDefinition, PPEExpr, PPEScript, PPEVisitor, StatementDefinition};
 
 #[derive(Default)]
 pub struct PPEOutputVisitor {
     pub output: String,
+    pub options: FormattingOptions,
+    pub indent: usize,
 }
 
 impl PPEOutputVisitor {
+    pub fn new(options: FormattingOptions) -> Self {
+        Self {
+            output: String::new(),
+            options,
+            indent: 0,
+        }
+    }
+
     fn output_keyword(&mut self, str: &str) {
         self.output.push_str(&str.to_uppercase());
     }
@@ -72,7 +82,13 @@ impl PPEVisitor<()> for PPEOutputVisitor {
 
     fn visit_binary_expression(&mut self, op: crate::ast::BinOp, left: &PPEExpr, right: &PPEExpr) {
         left.visit(self);
+        if self.options.space_around_binop {
+            self.output.push(' ');
+        }
         self.output.push_str(op.to_string().as_str());
+        if self.options.space_around_binop {
+            self.output.push(' ');
+        }
         right.visit(self);
     }
 

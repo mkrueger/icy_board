@@ -1,3 +1,5 @@
+use crate::formatting::FormattingOptions;
+
 use super::{AstVisitor, BlockStatement, Statement};
 
 #[repr(u8)]
@@ -17,6 +19,7 @@ pub struct OutputVisitor {
     pub output_func: OutputFunc,
     pub skip_comments: bool,
     pub output: String,
+    pub options: FormattingOptions,
     indent: i32,
 }
 
@@ -42,8 +45,13 @@ impl OutputVisitor {
     }
 
     fn indent(&mut self) {
+        let one_indent = if self.options.insert_spaces {
+            " ".repeat(self.options.tab_size)
+        } else {
+            "\t".to_string()
+        };
         for _ in 0..self.indent {
-            self.output.push_str("    ");
+            self.output.push_str(one_indent.as_str());
         }
     }
 
@@ -99,7 +107,11 @@ impl AstVisitor<()> for OutputVisitor {
 
     fn visit_binary_expression(&mut self, binary: &super::BinaryExpression) {
         binary.get_left_expression().visit(self);
-        self.output(&format!(" {} ", binary.get_op()));
+        if self.options.space_around_binop {
+            self.output(&format!(" {} ", binary.get_op()));
+        } else {
+            self.output(&format!("{}", binary.get_op()));
+        }
         binary.get_right_expression().visit(self);
     }
 
