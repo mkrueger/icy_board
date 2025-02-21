@@ -321,7 +321,7 @@ fn compile_files(arguments: &Cli, version: u16, encoding: Encoding, lang_version
                                                 stdout(),
                                                 Print(format!("{i:>3}:")),
                                                 SetForegroundColor(Color::Green),
-                                                Print(format!("-{}\n", r)),
+                                                Print(format!("+{}\n", r)),
                                                 SetAttribute(Attribute::Reset),
                                             )
                                             .unwrap()
