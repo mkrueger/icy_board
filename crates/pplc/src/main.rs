@@ -106,6 +106,7 @@ fn main() {
                 authors: None,
             },
             data: None,
+            formatting: FormattingOptions::default(),
         };
         ws.save(file.join("ppl.toml")).unwrap();
         println!("Created new ppl package in {}", file.display());
@@ -193,7 +194,7 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli, version: u16) -> Res<()> {
     fs::create_dir_all(&target_path).expect("Unable to create target directory");
 
     let out_file_name = target_path.join(workspace.package.name()).with_extension("ppe");
-    compile_files(arguments, version, encoding, lang_version, files, &out_file_name, FormattingOptions::default());
+    compile_files(arguments, version, encoding, lang_version, files, &out_file_name, workspace.formatting.clone());
     println!("Copying data files...");
     if let Some(data) = &workspace.data {
         if let Some(art_files) = &data.art_files {

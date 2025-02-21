@@ -370,12 +370,8 @@ impl LanguageServer for Backend {
                 edits: Vec::new(),
                 rope: &rope,
             };
-            let options = icy_board_engine::formatting::FormattingOptions {
-                space_around_binop: true,
-                insert_spaces: params.options.insert_spaces,
-                tab_size: params.options.tab_size as usize,
-                ..Default::default()
-            };
+
+            let options = self.workspace.lock().unwrap().formatting.clone();
             let mut visitor: FormattingVisitor<'_> = FormattingVisitor::new(&mut backend, &options);
             ast.visit(&mut visitor);
             backend.edits

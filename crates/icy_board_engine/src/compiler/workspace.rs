@@ -6,7 +6,7 @@ use std::{
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
-use crate::{executable::LAST_PPLC, Res};
+use crate::{executable::LAST_PPLC, formatting::FormattingOptions, Res};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Package {
@@ -46,6 +46,7 @@ pub struct Workspace {
     pub file_name: PathBuf,
     pub package: Package,
     pub data: Option<PackageData>,
+    pub formatting: FormattingOptions,
 }
 
 impl Workspace {
@@ -59,6 +60,7 @@ impl Workspace {
                 authors: None,
             },
             data: None,
+            formatting: FormattingOptions::default(),
         }
     }
 
