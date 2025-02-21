@@ -1681,10 +1681,10 @@ impl VariableValue {
                 data.int_value = self.as_int();
             }
             VariableType::Function => {
-                panic!("Can't convert to function")
+                unsafe { data.function_value = self.data.function_value };
             }
             VariableType::Procedure => {
-                panic!("Can't convert to procedure")
+                unsafe { data.procedure_value = self.data.procedure_value };
             }
             VariableType::UserData(x) => {
                 log::error!("can't convert {:?} to user data type {x}", self);

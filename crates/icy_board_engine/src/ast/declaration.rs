@@ -268,7 +268,6 @@ pub enum ParameterSpecifier {
 }
 
 impl ParameterSpecifier {
-
     pub fn is_var(&self) -> bool {
         if let ParameterSpecifier::Variable(var) = self {
             var.is_var()
@@ -354,7 +353,7 @@ impl VariableParameterSpecifier {
     pub fn create_empty_statement(variable_type: VariableType, variables: Vec<VariableSpecifier>) -> Statement {
         Statement::VariableDeclaration(VariableDeclarationStatement::empty(variable_type, variables))
     }
-    
+
     fn is_similar(&self, p2: &VariableParameterSpecifier) -> bool {
         if self.get_variable_type() != p2.get_variable_type() {
             return false;
@@ -372,7 +371,6 @@ impl VariableParameterSpecifier {
         }
         return true;
     }
-
 }
 
 impl fmt::Display for VariableDeclarationStatement {
@@ -587,9 +585,6 @@ impl FunctionDeclarationAstNode {
     }
 }
 
-
-
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionParameterSpecifier {
     function_token: Spanned<Token>,
@@ -684,7 +679,7 @@ impl FunctionParameterSpecifier {
     pub fn get_return_type(&self) -> VariableType {
         self.return_type
     }
-    
+
     fn is_similar(&self, check_func: &FunctionParameterSpecifier) -> bool {
         if self.get_return_type() != check_func.get_return_type() {
             return false;
@@ -700,8 +695,6 @@ impl FunctionParameterSpecifier {
         return true;
     }
 }
-
-
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ProcedureParameterSpecifier {
@@ -781,7 +774,7 @@ impl ProcedureParameterSpecifier {
     pub fn get_rightpar_token(&self) -> &Spanned<Token> {
         &self.rightpar_token
     }
-    
+
     fn is_similar(&self, check_func: &ProcedureParameterSpecifier) -> bool {
         if self.get_parameters().len() != check_func.get_parameters().len() {
             return false;
@@ -794,4 +787,3 @@ impl ProcedureParameterSpecifier {
         return true;
     }
 }
-

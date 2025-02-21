@@ -303,10 +303,6 @@ impl PPEDeserializer {
                         self.push_expr(PPEExpr::FunctionCall(id, arguments));
                         continue;
                     },
-                    VariableType::Procedure => {
-                        self.offset += 1;
-                        return Err(DeserializationErrorType::GotProcedureCallInExpression(id as i16));
-                    }
                     _ => {}
                 }
 

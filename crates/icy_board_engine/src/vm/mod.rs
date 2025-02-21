@@ -510,6 +510,7 @@ impl<'a> VirtualMachine<'a> {
                 let parameters;
                 let first;
                 let return_var_id;
+
                 unsafe {
                     let proc = &self.variable_table.get_var_entry(*func_id);
                     proc_offset = proc.value.data.function_value.start_offset as usize;
@@ -518,7 +519,6 @@ impl<'a> VirtualMachine<'a> {
                     parameters = proc.value.data.function_value.parameters as usize;
                     return_var_id = proc.value.data.function_value.return_var as usize;
                 }
-
                 self.prepare_call(locals, parameters, first, arguments, 0).await?;
 
                 self.return_addresses.push(ReturnAddress::func_call(self.cur_ptr, *func_id));

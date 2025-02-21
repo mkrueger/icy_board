@@ -511,7 +511,7 @@ impl AstVisitor<()> for OutputVisitor {
                         }
                     }
                 }
-                
+
                 ParameterSpecifier::Function(_) => {
                     todo!("Implement ParameterSpecifier::Function")
                 }
@@ -561,7 +561,6 @@ impl AstVisitor<()> for OutputVisitor {
                 ParameterSpecifier::Procedure(_) => {
                     todo!("Implement ParameterSpecifier::Procedure")
                 }
-
             }
             if i < func_decl.get_parameters().len() - 1 {
                 self.output.push_str(", ");
@@ -658,7 +657,6 @@ impl AstVisitor<()> for OutputVisitor {
                 ParameterSpecifier::Procedure(_) => {
                     todo!("Implement ParameterSpecifier::Procedure")
                 }
-
             }
 
             if i < procedure.get_parameters().len() - 1 {

@@ -124,7 +124,6 @@ impl AstNode {
                     if !p1.is_similar(p2) {
                         return false;
                     }
-                    
                 }
                 for (s1, s2) in f1.get_statements().iter().zip(f2.get_statements()) {
                     if !s1.is_similar(s2) {

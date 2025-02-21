@@ -133,13 +133,16 @@ impl References {
 
 type NameTableLookup = HashMap<unicase::Ascii<String>, usize>;
 
+#[derive(Clone)]
 pub enum FunctionDeclaration {
     Function(FunctionDeclarationAstNode),
     Procedure(ProcedureDeclarationAstNode),
 }
 
+#[derive(Clone)]
 pub struct FunctionContainer {
     pub name: unicase::Ascii<String>,
+    pub parameter_index: Option<usize>,
     pub id: usize,
     pub functions: FunctionDeclaration,
 
@@ -148,7 +151,7 @@ pub struct FunctionContainer {
     pub local_variables: core::ops::Range<usize>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct VariableLookups {
     pub variable_lookup: NameTableLookup,
 
@@ -201,7 +204,8 @@ pub struct SemanticVisitor {
     // constants
     pub function_containers: Vec<FunctionContainer>,
 
-    cur_func: u64,
+    cur_func_impl: usize,
+    cur_func_call: u64,
 }
 
 #[derive(Default)]
@@ -351,7 +355,8 @@ impl SemanticVisitor {
             global_lookup: VariableLookups::default(),
             local_variable_lookup: None,
             require_user_variables: false,
-            cur_func: 0,
+            cur_func_call: 0,
+            cur_func_impl: 0,
             function_containers: Vec::new(),
         };
         for user_var in USER_VARIABLES.iter() {
@@ -406,7 +411,10 @@ impl SemanticVisitor {
             variable_table.push(r.create_table_entry());
         }
 
-        for f in &self.function_containers {
+        for f in &self.function_containers.clone() {
+            if f.parameter_index.is_some() {
+                continue;
+            }
             {
                 let (_rt, r) = &mut self.references[f.id];
                 if r.usages.is_empty() {
@@ -483,7 +491,33 @@ impl SemanticVisitor {
             };
 
             for idx in f.parameters.clone() {
-                let (rt, r) = &self.references[idx];
+                let (rt, r) = &mut self.references[idx];
+                if let ReferenceType::Function(func) = rt {
+                    for f in &mut self.function_containers {
+                        if f.id == *func {
+                            f.parameter_index = Some(variable_table.len());
+                            break;
+                        }
+                    }
+                    r.variable_table_index = variable_table.len() + 1;
+                    let mut new_entry = r.create_table_entry();
+                    new_entry.entry_type = EntryType::Parameter;
+                    variable_table.push(new_entry);
+                    continue;
+                }
+                if let ReferenceType::Procedure(func) = rt {
+                    for f in &mut self.function_containers {
+                        if f.id == *func {
+                            f.parameter_index = Some(variable_table.len());
+                            break;
+                        }
+                    }
+                    r.variable_table_index = variable_table.len() + 1;
+                    let mut new_entry = r.create_table_entry();
+                    new_entry.entry_type = EntryType::Parameter;
+                    variable_table.push(new_entry);
+                    continue;
+                }
                 if !matches!(rt, ReferenceType::Variable(_)) {
                     continue;
                 }
@@ -762,7 +796,7 @@ impl SemanticVisitor {
     }
 
     fn add_parameters(&mut self, parameters: &[ParameterSpecifier]) {
-        for param in parameters {
+        for (i, param) in parameters.iter().enumerate() {
             match param {
                 ParameterSpecifier::Variable(param) => {
                     let id = self.references.len();
@@ -787,15 +821,92 @@ impl SemanticVisitor {
                         .variable_lookup
                         .insert(unicase::Ascii::new(param.get_variable().as_ref().unwrap().get_identifier().to_string()), id);
                 }
-                ParameterSpecifier::Function(_) => {
-                    todo!("Implement ParameterSpecifier::Function")
-                }
-                ParameterSpecifier::Procedure(_) => {
-                    todo!("Implement ParameterSpecifier::Procedure")
-                }
+                ParameterSpecifier::Function(func) => {
+                    let id = self.references.len();
+                    self.add_declaration(
+                        ReferenceType::Function(self.function_containers.len()),
+                        VariableType::Function,
+                        func.get_identifier_token(),
+                    );
+                    self.references[id].1.header = Some(VarHeader {
+                        id,
+                        variable_type: VariableType::Function,
+                        dim: func.get_parameters().len() as u8,
+                        vector_size: 0,
+                        matrix_size: 0,
+                        cube_size: 0,
+                        flags: 0,
+                    });
+                    self.local_variable_lookup
+                        .as_mut()
+                        .unwrap()
+                        .variable_lookup
+                        .insert(unicase::Ascii::new(func.get_identifier().to_string()), id);
 
+                    self.references[id].1.implementation = Some((
+                        self.errors.lock().unwrap().file_name().to_path_buf(),
+                        Spanned::new(func.get_identifier().to_string(), func.get_identifier_token().span.clone()),
+                    ));
+                    self.function_containers.push(FunctionContainer {
+                        name: func.get_identifier().clone(),
+                        parameter_index: Some(i),
+                        id,
+                        functions: FunctionDeclaration::Function(FunctionDeclarationAstNode::empty(
+                            func.get_identifier().clone(),
+                            func.get_parameters()
+                                .iter()
+                                .map(|_a| ParameterSpecifier::Variable(VariableParameterSpecifier::empty(false, VariableType::None, None)))
+                                .collect(),
+                            VariableType::None,
+                        )),
+                        lookup: VariableLookups::default(),
+                        parameters: 0..0,
+                        local_variables: 0..0,
+                    });
+                }
+                ParameterSpecifier::Procedure(func) => {
+                    let id = self.references.len();
+                    self.add_declaration(
+                        ReferenceType::Function(self.function_containers.len()),
+                        VariableType::Function,
+                        func.get_identifier_token(),
+                    );
+                    self.references[id].1.header = Some(VarHeader {
+                        id,
+                        variable_type: VariableType::Procedure,
+                        dim: func.get_parameters().len() as u8,
+                        vector_size: 0,
+                        matrix_size: 0,
+                        cube_size: 0,
+                        flags: 0,
+                    });
+                    self.local_variable_lookup
+                        .as_mut()
+                        .unwrap()
+                        .variable_lookup
+                        .insert(unicase::Ascii::new(func.get_identifier().to_string()), id);
+
+                    self.references[id].1.implementation = Some((
+                        self.errors.lock().unwrap().file_name().to_path_buf(),
+                        Spanned::new(func.get_identifier().to_string(), func.get_identifier_token().span.clone()),
+                    ));
+                    self.function_containers.push(FunctionContainer {
+                        name: func.get_identifier().clone(),
+                        parameter_index: Some(i),
+                        id,
+                        functions: FunctionDeclaration::Procedure(ProcedureDeclarationAstNode::empty(
+                            func.get_identifier().clone(),
+                            func.get_parameters()
+                                .iter()
+                                .map(|_a| ParameterSpecifier::Variable(VariableParameterSpecifier::empty(false, VariableType::None, None)))
+                                .collect(),
+                        )),
+                        lookup: VariableLookups::default(),
+                        parameters: 0..0,
+                        local_variables: 0..0,
+                    });
+                }
             }
-            
         }
     }
 
@@ -914,19 +1025,19 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         let predef = FunctionDefinition::get_function_definitions(identifier.get_identifier());
         if !predef.is_empty() {
             let def = &FUNCTION_DEFINITIONS[predef[0]];
-            if self.cur_func > 0 {
-                self.function_type_lookup.insert(self.cur_func, SemanticInfo::PredefFunctionGroup(predef));
+            if self.cur_func_call > 0 {
+                self.function_type_lookup.insert(self.cur_func_call, SemanticInfo::PredefFunctionGroup(predef));
             }
-
             return def.return_type;
         } else if let Some(idx) = self.lookup_variable(identifier.get_identifier()) {
             let (rt, r) = &mut self.references[idx];
             let identifier = identifier.get_identifier_token();
-            if self.cur_func > 0 {
+            if self.cur_func_call > 0 {
                 if let ReferenceType::Function(func_idx) = rt {
-                    self.function_type_lookup.insert(self.cur_func, SemanticInfo::FunctionReference(*func_idx));
+                    println!("Function call: {} -> {}", self.cur_func_call, *func_idx);
+                    self.function_type_lookup.insert(self.cur_func_call, SemanticInfo::FunctionReference(*func_idx));
                 } else if let ReferenceType::Variable(func_idx) = rt {
-                    self.function_type_lookup.insert(self.cur_func, SemanticInfo::VariableReference(*func_idx));
+                    self.function_type_lookup.insert(self.cur_func_call, SemanticInfo::VariableReference(*func_idx));
                 }
             }
 
@@ -937,7 +1048,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
             r.variable_type
         } else {
-            if self.version < 350 || self.cur_func == 0 {
+            if self.version < 350 || self.cur_func_call == 0 {
                 self.errors.lock().unwrap().report_error(
                     identifier.get_identifier_token().span.clone(),
                     CompilationErrorType::VariableNotFound(identifier.get_identifier().to_string()),
@@ -1103,9 +1214,9 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) -> VariableType {
         let mut res = VariableType::None;
         let is_ident = matches!(call.get_expression(), Expression::Identifier(_));
-        self.cur_func = call.id;
+        self.cur_func_call = call.id;
         call.get_expression().visit(self);
-        self.cur_func = 0;
+        self.cur_func_call = 0;
         for arg in call.get_arguments() {
             arg.visit(self);
         }
@@ -1211,6 +1322,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     );
                     self.function_containers.push(FunctionContainer {
                         name: ident.get_identifier().clone(),
+                        parameter_index: None,
                         id,
                         functions: FunctionDeclaration::Function(FunctionDeclarationAstNode::empty(
                             ident.get_identifier().clone(),
@@ -1224,7 +1336,6 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         parameters: 0..0,
                         local_variables: 0..0,
                     });
-                    return self.visit_function_call_expression(call);
                 } else {
                     panic!("Invalid function call expression");
                 }
@@ -1423,6 +1534,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 );
                 self.function_containers.push(FunctionContainer {
                     name: call.get_identifier().clone(),
+                    parameter_index: None,
                     id,
                     functions: FunctionDeclaration::Procedure(ProcedureDeclarationAstNode::empty(
                         call.get_identifier().clone(),
@@ -1460,6 +1572,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         );
         self.function_containers.push(FunctionContainer {
             name: func_decl.get_identifier().clone(),
+            parameter_index: None,
             id,
             functions: FunctionDeclaration::Function(func_decl.clone()),
             lookup: VariableLookups::default(),
@@ -1472,7 +1585,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     fn visit_function_implementation(&mut self, function: &FunctionImplementation) -> VariableType {
         if let Some(idx) = self.lookup_variable(function.get_identifier()) {
             let identifier = function.get_identifier_token();
-
+            self.cur_func_impl = idx;
             self.references[idx].1.implementation = Some((
                 self.errors.lock().unwrap().file_name().to_path_buf(),
                 Spanned::new(identifier.token.to_string(), identifier.span.clone()),
@@ -1503,6 +1616,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 );
             } else {
                 let id = self.references.len();
+                self.cur_func_impl = id;
                 self.global_lookup.variable_lookup.insert(function.get_identifier().clone(), id);
                 self.add_declaration(
                     ReferenceType::Function(self.function_containers.len()),
@@ -1511,6 +1625,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 );
                 self.function_containers.push(FunctionContainer {
                     name: function.get_identifier().clone(),
+                    parameter_index: None,
                     id,
                     functions: FunctionDeclaration::Function(FunctionDeclarationAstNode::empty(
                         function.get_identifier().clone(),
@@ -1578,6 +1693,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
         self.function_containers.push(FunctionContainer {
             name: proc_decl.get_identifier().clone(),
+            parameter_index: None,
             id,
             functions: FunctionDeclaration::Procedure(proc_decl.clone()),
             lookup: VariableLookups::default(),
@@ -1634,6 +1750,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 ));
                 self.function_containers.push(FunctionContainer {
                     name: procedure.get_identifier().clone(),
+                    parameter_index: None,
                     id,
                     functions: FunctionDeclaration::Procedure(ProcedureDeclarationAstNode::empty(
                         procedure.get_identifier().clone(),

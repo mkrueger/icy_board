@@ -5,7 +5,10 @@ use std::{
 };
 
 use crate::{
-    ast::{AstNode, FunctionDeclarationAstNode, ParameterSpecifier, ProcedureDeclarationAstNode, VariableDeclarationStatement, VariableParameterSpecifier, VariableSpecifier},
+    ast::{
+        AstNode, FunctionDeclarationAstNode, ParameterSpecifier, ProcedureDeclarationAstNode, VariableDeclarationStatement, VariableParameterSpecifier,
+        VariableSpecifier,
+    },
     executable::{VariableType, LAST_PPLC},
 };
 

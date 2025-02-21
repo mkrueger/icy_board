@@ -56,6 +56,7 @@ impl<'a> AstVisitor<PPEExpr> for ExpressionCompiler<'a> {
             log::error!("function not found at: {} ({})", call.get_expression().get_span().start, call.get_expression());
             return PPEExpr::Value(0);
         };
+
         match function_type {
             SemanticInfo::PredefinedFunc(op_code) => {
                 return PPEExpr::PredefinedFunctionCall(
@@ -71,10 +72,12 @@ impl<'a> AstVisitor<PPEExpr> for ExpressionCompiler<'a> {
             SemanticInfo::FunctionReference(idx) => {
                 let reference_index = self.compiler.semantic_visitor.function_containers[*idx].id;
                 let table_index = self.compiler.semantic_visitor.references[reference_index].1.variable_table_index;
+                println!("Function reference: {}", table_index);
                 return PPEExpr::FunctionCall(table_index, arguments);
             }
             SemanticInfo::VariableReference(reference_index) => {
-                let table_index = self.compiler.semantic_visitor.references[*reference_index].1.variable_table_index;
+                let r = &self.compiler.semantic_visitor.references[*reference_index];
+                let table_index = r.1.variable_table_index;
                 return PPEExpr::Dim(table_index, arguments);
             }
             _ => {

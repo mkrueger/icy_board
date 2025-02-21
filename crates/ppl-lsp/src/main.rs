@@ -676,7 +676,6 @@ impl AstVisitor<()> for TooltipVisitor {
             ParameterSpecifier::Procedure(_) => {
                 todo!("Implement ParameterSpecifier::Procedure")
             }
-
         }
     }
 
