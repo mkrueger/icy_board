@@ -1,46 +1,56 @@
+INTEGER CurMsgTxt
+
 PROCEDURE DrawMsgText()
     STRING line
     STRING MsgFile = PPEPath() + "msgtxt." + STRING(PCBNode())
-    MsgToFile CONF, LOW + Cursor, MsgFile
-
+    INTEGER I
+    if CurMsgTxt != LOW + Cursor THEN
+        CurMsgTxt = LOW + Cursor
+        MsgToFile CONF, LOW + Cursor, MsgFile
+    ENDIF
+ 
     IF !Exist(MsgFile) THEN
         LOG "Message file " + MsgFile + "  doesn't exists", true
-        ClrMsgArea()
+        ClrHdrArea()
         RETURN 
     ENDIF
-
+:Restart
     FOpen 1, MsgFile, O_RD, S_DB
     IF FErr(1) THEN
         LOG "Error reading message text", true
-        ClrMsgArea()
+        ClrHdrArea()
         RETURN
     ENDIF
   
-    LOOP  
+    LOOP 
         FGet 1, line
         IF FErr(1) RETURN
         IF line == "Message Body:" BREAK
     ENDLOOP
+        
+    FOR I=0 TO FirstTxtLine
+        FGet 1, line
+        IF FErr(1) THEN 
+            FirstTxtLine = I - (MsgY2 - MsgY1)
+            if FirstTxtLine <  FirstTxtLine FirstTxtLine = 0
+            GOTO Restart
+        ENDIF
+    NEXT
 
     INTEGER msg_line = 0
     Color 7
-    LOOP  
+    While MsgY1 + msg_line <= MsgY2 DO
         FGet 1, line
-        IF FErr(1) || msg_line + MsgStartY > 23 BREAK
-        AnsiPos MsgStartX, MsgStartY + msg_line
-        IF LEN(line) > 79 THEN 
-            line = Left(line, 79)
-        ELSE 
-            ClrEOL
-        ENDIF
+        IF FErr(1) || msg_line + MsgY1 > 23 BREAK
+        AnsiPos MsgX1, MsgY1 + msg_line
+        line = Left(line, MsgX2 - MsgX1)
         PRINT line
         msg_line += 1
-    ENDLOOP
+    ENDWHILE
     FClose 1
-    Delete MsgFile
-    WHILE msg_line <= 23 - MsgStartY DO
-        AnsiPos MsgStartX, MsgStartY + msg_line
-        ClrEOL
+    While MsgY1 + msg_line <= MsgY2 DO
+        AnsiPos MsgX1, MsgY1 + msg_line
+        Print Space(MsgX2 - MsgX1)
         msg_line+=1
     ENDWHILE
 ENDPROC

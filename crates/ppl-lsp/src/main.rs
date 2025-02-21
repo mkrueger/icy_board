@@ -31,6 +31,8 @@ use tower_lsp::{Client, LanguageServer, LspService, Server};
 struct Backend {
     client: Client,
 
+    cur_process: Mutex<Option<process::Child>>,
+
     workspace: Mutex<Workspace>,
     workspace_visitor: Mutex<SemanticVisitor>,
     workspace_map: DashMap<Url, Ast>,
@@ -186,36 +188,6 @@ impl LanguageServer for Backend {
         res
     }
 
-    async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
-        let uri = params.text_document_position.text_document.uri;
-        let Some(rope) = self.document_map.get(&uri) else {
-            return Ok(None);
-        };
-
-        let position = params.text_document_position.position;
-        let Ok(char) = rope.try_line_to_char(position.line as usize) else {
-            return Ok(None);
-        };
-        let offset = char + position.character as usize;
-
-        self.get_ast(&uri, |ast, visitor| {
-            let reference_list = get_reference(&ast, offset, visitor, true);
-            let ret = reference_list
-                .into_iter()
-                .filter_map(|(path, r)| {
-                    let uri2 = Url::from_file_path(&path).ok()?;
-                    let rope = self.document_map.get(&uri2)?;
-                    let start_position = offset_to_position(r.span.start, &rope)?;
-                    let end_position = offset_to_position(r.span.end, &rope)?;
-
-                    let range = Range::new(start_position, end_position);
-                    Some(Location::new(uri2.clone(), range))
-                })
-                .collect::<Vec<_>>();
-            Some(ret)
-        })
-    }
-
     async fn semantic_tokens_full(&self, params: SemanticTokensParams) -> Result<Option<SemanticTokensResult>> {
         let uri = params.text_document.uri;
         let mut im_complete_tokens = self.semantic_token_map.get_mut(&uri).unwrap();
@@ -314,37 +286,93 @@ impl LanguageServer for Backend {
         Ok(completions.map(CompletionResponse::Array))
     }
 
-    async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
-        let uri2 = params.text_document_position.text_document.uri.clone();
+    async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
         let uri = params.text_document_position.text_document.uri;
-        let workspace_edit = self.get_ast(&uri, |ast: &Ast, visitor| {
-            let rope = self.document_map.get(&uri2)?;
-            let position = params.text_document_position.position;
-            let char = rope.try_line_to_char(position.line as usize).ok()?;
-            let offset = char + position.character as usize;
-            let reference_list = get_reference(&ast, offset, visitor, true);
-            let new_name = params.new_name;
-            if !reference_list.is_empty() {
-                let mut map = HashMap::new();
 
-                for (path, r) in reference_list {
-                    let start_position = offset_to_position(r.span.start, &rope)?;
-                    let end_position = offset_to_position(r.span.end, &rope)?;
-                    let uri2 = Url::from_file_path(&path).ok()?;
-                    if !map.contains_key(&uri2) {
-                        map.insert(uri2.clone(), Vec::new());
+        let rope = self.document_map.get(&uri).unwrap();
+        let position = params.text_document_position.position;
+        let char = rope.try_line_to_char(position.line as usize).ok().unwrap();
+        let offset: usize = char + position.character as usize;
+
+        self.client.log_message(MessageType::INFO, format!("OFFSET {offset}!")).await;
+
+        let reference_list = self.get_ast(&uri, |ast: &Ast, visitor| get_reference(&ast, offset, visitor, true))?;
+
+        self.client.log_message(MessageType::INFO, format!("got {} refs!", reference_list.len())).await;
+
+        if !reference_list.is_empty() {
+            let mut list = Vec::new();
+            let mut rope_map = HashMap::new();
+            for (path, r) in reference_list {
+                let uri2 = Url::from_file_path(&path).ok().unwrap();
+                let start_position;
+                let end_position;
+                if let Some(rope) = self.document_map.get(&uri2) {
+                    start_position = offset_to_position(r.span.start, &rope).unwrap();
+                    end_position = offset_to_position(r.span.end, &rope).unwrap();
+                } else {
+                    if !rope_map.contains_key(&path) {
+                        let content = read_data_with_encoding_detection(&std::fs::read(&path).unwrap()).unwrap();
+                        rope_map.insert(path.clone(), Rope::from_str(&content));
                     }
-                    map.get_mut(&uri2)
-                        .unwrap()
-                        .push(TextEdit::new(Range::new(start_position, end_position), new_name.clone()));
-                }
-                let workspace_edit = WorkspaceEdit::new(map);
-                Some(workspace_edit)
-            } else {
-                None
+                    let rope = rope_map.get(&path).unwrap();
+                    start_position = offset_to_position(r.span.start, &rope).unwrap();
+                    end_position = offset_to_position(r.span.end, &rope).unwrap();
+                };
+                list.push(Location::new(uri2, Range::new(start_position, end_position)));
             }
-        })?;
-        Ok(workspace_edit)
+            Ok(Some(list))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
+        let uri = params.text_document_position.text_document.uri;
+
+        let rope = self.document_map.get(&uri).unwrap();
+        let position = params.text_document_position.position;
+        let char = rope.try_line_to_char(position.line as usize).ok().unwrap();
+        let offset: usize = char + position.character as usize;
+
+        self.client.log_message(MessageType::INFO, format!("OFFSET {offset}!")).await;
+
+        let reference_list = self.get_ast(&uri, |ast: &Ast, visitor| get_reference(&ast, offset, visitor, true))?;
+
+        self.client.log_message(MessageType::INFO, format!("got {} refs!", reference_list.len())).await;
+
+        let new_name = params.new_name;
+        if !reference_list.is_empty() {
+            let mut map = HashMap::new();
+            let mut rope_map = HashMap::new();
+            for (path, r) in reference_list {
+                let uri2 = Url::from_file_path(&path).ok().unwrap();
+                let start_position;
+                let end_position;
+                if let Some(rope) = self.document_map.get(&uri2) {
+                    start_position = offset_to_position(r.span.start, &rope).unwrap();
+                    end_position = offset_to_position(r.span.end, &rope).unwrap();
+                } else {
+                    if !rope_map.contains_key(&path) {
+                        let content = read_data_with_encoding_detection(&std::fs::read(&path).unwrap()).unwrap();
+                        rope_map.insert(path.clone(), Rope::from_str(&content));
+                    }
+                    let rope = rope_map.get(&path).unwrap();
+                    start_position = offset_to_position(r.span.start, &rope).unwrap();
+                    end_position = offset_to_position(r.span.end, &rope).unwrap();
+                };
+
+                if !map.contains_key(&uri2) {
+                    map.insert(uri2.clone(), Vec::new());
+                }
+                map.get_mut(&uri2)
+                    .unwrap()
+                    .push(TextEdit::new(Range::new(start_position, end_position), new_name.clone()));
+            }
+            Ok(Some(WorkspaceEdit::new(map)))
+        } else {
+            Ok(None)
+        }
     }
 
     async fn did_change_configuration(&self, _: DidChangeConfigurationParams) {
@@ -383,7 +411,7 @@ impl LanguageServer for Backend {
     async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<Value>> {
         match params.command.as_str() {
             "ppl-lsp-vscode.run" => {
-                let ws_file = self.workspace.lock().unwrap().file_name.clone();
+                let ws_file: PathBuf = self.workspace.lock().unwrap().file_name.clone();
                 if ws_file.exists() {
                     self.client.log_message(MessageType::INFO, "compile workspace!").await;
 
@@ -391,14 +419,20 @@ impl LanguageServer for Backend {
                     if let Ok(output) = String::from_utf8(output.stdout) {
                         self.client.log_message(MessageType::INFO, format!("{}", output)).await;
                     }
-                    let out_file = self.workspace.lock().unwrap().package.name().to_string();
+                    let out_file: String = self.workspace.lock().unwrap().package.name().to_string();
                     let target_file = self.workspace.lock().unwrap().get_target_path(LAST_PPLC).join(out_file).with_extension("ppe");
                     self.client.log_message(MessageType::INFO, format!("Execute:{}", target_file.display())).await;
 
-                    let _ = process::Command::new("sh")
+                    if let Ok(process) = process::Command::new("sh")
                         .arg("-c")
                         .arg(format!("gnome-terminal -- icboard --ppe {}", target_file.display()))
-                        .spawn();
+                        .spawn()
+                    {
+                        let mut state = self.cur_process.lock().unwrap();
+                        if let Some(mut child) = mem::replace(&mut *state, Some(process)) {
+                            child.kill().unwrap();
+                        }
+                    }
                 }
             }
             _ => {
@@ -597,6 +631,7 @@ async fn main() {
             UserTypeRegistry::default(),
         )),
         workspace_map: DashMap::new(),
+        cur_process: Mutex::new(None),
     })
     .finish();
 

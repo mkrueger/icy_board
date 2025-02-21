@@ -200,8 +200,8 @@ impl Tui {
                                 KeyCode::Down => self.add_input("\x1B[B".chars()).await?,
                                 KeyCode::Right => self.add_input("\x1B[C".chars()).await?,
                                 KeyCode::Left => self.add_input("\x1B[D".chars()).await?,
-                                KeyCode::PageUp => self.add_input("\x1B[5~".chars()).await?,
-                                KeyCode::PageDown => self.add_input("\x1B[6~".chars()).await?,
+                                KeyCode::PageUp => self.add_input("\x1B[V".chars()).await?,
+                                KeyCode::PageDown => self.add_input("\x1B[U".chars()).await?,
                                 _ => {}
                             }
                         }

@@ -68,7 +68,7 @@ pub struct References {
 }
 
 impl References {
-    pub fn contains(&self, path: &PathBuf, offset: usize) -> bool {
+    pub fn contains_pos(&self, path: &PathBuf, offset: usize) -> bool {
         for (p, r) in &self.usages {
             if p != path {
                 continue;

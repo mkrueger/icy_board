@@ -1974,14 +1974,14 @@ pub async fn getbankbal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
 pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_id();
     let field_num = vm.eval_expr(&args[2]).await?.as_int();
+    let msg_num = vm.eval_expr(&args[1]).await?.as_int() as u32;
 
-    if let Some((cn, an, header)) = &vm.cached_msg_header {
-        if conf_num == *cn && area_num == *an {
+    if let Some((cn, an, mn, header)) = &vm.cached_msg_header {
+        if conf_num == *cn && area_num == *an && msg_num == *mn {
             return get_field(field_num, header);
         }
     }
 
-    let msg_num = vm.eval_expr(&args[1]).await?.as_int() as u32;
     let msg_base = {
         let board = vm.icy_board_state.get_board().await;
         let Some(conf) = board.conferences[conf_num as usize].areas.as_ref() else {
@@ -1999,7 +1999,7 @@ pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
     match base.read_header(msg_num) {
         Ok(header) => {
             let res = get_field(field_num, &header);
-            vm.cached_msg_header = Some((conf_num, area_num, header));
+            vm.cached_msg_header = Some((conf_num, area_num, msg_num, header));
             res
         }
         Err(err) => {

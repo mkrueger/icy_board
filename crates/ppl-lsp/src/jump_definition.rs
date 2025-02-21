@@ -4,7 +4,7 @@ use icy_board_engine::{ast::Ast, parser::lexer::Spanned, semantic::SemanticVisit
 
 pub fn get_definition(ast: &Ast, visitor: &SemanticVisitor, offset: usize) -> Option<(PathBuf, Spanned<String>)> {
     for (_, refs) in &visitor.references {
-        if refs.contains(&ast.file_name, offset) {
+        if refs.contains_pos(&ast.file_name, offset) {
             if let Some((path, decl)) = &refs.implementation {
                 return Some((path.clone(), decl.clone()));
             }

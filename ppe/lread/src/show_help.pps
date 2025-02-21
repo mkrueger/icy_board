@@ -1,6 +1,6 @@
-PROCEDURE ShowHelp()
+ PROCEDURE ShowHelp()
     Cls
     StartDisp FNS
     DispFile PPEPath() + "data\help.pcb", GRAPH
     Wait
-ENDPROC 
+ENDPROC

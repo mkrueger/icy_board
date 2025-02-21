@@ -1,4 +1,4 @@
-PROCEDURE DrawMsgArea()
+PROCEDURE DrawHeaderArea()
     INTEGER I
     FOR I = 0 TO Lines
         AnsiPos AreaX, AreaY + I
@@ -11,7 +11,7 @@ PROCEDURE DrawMsgArea()
         IF O == Cursor THEN
             Color 11
             Print ">"
-    
+        ELSE
             Color 7
             Print " "
         ENDIF
@@ -26,11 +26,11 @@ PROCEDURE DrawMsgArea()
         Print Right(STRING(MSG_NUM), 4), " ", SUBJ[o], FROM[o], TO[o], DATETXT[O]
     NEXT  
 ENDPROC
-
-PROCEDURE ClrMsgArea()
+ 
+PROCEDURE ClrHdrArea()
     INTEGER I
     FOR I = 0 TO Lines
-        AnsiPos 1, MsgStartY + I
+        AnsiPos 1, MsgY1 + I
         ClrEOL
     NEXT
 ENDPROC

@@ -1,7 +1,8 @@
 DECLARE PROCEDURE DrawMsgText()
-DECLARE PROCEDURE DrawMsgArea()
-DECLARE PROCEDURE ClrMsgArea()
+DECLARE PROCEDURE DrawHeaderArea()
+DECLARE PROCEDURE ClrHdrArea()
 DECLARE PROCEDURE ShowHelp()
+
 
 INTEGER CONF = CurConf()
 INTEGER LOW = LOMSGNUM()
@@ -9,6 +10,8 @@ INTEGER HIGH = HiMsgNum()
 STRING FROM(10), SUBJ(10), TO(10), DATETXT(10)
 INTEGER FirstMsg = 0
 INTEGER Cursor = 0
+INTEGER FirstTxtLine = 0
+
 STRING LINE
 
 FOpen 1, PPEPath() + "lread.cfg", O_RD, S_DB
@@ -23,8 +26,11 @@ INTEGER Lines = ToInt(GETTOKEN())
 FGet 1, LINE
 TOKENIZE LINE
 
-INTEGER MsgStartX = ToInt(GETTOKEN())
-INTEGER MsgStartY = ToInt(GETTOKEN())
+INTEGER MsgX1 = ToInt(GETTOKEN())
+INTEGER MsgY1 = ToInt(GETTOKEN())
+
+INTEGER MsgX2 = ToInt(GETTOKEN())
+INTEGER MsgY2 = ToInt(GETTOKEN())
 
 FClose 1
 
@@ -38,9 +44,9 @@ ReDim DATETXT, MAX_MSGS
 Cls
 StartDisp FNS
 DispFile PPEPath() + "data\screen.pcb", GRAPH
-DrawMsgArea()
+DrawHeaderArea()
 DrawMsgText()
-   
+
 LOOP
     STRING CH = InKey()
     SELECT CASE CH
@@ -55,7 +61,8 @@ LOOP
             IF Cursor < FirstMsg THEN
                 FirstMsg = Cursor
             ENDIF
-            DrawMsgArea()
+            FirstTxtLine = 0
+            DrawHeaderArea()
             DrawMsgText()
         ENDIF
     CASE "DOWN"
@@ -64,10 +71,17 @@ LOOP
             IF Cursor > FirstMsg + Lines THEN
                 FirstMsg = Cursor - Lines 
             ENDIF
-            DrawMsgArea()
+            FirstTxtLine = 0
+            DrawHeaderArea()
             DrawMsgText()
         ENDIF
+    CASE "PGUP"
+        FirstTxtLine -= MsgY2 - MsgY1;
+        IF FirstTxtLine < 0 FirstTxtLine = 0
+        DrawMsgText()
+    CASE "PGDN"
+        FirstTxtLine += MsgY2 - MsgY1;
+        DrawMsgText()
     ENDSELECT
     AnsiPos 1, 1
-    Print CH
 ENDLOOP

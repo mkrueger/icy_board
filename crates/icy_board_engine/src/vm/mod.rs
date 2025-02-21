@@ -167,7 +167,7 @@ pub struct VirtualMachine<'a> {
 
     pub file_list: VecDeque<String>,
     pub user: User,
-    pub cached_msg_header: Option<(i32, i32, JamMessageHeader)>,
+    pub cached_msg_header: Option<(i32, i32, u32, JamMessageHeader)>,
 }
 
 impl<'a> VirtualMachine<'a> {

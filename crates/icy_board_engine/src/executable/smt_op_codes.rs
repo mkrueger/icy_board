@@ -1539,7 +1539,7 @@ lazy_static::lazy_static! {
             sig: StatementSignature::ArgumentsWithVariable(0, 0),
         },
         StatementDefinition {
-            name: "PageOFf",
+            name: "PageOff",
             version: 100,
             opcode: OpCode::PAGEOFF,
             args: None,
