@@ -243,14 +243,13 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli, version: u16) -> Res<()> {
 fn compile_files(arguments: &Cli, version: u16, encoding: Encoding, lang_version: u16, files: Vec<PathBuf>, out_file_name: &Path, options: FormattingOptions) {
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
 
-    for f in &files {
-        println!("Compiling: {:?}", f.display());
-    }
-
     let reg = UserTypeRegistry::icy_board_registry();
     let mut asts = Vec::new();
-    println!();
-    println!("Parsing...");
+    if !(arguments.format || arguments.check) {
+        println!();
+        println!("Parsing...");
+    }
+    let mut exit_code = 0;
 
     for src_file in files {
         match load_with_encoding(&src_file, encoding) {
@@ -270,24 +269,45 @@ fn compile_files(arguments: &Cli, version: u16, encoding: Encoding, lang_version
                         }
                         let formatted_text = backend.text.iter().collect::<String>();
                         if arguments.check {
-                            println!("Diff in {}", src_file.display());
-                            for diff in diff::lines(&src, &formatted_text) {
-                                match diff {
-                                    diff::Result::Left(l) => execute!(
-                                        stdout(),
-                                        SetForegroundColor(Color::Red),
-                                        Print(format!("-{}", l)),
-                                        SetAttribute(Attribute::Reset),
-                                    )
-                                    .unwrap(),
-                                    diff::Result::Both(l, _) => println!(" {}", l),
-                                    diff::Result::Right(r) => execute!(
-                                        stdout(),
-                                        SetForegroundColor(Color::Green),
-                                        Print(format!("-{}", r)),
-                                        SetAttribute(Attribute::Reset),
-                                    )
-                                    .unwrap(),
+                            let lines = diff::lines(&src, &formatted_text);
+                            if lines.iter().any(|l| matches!(l, diff::Result::Left(_) | diff::Result::Right(_))) {
+                                println!("Diff in {}", src_file.display());
+                                for (i, diff) in lines.iter().enumerate() {
+                                    let mut block_start = false;
+                                    let mut block_end = false;
+
+                                    if i + 1 < lines.len() {
+                                        if !matches!(lines[i + 1], diff::Result::Both(_, _)) {
+                                            block_start = true;
+                                            block_end = false;
+                                        } else if i > 0 && !matches!(lines[i - 1], diff::Result::Both(_, _)) {
+                                            block_end = true;
+                                        }
+                                    }
+                                    match diff {
+                                        diff::Result::Left(l) => execute!(
+                                            stdout(),
+                                            Print(format!("{i:>3}:")),
+                                            SetForegroundColor(Color::Red),
+                                            Print(format!("-{}\n", l)),
+                                            SetAttribute(Attribute::Reset),
+                                        )
+                                        .unwrap(),
+                                        diff::Result::Both(l, _) => {
+                                            exit_code = 1;
+                                            if block_start || block_end {
+                                                println!("{i:>3}: {}", l)
+                                            };
+                                        }
+                                        diff::Result::Right(r) => execute!(
+                                            stdout(),
+                                            Print(format!("{i:>3}:")),
+                                            SetForegroundColor(Color::Green),
+                                            Print(format!("-{}\n", r)),
+                                            SetAttribute(Attribute::Reset),
+                                        )
+                                        .unwrap(),
+                                    }
                                 }
                             }
                         } else {
@@ -319,8 +339,8 @@ fn compile_files(arguments: &Cli, version: u16, encoding: Encoding, lang_version
             }
         }
     }
-    if arguments.format {
-        return;
+    if arguments.format || arguments.check {
+        std::process::exit(exit_code);
     }
 
     println!("Compiling...");
