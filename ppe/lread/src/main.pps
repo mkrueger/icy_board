@@ -67,9 +67,11 @@ LOOP
         BREAK
     CASE Chr(13)
         ReadMsg()
+        LastFirstMsg = -1
         goto Redisplay
     CASE "H", "h"
         ShowHelp()
+        LastFirstMsg = -1
         goto Redisplay
     CASE "HOME"
         Cursor = 0
