@@ -6,8 +6,10 @@ authors = ["Mike Krüger <mkrueger@posteo.de>"]
 
 [data]
 text_files = [
-    "lread.cfg"
+    "lread.cfg",
+    "msg.cfg",
 ]
+
 art_files = [
     "data/screen.icy",
     "data/help.icy",

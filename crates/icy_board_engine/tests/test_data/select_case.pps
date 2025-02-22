@@ -18,19 +18,36 @@ END SELECT
 STRING CH = "H"
 
 SELECT CASE CH
-    CASE Chr(27)
-      BREAK
-    CASE "H", "h"
-      PRINTLN "OK"
-    CASE "UP"
-      IF TRUE THEN
+CASE Chr(27)
+    BREAK
+CASE "H", "h"
+    PRINTLN "OK"
+CASE "UP"
+    IF TRUE THEN
         IF FALSE THEN
             PRINTLN "2"
         ENDIF
         PRINTLN "1"
-      ENDIF
-    CASE "DOWN"
-      IF CH == "e" THEN
-         PRINTLN "3"
-      ENDIF
+    ENDIF
+CASE "DOWN"
+    IF CH == "e" THEN
+        PRINTLN "3"
+    ENDIF
+END SELECT
+
+CH = "              To: SYSOP";
+
+SELECT CASE Left(CH, 17)
+CASE "            Date:"
+    PrintLn "DATE"
+CASE "            Time:"
+    PrintLn "TIME"
+CASE "              To:"
+    PrintLn "TO"
+CASE "            From:"
+    PrintLn "FROM"  
+CASE "          Subject:"
+    PrintLn "SUBJECT" 
+CASE "   Message Number:"
+    PrintLn "MESSAGE NUMBER"
 END SELECT

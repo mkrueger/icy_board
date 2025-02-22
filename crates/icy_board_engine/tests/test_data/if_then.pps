@@ -1,0 +1,33 @@
+BOOLEAN A 
+A = True
+
+INTEGER O 
+O = 1
+INTEGER P 
+P = 2
+INTEGER Q
+Q = 3
+
+IF (!A && O != P && O != Q) THEN
+    PRINTLN "A"
+ELSE
+    PRINTLN "B"
+ENDIF
+
+A = False
+
+O = P 
+
+IF (!A && O != P && O != Q) THEN
+    PRINTLN "A"
+ELSE
+    PRINTLN "B"
+ENDIF
+
+O = Q 
+
+IF (!A && O != P && O != Q) THEN
+    PRINTLN "A"
+ELSE
+    PRINTLN "B"
+ENDIF

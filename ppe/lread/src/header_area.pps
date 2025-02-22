@@ -1,36 +1,77 @@
+
 PROCEDURE DrawHeaderArea()
-    INTEGER I
+    INTEGER Offset
+    MSGS_FILE = ConfInfo(CONF, 12)
+    IF !Exist(MSGS_FILE) THEN
+        Cls
+        PRINT "MSGS MSGS_FILE not found: '" + MSGS_FILE + "'"
+        WAIT
+        STOP
+    ENDIF
+
+    IF LastFirstMsg != FirstMsg THEN
+        LastFirstMsg = FirstMsg
+        Redraw = TRUE
+    ELSE 
+        Redraw = FALSE
+    ENDIF
+    
+    FOPEN 2, MSGS_FILE + ".IDX", O_RD, S_DW
+    IF FErr(2) THEN
+        Cls
+        PRINT "Error opening message index file : '", MSGS_FILE + ".IDX'"
+        WAIT
+        STOP
+    ENDIF
+    FOPEN 3, MSGS_FILE, O_RD, S_DW
+
     FOR I = 0 TO Lines
-        AnsiPos AreaX, AreaY + I
         INTEGER O = FirstMsg + I
         IF O > HIGH - LOW THEN
+            DefColor
             ClrEOL
             CONTINUE
-        ENDIF 
-
-        IF O == Cursor THEN
-            Color 11
-            Print ">"
-        ELSE
-            Color 7
-            Print " "
         ENDIF
+
+        IF !Redraw && O != Cursor && O != OldCursor THEN
+            CONTINUE
+        ENDIF
+
+        AnsiPos AreaX, AreaY + I
+        IF O == Cursor THEN
+            Print SELECTED_MSG_HDR_ATTRIBUTE
+        ELSE
+            Print MSG_HDR_ATTRIBUTE
+        ENDIF 
+        
         INTEGER MSG_NUM = LOW + O
 
         IF FROM[O] == "" THEN 
-            FROM[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_FROM)), 12) + " "
-            SUBJ[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_SUBJ)), 36) + " "
-            TO[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_TO)), 12) + " "
-            DATETXT[O] = STRING(GetMsgHdr(CONF, MSG_NUM, HDR_DATE))
+            FSeek 2, O * 64, SEEK_SET
+            FRead 2, Offset, 4
+            FRead 2, J, 4
+            FRead 2, LINE, 25
+            TO[O] = Left(StripATX(LINE), 12) + " "
+            FRead 2, LINE, 25
+            FROM[O] = Left(StripATX(LINE), 12) + " "
+            FRead 2, J, 1
+            FRead 2, J, 2
+            DATETXT[O] = STRING(TODATE(J))
+ 
+            FSeek 3, Offset + 83, SEEK_SET
+            FRead 3, LINE, 25
+            SUBJ[O] = Left(StripATX(LINE), 36) + " "
+
+            ;            FROM[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_FROM)), 12) + " "
+            ;            SUBJ[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_SUBJ)), 36) + " "
+            ;            TO[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_TO)), 12) + " "
+            ;            DATETXT[O] = STRING(GetMsgHdr(CONF, MSG_NUM, HDR_DATE))
         ENDIF
         Print Right(STRING(MSG_NUM), 4), " ", SUBJ[o], FROM[o], TO[o], DATETXT[O]
-    NEXT  
+    NEXT
+    FClose 2
+    FClose 3
+    OldCursor = Cursor
+    DefColor
 ENDPROC
  
-PROCEDURE ClrHdrArea()
-    INTEGER I
-    FOR I = 0 TO Lines
-        AnsiPos 1, MsgY1 + I
-        ClrEOL
-    NEXT
-ENDPROC

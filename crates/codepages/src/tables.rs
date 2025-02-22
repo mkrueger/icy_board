@@ -98,7 +98,7 @@ pub fn get_utf8_no_ctrl_codes(data: &[u8]) -> String {
     if let Ok(utf) = String::from_utf8(data.to_vec()) {
         return utf;
     }
-    data.iter().map(|c| CP437_TO_UNICODE_NO_CTRL_CODES[*c as usize]).collect()
+    data.iter().map(|c: &u8| CP437_TO_UNICODE_NO_CTRL_CODES[*c as usize]).collect()
 }
 
 pub fn write_utf8_with_bom<P: AsRef<Path>>(path: &P, buf: &str) -> io::Result<()> {
@@ -112,6 +112,12 @@ pub fn write_cp437<P: AsRef<Path>>(path: &P, buf: &str) -> io::Result<()> {
     let mut file = fs::File::create(path)?;
     let mut data = Vec::new();
     for c in buf.chars() {
+        if c == '\r' {
+            continue;
+        }
+        if c == '\n' {
+            data.push(b'\r');
+        }
         if let Some(ch) = UNICODE_TO_CP437.get(&c) {
             data.push(*ch);
         } else {

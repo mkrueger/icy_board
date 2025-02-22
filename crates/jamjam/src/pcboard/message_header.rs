@@ -198,6 +198,7 @@ impl PCBoardMessageHeader {
         convert_to_string!(reply_time, data, TIME_LEN);
         convert_u8!(reply_status, data);
         convert_to_string!(from_field, data, FROM_TO_LEN);
+
         convert_to_string!(subj_field, data, FROM_TO_LEN);
         convert_to_string!(password, data, PASSWORD_LEN);
         convert_u8!(active_flag, data);

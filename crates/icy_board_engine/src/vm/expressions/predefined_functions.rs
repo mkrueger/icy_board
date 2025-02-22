@@ -538,7 +538,7 @@ pub async fn target_inkey(vm: &mut VirtualMachine<'_>, target: TerminalTarget) -
                             'D' => return Ok(VariableValue::new_string("LEFT".to_string())),
 
                             'H' => return Ok(VariableValue::new_string("HOME".to_string())),
-                            'K' => return Ok(VariableValue::new_string("END".to_string())),
+                            'F' => return Ok(VariableValue::new_string("END".to_string())),
 
                             'V' => return Ok(VariableValue::new_string("PGUP".to_string())),
                             'U' => return Ok(VariableValue::new_string("PGDN".to_string())),

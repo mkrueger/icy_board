@@ -1,8 +1,10 @@
 DECLARE PROCEDURE DrawMsgText()
-DECLARE PROCEDURE DrawHeaderArea()
 DECLARE PROCEDURE ClrHdrArea()
-DECLARE PROCEDURE ShowHelp()
 
+DECLARE PROCEDURE DrawHeaderArea()
+DECLARE PROCEDURE ShowHelp()
+DECLARE PROCEDURE ReadMsg()
+DECLARE PROCEDURE ReadMsgConfig()
 
 INTEGER CONF = CurConf()
 INTEGER LOW = LOMSGNUM()
@@ -11,8 +13,16 @@ STRING FROM(10), SUBJ(10), TO(10), DATETXT(10)
 INTEGER FirstMsg = 0
 INTEGER Cursor = 0
 INTEGER FirstTxtLine = 0
+STRING MSG_HDR_ATTRIBUTE
+STRING SELECTED_MSG_HDR_ATTRIBUTE
+INTEGER I, J
+STRING MSGS_FILE
 
 STRING LINE
+INTEGER LastFirstMsg = -1
+INTEGER OldCursor = -1
+BOOLEAN Redraw
+
 
 FOpen 1, PPEPath() + "lread.cfg", O_RD, S_DB
 
@@ -26,11 +36,14 @@ INTEGER Lines = ToInt(GETTOKEN())
 FGet 1, LINE
 TOKENIZE LINE
 
-INTEGER MsgX1 = ToInt(GETTOKEN())
-INTEGER MsgY1 = ToInt(GETTOKEN())
+INTEGER MsgHdrX1 = ToInt(GETTOKEN())
+INTEGER MsgHdrY1 = ToInt(GETTOKEN())
 
-INTEGER MsgX2 = ToInt(GETTOKEN())
-INTEGER MsgY2 = ToInt(GETTOKEN())
+INTEGER MsgHdrX2 = ToInt(GETTOKEN())
+INTEGER MsgHdrY2 = ToInt(GETTOKEN())
+
+FGet 1, MSG_HDR_ATTRIBUTE
+FGet 1, SELECTED_MSG_HDR_ATTRIBUTE
 
 FClose 1
 
@@ -58,11 +71,29 @@ LOOP
     CASE "H", "h"
         ShowHelp()
         goto Redisplay
+    CASE "HOME"
+        Cursor = 0
+        FirstMsg = 0
+        FirstTxtLine = 0
+        DrawHeaderArea()
+        DrawMsgText()
+    CASE "END"
+        Cursor = HIGH - LOW
+        FirstMsg = Cursor - Lines
+        IF FirstMsg < 0 THEN
+            FirstMsg = 0
+        ENDIF
+        FirstTxtLine = 0
+        DrawHeaderArea()
+        DrawMsgText()
     CASE "UP"
         IF Cursor > 0 THEN
             Cursor -= 1
             IF Cursor < FirstMsg THEN
-                FirstMsg = Cursor
+                FirstMsg = Cursor - Lines
+                IF FirstMsg < 0 THEN
+                    FirstMsg = 0
+                ENDIF
             ENDIF
             FirstTxtLine = 0
             DrawHeaderArea()
@@ -72,18 +103,18 @@ LOOP
         IF Cursor < HIGH - LOW THEN
             Cursor += 1
             IF Cursor > FirstMsg + Lines THEN
-                FirstMsg = Cursor - Lines 
+                FirstMsg += Lines + 1
             ENDIF
             FirstTxtLine = 0
             DrawHeaderArea()
             DrawMsgText()
         ENDIF
     CASE "PGUP"
-        FirstTxtLine -= MsgY2 - MsgY1;
+        FirstTxtLine -= MsgHdrY2 - MsgHdrY1;
         IF FirstTxtLine < 0 FirstTxtLine = 0
         DrawMsgText()
     CASE "PGDN"
-        FirstTxtLine += MsgY2 - MsgY1;
+        FirstTxtLine += MsgHdrY2 - MsgHdrY1;
         DrawMsgText()
     ENDSELECT
 ENDLOOP

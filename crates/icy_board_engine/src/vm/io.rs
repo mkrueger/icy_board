@@ -262,7 +262,6 @@ impl PCBoardIO for DiskIO {
             let _ = f.read_to_end(&mut buf);
             let str = read_data_with_encoding_detection(&buf).unwrap();
             let c = Cursor::new(str);
-
             chan.reader = Some(c);
         }
         if let Some(reader) = &mut chan.reader {

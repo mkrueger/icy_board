@@ -1,0 +1,177 @@
+BOOLEAN ReadConfig = FALSE
+
+INTEGER ToX, ToY, ToLen
+INTEGER FromX, FromY, FromLen
+INTEGER SubjX, SubjY, SubjLen
+INTEGER NumberX, NumberY
+INTEGER DateX, DateY
+INTEGER MsgX1, MsgY1, MsgX2, MsgY2
+
+INTEGER MSG_LEN
+STRING MSGDATE, MSGTIME, MSGTO, MSGFROM, MSGSUBJ, MSGNUMBER
+STRING MSGTXT(200)
+
+PROCEDURE ReadMsg()
+    IF !ReadConfig THEN 
+        ReadConfig = TRUE
+        ReadMsgConfig()
+    ENDIF
+
+    STRING MsgFile = PPEPath() + "msgtxt." + STRING(PCBNode())
+    IF !Exist(MsgFile) THEN
+        LOG "Message file " + MsgFile + "  doesn't exists", true
+        STOP
+    ENDIF
+    FOpen 1, MsgFile, O_RD, S_DB
+    MSGTO = "<EMPTYTO>"
+    MSGFROM = "<EMPTYFROM>"
+    MSGSUBJ = "<EMPTYSUBJ>"
+    MSGNUMBER = "<EMPTY#>"
+    MSGDATE = "<DATE>"
+    MSGTIME = "<TIME>"
+    MSG_LEN = 0
+
+    LOOP 
+        FGet 1, line
+        IF FErr(1) RETURN
+        LOG ">" + Left(line, 17) + "<", true
+        SELECT CASE Left(line, 17)
+        CASE "            Date:"
+            MSGDATE = Mid(line, 19, 8)
+        CASE "            Time:"
+            MSGTIME = Mid(line, 19, 5)
+        CASE "              To:"
+            MSGTO   = Left(Mid(line, 19, LEN(line) - 18), ToLen)
+        CASE "            From:"
+            MSGFROM = Left(Mid(line, 19, LEN(line) - 18), FromLen)
+        CASE "         Subject:"
+            MSGSUBJ = Left(Mid(line, 19, LEN(line) - 18), SubjLen)
+        CASE "  Message Number:"
+            MSGNUMBER = Left(Mid(line, 19, LEN(line) - 18), 5)
+        ENDSELECT
+        IF line == "Message Body:" BREAK
+    ENDLOOP
+
+    MSG_LEN = 0
+    While MSG_LEN < 200 DO
+        FGet 1, MSGTXT[MSG_LEN]
+        WHILE LEN(MSGTXT[MSG_LEN]) > MsgX2 - MsgX1 DO 
+            MSGTXT[MSG_LEN + 1] = Right(MSGTXT[MSG_LEN], LEN(MSGTXT[MSG_LEN]) - (MsgX2 - MsgX1))
+            MSGTXT[MSG_LEN] = Left(MSGTXT[MSG_LEN], MsgX2 - MsgX1)
+            MSG_LEN += 1
+        ENDWHILE
+        IF FErr(1) BREAK
+        MSG_LEN += 1
+    ENDWHILE
+    FClose 1
+
+    Cls
+    StartDisp FNS
+    DispFile PPEPath() + "data\reader.pcb", GRAPH
+    
+    AnsiPos ToX, ToY
+    Print MSGTO
+    
+    AnsiPos FromX, FromY
+    Print MSGFROM
+    
+    AnsiPos SubjX, SubjY
+    Print MSGSUBJ
+    
+    AnsiPos NumberX, NumberY
+    Print MSGNUMBER
+    
+    AnsiPos DateX, DateY
+    Print MSGDATE + " " + MSGTIME
+
+    AnsiPos MsgX1, MsgY1
+    INTEGER first_line = 0              
+    
+    INTEGER I
+    :RedrawMsg
+    FOR I = 0 TO MsgY2 - MsgY1
+        AnsiPos MsgX1, MsgY1 + I
+        DefColor
+        IF I < MSG_LEN THEN
+            IF LEN(MSGTXT[I + first_line]) != MsgX2 - MsgX1 THEN
+                MSGTXT[I + first_line] = Left(MSGTXT[I + first_line], MsgX2 - MsgX1)
+            ENDIF
+            PRINT MSGTXT[I + first_line]
+        ELSE
+            PRINT Space(MsgX2 - MsgX1)
+        ENDIF
+    NEXT
+
+    LOOP
+        STRING CH = InKey()
+        SELECT CASE CH
+        CASE Chr(27)
+            BREAK
+        CASE "UP"
+            IF first_line > 0 THEN
+                first_line -= 1
+                goto RedrawMsg
+            ENDIF
+        CASE "DOWN"
+            IF first_line + MsgY2 - MsgY1 < MSG_LEN THEN
+                first_line += 1
+                goto RedrawMsg
+            ENDIF
+        CASE "PGUP"
+            IF first_line != 0 THEN
+                first_line = 0
+                goto RedrawMsg
+            ENDIF
+        CASE "PGDN"
+             IF first_line + MsgY2 - MsgY1 < MSG_LEN THEN
+                if MSG_LEN > MsgY2 - MsgY1 THEN 
+                    first_line = MSG_LEN - (MsgY2 - MsgY1)
+                    goto RedrawMsg
+                ENDIF
+            ENDIF
+        ENDSELECT
+    ENDLOOP
+    
+ENDPROC 
+
+PROCEDURE ReadMsgConfig()
+    FOpen 1, PPEPath() + "msg.cfg", O_RD, S_DB
+
+    FGet 1, LINE
+    
+    TOKENIZE LINE
+    ToX = ToInt(GETTOKEN())
+    ToY = ToInt(GETTOKEN())
+    ToLen = ToInt(GETTOKEN())
+
+    FGet 1, LINE
+    TOKENIZE LINE
+    FromX = ToInt(GETTOKEN())
+    FromY = ToInt(GETTOKEN())
+    FromLen = ToInt(GETTOKEN())
+    
+    FGet 1, LINE
+    TOKENIZE LINE
+    SubjX = ToInt(GETTOKEN())
+    SubjY = ToInt(GETTOKEN())
+    SubjLen = ToInt(GETTOKEN())
+
+    FGet 1, LINE
+    TOKENIZE LINE
+    NumberX = ToInt(GETTOKEN())
+    NumberY = ToInt(GETTOKEN())
+    
+    FGet 1, LINE
+    TOKENIZE LINE
+    DateX = ToInt(GETTOKEN())
+    DateY = ToInt(GETTOKEN())
+    
+    FGet 1, LINE
+    TOKENIZE LINE
+    MsgX1 = ToInt(GETTOKEN())
+    MsgY1 = ToInt(GETTOKEN())
+    MsgX2 = ToInt(GETTOKEN())
+    MsgY2 = ToInt(GETTOKEN())
+
+    FClose 1
+ENDPROC

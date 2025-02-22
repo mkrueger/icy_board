@@ -4,3 +4,11 @@ B = "3"
 FOR I = 0  TO B 
 PRINT I, ","
 NEXT
+
+FOR I = 0 TO 0
+PRINTLN "Hello"
+NEXT
+
+FOR I = 1 TO 0
+PRINTLN "Hello"
+NEXT

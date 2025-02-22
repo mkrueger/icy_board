@@ -13,14 +13,6 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_bool(&mut self) -> Option<Expression> {
-        // it's correct on the upper level - it's very unusual
-        if self.get_cur_token() == Some(Token::Not) {
-            let token = self.save_spanned_token();
-            self.next_token();
-            let expr = self.parse_bool()?;
-            return Some(Expression::Unary(UnaryExpression::new(token, expr)));
-        }
-
         let mut expr = self.parse_comparison()?;
         while self.get_cur_token() == Some(Token::Or) || self.get_cur_token() == Some(Token::And) {
             let op_token = self.save_spanned_token();

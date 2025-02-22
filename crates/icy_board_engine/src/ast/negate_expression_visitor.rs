@@ -67,13 +67,13 @@ impl AstVisitorMut for NegateExpressionVisitor {
             }
             super::BinOp::And => BinaryExpression::create_empty_expression(
                 super::BinOp::Or,
-                expr.get_left_expression().visit_mut(&mut NegateExpressionVisitor::default()),
-                expr.get_right_expression().visit_mut(&mut NegateExpressionVisitor::default()),
+                expr.get_left_expression().visit_mut(self),
+                expr.get_right_expression().visit_mut(self),
             ),
             super::BinOp::Or => BinaryExpression::create_empty_expression(
                 super::BinOp::And,
-                expr.get_left_expression().visit_mut(&mut NegateExpressionVisitor::default()),
-                expr.get_right_expression().visit_mut(&mut NegateExpressionVisitor::default()),
+                expr.get_left_expression().visit_mut(self),
+                expr.get_right_expression().visit_mut(self),
             ),
         }
     }

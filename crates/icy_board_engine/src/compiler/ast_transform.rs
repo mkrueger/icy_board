@@ -185,7 +185,6 @@ impl AstVisitorMut for AstTransformationVisitor {
 
     fn visit_select_statement(&mut self, select_stmt: &SelectStatement) -> Statement {
         let mut statements = Vec::new();
-
         let expr = select_stmt.get_expression().clone();
         let case_exit_label = self.next_label();
 
@@ -223,7 +222,6 @@ impl AstVisitorMut for AstTransformationVisitor {
         }
         statements.extend(select_stmt.get_default_statements().iter().map(|s| s.visit_mut(self)));
         statements.push(LabelStatement::create_empty_statement(case_exit_label.clone()));
-
         Statement::Block(BlockStatement::empty(statements))
     }
 
