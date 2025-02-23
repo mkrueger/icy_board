@@ -30,10 +30,12 @@ use self::functions::display_flags;
 
 use super::{
     bbs::{BBSMessage, BBS},
+    commands::{AutoRun, Command, CommandAction, CommandType},
     conferences::Conference,
     icb_config::{IcbColor, SysopCommandLevels, UserCommandLevels, DEFAULT_PCBOARD_DATE_FORMAT},
     icb_text::{IcbTextFile, IcbTextStyle, IceText},
     macro_parser::{Macro, MacroCommand},
+    security_expr::SecurityExpression,
     user_base::{FSEMode, Password, User},
     IcyBoard,
 };
@@ -754,33 +756,132 @@ impl IcyBoardState {
         Ok(output.to_str().unwrap().to_string())
     }
 
-    pub async fn try_find_command(&self, command: &str) -> Option<super::commands::Command> {
+    pub async fn try_find_command(&self, command: &str, via_cmd_list: bool) -> Option<super::commands::Command> {
         let command = command.to_ascii_uppercase();
-        for cmd in &self.session.current_conference.commands {
-            if cmd.keyword == command {
-                return Some(cmd.clone());
+        if via_cmd_list {
+            for cmd in &self.session.current_conference.commands {
+                if cmd.keyword == command {
+                    return Some(cmd.clone());
+                }
+            }
+
+            for cmd in &self.get_board().await.commands.commands {
+                if cmd.keyword == command {
+                    return Some(cmd.clone());
+                }
+            }
+
+            for cmd in &self.session.current_conference.commands {
+                if cmd.keyword.starts_with(&command) {
+                    return Some(cmd.clone());
+                }
+            }
+
+            for cmd in &self.get_board().await.commands.commands {
+                if cmd.keyword.starts_with(&command) {
+                    return Some(cmd.clone());
+                }
             }
         }
 
-        for cmd in &self.get_board().await.commands.commands {
-            if cmd.keyword == command {
-                return Some(cmd.clone());
-            }
-        }
+        return match command.as_str() {
+            "A" => convert_cmd(CommandType::AbandonConference),
+            "B" => convert_cmd(CommandType::BulletinList),
+            "C" => convert_cmd(CommandType::CommentToSysop),
+            "E" => convert_cmd(CommandType::EnterMessage),
+            // "RM" =>  convert_cmd(CommandType::ReadMessage(true)),
+            // "RM+" =>  convert_cmd(CommandType::ReadMessage(true)), // forward
+            // "RM-" =>  convert_cmd(CommandType::ReadMessage(false)), // backward
+            "F" => convert_cmd(CommandType::FileDirectory),
+            // "BD" =>  convert_cmd(CommandType::BatchDownload),
+            // "BU" =>  convert_cmd(CommandType::BatchUpload),
+            "G" => convert_cmd(CommandType::Goodbye),
+            "?" => convert_cmd(CommandType::Help),
+            "I" => convert_cmd(CommandType::InitialWelcome),
+            "K" => convert_cmd(CommandType::DeleteMessage),
+            "L" => convert_cmd(CommandType::LocateFile),
+            "M" => convert_cmd(CommandType::ToggleGraphics),
+            "N" => convert_cmd(CommandType::NewFileScan),
+            "O" => convert_cmd(CommandType::PageSysop),
+            "P" => convert_cmd(CommandType::SetPageLength),
+            "Q" => convert_cmd(CommandType::QuickMessageScan),
+            "R" => convert_cmd(CommandType::ReadMessages),
+            "S" => convert_cmd(CommandType::Survey),
+            "T" => convert_cmd(CommandType::SetTransferProtocol),
+            "V" => convert_cmd(CommandType::ViewSettings),
+            "W" => convert_cmd(CommandType::WriteSettings),
+            "X" => convert_cmd(CommandType::ExpertMode),
+            "Y" => convert_cmd(CommandType::YourMailScan),
+            "Z" => convert_cmd(CommandType::ZippyDirectoryScan),
+            "TS" => convert_cmd(CommandType::TextSearch),
+            "4" => convert_cmd(CommandType::RestoreMessage),
+            "@" => convert_cmd(CommandType::ReadEmail),
+            "@W" => convert_cmd(CommandType::WriteEmail),
+            _ => {
+                if "ALIAS".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::EnableAlias);
+                }
+                if "BYE".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::Bye);
+                }
+                if "CHAT".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::GroupChat);
+                }
+                if "WHO".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::WhoIsOnline);
+                }
+                if "BROADCAST".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::Broadcast);
+                }
+                if "HELP".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::Help);
+                }
+                if "DOOR".starts_with(command.as_str()) || "Open".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::OpenDoor);
+                }
+                if "DOWN".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::Download);
+                }
+                if "FLAG".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::FlagFiles);
+                }
+                if "REPLY".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::ReplyMessage);
+                }
+                if "JOIN".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::JoinConference);
+                }
+                if "LANG".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::SetLanguage);
+                }
+                if "MENU".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::ShowMenu);
+                }
+                if "NEWS".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::DisplayNews);
+                }
+                if "PPE".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::RunPPE);
+                }
 
-        for cmd in &self.session.current_conference.commands {
-            if cmd.keyword.starts_with(&command) {
-                return Some(cmd.clone());
-            }
-        }
+                // if "QWK".starts_with(command.as_str()) { return convert_cmd(CommandType::QWK) }
 
-        for cmd in &self.get_board().await.commands.commands {
-            if cmd.keyword.starts_with(&command) {
-                return Some(cmd.clone());
+                if "MENU".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::ShowMenu);
+                }
+                // if "SELECT".starts_with(command.as_str()) { return convert_cmd(CommandType::SelectConferences) }
+                if "TEST".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::TestFile);
+                }
+                if "UPLOAD".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::UploadFile);
+                }
+                if "USERS".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::UserList);
+                }
+                None
             }
-        }
-
-        None
+        };
     }
 
     pub fn resolve_path<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
@@ -2241,4 +2342,22 @@ pub mod control_codes {
     pub const CTRL_END: char = CTRL_K;
 
     pub const RETURN: char = CTRL_M;
+}
+
+fn convert_cmd(cmd_type: CommandType) -> Option<Command> {
+    Some(Command {
+        keyword: "".to_string(),
+        display: "".to_string(),
+        lighbar_display: "".to_string(),
+        help: "".to_string(),
+        auto_run: AutoRun::Disabled,
+        autorun_time: 0,
+        position: Default::default(),
+        actions: vec![CommandAction {
+            command_type: cmd_type,
+            parameter: "".to_string(),
+            trigger: Default::default(),
+        }],
+        security: SecurityExpression::from_req_security(0),
+    })
 }

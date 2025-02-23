@@ -1526,9 +1526,9 @@ pub enum IceText {
     EnterNode = 752,
 
     // NEW TEXT
-    /// `Alias mode is now on, @FIRST@ ...`
+    /// TODO: NEW TEXT -unused
     AliasOn = 753,
-    /// `Alias mode is now off, @FIRST@ ...`
+    /// TODO: NEW TEXT -unused
     AliasOff = 754,
 
     /// `~Alias Mode: On`

@@ -372,7 +372,7 @@ impl IcyBoardState {
             }
             if key_char.ch == '\n' || key_char.ch == '\r' {
                 if !help.is_empty() {
-                    if let Some(cmd) = self.try_find_command(&output).await {
+                    if let Some(cmd) = self.try_find_command(&output, true).await {
                         if !cmd.actions.is_empty() && cmd.actions[0].command_type == CommandType::Help {
                             self.show_help(help).await?;
                             return self.input_string(color, prompt, len, valid_mask, help, default_string, display_flags).await;

@@ -1,6 +1,6 @@
-pplc --version 300
-pplc --version 310
-pplc --version 320
-pplc --version 330
-pplc --version 340
-pplc
+#!/bin/bash
+for ver in 300 310 320 330 340
+do
+	pplc --version $ver
+done
+

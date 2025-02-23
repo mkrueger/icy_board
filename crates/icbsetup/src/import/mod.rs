@@ -1102,7 +1102,7 @@ impl PCBoardImporter {
 
     fn convert_default_cmd_lst(&mut self, file: &str, new_rel_name: &str) -> Res<PathBuf> {
         let res = if file.is_empty() {
-            CommandList::generate_pcboard_defaults()
+            CommandList::new()
         } else {
             let resolved_file = self.resolve_file(file);
             let resolved_file = PathBuf::from(&resolved_file);
@@ -1119,10 +1119,10 @@ impl PCBoardImporter {
                     }
                 }
 
-                res.commands.extend_from_slice(&CommandList::generate_pcboard_defaults().commands);
+                res.commands.extend_from_slice(&CommandList::new().commands);
                 res
             } else {
-                CommandList::generate_pcboard_defaults()
+                CommandList::new()
             }
         };
 

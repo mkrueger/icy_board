@@ -18,9 +18,9 @@ use super::{functions::MASK_COMMAND, IcyBoardState};
 
 impl IcyBoardState {
     #[async_recursion(?Send)]
-    pub async fn run_single_command(&mut self, _via_cmd_list: bool) -> Res<bool> {
+    pub async fn run_single_command(&mut self, via_cmd_list: bool) -> Res<bool> {
         if let Some(command) = self.session.tokens.pop_front() {
-            if let Some(action) = self.try_find_command(&command).await {
+            if let Some(action) = self.try_find_command(&command, via_cmd_list).await {
                 return self.dispatch_command(&command, &action).await;
             }
             log::warn!("Command not found: '{}'", command);
@@ -113,7 +113,7 @@ impl IcyBoardState {
                     continue;
                 }
 
-                if let Some(command) = self.try_find_command(&command_str).await {
+                if let Some(command) = self.try_find_command(&command_str, true).await {
                     self.session.last_new_line_y = self.display_screen().caret.get_position().y;
                     self.session.disp_options.no_change();
                     self.dispatch_command(&command_str, &command).await?;

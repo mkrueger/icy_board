@@ -16,6 +16,7 @@ use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
 use crate::bbs::{internal_handle_client, LoginOptions};
 
 mod cmd_a;
+mod cmd_alias;
 mod cmd_b;
 mod cmd_bye;
 mod cmd_c;
@@ -71,7 +72,7 @@ pub fn test_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
         let bbs: Arc<tokio::sync::Mutex<BBS>> = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
         let mut icy_board = icy_board_engine::icy_board::IcyBoard::new();
 
-        icy_board.commands = CommandList::generate_pcboard_defaults();
+        icy_board.commands = CommandList::new();
         icy_board.protocols = SupportedProtocols::generate_pcboard_defaults();
         icy_board.default_display_text = icy_board_engine::icy_board::icb_text::DEFAULT_DISPLAY_TEXT.clone();
         icy_board.users.new_user(User {

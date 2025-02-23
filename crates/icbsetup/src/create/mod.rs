@@ -164,7 +164,7 @@ impl IcyBoardCreator {
         self.logger.start_action("Write default command file".to_string());
         config.paths.command_file = PathBuf::from("main/commands.toml");
 
-        let cmd_list = CommandList::generate_pcboard_defaults();
+        let cmd_list = CommandList::new();
         cmd_list.save(&self.destination.join(&config.paths.command_file))?;
 
         self.logger.start_action("Write default art files".to_string());

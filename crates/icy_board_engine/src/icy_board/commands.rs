@@ -683,75 +683,9 @@ impl DerefMut for CommandList {
         &mut self.commands
     }
 }
-
-fn convert_cmd(name: &str, cmd_type: CommandType, security: i32) -> Command {
-    Command {
-        keyword: name.to_string(),
-        display: "".to_string(),
-        lighbar_display: "".to_string(),
-        help: "".to_string(),
-        auto_run: AutoRun::Disabled,
-        autorun_time: 0,
-        position: Default::default(),
-        actions: vec![CommandAction {
-            command_type: cmd_type,
-            parameter: "".to_string(),
-            trigger: Default::default(),
-        }],
-        security: SecurityExpression::from_req_security(security as u8),
-    }
-}
-
 impl CommandList {
-    pub fn generate_pcboard_defaults() -> Self {
-        let commands = vec![
-            convert_cmd("A", CommandType::AbandonConference, 0),
-            convert_cmd("B", CommandType::BulletinList, 0),
-            convert_cmd("C", CommandType::CommentToSysop, 0),
-            convert_cmd("DOWN", CommandType::Download, 0),
-            convert_cmd("E", CommandType::EnterMessage, 0),
-            convert_cmd("F", CommandType::FileDirectory, 0),
-            convert_cmd("FLAG", CommandType::FlagFiles, 0),
-            convert_cmd("G", CommandType::Goodbye, 0),
-            convert_cmd("BYE", CommandType::Bye, 0),
-            convert_cmd("HELP", CommandType::Help, 0),
-            convert_cmd("?", CommandType::Help, 0),
-            convert_cmd("I", CommandType::InitialWelcome, 0),
-            convert_cmd("JOIN", CommandType::JoinConference, 0),
-            convert_cmd("K", CommandType::DeleteMessage, 0),
-            convert_cmd("L", CommandType::LocateFile, 0),
-            convert_cmd("M", CommandType::ToggleGraphics, 0),
-            convert_cmd("N", CommandType::NewFileScan, 0),
-            convert_cmd("O", CommandType::PageSysop, 0),
-            convert_cmd("P", CommandType::SetPageLength, 0),
-            convert_cmd("Q", CommandType::QuickMessageScan, 0),
-            convert_cmd("R", CommandType::ReadMessages, 0),
-            convert_cmd("S", CommandType::Survey, 0),
-            convert_cmd("T", CommandType::SetTransferProtocol, 0),
-            convert_cmd("U", CommandType::UploadFile, 0),
-            convert_cmd("V", CommandType::ViewSettings, 0),
-            convert_cmd("W", CommandType::WriteSettings, 0),
-            convert_cmd("X", CommandType::ExpertMode, 0),
-            convert_cmd("Y", CommandType::YourMailScan, 0),
-            convert_cmd("Z", CommandType::ZippyDirectoryScan, 0),
-            convert_cmd("CHAT", CommandType::GroupChat, 0),
-            convert_cmd("DOOR", CommandType::OpenDoor, 0),
-            convert_cmd("OPEN", CommandType::OpenDoor, 0),
-            convert_cmd("TEST", CommandType::TestFile, 0),
-            convert_cmd("USER", CommandType::UserList, 0),
-            convert_cmd("WHO", CommandType::WhoIsOnline, 0),
-            convert_cmd("MENU", CommandType::ShowMenu, 0),
-            convert_cmd("NEWS", CommandType::DisplayNews, 0),
-            convert_cmd("LANG", CommandType::SetLanguage, 0),
-            convert_cmd("REPLY", CommandType::ReplyMessage, 0),
-            convert_cmd("ALIAS", CommandType::EnableAlias, 0),
-            convert_cmd("TS", CommandType::TextSearch, 0),
-            convert_cmd("BR", CommandType::Broadcast, 0),
-            convert_cmd("4", CommandType::RestoreMessage, 0),
-            convert_cmd("PPE", CommandType::RunPPE, 0),
-            convert_cmd("@", CommandType::ReadEmail, 0),
-            convert_cmd("@W", CommandType::WriteEmail, 0),
-        ];
+    pub fn new() -> Self {
+        let commands = vec![];
         Self { commands }
     }
 }
