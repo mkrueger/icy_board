@@ -1,4 +1,3 @@
-use crate::icy_board::state::user_commands::new;
 use crate::icy_board::{icb_text::IceText, state::functions::display_flags};
 use crate::{icy_board::state::IcyBoardState, Res};
 

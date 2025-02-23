@@ -1,40 +1,40 @@
 use crate::icy_board::commands::CommandType;
-use crate::icy_board::state::functions::{pwd_flags, MASK_ALNUM, MASK_COMMAND};
-use crate::icy_board::state::IcyBoardState;
+use crate::icy_board::state::functions::{MASK_ALNUM, MASK_COMMAND};
+use crate::{icy_board::state::IcyBoardState, Res};
+
 use crate::icy_board::{icb_text::IceText, state::functions::display_flags};
-use crate::Res;
 
 impl IcyBoardState {
-    pub async fn join_conference_cmd(&mut self) -> Res<()> {
-        if self.get_board().await.conferences.is_empty() {
-            self.display_text(
-                IceText::NoConferenceAvailable,
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL,
-            )
-            .await?;
+    pub async fn area_change_command(&mut self) -> Res<()> {
+        let conference = self.session.current_conference_number as usize;
+        let menu = self.get_board().await.conferences[conference].area_menu.clone();
+        let areas = self.get_board().await.conferences[conference].areas.clone().unwrap_or_default();
+
+        if areas.is_empty() {
+            self.display_text(IceText::NoAreasAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            self.press_enter().await?;
             return Ok(());
         }
+
         let mut display_menu = self.session.tokens.is_empty();
         loop {
-            let mut quick_join = false;
             let mut search = false;
-            let mut conf_num = -1;
+            let mut area_num = -1;
             if self.session.tokens.is_empty() {
                 if display_menu {
                     display_menu = false;
                     self.session.disp_options.no_change();
-                    let mnu = self.get_board().await.config.paths.conf_join_menu.clone();
-                    let mnu = self.resolve_path(&mnu);
-                    self.display_menu(&mnu).await?;
+                    self.display_menu(&menu).await?;
                     self.new_line().await?;
                 }
 
                 let str = self
                     .input_field(
-                        IceText::JoinConferenceNumber,
+                        IceText::JoinAreaNumber,
                         40,
                         MASK_COMMAND,
-                        CommandType::JoinConference.get_help(),
+                        CommandType::ChangeMessageArea.get_help(),
                         None,
                         display_flags::UPCASE | display_flags::STACKED | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,
                     )
@@ -50,19 +50,16 @@ impl IcyBoardState {
             for token in &self.session.tokens {
                 last_token = token.clone();
                 match token.as_str() {
-                    "Q" => {
-                        quick_join = true;
-                    }
                     "S" => {
                         search = true;
                     }
                     token => {
-                        if search || quick_join {
+                        if search {
                             search_text.push_str(token);
                             search_text.push(' ');
                         } else {
                             if let Ok(num) = token.parse::<i32>() {
-                                conf_num = num;
+                                area_num = num;
                             } else {
                                 if name.len() > 0 {
                                     name.push(' ');
@@ -74,27 +71,24 @@ impl IcyBoardState {
                     }
                 }
             }
+
             if !name.is_empty() {
-                if name == "MAIN" || name == "MAIN BOARD" {
-                    conf_num = 0;
-                } else {
-                    for (i, conf) in self.get_board().await.conferences.iter().enumerate() {
-                        if conf.name.to_ascii_uppercase() == name {
-                            conf_num = i as i32;
-                            break;
-                        }
+                for (i, area) in areas.iter().enumerate() {
+                    if area.name.to_ascii_uppercase() == name {
+                        area_num = i as i32;
+                        break;
                     }
                 }
             }
 
             self.session.tokens.clear();
-            if conf_num < 0 && search {
+            if area_num < 0 && search {
                 let text = if search_text.is_empty() {
                     self.input_field(
                         IceText::TextToScanFor,
                         40,
                         &MASK_ALNUM,
-                        CommandType::JoinConference.get_help(),
+                        CommandType::ChangeMessageArea.get_help(),
                         None,
                         display_flags::UPCASE | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,
                     )
@@ -107,7 +101,7 @@ impl IcyBoardState {
                     break;
                 }
                 let text = text.to_ascii_uppercase();
-                let c = self.get_board().await.conferences.iter().map(|c| c.name.clone()).collect::<Vec<String>>();
+                let c = areas.iter().map(|a| a.name.clone()).collect::<Vec<String>>();
                 for (i, c) in c.iter().enumerate() {
                     if c.to_ascii_uppercase().contains(&text) {
                         self.println(crate::vm::TerminalTarget::Both, &format!("{}) {}", i, c)).await?;
@@ -119,46 +113,39 @@ impl IcyBoardState {
                 continue;
             }
 
-            if conf_num == self.session.current_conference_number as i32 {
+            if area_num == self.session.current_message_area as i32 {
                 return Ok(());
             }
 
-            let Some(conference) = self.get_board().await.conferences.get(conf_num as usize).cloned() else {
+            let Some(area) = areas.get(area_num as usize).cloned() else {
                 self.session.op_text = last_token;
-                self.display_text(IceText::InvalidConferenceNumber, display_flags::NEWLINE | display_flags::LFBEFORE)
+                self.display_text(IceText::InvalidAreaNumber, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
                 continue;
             };
 
-            if !conference.required_security.user_can_access(&self.session) {
-                self.session.op_text = conference.name.clone();
+            if !area.req_level_to_enter.user_can_access(&self.session) {
+                self.session.op_text = area.name.clone();
                 self.display_text(IceText::NotRegisteredInConference, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
                 continue;
             }
 
-            if !conference.password.is_empty() {
+            /* Areas (not yet) have a password
+            if !area.password.is_empty() {
                 if !self
-                    .check_password(IceText::PasswordToJoin, pwd_flags::PLAIN, |pwd| conference.password.is_valid(pwd))
+                    .check_password(IceText::PasswordToJoin, pwd_flags::PLAIN, |pwd| area.password.is_valid(pwd))
                     .await?
                 {
                     self.display_text(IceText::DeniedWrongPassword, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
                     return Ok(());
                 }
-            }
+            }*/
 
-            if conf_num == 0 {
-                self.session.op_text = format!("{} ({})", self.session.current_conference.name, self.session.current_conference_number);
-                self.join_conference(conf_num as u16, quick_join).await;
-                self.display_text(IceText::ConferenceAbandoned, display_flags::NEWLINE | display_flags::LFBEFORE)
-                    .await?;
-            } else {
-                self.join_conference(conf_num as u16, quick_join).await;
-                self.session.op_text = format!("{} ({})", self.session.current_conference.name, self.session.current_conference_number);
-                self.display_text(IceText::ConferenceJoined, display_flags::NEWLINE | display_flags::LFBEFORE)
-                    .await?;
-            }
+            self.session.current_message_area = area_num as usize;
+            self.session.op_text = format!("{} ({})", area.name, self.session.current_message_area);
+            self.display_text(IceText::AreaJoined, display_flags::NEWLINE | display_flags::LFBEFORE).await?;
             break;
         }
         Ok(())

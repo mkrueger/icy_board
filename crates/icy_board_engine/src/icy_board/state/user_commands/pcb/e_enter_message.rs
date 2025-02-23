@@ -19,11 +19,6 @@ impl IcyBoardState {
             return Ok(());
         }
         self.set_activity(NodeStatus::EnterMessage).await;
-        let conf = self.session.current_conference_number;
-        let Ok(Some(area)) = self.show_message_areas(conf).await else {
-            return Ok(());
-        };
-
         let mut to = self
             .input_field(
                 IceText::MessageTo,
@@ -56,7 +51,7 @@ impl IcyBoardState {
 
         self.write_message(
             self.session.current_conference_number as i32,
-            area as i32,
+            self.session.current_message_area as i32,
             &to,
             &subject,
             false,

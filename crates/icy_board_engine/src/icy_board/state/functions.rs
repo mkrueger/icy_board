@@ -19,7 +19,7 @@ use crate::{
     vm::TerminalTarget,
 };
 
-use super::{IcyBoardState, KeySource, NodeStatus};
+use super::{IcyBoardState, KeySource};
 
 pub mod display_flags {
     pub const DEFAULT: i32 = 0x00000;
@@ -493,60 +493,6 @@ impl IcyBoardState {
                 .await?;
         }
         Ok(false)
-    }
-
-    #[async_recursion(?Send)]
-    pub async fn show_message_areas(&mut self, conference: u16) -> Res<Option<usize>> {
-        let menu = self.get_board().await.conferences[conference as usize].area_menu.clone();
-        let areas = self.get_board().await.conferences[conference as usize].areas.clone().unwrap_or_default();
-
-        self.set_activity(NodeStatus::EnterMessage).await;
-        self.session.disp_options.no_change();
-        self.session.more_requested = false;
-
-        if areas.is_empty() {
-            self.display_text(IceText::NoAreasAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
-                .await?;
-            self.press_enter().await?;
-            return Ok(None);
-        }
-        let area_number = if let Some(token) = self.session.tokens.pop_front() {
-            token
-        } else {
-            let mnu = self.resolve_path(&menu);
-            self.display_menu(&mnu).await?;
-            self.new_line().await?;
-
-            self.input_field(
-                if self.session.expert_mode {
-                    IceText::AreaListCommandExpert
-                } else {
-                    IceText::AreaListCommand
-                },
-                40,
-                &MASK_NUM,
-                CommandType::ReadMessages.get_help(),
-                None,
-                display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
-            )
-            .await?
-        };
-
-        if !area_number.is_empty() {
-            if let Ok(number) = area_number.parse::<i32>() {
-                if 1 <= number && (number as usize) <= areas.len() {
-                    let area = &areas[number as usize - 1];
-                    if area.req_level_to_list.user_can_access(&self.session) {
-                        return Ok(Some(number as usize - 1));
-                    }
-                }
-            }
-
-            self.session.op_text = area_number;
-            self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::NOTBLANK)
-                .await?;
-        }
-        Ok(None)
     }
 
     pub async fn send_message(&mut self, conf: i32, area: i32, msg: JamMessage, text: IceText) -> Res<()> {

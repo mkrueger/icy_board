@@ -237,6 +237,9 @@ pub enum CommandType {
 
     // 'TS'
     TextSearch,
+
+    // 'AREA'
+    ChangeMessageArea,
 }
 
 impl Display for CommandType {
@@ -305,6 +308,7 @@ impl Display for CommandType {
             CommandType::WriteEmail => write!(f, "(@W)\tWriteEmail"),
             CommandType::RunPPE => write!(f, "(PPE)\tRunPPE"),
             CommandType::TextSearch => write!(f, "(TS)\tTextSearch"),
+            CommandType::ChangeMessageArea => write!(f, "(AREA)\tMessageArea"),
             CommandType::GotoXY => write!(f, "GotoXY"),
             CommandType::PrintText => write!(f, "PrintText"),
             CommandType::RefreshDisplayString => write!(f, "RefreshDisplayString"),
@@ -381,6 +385,7 @@ impl FromStr for CommandType {
             "GotoXY" => Ok(CommandType::GotoXY),
             "PrintText" => Ok(CommandType::PrintText),
             "RefreshDisplayString" => Ok(CommandType::RefreshDisplayString),
+            "ChangeMessageArea" => Ok(CommandType::ChangeMessageArea),
             _ => Err(format!("Invalid CommandType: {}", s)),
         }
     }
@@ -504,6 +509,7 @@ impl CommandType {
             CommandType::WriteEmail => "hlp@w",
             CommandType::RunPPE => "hlpppe",
             CommandType::TextSearch => "hlpts",
+            CommandType::ChangeMessageArea => "hlparea",
 
             _ => "",
         }

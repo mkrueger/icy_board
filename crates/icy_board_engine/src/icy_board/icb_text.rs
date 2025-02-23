@@ -1526,33 +1526,34 @@ pub enum IceText {
     EnterNode = 752,
 
     // NEW TEXT
-    /// TODO: NEW TEXT -unused
-    AliasOn = 753,
-    /// TODO: NEW TEXT -unused
-    AliasOff = 754,
+    /// `Sorry, @FIRST@, no Areas are presently available.`
+    NoAreasAvailable = 753,
+
+    /// `Area # to enter (Enter)=none`
+    JoinAreaNumber = 754,
+
+    /// `(@OPTEXT@) is an invalid Area selection!`
+    InvalidAreaNumber = 755,
+
+    /// `Sorry, @FIRST@, you are not allowed in Area @OPTEXT@`
+    NotAllowedInArea = 756,
+
+    /// `@OPTEXT@ Selected`
+    AreaJoined = 757,
 
     /// `~Alias Mode: On`
-    ViewSettingsAliasOn = 755,
+    ViewSettingsAliasOn = 758,
     /// `~Alias Mode: Off`
-    ViewSettingsAliasOff = 756,
+    ViewSettingsAliasOff = 759,
 
     /// `~~~Gfx Mode:~@GFXMODE@`
-    ViewSettingsGraphicsMode = 757,
+    ViewSettingsGraphicsMode = 760,
 
     /// `Conf:                                 Area:`
-    MessagesConfArea = 758,
+    MessagesConfArea = 761,
 
     /// `Date Format Desired (Enter)=no change`
-    DateFormatDesired = 759,
-
-    /// `Sorry, @FIRST@, no Areas are presently available.`
-    NoAreasAvailable = 760,
-
-    /// `(H)elp, (1-@NUMDIR@), Area List Command`
-    AreaListCommand = 761,
-
-    /// `(H)elp, (1-@NUMDIR@), Area List Command`
-    AreaListCommandExpert = 762,
+    DateFormatDesired = 762,
 
     /// `AVATAR mode is now on, @FIRST@ ...`
     AvatarOn = 763,

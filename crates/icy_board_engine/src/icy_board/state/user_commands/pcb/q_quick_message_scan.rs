@@ -19,22 +19,15 @@ use bstr::{BString, ByteSlice};
 use jamjam::jam::JamMessageBase;
 
 impl IcyBoardState {
+    #[async_recursion(?Send)]
     pub async fn quick_message_scan(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::HandlingMail).await;
 
-        let Ok(Some(area)) = self.show_message_areas(self.session.current_conference_number).await else {
-            return Ok(());
-        };
-        self.quick_message_scan_in_area(area).await
-    }
-
-    #[async_recursion(?Send)]
-    async fn quick_message_scan_in_area(&mut self, area: usize) -> Res<()> {
-        let message_base_file = &self.session.current_conference.areas.as_ref().unwrap()[area].filename;
+        let message_base_file = &self.session.current_conference.areas.as_ref().unwrap()[self.session.current_message_area].filename;
         let msgbase_file_resolved = self.get_board().await.resolve_file(message_base_file);
         match JamMessageBase::open(&msgbase_file_resolved) {
             Ok(message_base) => {
-                self.show_quick_scans(area, message_base).await?;
+                self.show_quick_scans(self.session.current_message_area, message_base).await?;
                 Ok(())
             }
             Err(err) => {
@@ -44,7 +37,7 @@ impl IcyBoardState {
                     .await?;
                 if JamMessageBase::create(msgbase_file_resolved).is_ok() {
                     log::error!("successfully created new message index.");
-                    return self.quick_message_scan_in_area(area).await;
+                    return self.quick_message_scan().await;
                 }
                 log::error!("failed to create message index.");
 

@@ -410,13 +410,13 @@ impl UserDataValue for Conference {
         }
         if *name == *FILE_AREAS {
             if let Some(res) = &self.directories {
-                return Ok(VariableValue::new_bool(!res.is_empty()));
+                return Ok(VariableValue::new_int(res.len() as i32));
             }
             return Ok(VariableValue::new_int(0));
         }
         if *name == *MESSAGE_AREAS {
             if let Some(res) = &self.areas {
-                return Ok(VariableValue::new_bool(!res.is_empty()));
+                return Ok(VariableValue::new_int(res.len() as i32));
             }
             return Ok(VariableValue::new_int(0));
         }

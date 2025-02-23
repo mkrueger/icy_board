@@ -2884,13 +2884,25 @@ style = "Yellow"
 
 # IcyBoard Messages begin here
 
-[AliasOn]
-text = "Alias mode is now on, @ALIAS@ ..."
-style = "White"
+[NoAreasAvailable]
+text = "Sorry, @FIRST@, no Areas are presently available."
+style = "Red"
 
-[AliasOff]
-text = "Alias mode is now off, @FIRST@ ..."
-style = "White"
+[JoinAreaNumber]
+text = "Area # to enter (Enter)=none"
+style = "Yellow"
+
+[InvalidAreaNumber]
+text = "(@OPTEXT@) is an invalid Area selection!"
+style = "Red"
+
+[NotAllowedInArea]
+text = "Sorry, @FIRST@, you are not allowed in Area @OPTEXT@"
+style = "Red"
+
+[AreaJoined]
+text = "@OPTEXT@ Selected"
+style = "Green"
 
 [ViewSettingsAliasOn]
 text = "~Alias Mode: On"
@@ -2908,18 +2920,6 @@ style = "Yellow"
 [DateFormatDesired]
 text = "Date Format Desired (Enter)=no change"
 style = "Green"
-
-[NoAreasAvailable]
-text = "Sorry, @FIRST@, no Areas are presently available."
-style = "Red"
-
-[AreaListCommand]
-text = "(H)elp, (1-@NUMAREA@), Area List Command"
-style = "Yellow"
-
-[AreaListCommandExpert]
-text = "(H)elp, (1-@NUMAREA@), Area List Command"
-style = "Yellow"
 
 [AvatarOn]
 text = "AVATAR mode is now on, @FIRST@ ..."

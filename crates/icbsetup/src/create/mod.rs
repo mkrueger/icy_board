@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf, str::FromStr};
+use std::{fs, path::PathBuf};
 
 use bstr::BString;
 use chrono::Utc;
@@ -23,7 +23,7 @@ use icy_board_engine::{
     },
     Res,
 };
-use icy_engine::{Buffer, SaveOptions};
+use icy_engine::{Buffer, SaveOptions, ScreenPreperation};
 use jamjam::{jam::JamMessageBase, util::echmoail::EchomailAddress};
 
 use crate::import::{console_logger::ConsoleLogger, OutputLogger};
@@ -84,6 +84,7 @@ lazy_static::lazy_static! {
         ("hlpz", include_bytes!("../../data/new_bbs/help/hlpz.icy").to_vec()),
         ("hlp@", include_bytes!("../../data/new_bbs/help/hlp@.icy").to_vec()),
         ("hlp@w", include_bytes!("../../data/new_bbs/help/hlp@w.icy").to_vec()),
+        ("hlparea", include_bytes!("../../data/new_bbs/help/hlparea.icy").to_vec()),
     ];
 }
 
@@ -111,14 +112,13 @@ impl IcyBoardCreator {
         self.logger.start_action("Creating required paths.".to_string());
         fs::create_dir_all(&self.destination.join(&config.paths.help_path))?;
 
-        let path = PathBuf::from_str("in.icy").unwrap();
         let mut options = SaveOptions::default();
+        options.screen_preparation = ScreenPreperation::ClearScreen;
         options.modern_terminal_output = true;
 
         for hlp in HELP_FILES.iter() {
-            let mut buffer = Buffer::from_bytes(&path, true, &hlp.1, None, None).unwrap();
-            let bytes = buffer.to_bytes("pcb", &options).unwrap();
-            fs::write(&self.destination.join(&config.paths.help_path).join(hlp.0).with_extension("pcb"), &bytes)?;
+            let path = self.destination.join(&config.paths.help_path).join(hlp.0);
+            convert_to_pcb_opt(&path, &hlp.1, &options)?;
         }
 
         fs::create_dir_all(&self.destination.join(&config.paths.tmp_work_path))?;
@@ -169,32 +169,35 @@ impl IcyBoardCreator {
 
         self.logger.start_action("Write default art files".to_string());
 
+        let mut options = SaveOptions::default();
+        options.screen_preparation = ScreenPreperation::ClearScreen;
+        options.modern_terminal_output = true;
         config.paths.welcome = PathBuf::from("art/welcome");
-        fs::write(
-            &self.destination.join(&config.paths.welcome).with_extension("pcb"),
-            include_str!("../../data/new_bbs/welcome.pcb"),
-        )?;
-        config.paths.newuser = PathBuf::from("art/newuser");
-        fs::write(
-            &self.destination.join(&config.paths.newuser).with_extension("pcb"),
-            include_str!("../../data/new_bbs/newuser.pcb"),
-        )?;
-        config.paths.closed = PathBuf::from("art/closed");
-        fs::write(
-            &self.destination.join(&config.paths.closed).with_extension("pcb"),
-            include_str!("../../data/new_bbs/closed.pcb"),
+        convert_to_pcb_opt(
+            &self.destination.join(&config.paths.welcome),
+            include_bytes!("../../data/new_bbs/welcome.icy"),
+            &options,
         )?;
 
+        config.paths.newuser = PathBuf::from("art/newuser");
+        convert_to_pcb_opt(
+            &self.destination.join(&config.paths.newuser),
+            include_bytes!("../../data/new_bbs/newuser.icy"),
+            &options,
+        )?;
+        config.paths.closed = PathBuf::from("art/closed");
+        convert_to_pcb(&self.destination.join(&config.paths.closed), include_bytes!("../../data/new_bbs/closed.icy"))?;
+
         config.paths.expire_warning = PathBuf::from("art/exp_warning");
-        fs::write(
-            &self.destination.join(&config.paths.expire_warning).with_extension("pcb"),
-            include_str!("../../data/new_bbs/warning.pcb"),
+        convert_to_pcb_opt(
+            &self.destination.join(&config.paths.expire_warning),
+            include_bytes!("../../data/new_bbs/warning.icy"),
+            &options,
         )?;
+
         config.paths.expired = PathBuf::from("art/expired");
-        fs::write(
-            &self.destination.join(&config.paths.expired).with_extension("pcb"),
-            include_str!("../../data/new_bbs/expired.pcb"),
-        )?;
+        convert_to_pcb(&self.destination.join(&config.paths.expired), include_bytes!("../../data/new_bbs/expired.icy"))?;
+
         config.paths.no_ansi = PathBuf::from("art/noansi");
         fs::write(
             &self.destination.join(&config.paths.no_ansi).with_extension("asc"),
@@ -271,54 +274,45 @@ impl IcyBoardCreator {
 
         self.logger.start_action("Write user & sysop menus…".to_string());
         conf.users_menu = PathBuf::from("conferences/main/brdm");
-        fs::write(
-            &self.destination.join(&conf.users_menu).with_extension("pcb"),
-            include_str!("../../data/new_bbs/brdm.pcb"),
+        let mut options = SaveOptions::default();
+        options.screen_preparation = ScreenPreperation::ClearScreen;
+        options.modern_terminal_output = true;
+        convert_to_pcb_opt(
+            &self.destination.join(&conf.users_menu),
+            include_bytes!("../../data/new_bbs/brdm.icy"),
+            &options,
         )?;
+
         conf.sysop_menu = PathBuf::from("conferences/main/brds");
-        fs::write(
-            &self.destination.join(&conf.sysop_menu).with_extension("pcb"),
-            include_str!("../../data/new_bbs/brds.pcb"),
+        convert_to_pcb_opt(
+            &self.destination.join(&conf.sysop_menu),
+            include_bytes!("../../data/new_bbs/brds.icy"),
+            &options,
         )?;
         conf.news_file = PathBuf::from("conferences/main/news");
-        fs::write(
-            &self.destination.join(&conf.news_file).with_extension("pcb"),
-            include_str!("../../data/new_bbs/news.pcb"),
-        )?;
+        convert_to_pcb(&self.destination.join(&conf.news_file), include_bytes!("../../data/new_bbs/news.icy"))?;
 
         // Bulletin Menu
         self.logger.start_action("Write bulletins…".to_string());
         conf.blt_menu = PathBuf::from("conferences/main/blt");
-        fs::write(
-            &self.destination.join(&conf.blt_menu).with_extension("pcb"),
-            include_str!("../../data/new_bbs/blt.pcb"),
-        )?;
+        convert_to_pcb(&self.destination.join(&conf.blt_menu), include_bytes!("../../data/new_bbs/blt.icy"))?;
         conf.blt_file = PathBuf::from("conferences/main/blt.toml");
 
         let mut list = BullettinList::default();
         let path = PathBuf::from("conferences/main/rules");
         list.bullettins.push(Bullettin::new(&path));
-        fs::write(
-            &self.destination.join(&path).with_extension("pcb"),
-            include_str!("../../data/new_bbs/rules.pcb"),
-        )?;
+        convert_to_pcb(&self.destination.join(&path), include_bytes!("../../data/new_bbs/rules.icy"))?;
 
         let path = PathBuf::from("conferences/main/history");
         list.bullettins.push(Bullettin::new(&path));
-        fs::write(
-            &self.destination.join(&path).with_extension("pcb"),
-            include_str!("../../data/new_bbs/history.pcb"),
-        )?;
+        convert_to_pcb(&self.destination.join(&path), include_bytes!("../../data/new_bbs/history.icy"))?;
 
         list.save(&self.destination.join(&conf.blt_file))?;
 
         // Surveys
         self.logger.start_action("Write surveys".to_string());
         conf.survey_menu = PathBuf::from("conferences/main/survey");
-        fs::write(
-            &self.destination.join(&conf.survey_menu).with_extension("pcb"),
-            include_str!("../../data/new_bbs/survey.pcb"),
-        )?;
+        convert_to_pcb(&self.destination.join(&conf.survey_menu), include_bytes!("../../data/new_bbs/survey.icy"))?;
         conf.survey_file = PathBuf::from("conferences/main/survey.toml");
 
         let mut list = SurveyList::default();
@@ -327,9 +321,10 @@ impl IcyBoardCreator {
             answer_file: PathBuf::from("conferences/main/script1.answer"),
             ..Default::default()
         };
-        fs::write(
-            &self.destination.join(&s.survey_file).with_extension("pcb"),
-            include_str!("../../data/new_bbs/script1.pcb"),
+        convert_to_pcb_opt(
+            &self.destination.join(&s.survey_file),
+            include_bytes!("../../data/new_bbs/script1.icy"),
+            &options,
         )?;
         list.push(s);
 
@@ -476,5 +471,18 @@ fn generate_security_level_data(security_file_path: &PathBuf) -> Res<()> {
 
 fn generate_protocol_data(protocol_data_file: &PathBuf) -> Res<()> {
     SupportedProtocols::generate_pcboard_defaults().save(protocol_data_file)?;
+    Ok(())
+}
+
+pub fn convert_to_pcb(path: &PathBuf, data: &[u8]) -> Res<()> {
+    let mut options = SaveOptions::default();
+    options.modern_terminal_output = true;
+    convert_to_pcb_opt(path, data, &options)
+}
+
+pub fn convert_to_pcb_opt(path: &PathBuf, data: &[u8], opt: &SaveOptions) -> Res<()> {
+    let mut buffer = Buffer::from_bytes(&PathBuf::from("a.icy"), true, data, None, None).unwrap();
+    let bytes: Vec<u8> = buffer.to_bytes("pcb", opt).unwrap();
+    fs::write(path.with_extension("pcb"), &bytes)?;
     Ok(())
 }

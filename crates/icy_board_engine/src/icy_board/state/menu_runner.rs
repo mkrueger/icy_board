@@ -522,6 +522,15 @@ impl IcyBoardState {
                 self.broadcast_command().await?;
             }
 
+            CommandType::ChangeMessageArea => {
+                let sec: SecurityExpression = self.session.user_command_level.cmd_j.clone();
+                if !self.check_sec("AREA", &sec).await? {
+                    return Ok(());
+                }
+                // AREA
+                self.area_change_command().await?;
+            }
+
             _ => {
                 return Err(Box::new(IcyBoardError::UnknownAction(format!("{:?}", cmd_action.command_type))));
             }

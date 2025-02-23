@@ -660,6 +660,7 @@ impl IcyBoardState {
             self.session.current_conference_number = conference;
             let c = self.get_board().await.conferences[conference as usize].clone();
             self.session.current_conference = c;
+            self.session.current_message_area = 0;
             if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
                 state.cur_conference = self.session.current_conference_number;
             }
@@ -878,6 +879,9 @@ impl IcyBoardState {
                 }
                 if "USERS".starts_with(command.as_str()) {
                     return convert_cmd(CommandType::UserList);
+                }
+                if "AREA".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::ChangeMessageArea);
                 }
                 None
             }

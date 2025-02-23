@@ -9,10 +9,10 @@ BEGIN
   
   CONFERENCE CONF = CONFINFO(CURCONF())
   
-  FOR i = 1 to CONF.Areas
+  FOR i = 0 to CONF.Areas - 1
     IF GetX() > 45
       PRINTLN
-    Area a = CONF.GetArea(i - 1)
+    Area a = CONF.GetArea(i)
     
     IF !a.HasAccess() CONTINUE
 
