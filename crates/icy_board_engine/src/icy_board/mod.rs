@@ -201,7 +201,7 @@ impl IcyBoard {
             e
         })?;
 
-        let load_path = get_path(parent_path, &config.paths.icbtext);
+        let load_path: PathBuf = get_path(parent_path, &config.paths.icbtext);
         let default_display_text = IcbTextFile::load(&load_path).map_err(|e| {
             log::error!("Error loading display text: {} from {}", e, load_path.display());
             e
@@ -271,7 +271,12 @@ impl IcyBoard {
             };
             if area_file.exists() {
                 match AreaList::load(&area_file) {
-                    Ok(areas) => {
+                    Ok(mut areas) => {
+                        for area in areas.iter_mut() {
+                            if !area.filename.is_absolute() {
+                                area.filename = board.root_path.join(&area.filename);
+                            }
+                        }
                         conf.areas = Some(areas);
                     }
                     Err(err) => {

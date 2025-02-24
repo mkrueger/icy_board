@@ -503,7 +503,6 @@ impl IcyBoardState {
             let msg_base = self.get_board().await.conferences[conf as usize].areas.as_ref().unwrap()[area as usize]
                 .filename
                 .clone();
-            let msg_base: PathBuf = self.resolve_path(&msg_base);
             if msg_base.with_extension("jhr").exists() {
                 JamMessageBase::open(msg_base)
             } else {

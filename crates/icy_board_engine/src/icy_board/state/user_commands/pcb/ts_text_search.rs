@@ -32,9 +32,10 @@ impl IcyBoardState {
             return Ok(());
         }
 
-        let message_base_file = &self.session.current_conference.areas.as_ref().unwrap()[self.session.current_message_area].filename;
-        let msgbase_file_resolved = self.get_board().await.resolve_file(message_base_file);
-        match JamMessageBase::open(&msgbase_file_resolved) {
+        let message_base_file = self.session.current_conference.areas.as_ref().unwrap()[self.session.current_message_area]
+            .filename
+            .clone();
+        match JamMessageBase::open(&message_base_file) {
             Ok(mut message_base) => {
                 let msg_search_from = if let Some(token) = self.session.tokens.pop_front() {
                     token
@@ -59,7 +60,7 @@ impl IcyBoardState {
                 while start < message_base.active_messages() {
                     if let Ok(msg) = message_base.read_header(start) {
                         let txt = message_base.read_msg_text(&msg)?;
-                        let matches = get_matches(&txt, &search_text);
+                        let matches: Vec<(usize, usize)> = get_matches(&txt, &search_text);
                         if !matches.is_empty() {
                             self.read_message_number(&mut message_base, &viewer, start, Some(matches)).await?;
                         }
@@ -70,10 +71,10 @@ impl IcyBoardState {
             }
             Err(err) => {
                 log::error!("Message index load error {}", err);
-                log::error!("Creating new message index at {}", msgbase_file_resolved.display());
+                log::error!("Creating new message index at {}", message_base_file.display());
                 self.display_text(IceText::CreatingNewMessageIndex, display_flags::NEWLINE | display_flags::LFAFTER)
                     .await?;
-                if JamMessageBase::create(msgbase_file_resolved).is_ok() {
+                if JamMessageBase::create(message_base_file).is_ok() {
                     log::error!("successfully created new message index.");
                 }
                 log::error!("failed to create message index.");

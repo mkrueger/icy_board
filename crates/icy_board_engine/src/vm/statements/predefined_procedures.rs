@@ -1644,7 +1644,7 @@ pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area as usize]
         .filename
         .clone();
-    match JamMessageBase::open(vm.resolve_file(&msg_base).await) {
+    match JamMessageBase::open(&msg_base) {
         Ok(base) => {
             match base.read_header(msg_number as u32) {
                 Ok(header) => {

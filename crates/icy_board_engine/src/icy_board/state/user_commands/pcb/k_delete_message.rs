@@ -10,10 +10,9 @@ use jamjam::jam::JamMessageBase;
 
 impl IcyBoardState {
     pub async fn delete_message(&mut self) -> Res<()> {
-        let message_base_file = &self.session.current_conference.areas.as_ref().unwrap()[0].filename;
-        let msgbase_file_resolved = self.get_board().await.resolve_file(message_base_file);
+        let message_base_file = self.session.current_conference.areas.as_ref().unwrap()[0].filename.clone();
 
-        match JamMessageBase::open(&msgbase_file_resolved) {
+        match JamMessageBase::open(&message_base_file) {
             Ok(message_base) => {
                 let msg = if let Some(token) = self.session.tokens.pop_front() {
                     token
@@ -38,10 +37,10 @@ impl IcyBoardState {
             }
             Err(err) => {
                 log::error!("Message index load error {}", err);
-                log::error!("Creating new message index at {}", msgbase_file_resolved.display());
+                log::error!("Creating new message index at {}", message_base_file.display());
                 self.display_text(IceText::CreatingNewMessageIndex, display_flags::NEWLINE | display_flags::LFAFTER)
                     .await?;
-                if JamMessageBase::create(msgbase_file_resolved).is_ok() {
+                if JamMessageBase::create(message_base_file).is_ok() {
                     log::error!("successfully created new message index.");
                     return self.read_messages().await;
                 }

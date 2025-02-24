@@ -522,6 +522,15 @@ impl IcyBoardState {
                 self.broadcast_command().await?;
             }
 
+            CommandType::ReplyMessage => {
+                let sec = self.session.user_command_level.cmd_e.clone();
+                if !self.check_sec("REPLY", &sec).await? {
+                    return Ok(());
+                }
+                // REPLY
+                self.reply_message_command().await?;
+            }
+
             CommandType::ChangeMessageArea => {
                 let sec: SecurityExpression = self.session.user_command_level.cmd_j.clone();
                 if !self.check_sec("AREA", &sec).await? {
