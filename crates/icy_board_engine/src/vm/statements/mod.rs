@@ -243,8 +243,8 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::FDOQDEL => predefined_procedures::fdoqdel(arg, arguments).await,
         OpCode::SOUNDDELAY => predefined_procedures::sounddelay(arg, arguments).await,
 
-        OpCode::ShortDesc => predefined_procedures::invalid(arg, arguments).await,
-        OpCode::MoveMsg => predefined_procedures::invalid(arg, arguments).await,
-        OpCode::SetBankBal => predefined_procedures::invalid(arg, arguments).await,
+        OpCode::ShortDesc => predefined_procedures::shortdesc(arg, arguments).await,
+        OpCode::MoveMsg => predefined_procedures::move_msg(arg, arguments).await,
+        OpCode::SetBankBal => predefined_procedures::set_bank_bal(arg, arguments).await,
     }
 }

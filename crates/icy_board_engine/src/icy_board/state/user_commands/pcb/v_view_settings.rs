@@ -38,7 +38,7 @@ impl IcyBoardState {
         self.println(TerminalTarget::Both, &format!(" {}", self.session.page_len)).await?;
         self.reset_color(TerminalTarget::Both).await?;
 
-        if self.session.expert_mode {
+        if self.session.expert_mode() {
             self.display_text(IceText::ViewSettingsExpertModeOn, display_flags::NEWLINE).await?;
         } else {
             self.display_text(IceText::ViewSettingsExpertModeOff, display_flags::NEWLINE).await?;

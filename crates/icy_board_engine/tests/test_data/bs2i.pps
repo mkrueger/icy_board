@@ -1,0 +1,2 @@
+PrintLn BS2I("1231"), ",", BS2I(I2BS(1234))
+PrintLn BD2I("12345678")

@@ -40,7 +40,7 @@ pub async fn create_door_sys(state: &IcyBoardState, path: &std::path::Path) -> R
     };
     contents.push_str(&format!("{}\r\n", emulation)); //Graphics mode (GR=ANSI, NG=ASCII)
     contents.push_str(&format!("{}\r\n", state.session.page_len)); // Screen length
-    contents.push_str(if state.session.expert_mode { "Y\r\n" } else { "N\r\n" }); // User Mode
+    contents.push_str(if state.session.expert_mode() { "Y\r\n" } else { "N\r\n" }); // User Mode
     contents.push_str("\r\n"); // Always blank
     contents.push_str("\r\n"); // Always blank
 

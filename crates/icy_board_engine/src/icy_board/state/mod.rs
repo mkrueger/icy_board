@@ -185,8 +185,6 @@ pub struct Session {
 
     pub request_logoff: bool,
 
-    pub expert_mode: bool,
-
     pub time_limit: i32,
     pub security_violations: i32,
 
@@ -262,7 +260,6 @@ impl Session {
             is_sysop: false,
             is_local: false,
             op_text: String::new(),
-            expert_mode: false,
             use_alias: false,
             time_limit: 1000,
             keyboard_timer_check: false,
@@ -297,6 +294,14 @@ impl Session {
             highest_msg_read: 0,
             term_caps: TerminalCaps::LOCAL,
             search_text: String::new(),
+        }
+    }
+
+    pub fn expert_mode(&self) -> bool {
+        if let Some(user) = &self.current_user {
+            user.flags.expert_mode
+        } else {
+            false
         }
     }
 
@@ -790,12 +795,10 @@ impl IcyBoardState {
             "B" => convert_cmd(CommandType::BulletinList),
             "C" => convert_cmd(CommandType::CommentToSysop),
             "E" => convert_cmd(CommandType::EnterMessage),
-            // "RM" =>  convert_cmd(CommandType::ReadMessage(true)),
-            // "RM+" =>  convert_cmd(CommandType::ReadMessage(true)), // forward
-            // "RM-" =>  convert_cmd(CommandType::ReadMessage(false)), // backward
+            "RM" | "RM+" | "RM-" => convert_cmd(CommandType::ReadMemorizedMessage), // backward
             "F" => convert_cmd(CommandType::FileDirectory),
-            // "BD" =>  convert_cmd(CommandType::BatchDownload),
-            // "BU" =>  convert_cmd(CommandType::BatchUpload),
+            "BD" => convert_cmd(CommandType::BatchDownload),
+            "BU" => convert_cmd(CommandType::BatchUpload),
             "G" => convert_cmd(CommandType::Goodbye),
             "?" => convert_cmd(CommandType::Help),
             "I" => convert_cmd(CommandType::InitialWelcome),
@@ -865,12 +868,15 @@ impl IcyBoardState {
                     return convert_cmd(CommandType::RunPPE);
                 }
 
-                // if "QWK".starts_with(command.as_str()) { return convert_cmd(CommandType::QWK) }
-
+                if "QWK".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::QWK);
+                }
                 if "MENU".starts_with(command.as_str()) {
                     return convert_cmd(CommandType::ShowMenu);
                 }
-                // if "SELECT".starts_with(command.as_str()) { return convert_cmd(CommandType::SelectConferences) }
+                if "SELECT".starts_with(command.as_str()) {
+                    return convert_cmd(CommandType::SelectConferences);
+                }
                 if "TEST".starts_with(command.as_str()) {
                     return convert_cmd(CommandType::TestFile);
                 }

@@ -114,7 +114,7 @@ async fn create_user_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<(
         contents.extend(export_cp437_string(&user.bus_data_phone, 14, 0));
         contents.extend(export_cp437_string(&user.home_voice_phone, 14, 0));
         contents.extend(u16::to_le_bytes(IcbDate::from_utc(user.stats.last_on).to_pcboard_date() as u16));
-        if state.session.expert_mode {
+        if state.session.expert_mode() {
             contents.push(1);
         } else {
             contents.push(0);

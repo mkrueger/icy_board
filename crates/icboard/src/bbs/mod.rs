@@ -233,7 +233,7 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
         if cmd.state.session.disp_options.abort_printout {
             cmd.state.session.disp_options.check_display_status();
         }
-        if num_tries == 0 && !cmd.state.session.expert_mode {
+        if num_tries == 0 && !cmd.state.session.expert_mode() {
             if press_enter && cmd.state.session.disp_options.num_lines_printed > 0 {
                 cmd.state.new_line().await?;
                 cmd.state.press_enter().await?;

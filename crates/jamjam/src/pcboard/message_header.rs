@@ -4,7 +4,7 @@ use chrono::{Datelike, Local, NaiveTime};
 use super::{convert_pcboard_str, PCBoardError};
 use crate::{
     pcboard::{DATE_LEN, FROM_TO_LEN, PASSWORD_LEN, TIME_LEN},
-    util::basic_real::basicreal_to_u32,
+    util::basic_real::BasicReal,
 };
 use std::{
     fs::File,
@@ -186,14 +186,14 @@ impl PCBoardMessageHeader {
 
         convert_u8!(status, data);
         convert_u32!(msg_number, data);
-        let msg_number = basicreal_to_u32(msg_number);
+        let msg_number = BasicReal::from(msg_number.to_le_bytes()).into();
         convert_u32!(ref_number, data);
-        let ref_number = basicreal_to_u32(ref_number);
+        let ref_number = BasicReal::from(ref_number.to_le_bytes()).into();
         convert_u8!(num_blocks, data);
         convert_to_string!(date_time, data, DATE_LEN + TIME_LEN);
         convert_to_string!(to_field, data, FROM_TO_LEN);
         convert_u32!(reply_date, data);
-        let reply_date = basicreal_to_u32(reply_date);
+        let reply_date = BasicReal::from(reply_date.to_le_bytes()).into();
 
         convert_to_string!(reply_time, data, TIME_LEN);
         convert_u8!(reply_status, data);

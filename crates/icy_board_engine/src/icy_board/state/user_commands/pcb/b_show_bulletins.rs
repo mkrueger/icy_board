@@ -35,7 +35,7 @@ impl IcyBoardState {
             if self.session.tokens.is_empty() {
                 let input = self
                     .input_field(
-                        if self.session.expert_mode {
+                        if self.session.expert_mode() {
                             IceText::BulletinListCommandExpertmode
                         } else {
                             IceText::BulletinListCommand

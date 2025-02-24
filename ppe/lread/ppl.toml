@@ -13,5 +13,6 @@ text_files = [
 art_files = [
     "data/screen.icy",
     "data/help.icy",
+    "data/helprd.icy",
     "data/reader.icy"
 ]

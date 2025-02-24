@@ -39,7 +39,7 @@ impl IcyBoardState {
 
                 let input = self
                     .input_field(
-                        if self.session.expert_mode {
+                        if self.session.expert_mode() {
                             IceText::FileListCommandExpert
                         } else {
                             IceText::FileListCommand

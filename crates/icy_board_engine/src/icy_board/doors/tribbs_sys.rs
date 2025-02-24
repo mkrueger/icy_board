@@ -15,7 +15,7 @@ pub async fn create_tribbs_sys(state: &IcyBoardState, path: &std::path::Path) ->
     contents.push_str(&format!("{}\r\n", state.session.user_name));
     contents.push_str(&format!("{}\r\n", state.door_user_password().await));
     contents.push_str(&format!("{}\r\n", state.session.cur_security));
-    contents.push_str(&format!("{}\r\n", if state.session.expert_mode { "Y" } else { "N" }));
+    contents.push_str(&format!("{}\r\n", if state.session.expert_mode() { "Y" } else { "N" }));
     let ansi = match state.session.disp_options.grapics_mode {
         GraphicsMode::Ctty => "N",
         _ => "Y",

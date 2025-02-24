@@ -1454,6 +1454,14 @@ impl VariableValue {
         }
     }
 
+    pub fn as_date(&self) -> IcbDate {
+        return unsafe { IcbDate::from_pcboard(self.data.date_value) };
+    }
+
+    pub fn as_time(&self) -> IcbTime {
+        return unsafe { IcbTime::from_pcboard(self.data.time_value) };
+    }
+
     /// Returns (conference, area) for a message id
     pub fn as_msg_id(&self) -> (i32, i32) {
         match self.vtype {

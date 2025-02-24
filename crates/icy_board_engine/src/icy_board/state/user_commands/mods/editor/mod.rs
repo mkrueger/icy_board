@@ -54,7 +54,6 @@ impl EditState {
             self.print_divider(state).await?;
         }
         loop {
-            state.session.disp_options.no_change();
             if self.use_fse {
                 self.full_screen_edit(state).await?;
             } else {
@@ -62,7 +61,7 @@ impl EditState {
             }
 
             loop {
-                let cmd = if state.session.expert_mode {
+                let cmd = if state.session.expert_mode() {
                     state
                         .input_field(
                             IceText::MessageCommandExpertmode,
@@ -101,7 +100,7 @@ impl EditState {
                                 "",
                                 &"",
                                 Some(state.session.no_char.to_string()),
-                                display_flags::YESNO | display_flags::NEWLINE | display_flags::UPCASE | display_flags::FIELDLEN | display_flags::LFBEFORE,
+                                display_flags::YESNO | display_flags::NEWLINE | display_flags::UPCASE | display_flags::FIELDLEN,
                             )
                             .await?;
                         if abort == state.session.yes_char.to_uppercase().to_string() {
@@ -397,9 +396,16 @@ impl EditState {
                 }
 
                 '\r' => {
-                    let update = self.press_enter();
-                    self.update_screen(state, update).await?;
-                    self.print_line_number(state).await?;
+                    if (self.cursor.y + self.top_line as i32) < 999 {
+                        let update = self.press_enter();
+                        if (self.cursor.y - self.top_line as i32) >= state.session.page_len as i32 - Self::HEADER_SIZE - 1 {
+                            self.top_line += (state.session.page_len as i32 - Self::HEADER_SIZE - 1).max(1) as usize;
+                            self.redraw_fse(state).await?;
+                        } else {
+                            self.update_screen(state, update).await?;
+                        }
+                        self.print_line_number(state).await?;
+                    }
                 }
 
                 ch => {
@@ -450,6 +456,7 @@ impl EditState {
 
     async fn redraw_fse(&mut self, state: &mut IcyBoardState) -> Res<()> {
         state.clear_screen(TerminalTarget::Both).await?;
+        state.session.disp_options.force_non_stop();
         self.msg_header(state).await?;
         state.reset_color(TerminalTarget::Both).await?;
         state.gotoxy(TerminalTarget::Both, 1, Self::HEADER_SIZE).await?;

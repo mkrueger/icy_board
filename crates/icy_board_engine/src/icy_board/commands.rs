@@ -238,6 +238,21 @@ pub enum CommandType {
     // 'TS'
     TextSearch,
 
+    // 'QWK'
+    QWK,
+
+    // 'SELECT'
+    SelectConferences,
+
+    /// BD command
+    BatchDownload,
+
+    /// BU command
+    BatchUpload,
+
+    /// RM command
+    ReadMemorizedMessage,
+
     // 'AREA'
     ChangeMessageArea,
 }
@@ -308,7 +323,12 @@ impl Display for CommandType {
             CommandType::WriteEmail => write!(f, "(@W)\tWriteEmail"),
             CommandType::RunPPE => write!(f, "(PPE)\tRunPPE"),
             CommandType::TextSearch => write!(f, "(TS)\tTextSearch"),
+            CommandType::QWK => write!(f, "(QWK)\tQWK"),
+            CommandType::SelectConferences => write!(f, "(SELECT)\tSelectConferences"),
+            CommandType::BatchDownload => write!(f, "(BD)\tBatchDownload"),
+            CommandType::BatchUpload => write!(f, "(BU)\tBatchUpload"),
             CommandType::ChangeMessageArea => write!(f, "(AREA)\tMessageArea"),
+            CommandType::ReadMemorizedMessage => write!(f, "(RM)\tReadMemorizedMessage"),
             CommandType::GotoXY => write!(f, "GotoXY"),
             CommandType::PrintText => write!(f, "PrintText"),
             CommandType::RefreshDisplayString => write!(f, "RefreshDisplayString"),

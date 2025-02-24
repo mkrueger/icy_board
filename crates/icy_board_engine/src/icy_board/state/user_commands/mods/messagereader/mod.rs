@@ -212,7 +212,7 @@ impl IcyBoardState {
             active_messages = messages.len() as u32;
         }
         while !self.session.disp_options.abort_printout {
-            let prompt = if self.session.expert_mode {
+            let prompt = if self.session.expert_mode() {
                 IceText::MessageReadCommandExpert
             } else {
                 IceText::MessageReadCommand
@@ -305,7 +305,7 @@ impl IcyBoardState {
                     self.display_text(IceText::NoMailFound, display_flags::NEWLINE | display_flags::LFAFTER).await?;
                 }
             }
-            let prompt = if self.session.expert_mode {
+            let prompt = if self.session.expert_mode() {
                 IceText::EndOfMessageExpertmode
             } else {
                 IceText::EndOfMessage

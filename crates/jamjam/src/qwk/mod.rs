@@ -7,7 +7,7 @@ use std::{
 use bstr::BString;
 use thiserror::Error;
 
-use crate::util::basic_real::basicreal_to_u32;
+use crate::util::basic_real::BasicReal;
 
 use self::{
     control::{Conference, ControlDat},
@@ -119,7 +119,7 @@ impl QwkMessageBase {
         let mut res = Vec::with_capacity(data.len() / 5);
         while !data.is_empty() {
             convert_qwk_ndx!(conference, data);
-            res.push(basicreal_to_u32(conference));
+            res.push(BasicReal::from(conference.to_le_bytes()).into());
         }
         Ok(res)
     }

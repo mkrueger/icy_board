@@ -3,7 +3,7 @@ use std::{
     io::{BufWriter, Read, Write},
 };
 
-use crate::util::basic_real::basicreal_to_u32;
+use crate::util::basic_real::BasicReal;
 
 pub struct PCBoardMessageBaseHeader {
     /// Highest message number in index file
@@ -32,13 +32,13 @@ impl PCBoardMessageBaseHeader {
         let mut data = &data[..];
 
         convert_u32!(high_msg_num, data);
-        let high_msg_num = basicreal_to_u32(high_msg_num);
+        let high_msg_num = BasicReal::from(high_msg_num.to_le_bytes()).into();
         convert_u32!(low_msg_num, data);
-        let low_msg_num = basicreal_to_u32(low_msg_num);
+        let low_msg_num = BasicReal::from(low_msg_num.to_le_bytes()).into();
         convert_u32!(num_active_msgs, data);
-        let num_active_msgs = basicreal_to_u32(num_active_msgs);
+        let num_active_msgs = BasicReal::from(num_active_msgs.to_le_bytes()).into();
         convert_u32!(num_callers, data);
-        let num_callers = basicreal_to_u32(num_callers);
+        let num_callers = BasicReal::from(num_callers.to_le_bytes()).into();
         let lock_status = [data[0], data[1], data[2], data[3], data[4], data[5]];
 
         Ok(Self {

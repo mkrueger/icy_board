@@ -33,7 +33,7 @@ pub async fn create_callinfo_bbs(state: &IcyBoardState, path: &std::path::Path, 
     contents.push_str(&format!("{}\r\n", 999 * 1024)); // Max Downloads KB
     contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().home_voice_phone)); // Phone Number
     contents.push_str(&format!("{}\r\n", Local::now().format("%m/%d%/%y %H:%M"))); // Date-Time
-    let emulation = if state.session.expert_mode { "EXPERT" } else { "NOVICE" };
+    let emulation = if state.session.expert_mode() { "EXPERT" } else { "NOVICE" };
     contents.push_str(&format!("{}\r\n", emulation)); // Novice or Expert
     contents.push_str("All\r\n"); // Transfer Method  All, Ymodem, Ymodem/G, Xmodem, Xmodem/CRC, Xmodem-1K, Xmodem-1K/G, Ascii
     contents.push_str(&format!(

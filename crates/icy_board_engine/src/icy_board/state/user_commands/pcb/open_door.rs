@@ -44,7 +44,7 @@ impl IcyBoardState {
             token
         } else {
             self.input_field(
-                if self.session.expert_mode {
+                if self.session.expert_mode() {
                     IceText::DOORNumberCommandExpertmode
                 } else {
                     IceText::DOORNumber

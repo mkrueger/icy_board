@@ -48,7 +48,18 @@ PROCEDURE ReadMsg()
             MSGSUBJ = Left(Mid(line, 19, LEN(line) - 18), SubjLen)
         CASE "  Message Number:"
             MSGNUMBER = Left(Mid(line, 19, LEN(line) - 18), 5)
+        CASE "Extended headers:"
+            I = 0
+            J = TOINT(Mid(line, 19, LEN(line) - 18))
+            WHILE I < J DO
+                FGet 1, line
+                IF LEFT(line, 8) == "SUBJECT:" THEN
+                    MSGSUBJ = Left(Mid(line, 9, LEN(line) - 9), SubjLen)
+                ENDIF
+                I += 1
+            ENDWHILE
         ENDSELECT
+
         IF line == "Message Body:" BREAK
     ENDLOOP
 
@@ -64,7 +75,7 @@ PROCEDURE ReadMsg()
         MSG_LEN += 1
     ENDWHILE
     FClose 1
-
+    :RedrawReader
     Cls
     StartDisp FNS
     DispFile PPEPath() + "data\reader.pcb", GRAPH
@@ -129,6 +140,16 @@ PROCEDURE ReadMsg()
                     goto RedrawMsg
                 ENDIF
             ENDIF
+        CASE "H", "h"
+            Cls
+            StartDisp FNS
+            DispFile PPEPath() + "data\helprd.pcb", GRAPH
+            Wait
+            goto RedrawReader         
+        CASE "R", "r"
+            Cls
+            Command false, "REPLY " + MSGNUMBER
+            Goto RedrawReader
         ENDSELECT
     ENDLOOP
     

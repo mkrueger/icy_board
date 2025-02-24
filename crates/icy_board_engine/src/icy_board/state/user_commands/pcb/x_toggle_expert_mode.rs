@@ -5,7 +5,7 @@ impl IcyBoardState {
     pub async fn set_expert_mode(&mut self) -> Res<()> {
         self.displaycmdfile("x").await?;
 
-        let mut expert_mode = !self.session.expert_mode;
+        let mut expert_mode = !self.session.expert_mode();
         if let Some(token) = self.session.tokens.pop_front() {
             let token = token.to_ascii_uppercase();
             if token == "ON" {
@@ -16,7 +16,6 @@ impl IcyBoardState {
                 return Ok(());
             }
         }
-        self.session.expert_mode = expert_mode;
         if let Some(user) = &mut self.session.current_user {
             user.flags.expert_mode = expert_mode;
         }

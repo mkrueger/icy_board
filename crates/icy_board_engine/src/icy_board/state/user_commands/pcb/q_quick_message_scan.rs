@@ -50,7 +50,7 @@ impl IcyBoardState {
     }
 
     async fn show_quick_scans(&mut self, area: usize, message_base: JamMessageBase) -> Res<()> {
-        let prompt = if self.session.expert_mode {
+        let prompt = if self.session.expert_mode() {
             IceText::MessageScanCommandExpertmode
         } else {
             IceText::MessageScanCommand

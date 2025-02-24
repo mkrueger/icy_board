@@ -14,6 +14,7 @@ use crate::icy_board::security_expr::SecurityExpression;
 use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_NUM, MASK_PATH, MASK_PWD};
 use crate::icy_board::state::GraphicsMode;
 use crate::icy_board::user_base::Password;
+use crate::icy_board::user_inf::BankUserInf;
 use crate::parser::CONFERENCE_ID;
 use crate::vm::{TerminalTarget, VirtualMachine};
 use crate::Res;
@@ -21,6 +22,7 @@ use chrono::{DateTime, Utc};
 use icy_engine::{update_crc32, Position, TextPane};
 use jamjam::jam::msg_header::JamMessageHeader;
 use jamjam::jam::JamMessageBase;
+use jamjam::util::basic_real::{BasicDouble, BasicReal};
 use radix_fmt::radix;
 use rand::Rng; // 0.8.5
 
@@ -1934,23 +1936,29 @@ pub async fn setdrive(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn bs2i(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let str = vm.eval_expr(&args[0]).await?.as_string();
+    let val = BasicReal::from(str.chars().take(4).map(|c| c as u8).collect::<Vec<u8>>());
+    Ok(VariableValue::new_int(val.into()))
 }
 
 pub async fn bd2i(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let str = vm.eval_expr(&args[0]).await?.as_string();
+    let val: i64 = BasicDouble::from(str.chars().take(8).map(|c| c as u8).collect::<Vec<u8>>()).into();
+    Ok(VariableValue::new_unsigned(val as u64))
 }
 
 pub async fn i2bs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let val = vm.eval_expr(&args[0]).await?.as_int();
+    let val = BasicReal::from(val);
+    let a = val.bytes().iter().map(|c| *c as char).collect::<String>();
+    Ok(VariableValue::new_string(a))
 }
 
 pub async fn i2bd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let val = vm.eval_expr(&args[0]).await?.as_unsigned() as i64;
+    let val = BasicDouble::from(val);
+    let a = val.bytes().iter().map(|c| *c as char).collect::<String>();
+    Ok(VariableValue::new_string(a))
 }
 
 pub async fn ftell(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1963,13 +1971,46 @@ pub async fn os(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableVa
 }
 
 pub async fn shortdesc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    if let Some(user) = &vm.icy_board_state.session.current_user {
+        Ok(VariableValue::new_bool(user.flags.use_short_filedescr))
+    } else {
+        Ok(VariableValue::new_bool(false))
+    }
 }
 pub async fn getbankbal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let field = vm.eval_expr(&args[0]).await?.as_int();
+    let value = vm.eval_expr(&args[1]).await?;
+
+    if let Some(user) = &mut vm.icy_board_state.session.current_user {
+        if user.bank.is_none() {
+            user.bank = Some(BankUserInf::default());
+        }
+        if let Some(bank) = &mut user.bank {
+            let value = match field {
+                0 => VariableValue::new_date(bank.time_info.last_deposite_date.to_pcboard_date()),
+                1 => VariableValue::new_date(bank.time_info.last_withdraw_date.to_pcboard_date()),
+                2 => VariableValue::new_int(bank.time_info.last_transaction_amount as i32),
+                3 => VariableValue::new_int(bank.time_info.amount_saved as i32),
+                4 => VariableValue::new_int(bank.time_info.max_withdrawl_per_day as i32),
+                5 => VariableValue::new_int(bank.time_info.max_stored_amount as i32),
+
+                6 => VariableValue::new_date(bank.byte_info.last_deposite_date.to_pcboard_date()),
+                7 => VariableValue::new_date(bank.byte_info.last_withdraw_date.to_pcboard_date()),
+                8 => VariableValue::new_int(bank.byte_info.last_transaction_amount as i32),
+                9 => VariableValue::new_int(bank.byte_info.amount_saved as i32),
+                10 => VariableValue::new_int(bank.byte_info.max_withdrawl_per_day as i32),
+                11 => VariableValue::new_int(bank.byte_info.max_stored_amount as i32),
+                _ => {
+                    log::error!("GET_BANK_BAL: Invalid field {}", field);
+                    return Ok(VariableValue::new_int(0));
+                }
+            };
+            return Ok(value);
+        }
+    }
+    Ok(VariableValue::new_int(0))
 }
+
 pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_id();
     let field_num = vm.eval_expr(&args[2]).await?.as_int();

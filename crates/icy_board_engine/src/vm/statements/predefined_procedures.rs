@@ -9,6 +9,7 @@ use crate::{
             functions::{display_flags, MASK_ALNUM},
             GraphicsMode, NodeState, NodeStatus,
         },
+        user_inf::BankUserInf,
     },
     Res,
 };
@@ -1638,7 +1639,7 @@ pub async fn recordusage(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<(
 }
 pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let (conference, area) = vm.eval_expr(&args[0]).await?.as_msg_id();
-    let msg_number = vm.eval_expr(&args[1]).await?.as_int();
+    let msg_number: i32 = vm.eval_expr(&args[1]).await?.as_int();
     let file_name = vm.eval_expr(&args[2]).await?.as_string();
 
     let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area as usize]
@@ -1843,5 +1844,74 @@ pub async fn fdoqdel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 pub async fn sounddelay(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::warn!("SOUNDDELAY is not supported");
+    Ok(())
+}
+
+pub async fn shortdesc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let use_short_desc = vm.eval_expr(&args[0]).await?.as_bool();
+    if let Some(user) = &mut vm.icy_board_state.session.current_user {
+        user.flags.use_short_filedescr = use_short_desc;
+    }
+    Ok(())
+}
+
+pub async fn move_msg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    todo!("move_msg not implemented statement!");
+}
+
+pub async fn set_bank_bal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let field = vm.eval_expr(&args[0]).await?.as_int();
+    let value = vm.eval_expr(&args[1]).await?;
+
+    if let Some(user) = &mut vm.icy_board_state.session.current_user {
+        if user.bank.is_none() {
+            user.bank = Some(BankUserInf::default());
+        }
+        if let Some(bank) = &mut user.bank {
+            match field {
+                0 => {
+                    bank.time_info.last_deposite_date = value.as_date();
+                }
+                1 => {
+                    bank.time_info.last_withdraw_date = value.as_date();
+                }
+                2 => {
+                    bank.time_info.last_transaction_amount = value.as_int() as u32;
+                }
+                3 => {
+                    bank.time_info.amount_saved = value.as_int() as u32;
+                }
+                4 => {
+                    bank.time_info.max_withdrawl_per_day = value.as_int() as u32;
+                }
+                5 => {
+                    bank.time_info.max_stored_amount = value.as_int() as u32;
+                }
+
+                6 => {
+                    bank.byte_info.last_deposite_date = value.as_date();
+                }
+                7 => {
+                    bank.byte_info.last_withdraw_date = value.as_date();
+                }
+                8 => {
+                    bank.byte_info.last_transaction_amount = value.as_int() as u32;
+                }
+                9 => {
+                    bank.byte_info.amount_saved = value.as_int() as u32;
+                }
+                10 => {
+                    bank.byte_info.max_withdrawl_per_day = value.as_int() as u32;
+                }
+                11 => {
+                    bank.byte_info.max_stored_amount = value.as_int() as u32;
+                }
+
+                _ => {
+                    log::error!("SET_BANK_BAL: Invalid field {}", field);
+                }
+            }
+        }
+    }
     Ok(())
 }

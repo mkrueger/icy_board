@@ -7,7 +7,7 @@ use std::{
 use bstr::BString;
 use thiserror::Error;
 
-use crate::util::basic_real::basicreal_to_u32;
+use crate::util::basic_real::BasicReal;
 
 use self::{
     base_header::PCBoardMessageBaseHeader,
@@ -220,7 +220,8 @@ impl PCBoardMessageBase {
             if num == 0 {
                 break;
             }
-            let num = (basicreal_to_u32(num) - 1) * 128;
+            let r: u32 = BasicReal::from(num.to_le_bytes()).into();
+            let num = (r - 1) * 128;
             res.push(num);
         }
 
