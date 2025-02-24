@@ -15,7 +15,7 @@ PROCEDURE DrawHeaderArea()
     ELSE 
         Redraw = FALSE
     ENDIF
-    
+;$IF VERSION < 400
     FOPEN 2, MSGS_FILE + ".IDX", O_RD, S_DW
     IF FErr(2) THEN
         Cls
@@ -24,7 +24,7 @@ PROCEDURE DrawHeaderArea()
         STOP
     ENDIF
     FOPEN 3, MSGS_FILE, O_RD, S_DW
-
+;$ENDIF
     FOR I = 0 TO Lines
         INTEGER O = FirstMsg + I
         IF O > HIGH - LOW THEN
@@ -47,6 +47,7 @@ PROCEDURE DrawHeaderArea()
         INTEGER MSG_NUM = LOW + O
 
         IF FROM[O] == "" THEN 
+;$IF VERSION < 400
             FSeek 2, O * 64, SEEK_SET
             FRead 2, Offset, 4
             FRead 2, J, 4
@@ -61,16 +62,19 @@ PROCEDURE DrawHeaderArea()
             FSeek 3, Offset + 83, SEEK_SET
             FRead 3, LINE, 25
             SUBJ[O] = Left(StripATX(LINE), 36) + " "
-
-            ;            FROM[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_FROM)), 12) + " "
-            ;            SUBJ[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_SUBJ)), 36) + " "
-            ;            TO[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_TO)), 12) + " "
-            ;            DATETXT[O] = STRING(GetMsgHdr(CONF, MSG_NUM, HDR_DATE))
+;$ELSE
+            FROM[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_FROM)), 12) + " "
+            SUBJ[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_SUBJ)), 36) + " "
+            TO[O] = Left(StripATX(GetMsgHdr(CONF, MSG_NUM, HDR_TO)), 12) + " "
+            DATETXT[O] = STRING(GetMsgHdr(CONF, MSG_NUM, HDR_DATE))
+;$ENDIF
         ENDIF
         Print Right(STRING(MSG_NUM), 4), " ", SUBJ[o], FROM[o], TO[o], DATETXT[O]
     NEXT
+;$IF VERSION < 400
     FClose 2
     FClose 3
+;$ENDIF
     OldCursor = Cursor
     DefColor
 ENDPROC

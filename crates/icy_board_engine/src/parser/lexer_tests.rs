@@ -321,3 +321,57 @@ fn test_case_number() {
     assert_eq!(Token::Const(Constant::Integer(1, NumberFormat::Default)), lex.next_token().unwrap());
     assert_eq!(5..6, lex.span());
 }
+
+#[test]
+fn test_define() {
+    assert_eq!(Token::Identifier(unicase::Ascii::new("PRINT".to_string())), get_token("PRINT"));
+    assert_eq!(Token::Identifier(unicase::Ascii::new("_".to_string())), get_token("_"));
+    assert_eq!(Token::Identifier(unicase::Ascii::new("_O".to_string())), get_token("_O"));
+
+    let src = ";$DEFINE FOO";
+    let mut lex = Lexer::new(
+        PathBuf::from("."),
+        LAST_PPLC,
+        src,
+        Encoding::Utf8,
+        Arc::new(Mutex::new(ErrorReporter::default())),
+    );
+    while let Some(_token) = lex.next_token() {}
+    assert_eq!(Constant::Boolean(true), *lex.get_define("FOO").unwrap());
+}
+
+#[test]
+fn test_if() {
+    assert_eq!(Token::Identifier(unicase::Ascii::new("PRINT".to_string())), get_token("PRINT"));
+    assert_eq!(Token::Identifier(unicase::Ascii::new("_".to_string())), get_token("_"));
+    assert_eq!(Token::Identifier(unicase::Ascii::new("_O".to_string())), get_token("_O"));
+
+    let src = ";$IF VERSION > 0\nPRIINT\n$ENDIF";
+    let mut lex = Lexer::new(
+        PathBuf::from("."),
+        LAST_PPLC,
+        src,
+        Encoding::Utf8,
+        Arc::new(Mutex::new(ErrorReporter::default())),
+    );
+    lex.next_token().unwrap();
+    assert_eq!(Token::Identifier(unicase::Ascii::new("PRIINT".to_string())), lex.next_token().unwrap());
+}
+
+#[test]
+fn test_if2() {
+    assert_eq!(Token::Identifier(unicase::Ascii::new("PRINT".to_string())), get_token("PRINT"));
+    assert_eq!(Token::Identifier(unicase::Ascii::new("_".to_string())), get_token("_"));
+    assert_eq!(Token::Identifier(unicase::Ascii::new("_O".to_string())), get_token("_O"));
+
+    let src = ";$IF 1 == 2\nPRIINT\n$ENDIF";
+    let mut lex = Lexer::new(
+        PathBuf::from("."),
+        LAST_PPLC,
+        src,
+        Encoding::Utf8,
+        Arc::new(Mutex::new(ErrorReporter::default())),
+    );
+    lex.next_token().unwrap();
+    assert_eq!(None, lex.next_token());
+}

@@ -14,7 +14,7 @@ use std::{
 use thiserror::Error;
 use unicase::Ascii;
 
-use super::{Encoding, ErrorReporter};
+use super::{pre_processor_expr_visitor::PreProcessorVisitor, Encoding, ErrorReporter, Parser, UserTypeRegistry};
 
 #[derive(Error, Default, Debug, Clone, PartialEq)]
 pub enum LexingErrorType {
@@ -39,6 +39,12 @@ pub enum LexingErrorType {
 
     #[error("Don't use braces, they will get another meaning in the future. Use '(', ')' instead.")]
     DontUseBraces,
+
+    #[error("Invalid define value: {0}")]
+    InvalidDefineValue(String),
+
+    #[error("Already defined ({0})")]
+    AlreadyDefined(String),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -72,6 +78,7 @@ pub enum CommentType {
     SingleLineQuote,
     SingleLineSemicolon,
     SingleLineStar,
+    BlockComment,
 }
 
 impl fmt::Display for CommentType {
@@ -80,6 +87,7 @@ impl fmt::Display for CommentType {
             CommentType::SingleLineSemicolon => write!(f, ";"),
             CommentType::SingleLineQuote => write!(f, "'"),
             CommentType::SingleLineStar => write!(f, "*"),
+            CommentType::BlockComment => write!(f, ""),
         }
     }
 }
@@ -91,6 +99,7 @@ pub enum Token {
     Identifier(Ascii<String>),
     Comment(CommentType, String),
     UseFuncs(CommentType, String),
+    Define(CommentType, String, Constant),
 
     Comma,
 
@@ -269,6 +278,8 @@ impl fmt::Display for Token {
             Token::EndSelect => write!(f, "ENDSELECT"),
 
             Token::Comment(ct, s) | Token::UseFuncs(ct, s) => write!(f, "{ct}{s}"),
+            Token::Define(ct, s, value) => write!(f, "{ct}DEFINE {s} = {value}"),
+
             Token::Eol => write!(f, "<End Of Line>"),
 
             // Token::VarType(t) => write!(f, "{:?}", t),
@@ -303,6 +314,7 @@ pub enum LexerState {
 
 pub struct Lexer {
     lookup_table: &'static HashMap<unicase::Ascii<String>, Token>,
+    define_table: HashMap<unicase::Ascii<String>, Constant>,
     file: PathBuf,
     lang_version: u16,
     encoding: Encoding,
@@ -452,6 +464,9 @@ lazy_static::lazy_static! {
 
 impl Lexer {
     pub fn new(file: PathBuf, version: u16, text: &str, encoding: Encoding, errors: Arc<Mutex<ErrorReporter>>) -> Self {
+        let mut define_table = HashMap::new();
+        define_table.insert(Ascii::new("VERSION".into()), Constant::Integer(version as i32, NumberFormat::Default));
+
         Self {
             lookup_table: if version < 200 {
                 &*TOKEN_LOOKUP_TABLE_100
@@ -464,6 +479,7 @@ impl Lexer {
             },
             file,
             lang_version: version,
+            define_table,
             encoding,
             text: text.chars().collect(),
             lexer_state: LexerState::AfterEol,
@@ -472,6 +488,10 @@ impl Lexer {
             token_end: 0,
             include_lexer: None,
         }
+    }
+
+    pub fn get_define(&self, key: &str) -> Option<&Constant> {
+        self.define_table.get(&Ascii::new(key.to_string()))
     }
 
     #[inline]
@@ -1076,7 +1096,7 @@ impl Lexer {
             }
         }
         self.lexer_state = LexerState::AfterEol;
-        let comment = self.text[self.token_start + 1..self.token_end].iter().collect::<String>();
+        let mut comment = self.text[self.token_start + 1..self.token_end].iter().collect::<String>();
 
         if comment.len() > "$INCLUDE:".len() && comment.chars().take("$INCLUDE:".len()).collect::<String>().to_ascii_uppercase() == "$INCLUDE:" {
             let include_file = comment.chars().skip("$INCLUDE:".len()).collect::<String>().trim().to_string();
@@ -1102,9 +1122,110 @@ impl Lexer {
                 }
             }
         }
+        let chars = comment.chars().collect::<Vec<char>>();
 
-        if comment.len() > "$USEFUNCS".len() && comment.chars().take("$USEFUNCS".len()).collect::<String>().to_ascii_uppercase() == "$USEFUNCS" {
+        if comment.len() > "$USEFUNCS".len() && chars.iter().take("$USEFUNCS".len()).collect::<String>().to_ascii_uppercase() == "$USEFUNCS" {
             return Some(Token::UseFuncs(cmt_type, comment));
+        }
+
+        if comment.len() > "$ELSE".len() && chars.iter().take("$ELSE".len()).collect::<String>().to_ascii_uppercase() == "$ELSE" {
+            loop {
+                let Some(ch) = self.next_ch() else {
+                    break;
+                };
+                comment.push(ch);
+                if comment.ends_with(";$ENDIF") {
+                    break;
+                }
+            }
+            return Some(Token::Comment(cmt_type, comment));
+        }
+
+        if comment.len() > "$IF".len() && chars.iter().take("$IF".len()).collect::<String>().to_ascii_uppercase() == "$IF" {
+            let reg = UserTypeRegistry::default();
+            let input = chars.iter().skip("$IF".len()).collect::<String>();
+            let mut parser = Parser::new(PathBuf::from("."), self.errors.clone(), &reg, &input, Encoding::Utf8, 300);
+            parser.next_token();
+            let res = parser.parse_expression().unwrap();
+            let mut visitor = PreProcessorVisitor {
+                define_table: &self.define_table,
+                errors: self.errors.clone(),
+            };
+            let value = res.visit(&mut visitor);
+
+            if let Some(value) = value {
+                if value.as_bool() {
+                    return Some(Token::Comment(cmt_type, comment));
+                }
+            } else {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefineValue(input.to_string()));
+                return Some(Token::Comment(cmt_type, comment));
+            }
+            loop {
+                let Some(ch) = self.next_ch() else {
+                    break;
+                };
+                comment.push(ch);
+                if comment.ends_with(";$ENDIF") || comment.ends_with(";$ELSE") {
+                    break;
+                }
+            }
+            return Some(Token::Comment(cmt_type, comment));
+        }
+
+        if comment.len() > "$DEFINE".len() && chars.iter().take("$DEFINE".len()).collect::<String>().to_ascii_uppercase() == "$DEFINE" {
+            let mut variable = String::new();
+            let mut value = String::new();
+            let mut step = 0;
+            for c in chars.iter().skip("$DEFINE".len()) {
+                if step == 0 {
+                    if c.is_whitespace() {
+                        continue;
+                    }
+                    step += 1;
+                }
+                if step == 1 {
+                    if c == &'=' || c.is_whitespace() {
+                        step += 1;
+                        continue;
+                    }
+                    variable.push(*c);
+                }
+                if step == 2 {
+                    if c.is_whitespace() {
+                        continue;
+                    }
+                    step += 1;
+                }
+                if step == 3 {
+                    if c.is_whitespace() {
+                        break;
+                    }
+                    value.push(*c);
+                }
+            }
+
+            let value = if value.len() == 0 {
+                Constant::Boolean(true)
+            } else if let Ok(digit) = value.parse::<i32>() {
+                Constant::Integer(digit, NumberFormat::Default)
+            } else {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefineValue(value.to_string()));
+                Constant::Boolean(false)
+            };
+            if self.define_table.insert(Ascii::new(variable.clone()), value.clone()).is_some() {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_warning(self.token_start..self.token_end, LexingErrorType::AlreadyDefined(variable.to_string()));
+            }
+            return Some(Token::Define(cmt_type, variable, value));
         }
         Some(Token::Comment(cmt_type, comment))
     }

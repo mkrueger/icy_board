@@ -22,6 +22,7 @@ use unicase::Ascii;
 
 mod expression;
 pub mod lexer;
+pub mod pre_processor_expr_visitor;
 pub mod statements;
 
 #[cfg(test)]
