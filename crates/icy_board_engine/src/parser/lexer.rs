@@ -46,6 +46,15 @@ pub enum LexingErrorType {
 
     #[error("Already defined ({0})")]
     AlreadyDefined(String),
+
+    #[error("$ELSE without $IF")]
+    ElseWithoutIf,
+
+    #[error("$ELIF without $IF")]
+    ElseIfWithoutIf,
+
+    #[error("Missing $ENDIF")]
+    MissingEndIf,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -325,6 +334,7 @@ pub struct Lexer {
     lexer_state: LexerState,
     token_start: usize,
     token_end: usize,
+    if_level: i32,
 
     include_lexer: Option<Box<Lexer>>,
 }
@@ -494,6 +504,7 @@ impl Lexer {
             token_start: 0,
             token_end: 0,
             include_lexer: None,
+            if_level: 0,
         }
     }
 
@@ -534,6 +545,7 @@ impl Lexer {
                     return Some(token);
                 }
                 None => {
+                    self.check_eof();
                     self.include_lexer = None;
                 }
             }
@@ -547,6 +559,7 @@ impl Lexer {
                     break;
                 }
             } else {
+                self.check_eof();
                 return None;
             }
         }
@@ -1088,12 +1101,32 @@ impl Lexer {
         Some(Token::Identifier(identifier))
     }
 
+    fn read_define(&mut self) -> Option<Token> {
+        let mut define = String::new();
+        loop {
+            let Some(ch) = self.next_ch() else {
+                break;
+            };
+            if !char::is_alphanumeric(ch) {
+                break;
+            }
+            define.push(ch);
+        }
+
+        if let Some(value) = self.define_table.get(&Ascii::new(define)) {
+            Some(Token::Const(value.clone()))
+        } else {
+            None
+        }
+    }
+
     fn read_comment(&mut self, ch: char) -> Option<Token> {
         let cmt_type = match ch {
             ';' => CommentType::SingleLineSemicolon,
             '*' => CommentType::SingleLineStar,
             _ => CommentType::SingleLineQuote,
         };
+        let mut comment = Vec::new();
         loop {
             let Some(ch) = self.next_ch() else {
                 break;
@@ -1101,12 +1134,15 @@ impl Lexer {
             if ch == '\n' {
                 break;
             }
+            if comment.is_empty() && ch == '#' {
+                return self.read_define();
+            }
+            comment.push(ch);
         }
         self.lexer_state = LexerState::AfterEol;
-        let mut comment = self.text[self.token_start + 1..self.token_end].iter().collect::<String>();
 
-        if comment.len() > "$INCLUDE:".len() && comment.chars().take("$INCLUDE:".len()).collect::<String>().to_ascii_uppercase() == "$INCLUDE:" {
-            let include_file = comment.chars().skip("$INCLUDE:".len()).collect::<String>().trim().to_string();
+        if comment.len() > "$INCLUDE:".len() && comment.iter().take("$INCLUDE:".len()).collect::<String>().to_ascii_uppercase() == "$INCLUDE:" {
+            let include_file = comment.iter().skip("$INCLUDE:".len()).collect::<String>().trim().to_string();
             let Some(parent) = self.file.parent() else {
                 self.errors.lock().unwrap().report_error(
                     self.token_start..self.token_end,
@@ -1130,6 +1166,7 @@ impl Lexer {
                         token_start: 0,
                         token_end: 0,
                         include_lexer: None,
+                        if_level: 0,
                     }));
                 }
                 Err(err) => {
@@ -1141,28 +1178,48 @@ impl Lexer {
                 }
             }
         }
-        let chars = comment.chars().collect::<Vec<char>>();
-
-        if comment.len() > "$USEFUNCS".len() && chars.iter().take("$USEFUNCS".len()).collect::<String>().to_ascii_uppercase() == "$USEFUNCS" {
-            return Some(Token::UseFuncs(cmt_type, comment));
+        if comment.len() > "$USEFUNCS".len() && comment.iter().take("$USEFUNCS".len()).collect::<String>().to_ascii_uppercase() == "$USEFUNCS" {
+            return Some(Token::UseFuncs(cmt_type, comment.iter().collect()));
+        }
+        if comment.len() >= "$ENDIF".len() && comment.iter().take("$ENDIF".len()).collect::<String>().to_ascii_uppercase() == "$ENDIF" {
+            self.if_level -= 1;
         }
 
-        if comment.len() > "$ELSE".len() && chars.iter().take("$ELSE".len()).collect::<String>().to_ascii_uppercase() == "$ELSE" {
+        if comment.len() > "$ELSE".len() && comment.iter().take("$ELSE".len()).collect::<String>().to_ascii_uppercase() == "$ELSE" {
+            if self.if_level == 0 {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(self.token_start..self.token_end, LexingErrorType::ElseWithoutIf);
+            }
             loop {
                 let Some(ch) = self.next_ch() else {
                     break;
                 };
                 comment.push(ch);
-                if comment.ends_with(";$ENDIF") {
+                if comment.ends_with(&";$ENDIF".chars().collect::<Vec<char>>()) {
+                    self.if_level -= 1;
                     break;
                 }
             }
-            return Some(Token::Comment(cmt_type, comment));
+            return Some(Token::Comment(cmt_type, comment.iter().collect()));
         }
 
-        if comment.len() > "$IF".len() && chars.iter().take("$IF".len()).collect::<String>().to_ascii_uppercase() == "$IF" {
+        let is_if = comment.len() > "$IF".len() && comment.iter().take("$IF".len()).collect::<String>().to_ascii_uppercase() == "$IF";
+        let if_elif = comment.len() > "$ELIF".len() && comment.iter().take("$ELIF".len()).collect::<String>().to_ascii_uppercase() == "$ELIF";
+        if is_if || if_elif {
+            if is_if {
+                self.if_level += 1;
+            } else {
+                if self.if_level == 0 {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(self.token_start..self.token_end, LexingErrorType::ElseIfWithoutIf);
+                }
+            }
             let reg = UserTypeRegistry::default();
-            let input = chars.iter().skip("$IF".len()).collect::<String>();
+            let input = comment.iter().skip(if is_if { "$IF".len() } else { "$ELIF".len() }).collect::<String>();
             let mut parser = Parser::new(PathBuf::from("."), self.errors.clone(), &reg, &input, Encoding::Utf8, &Workspace::default());
             parser.next_token();
             let res = parser.parse_expression().unwrap();
@@ -1173,30 +1230,32 @@ impl Lexer {
             let value = res.visit(&mut visitor);
             if let Some(value) = value {
                 if value.as_bool() {
-                    return Some(Token::Comment(cmt_type, comment));
+                    return Some(Token::Comment(cmt_type, comment.iter().collect()));
                 }
             } else {
                 self.errors
                     .lock()
                     .unwrap()
                     .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefineValue(input.to_string()));
-                return Some(Token::Comment(cmt_type, comment));
+                return Some(Token::Comment(cmt_type, comment.iter().collect()));
             }
             loop {
                 let Some(ch) = self.next_ch() else {
                     break;
                 };
                 comment.push(ch);
-                if comment.ends_with(";$ENDIF") || comment.ends_with(";$ELSE") {
+                if comment.ends_with(&";$ENDIF".chars().collect::<Vec<char>>()) {
+                    self.if_level -= 1;
                     break;
+                } else if comment.ends_with(&";$ELSE".chars().collect::<Vec<char>>()) {
                 }
             }
-            return Some(Token::Comment(cmt_type, comment));
+            return Some(Token::Comment(cmt_type, comment.iter().collect()));
         }
 
-        if comment.len() > "$DEFINE".len() && chars.iter().take("$DEFINE".len()).collect::<String>().to_ascii_uppercase() == "$DEFINE" {
+        if comment.len() > "$DEFINE".len() && comment.iter().take("$DEFINE".len()).collect::<String>().to_ascii_uppercase() == "$DEFINE" {
             let reg = UserTypeRegistry::default();
-            let input = chars.iter().skip("$DEFINE".len()).collect::<String>().trim().to_string();
+            let input = comment.iter().skip("$DEFINE".len()).collect::<String>().trim().to_string();
             let (variable, value) = if input.chars().all(|c| c.is_ascii_alphabetic()) {
                 (input, Constant::Boolean(true))
             } else {
@@ -1257,11 +1316,20 @@ impl Lexer {
             }
             return Some(Token::Define(cmt_type, variable, value));
         }
-        Some(Token::Comment(cmt_type, comment))
+        Some(Token::Comment(cmt_type, comment.iter().collect()))
     }
 
     pub fn span(&self) -> std::ops::Range<usize> {
         self.token_start..self.token_end
+    }
+
+    fn check_eof(&mut self) {
+        if self.if_level > 0 {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(self.token_start..self.token_end, LexingErrorType::MissingEndIf);
+        }
     }
     /*
     pub(crate) fn define(&mut self, variable: &str, value: Constant)  {

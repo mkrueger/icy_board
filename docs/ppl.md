@@ -173,6 +173,47 @@ PROCEDURE PrintHello(PROCEDURE f())
     f()
 ENDPROC
 ```
+##### Pre Processor
+
+You use four preprocessor directives to control conditional compilation:
+
+`;$DEFINE` Defines a pre processor variable
+`;$IF` Opens a conditional compilation, where code is compiled only if the specified expression is true
+`;$ELIF` Closes the preceding conditional compilation and opens a new conditional compilation based on the specified expression
+`;$ELSE` Closes the preceding conditional compilation and opens a new conditional compilation if the previous specified expression was true or false
+`;$ENDIF` Closes the preceding conditional compilation.
+
+
+Tokens:
+
+`;#NAME` Replaces the directive with the evaluated token
+
+Example with the predefined defines:
+```
+PrintLn "Version:", ;#Version
+PrintLn "Runtime:", ;#Runtime
+PrintLn "Language:", ;#LangVersion
+```
+
+Would print:
+
+```
+Version:0.1.0                                                                   
+Runtime:400                                                                     
+Language:400     
+```
+
+Would be possible to define conditional compilation based on language or runtime version
+For example:
+```
+;$IF VERSION <= 340
+    PrintLn "World"
+;$ELIF VERSION < 200
+    PrintLn "Old World"
+;$ELSE
+    PrintLn "New World"
+;$ENDIF
+```
 
 ##### Language Version 400
 
