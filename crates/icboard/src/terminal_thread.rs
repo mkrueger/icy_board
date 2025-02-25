@@ -1,6 +1,6 @@
 use codepages::tables::CP437_TO_UNICODE;
 use icy_board_engine::Res;
-use icy_engine::{ansi, BufferParser, Caret};
+use icy_engine::{BufferParser, Caret, ansi};
 use icy_net::Connection;
 use std::{
     mem,

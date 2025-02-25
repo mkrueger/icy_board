@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 
 use crate::{
-    executable::{VariableType, VariableValue},
     Res,
+    executable::{VariableType, VariableValue},
 };
 
 pub trait UserDataMemberRegistry {

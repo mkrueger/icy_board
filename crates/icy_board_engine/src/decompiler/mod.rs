@@ -6,21 +6,21 @@ use std::{
 use reconstruct::strip_unused_labels;
 
 use crate::{
+    Res,
     ast::{
-        constant::NumberFormat, Ast, AstNode, BinOp, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression,
-        FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement,
-        IndexerExpression, LabelStatement, LetStatement, ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement,
-        ProcedureDeclarationAstNode, ProcedureImplementation, Statement, UnaryExpression, UnaryOp, VariableDeclarationStatement, VariableParameterSpecifier,
-        VariableSpecifier,
+        Ast, AstNode, BinOp, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression, FunctionCallExpression,
+        FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IndexerExpression,
+        LabelStatement, LetStatement, ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode,
+        ProcedureImplementation, Statement, UnaryExpression, UnaryOp, VariableDeclarationStatement, VariableParameterSpecifier, VariableSpecifier,
+        constant::NumberFormat,
     },
     compiler::workspace::Workspace,
     executable::{
         DeserializationError, DeserializationErrorType, EntryType, Executable, OpCode, PPECommand, PPEExpr, PPEScript, PPEVisitor, StatementDefinition,
         TableEntry, VariableType,
     },
-    parser::{lexer::Token, ErrorReporter, UserTypeRegistry},
+    parser::{ErrorReporter, UserTypeRegistry, lexer::Token},
     semantic::SemanticVisitor,
-    Res,
 };
 
 use self::evaluation_visitor::OptimizationVisitor;
@@ -506,11 +506,7 @@ fn add_parens_if_required(op: BinOp, expr: Expression) -> Expression {
         false
     };
 
-    if add_parens {
-        ParensExpression::create_empty_expression(expr)
-    } else {
-        expr
-    }
+    if add_parens { ParensExpression::create_empty_expression(expr) } else { expr }
 }
 
 fn generate_variable_declaration(var: &TableEntry) -> Statement {

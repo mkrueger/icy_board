@@ -251,7 +251,7 @@ pub mod correct_path {
         // let mut counter = 0;
         // for user_i in 0..slf.request_items.len() {
         let mut possible_directories = directory_cnt; // Copying directory_cnt vector
-                                                      // Looping through possible_directories vector
+        // Looping through possible_directories vector
 
         for pos_j in 0..possible_directories.len() {
             if slf
@@ -288,7 +288,7 @@ pub mod correct_path {
             way_step_by_step(slf);
         };
         let len = slf.request_items.len(); // Storing the length of request_items
-                                           // Looping through request_items
+        // Looping through request_items
         for user_i in 0..len {
             core(slf, directory_contents(slf.request_items[user_i].as_str()), user_i, &mut counter, len);
         }

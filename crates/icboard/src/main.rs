@@ -2,7 +2,7 @@ use std::{
     fmt::Display,
     io::stdout,
     path::PathBuf,
-    process::{self, exit, Command},
+    process::{self, Command, exit},
     sync::Arc,
 };
 
@@ -11,22 +11,21 @@ use bbs::await_telnet_connections;
 use call_wait_screen::{CallWaitMessage, CallWaitScreen};
 use chrono::Local;
 use crossterm::{
-    execute,
+    ExecutableCommand, execute,
     style::{Attribute, Print, SetAttribute, SetForegroundColor},
     terminal::Clear,
-    ExecutableCommand,
 };
 use icy_board_engine::{
-    icy_board::{bbs::BBS, IcyBoard},
     Res,
+    icy_board::{IcyBoard, bbs::BBS},
 };
 
 use node_monitoring_screen::NodeMonitoringScreenMessage;
-use ratatui::{backend::Backend, Terminal};
+use ratatui::{Terminal, backend::Backend};
 use semver::Version;
 use system_statistics_screen::{SystemStatisticsScreen, SystemStatisticsScreenMessage};
 use tokio::sync::Mutex;
-use tui::{print_exit_screen, Tui};
+use tui::{Tui, print_exit_screen};
 
 use crate::bbs::{await_securewebsocket_connections, await_websocket_connections};
 

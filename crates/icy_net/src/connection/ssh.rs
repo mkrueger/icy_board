@@ -4,7 +4,7 @@ use russh::{client::Msg, *};
 use russh_keys::*;
 use std::{borrow::Cow, collections::HashMap, io::ErrorKind, sync::Arc, time::Duration};
 
-use crate::{telnet::TermCaps, Connection, ConnectionType};
+use crate::{Connection, ConnectionType, telnet::TermCaps};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,

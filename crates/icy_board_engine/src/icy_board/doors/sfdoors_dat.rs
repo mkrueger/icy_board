@@ -3,11 +3,11 @@ use std::fs;
 use chrono::{Local, Timelike};
 
 use crate::{
+    Res,
     icy_board::{
         doors::{DOOR_BPS_RATE, DOOR_COM_PORT},
         state::{GraphicsMode, IcyBoardState},
     },
-    Res,
 };
 
 /// SpitFire BBS

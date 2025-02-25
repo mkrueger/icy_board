@@ -3,9 +3,9 @@ use std::{cmp::Ordering, io::Write, time::Instant};
 use tempfile::NamedTempFile;
 
 use crate::{
-    crc::{get_crc16_buggy_zlde, get_crc32, update_crc32},
-    protocol::{str_from_null_terminated_utf8_unchecked, Header, HeaderType, TransferState, ZFrameType, Zmodem, ZCRCE, ZCRCG, ZCRCW},
     Connection,
+    crc::{get_crc16_buggy_zlde, get_crc32, update_crc32},
+    protocol::{Header, HeaderType, TransferState, ZCRCE, ZCRCG, ZCRCW, ZFrameType, Zmodem, str_from_null_terminated_utf8_unchecked},
 };
 
 use super::{constants::*, err::ZModemError, read_zdle_bytes, zrinit_flag::CANFDX};

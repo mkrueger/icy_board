@@ -1,11 +1,11 @@
 use std::fs;
 
 use crate::{
+    Res,
     icy_board::{
         doors::DOOR_BPS_RATE,
         state::{GraphicsMode, IcyBoardState},
     },
-    Res,
 };
 
 /// Mystic BBS door32.sys format
@@ -30,11 +30,11 @@ pub fn create_door32_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<(
         GraphicsMode::Rip => 3,
     };
     contents.push_str(&format!("{}\r\n", emulation)); // Line 10: Emulation *See Below
-                                                      // 0 = Ascii
-                                                      // 1 = Ansi
-                                                      // 2 = Avatar
-                                                      // 3 = RIP
-                                                      // 4 = Max Graphics
+    // 0 = Ascii
+    // 1 = Ansi
+    // 2 = Avatar
+    // 3 = RIP
+    // 4 = Max Graphics
 
     contents.push_str(&format!("{}\r\n", state.node + 1)); // Line 11: Current node number
 

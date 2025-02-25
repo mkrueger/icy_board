@@ -8,21 +8,21 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{executable::Executable, search_patterns::PatternExpr, vm::expressions::fix_casing, Res};
+use crate::{Res, executable::Executable, search_patterns::PatternExpr, vm::expressions::fix_casing};
 use async_recursion::async_recursion;
 use chrono::{DateTime, Local, Utc};
 use codepages::tables::UNICODE_TO_CP437;
 use dizbase::file_base::FileBase;
-use icy_engine::{ansi, OutputFormat, SaveOptions, ScreenPreperation};
-use icy_engine::{ansi::constants::COLOR_OFFSETS, Position};
+use icy_engine::{OutputFormat, SaveOptions, ScreenPreperation, ansi};
+use icy_engine::{Position, ansi::constants::COLOR_OFFSETS};
 use icy_engine::{TextAttribute, TextPane};
-use icy_net::{channel::ChannelConnection, iemsi::EmsiICI, termcap_detect::TerminalCaps, terminal::virtual_screen::VirtualScreen, Connection, ConnectionType};
+use icy_net::{Connection, ConnectionType, channel::ChannelConnection, iemsi::EmsiICI, termcap_detect::TerminalCaps, terminal::virtual_screen::VirtualScreen};
 use regex::Regex;
 use tokio::{sync::Mutex, time::sleep};
 
 use crate::{
     icy_board::IcyBoardError,
-    vm::{run, DiskIO, TerminalTarget},
+    vm::{DiskIO, TerminalTarget, run},
 };
 pub mod functions;
 pub mod menu_runner;
@@ -30,15 +30,15 @@ pub mod user_commands;
 use self::functions::display_flags;
 
 use super::{
-    bbs::{BBSMessage, BBS},
+    IcyBoard,
+    bbs::{BBS, BBSMessage},
     commands::{AutoRun, Command, CommandAction, CommandType},
     conferences::Conference,
-    icb_config::{IcbColor, SysopCommandLevels, UserCommandLevels, DEFAULT_PCBOARD_DATE_FORMAT},
+    icb_config::{DEFAULT_PCBOARD_DATE_FORMAT, IcbColor, SysopCommandLevels, UserCommandLevels},
     icb_text::{IcbTextFile, IcbTextStyle, IceText},
     macro_parser::{Macro, MacroCommand},
     security_expr::SecurityExpression,
     user_base::{FSEMode, Password, User},
-    IcyBoard,
 };
 
 #[derive(Clone, Copy, PartialEq, Default)]
@@ -299,11 +299,7 @@ impl Session {
     }
 
     pub fn expert_mode(&self) -> bool {
-        if let Some(user) = &self.current_user {
-            user.flags.expert_mode
-        } else {
-            false
-        }
+        if let Some(user) = &self.current_user { user.flags.expert_mode } else { false }
     }
 
     pub fn push_tokens(&mut self, command: &str) -> usize {

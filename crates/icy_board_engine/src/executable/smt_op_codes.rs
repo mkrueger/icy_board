@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
 use crate::ast::{
-    constant::{BuiltinConst, NumberFormat, BUILTIN_CONSTS},
     BinOp, BinaryExpression, Constant, ConstantExpression, Expression,
+    constant::{BUILTIN_CONSTS, BuiltinConst, NumberFormat},
 };
 
 use super::VariableType;

@@ -10,11 +10,11 @@ use crossterm::{
 };
 
 use crate::{
-    crypt::{decrypt_chunks, encrypt_chunks},
     Res,
+    crypt::{decrypt_chunks, encrypt_chunks},
 };
 
-use super::{ExecutableError, GenericVariableData, PPEExpr, PPEScript, VariableData, VariableNameGenerator, VariableType, VariableValue, LAST_PPLC};
+use super::{ExecutableError, GenericVariableData, LAST_PPLC, PPEExpr, PPEScript, VariableData, VariableNameGenerator, VariableType, VariableValue};
 
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct VarHeader {

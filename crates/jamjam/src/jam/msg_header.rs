@@ -6,11 +6,11 @@ use std::{
 use bstr::BString;
 
 use crate::{
-    jam::{JamError, JAM_SIGNATURE},
+    jam::{JAM_SIGNATURE, JamError},
     util::crc32::CRC_SEED,
 };
 
-use super::{attributes, JamMessageBase};
+use super::{JamMessageBase, attributes};
 
 #[derive(Clone, Debug)]
 pub struct JamMessageHeader {

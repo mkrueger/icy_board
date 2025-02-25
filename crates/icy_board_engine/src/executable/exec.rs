@@ -4,11 +4,11 @@ use crossterm::execute;
 use crossterm::style::{Attribute, Print, SetAttribute};
 use thiserror::Error;
 
+use crate::Res;
 use crate::crypt::{decode_rle, decrypt_chunks, encode_rle};
 use crate::executable::disassembler::DisassembleVisitor;
-use crate::Res;
 
-use super::{VariableTable, VariableType, LAST_PPLC};
+use super::{LAST_PPLC, VariableTable, VariableType};
 
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum ExecutableError {

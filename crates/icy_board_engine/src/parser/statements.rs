@@ -10,8 +10,8 @@ use crate::{
 };
 
 use super::{
-    lexer::{Spanned, Token},
     Parser, ParserWarningType,
+    lexer::{Spanned, Token},
 };
 
 impl<'a> Parser<'a> {

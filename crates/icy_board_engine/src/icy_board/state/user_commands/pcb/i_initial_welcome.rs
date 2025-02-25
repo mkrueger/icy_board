@@ -1,5 +1,5 @@
 use crate::vm::TerminalTarget;
-use crate::{icy_board::state::IcyBoardState, Res};
+use crate::{Res, icy_board::state::IcyBoardState};
 
 impl IcyBoardState {
     pub async fn initial_welcome(&mut self) -> Res<()> {

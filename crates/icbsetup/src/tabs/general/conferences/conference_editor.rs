@@ -5,13 +5,13 @@ use std::{
 };
 
 use crossterm::event::KeyEvent;
-use icy_board_engine::icy_board::{security_expr::SecurityExpression, user_base::Password, IcyBoard};
+use icy_board_engine::icy_board::{IcyBoard, security_expr::SecurityExpression, user_base::Password};
 use icy_board_tui::{
+    BORDER_SET,
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
     get_text, get_text_args,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
-    BORDER_SET,
 };
 use ratatui::{
     layout::Rect,

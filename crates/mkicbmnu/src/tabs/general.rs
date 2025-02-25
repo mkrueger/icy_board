@@ -12,9 +12,9 @@ use icy_board_tui::{
     theme::get_tui_theme,
 };
 use ratatui::{
+    Frame,
     layout::{Margin, Rect},
     widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, Widget},
-    Frame,
 };
 
 pub struct GeneralTab {

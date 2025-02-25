@@ -1,10 +1,10 @@
 use crate::{
+    Res,
     icy_board::{
         doors::DOOR_BPS_RATE,
         state::{GraphicsMode, IcyBoardState},
     },
     tables::export_cp437_string,
-    Res,
 };
 use chrono::Local;
 use icy_engine::TextPane;
@@ -134,7 +134,7 @@ pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) 
     contents.push(0); // Days
     contents.push(0); // Forced
     contents.extend(b"00-00-00"); // MM-DD-YY' New 'MMKDDCYY'
-                                  // END OF EVENTrecord
+    // END OF EVENTrecord
 
     contents.push(0); // NetMailEntered
     contents.push(0); // EchoMailEntered
@@ -149,12 +149,12 @@ pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) 
     contents.extend(u16::to_le_bytes(0)); // NumberPages
     contents.extend(u16::to_le_bytes(0)); // DownloadLimit
     contents.extend(Local::now().format("%H:%M").to_string().as_bytes()); // TimeOfCreation
-                                                                          // Same as above - seems that can be used for login process doors.
+    // Same as above - seems that can be used for login process doors.
     contents.extend(u32::to_le_bytes(pwd_crc));
     contents.push(0); // WantChat
 
     contents.extend(u32::to_le_bytes(0)); // DeductedTime
-                                          // MenuStack ?
+    // MenuStack ?
     for _i in 0..50 {
         contents.extend(export_cp437_string("", 8, 0));
     }

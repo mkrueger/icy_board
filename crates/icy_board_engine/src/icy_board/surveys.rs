@@ -5,9 +5,9 @@ use std::{
 
 use crate::Res;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 
-use super::{security_expr::SecurityExpression, IcyBoardSerializer, PCBoardRecordImporter};
+use super::{IcyBoardSerializer, PCBoardRecordImporter, security_expr::SecurityExpression};
 
 /// A survey is a question and answer pair.
 /// PCBoard calles them "Questionnairies" but we call them surveys.

@@ -1,6 +1,7 @@
 use std::fs;
 
 use crate::{
+    Res,
     datetime::IcbDate,
     icy_board::{
         doors::DOOR_COM_PORT,
@@ -8,7 +9,6 @@ use crate::{
         user_base::FSEMode,
     },
     tables::export_cp437_string,
-    Res,
 };
 use chrono::{Timelike, Utc};
 pub async fn create_pcboard(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
@@ -64,7 +64,7 @@ fn create_pcboard_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> 
     contents.push(DOOR_COM_PORT); // Comm Port Number (0=none, 1-8)
     contents.push(0); // Reserved for PCBoard
     contents.push(0); // Unknown
-                      // Use ANSI (1 = Yes, 0 = No)
+    // Use ANSI (1 = Yes, 0 = No)
     if state.session.disp_options.grapics_mode == GraphicsMode::Ctty {
         contents.push(0);
     } else {

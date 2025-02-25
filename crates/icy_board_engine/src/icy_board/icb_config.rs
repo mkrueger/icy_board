@@ -5,7 +5,7 @@ use icy_engine::Color;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    is_false, is_null_16, is_null_32, is_null_8, login_server::LoginServer, security_expr::SecurityExpression, user_base::Password, IcyBoardSerializer,
+    IcyBoardSerializer, is_false, is_null_8, is_null_16, is_null_32, login_server::LoginServer, security_expr::SecurityExpression, user_base::Password,
 };
 
 #[derive(Clone, Default, Serialize, Deserialize)]

@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use dizbase::file_base::{metadata::MetadaType, FileEntry};
+use dizbase::file_base::{FileEntry, metadata::MetadaType};
 use humanize_bytes::humanize_bytes_decimal;
 
-use crate::{icy_board::state::IcyBoardState, vm::TerminalTarget, Res};
+use crate::{Res, icy_board::state::IcyBoardState, vm::TerminalTarget};
 
 pub struct FileList {
     pub path: PathBuf,

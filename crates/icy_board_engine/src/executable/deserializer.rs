@@ -4,10 +4,10 @@ use thiserror::Error;
 
 use crate::{
     ast::{BinOp, UnaryOp},
-    executable::{OpCode, FUNCTION_DEFINITIONS, STATEMENT_DEFINITIONS},
+    executable::{FUNCTION_DEFINITIONS, OpCode, STATEMENT_DEFINITIONS},
 };
 
-use super::{Executable, FuncOpCode, PPECommand, PPEExpr, StatementSignature, VariableType, VariableValue, LAST_STMT};
+use super::{Executable, FuncOpCode, LAST_STMT, PPECommand, PPEExpr, StatementSignature, VariableType, VariableValue};
 
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum DeserializationErrorType {

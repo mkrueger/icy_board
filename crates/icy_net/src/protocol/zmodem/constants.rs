@@ -111,13 +111,14 @@ pub mod zrinit_flag {
 
     // Bit Masks for ZRINIT flags byte ZF1
     const CANVHDR: u8 = 0x01; // Variable headers OK
-                              /*
-                              // Parameters for ZSINIT frame
-                              const ZATTNLEN 32	// Max length of attention string
-                              const ALTCOFF ZF1	// Offset to alternate canit string, 0 if not used
-                              // Bit Masks for ZSINIT flags byte ZF0
-                              const TESCCTL 0100	// Transmitter expects ctl chars to be escaped
-                              const ESC8   0200	// Transmitter expects 8th bit to be escaped */
+
+    /*
+    // Parameters for ZSINIT frame
+    const ZATTNLEN 32	// Max length of attention string
+    const ALTCOFF ZF1	// Offset to alternate canit string, 0 if not used
+    // Bit Masks for ZSINIT flags byte ZF0
+    const TESCCTL 0100	// Transmitter expects ctl chars to be escaped
+    const ESC8   0200	// Transmitter expects 8th bit to be escaped */
 }
 
 pub mod frame_types {

@@ -7,15 +7,15 @@ use std::{
 
 use icy_board_engine::{
     compiler::{
-        workspace::{CompilerData, Workspace},
         PPECompiler,
+        workspace::{CompilerData, Workspace},
     },
     decompiler::decompile,
     executable::Executable,
     icy_board::{bbs::BBS, read_data_with_encoding_detection, state::IcyBoardState},
     parser::{Encoding, ErrorReporter, UserTypeRegistry},
 };
-use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
+use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
 
 const EXPECTED_OUTPUT: &str = "Hello World!\n1,2,3,4,5,6,7,8,9,10,";
 #[test]

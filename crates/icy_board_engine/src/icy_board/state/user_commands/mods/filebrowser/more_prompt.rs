@@ -1,12 +1,12 @@
 use crate::{
+    Res,
     icy_board::{
         icb_text::IceText,
         state::{
-            functions::{self, display_flags},
             IcyBoardState,
+            functions::{self, display_flags},
         },
     },
-    Res,
 };
 
 impl IcyBoardState {

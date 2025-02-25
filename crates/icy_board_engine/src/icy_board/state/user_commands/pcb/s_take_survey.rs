@@ -4,8 +4,8 @@ use std::{
 };
 
 use crate::{
-    icy_board::{commands::CommandType, state::IcyBoardState},
     Res,
+    icy_board::{commands::CommandType, state::IcyBoardState},
 };
 
 use crate::{
@@ -15,8 +15,8 @@ use crate::{
         icb_text::IceText,
         read_with_encoding_detection,
         state::{
-            functions::{display_flags, MASK_ALNUM},
             NodeStatus,
+            functions::{MASK_ALNUM, display_flags},
         },
     },
     vm::TerminalTarget,

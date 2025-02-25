@@ -11,10 +11,10 @@ use jamjam::jam::{JamMessage, JamMessageBase};
 
 use crate::{
     icy_board::{
+        UTF8_BOM,
         commands::CommandType,
         icb_config::IcbColor,
         icb_text::{IcbTextStyle, IceText},
-        UTF8_BOM,
     },
     vm::TerminalTarget,
 };

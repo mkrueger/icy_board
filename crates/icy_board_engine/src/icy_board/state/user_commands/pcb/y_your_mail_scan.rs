@@ -4,14 +4,14 @@ use crate::{
         conferences::Conference,
         icb_config::IcbColor,
         icb_text::IceText,
-        state::functions::{display_flags, MASK_ASCII},
+        state::functions::{MASK_ASCII, display_flags},
     },
     vm::TerminalTarget,
 };
 use bstr::BString;
 use jamjam::jam::JamMessageBase;
 
-use crate::{icy_board::state::IcyBoardState, Res};
+use crate::{Res, icy_board::state::IcyBoardState};
 
 #[derive(Default)]
 struct YourMailScan {

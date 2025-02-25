@@ -3,11 +3,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{tables::import_cp437_string, Res};
+use crate::{Res, tables::import_cp437_string};
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 
-use super::{security_expr::SecurityExpression, IcyBoardSerializer, PCBoardRecordImporter};
+use super::{IcyBoardSerializer, PCBoardRecordImporter, security_expr::SecurityExpression};
 
 #[serde_as]
 #[derive(Clone, Serialize, Deserialize, Default, PartialEq)]

@@ -1,21 +1,21 @@
 use std::{env, fs, thread, time::Duration};
 
 use crate::{
+    Res,
     datetime::{IcbDate, IcbTime},
     executable::{PPEExpr, VariableType, VariableValue},
     icy_board::{
         icb_config::IcbColor,
         state::{
-            functions::{display_flags, MASK_ALNUM},
             GraphicsMode, NodeState, NodeStatus,
+            functions::{MASK_ALNUM, display_flags},
         },
         user_inf::BankUserInf,
     },
-    Res,
 };
 use bstr::BString;
 use chrono::{DateTime, Utc};
-use codepages::tables::{write_utf8_with_bom, CP437_TO_UNICODE};
+use codepages::tables::{CP437_TO_UNICODE, write_utf8_with_bom};
 use icy_engine::{BufferType, OutputFormat, SaveOptions, ScreenPreperation};
 use jamjam::jam::{JamMessage, JamMessageBase};
 
@@ -339,11 +339,7 @@ pub async fn inputyn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 async fn get_default_string(vm: &mut VirtualMachine<'_>, args: &PPEExpr) -> Option<String> {
     let default = vm.eval_expr(args).await.unwrap().as_string();
-    if default.is_empty() {
-        None
-    } else {
-        Some(default)
-    }
+    if default.is_empty() { None } else { Some(default) }
 }
 
 pub async fn inputmoney(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {

@@ -1,4 +1,4 @@
-use crate::{icy_board::state::IcyBoardState, Res};
+use crate::{Res, icy_board::state::IcyBoardState};
 
 impl IcyBoardState {
     pub async fn read_email(&mut self) -> Res<()> {

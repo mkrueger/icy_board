@@ -1,12 +1,13 @@
 use std::time::Duration;
 
 use chrono::{Local, Timelike};
-use color_eyre::{eyre::Context, Result};
+use color_eyre::{Result, eyre::Context};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 
 use ratatui::{prelude::*, widgets::*};
 
 use crate::{
+    TerminalType,
     colors::RgbSwatch,
     config_menu::EditMode,
     get_text,
@@ -14,8 +15,7 @@ use crate::{
     tab_page::TabPage,
     term::next_event,
     text_field::set_cursor_mode,
-    theme::{get_tui_theme, DOS_DARK_GRAY, DOS_LIGHT_GRAY, DOS_WHITE},
-    TerminalType,
+    theme::{DOS_DARK_GRAY, DOS_LIGHT_GRAY, DOS_WHITE, get_tui_theme},
 };
 
 pub struct App<'a> {

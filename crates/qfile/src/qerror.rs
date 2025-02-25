@@ -12,7 +12,9 @@ pub enum QPackError {
     )]
     UnixPathIsIncorrect,
     /// - `WindowsPathIsIncorrect`: Returns an error if you use a non-windows format for the path.
-    #[error("You are using the unix path format for Windows. Use `windows` format for the path:\n> .\\folder1\\folder2\\file.txt\n> ..\\folder2\\file.txt\n> .\\file.txt")]
+    #[error(
+        "You are using the unix path format for Windows. Use `windows` format for the path:\n> .\\folder1\\folder2\\file.txt\n> ..\\folder2\\file.txt\n> .\\file.txt"
+    )]
     WindowsPathIsIncorrect,
     /// - `SystemNotDefined`: Returns an error if the library is not prepared for this operating system.
     #[error("SystemNotDefined")]

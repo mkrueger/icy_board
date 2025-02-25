@@ -1,18 +1,18 @@
 use crossterm::event::KeyEvent;
 use ratatui::{
+    Frame,
     layout::{Margin, Rect},
     text::{Line, Span},
     widgets::{Block, Borders, Padding, Widget},
-    Frame,
 };
 
 use crate::{
+    BORDER_SET,
     config_menu::{EditMode, ResultState},
     get_text,
     select_menu::{SelectMenu, SelectMenuState},
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
-    BORDER_SET,
 };
 
 pub struct IcbSetupMenuUI {

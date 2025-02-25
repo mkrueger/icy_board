@@ -5,7 +5,7 @@ use std::{
 
 use chrono::{DateTime, Utc};
 
-use crate::{convert_u32, convert_u64, convert_u8};
+use crate::{convert_u8, convert_u32, convert_u64};
 
 #[derive(Clone)]
 pub struct FileHeader {

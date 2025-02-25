@@ -2,18 +2,17 @@ use std::{borrow::Cow, io::ErrorKind, sync::Arc};
 
 use crate::Res;
 use async_trait::async_trait;
-use icy_board_engine::icy_board::{bbs::BBS, login_server::SSH, IcyBoard};
+use icy_board_engine::icy_board::{IcyBoard, bbs::BBS, login_server::SSH};
 use icy_net::{Connection, ConnectionType};
-use russh_keys::{ssh_key, Certificate};
+use russh_keys::{Certificate, ssh_key};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::Mutex,
 };
 
 use russh::{
-    cipher, kex,
+    Channel, ChannelStream, Preferred, cipher, kex,
     server::{self, Msg, Session},
-    Channel, ChannelStream, Preferred,
 };
 
 use super::handle_client;

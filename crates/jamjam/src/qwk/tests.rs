@@ -1,6 +1,6 @@
 use super::{
-    control::{Conference, ControlDat},
     QwkMessageBase,
+    control::{Conference, ControlDat},
 };
 use bstr::BString;
 use pretty_assertions::assert_eq;

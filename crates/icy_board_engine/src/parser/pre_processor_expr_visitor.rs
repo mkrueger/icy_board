@@ -9,8 +9,8 @@ use crate::{
 };
 
 use super::{
-    lexer::{Spanned, Token},
     ErrorReporter,
+    lexer::{Spanned, Token},
 };
 
 pub struct PreProcessorVisitor<'a> {

@@ -4,7 +4,7 @@ use std::{
     path::Path,
 };
 
-use crate::{parser::Encoding, tables::import_cp437_string, Res};
+use crate::{Res, parser::Encoding, tables::import_cp437_string};
 use byteorder::ReadBytesExt;
 use codepages::tables::UNICODE_TO_CP437;
 

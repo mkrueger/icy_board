@@ -5,7 +5,7 @@ use std::{
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
@@ -15,17 +15,17 @@ use crate::{
 };
 
 use super::{
+    IcyBoardSerializer,
     bulletins::BullettinList,
     commands::Command,
     doors::DoorList,
     file_directory::DirectoryList,
-    is_false, is_null_16, is_null_8, is_null_f64, is_null_i32,
+    is_false, is_null_8, is_null_16, is_null_f64, is_null_i32,
     message_area::{AreaList, MessageArea},
     pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader},
     security_expr::SecurityExpression,
     surveys::SurveyList,
     user_base::Password,
-    IcyBoardSerializer,
 };
 
 #[derive(Default, Clone, Serialize, Deserialize)]

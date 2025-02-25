@@ -23,11 +23,11 @@ pub mod text_field;
 pub mod theme;
 
 use i18n_embed::{
-    fluent::{fluent_language_loader, FluentLanguageLoader},
     DesktopLanguageRequester,
+    fluent::{FluentLanguageLoader, fluent_language_loader},
 };
 use i18n_embed_fl::fl;
-use ratatui::{backend::CrosstermBackend, symbols::border, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend, symbols::border};
 use rust_embed::RustEmbed;
 
 #[derive(RustEmbed)]

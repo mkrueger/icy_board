@@ -19,8 +19,8 @@ use rz::Rz;
 mod err;
 
 use crate::{
-    crc::{get_crc16_buggy_zlde, get_crc32, update_crc32},
     Connection,
+    crc::{get_crc16_buggy_zlde, get_crc32, update_crc32},
 };
 
 use self::{err::ZModemError, rz::read_zdle_byte};
@@ -42,11 +42,7 @@ impl Zmodem {
     }
 
     fn get_name(&self) -> &str {
-        if self.block_length == 1024 {
-            "Zmodem"
-        } else {
-            "ZedZap (Zmodem 8k)"
-        }
+        if self.block_length == 1024 { "Zmodem" } else { "ZedZap (Zmodem 8k)" }
     }
 
     pub async fn cancel(com: &mut dyn Connection) -> crate::Result<()> {
@@ -115,11 +111,7 @@ pub async fn read_zdle_bytes(com: &mut dyn Connection, length: usize) -> crate::
 }
 
 fn get_hex(n: u8) -> u8 {
-    if n < 10 {
-        b'0' + n
-    } else {
-        b'a' + (n - 10)
-    }
+    if n < 10 { b'0' + n } else { b'a' + (n - 10) }
 }
 
 fn from_hex(n: u8) -> crate::Result<u8> {

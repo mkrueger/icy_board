@@ -1,7 +1,7 @@
-use super::{decode_ici, EmsiICI, EmsiISI, EMSI_ACK};
+use super::{EMSI_ACK, EmsiICI, EmsiISI, decode_ici};
 use crate::{
-    iemsi::{EMSI_IRQ_WITH_CLEAR, EMSI_NAK_WITH_CLEAR},
     Connection,
+    iemsi::{EMSI_IRQ_WITH_CLEAR, EMSI_NAK_WITH_CLEAR},
 };
 
 pub async fn try_iemsi(

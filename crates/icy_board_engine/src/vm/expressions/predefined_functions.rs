@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::{env, fs};
 
+use crate::Res;
 use crate::ast::constant::STACK_LIMIT;
 use crate::datetime::{IcbDate, IcbTime};
 use crate::executable::{GenericVariableData, PPEExpr, VariableData, VariableType, VariableValue};
@@ -11,17 +12,16 @@ use crate::icy_board::conferences::ConferenceType;
 use crate::icy_board::macro_parser::Macro;
 use crate::icy_board::read_with_encoding_detection;
 use crate::icy_board::security_expr::SecurityExpression;
-use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_NUM, MASK_PATH, MASK_PWD};
 use crate::icy_board::state::GraphicsMode;
+use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_NUM, MASK_PATH, MASK_PWD};
 use crate::icy_board::user_base::Password;
 use crate::icy_board::user_inf::BankUserInf;
 use crate::parser::CONFERENCE_ID;
 use crate::vm::{TerminalTarget, VirtualMachine};
-use crate::Res;
 use chrono::{DateTime, Utc};
-use icy_engine::{update_crc32, Position, TextPane};
-use jamjam::jam::msg_header::JamMessageHeader;
+use icy_engine::{Position, TextPane, update_crc32};
 use jamjam::jam::JamMessageBase;
+use jamjam::jam::msg_header::JamMessageHeader;
 use jamjam::util::basic_real::{BasicDouble, BasicReal};
 use radix_fmt::radix;
 use rand::Rng; // 0.8.5
@@ -861,21 +861,38 @@ pub async fn ansion(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
         vm.icy_board_state.session.disp_options.grapics_mode != GraphicsMode::Ctty,
     ))
 }
+
 pub async fn valcc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let ccnum = vm.eval_expr(&args[0]).await?.as_string();
-    
+    let is_valid = if let Ok(card) = ccnum.parse::<creditcard::CreditCard>() {
+        true
+    } else {
+        false
+    };
+    Ok(VariableValue::new_bool(is_valid))
+}
 
-    log::error!("not implemented function!");
-    panic!("TODO")
-}
 pub async fn fmtcc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let ccnum: String = vm.eval_expr(&args[0]).await?.as_string();
+    let fmt = match ccnum.len() {
+        13 => {
+            format!("{} {} {} {}", &ccnum[0..3], &ccnum[3..7], &ccnum[7..11], &ccnum[11..])
+        }
+        15 => {
+            format!("{} {} {}", &ccnum[0..4], &ccnum[4..10], &ccnum[10..])
+        }
+        16 => {
+            format!("{} {} {} {}", &ccnum[0..4], &ccnum[4..8], &ccnum[8..12], &ccnum[12..])
+        }
+        _ => ccnum,
+    };
+    Ok(VariableValue::new_string(fmt))
 }
+
 pub async fn cctype(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let ccnum = vm.eval_expr(&args[0]).await?.as_string();
     let issuer = if let Ok(card) = ccnum.parse::<creditcard::CreditCard>() {
-
+        card.issuer().name().to_string()
     } else {
         "UNKNOWN".to_string()
     };

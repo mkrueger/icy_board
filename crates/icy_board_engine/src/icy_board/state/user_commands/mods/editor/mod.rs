@@ -1,13 +1,12 @@
 use crate::icy_board::commands::CommandType;
-use crate::{icy_board::state::functions::MASK_COMMAND, Res};
+use crate::{Res, icy_board::state::functions::MASK_COMMAND};
 use crate::{
     icy_board::{
         icb_config::IcbColor,
         icb_text::IceText,
         state::{
-            control_codes,
-            functions::{display_flags, MASK_NUM},
-            IcyBoardState,
+            IcyBoardState, control_codes,
+            functions::{MASK_NUM, display_flags},
         },
     },
     vm::TerminalTarget,
@@ -177,10 +176,10 @@ impl EditState {
                         return Ok(EditResult::SendMessage);
                     }
                     "Q" => { // quote message
-                         // TODO: quote
+                        // TODO: quote
                     }
                     "U" => { // upload message
-                         // TODO: upload
+                        // TODO: upload
                     }
                     _ => {}
                 }

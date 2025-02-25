@@ -1,5 +1,5 @@
 use super::IcyBoardSerializer;
-use super::{is_false, is_null_32, is_null_64, is_null_8, PCBoardImport, PCBoardTextImport};
+use super::{PCBoardImport, PCBoardTextImport, is_false, is_null_8, is_null_32, is_null_64};
 use crate::Res;
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};

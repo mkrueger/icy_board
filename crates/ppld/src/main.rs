@@ -1,4 +1,5 @@
 use argh::FromArgs;
+use crossterm::ExecutableCommand;
 use crossterm::execute;
 use crossterm::style::Attribute;
 use crossterm::style::Color;
@@ -6,9 +7,8 @@ use crossterm::style::Print;
 use crossterm::style::ResetColor;
 use crossterm::style::SetAttribute;
 use crossterm::style::SetForegroundColor;
-use crossterm::ExecutableCommand;
-use icy_board_engine::ast::output_visitor;
 use icy_board_engine::ast::OutputFunc;
+use icy_board_engine::ast::output_visitor;
 use icy_board_engine::decompiler::decompile;
 use icy_board_engine::executable::Executable;
 use icy_board_engine::executable::PPEScript;

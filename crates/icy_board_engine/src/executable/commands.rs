@@ -69,7 +69,7 @@ impl PPEScript {
                     return Err(DeserializationError {
                         error_type: err,
                         span: deserializer.stmt_span(),
-                    })
+                    });
                 }
             }
         }
@@ -727,11 +727,7 @@ impl PPEVisitorMut for ExpressionNegator {
                     Box::new(left.visit_mut(self)),
                     Box::new(right.visit_mut(self)),
                 );
-                if variant1.get_size() < variant2.get_size() {
-                    variant1
-                } else {
-                    variant2
-                }
+                if variant1.get_size() < variant2.get_size() { variant1 } else { variant2 }
             }
         }
     }

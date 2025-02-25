@@ -12,7 +12,7 @@ use self::{
     users::PcbUserRecord,
 };
 
-use super::{case_insitive_lookup, icb_text::IcbTextFile, IcyBoardError};
+use super::{IcyBoardError, case_insitive_lookup, icb_text::IcbTextFile};
 
 pub mod pcbconferences;
 pub mod pcboard_data;

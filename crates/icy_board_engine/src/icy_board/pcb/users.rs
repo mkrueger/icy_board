@@ -1,9 +1,9 @@
 use std::{fs, path::Path};
 
 use crate::{
+    Res,
     datetime::{IcbDate, IcbTime},
     tables::import_cp437_string,
-    Res,
 };
 
 #[derive(Clone, Debug, Default, PartialEq)]

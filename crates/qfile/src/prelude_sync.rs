@@ -1,3 +1,5 @@
+use crate::CodeStatus;
+use crate::Directory;
 use crate::find::pathfinder::find_paths;
 use crate::init::{
     constructor::add_path,
@@ -6,8 +8,6 @@ use crate::init::{
 use crate::paths::get_path::{get_path_buf, get_path_string};
 use crate::read::read::*;
 use crate::write::write::{auto_write, write_only_new};
-use crate::CodeStatus;
-use crate::Directory;
 use crate::{QFilePath, QPackError};
 use std::sync::mpsc::{SendError, Sender};
 use std::{fs, path::PathBuf};

@@ -13,8 +13,8 @@ pub mod server;
 pub use server::*;
 
 use crate::{
-    crc::{get_crc16, get_crc32, update_crc32},
     NetError,
+    crc::{get_crc16, get_crc32, update_crc32},
 };
 
 /// EMSI Inquiry is transmitted by the calling system to identify it as

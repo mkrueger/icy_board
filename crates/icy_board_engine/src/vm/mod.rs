@@ -1,3 +1,4 @@
+use crate::Res;
 use crate::ast::BinOp;
 use crate::ast::Statement;
 use crate::ast::UnaryOp;
@@ -14,10 +15,9 @@ use crate::executable::VariableValue;
 use crate::icy_board::state::NodeState;
 use crate::icy_board::user_base::FSEMode;
 use crate::parser::UserTypeRegistry;
-use crate::Res;
 use async_recursion::async_recursion;
-use icy_engine::rip::to_base_36;
 use icy_engine::Buffer;
+use icy_engine::rip::to_base_36;
 use jamjam::jam::msg_header::JamMessageHeader;
 use std::collections::HashMap;
 use std::collections::VecDeque;

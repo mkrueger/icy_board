@@ -2,9 +2,9 @@ use core::panic;
 
 use crate::{
     ast::{
-        constant::NumberFormat, AstNode, AstVisitorMut, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, DimensionSpecifier,
-        Expression, ForStatement, FunctionImplementation, GotoStatement, IdentifierExpression, IfStatement, LabelStatement, LetStatement, ReturnStatement,
-        SelectStatement, Statement, VariableDeclarationStatement, VariableSpecifier,
+        AstNode, AstVisitorMut, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, DimensionSpecifier, Expression, ForStatement,
+        FunctionImplementation, GotoStatement, IdentifierExpression, IfStatement, LabelStatement, LetStatement, ReturnStatement, SelectStatement, Statement,
+        VariableDeclarationStatement, VariableSpecifier, constant::NumberFormat,
     },
     decompiler::evaluation_visitor::OptimizationVisitor,
     parser::lexer::{Spanned, Token},

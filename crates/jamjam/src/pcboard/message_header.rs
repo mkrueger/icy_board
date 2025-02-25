@@ -1,7 +1,7 @@
 use bstr::BString;
 use chrono::{Datelike, Local, NaiveTime};
 
-use super::{convert_pcboard_str, PCBoardError};
+use super::{PCBoardError, convert_pcboard_str};
 use crate::{
     pcboard::{DATE_LEN, FROM_TO_LEN, PASSWORD_LEN, TIME_LEN},
     util::basic_real::BasicReal,

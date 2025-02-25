@@ -6,11 +6,11 @@ use std::{
 use toml::Spanned;
 
 use crate::{
-    ast::{constant::NumberFormat, Constant},
+    ast::{Constant, constant::NumberFormat},
     compiler::workspace::{CompilerData, Workspace},
     parser::{
-        lexer::{CommentType, Lexer, Token},
         Encoding, ErrorReporter,
+        lexer::{CommentType, Lexer, Token},
     },
 };
 

@@ -4,9 +4,9 @@ use chrono::Local;
 use codepages::tables::write_utf8_with_bom;
 use color_eyre::Result;
 use create::IcyBoardCreator;
-use icy_board_engine::icy_board::{read_with_encoding_detection, IcyBoard};
+use icy_board_engine::icy_board::{IcyBoard, read_with_encoding_detection};
 use icy_board_tui::{print_error, term};
-use import::{console_logger::ConsoleLogger, PCBoardImporter};
+use import::{PCBoardImporter, console_logger::ConsoleLogger};
 use semver::Version;
 use std::{
     fs,

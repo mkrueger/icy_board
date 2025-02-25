@@ -1,14 +1,14 @@
 use std::path::Path;
 
+use crate::Res;
 use crate::icy_board::commands::CommandType;
+use crate::icy_board::state::IcyBoardState;
 use crate::icy_board::state::functions::MASK_COMMAND;
 use crate::icy_board::state::user_commands::mods::filebrowser::FileList;
-use crate::icy_board::state::IcyBoardState;
-use crate::Res;
 use crate::{
     icy_board::{
         icb_text::IceText,
-        state::{functions::display_flags, NodeStatus},
+        state::{NodeStatus, functions::display_flags},
     },
     vm::TerminalTarget,
 };

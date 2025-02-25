@@ -1,36 +1,36 @@
 use std::{
     collections::HashMap,
-    io::{self, stdout, Stdout},
+    io::{self, Stdout, stdout},
     path::PathBuf,
     sync::Arc,
     time::{Duration, Instant},
 };
 
 use crate::{
-    bbs::{handle_client, LoginOptions},
-    terminal_thread::SendData,
     Res,
+    bbs::{LoginOptions, handle_client},
+    terminal_thread::SendData,
 };
 use chrono::Utc;
 use crossterm::{
+    ExecutableCommand,
     cursor::MoveTo,
     event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
     terminal::Clear,
-    ExecutableCommand,
 };
 use icy_board_engine::icy_board::{
-    bbs::{BBSMessage, BBS},
-    state::{GraphicsMode, NodeState},
     IcyBoard, IcyBoardError,
+    bbs::{BBS, BBSMessage},
+    state::{GraphicsMode, NodeState},
 };
 use icy_board_tui::{
     get_text_args,
     theme::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GRAY, DOS_LIGHT_GREEN, DOS_RED, DOS_WHITE, DOS_YELLOW},
 };
 use icy_engine::TextPane;
-use icy_net::{channel::ChannelConnection, ConnectionType};
+use icy_net::{ConnectionType, channel::ChannelConnection};
 use ratatui::{prelude::*, widgets::Paragraph};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 
 use crate::icy_engine_output::Screen;
 
@@ -272,17 +272,19 @@ impl Tui {
                     GraphicsMode::Rip => "R",
                 };
 
-                let line = Line::from(vec![Span::from(format!(
-                    "{} ({})  Sec({})={}  Times On={}  Up:Dn={}:{}",
-                    graphics,
-                    status_bar_info.last_on.format(&status_bar_info.date_format),
-                    status_bar_info.current_conf,
-                    status_bar_info.cur_security,
-                    status_bar_info.times_on,
-                    status_bar_info.up,
-                    status_bar_info.dn
-                ))
-                .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY))]);
+                let line = Line::from(vec![
+                    Span::from(format!(
+                        "{} ({})  Sec({})={}  Times On={}  Up:Dn={}:{}",
+                        graphics,
+                        status_bar_info.last_on.format(&status_bar_info.date_format),
+                        status_bar_info.current_conf,
+                        status_bar_info.cur_security,
+                        status_bar_info.times_on,
+                        status_bar_info.up,
+                        status_bar_info.dn
+                    ))
+                    .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
+                ]);
                 frame.buffer_mut().set_line(area.x, area.y + 1, &line, area.width);
                 let hlp = "ALT-H=Help".to_string();
                 let len = hlp.len() as u16;
@@ -328,8 +330,10 @@ impl Tui {
                 ]);
                 frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
 
-                let line = Line::from(vec![Span::from(format!("  C1: {:40} C2: {:40}", status_bar_info.cmt1, status_bar_info.cmt2))
-                    .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY))]);
+                let line = Line::from(vec![
+                    Span::from(format!("  C1: {:40} C2: {:40}", status_bar_info.cmt1, status_bar_info.cmt2))
+                        .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
+                ]);
                 frame.buffer_mut().set_line(area.x, area.y + 1, &line, area.width);
             }
             3 => {
@@ -343,14 +347,16 @@ impl Tui {
                 ]);
                 frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
 
-                let line = Line::from(vec![Span::from(format!(
-                    "  Msgs Read: {:7}  Files D/L: {:7}  Bytes D/L: {:7}  Today: {:7}",
-                    status_bar_info.msg_read,
-                    status_bar_info.dn,
-                    status_bar_info.dnbytes,
-                    status_bar_info.today_dn as i64 + status_bar_info.today_ul as i64,
-                ))
-                .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY))]);
+                let line = Line::from(vec![
+                    Span::from(format!(
+                        "  Msgs Read: {:7}  Files D/L: {:7}  Bytes D/L: {:7}  Today: {:7}",
+                        status_bar_info.msg_read,
+                        status_bar_info.dn,
+                        status_bar_info.dnbytes,
+                        status_bar_info.today_dn as i64 + status_bar_info.today_ul as i64,
+                    ))
+                    .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
+                ]);
                 frame.buffer_mut().set_line(area.x, area.y + 1, &line, area.width);
             }
             _ => {}

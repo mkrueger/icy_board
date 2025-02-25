@@ -1,15 +1,15 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
+    Frame,
     layout::{Margin, Rect},
     style::Style,
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Clear, Widget},
-    Frame,
 };
 
 use crate::{
     get_text,
-    theme::{get_tui_theme, DOS_DARK_GRAY, DOS_LIGHT_GRAY, DOS_WHITE},
+    theme::{DOS_DARK_GRAY, DOS_LIGHT_GRAY, DOS_WHITE, get_tui_theme},
 };
 
 pub enum SaveChangesMessage {

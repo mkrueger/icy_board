@@ -4,7 +4,7 @@ use std::{
     path::Path,
 };
 
-use crate::{parser::Encoding, Res};
+use crate::{Res, parser::Encoding};
 use codepages::tables::{CP437_TO_UNICODE, UNICODE_TO_CP437};
 
 #[derive(Clone, Debug, Default, PartialEq)]

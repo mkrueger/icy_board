@@ -2,9 +2,9 @@ use crate::icy_board::{
     commands::CommandType,
     icb_text::IceText,
     state::{
-        functions::{display_flags, MASK_COMMAND, MASK_NUM},
-        user_commands::mods::messagereader::MessageViewer,
         IcyBoardState, NodeStatus,
+        functions::{MASK_COMMAND, MASK_NUM, display_flags},
+        user_commands::mods::messagereader::MessageViewer,
     },
 };
 use bstr::BString;

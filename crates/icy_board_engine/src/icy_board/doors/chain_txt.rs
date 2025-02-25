@@ -4,11 +4,11 @@ use chrono::{Timelike, Utc};
 use icy_engine::TextPane;
 
 use crate::{
+    Res,
     icy_board::{
         doors::{DOOR_BPS_RATE, DOOR_COM_PORT},
         state::{GraphicsMode, IcyBoardState},
     },
-    Res,
 };
 
 /// CALLINFO.BBS format from the WWIV software.

@@ -5,22 +5,22 @@ use std::{mem, process};
 
 use dashmap::DashMap;
 use icy_board_engine::ast::{
-    walk_function_declaration, walk_function_implementation, walk_predefined_call_statement, walk_variable_declaration_statement, Ast, AstVisitor, Constant,
-    ConstantExpression, Expression, ParameterSpecifier,
+    Ast, AstVisitor, Constant, ConstantExpression, Expression, ParameterSpecifier, walk_function_declaration, walk_function_implementation,
+    walk_predefined_call_statement, walk_variable_declaration_statement,
 };
 use icy_board_engine::compiler::workspace::Workspace;
-use icy_board_engine::executable::{FunctionDefinition, FUNCTION_DEFINITIONS, LAST_PPLC};
+use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionDefinition, LAST_PPLC};
 use icy_board_engine::formatting::FormattingVisitor;
 use icy_board_engine::icy_board::read_data_with_encoding_detection;
-use icy_board_engine::parser::{parse_ast, Encoding, ErrorReporter, UserTypeRegistry};
+use icy_board_engine::parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast};
 use icy_board_engine::semantic::SemanticVisitor;
 use ppl_language_server::completion::get_completion;
 use ppl_language_server::documentation::{get_const_hover, get_function_hover, get_statement_hover, get_type_hover};
 use ppl_language_server::formatting::VSCodeFormattingBackend;
 use ppl_language_server::jump_definition::get_definition;
 use ppl_language_server::reference::get_reference;
-use ppl_language_server::semantic_token::{semantic_token_from_ast, LEGEND_TYPE};
-use ppl_language_server::{offset_to_position, ImCompleteSemanticToken};
+use ppl_language_server::semantic_token::{LEGEND_TYPE, semantic_token_from_ast};
+use ppl_language_server::{ImCompleteSemanticToken, offset_to_position};
 use ropey::Rope;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

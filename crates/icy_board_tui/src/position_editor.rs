@@ -2,11 +2,11 @@ use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::icy_board::commands::Position;
 use icy_engine::{Buffer, TextPane};
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Style, Stylize},
     text::Span,
     widgets::{Clear, Widget},
-    Frame,
 };
 
 pub struct PositionEditor {

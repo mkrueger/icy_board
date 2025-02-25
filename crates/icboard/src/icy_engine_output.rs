@@ -1,4 +1,4 @@
-use icy_engine::{ansi, Buffer, BufferParser, Caret};
+use icy_engine::{Buffer, BufferParser, Caret, ansi};
 
 pub struct Screen {
     pub caret: Caret,

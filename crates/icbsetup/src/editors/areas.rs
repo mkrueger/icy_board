@@ -6,27 +6,27 @@ use std::{
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
+    Res,
     icy_board::{
+        IcyBoard, IcyBoardSerializer,
         message_area::{AreaList, MessageArea},
         security_expr::SecurityExpression,
-        IcyBoard, IcyBoardSerializer,
     },
-    Res,
 };
 use icy_board_tui::{
+    BORDER_SET,
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
     get_text, get_text_args,
     insert_table::InsertTable,
     save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
-    BORDER_SET,
 };
 use ratatui::{
+    Frame,
     layout::{Alignment, Margin, Rect},
     text::{Line, Span},
-    widgets::{block::Title, Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget},
-    Frame,
+    widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget, block::Title},
 };
 
 pub struct MessageAreasEditor<'a> {

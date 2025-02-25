@@ -6,8 +6,8 @@ pub mod predefined_functions;
 pub use predefined_functions::*;
 
 use crate::{
-    executable::{FuncOpCode, PPEExpr, VariableValue},
     Res,
+    executable::{FuncOpCode, PPEExpr, VariableValue},
 };
 
 use super::VirtualMachine;

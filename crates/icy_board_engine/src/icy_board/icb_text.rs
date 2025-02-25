@@ -6,7 +6,7 @@ use std::{
     path::Path,
 };
 
-use crate::{tables::import_cp437_string, Res};
+use crate::{Res, tables::import_cp437_string};
 use codepages::tables::UNICODE_TO_CP437;
 use strum_macros::{Display, EnumString};
 use thiserror::Error;

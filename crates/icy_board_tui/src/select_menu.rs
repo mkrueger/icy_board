@@ -1,10 +1,10 @@
 use crate::theme::get_tui_theme;
 use crossterm::event::KeyCode;
 use ratatui::{
+    Frame,
     layout::Rect,
     text::Text,
     widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState, Widget},
-    Frame,
 };
 
 pub struct MenuItem<T> {

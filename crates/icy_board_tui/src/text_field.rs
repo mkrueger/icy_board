@@ -1,8 +1,8 @@
 use crossterm::{
-    event::{KeyCode, KeyEvent, KeyModifiers},
     ExecutableCommand,
+    event::{KeyCode, KeyEvent, KeyModifiers},
 };
-use ratatui::{buffer::Buffer, layout::Rect, style::Style, widgets::StatefulWidget, Frame};
+use ratatui::{Frame, buffer::Buffer, layout::Rect, style::Style, widgets::StatefulWidget};
 
 use crate::theme::get_tui_theme;
 

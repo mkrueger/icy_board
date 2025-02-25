@@ -7,7 +7,7 @@ use crossterm::event::KeyEvent;
 pub use record::*;
 
 use icy_board_tui::TerminalType;
-use ratatui::{layout::Rect, Frame};
+use ratatui::{Frame, layout::Rect};
 
 use crate::app::ResultState;
 

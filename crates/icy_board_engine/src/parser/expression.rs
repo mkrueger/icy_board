@@ -1,4 +1,4 @@
-use super::{lexer::Token, Parser};
+use super::{Parser, lexer::Token};
 use crate::{
     ast::{
         ArrayInitializerExpression, BinaryExpression, ConstantExpression, Expression, FunctionCallExpression, IdentifierExpression, IndexerExpression,

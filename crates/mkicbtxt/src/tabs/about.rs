@@ -1,11 +1,11 @@
 use super::TabPage;
-use icy_board_tui::theme::{get_tui_theme, DOS_LIGHT_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE};
+use icy_board_tui::theme::{DOS_LIGHT_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE, get_tui_theme};
 use ratatui::{
+    Frame,
     layout::{Margin, Rect},
     style::Style,
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Clear, Padding, Paragraph, Widget},
-    Frame,
 };
 use substring::Substring;
 

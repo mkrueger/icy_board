@@ -307,8 +307,8 @@ impl Execute {
 #[cfg(test)]
 mod tests {
     use crate::zconnect::{
-        commands::{mails, ZConnectCommandBlock},
         BlockCode, ZConnectBlock,
+        commands::{ZConnectCommandBlock, mails},
     };
 
     #[test]

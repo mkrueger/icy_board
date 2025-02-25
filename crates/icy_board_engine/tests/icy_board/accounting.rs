@@ -1,4 +1,4 @@
-use icy_board_engine::icy_board::{accounting_cfg::AccountingConfig, PCBoardBinImporter};
+use icy_board_engine::icy_board::{PCBoardBinImporter, accounting_cfg::AccountingConfig};
 
 #[test]
 fn test_accounting_load() {

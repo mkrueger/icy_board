@@ -7,29 +7,17 @@ use std::{
 
 use codepages::tables::write_utf8_with_bom;
 use icy_board_engine::{
-    datetime::{IcbDoW, IcbTime},
+    Res,
     icy_board::{
-        accounting_cfg::AccountingConfig,
-        commands::CommandType,
-        doors::DoorList,
-        icb_config::{
-            AccountingOptions, ConfigSwitches, EventOptions, FileTransferOptions, LimitOptions, MessageOptions, SystemControlOptions, UserCommandLevels,
-        },
-        security_expr::SecurityExpression,
-        user_base::{PasswordInfo, User},
-        PCBoardRecordImporter,
-    },
-};
-use icy_board_engine::{
-    icy_board::{
+        IcyBoardError, IcyBoardSerializer, PCBoardImport, PcbUser,
         bulletins::BullettinList,
         commands::CommandList,
         conferences::ConferenceBase,
         file_directory::DirectoryList,
         group_list::GroupList,
         icb_config::{
-            BoardInformation, BoardOptions, ColorConfiguration, ConfigPaths, DisplayNewsBehavior, IcbColor, IcbConfig, NewUserSettings, SubscriptionMode,
-            SysopCommandLevels, SysopInformation, DEFAULT_PCBOARD_DATE_FORMAT,
+            BoardInformation, BoardOptions, ColorConfiguration, ConfigPaths, DEFAULT_PCBOARD_DATE_FORMAT, DisplayNewsBehavior, IcbColor, IcbConfig,
+            NewUserSettings, SubscriptionMode, SysopCommandLevels, SysopInformation,
         },
         icb_text::IcbTextFile,
         language::SupportedLanguages,
@@ -47,9 +35,21 @@ use icy_board_engine::{
         user_inf::PcbUserInf,
         users::PcbUserRecord,
         xfer_protocols::SupportedProtocols,
-        IcyBoardError, IcyBoardSerializer, PCBoardImport, PcbUser,
     },
-    Res,
+};
+use icy_board_engine::{
+    datetime::{IcbDoW, IcbTime},
+    icy_board::{
+        PCBoardRecordImporter,
+        accounting_cfg::AccountingConfig,
+        commands::CommandType,
+        doors::DoorList,
+        icb_config::{
+            AccountingOptions, ConfigSwitches, EventOptions, FileTransferOptions, LimitOptions, MessageOptions, SystemControlOptions, UserCommandLevels,
+        },
+        security_expr::SecurityExpression,
+        user_base::{PasswordInfo, User},
+    },
 };
 use jamjam::util::echmoail::EchomailAddress;
 use qfile::{QFilePath, QTraitSync};
@@ -1202,14 +1202,14 @@ impl PCBoardImporter {
                     self.logger.log_boxed_error(&*err);
                 }
             } /*
-              } else {
-                  self.logger.log(&format!(
-                      "Warning, can't resolve bulletin entry {} in file {}",
-                      entry.file.display(),
-                      destination.display()
-                  ));
-                  self.output.warning(format!("Warning, can't resolve {}", entry.file.display()));
-              }*/
+            } else {
+            self.logger.log(&format!(
+            "Warning, can't resolve bulletin entry {} in file {}",
+            entry.file.display(),
+            destination.display()
+            ));
+            self.output.warning(format!("Warning, can't resolve {}", entry.file.display()));
+            }*/
         }
 
         if destination.exists() {
@@ -1282,15 +1282,15 @@ impl PCBoardImporter {
                     self.logger.log_boxed_error(&*err);
                 }
             } /*
-                          } else {
-                              self.logger.log(&format!(
-                                  "Warning, can't resolve script questionary {} in file {}",
-                                  entry.question_file.display(),
-                                  destination.display()
-                              ));
-                              self.output.warning(format!("Warning, can't resolve {}", entry.question_file.display()));
-                          }
-              */
+            } else {
+            self.logger.log(&format!(
+            "Warning, can't resolve script questionary {} in file {}",
+            entry.question_file.display(),
+            destination.display()
+            ));
+            self.output.warning(format!("Warning, can't resolve {}", entry.question_file.display()));
+            }
+             */
             let new_entry = self.resolve_file(entry.answer_file.to_str().unwrap());
             let name = new_entry.file_name().unwrap().to_str().unwrap().to_string().to_ascii_lowercase();
             let new_name = format!("{}/{}", output, &name);

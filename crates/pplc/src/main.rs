@@ -3,16 +3,16 @@ use ariadne::{Label, Report, ReportKind};
 
 use codepages::tables::{write_cp437, write_utf8_with_bom};
 use icy_board_engine::{
+    Res,
     ast::Ast,
     compiler::{
-        workspace::{CompilerData, Package, Workspace},
         PPECompiler,
+        workspace::{CompilerData, Package, Workspace},
     },
     executable::LAST_PPLC,
     formatting::{FormattingVisitor, StringFormattingBackend},
     icy_board::read_with_encoding_detection,
-    parser::{load_with_encoding, parse_ast, Encoding, ErrorReporter, UserTypeRegistry},
-    Res,
+    parser::{Encoding, ErrorReporter, UserTypeRegistry, load_with_encoding, parse_ast},
 };
 
 use crossterm::{
@@ -171,11 +171,7 @@ fn main() {
     println!("Parsing...");
 
     let encoding = if let Some(cp437) = arguments.cp437 {
-        if cp437 {
-            Encoding::CP437
-        } else {
-            Encoding::Utf8
-        }
+        if cp437 { Encoding::CP437 } else { Encoding::Utf8 }
     } else {
         Encoding::Detect
     };

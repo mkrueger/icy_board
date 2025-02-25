@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use icy_board_engine::icy_board::{menu::Menu, IcyBoard};
+use icy_board_engine::icy_board::{IcyBoard, menu::Menu};
 use icy_board_tui::{
     app::{App, Mode},
     help_view::HelpViewState,

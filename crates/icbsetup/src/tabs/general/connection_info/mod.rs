@@ -9,7 +9,7 @@ use icy_board_tui::{
     select_menu::{MenuItem, SelectMenu},
     tab_page::{Page, PageMessage},
 };
-use ratatui::{layout::Rect, Frame};
+use ratatui::{Frame, layout::Rect};
 use secure_websockets::SecureWebsockets;
 use websockets::Websockets;
 

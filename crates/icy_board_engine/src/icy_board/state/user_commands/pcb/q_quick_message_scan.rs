@@ -1,16 +1,16 @@
 use crate::{
+    Res,
     icy_board::{
         commands::CommandType,
-        state::{functions::MASK_COMMAND, IcyBoardState},
+        state::{IcyBoardState, functions::MASK_COMMAND},
     },
-    Res,
 };
 
 use crate::{
     icy_board::{
         icb_config::IcbColor,
         icb_text::IceText,
-        state::{functions::display_flags, NodeStatus},
+        state::{NodeStatus, functions::display_flags},
     },
     vm::TerminalTarget,
 };
@@ -97,24 +97,12 @@ impl IcyBoardState {
             match message_base.read_header(i) {
                 Ok(header) => {
                     let status = if header.needs_password() {
-                        if header.is_read() {
-                            '^'
-                        } else {
-                            '%'
-                        }
+                        if header.is_read() { '^' } else { '%' }
                     } else if header.is_private() {
                         if header.get_to().unwrap().eq_ignore_ascii_case(b"SYSOP") {
-                            if header.is_read() {
-                                '~'
-                            } else {
-                                '`'
-                            }
+                            if header.is_read() { '~' } else { '`' }
                         } else {
-                            if header.is_read() {
-                                '+'
-                            } else {
-                                '*'
-                            }
+                            if header.is_read() { '+' } else { '*' }
                         }
                     } else if header.is_read() {
                         ' '

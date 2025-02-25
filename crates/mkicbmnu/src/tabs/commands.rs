@@ -1,13 +1,13 @@
 use std::sync::{Arc, Mutex};
 
 use crossterm::event::{KeyCode, KeyEvent};
-use icy_board_engine::icy_board::{menu::Menu, IcyBoard};
+use icy_board_engine::icy_board::{IcyBoard, menu::Menu};
 use icy_board_tui::{config_menu::ResultState, insert_table::InsertTable, pcb_line::get_styled_pcb_line, tab_page::TabPage, theme::get_tui_theme};
 use ratatui::{
+    Frame,
     layout::{Margin, Rect},
     text::Line,
     widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget},
-    Frame,
 };
 
 use crate::edit_command_dialog::EditCommandDialog;

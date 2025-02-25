@@ -5,7 +5,7 @@ use crate::{
     parser::lexer::{Spanned, Token},
 };
 
-use super::{constant::NumberFormat, AstVisitorMut, Constant, Expression, Statement};
+use super::{AstVisitorMut, Constant, Expression, Statement, constant::NumberFormat};
 #[derive(Debug, PartialEq, Clone)]
 pub struct DimensionSpecifier {
     dimension_token: Spanned<Token>,
@@ -269,11 +269,7 @@ pub enum ParameterSpecifier {
 
 impl ParameterSpecifier {
     pub fn is_var(&self) -> bool {
-        if let ParameterSpecifier::Variable(var) = self {
-            var.is_var()
-        } else {
-            false
-        }
+        if let ParameterSpecifier::Variable(var) = self { var.is_var() } else { false }
     }
 
     pub fn is_similar(&self, check: &ParameterSpecifier) -> bool {

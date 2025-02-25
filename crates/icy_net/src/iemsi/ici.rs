@@ -1,12 +1,12 @@
 use std::str::FromStr;
 
 use crate::{
+    NetError,
     crc::get_crc32,
     telnet::{TermCaps, TerminalEmulation},
-    NetError,
 };
 
-use super::{encode_emsi, get_crc32string, get_length_string, EMSI_2ACK};
+use super::{EMSI_2ACK, encode_emsi, get_crc32string, get_length_string};
 
 /// The ICI packet is used by the Client to transmit its configuration
 /// and Server-related information to the Server. It contains Server

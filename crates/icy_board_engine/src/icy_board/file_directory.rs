@@ -6,16 +6,16 @@ use std::{
 };
 
 use crate::{
+    Res,
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
     executable::{VariableType, VariableValue},
     tables::export_cp437_string,
-    Res,
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 
-use super::{is_false, security_expr::SecurityExpression, user_base::Password, IcyBoardError, IcyBoardSerializer, PCBoardRecordImporter};
+use super::{IcyBoardError, IcyBoardSerializer, PCBoardRecordImporter, is_false, security_expr::SecurityExpression, user_base::Password};
 
 #[derive(Serialize, Deserialize, Default, Clone, Copy, Debug, PartialEq)]
 pub enum SortOrder {

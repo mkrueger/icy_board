@@ -1,12 +1,12 @@
 use std::fs;
 
 use crate::{
+    Res,
     icy_board::{
         doors::{DOOR_BPS_RATE, DOOR_COM_PORT},
         icb_config::IcbColor,
         state::{GraphicsMode, IcyBoardState},
     },
-    Res,
 };
 
 ///  GAP, 52-line format

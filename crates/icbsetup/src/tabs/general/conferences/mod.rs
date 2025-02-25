@@ -1,9 +1,9 @@
 pub mod conference_editor;
 pub use conference_editor::*;
+use icy_board_tui::BORDER_SET;
 use icy_board_tui::get_text;
 use icy_board_tui::tab_page::Page;
 use icy_board_tui::tab_page::PageMessage;
-use icy_board_tui::BORDER_SET;
 use ratatui::text::Line;
 use ratatui::text::Span;
 
@@ -20,10 +20,10 @@ use ratatui::widgets::Block;
 use ratatui::widgets::Borders;
 use ratatui::widgets::Padding;
 use ratatui::{
+    Frame,
     layout::{Constraint, Rect},
     text::Text,
     widgets::{Cell, Clear, HighlightSpacing, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState, Widget},
-    Frame,
 };
 
 pub struct ConferenceListEditor {

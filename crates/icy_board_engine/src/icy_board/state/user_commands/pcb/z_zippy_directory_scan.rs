@@ -1,12 +1,12 @@
 use crate::{
-    icy_board::state::{functions::MASK_COMMAND, user_commands::mods::filebrowser::FileList, IcyBoardState},
     Res,
+    icy_board::state::{IcyBoardState, functions::MASK_COMMAND, user_commands::mods::filebrowser::FileList},
 };
 use crate::{
     icy_board::{
         icb_config::IcbColor,
         icb_text::IceText,
-        state::functions::{display_flags, MASK_ASCII},
+        state::functions::{MASK_ASCII, display_flags},
     },
     vm::TerminalTarget,
 };

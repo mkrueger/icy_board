@@ -6,7 +6,7 @@ use std::{
     time::SystemTime,
 };
 
-use crate::{icy_board::read_data_with_encoding_detection, Res};
+use crate::{Res, icy_board::read_data_with_encoding_detection};
 
 use crate::vm::VMError;
 
@@ -224,11 +224,7 @@ impl PCBoardIO for DiskIO {
     }
 
     fn ferr(&self, channel: usize) -> bool {
-        if let Some(channel) = self.channels.get(&channel) {
-            channel.err
-        } else {
-            true
-        }
+        if let Some(channel) = self.channels.get(&channel) { channel.err } else { true }
     }
 
     fn fput(&mut self, channel: usize, text: String) -> Res<()> {
@@ -403,10 +399,6 @@ impl PCBoardIO for DiskIO {
     }
 
     fn get_file_size(&self, file: &str) -> u64 {
-        if let Ok(metadata) = fs::metadata(file) {
-            metadata.len()
-        } else {
-            0
-        }
+        if let Ok(metadata) = fs::metadata(file) { metadata.len() } else { 0 }
     }
 }

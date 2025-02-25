@@ -1,10 +1,10 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::Res;
 use ratatui::{
+    Frame,
     layout::{Constraint, Rect},
     text::{Line, Text},
     widgets::{Cell, HighlightSpacing, Row, ScrollbarState, Table, TableState},
-    Frame,
 };
 
 use crate::theme::get_tui_theme;

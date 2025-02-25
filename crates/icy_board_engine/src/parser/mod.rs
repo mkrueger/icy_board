@@ -368,19 +368,11 @@ impl<'a> Parser<'a> {
     }
 
     fn save_token_span(&self) -> std::ops::Range<usize> {
-        if let Some(token) = &self.cur_token {
-            token.span.clone()
-        } else {
-            0..0
-        }
+        if let Some(token) = &self.cur_token { token.span.clone() } else { 0..0 }
     }
 
     fn save_token(&self) -> Token {
-        if let Some(token) = &self.cur_token {
-            token.token.clone()
-        } else {
-            Token::Eol
-        }
+        if let Some(token) = &self.cur_token { token.token.clone() } else { Token::Eol }
     }
 
     fn save_spanned_token(&self) -> Spanned<Token> {

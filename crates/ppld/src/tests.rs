@@ -1,7 +1,7 @@
 use std::env;
 
 use icy_board_engine::{
-    ast::{output_visitor, OutputFunc},
+    ast::{OutputFunc, output_visitor},
     executable::Executable,
 };
 

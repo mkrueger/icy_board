@@ -1,14 +1,14 @@
+use crate::Res;
 use crate::icy_board::commands::CommandType;
 use crate::icy_board::state::functions::MASK_COMMAND;
-use crate::Res;
 use crate::{
     icy_board::{
         icb_text::{IceText, TextEntry},
-        state::{functions::display_flags, IcyBoardState},
+        state::{IcyBoardState, functions::display_flags},
     },
     vm::TerminalTarget,
 };
-use jamjam::jam::{msg_header::JamMessageHeader, JamMessageBase};
+use jamjam::jam::{JamMessageBase, msg_header::JamMessageHeader};
 
 pub struct MessageViewer {
     date_num: TextEntry,

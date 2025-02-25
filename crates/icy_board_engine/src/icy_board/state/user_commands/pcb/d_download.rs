@@ -5,7 +5,7 @@ use humanize_bytes::humanize_bytes_decimal;
 
 use crate::icy_board::icb_config::IcbColor;
 use crate::icy_board::state::functions::MASK_NUM;
-use crate::{icy_board::state::IcyBoardState, Res};
+use crate::{Res, icy_board::state::IcyBoardState};
 use crate::{
     icy_board::{icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,

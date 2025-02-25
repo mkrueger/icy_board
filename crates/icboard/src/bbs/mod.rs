@@ -4,22 +4,22 @@ use crate::Res;
 use async_recursion::async_recursion;
 use icy_board_engine::{
     icy_board::{
+        IcyBoard,
         bbs::BBS,
         icb_text::IceText,
         login_server::{SecureWebsocket, Telnet, Websocket},
         state::{
-            functions::{display_flags, MASK_COMMAND},
             IcyBoardState, NodeState, NodeStatus,
+            functions::{MASK_COMMAND, display_flags},
         },
-        IcyBoard,
     },
     vm::TerminalTarget,
 };
 use icy_net::{
+    Connection, ConnectionType,
     telnet::TelnetConnection,
     termcap_detect::TerminalCaps,
     websocket::{accept_sec_websocket, accept_websocket},
-    Connection, ConnectionType,
 };
 use tokio::{net::TcpListener, sync::Mutex};
 

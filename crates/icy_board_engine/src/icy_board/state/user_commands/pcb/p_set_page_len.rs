@@ -1,7 +1,7 @@
-use crate::icy_board::commands::CommandType;
-use crate::icy_board::state::functions::MASK_NUM;
-use crate::icy_board::state::IcyBoardState;
 use crate::Res;
+use crate::icy_board::commands::CommandType;
+use crate::icy_board::state::IcyBoardState;
+use crate::icy_board::state::functions::MASK_NUM;
 use crate::{
     icy_board::{icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,

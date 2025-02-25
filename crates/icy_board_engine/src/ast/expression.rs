@@ -216,11 +216,7 @@ impl Expression {
         );
         let v1_len = variant1.visit(&mut ExpressionDepthVisitor::default());
         let v2_len = variant2.visit(&mut ExpressionDepthVisitor::default());
-        if v1_len <= v2_len {
-            variant1
-        } else {
-            variant2
-        }
+        if v1_len <= v2_len { variant1 } else { variant2 }
     }
 }
 

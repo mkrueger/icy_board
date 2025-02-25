@@ -1,5 +1,5 @@
 use crate::icy_board::{icb_text::IceText, state::functions::display_flags};
-use crate::{icy_board::state::IcyBoardState, Res};
+use crate::{Res, icy_board::state::IcyBoardState};
 
 impl IcyBoardState {
     pub async fn set_expert_mode(&mut self) -> Res<()> {

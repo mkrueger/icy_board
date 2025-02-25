@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::{tables::import_cp437_string, Res};
+use crate::{Res, tables::import_cp437_string};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 

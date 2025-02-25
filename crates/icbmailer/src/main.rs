@@ -1,14 +1,14 @@
 use std::{fs, time::Duration};
 
 use icy_net::{
+    Connection,
     pattern_recognizer::PatternRecognizer,
     telnet::{TelnetConnection, TermCaps, TerminalEmulation},
     zconnect::{
-        commands::{mails, Execute, ZConnectCommandBlock},
-        header::{Acer, TransferProtocol, ZConnectHeaderBlock},
         BlockCode, EndTransmission, ZConnectBlock, ZConnectState,
+        commands::{Execute, ZConnectCommandBlock, mails},
+        header::{Acer, TransferProtocol, ZConnectHeaderBlock},
     },
-    Connection,
 };
 use tokio::time::Instant;
 

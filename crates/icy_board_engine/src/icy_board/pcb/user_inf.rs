@@ -1,4 +1,4 @@
-use crate::{datetime::IcbDate, Res};
+use crate::{Res, datetime::IcbDate};
 use byteorder::{LittleEndian, ReadBytesExt};
 use codepages::tables::CP437_TO_UNICODE;
 use serde::{Deserialize, Serialize};

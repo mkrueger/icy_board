@@ -3,7 +3,7 @@ use crate::{
     executable::{Executable, FunctionValue, ProcedureValue, TableEntry, VariableType, VariableValue},
 };
 
-use super::{FuncOpCode, OpCode, PPECommand, PPEExpr, FUNCTION_DEFINITIONS};
+use super::{FUNCTION_DEFINITIONS, FuncOpCode, OpCode, PPECommand, PPEExpr};
 
 #[test]
 fn test_end_serialization() {

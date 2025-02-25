@@ -4,9 +4,9 @@ use std::vec;
 
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
+use icy_board_engine::icy_board::IcyBoard;
 use icy_board_engine::icy_board::group_list::Group;
 use icy_board_engine::icy_board::group_list::GroupList;
-use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::config_menu::ConfigEntry;
 use icy_board_tui::config_menu::ConfigMenu;
 use icy_board_tui::config_menu::ConfigMenuState;
@@ -20,10 +20,10 @@ use ratatui::widgets::BorderType;
 use ratatui::widgets::Borders;
 use ratatui::widgets::Padding;
 use ratatui::{
+    Frame,
     layout::{Constraint, Margin, Rect},
     text::Text,
     widgets::{Cell, Clear, HighlightSpacing, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState, Widget},
-    Frame,
 };
 
 pub struct GroupEditor {
@@ -211,13 +211,13 @@ impl Page for GroupEditor {
         self.render_table(frame, area);
         self.render_scrollbar(frame, area);
     } /*
-      fn set_cursor_position(&self, frame: &mut Frame) {
-          self.conference_config
-              .get_item(self.state.selected)
-              .unwrap()
-              .text_field_state
-              .set_cursor_position(frame);
-      }*/
+    fn set_cursor_position(&self, frame: &mut Frame) {
+    self.conference_config
+    .get_item(self.state.selected)
+    .unwrap()
+    .text_field_state
+    .set_cursor_position(frame);
+    }*/
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         if self.in_edit_mode {

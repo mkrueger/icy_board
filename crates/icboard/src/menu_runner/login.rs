@@ -10,8 +10,8 @@ use icy_board_engine::{
         icb_text::IceText,
         security_expr::SecurityExpression,
         state::{
-            functions::{display_flags, pwd_flags, MASK_ALNUM, MASK_PHONE, MASK_WEB},
             NodeStatus,
+            functions::{MASK_ALNUM, MASK_PHONE, MASK_WEB, display_flags, pwd_flags},
         },
         surveys::Survey,
         user_base::{Password, User},

@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use icy_board_engine::icy_board::{icb_config::DisplayNewsBehavior, IcyBoard};
+use icy_board_engine::icy_board::{IcyBoard, icb_config::DisplayNewsBehavior};
 use icy_board_tui::{
     cfg_entry_bool,
     config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState},

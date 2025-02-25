@@ -1,12 +1,12 @@
 use crate::icy_board::state::user_commands::mods::editor::{EditResult, EditState};
-use crate::{icy_board::state::IcyBoardState, Res};
+use crate::{Res, icy_board::state::IcyBoardState};
 
 use crate::icy_board::user_base::FSEMode;
 use crate::{
     datetime::IcbTime,
     icy_board::{
         icb_text::IceText,
-        state::{functions::display_flags, NodeStatus},
+        state::{NodeStatus, functions::display_flags},
     },
 };
 use bstr::BString;

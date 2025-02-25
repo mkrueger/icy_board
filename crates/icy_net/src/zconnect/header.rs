@@ -590,7 +590,7 @@ impl ZConnectBlock for ZConnectHeaderBlock {
 
 #[cfg(test)]
 mod tests {
-    use crate::zconnect::{header::ZConnectHeaderBlock, ZConnectBlock};
+    use crate::zconnect::{ZConnectBlock, header::ZConnectHeaderBlock};
 
     #[test]
     fn test_generate_header() {
@@ -613,7 +613,10 @@ mod tests {
         blk.set_acer_in(crate::zconnect::header::Acer::ZIP);
         blk.set_acer_out(crate::zconnect::header::Acer::ZIP);
         blk.add_mailer(0, crate::zconnect::header::Mailer::ZConnect);
-        assert_eq!("Sys:Icy Shadow BBS\rSysop:SYSOP\rSerNr:123456\rPost:Zossen, Germany\rPort:1\rTel:1 unknown\rDomain:icyshadow.com\rISO2:1 V.32bis\rISO3:1 V.42.bis\rArc:1 ZIP;ARJ\rProto:1 ZMODEM\rPasswd:password\rTelefon:+49-VOICE\rAcerin:ZIP\rAcerout:ZIP\rMailer:1 ZCONNECT\rStatus:BLK1\rCRC:1095\r\r", blk.display());
+        assert_eq!(
+            "Sys:Icy Shadow BBS\rSysop:SYSOP\rSerNr:123456\rPost:Zossen, Germany\rPort:1\rTel:1 unknown\rDomain:icyshadow.com\rISO2:1 V.32bis\rISO3:1 V.42.bis\rArc:1 ZIP;ARJ\rProto:1 ZMODEM\rPasswd:password\rTelefon:+49-VOICE\rAcerin:ZIP\rAcerout:ZIP\rMailer:1 ZCONNECT\rStatus:BLK1\rCRC:1095\r\r",
+            blk.display()
+        );
     }
 
     #[test]
@@ -666,7 +669,9 @@ mod tests {
 
     #[test]
     fn test_crc_mismatch() {
-        let header = ZConnectHeaderBlock::parse("Sys:Icy Shadow BBS\rSysop:SYSOP\rSerNr:123456\rPost:Zossen, Germany\rPort:1\rTel:1 223\rDomain:icyshadow.com\rISO2:1 V.32bis\rISO3:1 V.42.bis\rArc:1 ZIP;ARJ\rProto:1 ZMODEM\rPasswd:password\rTelefon:+49-VOICE\rStatus:BLK1\rAcerIn:ZIP\rAcerOut:ZIP\rMailer:1 ZCONNECT\rCRC:BD70\r\r");
+        let header = ZConnectHeaderBlock::parse(
+            "Sys:Icy Shadow BBS\rSysop:SYSOP\rSerNr:123456\rPost:Zossen, Germany\rPort:1\rTel:1 223\rDomain:icyshadow.com\rISO2:1 V.32bis\rISO3:1 V.42.bis\rArc:1 ZIP;ARJ\rProto:1 ZMODEM\rPasswd:password\rTelefon:+49-VOICE\rStatus:BLK1\rAcerIn:ZIP\rAcerOut:ZIP\rMailer:1 ZCONNECT\rCRC:BD70\r\r",
+        );
         assert!(header.is_err());
     }
 }

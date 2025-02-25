@@ -5,14 +5,14 @@ use std::{
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
     executable::{VariableType, VariableValue},
 };
 
-use super::{security_expr::SecurityExpression, IcyBoardSerializer};
+use super::{IcyBoardSerializer, security_expr::SecurityExpression};
 
 #[serde_as]
 #[derive(Default, Clone, Serialize, Deserialize, PartialEq)]

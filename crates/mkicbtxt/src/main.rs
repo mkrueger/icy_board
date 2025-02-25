@@ -11,7 +11,7 @@ use std::{io::stdout, path::PathBuf, process::exit};
 mod app;
 mod tabs;
 
-use icy_board_engine::icy_board::icb_text::{IcbTextFile, IcbTextFormat, DEFAULT_DISPLAY_TEXT};
+use icy_board_engine::icy_board::icb_text::{DEFAULT_DISPLAY_TEXT, IcbTextFile, IcbTextFormat};
 
 lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();

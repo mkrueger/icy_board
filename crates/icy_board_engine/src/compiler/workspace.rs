@@ -6,7 +6,7 @@ use std::{
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
-use crate::{executable::LAST_PPLC, formatting::FormattingOptions, Res};
+use crate::{Res, executable::LAST_PPLC, formatting::FormattingOptions};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Package {

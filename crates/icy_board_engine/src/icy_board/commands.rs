@@ -6,9 +6,9 @@ use std::{
 
 use crate::Res;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 
-use super::{is_null_64, security_expr::SecurityExpression, IcyBoardSerializer, PCBoardRecordImporter};
+use super::{IcyBoardSerializer, PCBoardRecordImporter, is_null_64, security_expr::SecurityExpression};
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug, Default)]
 pub enum CommandType {

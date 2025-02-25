@@ -1,6 +1,6 @@
 use crate::{
-    icy_board::state::{user_commands::mods::filebrowser::FileList, IcyBoardState},
     Res,
+    icy_board::state::{IcyBoardState, user_commands::mods::filebrowser::FileList},
 };
 use chrono::{DateTime, Local};
 

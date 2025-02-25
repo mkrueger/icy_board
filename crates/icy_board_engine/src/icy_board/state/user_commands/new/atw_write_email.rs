@@ -1,10 +1,10 @@
-use crate::{icy_board::state::IcyBoardState, Res};
+use crate::{Res, icy_board::state::IcyBoardState};
 
 use crate::icy_board::{
     icb_text::IceText,
     state::{
-        functions::{display_flags, MASK_ASCII},
         NodeStatus,
+        functions::{MASK_ASCII, display_flags},
     },
 };
 

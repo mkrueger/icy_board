@@ -5,7 +5,7 @@ use crate::icy_board::icb_config::IcbColor;
 use crate::icy_board::state::functions::MASK_ASCII;
 use crate::icy_board::{icb_text::IceText, state::functions::display_flags};
 use crate::vm::TerminalTarget;
-use crate::{icy_board::state::IcyBoardState, Res};
+use crate::{Res, icy_board::state::IcyBoardState};
 
 impl IcyBoardState {
     pub async fn view_file(&mut self) -> Res<()> {

@@ -6,7 +6,7 @@ use std::{
 use crate::Res;
 use chrono::{Local, Timelike};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use icy_board_engine::icy_board::{statistics::Statistics, IcyBoard};
+use icy_board_engine::icy_board::{IcyBoard, statistics::Statistics};
 use icy_board_tui::{
     app::get_screen_size,
     get_text,

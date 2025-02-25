@@ -1,6 +1,6 @@
 use crate::executable::{EntryType, FunctionValue, VariableType, VariableValue};
 
-use super::{Executable, FuncOpCode, PPEExpr, TableEntry, FUNCTION_DEFINITIONS};
+use super::{Executable, FUNCTION_DEFINITIONS, FuncOpCode, PPEExpr, TableEntry};
 
 #[test]
 fn test_value_serialization() {

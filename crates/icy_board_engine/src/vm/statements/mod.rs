@@ -7,8 +7,8 @@ use async_recursion::async_recursion;
 pub use predefined_procedures::*;
 
 use crate::{
-    executable::{OpCode, PPEExpr},
     Res,
+    executable::{OpCode, PPEExpr},
 };
 
 use super::VirtualMachine;

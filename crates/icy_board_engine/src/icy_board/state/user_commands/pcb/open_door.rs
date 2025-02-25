@@ -1,20 +1,20 @@
 use std::{process::Stdio, time::Duration};
 
 use crate::icy_board::commands::CommandType;
-use crate::{icy_board::state::IcyBoardState, Res};
+use crate::{Res, icy_board::state::IcyBoardState};
 
 use crate::icy_board::{
     doors::{BBSLink, Door, DoorList, DoorServerAccount, DoorType},
     icb_text::IceText,
     state::{
-        functions::{display_flags, MASK_ALNUM},
         NodeStatus,
+        functions::{MASK_ALNUM, display_flags},
     },
 };
 use icy_engine::TextPane;
 use icy_net::{
-    telnet::{TelnetConnection, TermCaps, TerminalEmulation},
     Connection,
+    telnet::{TelnetConnection, TermCaps, TerminalEmulation},
 };
 use rand::distr::{Alphanumeric, SampleString};
 use regex::Regex;

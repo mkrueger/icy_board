@@ -6,12 +6,12 @@ use std::{
 };
 
 use icy_board_engine::{
-    compiler::{workspace::Workspace, PPECompiler},
+    compiler::{PPECompiler, workspace::Workspace},
     executable::Executable,
     icy_board::{bbs::BBS, read_data_with_encoding_detection, state::IcyBoardState, user_base::User},
     parser::{Encoding, ErrorReporter, UserTypeRegistry},
 };
-use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
+use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
 
 #[test]
 fn test_compiler() {

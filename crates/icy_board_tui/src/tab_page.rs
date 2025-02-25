@@ -1,5 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::{layout::Rect, text::Text, Frame};
+use ratatui::{Frame, layout::Rect, text::Text};
 
 use crate::config_menu::ResultState;
 

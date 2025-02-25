@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     compiler::workspace::Workspace,
-    parser::{parse_ast, Encoding, ErrorReporter, UserTypeRegistry},
+    parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
 };
 
 use super::SemanticVisitor;

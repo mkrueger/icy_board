@@ -1,5 +1,5 @@
 use crate::{
-    ast::{constant::NumberFormat, AstVisitor, AstVisitorMut, BinOp, BinaryExpression, Constant, ConstantExpression, Expression, UnaryExpression, UnaryOp},
+    ast::{AstVisitor, AstVisitorMut, BinOp, BinaryExpression, Constant, ConstantExpression, Expression, UnaryExpression, UnaryOp, constant::NumberFormat},
     executable::{VariableType, VariableValue},
 };
 
@@ -162,18 +162,18 @@ fn value_to_expression(value: &VariableValue) -> Option<Expression> {
             return Some(ConstantExpression::create_empty_expression(Constant::Integer(
                 value.as_int(),
                 NumberFormat::Default,
-            )))
+            )));
         }
         VariableType::String => return Some(ConstantExpression::create_empty_expression(Constant::String(value.as_string()))),
         VariableType::Double => {
             return Some(ConstantExpression::create_empty_expression(Constant::Double(unsafe {
                 value.data.double_value
-            })))
+            })));
         }
         VariableType::Unsigned => {
             return Some(ConstantExpression::create_empty_expression(Constant::Unsigned(unsafe {
                 value.data.unsigned_value
-            })))
+            })));
         }
         _ => {}
     }

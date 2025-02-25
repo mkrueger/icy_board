@@ -10,7 +10,7 @@ use icy_board_tui::{
     select_menu::{MenuItem, SelectMenu},
     tab_page::{Page, PageMessage},
 };
-use ratatui::{layout::Rect, Frame};
+use ratatui::{Frame, layout::Rect};
 
 mod colors;
 mod config_switches;

@@ -1,11 +1,11 @@
 use std::fs;
 
 use crate::{
+    Res,
     icy_board::{
         doors::{DOOR_BPS_RATE, DOOR_COM_PORT},
         state::{GraphicsMode, IcyBoardState},
     },
-    Res,
 };
 
 /// Solar Realms doorfile.sr format

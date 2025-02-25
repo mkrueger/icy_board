@@ -4,13 +4,13 @@ use crate::{
     icy_board::{
         icb_text::IceText,
         security_expr::SecurityExpression,
-        state::{functions::display_flags, NodeStatus},
+        state::{NodeStatus, functions::display_flags},
         surveys::Survey,
     },
     vm::TerminalTarget,
 };
 
-use crate::{icy_board::state::IcyBoardState, Res};
+use crate::{Res, icy_board::state::IcyBoardState};
 
 impl IcyBoardState {
     pub async fn goodbye_cmd(&mut self) -> Res<()> {

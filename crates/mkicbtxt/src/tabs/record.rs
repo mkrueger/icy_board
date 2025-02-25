@@ -1,16 +1,16 @@
 use crossterm::event::KeyCode;
-use icy_board_engine::icy_board::icb_text::{IcbTextFile, IcbTextStyle, IceText, TextEntry, DEFAULT_DISPLAY_TEXT};
+use icy_board_engine::icy_board::icb_text::{DEFAULT_DISPLAY_TEXT, IcbTextFile, IcbTextStyle, IceText, TextEntry};
 use icy_board_tui::{
     pcb_line::get_styled_pcb_line,
     theme::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_LIGHT_GREEN, DOS_LIGHT_MAGENTA, DOS_LIGHT_RED, DOS_WHITE, DOS_YELLOW},
 };
 use itertools::Itertools;
 use ratatui::{
+    Frame,
     layout::{Constraint, Rect},
     style::Style,
     text::{Line, Span},
     widgets::{Cell, HighlightSpacing, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState, Widget},
-    Frame,
 };
 
 use super::TabPage;

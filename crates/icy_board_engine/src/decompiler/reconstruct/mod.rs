@@ -10,7 +10,7 @@ use crate::{
 
 use self::while_do::scan_do_while;
 
-use super::{rename_visitor::RenameScanVisitor, Ast, Expression, Statement};
+use super::{Ast, Expression, Statement, rename_visitor::RenameScanVisitor};
 
 pub mod for_next;
 mod if_else;

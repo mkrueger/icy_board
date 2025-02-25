@@ -13,8 +13,8 @@ use crate::{
     ast::{Ast, AstNode, Expression, Statement},
     executable::{Executable, ExpressionNegator, OpCode, PPECommand, PPEExpr, PPEScript, VariableType},
     parser::{
-        lexer::{Spanned, Token},
         ErrorReporter, UserTypeRegistry,
+        lexer::{Spanned, Token},
     },
     semantic::{LookupVariabeleTable, SemanticVisitor},
 };

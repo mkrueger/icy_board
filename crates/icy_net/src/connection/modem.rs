@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use serial2_tokio::SerialPort;
 
-use crate::{serial::Serial, Connection, ConnectionType};
+use crate::{Connection, ConnectionType, serial::Serial};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModemConfiguration {

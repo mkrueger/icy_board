@@ -5,7 +5,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::jam::{JamError, JAM_SIGNATURE};
+use crate::jam::{JAM_SIGNATURE, JamError};
 
 /// This isthe 1024-byte record at the beginning of all
 /// .JHR files.

@@ -7,8 +7,8 @@ use std::io;
 use std::io::ErrorKind;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
-use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::Message;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
 pub struct WebSocketConnection<S: AsyncRead + AsyncWrite + Unpin> {
@@ -55,11 +55,7 @@ pub async fn connect(address: &String, is_secure: bool) -> crate::Result<WebSock
 }
 
 fn schema_prefix(is_secure: bool) -> &'static str {
-    if is_secure {
-        "wss"
-    } else {
-        "ws"
-    }
+    if is_secure { "wss" } else { "ws" }
 }
 
 #[async_trait]

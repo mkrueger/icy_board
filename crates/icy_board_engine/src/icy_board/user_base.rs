@@ -5,15 +5,15 @@ use std::{
     str::FromStr,
 };
 
-use crate::{datetime::IcbDate, Res};
+use crate::{Res, datetime::IcbDate};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    icb_config::{PasswordStorageMethod, DEFAULT_PCBOARD_DATE_FORMAT},
+    IcyBoardSerializer, PcbUser,
+    icb_config::{DEFAULT_PCBOARD_DATE_FORMAT, PasswordStorageMethod},
     is_false, is_null_16, is_null_64,
     user_inf::{AccountUserInf, BankUserInf, QwkConfigUserInf},
-    IcyBoardSerializer, PcbUser,
 };
 
 #[derive(Clone, PartialEq)]
@@ -603,11 +603,7 @@ impl User {
                 fse_mode: if u.user.use_fsedefault {
                     FSEMode::Yes
                 } else {
-                    if u.user.dont_ask_fse {
-                        FSEMode::No
-                    } else {
-                        FSEMode::Ask
-                    }
+                    if u.user.dont_ask_fse { FSEMode::No } else { FSEMode::Ask }
                 },
                 scroll_msg_body: u.user.scroll_msg_body,
                 use_short_filedescr: u.user.short_file_descr,

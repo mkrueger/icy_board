@@ -6,20 +6,19 @@ use std::{
 
 use crate::{
     ast::{
-        walk_function_implementation, walk_indexer_expression, walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation,
         AstVisitor, CommentAstNode, Constant, ConstantExpression, Expression, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation,
         GosubStatement, GotoStatement, IdentifierExpression, LabelStatement, LetStatement, ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement,
-        ProcedureDeclarationAstNode, ProcedureImplementation, VariableDeclarationStatement, VariableParameterSpecifier,
+        ProcedureDeclarationAstNode, ProcedureImplementation, VariableDeclarationStatement, VariableParameterSpecifier, walk_function_implementation,
+        walk_indexer_expression, walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation,
     },
-    compiler::{user_data::UserDataMemberRegistry, workspace::Workspace, CompilationErrorType, CompilationWarningType},
+    compiler::{CompilationErrorType, CompilationWarningType, user_data::UserDataMemberRegistry, workspace::Workspace},
     executable::{
-        EntryType, FuncOpCode, FunctionDefinition, FunctionValue, GenericVariableData, OpCode, ProcedureValue, TableEntry, VarHeader, VariableData,
-        VariableTable, VariableType, VariableValue, FUNCTION_DEFINITIONS, USER_VARIABLES,
+        EntryType, FUNCTION_DEFINITIONS, FuncOpCode, FunctionDefinition, FunctionValue, GenericVariableData, OpCode, ProcedureValue, TableEntry,
+        USER_VARIABLES, VarHeader, VariableData, VariableTable, VariableType, VariableValue,
     },
     parser::{
-        self,
+        self, ErrorReporter, ParserErrorType, UserTypeRegistry,
         lexer::{Spanned, Token},
-        ErrorReporter, ParserErrorType, UserTypeRegistry,
     },
 };
 

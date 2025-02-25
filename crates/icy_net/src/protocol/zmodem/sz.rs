@@ -9,8 +9,8 @@ use std::{
 };
 
 use crate::{
-    protocol::{zfile_flag, zmodem::err::ZModemError, Header, HeaderType, TransferState, ZFrameType, Zmodem, ZCRCE, ZCRCG},
     Connection,
+    protocol::{Header, HeaderType, TransferState, ZCRCE, ZCRCG, ZFrameType, Zmodem, zfile_flag, zmodem::err::ZModemError},
 };
 
 use super::{ZCRCQ, ZCRCW};
@@ -83,11 +83,7 @@ impl Sz {
     }
 
     fn get_header_type(&self) -> HeaderType {
-        if self.can_use_crc32() {
-            HeaderType::Bin32
-        } else {
-            HeaderType::Bin
-        }
+        if self.can_use_crc32() { HeaderType::Bin32 } else { HeaderType::Bin }
     }
 
     fn encode_subpacket(&self, zcrc_byte: u8, data: &[u8]) -> Vec<u8> {
@@ -173,11 +169,7 @@ impl Sz {
                     transfer_state.send_state.cur_bytes_transfered as usize + self.package_len,
                 );
                 let crc_byte = if transfer_state.send_state.cur_bytes_transfered as usize + self.package_len < transfer_state.send_state.file_size as usize {
-                    if self.nonstop {
-                        ZCRCG
-                    } else {
-                        ZCRCQ
-                    }
+                    if self.nonstop { ZCRCG } else { ZCRCQ }
                 } else if self.nonstop {
                     ZCRCE
                 } else {

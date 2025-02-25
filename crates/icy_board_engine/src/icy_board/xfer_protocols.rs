@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
 use super::IcyBoardSerializer;
-use super::{is_false, is_true, set_true, PCBoardImport, PCBoardTextImport};
+use super::{PCBoardImport, PCBoardTextImport, is_false, is_true, set_true};
 use crate::Res;
 use icy_net::protocol::TransferProtocolType;
 use serde::{Deserialize, Serialize};

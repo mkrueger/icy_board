@@ -2,17 +2,17 @@ use crossterm::event::KeyEvent;
 use icy_board_engine::{
     datetime::IcbDate,
     icy_board::{
-        user_base::{ChatStatus, FSEMode, Password, User},
         IcyBoard,
+        user_base::{ChatStatus, FSEMode, Password, User},
     },
 };
 use icy_board_tui::{
+    BORDER_SET,
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
     get_text,
     save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
-    BORDER_SET,
 };
 use ratatui::{
     layout::Rect,

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
-    cfg_entry_u16, cfg_entry_u8,
+    cfg_entry_u8, cfg_entry_u16,
     config_menu::{ConfigEntry, ConfigMenu, ResultState},
     get_text,
     icbconfigmenu::ICBConfigMenuUI,

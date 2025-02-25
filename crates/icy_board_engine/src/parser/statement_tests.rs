@@ -5,18 +5,18 @@ use std::{
 
 use crate::{
     ast::{
-        constant::NumberFormat, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, Constant, ConstantExpression, ContinueStatement, ElseBlock,
-        ElseIfBlock, ForStatement, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement,
-        LoopStatement, ParensExpression, PredefinedCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, UnaryExpression, UnaryOp,
-        VariableDeclarationStatement, VariableSpecifier, WhileDoStatement, WhileStatement,
+        BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, Constant, ConstantExpression, ContinueStatement, ElseBlock, ElseIfBlock, ForStatement,
+        GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement, LoopStatement, ParensExpression,
+        PredefinedCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, UnaryExpression, UnaryOp, VariableDeclarationStatement,
+        VariableSpecifier, WhileDoStatement, WhileStatement, constant::NumberFormat,
     },
     compiler::workspace::Workspace,
     executable::{OpCode, VariableType},
 };
 
 use super::{
-    lexer::{Spanned, Token},
     Encoding, ErrorReporter, Parser, UserTypeRegistry,
+    lexer::{Spanned, Token},
 };
 
 fn parse_statement(input: &str, assert_eof: bool) -> Statement {

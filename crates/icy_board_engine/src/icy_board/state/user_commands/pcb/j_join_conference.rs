@@ -1,8 +1,8 @@
-use crate::icy_board::commands::CommandType;
-use crate::icy_board::state::functions::{pwd_flags, MASK_ALNUM, MASK_COMMAND};
-use crate::icy_board::state::IcyBoardState;
-use crate::icy_board::{icb_text::IceText, state::functions::display_flags};
 use crate::Res;
+use crate::icy_board::commands::CommandType;
+use crate::icy_board::state::IcyBoardState;
+use crate::icy_board::state::functions::{MASK_ALNUM, MASK_COMMAND, pwd_flags};
+use crate::icy_board::{icb_text::IceText, state::functions::display_flags};
 
 impl IcyBoardState {
     pub async fn join_conference_cmd(&mut self) -> Res<()> {

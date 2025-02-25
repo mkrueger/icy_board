@@ -12,7 +12,7 @@ use icy_board_tui::{
     select_menu::{MenuItem, SelectMenu},
     tab_page::TabPage,
 };
-use ratatui::{layout::Rect, text::Text, Frame};
+use ratatui::{Frame, layout::Rect, text::Text};
 
 use crate::VERSION;
 

@@ -11,7 +11,7 @@ use icy_board_tui::{
     tab_page::{Page, PageMessage},
 };
 use new_user_files::NewUserFiles;
-use ratatui::{layout::Rect, Frame};
+use ratatui::{Frame, layout::Rect};
 use system_files::SystemFiles;
 
 mod configuration_files;

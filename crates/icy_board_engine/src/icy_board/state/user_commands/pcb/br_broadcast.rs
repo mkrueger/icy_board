@@ -1,4 +1,4 @@
-use crate::{icy_board::state::IcyBoardState, Res};
+use crate::{Res, icy_board::state::IcyBoardState};
 
 impl IcyBoardState {
     pub async fn broadcast_command(&mut self) -> Res<()> {

@@ -1,10 +1,10 @@
 use crate::icy_board::{
     icb_text::IceText,
-    state::{functions::display_flags, NodeStatus},
+    state::{NodeStatus, functions::display_flags},
 };
 use jamjam::jam::JamMessageBase;
 
-use crate::{icy_board::state::IcyBoardState, Res};
+use crate::{Res, icy_board::state::IcyBoardState};
 
 impl IcyBoardState {
     pub async fn read_messages(&mut self) -> Res<()> {

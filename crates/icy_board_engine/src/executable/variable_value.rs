@@ -6,9 +6,9 @@ use std::{
 };
 
 use crate::{
+    Res,
     datetime::{IcbDate, IcbTime},
     executable::{FunctionValue, ProcedureValue, VMError},
-    Res,
 };
 
 use super::{MsgAreaIdValue, Signature};
@@ -779,15 +779,7 @@ impl Neg for VariableValue {
         let mut data = VariableData::default();
         let generic_data = GenericVariableData::None;
         match dest_type {
-            VariableType::Boolean => {
-                data.unsigned_value = unsafe {
-                    if self.data.unsigned_value == 0 {
-                        1
-                    } else {
-                        0
-                    }
-                }
-            }
+            VariableType::Boolean => data.unsigned_value = unsafe { if self.data.unsigned_value == 0 { 1 } else { 0 } },
             VariableType::Integer => data.int_value = -self.as_int(),
             VariableType::SByte => data.sbyte_value = -self.as_sbyte(),
             VariableType::SWord => data.sword_value = -self.as_sword(),
@@ -1656,7 +1648,7 @@ impl VariableValue {
                     vtype: VariableType::BigStr,
                     data,
                     generic_data: GenericVariableData::String(self.as_string()),
-                }
+                };
             }
             VariableType::Time => {
                 data.time_value = self.as_int();

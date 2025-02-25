@@ -5,11 +5,10 @@ use std::{
 
 use crate::{
     jam::{
-        self,
+        self, JamMessage, JamMessageBase,
         msg_header::{MessageSubfield, SubfieldType},
-        JamMessage, JamMessageBase,
     },
-    pcboard::{message_header::ExtendedHeaderInformation, PCBoardMessage, PCBoardMessageBase},
+    pcboard::{PCBoardMessage, PCBoardMessageBase, message_header::ExtendedHeaderInformation},
     util::echmoail::EchomailAddress,
 };
 

@@ -5,16 +5,16 @@ use std::{
 };
 
 use crate::{
+    Res,
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
     executable::{VariableType, VariableValue},
     parser::load_with_encoding,
-    Res,
 };
 
-use super::{security_expr::SecurityExpression, IcyBoardSerializer};
+use super::{IcyBoardSerializer, security_expr::SecurityExpression};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 
 mod callinfo_bbs;
 mod chain_txt;

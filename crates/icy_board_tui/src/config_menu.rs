@@ -6,11 +6,11 @@ use icy_board_engine::{
     icy_board::{commands::Position, icb_config::IcbColor, security_expr::SecurityExpression},
 };
 use ratatui::{
+    Frame,
     layout::{Alignment, Rect},
     style::Stylize,
     text::Text,
     widgets::{Block, BorderType, Borders, Clear, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget},
-    Frame,
 };
 
 use crate::{

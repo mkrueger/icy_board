@@ -1,20 +1,20 @@
 use async_recursion::async_recursion;
-use tokio::time::{sleep, Instant};
+use tokio::time::{Instant, sleep};
 
 use crate::{
+    Res,
     icy_board::{
+        IcyBoardError, IcyBoardSerializer,
         commands::{ActionTrigger, AutoRun, Command, CommandAction, CommandType},
         icb_text::IceText,
         menu::{Menu, MenuType},
         security_expr::SecurityExpression,
         state::{control_codes, functions::display_flags},
-        IcyBoardError, IcyBoardSerializer,
     },
     vm::TerminalTarget,
-    Res,
 };
 
-use super::{functions::MASK_COMMAND, IcyBoardState};
+use super::{IcyBoardState, functions::MASK_COMMAND};
 
 impl IcyBoardState {
     #[async_recursion(?Send)]

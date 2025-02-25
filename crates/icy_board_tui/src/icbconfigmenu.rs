@@ -9,11 +9,11 @@ use ratatui::{
 };
 
 use crate::{
+    BORDER_SET,
     config_menu::{ConfigMenu, ConfigMenuState, EditMode, ListValue, ResultState},
     get_text,
     tab_page::PageMessage,
     theme::get_tui_theme,
-    BORDER_SET,
 };
 
 pub struct ICBConfigMenuUI {

@@ -1,7 +1,7 @@
 use crate::{
     ast::{
-        constant::{NumberFormat, BUILTIN_CONSTS},
         Constant, Statement,
+        constant::{BUILTIN_CONSTS, NumberFormat},
     },
     compiler::workspace::Workspace,
     parser::load_with_encoding,
@@ -15,7 +15,7 @@ use std::{
 use thiserror::Error;
 use unicase::Ascii;
 
-use super::{pre_processor_expr_visitor::PreProcessorVisitor, Encoding, ErrorReporter, Parser, UserTypeRegistry};
+use super::{Encoding, ErrorReporter, Parser, UserTypeRegistry, pre_processor_expr_visitor::PreProcessorVisitor};
 
 #[derive(Error, Default, Debug, Clone, PartialEq)]
 pub enum LexingErrorType {

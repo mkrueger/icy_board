@@ -6,13 +6,13 @@ use std::{
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
+    Res,
     icy_board::{
+        IcyBoard, IcyBoardSerializer,
         file_directory::{DirectoryList, FileDirectory, SortDirection, SortOrder},
         security_expr::SecurityExpression,
         user_base::Password,
-        IcyBoard, IcyBoardSerializer,
     },
-    Res,
 };
 use icy_board_tui::{
     config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
@@ -23,10 +23,10 @@ use icy_board_tui::{
     theme::get_tui_theme,
 };
 use ratatui::{
+    Frame,
     layout::{Alignment, Margin, Rect},
     text::{Line, Span},
-    widgets::{block::Title, Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget},
-    Frame,
+    widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget, block::Title},
 };
 
 pub struct DirsEditor<'a> {

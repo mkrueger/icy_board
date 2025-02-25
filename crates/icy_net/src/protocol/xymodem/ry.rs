@@ -2,15 +2,14 @@ use std::io::Write;
 
 use tempfile::NamedTempFile;
 
-use super::{constants::DEFAULT_BLOCK_LENGTH, err::XYModemError, get_checksum, remove_cpm_eof, Checksum, XYModemConfiguration};
+use super::{Checksum, XYModemConfiguration, constants::DEFAULT_BLOCK_LENGTH, err::XYModemError, get_checksum, remove_cpm_eof};
 use crate::{
+    Connection,
     crc::get_crc16,
     protocol::{
-        str_from_null_terminated_utf8_unchecked,
+        TransferState, str_from_null_terminated_utf8_unchecked,
         xymodem::constants::{ACK, EOT, EXT_BLOCK_LENGTH, NAK, SOH, STX},
-        TransferState,
     },
-    Connection,
 };
 
 #[derive(Debug)]

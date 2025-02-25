@@ -1,5 +1,5 @@
 use crate::{
-    ast::{constant::NumberFormat, BinOp, BinaryExpression, Constant, ConstantExpression, Expression, ParensExpression, UnaryExpression, UnaryOp},
+    ast::{BinOp, BinaryExpression, Constant, ConstantExpression, Expression, ParensExpression, UnaryExpression, UnaryOp, constant::NumberFormat},
     compiler::workspace::Workspace,
     parser::{Encoding, ErrorReporter, Parser, UserTypeRegistry},
 };

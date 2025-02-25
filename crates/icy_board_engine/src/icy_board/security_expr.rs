@@ -5,7 +5,7 @@ use logos::{Lexer, Logos};
 use serde::{Deserialize, Serialize};
 
 use super::state::Session;
-use crate::{datetime::IcbDate, Res};
+use crate::{Res, datetime::IcbDate};
 
 #[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum UnaryOp {

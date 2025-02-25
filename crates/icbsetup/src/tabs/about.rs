@@ -1,13 +1,13 @@
 use icy_board_tui::{
     tab_page::TabPage,
-    theme::{get_tui_theme, DOS_LIGHT_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE},
+    theme::{DOS_LIGHT_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE, get_tui_theme},
 };
 use ratatui::{
+    Frame,
     layout::{Margin, Rect},
     style::Style,
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Padding, Paragraph, Widget},
-    Frame,
 };
 use substring::Substring;
 

@@ -6,18 +6,19 @@ use std::{
 };
 
 use super::{
+    Checksum, XYModemConfiguration, XYModemVariant,
     constants::{CAN, DEFAULT_BLOCK_LENGTH},
     err::XYModemError,
-    get_checksum, Checksum, XYModemConfiguration, XYModemVariant,
+    get_checksum,
 };
 
 use crate::{
+    Connection,
     crc::get_crc16,
     protocol::{
-        xymodem::constants::{ACK, CPMEOF, EOT, EXT_BLOCK_LENGTH, NAK, SOH, STX},
         TransferState,
+        xymodem::constants::{ACK, CPMEOF, EOT, EXT_BLOCK_LENGTH, NAK, SOH, STX},
     },
-    Connection,
 };
 
 #[derive(Debug)]

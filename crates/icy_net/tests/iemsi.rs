@@ -1,7 +1,7 @@
 #![allow(clippy::field_reassign_with_default)]
 
 use icy_net::{
-    iemsi::{encode_ici, ICIRequests, ICITerminalSettings, ICIUserSettings},
+    iemsi::{ICIRequests, ICITerminalSettings, ICIUserSettings, encode_ici},
     telnet::{TermCaps, TerminalEmulation},
 };
 use pretty_assertions::assert_eq;
@@ -33,7 +33,10 @@ fn test_emsi_ici_encoding() {
     let requests = ICIRequests::default();
 
     let result = encode_ici(&ici, &term, &requests).unwrap();
-    assert_eq!("**EMSI_ICI0089{fooboar}{foo}{Unit test}{-Unpublished-}{-Unpublished-}{bar}{}{ANSI,24,80,0}{ZAP,ZMO,KER}{CHT,TAB,ASCII8}{HOT,MORE,FSED,NEWS,CLR}{Rust}{}29535C6F\r**EMSI_ACKA490\r**EMSI_ACKA490\r", std::str::from_utf8(&result).unwrap());
+    assert_eq!(
+        "**EMSI_ICI0089{fooboar}{foo}{Unit test}{-Unpublished-}{-Unpublished-}{bar}{}{ANSI,24,80,0}{ZAP,ZMO,KER}{CHT,TAB,ASCII8}{HOT,MORE,FSED,NEWS,CLR}{Rust}{}29535C6F\r**EMSI_ACKA490\r**EMSI_ACKA490\r",
+        std::str::from_utf8(&result).unwrap()
+    );
 }
 
 #[test]

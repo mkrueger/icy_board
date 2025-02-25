@@ -1,6 +1,6 @@
 use icy_net::ConnectionType;
 use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 
 use super::state::NodeState;
 
@@ -21,11 +21,7 @@ impl BBS {
         let list = &mut self.open_connections.lock().await;
         for i in 0..list.len() {
             let is_finished = if let Some(state) = &list[i] {
-                if let Some(handle) = &state.handle {
-                    handle.is_finished()
-                } else {
-                    true
-                }
+                if let Some(handle) = &state.handle { handle.is_finished() } else { true }
             } else {
                 continue;
             };

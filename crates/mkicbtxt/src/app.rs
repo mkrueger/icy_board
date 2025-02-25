@@ -1,16 +1,15 @@
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 
 use chrono::{Local, Timelike};
-use color_eyre::{eyre::Context, Result};
+use color_eyre::{Result, eyre::Context};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use icy_board_engine::icy_board::icb_text::{IcbTextFile, IcbTextStyle, TextEntry};
 use icy_board_tui::{
-    get_text, get_text_args,
+    TerminalType, get_text, get_text_args,
     pcb_line::get_styled_pcb_line,
     term::next_event,
     text_field::{TextField, TextfieldState},
-    theme::{get_tui_theme, DOS_DARK_GRAY, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE},
-    TerminalType,
+    theme::{DOS_DARK_GRAY, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE, get_tui_theme},
 };
 use itertools::Itertools;
 use ratatui::{

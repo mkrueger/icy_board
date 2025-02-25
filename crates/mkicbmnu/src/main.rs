@@ -3,8 +3,8 @@ use argh::FromArgs;
 use chrono::Local;
 use color_eyre::Result;
 use icy_board_engine::{
-    icy_board::{menu::Menu, IcyBoard, IcyBoardSerializer},
-    Res, DEFAULT_ICYBOARD_FILE,
+    DEFAULT_ICYBOARD_FILE, Res,
+    icy_board::{IcyBoard, IcyBoardSerializer, menu::Menu},
 };
 use icy_board_tui::{print_error, term};
 use semver::Version;

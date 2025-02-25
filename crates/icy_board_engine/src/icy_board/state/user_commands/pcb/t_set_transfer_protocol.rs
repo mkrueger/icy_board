@@ -1,9 +1,9 @@
-use crate::{icy_board::state::IcyBoardState, Res};
+use crate::{Res, icy_board::state::IcyBoardState};
 use crate::{
     icy_board::{
         icb_config::IcbColor,
         icb_text::IceText,
-        state::functions::{display_flags, MASK_ALNUM},
+        state::functions::{MASK_ALNUM, display_flags},
     },
     vm::TerminalTarget,
 };

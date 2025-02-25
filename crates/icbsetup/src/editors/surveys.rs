@@ -6,12 +6,12 @@ use std::{
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
+    Res,
     icy_board::{
+        IcyBoard, IcyBoardSerializer,
         security_expr::SecurityExpression,
         surveys::{Survey, SurveyList},
-        IcyBoard, IcyBoardSerializer,
     },
-    Res,
 };
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
@@ -22,10 +22,10 @@ use icy_board_tui::{
     theme::get_tui_theme,
 };
 use ratatui::{
+    Frame,
     layout::{Alignment, Margin, Rect},
     text::{Line, Span},
-    widgets::{block::Title, Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget},
-    Frame,
+    widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget, block::Title},
 };
 
 pub struct SurveyEditor<'a> {

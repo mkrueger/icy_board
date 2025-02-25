@@ -1,16 +1,16 @@
 use std::fmt::Display;
 
 use crate::{
-    crc::{get_crc16_buggy, get_crc32, update_crc16},
-    protocol::{frame_types::ZACK, XON},
     Connection,
+    crc::{get_crc16_buggy, get_crc32, update_crc16},
+    protocol::{XON, frame_types::ZACK},
 };
 
 use super::{
-    append_zdle_encoded,
+    ZBIN, ZBIN32, ZDLE, ZHEX, ZPAD, append_zdle_encoded,
     err::ZModemError,
     frame_types::{self},
-    from_hex, get_hex, read_zdle_bytes, ZBIN, ZBIN32, ZDLE, ZHEX, ZPAD,
+    from_hex, get_hex, read_zdle_bytes,
 };
 
 #[derive(PartialEq, Clone, Copy, Debug)]

@@ -1,14 +1,14 @@
+use crate::{Res, icy_board::state::IcyBoardState};
 use crate::{
     datetime::IcbDate,
     icy_board::{
         icb_config::IcbColor,
         icb_text::IceText,
-        state::functions::{display_flags, MASK_ALNUM, MASK_NUM, MASK_PHONE, MASK_WEB},
+        state::functions::{MASK_ALNUM, MASK_NUM, MASK_PHONE, MASK_WEB, display_flags},
         user_base::FSEMode,
     },
     vm::TerminalTarget,
 };
-use crate::{icy_board::state::IcyBoardState, Res};
 
 impl IcyBoardState {
     pub async fn write_settings(&mut self) -> Res<()> {

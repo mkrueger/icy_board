@@ -1,6 +1,7 @@
 use std::{path::PathBuf, sync::Arc, thread};
 
 use icy_board_engine::icy_board::{
+    IcyBoard,
     bbs::BBS,
     bulletins::{Bullettin, BullettinList},
     commands::CommandList,
@@ -9,11 +10,10 @@ use icy_board_engine::icy_board::{
     state::IcyBoardState,
     user_base::User,
     xfer_protocols::SupportedProtocols,
-    IcyBoard,
 };
-use icy_net::{channel::ChannelConnection, Connection, ConnectionType};
+use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
 
-use crate::bbs::{internal_handle_client, LoginOptions};
+use crate::bbs::{LoginOptions, internal_handle_client};
 
 mod cmd_a;
 mod cmd_alias;
@@ -32,13 +32,19 @@ mod cmd_x;
 #[test]
 fn test_last_cmd() {
     let output = test_output("ABCDE\n!\n".to_string(), |_| {});
-    assert_eq!(output, "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mABCDE\n\n.\u{1b}[1;31mInvalid Entry!  Please try again, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m!\n\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mABCDE");
+    assert_eq!(
+        output,
+        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mABCDE\n\n.\u{1b}[1;31mInvalid Entry!  Please try again, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m!\n\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mABCDE"
+    );
 }
 
 #[test]
 fn test_last_cmd_empty() {
     let output = test_output("ABCD\n!\n".to_string(), |_| {});
-    assert_eq!(output, "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mABCD\n\n.\u{1b}[1;31mInvalid Entry!  Please try again, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m!\n\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m");
+    assert_eq!(
+        output,
+        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mABCD\n\n.\u{1b}[1;31mInvalid Entry!  Please try again, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m!\n\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m"
+    );
 }
 
 pub fn setup_conference(board: &mut IcyBoard) {

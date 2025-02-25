@@ -8,10 +8,10 @@ use std::{
 use crate::vm::errors::IcyError;
 
 use super::{
+    IcyBoardSerializer,
     commands::{ActionTrigger, AutoRun, Command, CommandAction, CommandType},
     is_false, path_is_empty, read_with_encoding_detection,
     security_expr::SecurityExpression,
-    IcyBoardSerializer,
 };
 
 #[derive(Clone, Serialize, Deserialize, Default, PartialEq, Debug)]

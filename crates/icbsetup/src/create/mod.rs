@@ -3,7 +3,9 @@ use std::{fs, path::PathBuf};
 use bstr::BString;
 use chrono::Utc;
 use icy_board_engine::{
+    Res,
     icy_board::{
+        IcyBoardSerializer,
         bulletins::{Bullettin, BullettinList},
         commands::CommandList,
         conferences::{Conference, ConferenceBase},
@@ -19,14 +21,12 @@ use icy_board_engine::{
         surveys::{Survey, SurveyList},
         user_base::{Password, PasswordInfo, User, UserBase},
         xfer_protocols::SupportedProtocols,
-        IcyBoardSerializer,
     },
-    Res,
 };
 use icy_engine::{Buffer, SaveOptions, ScreenPreperation};
 use jamjam::{jam::JamMessageBase, util::echmoail::EchomailAddress};
 
-use crate::import::{console_logger::ConsoleLogger, OutputLogger};
+use crate::import::{OutputLogger, console_logger::ConsoleLogger};
 
 pub struct IcyBoardCreator {
     destination: PathBuf,
