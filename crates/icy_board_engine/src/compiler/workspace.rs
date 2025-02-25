@@ -12,7 +12,7 @@ use crate::{executable::LAST_PPLC, formatting::FormattingOptions, Res};
 pub struct Package {
     pub name: String,
     pub version: Version,
-    pub language_version: Option<u16>,
+    pub runtime: Option<u16>,
     pub authors: Option<Vec<String>>,
 }
 
@@ -28,10 +28,6 @@ impl Package {
     pub fn authors(&self) -> &Option<Vec<String>> {
         &self.authors
     }
-
-    pub fn language_version(&self) -> u16 {
-        self.language_version.unwrap_or(LAST_PPLC)
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -40,11 +36,22 @@ pub struct PackageData {
     pub art_files: Option<Vec<String>>,
 }
 
+#[derive(Default, Debug, Deserialize, Serialize)]
+pub struct CompilerData {
+    pub language_version: Option<u16>,
+    pub defines: Option<Vec<String>>,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Workspace {
     #[serde(skip)]
     pub file_name: PathBuf,
+
+    #[serde(skip)]
+    pub hard_coded_files: Option<Vec<PathBuf>>,
+
     pub package: Package,
+    pub compiler: Option<CompilerData>,
     pub data: Option<PackageData>,
     formatting: Option<FormattingOptions>,
 }
@@ -54,12 +61,14 @@ impl Default for Workspace {
             file_name: PathBuf::new(),
             package: Package {
                 name: String::new(),
+                runtime: None,
                 version: Version::new(0, 1, 0),
-                language_version: Some(LAST_PPLC),
                 authors: None,
             },
+            compiler: None,
             data: None,
             formatting: None,
+            hard_coded_files: None,
         }
     }
 }
@@ -81,7 +90,7 @@ impl Workspace {
         Ok(())
     }
 
-    pub fn get_target_path(&self, version: u16) -> PathBuf {
+    pub fn target_path(&self, version: u16) -> PathBuf {
         let Some(base_path) = self.file_name.parent() else {
             return PathBuf::from("target");
         };
@@ -99,7 +108,10 @@ impl Workspace {
         base_path.join("target").join(path)
     }
 
-    pub fn get_files(&self) -> Vec<PathBuf> {
+    pub fn files(&self) -> Vec<PathBuf> {
+        if let Some(hard_coded_files) = &self.hard_coded_files {
+            return hard_coded_files.clone();
+        }
         let mut files = Vec::new();
         let Some(base_path) = self.file_name.parent() else {
             return files;
@@ -127,5 +139,18 @@ impl Workspace {
             }
         });
         files
+    }
+
+    pub fn runtime(&self) -> u16 {
+        self.package.runtime.unwrap_or(LAST_PPLC)
+    }
+
+    pub fn language_version(&self) -> u16 {
+        if let Some(compiler) = &self.compiler {
+            if let Some(language_version) = compiler.language_version {
+                return language_version;
+            }
+        }
+        LAST_PPLC
     }
 }

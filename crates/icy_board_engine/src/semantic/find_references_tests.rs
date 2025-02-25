@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    executable::LAST_PPLC,
+    compiler::workspace::Workspace,
     parser::{parse_ast, Encoding, ErrorReporter, UserTypeRegistry},
 };
 
@@ -141,9 +141,9 @@ fn find_references(arg: &str) {
     }
     let reg = UserTypeRegistry::default();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-    let ast = parse_ast(PathBuf::from("."), errors.clone(), &txt, &reg, Encoding::Utf8, LAST_PPLC);
+    let ast = parse_ast(PathBuf::from("."), errors.clone(), &txt, &reg, Encoding::Utf8, &Workspace::default());
 
-    let mut visitor = SemanticVisitor::new(LAST_PPLC, errors.clone(), reg);
+    let mut visitor = SemanticVisitor::new(&Workspace::default(), errors.clone(), reg);
     ast.visit(&mut visitor);
     visitor.finish();
 

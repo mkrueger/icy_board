@@ -1,6 +1,6 @@
 use crate::{
     ast::{constant::NumberFormat, BinOp, BinaryExpression, Constant, ConstantExpression, Expression, ParensExpression, UnaryExpression, UnaryOp},
-    executable::LAST_PPLC,
+    compiler::workspace::Workspace,
     parser::{Encoding, ErrorReporter, Parser, UserTypeRegistry},
 };
 use std::{
@@ -11,7 +11,7 @@ use std::{
 fn parse_expression(input: &str) -> Expression {
     let reg = UserTypeRegistry::default();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-    let mut parser = Parser::new(PathBuf::from("."), errors, &reg, input, Encoding::Utf8, LAST_PPLC);
+    let mut parser = Parser::new(PathBuf::from("."), errors, &reg, input, Encoding::Utf8, &Workspace::default());
     parser.next_token();
     let res = parser.parse_expression().unwrap();
     assert_eq!(parser.get_cur_token(), None);
@@ -26,7 +26,7 @@ fn check_expression(input: &str, check: &Expression) {
 fn _check_error(input: &str) {
     let reg = UserTypeRegistry::default();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-    let mut parser = Parser::new(PathBuf::from("."), errors, &reg, input, Encoding::Utf8, LAST_PPLC);
+    let mut parser = Parser::new(PathBuf::from("."), errors, &reg, input, Encoding::Utf8, &Workspace::default());
     parser.next_token();
     let expr = parser.parse_expression();
     assert!(!parser.error_reporter.lock().unwrap().has_errors(), "No error found parsed expr {expr:?}");

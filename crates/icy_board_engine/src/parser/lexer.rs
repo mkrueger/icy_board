@@ -1,8 +1,9 @@
 use crate::{
     ast::{
         constant::{NumberFormat, BUILTIN_CONSTS},
-        Constant,
+        Constant, Statement,
     },
+    compiler::workspace::Workspace,
     parser::load_with_encoding,
 };
 use core::fmt;
@@ -463,22 +464,28 @@ lazy_static::lazy_static! {
 }
 
 impl Lexer {
-    pub fn new(file: PathBuf, version: u16, text: &str, encoding: Encoding, errors: Arc<Mutex<ErrorReporter>>) -> Self {
+    pub fn new(file: PathBuf, workspace: &Workspace, text: &str, encoding: Encoding, errors: Arc<Mutex<ErrorReporter>>) -> Self {
         let mut define_table = HashMap::new();
-        define_table.insert(Ascii::new("VERSION".into()), Constant::Integer(version as i32, NumberFormat::Default));
+        define_table.insert(Ascii::new("VERSION".into()), Constant::String(workspace.package.version.to_string()));
+        let lang_version = workspace.language_version();
+        define_table.insert(Ascii::new("LANGVERSION".into()), Constant::Integer(lang_version as i32, NumberFormat::Default));
+        define_table.insert(
+            Ascii::new("RUNTIME".into()),
+            Constant::Integer(workspace.runtime() as i32, NumberFormat::Default),
+        );
 
         Self {
-            lookup_table: if version < 200 {
+            lookup_table: if lang_version < 200 {
                 &*TOKEN_LOOKUP_TABLE_100
-            } else if version < 300 {
+            } else if lang_version < 300 {
                 &*TOKEN_LOOKUP_TABLE_200
-            } else if version < 350 {
+            } else if lang_version < 350 {
                 &*TOKEN_LOOKUP_TABLE_300
             } else {
                 &*TOKEN_LOOKUP_TABLE_350
             },
             file,
-            lang_version: version,
+            lang_version,
             define_table,
             encoding,
             text: text.chars().collect(),
@@ -1111,7 +1118,19 @@ impl Lexer {
 
             match load_with_encoding(&path, self.encoding) {
                 Ok(k) => {
-                    self.include_lexer = Some(Box::new(Lexer::new(path, self.lang_version, &k, Encoding::Utf8, self.errors.clone())));
+                    self.include_lexer = Some(Box::new(Self {
+                        lookup_table: self.lookup_table,
+                        file: path.clone(),
+                        lang_version: self.lang_version,
+                        define_table: self.define_table.clone(),
+                        encoding: self.encoding,
+                        text: k.chars().collect(),
+                        lexer_state: LexerState::AfterEol,
+                        errors: self.errors.clone(),
+                        token_start: 0,
+                        token_end: 0,
+                        include_lexer: None,
+                    }));
                 }
                 Err(err) => {
                     self.errors.lock().unwrap().report_error(
@@ -1144,7 +1163,7 @@ impl Lexer {
         if comment.len() > "$IF".len() && chars.iter().take("$IF".len()).collect::<String>().to_ascii_uppercase() == "$IF" {
             let reg = UserTypeRegistry::default();
             let input = chars.iter().skip("$IF".len()).collect::<String>();
-            let mut parser = Parser::new(PathBuf::from("."), self.errors.clone(), &reg, &input, Encoding::Utf8, 300);
+            let mut parser = Parser::new(PathBuf::from("."), self.errors.clone(), &reg, &input, Encoding::Utf8, &Workspace::default());
             parser.next_token();
             let res = parser.parse_expression().unwrap();
             let mut visitor = PreProcessorVisitor {
@@ -1152,7 +1171,6 @@ impl Lexer {
                 errors: self.errors.clone(),
             };
             let value = res.visit(&mut visitor);
-
             if let Some(value) = value {
                 if value.as_bool() {
                     return Some(Token::Comment(cmt_type, comment));
@@ -1177,48 +1195,60 @@ impl Lexer {
         }
 
         if comment.len() > "$DEFINE".len() && chars.iter().take("$DEFINE".len()).collect::<String>().to_ascii_uppercase() == "$DEFINE" {
-            let mut variable = String::new();
-            let mut value = String::new();
-            let mut step = 0;
-            for c in chars.iter().skip("$DEFINE".len()) {
-                if step == 0 {
-                    if c.is_whitespace() {
-                        continue;
-                    }
-                    step += 1;
-                }
-                if step == 1 {
-                    if c == &'=' || c.is_whitespace() {
-                        step += 1;
-                        continue;
-                    }
-                    variable.push(*c);
-                }
-                if step == 2 {
-                    if c.is_whitespace() {
-                        continue;
-                    }
-                    step += 1;
-                }
-                if step == 3 {
-                    if c.is_whitespace() {
-                        break;
-                    }
-                    value.push(*c);
-                }
-            }
-
-            let value = if value.len() == 0 {
-                Constant::Boolean(true)
-            } else if let Ok(digit) = value.parse::<i32>() {
-                Constant::Integer(digit, NumberFormat::Default)
+            let reg = UserTypeRegistry::default();
+            let input = chars.iter().skip("$DEFINE".len()).collect::<String>().trim().to_string();
+            let (variable, value) = if input.chars().all(|c| c.is_ascii_alphabetic()) {
+                (input, Constant::Boolean(true))
             } else {
-                self.errors
-                    .lock()
-                    .unwrap()
-                    .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefineValue(value.to_string()));
-                Constant::Boolean(false)
+                let mut parser = Parser::new(PathBuf::from("."), self.errors.clone(), &reg, &input, Encoding::Utf8, &Workspace::default());
+                parser.next_token();
+                if let Some(res) = parser.parse_statement() {
+                    match res {
+                        Statement::Let(expr) => {
+                            let mut visitor = PreProcessorVisitor {
+                                define_table: &self.define_table,
+                                errors: self.errors.clone(),
+                            };
+                            let value = expr.get_value_expression().visit(&mut visitor);
+                            if let Some(value) = value {
+                                match value.get_type() {
+                                    crate::executable::VariableType::Boolean => (expr.get_identifier().to_string(), Constant::Boolean(value.as_bool())),
+                                    crate::executable::VariableType::Integer => {
+                                        (expr.get_identifier().to_string(), Constant::Integer(value.as_int(), NumberFormat::Default))
+                                    }
+                                    _ => {
+                                        self.errors
+                                            .lock()
+                                            .unwrap()
+                                            .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefineValue(input.to_string()));
+                                        ("".to_string(), Constant::Boolean(false))
+                                    }
+                                }
+                            } else {
+                                self.errors
+                                    .lock()
+                                    .unwrap()
+                                    .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefineValue(input.to_string()));
+                                ("".to_string(), Constant::Boolean(false))
+                            }
+                        }
+                        _ => {
+                            self.errors
+                                .lock()
+                                .unwrap()
+                                .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefineValue(input.to_string()));
+                            ("".to_string(), Constant::Boolean(false))
+                        }
+                    }
+                } else {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefineValue(input.to_string()));
+                    ("".to_string(), Constant::Boolean(false))
+                }
             };
+
             if self.define_table.insert(Ascii::new(variable.clone()), value.clone()).is_some() {
                 self.errors
                     .lock()
@@ -1233,6 +1263,10 @@ impl Lexer {
     pub fn span(&self) -> std::ops::Range<usize> {
         self.token_start..self.token_end
     }
+    /*
+    pub(crate) fn define(&mut self, variable: &str, value: Constant)  {
+        self.define_table.insert(Ascii::new(variable.to_string()), value);
+    }*/
 }
 
 fn conv_hex(first: char) -> i32 {

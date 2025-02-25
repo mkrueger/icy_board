@@ -11,7 +11,7 @@ use crate::{
         GosubStatement, GotoStatement, IdentifierExpression, LabelStatement, LetStatement, ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement,
         ProcedureDeclarationAstNode, ProcedureImplementation, VariableDeclarationStatement, VariableParameterSpecifier,
     },
-    compiler::{user_data::UserDataMemberRegistry, CompilationErrorType, CompilationWarningType},
+    compiler::{user_data::UserDataMemberRegistry, workspace::Workspace, CompilationErrorType, CompilationWarningType},
     executable::{
         EntryType, FuncOpCode, FunctionDefinition, FunctionValue, GenericVariableData, OpCode, ProcedureValue, TableEntry, VarHeader, VariableData,
         VariableTable, VariableType, VariableValue, FUNCTION_DEFINITIONS, USER_VARIABLES,
@@ -179,7 +179,7 @@ impl VariableLookups {
 }
 
 pub struct SemanticVisitor {
-    version: u16,
+    lang_version: u16,
     pub type_registry: UserTypeRegistry,
 
     pub errors: Arc<Mutex<ErrorReporter>>,
@@ -342,9 +342,9 @@ impl LookupVariabeleTable {
 }
 
 impl SemanticVisitor {
-    pub fn new(version: u16, errors: Arc<Mutex<ErrorReporter>>, type_registry: UserTypeRegistry) -> Self {
+    pub fn new(workspace: &Workspace, errors: Arc<Mutex<ErrorReporter>>, type_registry: UserTypeRegistry) -> Self {
         let mut result = Self {
-            version,
+            lang_version: workspace.language_version(),
             errors,
             references: Vec::new(),
             type_registry,
@@ -363,7 +363,7 @@ impl SemanticVisitor {
             last_lookup_index: 0,
         };
         for user_var in USER_VARIABLES.iter() {
-            if user_var.version <= version {
+            if user_var.runtime_version <= workspace.runtime() {
                 result.add_predefined_variable(user_var.name, &user_var.value);
             } else {
                 break;
@@ -382,7 +382,7 @@ impl SemanticVisitor {
 
         if self.require_user_variables {
             for user_var in USER_VARIABLES.iter() {
-                if user_var.version <= self.version {
+                if user_var.runtime_version <= self.lang_version {
                     let header = VarHeader {
                         id: 0,
                         variable_type: user_var.value.get_type(),
@@ -969,53 +969,59 @@ impl SemanticVisitor {
         for (rt, r) in &mut self.references.iter() {
             if matches!(rt, ReferenceType::Label(_)) {
                 if r.declaration.is_none() {
-                    self.errors.lock().unwrap().report_error(
-                        r.usages.first().unwrap().1.span.clone(),
-                        CompilationErrorType::LabelNotFound(r.usages.first().unwrap().1.token.to_string()),
-                    );
+                    if let Some((file, span)) = r.usages.first() {
+                        self.errors.lock().unwrap().report_error_file(
+                            file.clone(),
+                            span.span.clone(),
+                            CompilationErrorType::LabelNotFound(span.token.to_string()),
+                        );
+                    }
                 } else if r.usages.is_empty() {
-                    if let Some((_, declaration)) = &r.declaration {
+                    if let Some((file_name, declaration)) = &r.declaration {
                         if ":~BEGIN~" == declaration.token || declaration.token.starts_with(":*(") {
                             continue;
                         }
+                        self.errors.lock().unwrap().report_warning_file(
+                            file_name.clone(),
+                            declaration.span.clone(),
+                            CompilationWarningType::UnusedLabel(declaration.token.to_string()),
+                        );
                     }
-                    self.errors.lock().unwrap().report_warning(
-                        r.declaration.as_ref().unwrap().1.span.clone(),
-                        CompilationWarningType::UnusedLabel(r.declaration.as_ref().unwrap().1.token.to_string()),
-                    );
                 }
                 continue;
             }
 
-            let Some((_, decl)) = &r.declaration else {
+            let Some((file, decl)) = &r.declaration else {
                 continue;
             };
 
             if r.variable_type == VariableType::Function || r.variable_type == VariableType::Procedure {
                 if r.implementation.is_none() {
-                    self.errors
-                        .lock()
-                        .unwrap()
-                        .report_error(decl.span.clone(), CompilationErrorType::MissingImplementation(decl.token.to_string()));
+                    self.errors.lock().unwrap().report_error_file(
+                        file.clone(),
+                        decl.span.clone(),
+                        CompilationErrorType::MissingImplementation(decl.token.to_string()),
+                    );
                 }
                 if r.usages.is_empty() {
-                    self.errors
-                        .lock()
-                        .unwrap()
-                        .report_warning(decl.span.clone(), CompilationErrorType::UnusedFunction(decl.token.to_string()));
+                    self.errors.lock().unwrap().report_warning_file(
+                        file.clone(),
+                        decl.span.clone(),
+                        CompilationErrorType::UnusedFunction(decl.token.to_string()),
+                    );
                 }
             } else if matches!(rt, ReferenceType::Variable(_)) && r.usages.is_empty() {
                 self.errors
                     .lock()
                     .unwrap()
-                    .report_warning(decl.span.clone(), CompilationErrorType::UnusedVariable(decl.token.to_string()));
+                    .report_warning_file(file.clone(), decl.span.clone(), CompilationErrorType::UnusedVariable(decl.token.to_string()));
             }
         }
 
         // search if any user variables are used.
         if !self.require_user_variables {
             for (i, user_var) in USER_VARIABLES.iter().enumerate() {
-                if user_var.version <= self.version && !self.references[i].1.usages.is_empty() {
+                if user_var.runtime_version <= self.lang_version && !self.references[i].1.usages.is_empty() {
                     self.require_user_variables = true;
                     break;
                 }
@@ -1118,7 +1124,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             ));
             r.variable_type
         } else {
-            if self.version < 350 || self.cur_func_call == 0 {
+            if self.lang_version < 350 || self.cur_func_call == 0 {
                 self.errors.lock().unwrap().report_error(
                     identifier.get_identifier_token().span.clone(),
                     CompilationErrorType::VariableNotFound(identifier.get_identifier().to_string()),
@@ -1354,10 +1360,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 for func in funcs {
                     let def = &FUNCTION_DEFINITIONS[*func];
                     if def.arg_descr as usize == call.get_arguments().len() {
-                        if self.version < def.version {
+                        if self.lang_version < def.version {
                             self.errors.lock().unwrap().report_error(
                                 call.get_expression().get_span(),
-                                ParserErrorType::FunctionVersionNotSupported(def.opcode, def.version, self.version),
+                                ParserErrorType::FunctionVersionNotSupported(def.opcode, def.version, self.lang_version),
                             );
                             return res;
                         }
@@ -1377,7 +1383,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             }
 
             _ => {
-                if self.version < 350 || !is_ident {
+                if self.lang_version < 350 || !is_ident {
                     self.errors.lock().unwrap().report_error(
                         call.get_expression().get_span(),
                         CompilationErrorType::FunctionNotFound(call.get_expression().to_string()),
@@ -1592,7 +1598,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         }
 
         if !found {
-            if self.version < 350 {
+            if self.lang_version < 350 {
                 self.errors.lock().unwrap().report_error(
                     call.get_identifier_token().span.clone(),
                     CompilationErrorType::ProcedureNotFound(call.get_identifier().to_string()),
@@ -1682,7 +1688,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 }
             }
         } else {
-            if self.version < 350 {
+            if self.lang_version < 350 {
                 self.errors.lock().unwrap().report_error(
                     function.get_identifier_token().span.clone(),
                     CompilationErrorType::FunctionNotFound(function.get_identifier().to_string()),
@@ -1801,7 +1807,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 }
             }
         } else {
-            if self.version < 350 {
+            if self.lang_version < 350 {
                 self.errors.lock().unwrap().report_error(
                     procedure.get_identifier_token().span.clone(),
                     CompilationErrorType::ProcedureNotFound(procedure.get_identifier().to_string()),

@@ -10,7 +10,10 @@ use crate::{
         Ast, AstNode, BlockStatement, CommentAstNode, Constant, DimensionSpecifier, FunctionDeclarationAstNode, FunctionImplementation, ParameterSpecifier,
         ProcedureDeclarationAstNode, ProcedureImplementation, ProcedureParameterSpecifier, Statement, VariableParameterSpecifier, VariableSpecifier,
     },
-    compiler::user_data::{UserData, UserDataRegistry},
+    compiler::{
+        user_data::{UserData, UserDataRegistry},
+        workspace::Workspace,
+    },
     executable::{FuncOpCode, FunctionDefinition, OpCode, StatementDefinition, VariableType},
     icy_board::{conferences::Conference, doors::Door, file_directory::FileDirectory, message_area::MessageArea},
 };
@@ -248,9 +251,10 @@ impl<'a> Parser<'a> {
         type_registry: &'a UserTypeRegistry,
         text: &str,
         encoding: Encoding,
-        lang_version: u16,
+        workspace: &Workspace,
     ) -> Self {
-        let lex: Lexer = Lexer::new(file, lang_version, text, encoding, error_reporter.clone());
+        let lex: Lexer = Lexer::new(file, workspace, text, encoding, error_reporter.clone());
+        let lang_version = workspace.language_version();
         Parser {
             error_reporter,
             lang_version,
@@ -1211,11 +1215,11 @@ pub fn parse_ast(
     input: &str,
     user_types: &UserTypeRegistry,
     encoding: Encoding,
-    version: u16,
+    workspace: &Workspace,
 ) -> Ast {
     error_reporter.lock().unwrap().set_file_name(&file_name);
     let mut nodes = Vec::new();
-    let mut parser = Parser::new(file_name.clone(), error_reporter, user_types, input, encoding, version);
+    let mut parser = Parser::new(file_name.clone(), error_reporter, user_types, input, encoding, workspace);
     parser.next_token();
     parser.skip_eol();
 
@@ -1261,11 +1265,27 @@ impl ErrorReporter {
         });
     }
 
+    pub fn report_error_file<T: std::error::Error + 'static + Send + Sync>(&mut self, file_name: PathBuf, span: core::ops::Range<usize>, error: T) {
+        self.errors.push(ErrorContainer {
+            error: Box::new(error),
+            span,
+            file_name,
+        });
+    }
+
     pub fn report_warning<T: std::error::Error + 'static + Send + Sync>(&mut self, span: core::ops::Range<usize>, warning: T) {
         self.warnings.push(ErrorContainer {
             error: Box::new(warning),
             span,
             file_name: self.cur_file.clone(),
+        });
+    }
+
+    pub fn report_warning_file<T: std::error::Error + 'static + Send + Sync>(&mut self, file_name: PathBuf, span: core::ops::Range<usize>, warning: T) {
+        self.warnings.push(ErrorContainer {
+            error: Box::new(warning),
+            span,
+            file_name,
         });
     }
 

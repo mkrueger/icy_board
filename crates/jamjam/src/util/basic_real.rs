@@ -209,7 +209,7 @@ impl From<BasicDouble> for i64 {
 mod tests {
     use pretty_assertions::assert_eq;
 
-    use crate::util::basic_real::{BasicDouble, BasicReal};
+    use crate::util::basic_real::BasicReal;
 
     #[test]
     fn test_basicreal_conversion() {

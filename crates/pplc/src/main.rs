@@ -5,11 +5,11 @@ use codepages::tables::{write_cp437, write_utf8_with_bom};
 use icy_board_engine::{
     ast::Ast,
     compiler::{
-        workspace::{Package, Workspace},
+        workspace::{CompilerData, Package, Workspace},
         PPECompiler,
     },
     executable::LAST_PPLC,
-    formatting::{FormattingOptions, FormattingVisitor, StringFormattingBackend},
+    formatting::{FormattingVisitor, StringFormattingBackend},
     icy_board::read_with_encoding_detection,
     parser::{load_with_encoding, parse_ast, Encoding, ErrorReporter, UserTypeRegistry},
     Res,
@@ -42,7 +42,7 @@ struct Cli {
 
     /// version number for the compiled PPE, valid: 100, 200, 300, 310, 320, 330, 340, 400 (default)
     #[argh(option)]
-    version: Option<u16>,
+    runtime: Option<u16>,
 
     /// version number for the language (defaults to version)
     #[argh(option)]
@@ -55,6 +55,10 @@ struct Cli {
     /// create & init new ppl package in target directory
     #[argh(switch)]
     init: bool,
+
+    /// semicolon separated list of pre processor variables
+    #[argh(option)]
+    defines: Option<String>,
 
     /// formats source file instead of compile
     #[argh(switch)]
@@ -76,11 +80,12 @@ lazy_static::lazy_static! {
 fn main() {
     let arguments: Cli = argh::from_env();
 
-    let version = if let Some(v) = arguments.version { v } else { 400 };
-    let valid_versions: Vec<u16> = vec![100, 200, 300, 310, 320, 330, 340, 400];
-    if !valid_versions.contains(&version) {
-        println!("Invalid version number valid values {valid_versions:?}");
-        return;
+    if let Some(version) = arguments.runtime {
+        let valid_versions: Vec<u16> = vec![100, 200, 300, 310, 320, 330, 340, 400];
+        if !valid_versions.contains(&version) {
+            println!("Invalid version number valid values {valid_versions:?}");
+            return;
+        }
     }
 
     if arguments.init {
@@ -101,16 +106,23 @@ fn main() {
         ws.file_name = file.clone();
         ws.package = Package {
             name: file.file_name().unwrap().to_str().unwrap().to_string(),
+            runtime: None,
             version: Version::new(0, 1, 0),
-            language_version: Some(LAST_PPLC),
             authors: None,
         };
+        ws.compiler = Some(CompilerData {
+            language_version: Some(arguments.lang_version.unwrap_or(LAST_PPLC)),
+            defines: if let Some(defines) = arguments.defines {
+                Some(defines.split(';').map(|s| s.to_string()).collect())
+            } else {
+                None
+            },
+        });
         ws.save(file.join("ppl.toml")).unwrap();
         println!("Created new ppl package in {}", file.display());
         return;
     }
 
-    let lang_version: u16 = if let Some(v) = arguments.lang_version { v } else { version };
     let toml_f = PathBuf::from("ppl.toml");
     let file = arguments.file.as_ref().unwrap_or(&toml_f);
 
@@ -136,7 +148,7 @@ fn main() {
     }
 
     if file_name.extension().unwrap() == "toml" {
-        if let Err(err) = compile_toml(&file_name, &arguments, version) {
+        if let Err(err) = compile_toml(&file_name, &arguments) {
             execute!(
                 stdout(),
                 SetAttribute(Attribute::Bold),
@@ -168,38 +180,27 @@ fn main() {
         Encoding::Detect
     };
     let out_file_name = Path::new(&file_name).with_extension("ppe");
-    compile_files(
-        &arguments,
-        version,
-        encoding,
-        lang_version,
-        vec![PathBuf::from(&file_name)],
-        &out_file_name,
-        FormattingOptions::default(),
-    );
+
+    let mut ws = Workspace::default();
+    ws.hard_coded_files = Some(vec![PathBuf::from(&file_name)]);
+
+    compile_files(&arguments, encoding, &ws, &out_file_name);
 }
 
-fn compile_toml(file_name: &PathBuf, arguments: &Cli, version: u16) -> Res<()> {
-    let workspace = Workspace::load(file_name)?;
+fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {
+    let mut workspace = Workspace::load(file_name)?;
+    if let Some(runtime) = arguments.runtime {
+        workspace.package.runtime = Some(runtime);
+    }
 
     let base_path = file_name.parent().unwrap();
     let encoding: Encoding = Encoding::Detect;
-    let lang_version = workspace.package.language_version();
 
-    let files = workspace.get_files();
-    let target_path = workspace.get_target_path(version);
+    let target_path = workspace.target_path(workspace.runtime());
     fs::create_dir_all(&target_path).expect("Unable to create target directory");
 
     let out_file_name = target_path.join(workspace.package.name()).with_extension("ppe");
-    compile_files(
-        arguments,
-        version,
-        encoding,
-        lang_version,
-        files,
-        &out_file_name,
-        workspace.formatting().clone(),
-    );
+    compile_files(arguments, encoding, &workspace, &out_file_name);
     println!("Copying data files...");
     if let Some(data) = &workspace.data {
         if let Some(art_files) = &data.art_files {
@@ -212,7 +213,7 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli, version: u16) -> Res<()> {
                     let data = fs::read(&src_file)?;
                     let mut buffer = Buffer::from_bytes(&src_file, true, &data, None, None).unwrap();
                     let mut options = SaveOptions::default();
-                    options.modern_terminal_output = version > 340;
+                    options.modern_terminal_output = workspace.runtime() > 340;
                     let bytes = buffer.to_bytes("pcb", &options).unwrap();
                     let out_file: PathBuf = out_file.with_extension("pcb");
                     fs::write(out_file, bytes)?;
@@ -220,7 +221,7 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli, version: u16) -> Res<()> {
                 }
 
                 let txt = read_with_encoding_detection(&src_file)?;
-                if version <= 340 {
+                if workspace.runtime() <= 340 {
                     write_cp437(&out_file, &txt)?;
                 } else {
                     write_utf8_with_bom(&out_file, &txt)?;
@@ -234,7 +235,7 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli, version: u16) -> Res<()> {
                 fs::create_dir_all(out_file.parent().unwrap())?;
                 let txt = read_with_encoding_detection(&src_file)?;
 
-                if version <= 340 {
+                if workspace.runtime() <= 340 {
                     write_cp437(&out_file, &txt)?;
                 } else {
                     write_utf8_with_bom(&out_file, &txt)?;
@@ -246,7 +247,7 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli, version: u16) -> Res<()> {
     Ok(())
 }
 
-fn compile_files(arguments: &Cli, version: u16, encoding: Encoding, lang_version: u16, files: Vec<PathBuf>, out_file_name: &Path, options: FormattingOptions) {
+fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out_file_name: &Path) {
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
 
     let reg = UserTypeRegistry::icy_board_registry();
@@ -257,16 +258,16 @@ fn compile_files(arguments: &Cli, version: u16, encoding: Encoding, lang_version
     }
     let mut exit_code = 0;
 
-    for src_file in files {
+    for src_file in workspace.files() {
         match load_with_encoding(&src_file, encoding) {
             Ok(src) => {
-                let ast = parse_ast(src_file.to_path_buf(), errors.clone(), &src, &reg, encoding, lang_version);
+                let ast = parse_ast(src_file.to_path_buf(), errors.clone(), &src, &reg, encoding, workspace);
                 if arguments.format || arguments.check {
                     let mut backend = StringFormattingBackend {
                         text: src.chars().collect(),
                         edits: Vec::new(),
                     };
-                    let mut visitor = FormattingVisitor::new(&mut backend, &options);
+                    let mut visitor = FormattingVisitor::new(&mut backend, workspace.formatting());
                     ast.visit(&mut visitor);
                     if !backend.edits.is_empty() {
                         backend.edits.sort_by_key(|(range, _)| range.start);
@@ -363,13 +364,13 @@ fn compile_files(arguments: &Cli, version: u16, encoding: Encoding, lang_version
     }
 
     println!("Compiling...");
-    let mut compiler = PPECompiler::new(version, reg, errors.clone());
+    let mut compiler = PPECompiler::new(&workspace, reg, errors.clone());
     compiler.compile(&asts.iter().map(|(ast, _)| ast).collect::<Vec<&Ast>>());
     if check_errors(errors.clone(), &arguments, &asts) {
         std::process::exit(1);
     }
 
-    match compiler.create_executable(version) {
+    match compiler.create_executable() {
         Ok(executable) => {
             if arguments.disassemble {
                 println!();

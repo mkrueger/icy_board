@@ -420,7 +420,7 @@ impl LanguageServer for Backend {
                         self.client.log_message(MessageType::INFO, format!("{}", output)).await;
                     }
                     let out_file: String = self.workspace.lock().unwrap().package.name().to_string();
-                    let target_file = self.workspace.lock().unwrap().get_target_path(LAST_PPLC).join(out_file).with_extension("ppe");
+                    let target_file = self.workspace.lock().unwrap().target_path(LAST_PPLC).join(out_file).with_extension("ppe");
                     self.client.log_message(MessageType::INFO, format!("Execute:{}", target_file.display())).await;
 
                     if let Ok(process) = process::Command::new("sh")
@@ -461,8 +461,8 @@ impl Backend {
         let ws_file = roo_path.join("ppl.toml");
         if ws_file.exists() {
             if let Ok(ws) = Workspace::load(ws_file) {
-                let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorReporter::default())), UserTypeRegistry::default());
-                for file in ws.get_files() {
+                let mut semantic_visitor = SemanticVisitor::new(&ws, Arc::new(Mutex::new(ErrorReporter::default())), UserTypeRegistry::default());
+                for file in ws.files() {
                     let content = read_data_with_encoding_detection(&std::fs::read(&file).unwrap()).unwrap();
                     let ast = parse_ast(
                         file.clone(),
@@ -470,7 +470,7 @@ impl Backend {
                         &content,
                         &UserTypeRegistry::default(),
                         Encoding::Utf8,
-                        LAST_PPLC,
+                        &ws,
                     );
                     ast.visit(&mut semantic_visitor);
                     self.workspace_map.insert(Url::from_file_path(file).unwrap(), ast);
@@ -502,8 +502,12 @@ impl Backend {
         self.client.publish_diagnostics(uri.clone(), Vec::new(), None).await;
 
         if self.workspace_map.get(&uri).is_some() {
-            let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorReporter::default())), UserTypeRegistry::default());
-            let files = self.workspace.lock().unwrap().get_files();
+            let mut semantic_visitor = SemanticVisitor::new(
+                &self.workspace.lock().unwrap(),
+                Arc::new(Mutex::new(ErrorReporter::default())),
+                UserTypeRegistry::default(),
+            );
+            let files = self.workspace.lock().unwrap().files();
             for file in files {
                 let name = file.to_string_lossy().to_string();
                 let cur_uri = Url::from_file_path(name).unwrap();
@@ -515,7 +519,7 @@ impl Backend {
                         &params.text,
                         &UserTypeRegistry::default(),
                         Encoding::Utf8,
-                        LAST_PPLC,
+                        &self.workspace.lock().unwrap(),
                     );
                     let semantic_tokens: Vec<ImCompleteSemanticToken> = semantic_token_from_ast(&ast);
                     self.semantic_token_map.insert(cur_uri.clone(), semantic_tokens);
@@ -529,7 +533,7 @@ impl Backend {
                         &content,
                         &UserTypeRegistry::default(),
                         Encoding::Utf8,
-                        LAST_PPLC,
+                        &self.workspace.lock().unwrap(),
                     );
                     let semantic_tokens = semantic_token_from_ast(&ast);
                     self.semantic_token_map.insert(cur_uri.clone(), semantic_tokens);
@@ -551,9 +555,9 @@ impl Backend {
             let reg: UserTypeRegistry = UserTypeRegistry::default();
             let errors = Arc::new(Mutex::new(ErrorReporter::default()));
             let path = uri.to_file_path().unwrap();
-            let ast = parse_ast(path, errors.clone(), &params.text, &reg, Encoding::Utf8, LAST_PPLC);
+            let ast = parse_ast(path, errors.clone(), &params.text, &reg, Encoding::Utf8, &Workspace::default());
 
-            let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, errors, reg);
+            let mut semantic_visitor = SemanticVisitor::new(&Workspace::default(), errors, reg);
             ast.visit(&mut semantic_visitor);
             semantic_visitor.finish();
 
@@ -628,7 +632,7 @@ async fn main() {
         semantic_token_map: DashMap::new(),
         workspace: Mutex::new(Workspace::default()),
         workspace_visitor: Mutex::new(SemanticVisitor::new(
-            LAST_PPLC,
+            &Workspace::default(),
             Arc::new(Mutex::new(ErrorReporter::default())),
             UserTypeRegistry::default(),
         )),

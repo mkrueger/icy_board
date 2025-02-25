@@ -4,7 +4,7 @@ use std::{
 };
 
 use icy_board_engine::{
-    executable::LAST_PPLC,
+    compiler::workspace::Workspace,
     formatting::{FormattingOptions, FormattingVisitor, StringFormattingBackend},
     parser::{Encoding, ErrorReporter, UserTypeRegistry},
 };
@@ -20,7 +20,7 @@ pub fn test_formatting() {
         let reg = UserTypeRegistry::default();
         let input = fs::read_to_string(&cur_entry).unwrap();
         let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-        let ast = icy_board_engine::parser::parse_ast(cur_entry.clone(), errors.clone(), &input, &reg, Encoding::Utf8, LAST_PPLC);
+        let ast = icy_board_engine::parser::parse_ast(cur_entry.clone(), errors.clone(), &input, &reg, Encoding::Utf8, &Workspace::default());
         let mut backend = StringFormattingBackend {
             text: input.chars().collect(),
             edits: Vec::new(),

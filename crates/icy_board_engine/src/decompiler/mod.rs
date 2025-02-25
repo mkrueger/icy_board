@@ -13,9 +13,10 @@ use crate::{
         ProcedureDeclarationAstNode, ProcedureImplementation, Statement, UnaryExpression, UnaryOp, VariableDeclarationStatement, VariableParameterSpecifier,
         VariableSpecifier,
     },
+    compiler::workspace::Workspace,
     executable::{
         DeserializationError, DeserializationErrorType, EntryType, Executable, OpCode, PPECommand, PPEExpr, PPEScript, PPEVisitor, StatementDefinition,
-        TableEntry, VariableType, LAST_PPLC,
+        TableEntry, VariableType,
     },
     parser::{lexer::Token, ErrorReporter, UserTypeRegistry},
     semantic::SemanticVisitor,
@@ -543,7 +544,7 @@ pub fn decompile(executable: Executable, raw: bool) -> Res<(Ast, Vec<DecompilerI
 
             let reg = UserTypeRegistry::default();
             let errors: Arc<std::sync::Mutex<crate::parser::ErrorReporter>> = Arc::new(Mutex::new(ErrorReporter::default()));
-            let mut visitor = SemanticVisitor::new(LAST_PPLC, errors.clone(), reg);
+            let mut visitor = SemanticVisitor::new(&Workspace::default(), errors.clone(), reg);
             ast.visit(&mut visitor);
             visitor.finish();
 

@@ -1,6 +1,6 @@
 #!/bin/bash
-for ver in 300 310 320 330 340
+for ver in 300 310 320 330 340 400
 do
-	pplc --version $ver
+	pplc --runtime $ver
 done
 

@@ -56,7 +56,7 @@ impl VariableNameGenerator {
             return ("INVALID".to_string(), false);
         }
         let var_idx = decl.header.id - 1;
-        if var_idx < USER_VARIABLES.len() && self.user_vars_version >= USER_VARIABLES[var_idx].version {
+        if var_idx < USER_VARIABLES.len() && self.user_vars_version >= USER_VARIABLES[var_idx].runtime_version {
             return (USER_VARIABLES[var_idx].name.to_string(), true);
         }
 

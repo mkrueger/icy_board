@@ -7,7 +7,7 @@ use toml::Spanned;
 
 use crate::{
     ast::{constant::NumberFormat, Constant},
-    executable::LAST_PPLC,
+    compiler::workspace::{CompilerData, Workspace},
     parser::{
         lexer::{CommentType, Lexer, Token},
         Encoding, ErrorReporter,
@@ -24,7 +24,7 @@ fn test_comments() {
 fn get_token(src: &str) -> Token {
     let mut lex = Lexer::new(
         PathBuf::from("."),
-        LAST_PPLC,
+        &Workspace::default(),
         src,
         Encoding::Utf8,
         Arc::new(Mutex::new(ErrorReporter::default())),
@@ -40,7 +40,7 @@ fn get_token(src: &str) -> Token {
 fn get_spanned_token(src: &str) -> Spanned<Token> {
     let mut lex = Lexer::new(
         PathBuf::from("."),
-        LAST_PPLC,
+        &Workspace::default(),
         src,
         Encoding::Utf8,
         Arc::new(Mutex::new(ErrorReporter::default())),
@@ -54,7 +54,13 @@ fn get_spanned_token(src: &str) -> Spanned<Token> {
 }
 
 fn get_token_ver(src: &str, ver: u16) -> Token {
-    let mut lex = Lexer::new(PathBuf::from("."), ver, src, Encoding::Utf8, Arc::new(Mutex::new(ErrorReporter::default())));
+    let mut ws = Workspace::default();
+    if ws.compiler.is_none() {
+        ws.compiler = Some(CompilerData::default());
+    }
+    ws.compiler.as_mut().unwrap().language_version = Some(ver);
+
+    let mut lex = Lexer::new(PathBuf::from("."), &ws, src, Encoding::Utf8, Arc::new(Mutex::new(ErrorReporter::default())));
     match lex.next_token() {
         Some(t) => t,
         None => {
@@ -73,7 +79,7 @@ fn test_string() {
     let src = "\"Hello World\" \"foo\"";
     let mut lex = Lexer::new(
         PathBuf::from("."),
-        LAST_PPLC,
+        &Workspace::default(),
         src,
         Encoding::Utf8,
         Arc::new(Mutex::new(ErrorReporter::default())),
@@ -143,7 +149,7 @@ fn test_identifier() {
     let src = "Hello World";
     let mut lex = Lexer::new(
         PathBuf::from("."),
-        LAST_PPLC,
+        &Workspace::default(),
         src,
         Encoding::Utf8,
         Arc::new(Mutex::new(ErrorReporter::default())),
@@ -192,7 +198,7 @@ fn test_eol() {
     let src = "A\nB\r\nC";
     let mut lex = Lexer::new(
         PathBuf::from("."),
-        LAST_PPLC,
+        &Workspace::default(),
         src,
         Encoding::Utf8,
         Arc::new(Mutex::new(ErrorReporter::default())),
@@ -210,7 +216,7 @@ fn test_colon_eol() {
     let src = "A:B:C";
     let mut lex = Lexer::new(
         PathBuf::from("."),
-        LAST_PPLC,
+        &Workspace::default(),
         src,
         Encoding::Utf8,
         Arc::new(Mutex::new(ErrorReporter::default())),
@@ -251,7 +257,7 @@ fn test_skip() {
     let src = "Hello _\n World";
     let mut lex = Lexer::new(
         PathBuf::from("."),
-        LAST_PPLC,
+        &Workspace::default(),
         src,
         Encoding::Utf8,
         Arc::new(Mutex::new(ErrorReporter::default())),
@@ -263,7 +269,7 @@ fn test_skip() {
     let src = "Hello \\\n World";
     let mut lex = Lexer::new(
         PathBuf::from("."),
-        LAST_PPLC,
+        &Workspace::default(),
         src,
         Encoding::Utf8,
         Arc::new(Mutex::new(ErrorReporter::default())),
@@ -295,7 +301,7 @@ fn test_dotdot() {
     let src = "1..";
     let mut lex = Lexer::new(
         PathBuf::from("."),
-        LAST_PPLC,
+        &Workspace::default(),
         src,
         Encoding::Utf8,
         Arc::new(Mutex::new(ErrorReporter::default())),
@@ -310,7 +316,7 @@ fn test_case_number() {
     let src = "CASE 1";
     let mut lex = Lexer::new(
         PathBuf::from("."),
-        LAST_PPLC,
+        &Workspace::default(),
         src,
         Encoding::Utf8,
         Arc::new(Mutex::new(ErrorReporter::default())),
@@ -331,7 +337,7 @@ fn test_define() {
     let src = ";$DEFINE FOO";
     let mut lex = Lexer::new(
         PathBuf::from("."),
-        LAST_PPLC,
+        &Workspace::default(),
         src,
         Encoding::Utf8,
         Arc::new(Mutex::new(ErrorReporter::default())),
@@ -341,15 +347,33 @@ fn test_define() {
 }
 
 #[test]
+fn test_define_arithmetic() {
+    assert_eq!(Token::Identifier(unicase::Ascii::new("PRINT".to_string())), get_token("PRINT"));
+    assert_eq!(Token::Identifier(unicase::Ascii::new("_".to_string())), get_token("_"));
+    assert_eq!(Token::Identifier(unicase::Ascii::new("_O".to_string())), get_token("_O"));
+
+    let src = ";$DEFINE FOO=1+2";
+    let mut lex = Lexer::new(
+        PathBuf::from("."),
+        &Workspace::default(),
+        src,
+        Encoding::Utf8,
+        Arc::new(Mutex::new(ErrorReporter::default())),
+    );
+    while let Some(_token) = lex.next_token() {}
+    assert_eq!(Constant::Integer(3, NumberFormat::Default), *lex.get_define("FOO").unwrap());
+}
+
+#[test]
 fn test_if() {
     assert_eq!(Token::Identifier(unicase::Ascii::new("PRINT".to_string())), get_token("PRINT"));
     assert_eq!(Token::Identifier(unicase::Ascii::new("_".to_string())), get_token("_"));
     assert_eq!(Token::Identifier(unicase::Ascii::new("_O".to_string())), get_token("_O"));
 
-    let src = ";$IF VERSION > 0\nPRIINT\n$ENDIF";
+    let src = ";$IF LANGVERSION > 0\nPRIINT\n$ENDIF";
     let mut lex = Lexer::new(
         PathBuf::from("."),
-        LAST_PPLC,
+        &Workspace::default(),
         src,
         Encoding::Utf8,
         Arc::new(Mutex::new(ErrorReporter::default())),
@@ -367,7 +391,7 @@ fn test_if2() {
     let src = ";$IF 1 == 2\nPRIINT\n$ENDIF";
     let mut lex = Lexer::new(
         PathBuf::from("."),
-        LAST_PPLC,
+        &Workspace::default(),
         src,
         Encoding::Utf8,
         Arc::new(Mutex::new(ErrorReporter::default())),

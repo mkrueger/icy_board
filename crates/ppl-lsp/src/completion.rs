@@ -2,7 +2,8 @@ use std::sync::{Arc, Mutex};
 
 use icy_board_engine::{
     ast::{constant::BUILTIN_CONSTS, walk_predefined_call_statement, Ast, AstVisitor, IdentifierExpression, PredefinedCallStatement},
-    executable::{StatementSignature, FUNCTION_DEFINITIONS, LAST_PPLC, STATEMENT_DEFINITIONS},
+    compiler::workspace::Workspace,
+    executable::{StatementSignature, FUNCTION_DEFINITIONS, STATEMENT_DEFINITIONS},
     parser::{ErrorReporter, UserTypeRegistry},
     semantic::{ReferenceType, SemanticVisitor},
 };
@@ -70,7 +71,7 @@ const TYPES: [&str; 27] = [
 pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
     let mut map = CompletionVisitor::new(offset);
     let reg = UserTypeRegistry::default();
-    let mut semantic_visitor = SemanticVisitor::new(LAST_PPLC, Arc::new(Mutex::new(ErrorReporter::default())), reg);
+    let mut semantic_visitor = SemanticVisitor::new(&Workspace::default(), Arc::new(Mutex::new(ErrorReporter::default())), reg);
     ast.visit(&mut semantic_visitor);
     semantic_visitor.finish();
 

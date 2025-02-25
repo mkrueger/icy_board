@@ -48,7 +48,7 @@ pub enum ExecutableError {
 
 #[derive(Clone)]
 pub struct Executable {
-    pub version: u16,
+    pub runtime: u16,
     pub variable_table: VariableTable,
     pub script_buffer: Vec<i16>,
 }
@@ -143,7 +143,7 @@ impl Executable {
             i += 2;
         }
         Ok(Executable {
-            version,
+            runtime: version,
             variable_table,
             script_buffer,
         })
@@ -155,16 +155,16 @@ impl Executable {
     ///
     /// This function will return an error if .
     pub fn to_buffer(&self) -> Result<Vec<u8>, ExecutableError> {
-        if self.version > LAST_PPLC {
-            return Err(ExecutableError::UnsupporrtedVersion(self.version));
+        if self.runtime > LAST_PPLC {
+            return Err(ExecutableError::UnsupporrtedVersion(self.runtime));
         }
         let mut buffer = Vec::new();
         buffer.extend_from_slice(PREAMBLE);
         buffer.push(b' ');
         buffer.push(b' ');
-        buffer.push(b'0' + (self.version / 100) as u8);
+        buffer.push(b'0' + (self.runtime / 100) as u8);
         buffer.push(b'.');
-        let minor = self.version % 100;
+        let minor = self.runtime % 100;
         buffer.push(b'0' + (minor / 10) as u8);
         buffer.push(b'0' + (minor % 10) as u8);
         buffer.extend_from_slice(b"\x0D\x0A\x1A");
@@ -179,11 +179,11 @@ impl Executable {
 
         buffer.extend_from_slice(&u16::to_le_bytes(self.script_buffer.len() as u16 * 2));
         // in the very unlikely case the rle compressed buffer is larger than the original buffer
-        let use_rle = code_data.len() < script_buffer.len() && self.version >= 300;
+        let use_rle = code_data.len() < script_buffer.len() && self.runtime >= 300;
         if !use_rle {
             code_data = script_buffer;
         }
-        crate::crypt::encrypt_chunks(&mut code_data, self.version, use_rle);
+        crate::crypt::encrypt_chunks(&mut code_data, self.runtime, use_rle);
         buffer.extend_from_slice(&code_data);
         Ok(buffer)
     }
@@ -202,7 +202,7 @@ impl Executable {
 impl Default for Executable {
     fn default() -> Self {
         Self {
-            version: LAST_PPLC,
+            runtime: LAST_PPLC,
             variable_table: VariableTable::default(),
             script_buffer: Vec::new(),
         }

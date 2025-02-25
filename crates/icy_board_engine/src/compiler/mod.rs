@@ -1,4 +1,5 @@
 pub use ast_transform::*;
+use workspace::Workspace;
 pub mod ast_transform;
 pub mod user_data;
 
@@ -103,6 +104,7 @@ struct LabelDescriptor {
 }
 
 pub struct PPECompiler {
+    runtime: u16,
     lookup_table: LookupVariabeleTable,
     semantic_visitor: SemanticVisitor,
 
@@ -115,14 +117,15 @@ pub struct PPECompiler {
 }
 
 impl PPECompiler {
-    pub fn new(language_version: u16, type_registry: UserTypeRegistry, errors: Arc<Mutex<ErrorReporter>>) -> Self {
-        let semantic_visitor = SemanticVisitor::new(language_version, errors, type_registry);
+    pub fn new(workspace: &Workspace, type_registry: UserTypeRegistry, errors: Arc<Mutex<ErrorReporter>>) -> Self {
+        let semantic_visitor = SemanticVisitor::new(workspace, errors, type_registry);
         Self {
             lookup_table: LookupVariabeleTable::default(),
             semantic_visitor,
             cur_offset: 0,
             label_table: Vec::new(),
             label_lookup_table: HashMap::new(),
+            runtime: workspace.runtime(),
             commands: PPEScript::default(),
         }
     }
@@ -374,11 +377,11 @@ impl PPECompiler {
     /// # Errors
     ///
     /// This function will return an error if .
-    pub fn create_executable(&self, version: u16) -> Result<Executable, CompilationErrorType> {
+    pub fn create_executable(&self) -> Result<Executable, CompilationErrorType> {
         let mut variable_table = self.lookup_table.variable_table.clone();
-        variable_table.set_version(version);
+        variable_table.set_version(self.runtime);
         Ok(Executable {
-            version,
+            runtime: self.runtime,
             variable_table,
             script_buffer: self.commands.serialize(),
         })

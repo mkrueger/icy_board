@@ -9,7 +9,8 @@ use crate::{
         AstNode, FunctionDeclarationAstNode, ParameterSpecifier, ProcedureDeclarationAstNode, VariableDeclarationStatement, VariableParameterSpecifier,
         VariableSpecifier,
     },
-    executable::{VariableType, LAST_PPLC},
+    compiler::workspace::Workspace,
+    executable::VariableType,
 };
 
 use super::{Encoding, ErrorReporter, Parser, UserTypeRegistry};
@@ -17,7 +18,7 @@ use super::{Encoding, ErrorReporter, Parser, UserTypeRegistry};
 fn parse_ast_node(input: &str, assert_eof: bool) -> AstNode {
     let reg = UserTypeRegistry::default();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-    let mut parser = Parser::new(PathBuf::from("."), errors, &reg, input, Encoding::Utf8, LAST_PPLC);
+    let mut parser: Parser<'_> = Parser::new(PathBuf::from("."), errors, &reg, input, Encoding::Utf8, &Workspace::default());
     parser.next_token();
     let res: AstNode = parser.parse_ast_node().unwrap();
     if assert_eof {

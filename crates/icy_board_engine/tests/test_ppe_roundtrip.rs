@@ -6,7 +6,10 @@ use std::{
 };
 
 use icy_board_engine::{
-    compiler::PPECompiler,
+    compiler::{
+        workspace::{CompilerData, Workspace},
+        PPECompiler,
+    },
     decompiler::decompile,
     executable::Executable,
     icy_board::{bbs::BBS, read_data_with_encoding_detection, state::IcyBoardState},
@@ -31,12 +34,18 @@ fn test_legacy_ppe_roundtrip() {
         let file_name = cur_entry.as_os_str().to_str().unwrap();
         println!("Decompile {:?}...", file_name);
         let executable = Executable::read_file(&file_name, false).unwrap();
-        let version = executable.version;
+        let mut workspace = Workspace::default();
+        workspace.package.runtime = Some(executable.runtime);
+        if workspace.compiler.is_none() {
+            workspace.compiler = Some(CompilerData::default());
+        }
+        workspace.compiler.as_mut().unwrap().language_version = Some(executable.runtime);
+
         // Check compiler version in file name
         assert!(
-            file_name.contains(version.to_string().as_str()),
+            file_name.contains(executable.runtime.to_string().as_str()),
             "File name does not contain version number {}.",
-            version
+            executable.runtime
         );
 
         println!("Run {:?}...", file_name);
@@ -49,18 +58,18 @@ fn test_legacy_ppe_roundtrip() {
         let reg = UserTypeRegistry::default();
         let input = dec_ast.to_string();
         let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-        let ast = icy_board_engine::parser::parse_ast(PathBuf::from(&file_name), errors.clone(), &input, &reg, Encoding::Utf8, version);
-        let mut compiler = PPECompiler::new(version, reg, errors.clone());
+        let ast = icy_board_engine::parser::parse_ast(PathBuf::from(&file_name), errors.clone(), &input, &reg, Encoding::Utf8, &workspace);
+        let mut compiler = PPECompiler::new(&workspace, reg, errors.clone());
         compiler.compile(&[&ast]);
         check_errors(errors.clone());
         println!("success.");
-        match compiler.create_executable(version) {
+        match compiler.create_executable() {
             Ok(executable) => {
                 println!("Generate bin {:?}...", file_name);
                 let mut bin = executable.to_buffer().unwrap();
                 println!("Reload bin {:?}...", file_name);
                 let loaded_exectuable = Executable::from_buffer(&mut bin, false).unwrap();
-                assert_eq!(loaded_exectuable.version, version, "Reloaded version mismatch");
+                assert_eq!(loaded_exectuable.runtime, workspace.runtime(), "Reloaded version mismatch");
                 let output = run_executable(file_name, &loaded_exectuable);
                 assert_eq!(&output, EXPECTED_OUTPUT);
             }

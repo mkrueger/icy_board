@@ -10,7 +10,8 @@ use crate::{
         LoopStatement, ParensExpression, PredefinedCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, UnaryExpression, UnaryOp,
         VariableDeclarationStatement, VariableSpecifier, WhileDoStatement, WhileStatement,
     },
-    executable::{OpCode, VariableType, LAST_PPLC},
+    compiler::workspace::Workspace,
+    executable::{OpCode, VariableType},
 };
 
 use super::{
@@ -21,7 +22,7 @@ use super::{
 fn parse_statement(input: &str, assert_eof: bool) -> Statement {
     let reg = UserTypeRegistry::default();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-    let mut parser = Parser::new(PathBuf::from("."), errors, &reg, input, Encoding::Utf8, LAST_PPLC);
+    let mut parser = Parser::new(PathBuf::from("."), errors, &reg, input, Encoding::Utf8, &Workspace::default());
     parser.next_token();
     match parser.parse_statement() {
         Some(stmt) => {
