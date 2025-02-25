@@ -220,7 +220,7 @@ impl UserDataValue for FileDirectory {
         _arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
-            let res = self.list_security.user_can_access(&vm.icy_board_state.session);
+            let res = self.list_security.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
         log::error!("Invalid function call on FileDirectory ({})", name);

@@ -301,8 +301,11 @@ impl<'a> VirtualMachine<'a> {
             self.variable_table
                 .set_value(U_SHORTDESC, VariableValue::new_bool(cur_user.flags.use_short_filedescr));
             self.variable_table.set_value(U_GENDER, VariableValue::new_string(cur_user.gender.clone()));
-            self.variable_table
-                .set_value(U_BIRTHDATE, VariableValue::new_string(cur_user.birth_date.to_string()));
+            if let Some(day) = &cur_user.birth_day {
+                self.variable_table.set_value(U_BIRTHDATE, VariableValue::new_string(day.to_string()));
+            } else {
+                self.variable_table.set_value(U_BIRTHDATE, VariableValue::new_string("0".to_string()));
+            }
             self.variable_table.set_value(U_EMAIL, VariableValue::new_string(cur_user.email.clone()));
             self.variable_table.set_value(U_WEB, VariableValue::new_string(cur_user.web.clone()));
         }
@@ -367,7 +370,7 @@ impl<'a> VirtualMachine<'a> {
             cur_user.flags.use_short_filedescr = self.variable_table.get_value(U_SHORTDESC).as_bool();
 
             cur_user.gender = self.variable_table.get_value(U_GENDER).as_string();
-            cur_user.birth_date = IcbDate::parse(&self.variable_table.get_value(U_BIRTHDATE).as_string());
+            cur_user.birth_day = Some(IcbDate::parse(&self.variable_table.get_value(U_BIRTHDATE).as_string()));
             cur_user.email = self.variable_table.get_value(U_EMAIL).as_string();
             cur_user.web = self.variable_table.get_value(U_WEB).as_string();
         }

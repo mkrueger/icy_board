@@ -237,6 +237,10 @@ pub struct Session {
     pub term_caps: TerminalCaps,
 
     pub search_pattern: Option<Regex>,
+
+    /// The current default answer on last input_string
+    pub default_answer: Option<String>,
+    pub last_answer: Option<String>,
 }
 
 impl Session {
@@ -295,6 +299,8 @@ impl Session {
             highest_msg_read: 0,
             term_caps: TerminalCaps::LOCAL,
             search_pattern: None,
+            default_answer: None,
+            last_answer: None,
         }
     }
 
@@ -342,6 +348,11 @@ impl Session {
     }
     pub fn seconds_left(&self) -> i32 {
         self.time_limit * 60
+    }
+
+    pub(crate) fn calculate_balance(&self) -> f64 {
+        // TODO implement balance calculation
+        0.0
     }
 }
 

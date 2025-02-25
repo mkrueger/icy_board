@@ -5,7 +5,8 @@ use icy_engine::Color;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    IcyBoardSerializer, is_false, is_null_8, is_null_16, is_null_32, login_server::LoginServer, security_expr::SecurityExpression, user_base::Password,
+    IcyBoardSerializer, accounting_cfg::AccountingConfig, is_false, is_null_8, is_null_16, is_null_32, login_server::LoginServer,
+    security_expr::SecurityExpression, user_base::Password,
 };
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -627,6 +628,9 @@ pub struct AccountingOptions {
 
     #[serde(default)]
     pub logoff_file: PathBuf,
+
+    #[serde(skip)]
+    pub accounting_config: Option<AccountingConfig>,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
@@ -948,6 +952,7 @@ impl IcbConfig {
                 info_file: PathBuf::new(),
                 warning_file: PathBuf::new(),
                 logoff_file: PathBuf::new(),
+                accounting_config: None,
             },
         }
     }

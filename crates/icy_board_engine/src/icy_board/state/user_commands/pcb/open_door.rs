@@ -86,7 +86,7 @@ impl IcyBoardState {
     }
 
     pub async fn run_door(&mut self, door_list: &DoorList, door: &Door, door_number: usize) -> Res<()> {
-        if !door.securiy_level.user_can_access(&self.session) {
+        if !door.securiy_level.session_can_access(&self.session) {
             self.display_text(
                 IceText::DOORNotAvailable,
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,

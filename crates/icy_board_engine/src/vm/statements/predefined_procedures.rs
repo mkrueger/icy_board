@@ -33,7 +33,6 @@ use super::super::errors::IcyError;
 ///
 /// Always
 pub async fn invalid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
     panic!("Invalid statement");
 }
 
@@ -1488,10 +1487,12 @@ pub async fn bitclear(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
         .await?;
     Ok(())
 }
+
 pub async fn brag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("brag not implemented statement!");
-    panic!("TODO")
+    // According to PCB 15.3: No longer supported.
+    Ok(())
 }
+
 pub async fn frealtuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     if let Some(user) = vm.icy_board_state.session.current_user.clone() {
         vm.user = user;

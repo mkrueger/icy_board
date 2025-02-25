@@ -406,7 +406,7 @@ impl UserDataValue for Conference {
             return Ok(VariableValue::new_string(self.name.clone()));
         }
         if *name == *ISPUBLIC {
-            return Ok(VariableValue::new_bool(self.required_security.user_can_access(&vm.icy_board_state.session)));
+            return Ok(VariableValue::new_bool(self.required_security.session_can_access(&vm.icy_board_state.session)));
         }
         if *name == *FILE_AREAS {
             if let Some(res) = &self.directories {
@@ -443,7 +443,7 @@ impl UserDataValue for Conference {
         arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
-            let res = self.required_security.user_can_access(&vm.icy_board_state.session);
+            let res = self.required_security.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
         if *name == *GET_FILE_AREA {

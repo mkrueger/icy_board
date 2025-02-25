@@ -506,6 +506,7 @@ impl PCBoardImporter {
                 info_file: accounting_info_file,
                 warning_file: accounting_warning_file,
                 logoff_file: accounting_logoff_file,
+                accounting_config: None,
             },
         };
         icb_cfg.board.allow_iemsi = false;

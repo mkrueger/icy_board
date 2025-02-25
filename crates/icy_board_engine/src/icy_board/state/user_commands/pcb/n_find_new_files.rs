@@ -9,7 +9,7 @@ impl IcyBoardState {
         for area in 0..self.session.current_conference.directories.as_ref().unwrap().len() {
             if self.session.current_conference.directories.as_ref().unwrap()[area]
                 .list_security
-                .user_can_access(&self.session)
+                .session_can_access(&self.session)
             {
                 self.find_newer_files(area, time_stamp).await?;
             }

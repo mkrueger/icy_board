@@ -64,7 +64,7 @@ impl IcyBoardState {
             if let Ok(number) = directory_number.parse::<i32>() {
                 if 1 <= number && (number as usize) <= self.session.current_conference.directories.as_ref().unwrap().len() {
                     let area = &self.session.current_conference.directories.as_ref().unwrap()[number as usize - 1];
-                    if area.list_security.user_can_access(&self.session) {
+                    if area.list_security.session_can_access(&self.session) {
                         self.display_file_area(&area.path.to_path_buf()).await?;
                         self.new_line().await?;
                         continue;

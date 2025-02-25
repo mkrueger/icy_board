@@ -575,7 +575,7 @@ impl IcyBoardState {
     }
 
     async fn check_sec(&mut self, command: &str, required_sec: &SecurityExpression) -> Res<bool> {
-        if required_sec.user_can_access(&self.session) {
+        if required_sec.session_can_access(&self.session) {
             return Ok(true);
         }
 

@@ -93,16 +93,12 @@ pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) 
         contents.extend(u16::to_le_bytes(0));
     }
     contents.extend(user.stats.first_date_on.format("%m-%d-%y").to_string().as_bytes());
-    contents.extend(
-        format!(
-            "{:02}-{:02}-{:02}",
-            user.birth_date.day(),
-            user.birth_date.month(),
-            user.birth_date.year() % 100
-        )
-        .to_string()
-        .as_bytes(),
-    );
+    if let Some(day) = &user.birth_day {
+        contents.extend(format!("{:02}-{:02}-{:02}", day.day(), day.month(), day.year() % 100).to_string().as_bytes());
+    } else {
+        contents.extend(b"00-00-00");
+    }
+
     contents.extend(user.stats.first_date_on.format("%m-%d-%y").to_string().as_bytes()); // SubDate?
     contents.push(state.display_screen().buffer.get_width() as u8);
     contents.push(0); // Language
@@ -119,7 +115,11 @@ pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) 
 
     contents.extend(user.stats.last_on.format("%C").to_string().as_bytes());
     contents.extend(user.stats.first_date_on.format("%C").to_string().as_bytes());
-    contents.extend((user.birth_date.year() / 100).to_string().as_bytes());
+    if let Some(day) = &user.birth_day {
+        contents.extend(format!("{:02}", (day.year() / 100)).as_bytes());
+    } else {
+        contents.extend(b"00");
+    }
     contents.extend(user.stats.first_date_on.format("%C").to_string().as_bytes()); // SubDate ?
 
     // free space

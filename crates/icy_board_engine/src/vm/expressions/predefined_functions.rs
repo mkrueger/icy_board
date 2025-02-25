@@ -697,10 +697,11 @@ pub async fn getenv(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
         Ok(VariableValue::new_string(String::new()))
     }
 }
+
 pub async fn callid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    Ok(VariableValue::new_string(vm.icy_board_state.session.caller_number.to_string()))
 }
+
 pub async fn regal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
@@ -1143,8 +1144,12 @@ pub async fn ppename(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn mkdate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let year = vm.eval_expr(&args[0]).await?.as_int();
+    let month = vm.eval_expr(&args[1]).await?.as_int();
+    let day = vm.eval_expr(&args[2]).await?.as_int();
+
+    let date = IcbDate::new(month as u8, day as u8, year as u16);
+    Ok(VariableValue::new(VariableType::Date, VariableData::from_int(date.to_pcboard_date())))
 }
 
 pub async fn curcolor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1213,17 +1218,36 @@ pub async fn u_recnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn u_inconf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let record = vm.eval_expr(&args[0]).await?.as_int();
+    let (area, conf) = vm.eval_expr(&args[1]).await?.as_msg_id();
+    let board = vm.icy_board_state.get_board().await;
+    if let Some(user) = board.users.get(record as usize) {
+        if let Some(conf) = &board.conferences.get(conf as usize) {
+            if !conf.required_security.user_can_access(user) {
+                return Ok(VariableValue::new_bool(true));
+            }
+            if let Some(areas) = &conf.areas {
+                if let Some(area) = areas.get(area as usize) {
+                    if !area.req_level_to_enter.user_can_access(user) {
+                        return Ok(VariableValue::new_bool(true));
+                    }
+                }
+            }
+        }
+    }
+    Ok(VariableValue::new_bool(false))
 }
+
 pub async fn peekdw(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function 'peekdw' !");
     let mut rng = rand::rng();
     Ok(VariableValue::new_int(rng.random()))
 }
+
 pub async fn dbglevel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.icy_board_state.debug_level))
 }
+
 pub async fn scrtext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let col = vm.eval_expr(&args[0]).await?.as_int() - 1;
     let row = vm.eval_expr(&args[1]).await?.as_int() - 1;
@@ -1245,54 +1269,71 @@ pub async fn scrtext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     }
     Ok(VariableValue::new_string(res))
 }
+
 pub async fn showstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_bool(vm.icy_board_state.session.disp_options.show_on_screen))
 }
+
 pub async fn pagestat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_bool(vm.icy_board_state.session.paged_sysop))
 }
+
 pub async fn tobigstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::BigStr))
 }
+
 pub async fn toboolean(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Boolean))
 }
+
 pub async fn tobyte(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Byte))
 }
+
 pub async fn todate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Date))
 }
+
 pub async fn todreal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Double))
 }
+
 pub async fn toedate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::EDate))
 }
+
 pub async fn tointeger(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Integer))
 }
+
 pub async fn tomoney(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Money))
 }
+
 pub async fn toreal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Float))
 }
+
 pub async fn tosbyte(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::SByte))
 }
+
 pub async fn tosword(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::SWord))
 }
+
 pub async fn totime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Time))
 }
+
 pub async fn tounsigned(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Unsigned))
 }
+
 pub async fn toword(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Word))
 }
+
 pub async fn mixed(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let param = vm.eval_expr(&args[0]).await?.as_string();
     Ok(VariableValue::new_string(fix_casing(param)))
@@ -1301,6 +1342,7 @@ pub async fn mixed(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 pub async fn alias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_bool(vm.icy_board_state.session.use_alias))
 }
+
 pub async fn confreg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
 
@@ -1308,40 +1350,50 @@ pub async fn confreg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     // vm.icy_board_state.get_board().await.conferences[conf_num].
     Ok(VariableValue::new_bool(true))
 }
+
 pub async fn confexp(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn confsel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn confsys(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn confmw(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn lprinted(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.icy_board_state.session.disp_options.num_lines_printed as i32))
 }
+
 pub async fn isnonstop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_bool(!vm.icy_board_state.session.disp_options.count_lines))
 }
+
 pub async fn errcorrect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     // No longer an issue:
     Ok(VariableValue::new_bool(true))
 }
+
 pub async fn confalias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_bool(vm.icy_board_state.session.current_conference.allow_aliases))
 }
+
 pub async fn useralias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_bool(
         vm.icy_board_state.session.use_alias && vm.icy_board_state.session.current_conference.allow_aliases,
     ))
 }
+
 pub async fn curuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.icy_board_state.session.cur_user_id as i32))
 }
@@ -1354,12 +1406,19 @@ pub async fn chatstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn defans(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    if let Some(answer) = &vm.icy_board_state.session.default_answer {
+        Ok(VariableValue::new_string(answer.clone()))
+    } else {
+        Ok(VariableValue::new_string(String::new()))
+    }
 }
+
 pub async fn lastans(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    if let Some(answer) = &vm.icy_board_state.session.last_answer {
+        Ok(VariableValue::new_string(answer.clone()))
+    } else {
+        Ok(VariableValue::new_string(String::new()))
+    }
 }
 
 pub fn to_base_36(number: i32) -> String {
@@ -1383,19 +1442,23 @@ pub async fn evttimeadj(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn isbitset(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let var = vm.eval_expr(&args[0]).await?.as_int();
     let bit = vm.eval_expr(&args[1]).await?.as_int();
 
     Ok(VariableValue::new_bool(var & (1 << bit) != 0))
 }
+
 pub async fn fmtreal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn flagcnt(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.icy_board_state.session.flagged_files.len() as i32))
 }
+
 pub async fn kbdbufsize(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
@@ -1692,13 +1755,55 @@ pub async fn dchkstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn pcbaccount(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let field = vm.eval_expr(&args[0]).await?.as_int();
+
+    if let Some(accounting) = &vm.icy_board_state.get_board().await.config.accounting.accounting_config {
+        match field {
+            0 => return Ok(VariableValue::new_double(accounting.new_user_balance)),
+            1 => return Ok(VariableValue::new_double(accounting.charge_per_logon)),
+            2 => return Ok(VariableValue::new_double(accounting.charge_per_time)),
+            3 => return Ok(VariableValue::new_double(accounting.charge_per_peak_time)),
+            4 => return Ok(VariableValue::new_double(accounting.charge_per_group_chat_time)),
+            5 => return Ok(VariableValue::new_double(accounting.charge_per_msg_read)),
+            6 => return Ok(VariableValue::new_double(accounting.charge_per_msg_read_captured)),
+            7 => return Ok(VariableValue::new_double(accounting.charge_per_msg_written)),
+            8 => return Ok(VariableValue::new_double(accounting.charge_per_msg_write_echoed)),
+            9 => return Ok(VariableValue::new_double(accounting.charge_per_msg_write_private)),
+            10 => return Ok(VariableValue::new_double(accounting.charge_per_download_file)),
+            11 => return Ok(VariableValue::new_double(accounting.charge_per_download_bytes)),
+            12 => return Ok(VariableValue::new_double(accounting.pay_back_for_upload_file)),
+            13 => return Ok(VariableValue::new_double(accounting.pay_back_for_upload_bytes)),
+            14 => return Ok(VariableValue::new_double(accounting.warn_level)),
+            _ => {
+                log::error!("PCBACCOUNT: Invalid field number: {field}");
+            }
+        }
+    }
+    Ok(VariableValue::new_double(-1.0))
 }
+
 pub async fn pcbaccstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let field = vm.eval_expr(&args[0]).await?.as_int();
+    match field {
+        0 => {
+            // ActStatus
+            // TODO
+            Ok(VariableValue::new_int(b'T' as i32))
+        }
+        1 => Ok(VariableValue::new_double(vm.icy_board_state.session.current_conference.charge_time)),
+        2 => Ok(VariableValue::new_double(vm.icy_board_state.session.current_conference.charge_msg_read)),
+        3 => Ok(VariableValue::new_double(vm.icy_board_state.session.current_conference.charge_msg_write)),
+        4 => {
+            // Balance
+            Ok(VariableValue::new_double(vm.icy_board_state.session.calculate_balance()))
+        }
+        _ => {
+            log::error!("PCBACCSTAT: Invalid field number: {field}");
+            Ok(VariableValue::new_double(-1.0))
+        }
+    }
 }
+
 pub async fn derrmsg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")

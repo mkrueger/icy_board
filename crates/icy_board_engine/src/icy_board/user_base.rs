@@ -359,11 +359,12 @@ pub struct User {
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub bus_data_phone: String,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub home_voice_phone: String,
 
-    pub birth_date: IcbDate,
+    pub birth_day: Option<IcbDate>,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -558,7 +559,7 @@ impl User {
 
             date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
             gender,
-            birth_date,
+            birth_day: Some(birth_date),
             email,
             web,
 

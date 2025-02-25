@@ -973,9 +973,19 @@ hint-function-dchkstat=todo
 hint-function-pcbaccount=
     Returns what PCBoard will charge a user for a certain activity. These are values the SysOp assigns in PCBsetup when accounting is configures and enabled.
     Valid values for the field parameter are 0-14. Use of the corresponding constants is encouraged. (see the Accounting section)
+
+    { accounting_constants }
+
 hint-function-pcbaccstat=
     Returns value in status field
-    This function can and should be used in conjunction with the ACC_??? constants as the field parameter. Valid values for field are 0-3. (see the Accounting section)
+    This function can and should be used in conjunction with the ACC_??? constants as the field parameter. Valid values for field are 0-3. 
+
+ | Field | dec | Field Description |
+ | :--- |  :--- | :--- |
+ | `ACC_STAT`   | `0`  | Returns status of the “Enable Accounting” switch in the PWRD file.  |
+ | `ACC_TIME`   | `1`  | The amount of ADDITIONAL units to charge |
+ | `ACC_MSGR`   | `2`  | The amount to charge in ADDITION for each message read in the current conference. |
+ | `ACC_MSGW`   | `3`  | The amount to charge in ADDITION for each message entered in the current conference. |
 
 hint-function-derrmsg=returns last DBase error text
 hint-function-account=Returns amount of credits charged for services corresponding to the field parameter.
@@ -1308,7 +1318,7 @@ message_header_constants=
  | `HDR_ACTIVE`   | `0x0E` | `14`  | Message active flag field |
  | `HDR_BLOCKS`   | `0x04` | `4`   | Number of 128 byte blocks in message |
  | `HDR_DATE`     | `0x05` | `5`   | Date message was written |
- | `HDR_ECHO`     | `0x0F` | `15`  | Echoed message flag
+ | `HDR_ECHO`     | `0x0F` | `15`  | Echoed message flag |
  | `HDR_FROM`     | `0x0B` | `11`  | Who the message is from |
  | `HDR_MSGNUM`   | `0x02` | `2`   | Message number | 
  | `HDR_MSGREF`   | `0x03` | `3`   | Reference message |
@@ -1379,3 +1389,24 @@ conference_access_constants=
  |52| Charge Per Minute| DREAL |
  |53| Charge per Message Read| DREAL |
  |54| Charge per Message Written| DREAL |
+
+accounting_constants= 
+ ### Accounting Information
+ 
+ | Field | dec | Field Description |
+ | :--- |  :--- | :--- |
+ | `NEWBALANCE`      | `0`  | Credits Given to a new user account |
+ | `CHRG_CALL`       | `1`  | Credits charged for a call |
+ | `CHRG_TIME`       | `2`  | Credits charged for time used (in minutes) |
+ | `CHRG_PEAKTIME`   | `3`  | Credits charged for peak time used |
+ | `CHRG_CHAT`       | `4`  | Credits charged for chat session |
+ | `CHRG_MSGREAD`    | `5`  | Credits charged for reading a message | 
+ | `CHRG_MSGCAP`     | `6`  | Credits charged for capturing a message |
+ | `CHRG_MSGWRITE`   | `7`  | Credits charged for writing a message |
+ | `CHRG_MSGECHOED`  | `8`  | Credits charged for writing an echoed message |
+ | `CHRG_MSGPRIVATE` | `9`  | Credits charged for writing a private message |
+ | `CHRG_DOWNFILE`   | `10` | Credits charged for downloading a file |
+ | `CHRG_DOWNBYTES`  | `11` | Credits charged for downloading bytes |
+ | `PAY_UPFILE`      | `12` | Credits given for uploading a file |
+ | `PAY_UPBYTES`     | `13` | Credits given for uploading bytes |
+ | `WARNLEVEL`       | `14` | Credit threshold for low credit warning |

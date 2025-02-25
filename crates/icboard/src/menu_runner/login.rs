@@ -432,7 +432,7 @@ impl PcbBoardCommand {
                         display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
                     )
                     .await?;
-                new_user.birth_date = IcbDate::parse(&date);
+                new_user.birth_day = Some(IcbDate::parse(&date));
             }
 
             if settings.ask_email && self.state.display_text.has_text(IceText::EnterEmail) {

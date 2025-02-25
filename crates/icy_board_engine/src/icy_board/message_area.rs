@@ -105,7 +105,7 @@ impl UserDataValue for MessageArea {
         _arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
-            let res = self.req_level_to_list.user_can_access(&vm.icy_board_state.session);
+            let res = self.req_level_to_list.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
         log::error!("Invalid function call on MessageArea ({})", name);

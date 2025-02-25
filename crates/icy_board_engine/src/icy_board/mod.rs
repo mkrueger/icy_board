@@ -4,6 +4,7 @@ use std::{
 };
 
 use crate::Res;
+use accounting_cfg::AccountingConfig;
 use bulletins::BullettinList;
 use codepages::tables::write_utf8_with_bom;
 use qfile::QTraitSync;
@@ -166,7 +167,7 @@ impl IcyBoard {
     }
 
     pub fn load<P: AsRef<Path>>(path: &P) -> Res<Self> {
-        let config = IcbConfig::load(path).map_err(|e| {
+        let mut config = IcbConfig::load(path).map_err(|e| {
             log::error!("Error loading icy board config file: {} from {}", e, path.as_ref().display());
             e
         })?;
@@ -248,6 +249,17 @@ impl IcyBoard {
                 GroupList::default()
             }
         };
+
+        let load_path = get_path(parent_path, &config.accounting.cfg_file);
+        match AccountingConfig::load(&load_path) {
+            Ok(acc) => {
+                config.accounting.accounting_config = Some(acc);
+            }
+            Err(e) => {
+                log::error!("Error loading accounting: {} from {}", e, load_path.display());
+            }
+        }
+
         let mut board = IcyBoard {
             file_name: path.as_ref().to_path_buf(),
             root_path: parent_path.to_path_buf(),

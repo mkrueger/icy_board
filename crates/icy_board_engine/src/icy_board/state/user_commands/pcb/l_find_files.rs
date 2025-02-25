@@ -67,7 +67,7 @@ impl IcyBoardState {
             for area in 0..self.session.current_conference.directories.as_ref().unwrap().len() {
                 if self.session.current_conference.directories.as_ref().unwrap()[area]
                     .list_security
-                    .user_can_access(&self.session)
+                    .session_can_access(&self.session)
                 {
                     self.search_file_area(area, search_pattern.clone()).await?;
                 }
@@ -79,7 +79,7 @@ impl IcyBoardState {
         } else if let Ok(number) = search_area.parse::<i32>() {
             if 1 <= number && (number as usize) <= self.session.current_conference.directories.as_ref().unwrap().len() {
                 let area = &self.session.current_conference.directories.as_ref().unwrap()[number as usize - 1];
-                if area.list_security.user_can_access(&self.session) {
+                if area.list_security.session_can_access(&self.session) {
                     self.search_file_area(number as usize - 1, search_pattern).await?;
                 }
 

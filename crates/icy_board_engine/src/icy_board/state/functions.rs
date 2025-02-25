@@ -273,13 +273,13 @@ impl IcyBoardState {
         len: i32,
         valid_mask: &str,
         help: &str,
-        default_string: Option<String>,
+        default_answer: Option<String>,
         mut display_flags: i32,
     ) -> Res<String> {
         if self.session.request_logoff {
             return Ok(String::new());
         }
-
+        self.session.default_answer = default_answer.clone();
         self.session.disp_options.no_change();
 
         // we've data from a PPE here, so take that input and return it.
@@ -296,6 +296,7 @@ impl IcyBoardState {
                 log::info!("PPE stuffed input: {}", result);
                 self.session.push_tokens(&result);
                 if let Some(token) = self.session.tokens.pop_front() {
+                    self.session.last_answer = Some(token.clone());
                     return Ok(token);
                 }
             }
@@ -335,6 +336,7 @@ impl IcyBoardState {
                     result.push(key.ch);
                 }
                 log::info!("PPE stuffed input: {}", result);
+                self.session.last_answer = Some(result.clone());
                 return Ok(result);
             }
         }
@@ -349,7 +351,7 @@ impl IcyBoardState {
             self.print(TerminalTarget::Both, ")").await?;
             self.backward(len + 1).await?;
             self.reset_color(TerminalTarget::Both).await?;
-            if let Some(default) = &default_string {
+            if let Some(default) = &default_answer {
                 self.print(TerminalTarget::Both, default).await?;
                 self.backward(default.len() as i32).await?;
             }
@@ -375,7 +377,7 @@ impl IcyBoardState {
                     if let Some(cmd) = self.try_find_command(&output, true).await {
                         if !cmd.actions.is_empty() && cmd.actions[0].command_type == CommandType::Help {
                             self.show_help(help).await?;
-                            return self.input_string(color, prompt, len, valid_mask, help, default_string, display_flags).await;
+                            return self.input_string(color, prompt, len, valid_mask, help, default_answer, display_flags).await;
                         }
                     }
                 }
@@ -420,11 +422,12 @@ impl IcyBoardState {
         }
 
         if output.is_empty() {
-            if let Some(default) = default_string {
+            if let Some(default) = default_answer {
+                self.session.last_answer = Some(default.clone());
                 return Ok(default);
             }
         }
-
+        self.session.last_answer = Some(output.clone());
         Ok(output)
     }
 

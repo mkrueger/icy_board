@@ -130,7 +130,7 @@ impl IcyBoardState {
                 continue;
             };
 
-            if !area.req_level_to_enter.user_can_access(&self.session) {
+            if !area.req_level_to_enter.session_can_access(&self.session) {
                 self.session.op_text = area.name.clone();
                 self.display_text(IceText::NotRegisteredInConference, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;

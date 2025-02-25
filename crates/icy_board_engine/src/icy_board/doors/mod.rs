@@ -189,7 +189,7 @@ impl UserDataValue for Door {
         _arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
-            let res = self.securiy_level.user_can_access(&vm.icy_board_state.session);
+            let res = self.securiy_level.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
         log::error!("Invalid function call on Door ({})", name);

@@ -1,10 +1,10 @@
 use std::{fmt::Display, iter::Peekable, str::FromStr};
 
-use chrono::{Local, NaiveTime, Timelike};
+use chrono::{DateTime, Local, NaiveTime, Timelike, Utc};
 use logos::{Lexer, Logos};
 use serde::{Deserialize, Serialize};
 
-use super::state::Session;
+use super::{state::Session, user_base::User};
 use crate::{Res, datetime::IcbDate};
 
 #[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -177,37 +177,90 @@ enum Token {
     Time(String),
 }
 
+pub trait SecData {
+    fn cur_security(&self) -> u8;
+    fn birth_day(&self) -> Option<DateTime<Utc>>;
+    fn is_in_goup(&self, group: &str) -> bool;
+    fn minutes_left(&self) -> i32 {
+        0
+    }
+}
+
+impl SecData for Session {
+    fn cur_security(&self) -> u8 {
+        self.cur_security
+    }
+
+    fn birth_day(&self) -> Option<DateTime<Utc>> {
+        if let Some(user) = &self.current_user {
+            if let Some(day) = &user.birth_day {
+                return Some(day.to_utc_date_time());
+            }
+        }
+        None
+    }
+
+    fn is_in_goup(&self, group: &str) -> bool {
+        self.cur_groups.contains(&group.to_string())
+    }
+
+    fn minutes_left(&self) -> i32 {
+        self.minutes_left()
+    }
+}
+
+impl SecData for User {
+    fn cur_security(&self) -> u8 {
+        self.security_level
+    }
+
+    fn birth_day(&self) -> Option<DateTime<Utc>> {
+        if let Some(day) = &self.birth_day {
+            return Some(day.to_utc_date_time());
+        }
+        None
+    }
+
+    fn is_in_goup(&self, _group: &str) -> bool {
+        false
+    }
+
+    fn minutes_left(&self) -> i32 {
+        0
+    }
+}
+
 impl SecurityExpression {
-    pub fn eval(&self, session: &Session) -> Res<Value> {
+    pub fn eval(&self, sec_data: &dyn SecData) -> Res<Value> {
         match self {
             SecurityExpression::UnaryExpression(op, expr) => match op {
-                UnaryOp::Not => match expr.eval(session)? {
+                UnaryOp::Not => match expr.eval(sec_data)? {
                     Value::Bool(b) => Ok(Value::Bool(!b)),
                     expr => Err(format!("Invalid operand for NOT operator {}", expr).into()),
                 },
             },
             SecurityExpression::BinaryExpression(op, left, right) => match op {
-                BinaryOp::And => match (left.eval(session)?, right.eval(session)?) {
+                BinaryOp::And => match (left.eval(sec_data)?, right.eval(sec_data)?) {
                     (Value::Bool(l), Value::Bool(r)) => Ok(Value::Bool(l && r)),
                     (l, r) => Err(format!("Invalid operands for AND operator {} {}", l, r).into()),
                 },
-                BinaryOp::Or => match (left.eval(session)?, right.eval(session)?) {
+                BinaryOp::Or => match (left.eval(sec_data)?, right.eval(sec_data)?) {
                     (Value::Bool(l), Value::Bool(r)) => Ok(Value::Bool(l || r)),
                     (l, r) => Err(format!("Invalid operands for AND operator {} {}", l, r).into()),
                 },
                 BinaryOp::Equal => {
-                    let l = left.eval(session)?;
-                    let r = right.eval(session)?;
+                    let l = left.eval(sec_data)?;
+                    let r = right.eval(sec_data)?;
                     Ok(Value::Bool(l == r))
                 }
                 BinaryOp::NotEqual => {
-                    let l = left.eval(session)?;
-                    let r = right.eval(session)?;
+                    let l = left.eval(sec_data)?;
+                    let r = right.eval(sec_data)?;
                     Ok(Value::Bool(l != r))
                 }
                 BinaryOp::Greater => {
-                    let l = left.eval(session)?;
-                    let r = right.eval(session)?;
+                    let l = left.eval(sec_data)?;
+                    let r = right.eval(sec_data)?;
                     match (l, r) {
                         (Value::Integer(l), Value::Integer(r)) => Ok(Value::Bool(l > r)),
                         (Value::Time(l), Value::Time(r)) => Ok(Value::Bool(l > r)),
@@ -215,8 +268,8 @@ impl SecurityExpression {
                     }
                 }
                 BinaryOp::GreaterEqual => {
-                    let l = left.eval(session)?;
-                    let r = right.eval(session)?;
+                    let l = left.eval(sec_data)?;
+                    let r = right.eval(sec_data)?;
                     match (l, r) {
                         (Value::Integer(l), Value::Integer(r)) => Ok(Value::Bool(l >= r)),
                         (Value::Time(l), Value::Time(r)) => Ok(Value::Bool(l >= r)),
@@ -224,8 +277,8 @@ impl SecurityExpression {
                     }
                 }
                 BinaryOp::Less => {
-                    let l = left.eval(session)?;
-                    let r = right.eval(session)?;
+                    let l = left.eval(sec_data)?;
+                    let r = right.eval(sec_data)?;
                     match (l, r) {
                         (Value::Integer(l), Value::Integer(r)) => Ok(Value::Bool(l < r)),
                         (Value::Time(l), Value::Time(r)) => Ok(Value::Bool(l < r)),
@@ -233,8 +286,8 @@ impl SecurityExpression {
                     }
                 }
                 BinaryOp::LessEqual => {
-                    let l = left.eval(session)?;
-                    let r = right.eval(session)?;
+                    let l = left.eval(sec_data)?;
+                    let r = right.eval(sec_data)?;
                     match (l, r) {
                         (Value::Integer(l), Value::Integer(r)) => Ok(Value::Bool(l <= r)),
                         (Value::Time(l), Value::Time(r)) => Ok(Value::Bool(l <= r)),
@@ -243,11 +296,11 @@ impl SecurityExpression {
                 }
             },
             SecurityExpression::Call(name, args) => match name.to_uppercase().as_str() {
-                U_SEC_FUNC => Ok(Value::Integer(session.cur_security as i64)),
+                U_SEC_FUNC => Ok(Value::Integer(sec_data.cur_security() as i64)),
 
                 U_AGE_FUNC => {
-                    let age = if let Some(user) = &session.current_user {
-                        chrono::Utc::now().years_since(user.birth_date.to_utc_date_time()).unwrap_or(0)
+                    let age = if let Some(day) = &sec_data.birth_day() {
+                        chrono::Utc::now().years_since(*day).unwrap_or(0)
                     } else {
                         0
                     };
@@ -255,8 +308,8 @@ impl SecurityExpression {
                 }
 
                 U_GROUP_FUNC => {
-                    if let Value::String(group) = args[0].eval(session)? {
-                        Ok(Value::Bool(session.cur_groups.contains(&group)))
+                    if let Value::String(group) = args[0].eval(sec_data)? {
+                        Ok(Value::Bool(sec_data.is_in_goup(&group)))
                     } else {
                         Err("Invalid argument for U_GROUP".into())
                     }
@@ -267,20 +320,35 @@ impl SecurityExpression {
                     Ok(Value::Time(time))
                 }
 
-                TIME_LEFT_FUNC => Ok(Value::Integer(session.minutes_left() as i64)),
+                TIME_LEFT_FUNC => Ok(Value::Integer(sec_data.minutes_left() as i64)),
 
                 DOW_FUNC => Ok(Value::Integer(IcbDate::today().day_of_week() as i64)),
                 _ => Err(format!("Invalid function {name}").into()),
             },
             SecurityExpression::Constant(constant) => Ok(constant.clone()),
-            SecurityExpression::Parens(expr) => expr.eval(session),
+            SecurityExpression::Parens(expr) => expr.eval(sec_data),
         }
     }
 
-    pub fn user_can_access(&self, session: &Session) -> bool {
+    pub fn session_can_access(&self, session: &Session) -> bool {
         match self.eval(session) {
             Ok(Value::Bool(b)) => b,
             Ok(Value::Integer(i)) => session.cur_security >= i as u8,
+            Ok(_) => {
+                log::error!("expression didn't evaluate to bool ({})", self);
+                false
+            }
+            Err(err) => {
+                log::error!("Error evaluating security expression: {} ({})", err, self);
+                false
+            }
+        }
+    }
+
+    pub(crate) fn user_can_access(&self, user: &super::user_base::User) -> bool {
+        match self.eval(user) {
+            Ok(Value::Bool(b)) => b,
+            Ok(Value::Integer(i)) => user.security_level >= i as u8,
             Ok(_) => {
                 log::error!("expression didn't evaluate to bool ({})", self);
                 false
