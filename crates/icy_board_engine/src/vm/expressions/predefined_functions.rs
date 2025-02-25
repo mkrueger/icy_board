@@ -862,6 +862,9 @@ pub async fn ansion(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
     ))
 }
 pub async fn valcc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let ccnum = vm.eval_expr(&args[0]).await?.as_string();
+    
+
     log::error!("not implemented function!");
     panic!("TODO")
 }
@@ -870,8 +873,14 @@ pub async fn fmtcc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     panic!("TODO")
 }
 pub async fn cctype(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let ccnum = vm.eval_expr(&args[0]).await?.as_string();
+    let issuer = if let Ok(card) = ccnum.parse::<creditcard::CreditCard>() {
+
+    } else {
+        "UNKNOWN".to_string()
+    };
+
+    Ok(VariableValue::new_string(issuer))
 }
 
 pub async fn getx(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

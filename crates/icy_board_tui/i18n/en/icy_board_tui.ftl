@@ -156,7 +156,7 @@ icb_setup_key_menu_edit_help=↑ Up  ↓ Down  F1 Help  F2 Edit this file  ␛ B
 icb_setup_key_conf_list_help=↑ Up  ↓ Down  INS New  ␡ Delete  PgUp/Dn Move ␛ Back
 
 icb_setup_main_title=Main Menu
-icb_setup_main_use_label=Use /w ICB { $version}
+icb_setup_main_use_label=Use /w ICB { $version }
 icb_setup_main_sysop_info=Sysop Information
 icb_setup_main_file_locs=File Locations
 icb_setup_main_con_info=Connection Information

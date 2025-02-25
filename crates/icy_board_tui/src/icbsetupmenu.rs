@@ -86,7 +86,7 @@ impl IcbSetupMenuUI {
         }
 
         if let Some(val) = &self.right_title {
-            let width = val.len() as u16;
+            let width = val.chars().count() as u16 - 2;
             Line::raw(val).style(get_tui_theme().item).render(
                 Rect {
                     x: disp_area.x + disp_area.width.saturating_sub(width + 1),

@@ -21,7 +21,7 @@ members = [
 ]
 [workspace.package]
 version = "0.1.4"
-edition = "2021"
+edition = "2024"
 authors = ["Mike Krüger <mkrueger@posteo.de>"]
 
 [workspace.dependencies]

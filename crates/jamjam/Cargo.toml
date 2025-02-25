@@ -1,7 +1,7 @@
 [package]
 name = "jamjam"
 version = "0.2.0"
-edition = "2021"
+edition = "2024"
 description = "Handles JAM, PCBOARD message bases & QWK packets."
 authors = ["Mike Krüger <mkrueger@posteo.de>"]
 homepage = "https://github.com/mkrueger/jamjam"
