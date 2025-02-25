@@ -102,12 +102,11 @@ impl IcyBoardState {
                     )
                     .await?;
                 let search = search_text.to_lowercase();
-                let Some(search_text) = self.session.parse_search_text(search) else {
+                if !self.search_init(search, true) {
                     self.display_text(IceText::PunctuationError, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
                     return Ok(());
                 };
-                self.session.search_text = search_text;
                 if files.is_empty() {
                     files.extend(0..bulletins.len() as i32);
                 }
@@ -136,7 +135,7 @@ impl IcyBoardState {
                     .await?;
                 }
             }
-            self.session.search_text.clear();
+            self.stop_search();
             // no prompt after displaying bulletins
             self.session.disp_options.count_lines = false;
 

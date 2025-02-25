@@ -100,16 +100,22 @@ impl IcyBoardState {
                 if text.is_empty() {
                     break;
                 }
-                let text = text.to_ascii_uppercase();
-                let c = areas.iter().map(|a| a.name.clone()).collect::<Vec<String>>();
-                for (i, c) in c.iter().enumerate() {
-                    if c.to_ascii_uppercase().contains(&text) {
-                        self.println(crate::vm::TerminalTarget::Both, &format!("{}) {}", i, c)).await?;
-                        if self.session.disp_options.abort_printout {
-                            break;
+
+                self.search_init(text, false);
+                if let Some(regex) = &self.session.search_pattern.clone() {
+                    let c = areas.iter().map(|a| a.name.clone()).collect::<Vec<String>>();
+                    for (i, c) in c.iter().enumerate() {
+                        if let Some(_) = regex.find(c) {
+                            self.print(crate::vm::TerminalTarget::Both, &format!("{}) ", i)).await?;
+                            self.print_found_text(crate::vm::TerminalTarget::Both, c).await?;
+                            self.new_line().await?;
+                            if self.session.disp_options.abort_printout {
+                                break;
+                            }
                         }
                     }
                 }
+                self.stop_search();
                 continue;
             }
 

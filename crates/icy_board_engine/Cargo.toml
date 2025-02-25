@@ -45,6 +45,7 @@ reqwest = { version = "0.12", features = ["json", "blocking"] }
 md5 = "0.7.0"
 temp-file = "0.1.9"
 glob = "0.3.2"
+chumsky = "0.9.3"
 
 # interpreter deps
 [dev-dependencies]

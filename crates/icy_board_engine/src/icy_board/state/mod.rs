@@ -8,7 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{executable::Executable, vm::expressions::fix_casing, Res};
+use crate::{executable::Executable, search_patterns::PatternExpr, vm::expressions::fix_casing, Res};
 use async_recursion::async_recursion;
 use chrono::{DateTime, Local, Utc};
 use codepages::tables::UNICODE_TO_CP437;
@@ -17,6 +17,7 @@ use icy_engine::{ansi, OutputFormat, SaveOptions, ScreenPreperation};
 use icy_engine::{ansi::constants::COLOR_OFFSETS, Position};
 use icy_engine::{TextAttribute, TextPane};
 use icy_net::{channel::ChannelConnection, iemsi::EmsiICI, termcap_detect::TerminalCaps, terminal::virtual_screen::VirtualScreen, Connection, ConnectionType};
+use regex::Regex;
 use tokio::{sync::Mutex, time::sleep};
 
 use crate::{
@@ -235,7 +236,7 @@ pub struct Session {
 
     pub term_caps: TerminalCaps,
 
-    pub search_text: String,
+    pub search_pattern: Option<Regex>,
 }
 
 impl Session {
@@ -293,7 +294,7 @@ impl Session {
             last_msg_read: 0,
             highest_msg_read: 0,
             term_caps: TerminalCaps::LOCAL,
-            search_text: String::new(),
+            search_pattern: None,
         }
     }
 
@@ -345,11 +346,6 @@ impl Session {
     }
     pub fn seconds_left(&self) -> i32 {
         self.time_limit * 60
-    }
-
-    fn parse_search_text(&self, search: String) -> Option<String> {
-        // TODO
-        Some(search)
     }
 }
 
@@ -1196,6 +1192,29 @@ impl IcyBoardState {
             self.print(TerminalTarget::Both, &ch.ch.to_string()).await?;
         }
     }
+
+    pub fn search_init(&mut self, pattern: String, case_sensitive: bool) -> bool {
+        match PatternExpr::parse(&pattern) {
+            Ok(pattern) => {
+                let mut pattern = pattern.to_regex();
+                if !case_sensitive {
+                    pattern = format!("(?i){}", pattern);
+                }
+                if let Ok(r) = Regex::new(&pattern) {
+                    self.session.search_pattern = Some(r);
+                    return true;
+                } else {
+                    log::error!("Error parsing search pattern: {}", pattern);
+                }
+            }
+            Err(err) => log::error!("Error parsing search pattern: {}", err),
+        }
+        return false;
+    }
+
+    pub fn stop_search(&mut self) {
+        self.session.search_pattern = None;
+    }
 }
 
 #[derive(PartialEq)]
@@ -1279,6 +1298,28 @@ impl IcyBoardState {
     /// # Errors
     pub async fn print(&mut self, target: TerminalTarget, str: &str) -> Res<()> {
         self.write_raw(target, str.chars().collect::<Vec<char>>().as_slice()).await
+    }
+
+    pub async fn print_found_text(&mut self, target: TerminalTarget, str: &str) -> Res<()> {
+        let chars = str.chars().collect::<Vec<char>>();
+        if let Some(regex) = &self.session.search_pattern.clone() {
+            if let Some(find) = regex.find(str) {
+                self.write_raw(target, &chars[..find.start()]).await?;
+                let old_color = self.user_screen.caret.get_attribute();
+                if old_color.get_background() == 0 {
+                    self.set_color(target, IcbColor::Dos(0x70)).await?;
+                } else {
+                    self.set_color(target, IcbColor::Dos(0x07)).await?;
+                }
+                self.write_raw(target, &chars[find.start()..find.end()]).await?;
+                self.set_color(target, IcbColor::Dos((old_color.get_foreground() + old_color.get_background() * 16) as u8))
+                    .await?;
+                self.write_raw(target, &chars[find.end()..]).await?;
+                return Ok(());
+            }
+        }
+
+        self.write_raw(target, chars.as_slice()).await
     }
 
     pub async fn println(&mut self, target: TerminalTarget, str: &str) -> Res<()> {

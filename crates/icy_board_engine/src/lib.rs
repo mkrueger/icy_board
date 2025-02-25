@@ -26,6 +26,7 @@ pub mod decompiler;
 pub mod executable;
 pub mod formatting;
 pub mod parser;
+pub mod search_patterns;
 pub mod semantic;
 pub mod tables;
 pub mod tokens;

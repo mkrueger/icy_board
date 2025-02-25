@@ -816,10 +816,12 @@ pub async fn forward(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     }
     Ok(())
 }
+
 pub async fn freshline(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.print(TerminalTarget::Both, "\r\n").await?;
+    vm.icy_board_state.fresh_line().await?;
     Ok(())
 }
+
 pub async fn wrusysdoor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::error!("wrusysdoor not implemented statement!");
     panic!("TODO")
@@ -941,7 +943,7 @@ pub async fn println(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         let txt = &vm.eval_expr(value).await?.as_string();
         vm.icy_board_state.print(TerminalTarget::Both, txt).await?;
     }
-    vm.icy_board_state.print(TerminalTarget::Both, "\r\n").await?;
+    vm.icy_board_state.new_line().await?;
     Ok(())
 }
 
@@ -1390,24 +1392,44 @@ pub async fn scrfile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn searchinit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("searchinit not implemented statement!");
-    panic!("TODO")
+    let pattern = vm.eval_expr(&args[0]).await?.as_string();
+    let case_sensitive = vm.eval_expr(&args[1]).await?.as_bool();
+    vm.icy_board_state.search_init(pattern, case_sensitive);
+    Ok(())
 }
+
 pub async fn searchfind(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("searchfind not implemented statement!");
-    panic!("TODO")
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+
+    let res = if let Some(regex) = &vm.icy_board_state.session.search_pattern {
+        regex.is_match(&text)
+    } else {
+        false
+    };
+
+    vm.set_variable(&args[1], VariableValue::new_bool(res)).await?;
+    Ok(())
 }
+
 pub async fn searchstop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("searchstop not implemented statement!");
-    panic!("TODO")
+    vm.icy_board_state.stop_search();
+    Ok(())
 }
+
 pub async fn prfound(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!("not implemented statement!");
-    panic!("TODO")
+    for value in args {
+        let txt = &vm.eval_expr(value).await?.as_string();
+        vm.icy_board_state.print_found_text(TerminalTarget::Both, txt).await?;
+    }
+    Ok(())
 }
 pub async fn prfoundln(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::error!(" prfoundlnnot implemented statement!");
-    panic!("TODO")
+    for value in args {
+        let txt = &vm.eval_expr(value).await?.as_string();
+        vm.icy_board_state.print_found_text(TerminalTarget::Both, txt).await?;
+    }
+    vm.icy_board_state.new_line().await?;
+    Ok(())
 }
 
 pub async fn tpaget(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
