@@ -20,6 +20,7 @@ jobs:
    - name: Build
      id: build
      run: |
+       rustup  update
        cargo build --release
        echo "Copy $DEB to icboard.deb"
        mkdir bin
@@ -60,6 +61,7 @@ jobs:
    - name: Build
      id: build
      run: |
+       rustup  update
        cargo build --release
        echo "Copy $DEB to icy_board.deb"
        mkdir bin
@@ -99,6 +101,7 @@ jobs:
        echo "Version: $version"
    - name: Install rust compilation targets
      run: |
+       rustup update
        rustup target add aarch64-apple-darwin
        rustup target add x86_64-apple-darwin
    - name: Build
