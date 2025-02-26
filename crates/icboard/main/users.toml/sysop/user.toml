@@ -1,5 +1,4 @@
 name = "SYSOP"
-birth_date = 0000-01-01
 security_level = 255
 exp_date = 0000-01-01
 exp_security_level = 0
@@ -18,5 +17,5 @@ fse_mode = "Yes"
 
 [stats]
 first_date_on = "1970-01-01T00:00:00Z"
-last_on = "2025-02-25T07:24:55.891029580Z"
+last_on = "2025-02-26T18:23:53.003916381Z"
 num_times_on = 1
