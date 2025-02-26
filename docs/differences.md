@@ -27,7 +27,7 @@ So it's possible to use a modern (non CP437) text editor to alter the BBS files.
   
 ## Command changes
 
-* No more hard coded commands. They're now all configurable. (however all pcb commands are built-in but can now be configured)
+* Added Read & Write email (@/@W)
 
 ## PPE/Menus
 
