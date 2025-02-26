@@ -547,10 +547,36 @@ pub async fn gettoken(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 }
 
 pub async fn shell(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let cmd = vm.eval_expr(&args[0]).await?.as_string();
+    let use_shell = vm.eval_expr(&args[0]).await?.as_bool();
 
-    log::error!("PPE wanted to shell out to '{cmd}'!");
-    //Err(VMError::ErrorInFunctionCall("shell".to_string(), "shell out is not supported.".to_string()).into())
+    let mut cmd = vm.eval_expr(&args[2]).await?.as_string();
+    let mut arguments = vm.eval_expr(&args[3]).await?.as_string();
+    let mut exit_code = 1;
+
+    if use_shell {
+        if let Ok(shell) = env::var("SHELL") {
+            arguments = format!("/C {} '{}'", cmd, arguments);
+            cmd = shell;
+        }
+    }
+
+    match std::process::Command::new(cmd).arg(arguments).spawn() {
+        Ok(mut child) => match child.wait() {
+            Ok(code) => {
+                if let Some(ec) = code.code() {
+                    exit_code = ec;
+                }
+            }
+            Err(e) => {
+                log::error!("Error running process: {}", e);
+            }
+        },
+        Err(e) => {
+            log::error!("Error starting process: {}", e);
+        }
+    }
+
+    vm.set_variable(&args[1], VariableValue::new_int(exit_code)).await?;
     Ok(())
 }
 
