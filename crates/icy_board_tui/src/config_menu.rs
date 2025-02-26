@@ -25,6 +25,7 @@ pub enum EditMode {
     None,
     Open(String, PathBuf),
     ExternalProgramStarted,
+    DisplayHelp(String),
 }
 
 #[derive(Default)]
@@ -622,6 +623,14 @@ impl<T> ListItem<T> {
 
     fn handle_key_press(&mut self, key: KeyEvent, _state: &mut ConfigMenuState) -> ResultState {
         match key {
+            KeyEvent { code: KeyCode::F(1), .. } => {
+                if !self.help.is_empty() {
+                    return ResultState {
+                        edit_mode: EditMode::DisplayHelp(self.help.clone()),
+                        status_line: self.status.clone(),
+                    };
+                }
+            }
             KeyEvent { code: KeyCode::Enter, .. } => {
                 return ResultState::status_line(self.status.clone());
             }

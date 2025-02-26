@@ -11,14 +11,14 @@ use crate::{
     colors::RgbSwatch,
     config_menu::EditMode,
     get_text,
-    help_view::{HelpView, HelpViewState},
+    help_view::HelpViewState,
     tab_page::TabPage,
     term::next_event,
     text_field::set_cursor_mode,
     theme::{DOS_DARK_GRAY, DOS_LIGHT_GRAY, DOS_WHITE, get_tui_theme},
 };
 
-pub struct App<'a> {
+pub struct App {
     pub mode: Mode,
     pub tab: usize,
     pub title: String,
@@ -27,7 +27,7 @@ pub struct App<'a> {
     pub date_format: String,
 
     pub tabs: Vec<Box<dyn TabPage>>,
-    pub help_state: HelpViewState<'a>,
+    pub help_state: HelpViewState,
 
     pub save: bool,
 }
@@ -41,7 +41,7 @@ pub enum Mode {
     ShowHelp,
 }
 
-impl<'a> App<'a> {
+impl App {
     /// Run the app until the user quits.
     pub fn run(&mut self, terminal: &mut TerminalType) -> Result<()> {
         set_cursor_mode();
@@ -61,12 +61,14 @@ impl<'a> App<'a> {
         terminal
             .draw(|frame| {
                 let screen: Rect = get_screen_size(&frame, self.full_screen);
+                self.help_state.set_area(screen);
                 self.ui(frame, screen);
 
                 match self.mode {
                     Mode::ShowHelp => {
                         self.show_help(frame, screen);
                     }
+
                     _ => {}
                 }
             })
@@ -96,6 +98,16 @@ impl<'a> App<'a> {
     }
 
     fn handle_key_press(&mut self, terminal: &mut TerminalType, key: KeyEvent) {
+        if self.mode == Mode::ShowHelp {
+            match key.code {
+                KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Command,
+                _ => {
+                    self.help_state.handle_key_press(key);
+                }
+            }
+            return;
+        }
+
         if self.mode == Mode::RequestQuit {
             match key.code {
                 KeyCode::Left | KeyCode::Right => self.save = !self.save,
@@ -112,20 +124,17 @@ impl<'a> App<'a> {
 
         if self.get_tab().has_control() {
             let state = self.get_tab_mut().handle_key_press(key);
-            if let EditMode::ExternalProgramStarted = &state.edit_mode {
-                let _ = terminal.clear();
+            match state.edit_mode {
+                EditMode::ExternalProgramStarted => {
+                    let _ = terminal.clear();
+                }
+                EditMode::DisplayHelp(help) => {
+                    self.help_state.set_content(&help);
+                    self.mode = Mode::ShowHelp;
+                }
+                _ => (),
             }
             self.status_line = state.status_line;
-            return;
-        }
-
-        if self.mode == Mode::ShowHelp {
-            match key.code {
-                KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Command,
-                _ => {
-                    self.help_state.handle_key_press(key);
-                }
-            }
             return;
         }
 
@@ -139,13 +148,19 @@ impl<'a> App<'a> {
             }
             KeyCode::BackTab => self.prev_tab(),
             KeyCode::Tab => self.next_tab(),
-            KeyCode::F(1) => {
-                self.help_state.text = self.get_tab().get_help();
-                self.mode = Mode::ShowHelp;
-            }
+
             _ => {
                 let state = self.get_tab_mut().handle_key_press(key);
-
+                match state.edit_mode {
+                    EditMode::ExternalProgramStarted => {
+                        let _ = terminal.clear();
+                    }
+                    EditMode::DisplayHelp(help) => {
+                        self.help_state.set_content(&help);
+                        self.mode = Mode::ShowHelp;
+                    }
+                    _ => (),
+                }
                 self.status_line = state.status_line;
             }
         };
@@ -207,11 +222,12 @@ impl<'a> App<'a> {
     fn show_help(&mut self, frame: &mut Frame, screen: Rect) {
         let area = screen.inner(Margin { horizontal: 2, vertical: 2 });
         Clear.render(area, frame.buffer_mut());
-        HelpView::default().render(area, frame.buffer_mut(), &mut self.help_state);
+
+        self.help_state.draw(frame);
     }
 }
 
-impl<'a> App<'a> {
+impl App {
     fn render_title_bar(&self, area: Rect, buf: &mut Buffer) {
         let len: u16 = self.tabs.iter().map(|t| t.title().len() as u16 + 1).sum();
         let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(1 + len)]);
@@ -244,6 +260,9 @@ impl<'a> App<'a> {
                 .style(get_tui_theme().background)
                 .borders(Borders::NONE)
                 .render(area, frame.buffer_mut());
+        }
+        if self.mode == Mode::ShowHelp {
+            return;
         }
         self.get_tab_mut().render(frame, area);
     }

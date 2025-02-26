@@ -11,13 +11,13 @@ use event_setup::EventSetup;
 use file_locations::FileLocations;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
-    config_menu::ResultState,
+    config_menu::{EditMode, ResultState},
     get_text, get_text_args,
     icbsetupmenu::IcbSetupMenuUI,
     select_menu::{MenuItem, SelectMenu},
     tab_page::TabPage,
 };
-use ratatui::{Frame, layout::Rect, text::Text};
+use ratatui::{Frame, layout::Rect};
 use subscription_information::SubscriptionInformation;
 mod accounting;
 mod board_configuration;
@@ -45,19 +45,19 @@ impl GeneralTab {
         let right_title = get_text_args("icb_setup_main_use_label", HashMap::from([("version".to_string(), VERSION.to_string())]));
         Self {
             page: IcbSetupMenuUI::new(SelectMenu::new(vec![
-                MenuItem::new(0, 'A', get_text("icb_setup_main_sysop_info")),
-                MenuItem::new(1, 'B', get_text("icb_setup_main_file_locs")),
-                MenuItem::new(2, 'C', get_text("icb_setup_main_con_info")),
-                MenuItem::new(3, 'D', get_text("icb_setup_main_board_cfg")),
-                MenuItem::new(4, 'E', get_text("icb_setup_main_evt_setup")),
-                MenuItem::new(5, 'F', get_text("icb_setup_main_subscription")),
-                MenuItem::new(6, 'G', get_text("icb_setup_main_conf_opt")),
-                MenuItem::new(7, 'H', get_text("icb_setup_main_sec_levels")),
-                MenuItem::new(8, 'I', get_text("icb_setup_main_acc_cfg")),
-                MenuItem::new(9, 'J', get_text("icb_setup_main_new_user")),
+                MenuItem::new(0, 'A', get_text("icb_setup_main_sysop_info")).with_help(get_text("icb_setup_main_sysop_info-help")),
+                MenuItem::new(1, 'B', get_text("icb_setup_main_file_locs")).with_help(get_text("icb_setup_main_file_locs-help")),
+                MenuItem::new(2, 'C', get_text("icb_setup_main_con_info")).with_help(get_text("icb_setup_main_con_info-help")),
+                MenuItem::new(3, 'D', get_text("icb_setup_main_board_cfg")).with_help(get_text("icb_setup_main_board_cfg-help")),
+                MenuItem::new(4, 'E', get_text("icb_setup_main_evt_setup")).with_help(get_text("icb_setup_main_evt_setup-help")),
+                MenuItem::new(5, 'F', get_text("icb_setup_main_subscription")).with_help(get_text("icb_setup_main_subscription-help")),
+                MenuItem::new(6, 'G', get_text("icb_setup_main_conf_opt")).with_help(get_text("icb_setup_main_conf_opt-help")),
+                MenuItem::new(7, 'H', get_text("icb_setup_main_sec_levels")).with_help(get_text("icb_setup_main_sec_levels-help")),
+                MenuItem::new(8, 'I', get_text("icb_setup_main_acc_cfg")).with_help(get_text("icb_setup_main_acc_cfg-help")),
+                MenuItem::new(9, 'J', get_text("icb_setup_main_new_user")).with_help(get_text("icb_setup_main_new_user-help")),
                 MenuItem::new(10, 'K', "TODO: Mailer/Tosser".to_string()),
-                MenuItem::new(11, 'L', get_text("icb_setup_mb_conf")),
-                MenuItem::new(12, 'M', get_text("icb_setup_conferences")),
+                MenuItem::new(11, 'L', get_text("icb_setup_mb_conf")).with_help(get_text("icb_setup_mb_conf-help")),
+                MenuItem::new(12, 'M', get_text("icb_setup_conferences")).with_help(get_text("icb_setup_conferences-help")),
             ]))
             .with_left_title(left_title)
             .with_center_title(center_title)
@@ -86,6 +86,9 @@ impl TabPage for GeneralTab {
 
     fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
         let (state, opt) = self.page.handle_key_press(key);
+        if matches!(state.edit_mode, EditMode::DisplayHelp(_)) {
+            return state;
+        }
         if let Some(selected) = opt {
             match selected {
                 0 => {
@@ -147,9 +150,5 @@ impl TabPage for GeneralTab {
             }
         }
         state
-    }
-
-    fn get_help(&self) -> Text<'static> {
-        String::new().into()
     }
 }

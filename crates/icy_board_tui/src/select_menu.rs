@@ -11,11 +11,12 @@ pub struct MenuItem<T> {
     id: T,
     char: char,
     title: String,
+    help: Option<String>,
 }
 
 impl<T> MenuItem<T> {
     pub fn new(id: T, char: char, title: String) -> Self {
-        Self { id, char, title }
+        Self { id, char, title, help: None }
     }
 
     pub fn id(&self) -> &T {
@@ -28,6 +29,15 @@ impl<T> MenuItem<T> {
 
     pub fn title(&self) -> &str {
         &self.title
+    }
+
+    pub fn help(&self) -> Option<&str> {
+        self.help.as_deref()
+    }
+
+    pub fn with_help(mut self, help: String) -> Self {
+        self.help = Some(help);
+        self
     }
 
     fn render_label(&self, area: Rect, frame: &mut Frame, selected: bool) {
@@ -110,6 +120,10 @@ impl<T> SelectMenu<T> {
         );
     }
 
+    pub fn help(&self, state: &mut SelectMenuState) -> Option<&str> {
+        self.items.get(state.selected as usize).and_then(|item| item.help())
+    }
+
     pub fn handle_key_press(&self, key: crossterm::event::KeyEvent, state: &mut SelectMenuState) -> Option<&T> {
         match key.code {
             KeyCode::Up => {
@@ -149,6 +163,7 @@ impl<T> SelectMenu<T> {
                     }
                 }
             }
+
             KeyCode::Enter => {
                 return Some(&self.items[state.selected as usize].id);
             }

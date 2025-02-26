@@ -8,7 +8,7 @@ use icy_board_tui::{
 
 use crate::tabs::{AboutTab, GeneralTab};
 
-pub fn new_main_window<'a>(icy_board: Arc<Mutex<IcyBoard>>, full_screen: bool) -> App<'a> {
+pub fn new_main_window(icy_board: Arc<Mutex<IcyBoard>>, full_screen: bool) -> App {
     let general_tab = GeneralTab::new(icy_board.clone());
     let date_format = icy_board.lock().unwrap().config.board.date_format.clone();
     App {
@@ -19,7 +19,7 @@ pub fn new_main_window<'a>(icy_board: Arc<Mutex<IcyBoard>>, full_screen: bool) -
         date_format,
         tabs: vec![Box::new(general_tab), Box::new(AboutTab::default())],
         status_line: String::new(),
-        help_state: HelpViewState::new(23),
+        help_state: HelpViewState::new(),
         save: false,
     }
 }

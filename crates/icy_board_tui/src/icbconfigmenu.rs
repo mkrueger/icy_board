@@ -101,7 +101,7 @@ impl ICBConfigMenuUI {
                         return editor(self.menu.obj.clone(), path);
                     }
 
-                    let editor = &self.menu.obj.lock().unwrap().config.sysop.external_editor;
+                    let editor: &String = &self.menu.obj.lock().unwrap().config.sysop.external_editor;
                     match std::process::Command::new(editor).arg(format!("{}", path.display())).spawn() {
                         Ok(mut child) => match child.wait() {
                             Ok(_) => {

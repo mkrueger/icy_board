@@ -25,3 +25,4 @@ i18n-embed-fl = { workspace = true }
 fluent-bundle = { workspace = true }
 rust-embed = { workspace = true }
 once_cell = { workspace = true }
+md-tui =  { git = "https://github.com/mkrueger/md-tui.git", branch = "dev/mkrueger/color_config"}

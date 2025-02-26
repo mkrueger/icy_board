@@ -46,6 +46,8 @@ pub struct Theme {
     pub table_inactive: Style,
     pub table_header: Style,
     pub help_box: Style,
+    pub help_header: Style,
+
     pub swatch: bool,
 }
 
@@ -96,7 +98,8 @@ pub static CLASSIC_THEME: Theme = Theme {
     table_inactive: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),
     table_header: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
 
-    help_box: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
+    help_box: Style::new().bg(DOS_GREEN).fg(DOS_BLACK),
+    help_header: Style::new().bg(DOS_GREEN).fg(DOS_YELLOW),
 
     text_field_text: Style::new().bg(DOS_RED).fg(DOS_WHITE),
     text_field_filler_char: ' ',
@@ -151,6 +154,8 @@ pub static DEFAULT_THEME: Theme = Theme {
     filter_text: Style::new().bg(DOS_BLUE).fg(DOS_YELLOW),
     description_text: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
     help_box: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
+    help_header: Style::new().bg(DOS_BLUE).fg(DOS_YELLOW),
+
     swatch: true,
 };
 

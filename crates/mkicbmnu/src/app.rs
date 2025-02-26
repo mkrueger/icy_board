@@ -11,7 +11,7 @@ use icy_board_tui::{
 
 use crate::{AboutTab, CommandsTab, GeneralTab};
 
-pub fn new_main_window<'a>(icy_board: IcyBoard, mnu: Arc<Mutex<Menu>>, full_screen: bool, path: &Path) -> App<'a> {
+pub fn new_main_window(icy_board: IcyBoard, mnu: Arc<Mutex<Menu>>, full_screen: bool, path: &Path) -> App {
     let date_format = icy_board.config.board.date_format.clone();
 
     let icy_board = Arc::new(Mutex::new(icy_board));
@@ -26,7 +26,7 @@ pub fn new_main_window<'a>(icy_board: IcyBoard, mnu: Arc<Mutex<Menu>>, full_scre
         date_format,
         tabs: vec![Box::new(general_tab), Box::new(command_tab), Box::new(AboutTab::default())],
         status_line: String::new(),
-        help_state: HelpViewState::new(23),
+        help_state: HelpViewState::new(),
         save: false,
     }
 }

@@ -1,4 +1,4 @@
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     Frame,
     layout::{Margin, Rect},
@@ -154,6 +154,17 @@ impl IcbSetupMenuUI {
                 _ => {
                     return (ResultState::default(), None);
                 }
+            }
+        }
+        if let KeyCode::F(1) = key.code {
+            if let Some(str) = self.menu.help(&mut self.state) {
+                return (
+                    ResultState {
+                        edit_mode: EditMode::DisplayHelp(str.to_string()),
+                        ..Default::default()
+                    },
+                    None,
+                );
             }
         }
 

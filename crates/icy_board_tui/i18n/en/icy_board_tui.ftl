@@ -147,7 +147,6 @@ key_desc_filter=Filter
 key_desc_jump=Jump
 key_desc_edit=Edit
 
-
 # ICBSetup
 
 icb_setup_key_main_help=↑ Up  ↓ Down  F1 Help  ␛ Quit
@@ -158,17 +157,102 @@ icb_setup_key_conf_list_help=↑ Up  ↓ Down  INS New  ␡ Delete  PgUp/Dn Move
 icb_setup_main_title=Main Menu
 icb_setup_main_use_label=Use /w ICB { $version }
 icb_setup_main_sysop_info=Sysop Information
+icb_setup_main_sysop_info-help=
+    # Sysop Information
+    
+    The Sysop Information screen contains such items as the sysop's name,
+    local logon password, graphics default, etc.
+    
+    These are items that are about the sysop which are not stored in the
+    sysop record of the sysop users file.
+
 icb_setup_main_file_locs=File Locations
+icb_setup_main_file_locs-help=
+    # File Locations
+
+    File Locations is a menu that splits Icy Board's system paths and
+    file names into several input screens.
+
 icb_setup_main_con_info=Connection Information
+icb_setup_main_con_info-help=
+    # Connection Information
+
+    Connection Information is a menu for a few screens of information
+    relating to how users to connect to Icy Board.
+
 icb_setup_main_board_cfg=Board Configuration
+icb_setup_main_board_cfg-help=
+    # Board Configuration
+
+    The Board Configuration screen stores information about the board itself.
+
 icb_setup_main_evt_setup=Event Setup
+icb_setup_main_evt_setup-help=
+    # Event Setup
+
+    The Event Setup screen provides general information for running events.
+    The F2 key on the EVENT.DAT file takes you into the full event config.
+
 icb_setup_main_subscription=Subscription
+icb_setup_main_subscription-help=
+    # Subscription
+
+    The Subscription screen contains information pertaining to the setup
+    and operation of a subscription system where new callers are provided
+    a set number of days in their subscription and then security levels 
+    are modified according to the information provided.
+
 icb_setup_main_conf_opt=Configuration Options
+icb_setup_main_conf_opt-help=
+    # Configuration Options
+
+    Configuration Options leads to another menu for several screens 
+    worth of information used to customize the behavior of a Icy Board system.
+
 icb_setup_main_sec_levels=Security Levels
+icb_setup_main_sec_levels-help=
+    # Security Levels
+
+    Security Levels leads to a menu of more choices for setting 
+    up security levels for sysop functions, sysop commands and user
+    commands.
+
 icb_setup_main_acc_cfg=Accounting Configuration
+icb_setup_main_acc_cfg-help=
+    # Accounting Configuration
+
+    Accounting Configuration is an optional component of a Icy Board system.
+
+    The accounting configuration screens allow you to define 
+    the costs or rewards for various activities on your BBS and to
+    also define Peak Usage times as well as holidays.
+
 icb_setup_main_new_user=New User Options
+icb_setup_main_new_user-help=
+    # New User Options
+
+    New User Options is a menu for setting up the default settings
+    and questions for new users.
+
+    This includes the default security level, the default groups, and the
+    default questions to ask new users.
+
 icb_setup_mb_conf=Main Board Configuration
+icb_setup_mb_conf-help=
+    # Main Board Configuration
+
+    The Main Board Configuration screen contains the definitions
+    required for the main board including download paths, bulletins,
+    scripts and menus.
+
 icb_setup_conferences=Conferences
+icb_setup_conferences-help=
+    # Conferences
+
+    The Conferences selection brings up a list of conferences that
+    can be selected for editing.
+
+    Conferences can be added, deleted, rearranged or edited.
 
 board_config_title=Board Configuration
 
@@ -314,27 +398,57 @@ sysop_information_title=Sysop Information
 
 sysop_name=Sysop's Name
 sysop_name-status=When NOT using the real name.
-sysop_name-help=TODO
+sysop_name-help=
+    # Sysop Name
+
+    Enter the first name of the sysop.
+    
+    NOTE: Do NOT use your full name.
+    This is just the sysop's first name.
+    Your FULL NAME should be entered in record #1 of the USERS file via `icbsysmgr`.
 
 local_password=Local Password
 local_password-status=Call waiting screen password.
-local_password-help=TODO
+local_password-help=
+    # Local Password
+
+    Enter the password that the sysop will enter at the LOCAL station
+    to get into Icy Board (at the call waiting screen).
 
 require_password_to_exit=Require Password to Exit
 require_password_to_exit-status=IcyBoard requires pw to exit the call waiting screen.
-require_password_to_exit-help=TODO
+require_password_to_exit-help=
+    # Require Password to Exit
+
+    If this is set to YES, the sysop will be required to enter the
+    local password to exit the call waiting screen.
 
 sys_info_external_editor=External Editor
 sys_info_external_editor-status=External editor for sysop messages.
-sys_info_external_editor-help=TODO
+sys_info_external_editor-help=
+    # External Editor
+
+    Enter the name of the external editor that the sysop will use
+    to edit general text files in `icbsetup`.
 
 sys_info_theme=Color Theme
 sys_info_theme-status=Color Theme
-sys_info_theme-help=TODO
+sys_info_theme-help=
+    # Color Theme
+
+    Enter the color theme that the `icbsetup` is using.
 
 use_real_name=Use Real Name
 use_real_name-status=Use the real name of the sysop.
-use_real_name-help=TODO
+use_real_name-help=
+    # Use Real Name
+
+    If you answer 'N' to this question then, when leaving messages
+    the system will record the message as having been left by the
+    SYSOP.
+    
+    Answering 'Y' will cause it to use the sysop name that is found
+    in record #1 of the users file.
 
 sec_level_menu_title=Security Levels
 sec_level_menu_sysop_funcs=Sysop Functions

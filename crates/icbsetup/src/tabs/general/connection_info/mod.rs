@@ -52,6 +52,7 @@ impl Page for ConnectionInfo {
             return PageMessage::Close;
         }
         let (_state, opt) = self.page.handle_key_press(key);
+
         if let Some(selected) = opt {
             return match selected {
                 0 => PageMessage::OpenSubPage(Box::new(telnet::Telnet::new(self.icy_board.clone()))),

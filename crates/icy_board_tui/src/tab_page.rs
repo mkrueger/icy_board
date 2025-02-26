@@ -1,5 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::{Frame, layout::Rect, text::Text};
+use ratatui::{Frame, layout::Rect};
 
 use crate::config_menu::ResultState;
 
@@ -41,10 +41,6 @@ pub trait TabPage {
     }
 
     fn title(&self) -> String;
-
-    fn get_help(&self) -> Text<'static> {
-        Text::from("")
-    }
 
     fn is_dirty(&self) -> bool {
         false

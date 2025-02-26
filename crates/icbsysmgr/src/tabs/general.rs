@@ -6,13 +6,13 @@ use std::{
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
-    config_menu::ResultState,
+    config_menu::{EditMode, ResultState},
     get_text, get_text_args,
     icbsetupmenu::IcbSetupMenuUI,
     select_menu::{MenuItem, SelectMenu},
     tab_page::TabPage,
 };
-use ratatui::{Frame, layout::Rect, text::Text};
+use ratatui::{Frame, layout::Rect};
 
 use crate::VERSION;
 
@@ -58,6 +58,9 @@ impl TabPage for GeneralTab {
 
     fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
         let (state, opt) = self.page.handle_key_press(key);
+        if matches!(state.edit_mode, EditMode::DisplayHelp(_)) {
+            return state;
+        }
         if let Some(selected) = opt {
             match selected {
                 0 => {
@@ -72,9 +75,5 @@ impl TabPage for GeneralTab {
             }
         }
         state
-    }
-
-    fn get_help(&self) -> Text<'static> {
-        String::new().into()
     }
 }
