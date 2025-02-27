@@ -1,4 +1,10 @@
-use std::{env, fs, thread, time::Duration};
+use std::{
+    env,
+    fs::{self, File},
+    io::Write,
+    thread,
+    time::Duration,
+};
 
 use crate::{
     Res,
@@ -1958,5 +1964,14 @@ pub async fn set_bank_bal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<
             }
         }
     }
+    Ok(())
+}
+
+pub async fn web_request(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let url = vm.eval_expr(&args[0]).await?.as_string();
+    let file = vm.eval_expr(&args[1]).await?.as_string();
+    let response = reqwest::get(url).await?.bytes().await?;
+    let mut file = File::create(file)?;
+    file.write_all(&response)?;
     Ok(())
 }

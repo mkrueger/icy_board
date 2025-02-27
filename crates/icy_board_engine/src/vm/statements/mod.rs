@@ -246,5 +246,6 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::ShortDesc => predefined_procedures::shortdesc(arg, arguments).await,
         OpCode::MoveMsg => predefined_procedures::move_msg(arg, arguments).await,
         OpCode::SetBankBal => predefined_procedures::set_bank_bal(arg, arguments).await,
+        OpCode::WebRequest => predefined_procedures::web_request(arg, arguments).await,
     }
 }

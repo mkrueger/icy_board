@@ -306,9 +306,10 @@ pub enum FuncOpCode {
     MemberCall = -292,
     NewConfInfo = -293,
     AreaId = -294,
+    WebRequest = -295,
 }
 
-pub const LAST_FUNC: i16 = -293;
+pub const LAST_FUNC: i16 = -295;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -361,7 +362,7 @@ impl FunctionDefinition {
     }
 }
 lazy_static::lazy_static! {
-    pub static ref FUNCTION_DEFINITIONS: [FunctionDefinition; 298] = [
+    pub static ref FUNCTION_DEFINITIONS: [FunctionDefinition; 299] = [
         FunctionDefinition {
             name: "END",
             version: 100,
@@ -3078,6 +3079,17 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("conf", VariableType::Integer),
                 ArgumentDefinition::new("area", VariableType::Integer)
+            ]),
+            arg_descr: 0x02,
+        },
+
+        FunctionDefinition {
+            name: "WebRequest",
+            version: 400,
+            opcode: FuncOpCode::AreaId,
+            return_type: VariableType::MessageAreaID,
+            args: Some(vec![
+                ArgumentDefinition::new("url", VariableType::String),
             ]),
             arg_descr: 0x02,
         },

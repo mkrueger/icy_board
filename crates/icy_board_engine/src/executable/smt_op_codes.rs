@@ -266,8 +266,9 @@ pub enum OpCode {
     ShortDesc = 227,
     MoveMsg = 228,
     SetBankBal = 229,
+    WebRequest = 230,
 }
-pub const LAST_STMT: i16 = OpCode::SetBankBal as i16;
+pub const LAST_STMT: i16 = OpCode::WebRequest as i16;
 
 impl OpCode {
     pub fn get_definition(self) -> &'static StatementDefinition {
@@ -530,7 +531,7 @@ lazy_static::lazy_static! {
     // "WAIT FOR" == "WAITFOR"
     // "GO SUB"
     // " GO TO"
-    pub static ref STATEMENT_DEFINITIONS: [StatementDefinition; 235] = [
+    pub static ref STATEMENT_DEFINITIONS: [StatementDefinition; 236] = [
         StatementDefinition {
             // helps to map opcode to array index.
             name: "Placeholder",
@@ -2695,6 +2696,17 @@ lazy_static::lazy_static! {
             opcode: OpCode::RMDIR,
             args: Some(vec![
                 ArgumentDefinition::new("path", VariableType::String),
+            ]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 1),
+        },
+
+        StatementDefinition {
+            name: "WebRequest",
+            version: 400,
+            opcode: OpCode::WebRequest,
+            args: Some(vec![
+                ArgumentDefinition::new("url", VariableType::String),
+                ArgumentDefinition::new("FileName", VariableType::String),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
