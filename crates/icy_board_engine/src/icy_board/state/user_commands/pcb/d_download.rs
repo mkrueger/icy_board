@@ -67,7 +67,7 @@ impl IcyBoardState {
                 .await?;
 
             self.display_text(IceText::BatchProtocol, display_flags::DEFAULT).await?;
-            self.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
+            self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
             self.println(TerminalTarget::Both, &p_descr).await?;
             self.display_text(IceText::ReadyToSendBatch, display_flags::NEWLINE | display_flags::LFAFTER)
                 .await?;

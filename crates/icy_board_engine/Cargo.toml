@@ -23,6 +23,7 @@ tokio = { workspace = true }
 semver = { workspace = true }
 regex = { workspace = true }
 walkdir = { workspace = true }
+bitflag = { workspace = true }
 
 unicase = { workspace = true }
 rand = { workspace = true }

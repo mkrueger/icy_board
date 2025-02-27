@@ -70,7 +70,7 @@ impl IcyBoardState {
                         .await?;
                     self.println(TerminalTarget::Both, "  Length      Date    Time   Name").await?;
                     self.println(TerminalTarget::Both, " ========  ========== ===== ======").await?;
-                    self.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
+                    self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
                     for info in &file_content {
                         if self.session.disp_options.abort_printout {
                             break;

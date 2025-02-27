@@ -40,7 +40,7 @@ impl IcyBoardState {
                 if user.protocol != selected_protocol {
                     user.protocol = selected_protocol;
                     self.display_text(IceText::DefaultProtocol, display_flags::LFBEFORE).await?;
-                    self.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
+                    self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
                     self.println(TerminalTarget::Both, &txt).await?;
                 }
             }
@@ -62,7 +62,7 @@ impl IcyBoardState {
             }
         }
 
-        self.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
+        self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
         for line in protocols {
             self.print(TerminalTarget::Both, &line).await?;
             self.new_line().await?;

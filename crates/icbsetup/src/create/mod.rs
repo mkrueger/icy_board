@@ -65,6 +65,7 @@ lazy_static::lazy_static! {
         ("hlpq", include_bytes!("../../data/new_bbs/help/hlpq.icy").to_vec()),
         ("hlpqwk", include_bytes!("../../data/new_bbs/help/hlpqwk.icy").to_vec()),
         ("hlpreg", include_bytes!("../../data/new_bbs/help/hlpreg.icy").to_vec()),
+        ("hlpsel", include_bytes!("../../data/new_bbs/help/hlpsel.icy").to_vec()),
         ("hlprep", include_bytes!("../../data/new_bbs/help/hlprep.icy").to_vec()),
         ("hlpr", include_bytes!("../../data/new_bbs/help/hlpr.icy").to_vec()),
         ("hlprm", include_bytes!("../../data/new_bbs/help/hlprm.icy").to_vec()),

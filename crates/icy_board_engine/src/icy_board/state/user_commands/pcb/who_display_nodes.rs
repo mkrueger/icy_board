@@ -22,7 +22,7 @@ impl IcyBoardState {
                 }
             }
         }
-        self.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
+        self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
         self.println(TerminalTarget::Both, &lines.join("\r\n")).await?;
         self.new_line().await?;
         Ok(())

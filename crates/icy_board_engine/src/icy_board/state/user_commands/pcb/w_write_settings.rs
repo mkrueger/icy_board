@@ -327,7 +327,7 @@ impl IcyBoardState {
         self.new_line().await?;
         let date_formats = self.get_board().await.languages.date_formats.clone();
 
-        self.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
+        self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
         let mut preview = String::new();
         for (i, (disp_fmt, fmt)) in date_formats.iter().enumerate() {
             if fmt == cur_format {

@@ -92,7 +92,7 @@ impl IcyBoardState {
 
         self.display_text(IceText::QuickScanHeader, display_flags::NEWLINE).await?;
 
-        self.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
+        self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
         for i in number..message_base.active_messages() {
             match message_base.read_header(i) {
                 Ok(header) => {

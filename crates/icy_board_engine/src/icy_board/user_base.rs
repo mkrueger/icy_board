@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs,
     ops::{Deref, DerefMut, Index, IndexMut},
     path::{Path, PathBuf},
@@ -6,6 +7,7 @@ use std::{
 };
 
 use crate::{Res, datetime::IcbDate};
+use bitflag::bitflag;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -433,6 +435,67 @@ pub struct User {
 
     #[serde(default)]
     pub chat_status: ChatStatus,
+
+    #[serde(default)]
+    #[serde(with = "conference_flags_format")]
+    pub conference_flags: HashMap<usize, ConferenceFlags>,
+}
+
+#[bitflag(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
+pub enum ConferenceFlags {
+    None = 0b0000_0000,
+    UserSelected = 0b0000_0001,
+    Registered = 0b0000_0010,
+    Expired = 0b0000_0100,
+
+    CON = 0b0000_1000,
+    MFL = 0b0001_0000,
+    NET = 0b0010_0000,
+}
+
+mod conference_flags_format {
+    use std::collections::HashMap;
+
+    use serde::{self, Deserialize, Deserializer, Serializer};
+
+    use super::ConferenceFlags;
+
+    pub fn serialize<S>(date: &HashMap<usize, ConferenceFlags>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = String::new();
+        for (k, v) in date {
+            if v.is_empty() {
+                continue;
+            }
+            // Only these flags get stored in PCBoard - rest is for use at runtime.
+            let v = *v & (ConferenceFlags::UserSelected | ConferenceFlags::Registered | ConferenceFlags::Expired);
+            s.push_str(&format!("{}:{};", k, v.bits()));
+        }
+        serializer.serialize_str(&s)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<HashMap<usize, ConferenceFlags>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let mut map = HashMap::new();
+        s.split(';').for_each(|item| {
+            if item.is_empty() {
+                return;
+            }
+            let mut iter = item.split(':');
+            if let (Some(k), Some(v)) = (iter.next(), iter.next()) {
+                if let (Ok(k), Ok(v)) = (k.parse::<usize>(), v.parse::<u8>()) {
+                    map.insert(k, ConferenceFlags::from_bits_truncate(v));
+                }
+            }
+        });
+        Ok(map)
+    }
 }
 
 impl User {
@@ -550,6 +613,33 @@ impl User {
         let account = u.inf.account.clone();
         let bank = u.inf.bank.clone();
 
+        let mut conference_flags = HashMap::new();
+
+        for i in 0..5 {
+            for j in 0..8 {
+                let reg = u.user.conf_reg_flags[i] & (1 << j) != 0;
+                let exp = u.user.conf_exp_flags[i] & (1 << j) != 0;
+                let usr = u.user.conf_usr_flags[i] & (1 << j) != 0;
+
+                let mut flag = ConferenceFlags::None;
+                if exp {
+                    flag |= ConferenceFlags::Expired;
+                }
+                if reg {
+                    flag |= ConferenceFlags::Registered;
+                }
+                if usr {
+                    flag |= ConferenceFlags::UserSelected;
+                }
+
+                if !flag.is_empty() {
+                    conference_flags.insert(i * 8 + j, flag);
+                }
+            }
+        }
+
+        // for x in 0..u.user.
+
         Self {
             path: None,
             name: u.user.name.clone(),
@@ -652,6 +742,7 @@ impl User {
                 total_doors_executed: 0,
                 minutes_today: 0,
             },
+            conference_flags,
         }
     }
 

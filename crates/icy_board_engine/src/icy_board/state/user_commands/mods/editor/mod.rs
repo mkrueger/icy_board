@@ -121,7 +121,7 @@ impl EditState {
                         let line: usize = self.read_line_number(IceText::DeleteLineNumber, state).await?;
                         if line > 0 && (line as usize - 1) < self.msg.len() {
                             self.print_divider(state).await?;
-                            state.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
+                            state.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
                             state.print(TerminalTarget::Both, &format!("{}: ", line)).await?;
                             state.reset_color(TerminalTarget::Both).await?;
                             state.println(TerminalTarget::Both, &self.msg[line - 1]).await?;
@@ -201,7 +201,7 @@ impl EditState {
     }
 
     async fn print_divider(&mut self, state: &mut IcyBoardState) -> Res<()> {
-        state.set_color(TerminalTarget::Both, IcbColor::dos_cyan()).await?;
+        state.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
         state.println(TerminalTarget::Both, &str::repeat("-", 79)).await?;
         state.reset_color(TerminalTarget::Both).await?;
         Ok(())

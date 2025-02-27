@@ -1190,9 +1190,9 @@ pub enum IceText {
     MessageReadCommandExpert = 584,
     /// `(H)elp, (1-@NUMDIR@), File List Command`
     FileListCommandExpert = 585,
-    /// `Conference                                                   Last   High`
+    /// `Conference`
     ConferenceHeader1 = 586,
-    /// `#   Name                                                   Read   Num. Flags`
+    /// `#   Name                                                   Flags`
     ConferenceHeader2 = 587,
     /// `CTTY mode is now on, @FIRST@ ...`
     CTTYOn = 588,
@@ -1639,7 +1639,7 @@ impl IcbTextStyle {
             IcbTextStyle::Yellow => IcbColor::dos_yellow(),
             IcbTextStyle::Blue => IcbColor::dos_light_blue(),
             IcbTextStyle::Purple => IcbColor::dos_magenta(),
-            IcbTextStyle::Cyan => IcbColor::dos_cyan(),
+            IcbTextStyle::Cyan => IcbColor::dos_light_cyan(),
             IcbTextStyle::White => IcbColor::dos_white(),
         }
     }

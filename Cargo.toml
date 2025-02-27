@@ -47,6 +47,7 @@ serde = "1.0.210"
 tokio = { version = "1.43.0", features = ["full"] }
 rayon = "1.10.0"
 regex = "1.11.0"
+bitflag = "0.10.1"
 
 walkdir = "2.5.0"
 i18n-embed = { version = "0.15.3", features = ["fluent-system", "desktop-requester"]} 

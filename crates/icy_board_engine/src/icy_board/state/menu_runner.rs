@@ -14,7 +14,7 @@ use crate::{
     vm::TerminalTarget,
 };
 
-use super::{IcyBoardState, functions::MASK_COMMAND};
+use super::{IcyBoardState, functions::MASK_COMMAND, user_commands::pcb::select_conferences::SelectMode};
 
 impl IcyBoardState {
     #[async_recursion(?Send)]
@@ -442,18 +442,16 @@ impl IcyBoardState {
                 if !self.check_sec("TEST", &sec).await? {
                     return Ok(());
                 }
-                self.println(TerminalTarget::Both, "TODO TEST_FILE").await?;
-                // TODO
-                // self.test_file().await?;
+                // TEST
+                self.test_file_command().await?;
             }
             CommandType::GroupChat => {
                 let sec = self.session.user_command_level.cmd_chat.clone();
                 if !self.check_sec("CHAT", &sec).await? {
                     return Ok(());
                 }
-                self.println(TerminalTarget::Both, "TODO CHAIT").await?;
-                // TODO
-                // self.group_chat().await?;
+                // CHAT
+                self.group_chat_command().await?;
             }
             CommandType::RestoreMessage => {
                 let sec = self.session.sysop_command_level.sec_4_recover_deleted_msg.clone();
@@ -520,35 +518,31 @@ impl IcyBoardState {
                     return Ok(());
                 }
                 // QWK
-                // TODO
-                // self.qwk_command().await?;
+                self.qwk_command().await?;
             }
             CommandType::SelectConferences => {
                 let sec = self.session.user_command_level.cmd_j.clone();
                 if !self.check_sec("SELECT", &sec).await? {
                     return Ok(());
                 }
-                // QWK
-                // TODO
-                // self.select_command().await?;
+                // SELECT
+                self.select_conferences(SelectMode::SelectCmd).await?;
             }
             CommandType::BatchDownload => {
                 let sec = self.session.user_command_level.batch_file_transfer.clone();
                 if !self.check_sec("DB", &sec).await? {
                     return Ok(());
                 }
-                // QWK
-                // TODO
-                // self.download_batch().await?;
+                // BD
+                self.batch_download_command().await?;
             }
             CommandType::BatchUpload => {
                 let sec = self.session.user_command_level.batch_file_transfer.clone();
                 if !self.check_sec("UB", &sec).await? {
                     return Ok(());
                 }
-                // QWK
-                // TODO
-                // self.upload_batch().await?;
+                // BU
+                self.batch_upload_command().await?;
             }
             CommandType::ReadMemorizedMessage => {
                 let sec = self.session.user_command_level.cmd_r.clone();
@@ -556,8 +550,7 @@ impl IcyBoardState {
                     return Ok(());
                 }
                 // QWK
-                // TODO
-                // self.read_memorized_message().await?;
+                self.read_memorized_messages_command().await?;
             }
             CommandType::ChangeMessageArea => {
                 let sec: SecurityExpression = self.session.user_command_level.cmd_j.clone();

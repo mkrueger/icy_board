@@ -1,5 +1,7 @@
 use std::{fs, path::Path};
 
+use jamjam::util::basic_real::BasicReal;
+
 use crate::{
     Res,
     datetime::{IcbDate, IcbTime},
@@ -66,6 +68,16 @@ pub struct PcbUserRecord {
     pub rec_num: u32,
 
     pub last_conference: u16,
+
+    /// Conference Registration Flags (conf 0-39)
+    pub conf_reg_flags: [u8; 5],
+    /// Expired Registration Conference Flags (conf 0-39)
+    pub conf_exp_flags: [u8; 5],
+    /// User Selected Conference Flags (conf 0-39)
+    pub conf_usr_flags: [u8; 5],
+
+    pub last_message_read_ptr: Vec<i32>,
+
     pub ul_tot_dnld_bytes: u64,
     pub ul_tot_upld_bytes: u64,
 }
@@ -164,7 +176,17 @@ impl PcbUserRecord {
             let _last_conference_old = data[0];
             data = &data[1..];
 
-            data = &data[15..];
+            let mut conf_reg_flags = [0; 5];
+            conf_reg_flags.clone_from_slice(&data[0..5]);
+            data = &data[5..];
+
+            let mut conf_exp_flags = [0; 5];
+            conf_exp_flags.clone_from_slice(&data[0..5]);
+            data = &data[5..];
+
+            let mut conf_sel_flags = [0; 5];
+            conf_sel_flags.clone_from_slice(&data[0..5]);
+            data = &data[5..];
 
             let ul_tot_dnld_bytes = import_cp437_string(&data[..8], true);
             data = &data[8..];
@@ -176,7 +198,14 @@ impl PcbUserRecord {
 
             let delete_flag = data[0] == b'Y';
             data = &data[1..];
-            data = &data[40 * 4..];
+
+            // Last Message Read pointer - skip that
+            let mut last_message_read_ptr = vec![];
+            for _ in 0..40 {
+                let real = BasicReal::from([data[0], data[1], data[2], data[3]]);
+                last_message_read_ptr.push(real.into());
+                data = &data[4..];
+            }
 
             let rec_num = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) - 1;
             data = &data[4..];
@@ -228,6 +257,13 @@ impl PcbUserRecord {
                 exp_date: reg_exp_date,
                 exp_security_level,
                 last_conference,
+
+                conf_reg_flags,
+                conf_exp_flags,
+                conf_usr_flags: conf_sel_flags,
+
+                last_message_read_ptr,
+
                 ul_tot_dnld_bytes: ul_tot_dnld_bytes as u64,
                 ul_tot_upld_bytes: ul_tot_upld_bytes as u64,
                 delete_flag,

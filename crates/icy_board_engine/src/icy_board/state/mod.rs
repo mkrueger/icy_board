@@ -38,7 +38,7 @@ use super::{
     icb_text::{IcbTextFile, IcbTextStyle, IceText},
     macro_parser::{Macro, MacroCommand},
     security_expr::SecurityExpression,
-    user_base::{FSEMode, Password, User},
+    user_base::{ConferenceFlags, FSEMode, Password, User},
 };
 
 #[derive(Clone, Copy, PartialEq, Default)]
@@ -680,7 +680,7 @@ impl IcyBoardState {
         if self.session.disp_options.count_lines {
             self.session.disp_options.num_lines_printed += 1;
         }
-        if self.session.page_len > 0 && self.session.disp_options.num_lines_printed >= self.session.page_len as usize {
+        if self.session.page_len > 0 && self.session.disp_options.num_lines_printed > self.session.page_len as usize {
             if self.session.disp_options.abort_printout {
                 return Ok(());
             }
@@ -1221,6 +1221,45 @@ impl IcyBoardState {
 
     pub fn stop_search(&mut self) {
         self.session.search_pattern = None;
+    }
+
+    pub fn is_lockedout(&self, conf_number: u16) -> bool {
+        if let Some(user) = &self.session.current_user {
+            if let Some(flags) = user.conference_flags.get(&(conf_number as usize)) {
+                if flags.contains(ConferenceFlags::Expired | ConferenceFlags::Registered) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    pub fn is_registered(&self, conference: &Conference, conf_number: u16) -> bool {
+        if self.session.current_conference_number == conf_number || self.session.is_sysop {
+            return true;
+        }
+
+        if conf_number == 0 && !self.session.user_command_level.cmd_a.session_can_access(&self.session) {
+            return false;
+        }
+
+        if self.is_lockedout(conf_number) {
+            return false;
+        }
+
+        if let Some(user) = &self.session.current_user {
+            if let Some(flags) = user.conference_flags.get(&(conf_number as usize)) {
+                if flags.contains(ConferenceFlags::UserSelected) {
+                    return true;
+                }
+            }
+        }
+
+        if conference.is_public {
+            return true;
+        }
+
+        false
     }
 }
 

@@ -28,7 +28,7 @@ use super::{
     user_base::Password,
 };
 
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ConferenceType {
     #[default]
     Normal,

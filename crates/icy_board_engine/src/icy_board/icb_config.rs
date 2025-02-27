@@ -250,6 +250,14 @@ impl IcbColor {
         IcbColor::Dos(0x00)
     }
 
+    pub fn dos_gray() -> Self {
+        IcbColor::Dos(0x07)
+    }
+
+    pub fn dos_dark_gray() -> Self {
+        IcbColor::Dos(0x08)
+    }
+
     pub fn dos_light_blue() -> Self {
         IcbColor::Dos(0x09)
     }
@@ -258,7 +266,7 @@ impl IcbColor {
         IcbColor::Dos(0x0A)
     }
 
-    pub fn dos_cyan() -> Self {
+    pub fn dos_light_cyan() -> Self {
         IcbColor::Dos(0x0B)
     }
 
