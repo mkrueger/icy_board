@@ -25,6 +25,7 @@ use ratatui::{Terminal, backend::Backend};
 use semver::Version;
 use system_statistics_screen::{SystemStatisticsScreen, SystemStatisticsScreenMessage};
 use tokio::sync::Mutex;
+use tokio_util::sync::CancellationToken;
 use tui::{Tui, print_exit_screen};
 
 use crate::bbs::await_securewebsocket_connections;
@@ -123,7 +124,8 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                 restore_terminal()?;
                 return Ok(());
             }
-            start_connections(&bbs, &board).await;
+            let mut connection_token = CancellationToken::new();
+            start_connections(&bbs, &board, connection_token.clone()).await;
             let mut app = CallWaitScreen::new(&board).await?;
             let mut terminal = init_terminal()?;
             loop {
@@ -139,7 +141,9 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                                 bbs = Arc::new(Mutex::new(BBS::new(icy_board.config.board.num_nodes as usize)));
                                 board = Arc::new(tokio::sync::Mutex::new(icy_board));
                                 app = CallWaitScreen::new(&board).await?;
-                                start_connections(&bbs, &board).await;
+                                connection_token.cancel();
+                                connection_token = CancellationToken::new();
+                                start_connections(&bbs, &board, connection_token.clone()).await;
                                 continue;
                             }
                         }
@@ -167,30 +171,17 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
     }
 }
 
-static mut TELENET_RECEIVER: Option<tokio::sync::oneshot::Receiver<bool>> = None;
-static mut SSH_RECEIVER: Option<tokio::sync::oneshot::Receiver<bool>> = None;
-static mut SWEBSOCKET_RECEIVER: Option<tokio::sync::oneshot::Receiver<bool>> = None;
-
-async fn start_connections(bbs: &Arc<Mutex<BBS>>, board: &Arc<Mutex<IcyBoard>>) {
+async fn start_connections(bbs: &Arc<Mutex<BBS>>, board: &Arc<Mutex<IcyBoard>>, token: CancellationToken) {
     let telnet_connection: icy_board_engine::icy_board::login_server::Telnet = board.lock().await.config.login_server.telnet.clone();
     if telnet_connection.is_enabled {
         let bbs = bbs.clone();
         let board: Arc<Mutex<IcyBoard>> = board.clone();
-        let (mut tx1, rx1) = tokio::sync::oneshot::channel::<bool>();
-        unsafe {
-            #[allow(static_mut_refs)]
-            if let Some(mut rx) = TELENET_RECEIVER.take() {
-                rx.close();
-            }
-
-            TELENET_RECEIVER = Some(rx1);
-        }
+        let token = token.clone();
         tokio::spawn(async move {
             tokio::select! {
                 _ = await_telnet_connections(telnet_connection, board, bbs) => {
                 },
-                _ = tx1.closed() => {
-                    log::info!("telnet connection closed");
+                _ = token.cancelled() => {
                 }
             }
         });
@@ -200,23 +191,12 @@ async fn start_connections(bbs: &Arc<Mutex<BBS>>, board: &Arc<Mutex<IcyBoard>>) 
     if ssh_connection.is_enabled {
         let bbs: Arc<Mutex<BBS>> = bbs.clone();
         let board = board.clone();
-
-        let (mut tx1, rx1) = tokio::sync::oneshot::channel::<bool>();
-        unsafe {
-            #[allow(static_mut_refs)]
-            if let Some(mut rx) = SSH_RECEIVER.take() {
-                rx.close();
-            }
-
-            SSH_RECEIVER = Some(rx1);
-        }
-
+        let token = token.clone();
         tokio::spawn(async move {
             tokio::select! {
                 _ = bbs::ssh::await_ssh_connections(ssh_connection, board, bbs) => {
                 },
-                _ = tx1.closed() => {
-                    log::info!("telnet connection closed");
+                _ = token.cancelled() => {
                 }
             }
         });
@@ -239,23 +219,12 @@ async fn start_connections(bbs: &Arc<Mutex<BBS>>, board: &Arc<Mutex<IcyBoard>>) 
     if secure_websocket_connection.is_enabled {
         let bbs = bbs.clone();
         let board = board.clone();
-
-        let (mut tx1, rx1) = tokio::sync::oneshot::channel::<bool>();
-        unsafe {
-            #[allow(static_mut_refs)]
-            if let Some(mut rx) = SWEBSOCKET_RECEIVER.take() {
-                rx.close();
-            }
-
-            SWEBSOCKET_RECEIVER = Some(rx1);
-        }
-
+        let token = token.clone();
         tokio::spawn(async move {
             tokio::select! {
                 _ = await_securewebsocket_connections(secure_websocket_connection, board, bbs) => {
                 },
-                _ = tx1.closed() => {
-                    log::info!("telnet connection closed");
+                _ = token.cancelled() => {
                 }
             }
         });
