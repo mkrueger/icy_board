@@ -12,9 +12,10 @@
 - [ ] ICBSETUP needs a "cmd editor"
 - [ ] Rework the mkicbmnu - due to changes in the icbsetup menu system that got broken
 - [ ] Look at the NEWS/INTRO feature of PCBOARD how that really works
+- [ ] Logon mail scan
 - [ ] Finish internal message reader - I don't like it have a message reader PPE going but needs to be finished in any case…
 - [ ] Implement RM command
-- [ ] Implement SELECT command
+- [x] Implement SELECT command
 - [ ] Implement group chat (CHAT command)
 - [ ] Finish SSH/Websocket support - works somewhat but SSH only with icy term so far
 - [ ] Mailer Support (BINKP?)
