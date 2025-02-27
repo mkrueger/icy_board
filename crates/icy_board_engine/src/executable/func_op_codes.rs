@@ -3086,12 +3086,12 @@ lazy_static::lazy_static! {
         FunctionDefinition {
             name: "WebRequest",
             version: 400,
-            opcode: FuncOpCode::AreaId,
-            return_type: VariableType::MessageAreaID,
+            opcode: FuncOpCode::WebRequest,
+            return_type: VariableType::String,
             args: Some(vec![
                 ArgumentDefinition::new("url", VariableType::String),
             ]),
-            arg_descr: 0x02,
+            arg_descr: 0x01,
         },
 
         // ALIASES (need to be last in the list)

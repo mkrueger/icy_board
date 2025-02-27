@@ -104,13 +104,12 @@ impl PPEDeserializer {
         if cur_stmt == 0 {
             return Ok(None);
         }
-        if !(0..LAST_STMT).contains(&cur_stmt) {
+        if !(0..=LAST_STMT).contains(&cur_stmt) {
             self.report_bug(DeserializationErrorType::InvalidStatement(cur_stmt));
             return Ok(None);
         }
 
         let op: OpCode = unsafe { transmute(cur_stmt) };
-
         let res = match op {
             OpCode::END => Ok(Some(PPECommand::End)),
             OpCode::RETURN => Ok(Some(PPECommand::Return)),

@@ -2652,6 +2652,18 @@ lazy_static::lazy_static! {
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
+
+        StatementDefinition {
+            name: "WebRequest",
+            version: 400,
+            opcode: OpCode::WebRequest,
+            args: Some(vec![
+                ArgumentDefinition::new("url", VariableType::String),
+                ArgumentDefinition::new("FileName", VariableType::String),
+            ]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 2),
+        },
+
         // Alias section
         // Moving to the end, so that the opcode <--> index mapping is not broken
         StatementDefinition {
@@ -2696,17 +2708,6 @@ lazy_static::lazy_static! {
             opcode: OpCode::RMDIR,
             args: Some(vec![
                 ArgumentDefinition::new("path", VariableType::String),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 1),
-        },
-
-        StatementDefinition {
-            name: "WebRequest",
-            version: 400,
-            opcode: OpCode::WebRequest,
-            args: Some(vec![
-                ArgumentDefinition::new("url", VariableType::String),
-                ArgumentDefinition::new("FileName", VariableType::String),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },

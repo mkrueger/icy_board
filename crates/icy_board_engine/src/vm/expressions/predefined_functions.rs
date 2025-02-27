@@ -2315,7 +2315,7 @@ pub fn fix_casing(param: String) -> String {
 
 pub async fn web_request(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let url = vm.eval_expr(&args[0]).await?.as_string();
-    let response = reqwest::get(url).await?.text().await?;
+    let response = reqwest::get(url.clone()).await?.text().await?;
     Ok(VariableValue::new_string(response))
 }
 
