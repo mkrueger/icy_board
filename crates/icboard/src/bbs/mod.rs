@@ -38,7 +38,7 @@ pub async fn await_telnet_connections(con: Telnet, board: Arc<tokio::sync::Mutex
         let (stream, _addr) = listener.accept().await?;
         let bbs2 = bbs.clone();
         let node = bbs.lock().await.create_new_node(ConnectionType::Telnet).await;
-        let node_list: Arc<Mutex<Vec<Option<NodeState>>>> = bbs.lock().await.get_open_connections().await.clone();
+        let node_list = bbs.lock().await.get_open_connections().await.clone();
         let board = board.clone();
         let handle = std::thread::Builder::new()
             .name("Telnet handle".to_string())

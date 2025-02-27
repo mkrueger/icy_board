@@ -116,7 +116,7 @@ pub struct Modem {
 pub struct LoginServer {
     pub telnet: Telnet,
     pub ssh: SSH,
-    pub websocket: Websocket,
+    //pub websocket: Websocket,
     pub secure_websocket: SecureWebsocket,
     pub modems: Vec<Modem>,
 }

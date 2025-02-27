@@ -454,6 +454,7 @@ impl<'a> Parser<'a> {
                         if matches!(stmt, Statement::Comment(_)) {
                             return Some(AstNode::TopLevelStatement(stmt));
                         }
+                        println!("stmt: {:?}", stmt);
                         self.report_error(stmt.get_span(), ParserErrorType::NoStatementsAfterFunctions);
                         return None;
                     }

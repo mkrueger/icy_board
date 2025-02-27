@@ -11,12 +11,12 @@ use icy_board_tui::{
 };
 use ratatui::{Frame, layout::Rect};
 use secure_websockets::SecureWebsockets;
-use websockets::Websockets;
+//use websockets::Websockets;
 
 mod secure_websockets;
 mod ssh;
 mod telnet;
-mod websockets;
+//mod websockets;
 
 pub struct ConnectionInfo {
     pub page: IcbSetupMenuUI,
@@ -29,8 +29,8 @@ impl ConnectionInfo {
             page: IcbSetupMenuUI::new(SelectMenu::new(vec![
                 MenuItem::new(0, 'A', get_text("connection_info_telnet")),
                 MenuItem::new(1, 'B', get_text("connection_info_ssh")),
-                MenuItem::new(2, 'C', get_text("connection_info_websockets")),
-                MenuItem::new(3, 'D', get_text("connection_info_secure_websockets")),
+                //                MenuItem::new(2, 'C', get_text("connection_info_websockets")),
+                MenuItem::new(2, 'C', get_text("connection_info_secure_websockets")),
             ]))
             .with_center_title(get_text("connection_info_title")),
             icy_board,
@@ -57,8 +57,8 @@ impl Page for ConnectionInfo {
             return match selected {
                 0 => PageMessage::OpenSubPage(Box::new(telnet::Telnet::new(self.icy_board.clone()))),
                 1 => PageMessage::OpenSubPage(Box::new(ssh::SSH::new(self.icy_board.clone()))),
-                2 => PageMessage::OpenSubPage(Box::new(Websockets::new(self.icy_board.clone()))),
-                3 => PageMessage::OpenSubPage(Box::new(SecureWebsockets::new(self.icy_board.clone()))),
+                //2 => PageMessage::OpenSubPage(Box::new(Websockets::new(self.icy_board.clone()))),
+                2 => PageMessage::OpenSubPage(Box::new(SecureWebsockets::new(self.icy_board.clone()))),
                 _ => PageMessage::None,
             };
         }

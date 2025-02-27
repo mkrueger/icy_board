@@ -27,7 +27,7 @@ use system_statistics_screen::{SystemStatisticsScreen, SystemStatisticsScreenMes
 use tokio::sync::Mutex;
 use tui::{Tui, print_exit_screen};
 
-use crate::bbs::{await_securewebsocket_connections, await_websocket_connections};
+use crate::bbs::await_securewebsocket_connections;
 
 pub mod bbs;
 mod call_wait_screen;
@@ -111,7 +111,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
         Ok(mut icy_board) => {
             icy_board.resolve_paths();
             let mut bbs = Arc::new(Mutex::new(BBS::new(icy_board.config.board.num_nodes as usize)));
-            let board = Arc::new(tokio::sync::Mutex::new(icy_board));
+            let mut board = Arc::new(tokio::sync::Mutex::new(icy_board));
             if arguments.localon || arguments.ppe.is_some() {
                 let mut terminal = init_terminal()?;
                 let cmd = if let Some(ppe) = &arguments.ppe {
@@ -123,78 +123,33 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                 restore_terminal()?;
                 return Ok(());
             }
-            {
-                let telnet_connection: icy_board_engine::icy_board::login_server::Telnet = board.lock().await.config.login_server.telnet.clone();
-                if telnet_connection.is_enabled {
-                    let bbs = bbs.clone();
-                    let board = board.clone();
-                    std::thread::Builder::new()
-                        .name("Telnet connect".to_string())
-                        .spawn(move || {
-                            tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                                let _ = await_telnet_connections(telnet_connection, board, bbs).await;
-                            });
-                        })
-                        .unwrap();
-                }
-
-                let ssh_connection = board.lock().await.config.login_server.ssh.clone();
-                if ssh_connection.is_enabled {
-                    let bbs: Arc<Mutex<BBS>> = bbs.clone();
-                    let board = board.clone();
-                    std::thread::Builder::new()
-                        .name("SSH connect".to_string())
-                        .spawn(move || {
-                            tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                                let _ = bbs::ssh::await_ssh_connections(ssh_connection, board, bbs).await;
-                            });
-                        })
-                        .unwrap();
-                }
-
-                let websocket_connection = board.lock().await.config.login_server.websocket.clone();
-                if websocket_connection.is_enabled {
-                    let bbs = bbs.clone();
-                    let board = board.clone();
-                    std::thread::Builder::new()
-                        .name("Websocket connect".to_string())
-                        .spawn(move || {
-                            tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                                let _ = await_websocket_connections(websocket_connection, board, bbs).await;
-                            });
-                        })
-                        .unwrap();
-                }
-
-                let secure_websocket_connection = board.lock().await.config.login_server.secure_websocket.clone();
-                if secure_websocket_connection.is_enabled {
-                    let bbs = bbs.clone();
-                    let board = board.clone();
-                    std::thread::Builder::new()
-                        .name("Secure Websocket connect".to_string())
-                        .spawn(move || {
-                            tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                                let _ = await_securewebsocket_connections(secure_websocket_connection, board, bbs).await;
-                            });
-                        })
-                        .unwrap();
-                }
-            }
-
+            start_connections(&bbs, &board).await;
             let mut app = CallWaitScreen::new(&board).await?;
             let mut terminal = init_terminal()?;
             loop {
                 terminal.clear()?;
                 app.reset(&board).await;
                 match app.run(&mut terminal, &board, arguments.full_screen).await {
-                    Ok(msg) => {
-                        if let Err(err) = run_message(msg, &mut terminal, &board, &mut bbs, arguments.full_screen, String::new()).await {
+                    Ok(msg) => match run_message(msg, &mut terminal, &mut board, &mut bbs, arguments.full_screen, String::new()).await {
+                        Ok(reload) => {
+                            if reload {
+                                icy_board = IcyBoard::load(&config_file)?;
+                                icy_board.resolve_paths();
+
+                                bbs = Arc::new(Mutex::new(BBS::new(icy_board.config.board.num_nodes as usize)));
+                                board = Arc::new(tokio::sync::Mutex::new(icy_board));
+                                app = CallWaitScreen::new(&board).await?;
+                                start_connections(&bbs, &board).await;
+                                continue;
+                            }
+                        }
+                        Err(err) => {
                             restore_terminal()?;
                             log::error!("while processing call wait screen message: {}", err.to_string());
                             print_error(err.to_string());
                             return Err(err);
                         }
-                    }
+                    },
                     Err(err) => {
                         restore_terminal()?;
                         log::error!("while running call wait screen: {}", err.to_string());
@@ -212,6 +167,101 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
     }
 }
 
+static mut TELENET_RECEIVER: Option<tokio::sync::oneshot::Receiver<bool>> = None;
+static mut SSH_RECEIVER: Option<tokio::sync::oneshot::Receiver<bool>> = None;
+static mut SWEBSOCKET_RECEIVER: Option<tokio::sync::oneshot::Receiver<bool>> = None;
+
+async fn start_connections(bbs: &Arc<Mutex<BBS>>, board: &Arc<Mutex<IcyBoard>>) {
+    let telnet_connection: icy_board_engine::icy_board::login_server::Telnet = board.lock().await.config.login_server.telnet.clone();
+    if telnet_connection.is_enabled {
+        let bbs = bbs.clone();
+        let board: Arc<Mutex<IcyBoard>> = board.clone();
+        let (mut tx1, rx1) = tokio::sync::oneshot::channel::<bool>();
+        unsafe {
+            #[allow(static_mut_refs)]
+            if let Some(mut rx) = TELENET_RECEIVER.take() {
+                rx.close();
+            }
+
+            TELENET_RECEIVER = Some(rx1);
+        }
+        tokio::spawn(async move {
+            tokio::select! {
+                _ = await_telnet_connections(telnet_connection, board, bbs) => {
+                },
+                _ = tx1.closed() => {
+                    log::info!("telnet connection closed");
+                }
+            }
+        });
+    }
+
+    let ssh_connection = board.lock().await.config.login_server.ssh.clone();
+    if ssh_connection.is_enabled {
+        let bbs: Arc<Mutex<BBS>> = bbs.clone();
+        let board = board.clone();
+
+        let (mut tx1, rx1) = tokio::sync::oneshot::channel::<bool>();
+        unsafe {
+            #[allow(static_mut_refs)]
+            if let Some(mut rx) = SSH_RECEIVER.take() {
+                rx.close();
+            }
+
+            SSH_RECEIVER = Some(rx1);
+        }
+
+        tokio::spawn(async move {
+            tokio::select! {
+                _ = bbs::ssh::await_ssh_connections(ssh_connection, board, bbs) => {
+                },
+                _ = tx1.closed() => {
+                    log::info!("telnet connection closed");
+                }
+            }
+        });
+    }
+    /*
+    let websocket_connection = board.lock().await.config.login_server.websocket.clone();
+    if websocket_connection.is_enabled {
+        let bbs = bbs.clone();
+        let board = board.clone();
+        std::thread::Builder::new()
+            .name("Websocket connect".to_string())
+            .spawn(move || {
+                tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+                    let _ = await_websocket_connections(websocket_connection, board, bbs).await;
+                });
+            })
+            .unwrap();
+    }*/
+    let secure_websocket_connection = board.lock().await.config.login_server.secure_websocket.clone();
+    if secure_websocket_connection.is_enabled {
+        let bbs = bbs.clone();
+        let board = board.clone();
+
+        let (mut tx1, rx1) = tokio::sync::oneshot::channel::<bool>();
+        unsafe {
+            #[allow(static_mut_refs)]
+            if let Some(mut rx) = SWEBSOCKET_RECEIVER.take() {
+                rx.close();
+            }
+
+            SWEBSOCKET_RECEIVER = Some(rx1);
+        }
+
+        tokio::spawn(async move {
+            tokio::select! {
+                _ = await_securewebsocket_connections(secure_websocket_connection, board, bbs) => {
+                },
+                _ = tx1.closed() => {
+                    log::info!("telnet connection closed");
+                }
+            }
+        });
+    }
+}
+
 async fn run_message(
     msg: CallWaitMessage,
     terminal: &mut Terminal<impl Backend>,
@@ -219,7 +269,7 @@ async fn run_message(
     bbs: &mut Arc<Mutex<BBS>>,
     full_screen: bool,
     stuffed_chars: String,
-) -> Res<()> {
+) -> Res<bool> {
     match msg {
         CallWaitMessage::User(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
@@ -297,6 +347,7 @@ async fn run_message(
                 .spawn()
                 .expect("icbsysmgr command failed to start");
             cmd.wait().expect("icbsysmgr command failed to run");
+            return Ok(true);
         }
         CallWaitMessage::Setup => {
             let path = std::env::current_exe().unwrap().with_file_name("icbsetup");
@@ -305,6 +356,7 @@ async fn run_message(
                 .spawn()
                 .expect("icbsysmgr command failed to start");
             cmd.wait().expect("icbsysmgr command failed to run");
+            return Ok(true);
         }
         CallWaitMessage::IcbText => {
             let icbtxt_path = board.lock().await.config.paths.icbtext.clone();
@@ -316,6 +368,7 @@ async fn run_message(
                 .spawn()
                 .expect("icbsysmgr command failed to start");
             cmd.wait().expect("icbsysmgr command failed to run");
+            return Ok(true);
         }
         CallWaitMessage::ToggleStatistics => unsafe {
             SHOW_TOTAL_STATS = !SHOW_TOTAL_STATS;
@@ -340,7 +393,7 @@ async fn run_message(
             }
         }
     }
-    Ok(())
+    Ok(false)
 }
 
 fn init_terminal() -> Res<Terminal<impl Backend>> {
