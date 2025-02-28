@@ -19,6 +19,7 @@ use icy_board_engine::{
     vm::TerminalTarget,
 };
 use icy_net::iemsi::try_iemsi;
+use tokio::fs;
 impl PcbBoardCommand {
     pub async fn login(&mut self, is_local: bool) -> Res<bool> {
         self.state.set_activity(NodeStatus::LogIntoSystem).await;
@@ -195,9 +196,26 @@ impl PcbBoardCommand {
         if self.state.get_board().await.config.system_control.is_closed_board {
             self.newask_questions().await?;
             log::info!("New user registration for {} attempted on closed board.", self.state.session.user_name);
+
+            let closed_path = self.state.resolve_path(&self.state.get_board().await.config.paths.closed);
+            if closed_path.is_file() {
+                self.state.display_file(&closed_path).await?;
+            }
             self.state.display_text(IceText::ClosedBoard, display_flags::NEWLINE).await?;
             self.state.hangup().await?;
             return Ok(false);
+        }
+
+        let trashcan_user = self.state.resolve_path(&self.state.get_board().await.config.paths.trashcan_user);
+        if trashcan_user.is_file() {
+            let users = fs::read_to_string(trashcan_user).await?;
+            for line in users.lines().filter(|p| !p.is_empty() && !p.starts_with('#')) {
+                if line.eq_ignore_ascii_case(&self.state.session.user_name) {
+                    self.state.display_text(IceText::RealNamesOnly, display_flags::NEWLINE).await?;
+                    self.state.hangup().await?;
+                    return Ok(false);
+                }
+            }
         }
 
         let mut new_user = User::default();
@@ -217,6 +235,20 @@ impl PcbBoardCommand {
                 self.state.display_text(IceText::PasswordTooShort, display_flags::NEWLINE).await?;
                 continue;
             }
+
+            let trashcan_passwords = self.state.resolve_path(&self.state.get_board().await.config.paths.trashcan_passwords);
+            if trashcan_passwords.is_file() {
+                let users = fs::read_to_string(trashcan_passwords).await?;
+                if users
+                    .lines()
+                    .filter(|p| !p.is_empty() && !p.starts_with('#'))
+                    .any(|p| p.eq_ignore_ascii_case(&pw1))
+                {
+                    self.state.display_text(IceText::PasswordTooWeak, display_flags::NEWLINE).await?;
+                    continue;
+                }
+            }
+
             let Some(pw2) = self.input_required(IceText::ReEnterPassword, &MASK_ALNUM, 20, display_flags::ECHODOTS).await? else {
                 return Ok(false);
             };

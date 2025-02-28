@@ -1575,9 +1575,12 @@ pub enum IceText {
 
     /// `Enter the DOOR # to Open (Enter)=none`
     DOORNumberCommandExpertmode = 769,
+
+    /// `This password is not secure. Try a different one.`
+    PasswordTooWeak = 770,
 }
 
-const LAST_ENTRY: usize = 769;
+const LAST_ENTRY: usize = 770;
 
 impl IceText {
     pub fn from(i: usize) -> Self {

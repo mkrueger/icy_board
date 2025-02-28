@@ -30,9 +30,8 @@ There are data structures for almost all PCBoard data structures so making a BBS
 
 # Topics
 * [GettingStarted](docs/gettingstarted.md)
-* [Features](docs/differences.md)
-
+* [PCBoard Feature Status](docs/feature_parity.md)
 * [Differences](docs/differences.md)
 * [PPLC](docs/pplc.md)
 * [PPL](docs/ppl.md)
-* [NEW PPL FUNCTIONS](docs/new_ppl.md)
+* [New PPL functions](docs/new_ppl.md)

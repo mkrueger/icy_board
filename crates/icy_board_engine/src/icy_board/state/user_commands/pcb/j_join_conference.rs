@@ -156,11 +156,11 @@ impl IcyBoardState {
 
             if conf_num == 0 {
                 self.session.op_text = format!("{} ({})", self.session.current_conference.name, self.session.current_conference_number);
-                self.join_conference(conf_num as u16, quick_join).await;
+                self.join_conference(conf_num as u16, quick_join, true).await?;
                 self.display_text(IceText::ConferenceAbandoned, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
             } else {
-                self.join_conference(conf_num as u16, quick_join).await;
+                self.join_conference(conf_num as u16, quick_join, true).await?;
                 self.session.op_text = format!("{} ({})", self.session.current_conference.name, self.session.current_conference_number);
                 self.display_text(IceText::ConferenceJoined, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;

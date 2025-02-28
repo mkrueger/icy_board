@@ -662,7 +662,7 @@ impl IcyBoardState {
         }
     }
 
-    pub async fn join_conference(&mut self, conference: u16, _quick_join: bool) {
+    pub async fn join_conference(&mut self, conference: u16, _quick_join: bool, show_intro: bool) -> Res<()> {
         // todo: display news on join.
         if (conference as usize) < self.get_board().await.conferences.len() {
             self.session.current_conference_number = conference;
@@ -672,7 +672,18 @@ impl IcyBoardState {
             if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
                 state.cur_conference = self.session.current_conference_number;
             }
+            if let Some(user) = &mut self.session.current_user {
+                user.last_conference = conference;
+            }
+
+            if self.get_board().await.config.switches.force_intro_on_join || show_intro {
+                if self.session.current_conference.intro_file.is_file() {
+                    let f = self.session.current_conference.intro_file.clone();
+                    self.display_file(&f).await?;
+                }
+            }
         }
+        Ok(())
     }
 
     #[async_recursion(?Send)]
@@ -946,7 +957,7 @@ impl IcyBoardState {
         if self.session.language != old_language {
             self.update_language().await;
         }
-        self.join_conference(last_conference, false).await;
+        self.join_conference(last_conference, false, false).await?;
         return Ok(());
     }
 
@@ -2461,8 +2472,6 @@ fn convert_cmd(cmd_type: CommandType) -> Option<Command> {
     })
 }
 
-
-
 #[cfg(not(target_os = "windows"))]
 fn adjust_canonicalization<P: AsRef<Path>>(p: P) -> String {
     p.as_ref().display().to_string()
@@ -2478,4 +2487,3 @@ fn adjust_canonicalization<P: AsRef<Path>>(p: P) -> String {
         p
     }
 }
-

@@ -2943,3 +2943,7 @@ text = "Rip"
 [DOORNumberCommandExpertmode]
 text = "Enter the DOOR # to Open (Enter)=none"
 style = "Yellow"
+
+[PasswordTooWeak]
+text = "This password is not secure. Try a different one."
+style = "Red"
