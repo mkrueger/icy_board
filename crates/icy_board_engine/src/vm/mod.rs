@@ -748,7 +748,13 @@ impl<'a> VirtualMachine<'a> {
     }
 
     pub async fn resolve_file<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
-        let file = file.as_ref().to_string_lossy().to_string().replace('\\', "/");
+        let mut file = file.as_ref().to_string_lossy().to_string();
+        if std::path::MAIN_SEPARATOR == '/' {
+            file = file.replace('\\', "/");
+        } else if std::path::MAIN_SEPARATOR == '\\' {
+            file = file.replace('/', "\\");
+        }
+
         if file.starts_with("C:/") {
             log::warn!("Absolute path detected: {}, change the src file.", file);
             self.icy_board_state.get_board().await.resolve_file(&PathBuf::from(&file[3..]))

@@ -596,7 +596,7 @@ pub async fn ppepath(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
         return Ok(VariableValue::new_string(String::new()));
     };
     let mut res = dir.to_string_lossy().to_string();
-    res.push('/');
+    res.push(std::path::MAIN_SEPARATOR);
     Ok(VariableValue::new_string(res))
 }
 
@@ -604,6 +604,7 @@ pub async fn valdate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     let date = vm.eval_expr(&args[0]).await?.as_string();
     Ok(VariableValue::new_bool(!IcbDate::parse(&date).is_empty()))
 }
+
 pub async fn valtime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let time = vm.eval_expr(&args[0]).await?.as_string();
     Ok(VariableValue::new_bool(!IcbTime::parse(&time).is_empty()))
