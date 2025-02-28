@@ -714,11 +714,13 @@ impl IcyBoardState {
 
     pub async fn run_executable<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>, executable: Executable) -> Res<()> {
         self.session.disp_options.no_change();
-        let path = PathBuf::from(file_name.as_ref());
-        let parent = path.parent().unwrap().to_str().unwrap().to_string();
+        let canonicalized_path = file_name.as_ref().canonicalize()?;
+        let canonicalized_path = PathBuf::from(adjust_canonicalization(canonicalized_path));
+
+        let parent = canonicalized_path.parent().unwrap().to_str().unwrap().to_string();
         let mut io = DiskIO::new(&parent, answer_file);
-        Ok(if let Err(err) = run(file_name, &executable, &mut io, self).await {
-            log::error!("Error executing PPE {}: {}", file_name.as_ref().display(), err);
+        Ok(if let Err(err) = run(&canonicalized_path, &executable, &mut io, self).await {
+            log::error!("Error executing PPE {}: {}", canonicalized_path.display(), err);
             self.session.op_text = format!("{}", err);
             self.display_text(IceText::ErrorExecPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
                 .await?;
@@ -2458,3 +2460,22 @@ fn convert_cmd(cmd_type: CommandType) -> Option<Command> {
         security: SecurityExpression::from_req_security(0),
     })
 }
+
+
+
+#[cfg(not(target_os = "windows"))]
+fn adjust_canonicalization<P: AsRef<Path>>(p: P) -> String {
+    p.as_ref().display().to_string()
+}
+
+#[cfg(target_os = "windows")]
+fn adjust_canonicalization<P: AsRef<Path>>(p: P) -> String {
+    const VERBATIM_PREFIX: &str = r#"\\?\"#;
+    let p = p.as_ref().display().to_string();
+    if p.starts_with(VERBATIM_PREFIX) {
+        p[VERBATIM_PREFIX.len()..].to_string()
+    } else {
+        p
+    }
+}
+

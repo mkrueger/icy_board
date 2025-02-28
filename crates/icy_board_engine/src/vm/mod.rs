@@ -810,7 +810,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
             let file_name = file_name.as_ref().to_path_buf();
             let reg = UserTypeRegistry::icy_board_registry();
             log::info!("Run PPE {}", file_name.display());
-
+            
             let mut vm = VirtualMachine {
                 file_name,
                 type_registry: &reg,
