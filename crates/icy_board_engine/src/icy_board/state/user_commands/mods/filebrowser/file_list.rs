@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use dizbase::file_base::{FileEntry, metadata::MetadaType};
+use dizbase::file_base::{FileEntry, metadata::MetadataType};
 use humanize_bytes::humanize_bytes_decimal;
 
 use crate::{Res, icy_board::state::IcyBoardState, vm::TerminalTarget};
@@ -15,7 +15,7 @@ impl FileList {
         Self { path, files }
     }
 
-    pub async fn display_file_list(&mut self, cmd: &mut IcyBoardState) -> Res<()> {
+    pub async fn display_file_list(&mut self, cmd: &mut IcyBoardState, f: Box<dyn Fn(&mut FileEntry) -> bool>) -> Res<()> {
         let short_header = if let Some(user) = &cmd.session.current_user {
             user.flags.use_short_filedescr
         } else {
@@ -24,6 +24,9 @@ impl FileList {
         cmd.session.disp_options.in_file_list = Some(self.path.clone());
         let colors = cmd.get_board().await.config.color_configuration.clone();
         for entry in &mut self.files {
+            if !f(entry) {
+                continue;
+            }
             if cmd.session.request_logoff {
                 break;
             }
@@ -34,7 +37,11 @@ impl FileList {
             let size = entry.size();
             let name = &entry.file_name;
             cmd.set_color(TerminalTarget::Both, colors.file_name.clone()).await?;
-            cmd.print(TerminalTarget::Both, &format!("{:<12} ", name)).await?;
+            if cmd.session.search_pattern.is_some() {
+                cmd.print_found_text(TerminalTarget::Both, &format!("{:<12} ", name)).await?;
+            } else {
+                cmd.print(TerminalTarget::Both, &format!("{:<12} ", name)).await?;
+            }
             if name.len() > 12 {
                 cmd.new_line().await?;
             }
@@ -63,7 +70,7 @@ impl FileList {
             match entry.get_metadata() {
                 Ok(data) => {
                     for m in data {
-                        if m.get_type() == MetadaType::FileID {
+                        if m.get_type() == MetadataType::FileID {
                             let description = std::str::from_utf8(&m.data)?;
                             cmd.set_color(TerminalTarget::Both, colors.file_description.clone()).await?;
                             for (i, line) in description.lines().enumerate() {
@@ -71,9 +78,17 @@ impl FileList {
                                     break;
                                 }
                                 if i > 0 {
-                                    cmd.print(TerminalTarget::Both, &format!("{:33}", " ")).await?;
+                                    if cmd.session.search_pattern.is_some() {
+                                        cmd.print_found_text(TerminalTarget::Both, &format!("{:33}", " ")).await?;
+                                    } else {
+                                        cmd.print(TerminalTarget::Both, &format!("{:33}", " ")).await?;
+                                    }
                                 }
-                                cmd.print(TerminalTarget::Both, line).await?;
+                                if cmd.session.search_pattern.is_some() {
+                                    cmd.print_found_text(TerminalTarget::Both, line).await?;
+                                } else {
+                                    cmd.print(TerminalTarget::Both, line).await?;
+                                }
                                 cmd.new_line().await?;
                                 printed_lines = true;
                                 if short_header {

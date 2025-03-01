@@ -12,7 +12,7 @@ use crate::{extensions, file_base_scanner::scan_file};
 
 use self::{
     file_header::FileHeader,
-    metadata::{MetadaType, MetadataHeader},
+    metadata::{MetadataHeader, MetadataType},
     pattern::Pattern,
 };
 
@@ -176,7 +176,7 @@ impl FileBase {
             let end = meta_len as usize + 5;
             let metadata = data[5..end].to_vec();
             data = &data[end..];
-            result.push(MetadataHeader::new(MetadaType::from_data(meta_type), metadata));
+            result.push(MetadataHeader::new(MetadataType::from_data(meta_type), metadata));
         }
         Ok(result)
     }

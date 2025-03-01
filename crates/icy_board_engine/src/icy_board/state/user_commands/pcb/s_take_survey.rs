@@ -78,8 +78,8 @@ impl IcyBoardState {
     }
 
     pub async fn start_survey(&mut self, survey: &crate::icy_board::surveys::Survey) -> Res<()> {
-        let question = self.resolve_path(&survey.survey_file);
-        let answer_file = self.resolve_path(&survey.answer_file);
+        let question = &survey.survey_file;
+        let answer_file = &survey.answer_file;
 
         if !answer_file.exists() || !answer_file.is_file() {
             self.display_file(&question).await?;

@@ -197,10 +197,33 @@ impl IcyBoard {
         })?;
 
         let load_path = get_path(parent_path, &config.paths.conferences);
-        let conferences = ConferenceBase::load(&load_path).map_err(|e| {
+        let mut conferences = ConferenceBase::load(&load_path).map_err(|e| {
             log::error!("Error loading conference base: {} from {}", e, load_path.display());
             e
         })?;
+
+        for c in conferences.iter_mut() {
+            c.command_file = get_path(parent_path, &c.command_file);
+            c.intro_file = get_path(parent_path, &c.intro_file);
+
+            c.area_file = get_path(parent_path, &c.area_file);
+            c.area_menu = get_path(parent_path, &c.area_menu);
+
+            c.dir_file = get_path(parent_path, &c.dir_file);
+            c.dir_menu = get_path(parent_path, &c.dir_menu);
+
+            c.doors_file = get_path(parent_path, &c.doors_file);
+            c.doors_menu = get_path(parent_path, &c.doors_menu);
+
+            c.blt_file = get_path(parent_path, &c.blt_file);
+            c.blt_menu = get_path(parent_path, &c.blt_menu);
+
+            c.survey_file = get_path(parent_path, &c.survey_file);
+            c.survey_menu = get_path(parent_path, &c.survey_menu);
+
+            c.pub_upload_location = get_path(parent_path, &c.pub_upload_location);
+            c.private_upload_location = get_path(parent_path, &c.private_upload_location);
+        }
 
         let load_path: PathBuf = get_path(parent_path, &config.paths.icbtext);
         let default_display_text = IcbTextFile::load(&load_path).map_err(|e| {
@@ -496,7 +519,7 @@ impl IcyBoard {
 
             // Convert dir file
             let dir_file = base_loc.join(&format!("dir{}", dirs));
-            let dir_file = if let Ok(area_list) = DirectoryList::load(&self.resolve_file(&conf.dir_file)) {
+            let dir_file = if let Ok(area_list) = DirectoryList::load(&conf.dir_file) {
                 area_list.export_pcboard(&dir_file)?;
 
                 let dir_file = dir_file.to_string_lossy().to_string();

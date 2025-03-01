@@ -8,7 +8,7 @@ use codepages::{normalize_file, tables::get_utf8};
 use icy_sauce::SauceInformation;
 use unrar::Archive;
 
-use crate::file_base::metadata::{MetadaType, MetadataHeader};
+use crate::file_base::metadata::{MetadataHeader, MetadataType};
 pub mod repack;
 
 pub mod bbstro_fingerprint;
@@ -24,10 +24,7 @@ pub fn scan_file(path: &Path, extension: &str) -> crate::Result<Vec<MetadataHead
         "RAR" => scan_rar(info, path),
         "EXE" | "COM" | "BAT" | "BMP" | "GIF" | "JPG" => Ok(info),
 
-        ext => {
-            println!("Unknown extension {:?}", ext);
-            Ok(info)
-        }
+        _ext => Ok(info),
     }
 }
 
@@ -49,7 +46,7 @@ fn scan_sauce(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<M
         let mut sauce = [0u8; 128];
         reader.read_exact(&mut sauce)?;
         if let Ok(Some(_)) = SauceInformation::read(&sauce[..]) {
-            info.push(MetadataHeader::new(MetadaType::Sauce, sauce.to_vec()));
+            info.push(MetadataHeader::new(MetadataType::Sauce, sauce.to_vec()));
         }
     }
     Ok(info)
@@ -79,7 +76,7 @@ fn scan_zip(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<Met
         };
     }
     if !short_descr.is_empty() {
-        info.push(MetadataHeader::new(MetadaType::FileID, get_file_id(short_descr).as_bytes().to_vec()));
+        info.push(MetadataHeader::new(MetadataType::FileID, get_file_id(short_descr).as_bytes().to_vec()));
     }
 
     Ok(info)
@@ -124,7 +121,7 @@ fn scan_lha(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<Met
         }
     }
     if !short_descr.is_empty() {
-        info.push(MetadataHeader::new(MetadaType::FileID, get_file_id(short_descr).as_bytes().to_vec()));
+        info.push(MetadataHeader::new(MetadataType::FileID, get_file_id(short_descr).as_bytes().to_vec()));
     }
     Ok(info)
 }
@@ -156,7 +153,7 @@ fn scan_rar(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<Met
     }
 
     if !short_descr.is_empty() {
-        info.push(MetadataHeader::new(MetadaType::FileID, get_file_id(short_descr).as_bytes().to_vec()));
+        info.push(MetadataHeader::new(MetadataType::FileID, get_file_id(short_descr).as_bytes().to_vec()));
     }
 
     Ok(info)

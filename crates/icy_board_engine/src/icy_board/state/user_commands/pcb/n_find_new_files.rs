@@ -38,6 +38,6 @@ impl IcyBoardState {
                 .collect::<Vec<_>>()
         };
         let mut list = FileList::new(file_base_path, files);
-        list.display_file_list(self).await
+        list.display_file_list(self, Box::new(|_f| true)).await
     }
 }

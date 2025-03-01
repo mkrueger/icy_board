@@ -15,7 +15,7 @@ use icy_net::protocol::{Protocol, TransferProtocolType, XYModemVariant, XYmodem,
 impl IcyBoardState {
     pub async fn upload_file(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::Transfer).await;
-        let upload_location = self.resolve_path(&self.session.current_conference.pub_upload_location);
+        let upload_location = self.session.current_conference.pub_upload_location.clone();
         if !upload_location.exists() {
             self.display_text(
                 IceText::NoDirectoriesAvailable,

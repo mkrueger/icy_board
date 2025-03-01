@@ -1,6 +1,13 @@
+use dizbase::file_base::metadata::MetadataType;
+
 use crate::{
     Res,
-    icy_board::state::{IcyBoardState, functions::MASK_COMMAND, user_commands::mods::filebrowser::FileList},
+    datetime::IcbDate,
+    icy_board::{
+        commands::CommandType,
+        state::{IcyBoardState, functions::MASK_COMMAND},
+    },
+    tables::import_cp437_string,
 };
 use crate::{
     icy_board::{
@@ -10,6 +17,15 @@ use crate::{
     },
     vm::TerminalTarget,
 };
+
+#[derive(Default)]
+struct DirNumbers {
+    pub numbers: Vec<usize>,
+    pub flag_files: bool,
+    pub _date: Option<IcbDate>,
+    pub private_upload: bool,
+    pub public_upload: bool,
+}
 
 impl IcyBoardState {
     pub async fn zippy_directory_scan(&mut self) -> Res<()> {
@@ -25,7 +41,7 @@ impl IcyBoardState {
                 IceText::TextToScanFor,
                 40,
                 &MASK_ASCII,
-                "hlpts", // Help text scan
+                CommandType::ZippyDirectoryScan.get_help(),
                 None,
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
             )
@@ -34,94 +50,162 @@ impl IcyBoardState {
         if search_pattern.is_empty() {
             return Ok(());
         }
+        if !self.search_init(search_pattern, false) {
+            self.display_text(IceText::PunctuationError, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            return Ok(());
+        }
+        loop {
+            let search_area = if let Some(token) = self.session.tokens.pop_front() {
+                token
+            } else {
+                self.input_field(
+                    if self.session.expert_mode() {
+                        IceText::FileNumberExpertmode
+                    } else {
+                        IceText::FileNumberNovice
+                    },
+                    40,
+                    MASK_COMMAND,
+                    "",
+                    None,
+                    display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
+                )
+                .await?
+            };
+            if search_area.is_empty() {
+                return Ok(());
+            }
 
-        let search_area = if let Some(token) = self.session.tokens.pop_front() {
-            token
-        } else {
-            self.input_field(
-                if self.session.expert_mode() {
-                    IceText::FileNumberExpertmode
+            if search_area == "L" {
+                self.show_dir_menu().await?;
+            } else {
+                self.session.push_tokens(&search_area);
+                let dir_numbers = self.get_dir_numbers().await?;
+                self.displaycmdfile("prefile").await?;
+                self.new_line().await?;
+                self.session.disp_options.no_change();
+                let r = self.session.search_pattern.as_ref().unwrap().clone();
+
+                for p in dir_numbers.numbers {
+                    self.display_text(IceText::ScanningDirectory, display_flags::DEFAULT).await?;
+                    self.print(TerminalTarget::Both, &format!(" {}", p)).await?;
+                    let desc = self.session.current_conference.directories.as_ref().unwrap()[p - 1].name.clone();
+                    if !desc.is_empty() {
+                        self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
+                        self.print(TerminalTarget::Both, &format!(" ({})", desc)).await?;
+                    }
+                    self.new_line().await?;
+                    self.reset_color(TerminalTarget::Both).await?;
+                    let r = r.clone();
+                    let path = self.session.current_conference.directories.as_ref().unwrap()[p - 1].path.clone();
+                    self.display_file_area(
+                        &path,
+                        Box::new(move |p| {
+                            if r.is_match(p.name()) {
+                                return true;
+                            }
+                            if let Ok(md) = p.get_metadata() {
+                                for d in md {
+                                    if d.metadata_type != MetadataType::FileID {
+                                        continue;
+                                    }
+                                    let desc = import_cp437_string(&d.data, true);
+                                    if r.is_match(&desc) {
+                                        return true;
+                                    }
+                                }
+                            }
+                            false
+                        }),
+                    )
+                    .await?;
+                    if self.session.disp_options.abort_printout {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    async fn get_dir_numbers(&mut self) -> Res<DirNumbers> {
+        let mut res = DirNumbers::default();
+        while let Some(token) = self.session.tokens.pop_front() {
+            match token.as_str() {
+                "A" => {
+                    for num in 1..=self.session.current_conference.directories.as_ref().unwrap().len() {
+                        res.numbers.push(num);
+                    }
+                }
+                "D" => {
+                    res.flag_files = true;
+                }
+                "0" | "P" => {
+                    if !self
+                        .board
+                        .lock()
+                        .await
+                        .config
+                        .sysop_command_level
+                        .view_private_uploads
+                        .session_can_access(&self.session)
+                    {
+                        continue;
+                    }
+                    res.private_upload = true;
+                }
+                "U" => {
+                    if self.session.current_conference.private_uploads && !self.session.current_conference.pub_upload_location.is_dir() {
+                        self.display_text(IceText::UploadsArePrivate, display_flags::NEWLINE | display_flags::LFBEFORE)
+                            .await?;
+                        continue;
+                    }
+                    res.public_upload = true;
+                }
+                "N" => {
+                    // TODO
+                }
+                "S" => {
+                    // TODO
+                }
+                t => {
+                    self.add_numbers(&mut res.numbers, t).await?;
+                }
+            }
+        }
+        Ok(res)
+    }
+
+    async fn add_numbers(&mut self, numbers: &mut Vec<usize>, token: &str) -> Res<()> {
+        let mut beg = 0;
+        let mut end = 0;
+        let mut parse_end = false;
+
+        for c in token.chars() {
+            if c.is_ascii_digit() {
+                if parse_end {
+                    end = end * 10 + c.to_digit(10).unwrap() as usize;
                 } else {
-                    IceText::FileNumberNovice
-                },
-                40,
-                MASK_COMMAND,
-                "",
-                None,
-                display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
-            )
-            .await?
-        };
-        if search_area.is_empty() {
+                    beg = beg * 10 + c.to_digit(10).unwrap() as usize;
+                }
+            } else if c == '-' {
+                parse_end = true;
+            }
+        }
+        if beg < 1
+            || beg > self.session.current_conference.directories.as_ref().unwrap().len()
+            || parse_end && (end < beg || end > self.session.current_conference.directories.as_ref().unwrap().len())
+        {
+            self.display_text(IceText::InvalidFileNumber, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
             return Ok(());
         }
 
-        let mut joined = false;
-        if search_area == "A" {
-            self.session.cancel_batch = false;
-            for area in 0..self.session.current_conference.directories.as_ref().unwrap().len() {
-                if self.session.current_conference.directories.as_ref().unwrap()[area]
-                    .list_security
-                    .session_can_access(&self.session)
-                {
-                    self.pattern_search_file_area(area, search_pattern.clone()).await?;
-                }
-                if self.session.cancel_batch {
-                    break;
-                }
-            }
-            joined = true;
-        } else if let Ok(number) = search_area.parse::<i32>() {
-            if 1 <= number && (number as usize) <= self.session.current_conference.directories.as_ref().unwrap().len() {
-                let area = &self.session.current_conference.directories.as_ref().unwrap()[number as usize - 1];
-
-                if area.list_security.session_can_access(&self.session) {
-                    self.pattern_search_file_area(number as usize - 1, search_pattern).await?;
-                }
-
-                joined = true;
-            }
+        if parse_end {
+            numbers.extend(beg..=end);
+        } else {
+            numbers.push(beg);
         }
-
-        if !joined {
-            self.session.op_text = search_area;
-            self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::NOTBLANK)
-                .await?;
-        }
-        Ok(())
-    }
-
-    async fn pattern_search_file_area(&mut self, area: usize, search_pattern: String) -> Res<()> {
-        let file_base_path = self.resolve_path(&self.session.current_conference.directories.as_ref().unwrap()[area].path);
-
-        self.display_text(IceText::ScanningDirectory, display_flags::DEFAULT).await?;
-        self.print(TerminalTarget::Both, &format!(" {} ", area + 1)).await?;
-        self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
-        self.print(
-            TerminalTarget::Both,
-            &format!("({})", self.session.current_conference.directories.as_ref().unwrap()[area].name),
-        )
-        .await?;
-        self.new_line().await?;
-
-        let files = {
-            let Ok(base) = self.get_filebase(&file_base_path).await else {
-                return Ok(());
-            };
-            let mut base = base.lock().await;
-            base.find_files_with_pattern(search_pattern.as_str())?
-                .iter_mut()
-                .map(|f| {
-                    let _ = f.get_metadata();
-                    f.clone()
-                })
-                .collect::<Vec<_>>()
-        };
-
-        let mut list = FileList::new(file_base_path, files);
-        list.display_file_list(self).await?;
-
-        self.session.more_requested = false;
         Ok(())
     }
 }

@@ -1274,6 +1274,13 @@ impl IcyBoardState {
 
         false
     }
+
+    async fn show_dir_menu(&mut self) -> Res<()> {
+        let mnu = self.session.current_conference.dir_menu.clone();
+        self.display_menu(&mnu).await?;
+        self.session.disp_options.num_lines_printed = 0;
+        Ok(())
+    }
 }
 
 #[derive(PartialEq)]
@@ -1371,8 +1378,7 @@ impl IcyBoardState {
                     self.set_color(target, IcbColor::Dos(0x07)).await?;
                 }
                 self.write_raw(target, &chars[find.start()..find.end()]).await?;
-                self.set_color(target, IcbColor::Dos((old_color.get_foreground() + old_color.get_background() * 16) as u8))
-                    .await?;
+                self.set_color(target, IcbColor::Dos(old_color.as_u8(icy_engine::IceMode::Blink))).await?;
                 self.write_raw(target, &chars[find.end()..]).await?;
                 return Ok(());
             }
