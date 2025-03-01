@@ -957,7 +957,7 @@ pub enum IceText {
     /// `/ LIST`
     MessageList = 468,
     /// `Recent Uploads`
-    RecentUploadS = 469,
+    RecentUploads = 469,
     /// `(Esc) Exit, (↑) (↓) (PgUp) (PgDn) (Home) (End) Scrolls, (Space) Tags/Untags`
     ScrollKeys = 470,
     /// `Scroll Lines Above Cursor:`

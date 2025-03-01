@@ -98,7 +98,7 @@ impl IcyBoardState {
                         self.zippy_directory_scan().await?;
                     }
                     "N" => {
-                        self.find_new_files(self.session.current_user.as_ref().unwrap().stats.last_on.into()).await?;
+                        self.find_new_files().await?;
                     }
                     "D" => {
                         self.download(true).await?;

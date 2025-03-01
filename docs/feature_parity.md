@@ -56,9 +56,9 @@ If something is missing just let me know.
 | I  | Initial Welcome  | 💯 | 
 | J  | Join Conference  | 💯 | 
 | K  | Delete Message | 90% | 
-| L  | Find Files | 90% | 
+| L  | Find Files | 💯 | 
 | M  | Toggle Graphics  | 💯 | 
-| N  | New Files | 90% | 
+| N  | New Files | 💯 | 
 | O  | Page Sysop | 90% | 
 | P  | Set Page Length | 💯 | 
 | Q  | Quick Message Scan | 90% | 
@@ -70,7 +70,7 @@ If something is missing just let me know.
 | W  | Write Settings  | 90% | 
 | X  | Toggle Expert Mode  | 💯 | 
 | Y  | Your Mail Scan  | 70% | 
-| Z  | Zippy Directory Scan  | 70% | 
+| Z  | Zippy Directory Scan  | 💯 | 
 | ALIAS  |  Alias | 💯 | 
 | BYE  | Force logoff | 💯 | 
 | FLAG  | Flag Files | 💯 | 

@@ -296,9 +296,7 @@ impl IcyBoardState {
                     return Ok(());
                 }
                 // N
-                if let Some(user) = &self.session.current_user {
-                    self.find_new_files(user.stats.last_on.into()).await?;
-                }
+                self.find_new_files().await?;
             }
             CommandType::PageSysop => {
                 let sec = self.session.user_command_level.cmd_o.clone();

@@ -19,12 +19,10 @@ use crate::{
 };
 
 #[derive(Default)]
-struct DirNumbers {
-    pub numbers: Vec<usize>,
+pub struct DirNumbers {
     pub flag_files: bool,
-    pub _date: Option<IcbDate>,
-    pub private_upload: bool,
-    pub public_upload: bool,
+    pub date_time: Option<chrono::prelude::DateTime<chrono::prelude::Local>>,
+    pub numbers: Vec<(usize, String, std::path::PathBuf)>,
 }
 
 impl IcyBoardState {
@@ -87,10 +85,9 @@ impl IcyBoardState {
                 self.session.disp_options.no_change();
                 let r = self.session.search_pattern.as_ref().unwrap().clone();
 
-                for p in dir_numbers.numbers {
+                for (num, desc, path) in dir_numbers.numbers {
                     self.display_text(IceText::ScanningDirectory, display_flags::DEFAULT).await?;
-                    self.print(TerminalTarget::Both, &format!(" {}", p)).await?;
-                    let desc = self.session.current_conference.directories.as_ref().unwrap()[p - 1].name.clone();
+                    self.print(TerminalTarget::Both, &format!(" {}", num)).await?;
                     if !desc.is_empty() {
                         self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
                         self.print(TerminalTarget::Both, &format!(" ({})", desc)).await?;
@@ -98,13 +95,20 @@ impl IcyBoardState {
                     self.new_line().await?;
                     self.reset_color(TerminalTarget::Both).await?;
                     let r = r.clone();
-                    let path = self.session.current_conference.directories.as_ref().unwrap()[p - 1].path.clone();
+                    let date_time = dir_numbers.date_time.clone();
                     self.display_file_area(
                         &path,
                         Box::new(move |p| {
+                            if let Some(date) = date_time {
+                                if p.date() < date {
+                                    return false;
+                                }
+                            }
+
                             if r.is_match(p.name()) {
                                 return true;
                             }
+
                             if let Ok(md) = p.get_metadata() {
                                 for d in md {
                                     if d.metadata_type != MetadataType::FileID {
@@ -128,13 +132,25 @@ impl IcyBoardState {
         }
     }
 
-    async fn get_dir_numbers(&mut self) -> Res<DirNumbers> {
+    pub async fn get_dir_numbers(&mut self) -> Res<DirNumbers> {
         let mut res = DirNumbers::default();
+        let mut private_upload = false;
+        let mut public_upload = false;
+        let mut read_date = false;
+        let mut numbers = Vec::new();
+        let max_dirs = self.session.current_conference.directories.as_ref().unwrap().len();
         while let Some(token) = self.session.tokens.pop_front() {
+            if read_date {
+                let month = token[0..2].parse::<u8>().unwrap_or(0);
+                let day = token[2..4].parse::<u8>().unwrap_or(0);
+                let year = token[4..6].parse::<u16>().unwrap_or(0);
+                res.date_time = Some(IcbDate::new(month, day, year).to_local_date_time());
+                continue;
+            }
             match token.as_str() {
                 "A" => {
-                    for num in 1..=self.session.current_conference.directories.as_ref().unwrap().len() {
-                        res.numbers.push(num);
+                    for num in 1..=max_dirs {
+                        numbers.push(num);
                     }
                 }
                 "D" => {
@@ -152,7 +168,7 @@ impl IcyBoardState {
                     {
                         continue;
                     }
-                    res.private_upload = true;
+                    private_upload = true;
                 }
                 "U" => {
                     if self.session.current_conference.private_uploads && !self.session.current_conference.pub_upload_location.is_dir() {
@@ -160,19 +176,42 @@ impl IcyBoardState {
                             .await?;
                         continue;
                     }
-                    res.public_upload = true;
+                    public_upload = true;
                 }
                 "N" => {
-                    // TODO
+                    read_date = true;
                 }
                 "S" => {
                     // TODO
                 }
                 t => {
-                    self.add_numbers(&mut res.numbers, t).await?;
+                    self.add_numbers(&mut numbers, t).await?;
                 }
             }
         }
+
+        if private_upload {
+            res.numbers.push((
+                0,
+                self.get_display_text(IceText::RecentUploads)?,
+                self.session.current_conference.private_upload_location.clone(),
+            ))
+        }
+
+        for p in numbers {
+            let desc = self.session.current_conference.directories.as_ref().unwrap()[p - 1].name.clone();
+            res.numbers
+                .push((p, desc, self.session.current_conference.directories.as_ref().unwrap()[p - 1].path.clone()));
+        }
+
+        if public_upload {
+            res.numbers.push((
+                max_dirs + 1,
+                self.get_display_text(IceText::RecentUploads)?,
+                self.session.current_conference.pub_upload_location.clone(),
+            ))
+        }
+
         Ok(res)
     }
 

@@ -1,43 +1,100 @@
 use crate::{
     Res,
-    icy_board::state::{IcyBoardState, user_commands::mods::filebrowser::FileList},
+    datetime::IcbDate,
+    icy_board::{
+        commands::CommandType,
+        state::{
+            IcyBoardState,
+            functions::{MASK_COMMAND, MASK_NUM},
+        },
+    },
 };
-use chrono::{DateTime, Local};
+use crate::{
+    icy_board::{icb_config::IcbColor, icb_text::IceText, state::functions::display_flags},
+    vm::TerminalTarget,
+};
 
 impl IcyBoardState {
-    pub async fn find_new_files(&mut self, time_stamp: DateTime<Local>) -> Res<()> {
-        for area in 0..self.session.current_conference.directories.as_ref().unwrap().len() {
-            if self.session.current_conference.directories.as_ref().unwrap()[area]
-                .list_security
-                .session_can_access(&self.session)
-            {
-                self.find_newer_files(area, time_stamp).await?;
+    pub async fn find_new_files(&mut self) -> Res<()> {
+        if self.session.current_conference.directories.as_ref().unwrap().is_empty() {
+            self.display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            return Ok(());
+        }
+        let search_pattern = if let Some(token) = self.session.tokens.pop_front() {
+            token
+        } else {
+            let date = if let Some(user) = &self.session.current_user {
+                Some(user.stats.last_on.format("%m%d%y").to_string())
+            } else {
+                None
+            };
+
+            self.input_field(
+                IceText::DateToSearch,
+                6,
+                &MASK_NUM,
+                CommandType::LocateFile.get_help(),
+                date,
+                display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::GUIDE,
+            )
+            .await?
+        };
+        if search_pattern.is_empty() {
+            return Ok(());
+        }
+        let month = search_pattern[0..2].parse::<u8>().unwrap_or(0);
+        let day = search_pattern[2..4].parse::<u8>().unwrap_or(0);
+        let year = search_pattern[4..6].parse::<u16>().unwrap_or(0);
+        let search_date = IcbDate::new(month, day, year).to_local_date_time();
+
+        loop {
+            let search_area = if let Some(token) = self.session.tokens.pop_front() {
+                token
+            } else {
+                self.input_field(
+                    if self.session.expert_mode() {
+                        IceText::FileNumberExpertmode
+                    } else {
+                        IceText::FileNumberNovice
+                    },
+                    40,
+                    MASK_COMMAND,
+                    "",
+                    None,
+                    display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::HIGHASCII,
+                )
+                .await?
+            };
+            if search_area.is_empty() {
+                return Ok(());
             }
-            if self.session.cancel_batch {
-                break;
+
+            if search_area == "L" {
+                self.show_dir_menu().await?;
+            } else {
+                self.session.push_tokens(&search_area);
+                let dir_numbers = self.get_dir_numbers().await?;
+                self.displaycmdfile("prefile").await?;
+                self.new_line().await?;
+                self.session.disp_options.no_change();
+
+                for (num, desc, path) in dir_numbers.numbers {
+                    self.display_text(IceText::ScanningDirectory, display_flags::DEFAULT).await?;
+                    self.print(TerminalTarget::Both, &format!(" {}", num)).await?;
+                    if !desc.is_empty() {
+                        self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
+                        self.print(TerminalTarget::Both, &format!(" ({})", desc)).await?;
+                    }
+                    self.new_line().await?;
+                    self.reset_color(TerminalTarget::Both).await?;
+                    let r = search_date.clone();
+                    self.display_file_area(&path, Box::new(move |p| p.date() >= r)).await?;
+                    if self.session.disp_options.abort_printout {
+                        break;
+                    }
+                }
             }
         }
-
-        Ok(())
-    }
-
-    async fn find_newer_files(&mut self, area: usize, time_stamp: DateTime<Local>) -> Res<()> {
-        let file_base_path = self.resolve_path(&self.session.current_conference.directories.as_ref().unwrap()[area].path);
-
-        let files = {
-            let Ok(base) = self.get_filebase(&file_base_path).await else {
-                return Ok(());
-            };
-            let mut base = base.lock().await;
-            base.find_newer_files(time_stamp)?
-                .iter_mut()
-                .map(|f| {
-                    let _ = f.get_metadata();
-                    f.clone()
-                })
-                .collect::<Vec<_>>()
-        };
-        let mut list = FileList::new(file_base_path, files);
-        list.display_file_list(self, Box::new(|_f| true)).await
     }
 }

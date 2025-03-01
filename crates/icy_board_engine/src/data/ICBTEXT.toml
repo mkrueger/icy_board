@@ -1808,7 +1808,7 @@ text = "Message Moved: #"
 [MessageList]
 text = " / LIST"
 
-[RecentUploadS]
+[RecentUploads]
 text = "Recent Uploads"
 style = "Yellow"
 

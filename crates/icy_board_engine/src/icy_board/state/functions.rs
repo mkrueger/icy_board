@@ -131,6 +131,11 @@ impl IcyBoardState {
         self.display_string(&txt_entry.text.replace('~', " "), color, display_flags).await
     }
 
+    pub fn get_display_text(&mut self, message_number: IceText) -> Res<String> {
+        let txt_entry = self.display_text.get_display_text(message_number)?;
+        Ok(txt_entry.text.replace('~', " "))
+    }
+
     pub async fn display_string(&mut self, txt: &str, color: IcbColor, display_flags: i32) -> Res<()> {
         if display_flags & display_flags::NOTBLANK != 0 && txt.is_empty() {
             return Ok(());

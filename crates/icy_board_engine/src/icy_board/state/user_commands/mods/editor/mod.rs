@@ -188,8 +188,8 @@ impl EditState {
     }
 
     async fn msg_header(&mut self, state: &mut IcyBoardState) -> Res<()> {
-        let to_txt = state.display_text.get_display_text(IceText::To)?.text.trim_start().replace("~", " ");
-        let subj_txt = state.display_text.get_display_text(IceText::Subject)?.text.trim_start().replace("~", " ");
+        let to_txt = state.get_display_text(IceText::To)?;
+        let subj_txt = state.get_display_text(IceText::Subject)?;
 
         let to_part = format!("{}{}", to_txt, self.to);
         let subj_part = format!("{}{} {}", subj_txt, self.subj, Local::now().format("%H:%M"));
