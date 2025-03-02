@@ -1,6 +1,6 @@
 # Roadmap/TODO
 
-- [ ] Implement all search commands (text/file search)
+- [x] Implement all search commands (text/file search)
 - [ ] Mail QWK support
 - [ ] Solution for file base meta data 
   - I don't want a "DIRS" file but there is metadata that is not included in the .ZIP - let's say uploader.
@@ -9,9 +9,9 @@
   I implemented all outdated ZIP algorithms for the rust zip libary so that the files from the 80' all extract.
   But this needs to be merged.
 - [ ] Finsh/sync commands & help files
-- [ ] ICBSETUP needs a "cmd editor"
+- [x] ICBSETUP needs a "cmd editor"
 - [ ] Rework the mkicbmnu - due to changes in the icbsetup menu system that got broken
-- [ ] Look at the NEWS/INTRO feature of PCBOARD how that really works
+- [x] Look at the NEWS/INTRO feature of PCBOARD how that really works
 - [ ] Logon mail scan
 - [ ] Finish internal message reader - I don't like it have a message reader PPE going but needs to be finished in any case…
 - [ ] Implement RM command
