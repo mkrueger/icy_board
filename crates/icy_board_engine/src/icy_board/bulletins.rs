@@ -12,7 +12,7 @@ use super::{IcyBoardSerializer, PCBoardRecordImporter, security_expr::SecurityEx
 #[serde_as]
 #[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Bullettin {
-    pub file: PathBuf,
+    pub path: PathBuf,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
@@ -21,9 +21,9 @@ pub struct Bullettin {
 }
 
 impl Bullettin {
-    pub fn new(file: &Path) -> Self {
+    pub fn new(path: &Path) -> Self {
         Self {
-            file: file.to_path_buf(),
+            path: path.to_path_buf(),
             required_security: SecurityExpression::default(),
         }
     }
@@ -64,7 +64,7 @@ impl PCBoardRecordImporter<Bullettin> for BullettinList {
     fn load_pcboard_record(data: &[u8]) -> Res<Bullettin> {
         let file_name = import_cp437_string(data, true);
         Ok(Bullettin {
-            file: PathBuf::from(file_name),
+            path: PathBuf::from(file_name),
             required_security: SecurityExpression::default(),
         })
     }

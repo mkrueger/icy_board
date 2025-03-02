@@ -137,7 +137,74 @@ impl IcyBoard {
     }
 
     pub fn resolve_paths(&mut self) {
-        self.config.paths.statistics_file = self.resolve_file(&self.config.paths.statistics_file);
+        self.config.paths.user_file = get_path(&self.root_path, &self.config.paths.user_file);
+        self.config.paths.group_file = get_path(&self.root_path, &self.config.paths.group_file);
+        self.config.paths.command_file = get_path(&self.root_path, &self.config.paths.command_file);
+        self.config.paths.language_file = get_path(&self.root_path, &self.config.paths.language_file);
+        self.config.paths.chat_intro_file = get_path(&self.root_path, &self.config.paths.chat_intro_file);
+        self.config.paths.protocol_data_file = get_path(&self.root_path, &self.config.paths.protocol_data_file);
+        self.config.paths.pwrd_sec_level_file = get_path(&self.root_path, &self.config.paths.pwrd_sec_level_file);
+        self.config.paths.trashcan_upload_files = get_path(&self.root_path, &self.config.paths.trashcan_upload_files);
+        self.config.paths.trashcan_email = get_path(&self.root_path, &self.config.paths.trashcan_email);
+        self.config.paths.trashcan_passwords = get_path(&self.root_path, &self.config.paths.trashcan_passwords);
+        self.config.paths.trashcan_user = get_path(&self.root_path, &self.config.paths.trashcan_user);
+        self.config.paths.statistics_file = get_path(&self.root_path, &self.config.paths.statistics_file);
+
+        self.config.paths.newask_answer = get_path(&self.root_path, &self.config.paths.newask_answer);
+        self.config.paths.newask_survey = get_path(&self.root_path, &self.config.paths.newask_survey);
+
+        self.config.paths.logon_answer = get_path(&self.root_path, &self.config.paths.logon_answer);
+        self.config.paths.logoff_survey = get_path(&self.root_path, &self.config.paths.logoff_survey);
+
+        self.config.paths.logoff_answer = get_path(&self.root_path, &self.config.paths.logon_answer);
+        self.config.paths.logoff_survey = get_path(&self.root_path, &self.config.paths.logoff_survey);
+
+        for c in self.conferences.iter_mut() {
+            c.command_file = get_path(&self.root_path, &c.command_file);
+            c.intro_file = get_path(&self.root_path, &c.intro_file);
+
+            c.area_file = get_path(&self.root_path, &c.area_file);
+            c.area_menu = get_path(&self.root_path, &c.area_menu);
+
+            c.dir_file = get_path(&self.root_path, &c.dir_file);
+            c.dir_menu = get_path(&self.root_path, &c.dir_menu);
+
+            c.doors_file = get_path(&self.root_path, &c.doors_file);
+            c.doors_menu = get_path(&self.root_path, &c.doors_menu);
+
+            c.blt_file = get_path(&self.root_path, &c.blt_file);
+            c.blt_menu = get_path(&self.root_path, &c.blt_menu);
+
+            c.survey_file = get_path(&self.root_path, &c.survey_file);
+            c.survey_menu = get_path(&self.root_path, &c.survey_menu);
+
+            c.pub_upload_location = get_path(&self.root_path, &c.pub_upload_location);
+            c.private_upload_location = get_path(&self.root_path, &c.private_upload_location);
+
+            if let Some(areas) = &mut c.areas {
+                for area in areas.iter_mut() {
+                    area.path = get_path(&self.root_path, &area.path);
+                }
+            }
+            if let Some(directories) = &mut c.directories {
+                for dir in directories.iter_mut() {
+                    dir.path = get_path(&self.root_path, &dir.path);
+                }
+            }
+
+            if let Some(blt) = &mut c.bulletins {
+                for dir in blt.iter_mut() {
+                    dir.path = get_path(&self.root_path, &dir.path);
+                }
+            }
+
+            if let Some(surveys) = &mut c.surveys {
+                for survey in surveys.iter_mut() {
+                    survey.survey_file = get_path(&self.root_path, &survey.survey_file);
+                    survey.answer_file = get_path(&self.root_path, &survey.answer_file);
+                }
+            }
+        }
     }
 
     pub fn resolve_file<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
@@ -197,33 +264,10 @@ impl IcyBoard {
         })?;
 
         let load_path = get_path(parent_path, &config.paths.conferences);
-        let mut conferences = ConferenceBase::load(&load_path).map_err(|e| {
+        let conferences = ConferenceBase::load(&load_path).map_err(|e| {
             log::error!("Error loading conference base: {} from {}", e, load_path.display());
             e
         })?;
-
-        for c in conferences.iter_mut() {
-            c.command_file = get_path(parent_path, &c.command_file);
-            c.intro_file = get_path(parent_path, &c.intro_file);
-
-            c.area_file = get_path(parent_path, &c.area_file);
-            c.area_menu = get_path(parent_path, &c.area_menu);
-
-            c.dir_file = get_path(parent_path, &c.dir_file);
-            c.dir_menu = get_path(parent_path, &c.dir_menu);
-
-            c.doors_file = get_path(parent_path, &c.doors_file);
-            c.doors_menu = get_path(parent_path, &c.doors_menu);
-
-            c.blt_file = get_path(parent_path, &c.blt_file);
-            c.blt_menu = get_path(parent_path, &c.blt_menu);
-
-            c.survey_file = get_path(parent_path, &c.survey_file);
-            c.survey_menu = get_path(parent_path, &c.survey_menu);
-
-            c.pub_upload_location = get_path(parent_path, &c.pub_upload_location);
-            c.private_upload_location = get_path(parent_path, &c.private_upload_location);
-        }
 
         let load_path: PathBuf = get_path(parent_path, &config.paths.icbtext);
         let default_display_text = IcbTextFile::load(&load_path).map_err(|e| {
@@ -661,11 +705,15 @@ pub(crate) fn case_insitive_lookup(path: PathBuf) -> PathBuf {
 }
 
 fn get_path(parent_path: &Path, home_dir: &PathBuf) -> PathBuf {
-    if home_dir.is_absolute() {
+    if home_dir.as_os_str().is_empty() {
+        return PathBuf::new();
+    }
+    let res: PathBuf = if home_dir.is_absolute() {
         home_dir.clone()
     } else {
         parent_path.join(home_dir)
-    }
+    };
+    res
 }
 
 impl Default for IcyBoard {

@@ -540,8 +540,8 @@ impl PcbBoardCommand {
         let survey: Survey = {
             let board = self.state.get_board().await;
             Survey {
-                survey_file: board.resolve_file(&board.config.paths.logon_survey),
-                answer_file: board.resolve_file(&board.config.paths.logon_answer),
+                survey_file: board.config.paths.logon_survey.clone(),
+                answer_file: board.config.paths.logon_answer.clone(),
                 required_security: SecurityExpression::default(),
             }
         };

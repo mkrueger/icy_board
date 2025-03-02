@@ -64,7 +64,7 @@ impl<'a> BullettinsEditor<'a> {
                 }
                 match j {
                     0 => Line::from(format!("{})", *i + 1)),
-                    1 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].file.display())),
+                    1 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].path.display())),
                     _ => Line::from("".to_string()),
                 }
             }),
@@ -201,7 +201,7 @@ impl<'a> Page for BullettinsEditor<'a> {
 
                 KeyCode::Insert => {
                     self.sec_levels.lock().unwrap().push(Bullettin {
-                        file: PathBuf::new(),
+                        path: PathBuf::new(),
                         required_security: SecurityExpression::default(),
                     });
                     self.insert_table.content_length += 1;
@@ -227,10 +227,10 @@ impl<'a> Page for BullettinsEditor<'a> {
                             obj: (selected_item, self.sec_levels.clone()),
                             entry: vec![
                                 ConfigEntry::Item(
-                                    ListItem::new("Path".to_string(), ListValue::Path(action.file.clone()))
+                                    ListItem::new("Path".to_string(), ListValue::Path(action.path.clone()))
                                         .with_label_width(16)
                                         .with_update_path_value(&|board: &(usize, Arc<Mutex<Vec<Bullettin>>>), value: PathBuf| {
-                                            board.1.lock().unwrap()[board.0].file = value;
+                                            board.1.lock().unwrap()[board.0].path = value;
                                         }),
                                 ),
                                 ConfigEntry::Item(

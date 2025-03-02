@@ -50,11 +50,11 @@ fn test_last_cmd_empty() {
 pub fn setup_conference(board: &mut IcyBoard) {
     let mut bulletins = BullettinList::default();
     bulletins.push(Bullettin {
-        file: PathBuf::from("src/tests/main/blt1"),
+        path: PathBuf::from("src/tests/main/blt1"),
         ..Default::default()
     });
     bulletins.push(Bullettin {
-        file: PathBuf::from("src/tests/main/blt2"),
+        path: PathBuf::from("src/tests/main/blt2"),
         ..Default::default()
     });
 

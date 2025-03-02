@@ -648,7 +648,7 @@ pub async fn blt(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let nr = vm.eval_expr(&args[0]).await?.as_int();
     if let Some(bulletins) = &vm.icy_board_state.session.current_conference.bulletins {
         if let Some(bulletin) = bulletins.get(nr as usize) {
-            vm.icy_board_state.display_file(&bulletin.file.clone()).await?;
+            vm.icy_board_state.display_file(&bulletin.path.clone()).await?;
         }
     }
     Ok(())

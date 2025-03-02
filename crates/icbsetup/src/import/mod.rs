@@ -1185,7 +1185,7 @@ impl PCBoardImporter {
         let destination = PathBuf::from(dest_path).join(resolved_file.file_name().unwrap().to_ascii_lowercase());
 
         for entry in list.iter_mut() {
-            let new_entry = self.resolve_file(entry.file.to_str().unwrap());
+            let new_entry = self.resolve_file(entry.path.to_str().unwrap());
             if !new_entry.exists() {
                 self.logger
                     .log(&format!("Warning, can't import bulletin  {}, doesn't exist.", new_entry.display()));
@@ -1197,7 +1197,7 @@ impl PCBoardImporter {
 
             match self.convert_display_file(new_entry.to_str().unwrap(), &new_name) {
                 Ok(new_name) => {
-                    entry.file = new_name;
+                    entry.path = new_name;
                 }
                 Err(err) => {
                     self.logger.log_boxed_error(&*err);

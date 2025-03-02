@@ -115,7 +115,7 @@ impl IcyBoardState {
             for i in files {
                 if let Some(b) = bulletins.get(i as usize) {
                     if new_files {
-                        if let Ok(md) = b.file.metadata() {
+                        if let Ok(md) = b.path.metadata() {
                             let mod_time: DateTime<Utc> = md.modified().unwrap().into();
                             if mod_time < self.session.current_user.as_ref().unwrap().stats.last_on {
                                 continue;
@@ -123,9 +123,9 @@ impl IcyBoardState {
                         }
                     }
                     if download_blt {
-                        self.add_flagged_file(b.file.clone(), false, false).await?;
+                        self.add_flagged_file(b.path.clone(), false, false).await?;
                     } else {
-                        self.display_file(&b.file).await?;
+                        self.display_file(&b.path).await?;
                     }
                 } else {
                     self.display_text(
