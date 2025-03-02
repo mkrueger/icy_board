@@ -19,12 +19,12 @@ message area just works in icy board. But with icy board it's possible to specif
 ## `WebRequest()`  Function (4.00)
 
 ### Function
-Gets data from a web server and stores it as a string.
+Gets data from a web server and returns it as a string.
 
 ### Syntax
 `WebRequest(url)`
 
-`url` An string expression stating the url to get
+`url` An string expression stating the url to get data from.
         
 ### Returns
 `STRING`   Returns the web request value as STRING.
@@ -37,6 +37,6 @@ Gets data from a web server and stores it as a file.
 ### Syntax
 `WEBREQUEST url, file`
 
-`url`  An string expression stating the url to get
+`url`  An string expression stating the url to get data from.
 
-`file` The file name to store the returned data in
+`file` An string expression stating the file to save the data to.

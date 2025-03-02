@@ -7,7 +7,7 @@ use crate::{
     executable::{FUNCTION_DEFINITIONS, OpCode, STATEMENT_DEFINITIONS},
 };
 
-use super::{Executable, FuncOpCode, LAST_STMT, PPECommand, PPEExpr, StatementSignature, VariableType, VariableValue};
+use super::{Executable, FuncOpCode, FunctionSignature, LAST_STMT, PPECommand, PPEExpr, StatementSignature, VariableType, VariableValue};
 
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum DeserializationErrorType {
@@ -24,7 +24,7 @@ pub enum DeserializationErrorType {
     TooFewArgumentsForUnaryExpression(usize, UnaryOp),
 
     #[error("Too few function arguments for {0:?}, expected {1}, got {2}")]
-    TooFewBuiltInFunctionArguments(FuncOpCode, i8, usize),
+    TooFewBuiltInFunctionArguments(FuncOpCode, usize, usize),
 
     #[error("Too few function arguments")]
     TooFewFunctionArguments,
@@ -349,8 +349,8 @@ impl PPEDeserializer {
 
                 let func = -id as usize;
                 let func_def = &FUNCTION_DEFINITIONS[func];
-                match func_def.arg_descr {
-                    0x10 => {
+                match func_def.signature {
+                    FunctionSignature::UnaryOp => {
                         self.offset += 1;
                         let op = UnaryOp::from_opcode(func_def.opcode);
 
@@ -363,7 +363,7 @@ impl PPEDeserializer {
                             return self.deserialize_expression(executable);
                         }
                     }
-                    0x11 => {
+                    FunctionSignature::BinaryOp => {
                         self.offset += 1;
                         let binop = BinOp::from_opcode(func_def.opcode);
                         if self.expr_stack.is_empty() {
@@ -380,21 +380,21 @@ impl PPEDeserializer {
                             self.push_expr(PPEExpr::BinaryExpression(binop, Box::new(l_value), Box::new(r_value)));
                         }
                     }
-                    _ => {
+                    FunctionSignature::Invalid => {
+                        self.push_expr(PPEExpr::PredefinedFunctionCall(func_def, vec![]));
+                    }
+                    FunctionSignature::FixedParameters(count) => {
                         self.offset += 1;
-                        if func_def.arg_descr < 0 {
-                            self.push_expr(PPEExpr::PredefinedFunctionCall(func_def, vec![]));
-                        } else {
-                            if (self.expr_stack.len() as i8) < func_def.arg_descr {
-                                return Err(DeserializationErrorType::TooFewBuiltInFunctionArguments(
-                                    func_def.opcode,
-                                    func_def.arg_descr,
-                                    self.expr_stack.len(),
-                                ));
-                            }
-                            let arguments = self.expr_stack.drain(self.expr_stack.len() - func_def.arg_descr as usize..).collect();
-                            self.push_expr(PPEExpr::PredefinedFunctionCall(func_def, arguments));
+
+                        if self.expr_stack.len() < count {
+                            return Err(DeserializationErrorType::TooFewBuiltInFunctionArguments(
+                                func_def.opcode,
+                                count,
+                                self.expr_stack.len(),
+                            ));
                         }
+                        let arguments = self.expr_stack.drain(self.expr_stack.len() - count..).collect();
+                        self.push_expr(PPEExpr::PredefinedFunctionCall(func_def, arguments));
                     }
                 }
             }

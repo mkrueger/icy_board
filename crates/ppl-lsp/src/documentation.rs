@@ -431,21 +431,21 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
         FuncOpCode::SetMsgHdr => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-setmsghdr")),
         FuncOpCode::NewConfInfo => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-newconfinfo")),
         FuncOpCode::AreaId => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-areaid")),
+        FuncOpCode::WebRequest => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-webrequest")),
         _ => None,
     }
 }
 
 #[cfg(test)]
 mod test {
-    use icy_board_engine::executable::FUNCTION_DEFINITIONS;
+    use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionSignature};
 
     #[test]
     fn test_function_translations() {
         for f in FUNCTION_DEFINITIONS.iter() {
-            if f.arg_descr < 0 || f.arg_descr >= 0x10 {
-                continue;
+            if let FunctionSignature::FixedParameters(_) = f.signature {
+                assert!(super::get_function_hover(f).is_some(), "Function {:?} failed", f.opcode);
             }
-            super::get_function_hover(f).unwrap();
         }
     }
 }
@@ -672,6 +672,7 @@ pub fn get_statement_hover(stmt: &StatementDefinition) -> Option<Hover> {
         OpCode::ShortDesc => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-shortdesc")),
         OpCode::MoveMsg => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-movemsg")),
         OpCode::SetBankBal => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-setbankbal")),
+        OpCode::WebRequest => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-webrequest")),
         _ => None,
     }
 }

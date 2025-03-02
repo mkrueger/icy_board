@@ -725,9 +725,9 @@ impl IcyBoardState {
 
     pub async fn run_executable<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>, executable: Executable) -> Res<()> {
         self.session.disp_options.no_change();
-        let canonicalized_path = file_name.as_ref().canonicalize()?;
-        let canonicalized_path = PathBuf::from(adjust_canonicalization(canonicalized_path));
+        let canonicalized_path: PathBuf = file_name.as_ref().canonicalize()?;
 
+        let canonicalized_path = PathBuf::from(adjust_canonicalization(canonicalized_path));
         let parent = canonicalized_path.parent().unwrap().to_str().unwrap().to_string();
         let mut io = DiskIO::new(&parent, answer_file);
         Ok(if let Err(err) = run(&canonicalized_path, &executable, &mut io, self).await {

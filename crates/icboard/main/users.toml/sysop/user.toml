@@ -6,6 +6,7 @@ protocol = "Z"
 page_len = 0
 date_last_dir_read = "1970-01-01T00:00:00Z"
 chat_status = "Available"
+conference_flags = ""
 
 [password]
 password = ""
@@ -17,5 +18,5 @@ fse_mode = "Yes"
 
 [stats]
 first_date_on = "1970-01-01T00:00:00Z"
-last_on = "2025-02-26T18:23:53.003916381Z"
+last_on = "2025-03-02T07:49:39.410407390Z"
 num_times_on = 1

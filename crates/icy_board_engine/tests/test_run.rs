@@ -1,6 +1,5 @@
 use std::{
-    env,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
     thread,
 };
@@ -16,9 +15,6 @@ use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
 #[test]
 fn test_compiler() {
     use std::fs::{self};
-
-    let mut data_path: PathBuf = env::current_dir().unwrap();
-    data_path.push("src/test_data");
     //let mut success = 0;
     //let mut skipped = 0;
     for entry in fs::read_dir("tests/test_data").expect("Error reading test_data directory.") {
@@ -26,23 +22,21 @@ fn test_compiler() {
         if cur_entry.extension().unwrap() != "pps" {
             continue;
         }
-
         let executable = fs::read_to_string(&cur_entry).unwrap();
         let mut out_path = cur_entry.clone();
         out_path.set_extension("out");
         let expected_output = unsafe { String::from_utf8_unchecked(fs::read(&out_path).unwrap()) };
 
-        let file_name = cur_entry.file_name().unwrap().to_str().unwrap();
-        run_test(file_name, &executable, &expected_output);
+        run_test(&cur_entry, &executable, &expected_output);
     }
 }
 
-fn run_test(file_name: &str, input: &str, expected_output: &str) {
-    println!("Test {}...", file_name);
+fn run_test(file_name: &Path, input: &str, expected_output: &str) {
+    println!("Test {}...", file_name.display());
     let reg = UserTypeRegistry::default();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     let ws = Workspace::default();
-    let ast = icy_board_engine::parser::parse_ast(PathBuf::from(&file_name), errors.clone(), input, &reg, Encoding::Utf8, &ws);
+    let ast = icy_board_engine::parser::parse_ast(file_name.to_path_buf(), errors.clone(), input, &reg, Encoding::Utf8, &ws);
     check_errors(errors.clone());
     let mut compiler = PPECompiler::new(&ws, reg, errors.clone());
     compiler.compile(&[&ast]);
@@ -97,7 +91,7 @@ fn run_test(file_name: &str, input: &str, expected_output: &str) {
                 });
                 state.run_executable(&file_name, None, executable.clone()).await.unwrap();
                 thread::sleep(std::time::Duration::from_millis(50));
-                let x = result.as_ref().lock().await.clone();
+                let x: Vec<u8> = result.as_ref().lock().await.clone();
                 x
             });
 

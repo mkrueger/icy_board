@@ -319,12 +319,20 @@ impl FuncOpCode {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum FunctionSignature {
+    Invalid,
+    UnaryOp,
+    BinaryOp,
+    FixedParameters(usize),
+}
+
+#[derive(Debug, PartialEq)]
 pub struct FunctionDefinition {
     pub name: &'static str,
     pub version: u16,
     pub opcode: FuncOpCode,
     pub return_type: VariableType,
-    pub arg_descr: i8,
+    pub signature: FunctionSignature,
     pub args: Option<Vec<ArgumentDefinition>>,
 }
 
@@ -360,6 +368,13 @@ impl FunctionDefinition {
         res.push_str(&ts);
         Signature::new_with_args(res, sig_args)
     }
+
+    pub fn parameter_count(&self) -> usize {
+        match self.signature {
+            FunctionSignature::FixedParameters(len) => len,
+            _ => 0,
+        }
+    }
 }
 lazy_static::lazy_static! {
     pub static ref FUNCTION_DEFINITIONS: [FunctionDefinition; 299] = [
@@ -370,7 +385,7 @@ lazy_static::lazy_static! {
 
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: -1,
+            signature: FunctionSignature::Invalid,
         },
         FunctionDefinition {
             name: "CPAR",
@@ -378,7 +393,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::CPAR,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: -1,
+            signature: FunctionSignature::Invalid,
         },
         FunctionDefinition {
             name: "UPLUS",
@@ -386,7 +401,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::UPLUS,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x10,
+            signature: FunctionSignature::UnaryOp,
         },
         FunctionDefinition {
             name: "UMINUS",
@@ -394,7 +409,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::UMINUS,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x10,
+            signature: FunctionSignature::UnaryOp,
         },
         FunctionDefinition {
             name: "EXP",
@@ -402,7 +417,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::EXP,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x11,
+            signature: FunctionSignature::BinaryOp,
         },
         FunctionDefinition {
             name: "TIMES",
@@ -410,7 +425,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::TIMES,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x11,
+            signature: FunctionSignature::BinaryOp,
         },
         FunctionDefinition {
             name: "DIVIDE",
@@ -418,7 +433,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::DIVIDE,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x11,
+            signature: FunctionSignature::BinaryOp,
         },
         FunctionDefinition {
             name: "MOD",
@@ -426,7 +441,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MOD,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x11,
+            signature: FunctionSignature::BinaryOp,
         },
         FunctionDefinition {
             name: "PLUS",
@@ -434,7 +449,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::PLUS,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x11,
+            signature: FunctionSignature::BinaryOp,
         },
         FunctionDefinition {
             name: "MINUS",
@@ -442,7 +457,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MINUS,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x11,
+            signature: FunctionSignature::BinaryOp,
         },
         FunctionDefinition {
             name: "EQ",
@@ -450,7 +465,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::EQ,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x11,
+            signature: FunctionSignature::BinaryOp,
         },
         FunctionDefinition {
             name: "NE",
@@ -458,7 +473,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::NE,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x11,
+            signature: FunctionSignature::BinaryOp,
         },
         FunctionDefinition {
             name: "LT",
@@ -466,7 +481,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::LT,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x11,
+            signature: FunctionSignature::BinaryOp,
         },
         FunctionDefinition {
             name: "LE",
@@ -474,7 +489,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::LE,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x11,
+            signature: FunctionSignature::BinaryOp,
         },
         FunctionDefinition {
             name: "GT",
@@ -482,7 +497,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::GT,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x11,
+            signature: FunctionSignature::BinaryOp,
         },
         FunctionDefinition {
             name: "GE",
@@ -490,7 +505,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::GE,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x11,
+            signature: FunctionSignature::BinaryOp,
         },
         FunctionDefinition {
             name: "NOT",
@@ -498,7 +513,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::NOT,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x10,
+            signature: FunctionSignature::UnaryOp,
         },
         FunctionDefinition {
             name: "AND",
@@ -506,7 +521,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::AND,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x11,
+            signature: FunctionSignature::BinaryOp,
         },
         FunctionDefinition {
             name: "OR",
@@ -514,7 +529,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::OR,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x11,
+            signature: FunctionSignature::BinaryOp,
         },
         FunctionDefinition {
             name: "OPAR",
@@ -522,7 +537,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::OPAR,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: -1,
+            signature: FunctionSignature::Invalid,
         },
         FunctionDefinition {
             name: "Len",
@@ -532,7 +547,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::BigStr)
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Lower",
@@ -542,7 +557,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::BigStr)
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Upper",
@@ -552,7 +567,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::BigStr)
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Mid",
@@ -564,7 +579,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("pos", VariableType::Integer),
                 ArgumentDefinition::new("len", VariableType::Integer),
             ]),
-            arg_descr: 0x03,
+            signature: FunctionSignature::FixedParameters(3),
         },
         FunctionDefinition {
             name: "Left",
@@ -575,7 +590,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("str", VariableType::BigStr),
                 ArgumentDefinition::new("count", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "Right",
@@ -586,7 +601,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("str", VariableType::BigStr),
                 ArgumentDefinition::new("count", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "Space",
@@ -596,7 +611,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("count", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "FErr",
@@ -606,7 +621,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Chr",
@@ -616,7 +631,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("ch", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Asc",
@@ -626,7 +641,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "InStr",
@@ -637,7 +652,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("str", VariableType::BigStr),
                 ArgumentDefinition::new("search", VariableType::String),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "Abort",
@@ -645,7 +660,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::ABORT,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "LTrim",
@@ -656,7 +671,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("str", VariableType::BigStr),
                 ArgumentDefinition::new("char", VariableType::String),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "RTrim",
@@ -667,7 +682,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("str", VariableType::BigStr),
                 ArgumentDefinition::new("char", VariableType::String),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "Trim",
@@ -678,7 +693,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("str", VariableType::BigStr),
                 ArgumentDefinition::new("char", VariableType::String),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "Random",
@@ -688,7 +703,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("var", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Date",
@@ -696,7 +711,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::DATE,
             return_type: VariableType::Date,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "Time",
@@ -704,7 +719,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::TIME,
             return_type: VariableType::Time,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "U_Name",
@@ -712,7 +727,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::U_NAME,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "U_LDate",
@@ -720,7 +735,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::U_LDATE,
             return_type: VariableType::Date,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "U_LTime",
@@ -728,7 +743,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::U_LTIME,
             return_type: VariableType::Time,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "U_LDir",
@@ -736,7 +751,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::U_LDIR,
             return_type: VariableType::Date,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "U_Logons",
@@ -744,7 +759,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::U_LOGONS,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "U_FUl",
@@ -752,7 +767,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::U_FUL,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "U_FDl",
@@ -760,7 +775,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::U_FDL,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "U_BDLDay",
@@ -768,7 +783,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::U_BDLDAY,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "U_TimeOn",
@@ -776,7 +791,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::U_TIMEON,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "U_BDl",
@@ -784,7 +799,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::U_BDL,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "U_BUl",
@@ -792,7 +807,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::U_BUL,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "Year",
@@ -802,7 +817,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("var", VariableType::Date),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Month",
@@ -812,7 +827,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("var", VariableType::Date),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Day",
@@ -822,7 +837,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("var", VariableType::Date),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Dow",
@@ -832,7 +847,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("var", VariableType::Date),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Hour",
@@ -842,7 +857,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("dayhour", VariableType::Time),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Min",
@@ -852,7 +867,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("dayhour", VariableType::Time),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Sec",
@@ -862,7 +877,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("dayhour", VariableType::Time),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "TimeAP",
@@ -872,7 +887,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("var", VariableType::Time),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Ver",
@@ -880,7 +895,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::VER,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "NoChar",
@@ -888,7 +903,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::NOCHAR,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "YesChar",
@@ -896,7 +911,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::YESCHAR,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "StripATX",
@@ -906,7 +921,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::BigStr),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Replace",
@@ -918,7 +933,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("search", VariableType::String),
                 ArgumentDefinition::new("replace", VariableType::String),
             ]),
-            arg_descr: 0x03,
+            signature: FunctionSignature::FixedParameters(3),
         },
         FunctionDefinition {
             name: "Strip",
@@ -929,7 +944,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("str", VariableType::BigStr),
                 ArgumentDefinition::new("char", VariableType::String),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "InKey",
@@ -937,7 +952,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::INKEY,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "String",
@@ -947,7 +962,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("var", VariableType::None),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Mask_Pwd",
@@ -955,7 +970,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MASK_PWD,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "Mask_Alpha",
@@ -963,7 +978,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MASK_ALPHA,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "Mask_Num",
@@ -971,7 +986,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MASK_NUM,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "Mask_Alnum",
@@ -979,7 +994,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MASK_ALNUM,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "Mask_File",
@@ -987,7 +1002,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MASK_FILE,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "Mask_Path",
@@ -995,7 +1010,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MASK_PATH,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "Mask_ASCII",
@@ -1003,7 +1018,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MASK_ASCII,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "CurConf",
@@ -1011,7 +1026,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::CURCONF,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "PCBDat",
@@ -1019,7 +1034,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::PCBDAT,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "PPEPath",
@@ -1027,7 +1042,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::PPEPATH,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "ValDate",
@@ -1037,7 +1052,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("date", VariableType::String),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ValTime",
@@ -1047,7 +1062,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("time", VariableType::String),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "U_MsgRd",
@@ -1055,7 +1070,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::U_MSGRD,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "U_MsgWr",
@@ -1063,7 +1078,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::U_MSGWR,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "PCBNode",
@@ -1071,7 +1086,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::PCBNODE,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "ReadLine",
@@ -1082,7 +1097,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("file", VariableType::String),
                 ArgumentDefinition::new("line", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "SysopSec",
@@ -1090,7 +1105,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::SYSOPSEC,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "OnLocal",
@@ -1098,7 +1113,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::ONLOCAL,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "UN_Stat",
@@ -1106,7 +1121,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::UN_STAT,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "UN_Name",
@@ -1114,7 +1129,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::UN_NAME,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "UN_City",
@@ -1122,7 +1137,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::UN_CITY,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "UN_Oper",
@@ -1130,7 +1145,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::UN_OPER,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "CurSec",
@@ -1138,7 +1153,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::CURSEC,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "GetToken",
@@ -1146,7 +1161,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::GETTOKEN,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "MinLeft",
@@ -1154,7 +1169,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MINLEFT,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "MinOn",
@@ -1162,7 +1177,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MINON,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "GetEnv",
@@ -1172,7 +1187,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("var", VariableType::String),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "CallId",
@@ -1180,7 +1195,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::CALLID,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegAL",
@@ -1188,7 +1203,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGAL,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegAH",
@@ -1196,7 +1211,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGAH,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegBL",
@@ -1204,7 +1219,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGBL,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegBH",
@@ -1212,7 +1227,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGBH,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegCL",
@@ -1220,7 +1235,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGCL,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegCH",
@@ -1228,7 +1243,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGCH,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegDL",
@@ -1236,7 +1251,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGDL,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegDH",
@@ -1244,7 +1259,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGDH,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegAX",
@@ -1252,7 +1267,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGAX,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegBX",
@@ -1260,7 +1275,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGBX,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegCX",
@@ -1268,7 +1283,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGCX,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegDX",
@@ -1276,7 +1291,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGDX,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegSI",
@@ -1284,7 +1299,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGSI,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegDI",
@@ -1292,7 +1307,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGDI,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegF",
@@ -1300,7 +1315,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGF,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegCF",
@@ -1308,7 +1323,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGCF,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegDS",
@@ -1316,7 +1331,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGDS,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RegES",
@@ -1324,7 +1339,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::REGES,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "B2W",
@@ -1335,7 +1350,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("hi", VariableType::Integer),
                 ArgumentDefinition::new("lo", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "PeekB",
@@ -1345,7 +1360,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("var", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "PeekW",
@@ -1355,7 +1370,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("var", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "MkAddr",
@@ -1366,7 +1381,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("seg", VariableType::Integer),
                 ArgumentDefinition::new("off", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "Exist",
@@ -1376,7 +1391,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("file", VariableType::String),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "I2S",
@@ -1387,7 +1402,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("num", VariableType::Integer),
                 ArgumentDefinition::new("base", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "S2I",
@@ -1398,7 +1413,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("num", VariableType::Integer),
                 ArgumentDefinition::new("base", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "Carrier",
@@ -1406,7 +1421,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::CARRIER,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "TokenStr",
@@ -1414,7 +1429,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::TOKENSTR,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "CDOn",
@@ -1422,7 +1437,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::CDON,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "LangExt",
@@ -1430,7 +1445,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::LANGEXT,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "ANSIOn",
@@ -1438,7 +1453,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::ANSION,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "ValCC",
@@ -1448,7 +1463,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("ccNum", VariableType::String),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "FmtCC",
@@ -1458,7 +1473,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("format", VariableType::String),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "CCType",
@@ -1468,7 +1483,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("ccNum", VariableType::String),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "GetX",
@@ -1476,7 +1491,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::GETX,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "GetY",
@@ -1484,7 +1499,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::GETY,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "And",
@@ -1495,7 +1510,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("left", VariableType::Integer),
                 ArgumentDefinition::new("right", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "Or",
@@ -1506,7 +1521,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("left", VariableType::Integer),
                 ArgumentDefinition::new("right", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "Xor",
@@ -1517,7 +1532,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("left", VariableType::Integer),
                 ArgumentDefinition::new("right", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "Not",
@@ -1527,7 +1542,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("expr", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "U_PwdHist",
@@ -1537,7 +1552,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("hist", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "U_PwdLc",
@@ -1545,7 +1560,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::U_PWDLC,
             return_type: VariableType::Date,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "U_PwdTc",
@@ -1553,7 +1568,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::U_PWDTC,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "U_Stat",
@@ -1563,7 +1578,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("option", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DefColor",
@@ -1571,7 +1586,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::DEFCOLOR,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "Abs",
@@ -1581,7 +1596,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("var", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "GrafMode",
@@ -1589,7 +1604,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::GRAFMODE,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "PSA",
@@ -1599,7 +1614,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("var", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "FileInf",
@@ -1610,7 +1625,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("file", VariableType::String),
                 ArgumentDefinition::new("option", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "PPEName",
@@ -1618,7 +1633,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::PPENAME,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "MkDate",
@@ -1630,7 +1645,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("month", VariableType::Integer),
                 ArgumentDefinition::new("day", VariableType::Integer),
             ]),
-            arg_descr: 0x03,
+            signature: FunctionSignature::FixedParameters(3),
         },
         FunctionDefinition {
             name: "CurColor",
@@ -1638,7 +1653,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::CURCOLOR,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "KInkey",
@@ -1646,7 +1661,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::KINKEY,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "MInkey",
@@ -1654,7 +1669,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MINKEY,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "MaxNode",
@@ -1662,7 +1677,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MAXNODE,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "SLPath",
@@ -1670,7 +1685,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::SLPATH,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "HelpPath",
@@ -1678,7 +1693,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::HELPPATH,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "TempPath",
@@ -1686,7 +1701,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::TEMPPATH,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "Modem",
@@ -1694,7 +1709,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MODEM,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "LoggedOn",
@@ -1702,7 +1717,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::LOGGEDON,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "CallNum",
@@ -1710,7 +1725,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::CALLNUM,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "MGetByte",
@@ -1718,7 +1733,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MGETBYTE,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "TokCount",
@@ -1726,7 +1741,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::TOKCOUNT,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "U_RecNum",
@@ -1736,7 +1751,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("user", VariableType::String),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "U_InConf",
@@ -1747,7 +1762,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("record", VariableType::Integer),
                 ArgumentDefinition::new("conf", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "PeekDW",
@@ -1757,7 +1772,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("var", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DbgLevel",
@@ -1765,7 +1780,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::DBGLEVEL,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "ScrText",
@@ -1778,7 +1793,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("len", VariableType::Integer),
                 ArgumentDefinition::new("code", VariableType::Boolean),
             ]),
-            arg_descr: 0x04,
+            signature: FunctionSignature::FixedParameters(4),
         },
         FunctionDefinition {
             name: "ShowStat",
@@ -1786,7 +1801,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::SHOWSTAT,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "PageStat",
@@ -1794,7 +1809,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::PAGESTAT,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "ReplaceStr",
@@ -1806,7 +1821,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("search", VariableType::String),
                 ArgumentDefinition::new("replace", VariableType::String),
             ]),
-            arg_descr: 0x03,
+            signature: FunctionSignature::FixedParameters(3),
         },
         FunctionDefinition {
             name: "StripStr",
@@ -1818,7 +1833,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("search", VariableType::String),
             ]),
 
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "ToBigStr",
@@ -1828,7 +1843,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("exp", VariableType::None),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ToBoolean",
@@ -1838,7 +1853,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("exp", VariableType::None),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ToByte",
@@ -1848,7 +1863,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("exp", VariableType::None),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ToDate",
@@ -1858,7 +1873,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("exp", VariableType::None),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ToDReal",
@@ -1868,7 +1883,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("exp", VariableType::None),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ToEDate",
@@ -1878,7 +1893,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("exp", VariableType::None),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ToInteger",
@@ -1888,7 +1903,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("exp", VariableType::None),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ToMoney",
@@ -1898,7 +1913,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("exp", VariableType::None),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ToReal",
@@ -1908,7 +1923,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("exp", VariableType::None),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ToSByte",
@@ -1918,7 +1933,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("exp", VariableType::None),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ToSWord",
@@ -1928,7 +1943,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("exp", VariableType::None),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ToTime",
@@ -1938,7 +1953,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("exp", VariableType::None),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ToUnsigned",
@@ -1948,7 +1963,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("exp", VariableType::None),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ToWord",
@@ -1958,7 +1973,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("exp", VariableType::None),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Mixed",
@@ -1968,7 +1983,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Alias",
@@ -1976,7 +1991,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::ALIAS,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "ConfReg",
@@ -1984,7 +1999,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::CONFREG,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ConfExp",
@@ -1994,7 +2009,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("confNum", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ConfSel",
@@ -2004,7 +2019,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("confNum", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ConfSys",
@@ -2014,7 +2029,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("confNum", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ConfMW",
@@ -2024,7 +2039,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("confNum", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "LPrinted",
@@ -2032,7 +2047,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::LPRINTED,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "IsNonStop",
@@ -2040,7 +2055,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::ISNONSTOP,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "ErrCorrect",
@@ -2048,7 +2063,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::ERRCORRECT,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "ConfAlias",
@@ -2056,7 +2071,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::CONFALIAS,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "UserAlias",
@@ -2064,7 +2079,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::USERALIAS,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "CurUser",
@@ -2072,7 +2087,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::CURUSER,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "U_LMR",
@@ -2082,7 +2097,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("confNum", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ChatStat",
@@ -2090,7 +2105,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::CHATSTAT,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "DefAns",
@@ -2098,7 +2113,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::DEFANS,
             return_type: VariableType::BigStr,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "LastAns",
@@ -2106,7 +2121,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::LASTANS,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "MegaNum",
@@ -2116,7 +2131,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("number", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "EVTTimeAdj",
@@ -2124,7 +2139,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::EVTTIMEADJ,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "IsBitSet",
@@ -2135,7 +2150,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("number", VariableType::None),
                 ArgumentDefinition::new("bit", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "FmtReal",
@@ -2147,7 +2162,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("fieldWidth", VariableType::Integer),
                 ArgumentDefinition::new("decimalPlaces", VariableType::Integer),
             ]),
-            arg_descr: 0x03,
+            signature: FunctionSignature::FixedParameters(3),
         },
         FunctionDefinition {
             name: "FlagCNT",
@@ -2155,7 +2170,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::FLAGCNT,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "KBDBufSize",
@@ -2163,7 +2178,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::KBDBUFSIZE,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "PPLBufSize",
@@ -2171,7 +2186,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::PPLBUFSIZE,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "KBDFilUsued",
@@ -2179,7 +2194,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::KBDFILUSED,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "LoMsgNum",
@@ -2187,7 +2202,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::LOMSGNUM,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "HiMsgNum",
@@ -2195,7 +2210,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::HIMSGNUM,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "DriveSpace",
@@ -2205,7 +2220,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("drivespec", VariableType::String),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "OutBytes",
@@ -2213,7 +2228,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::OUTBYTES,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "HiConfNum",
@@ -2221,7 +2236,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::HICONFNUM,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "InBytes",
@@ -2229,7 +2244,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::INBYTES,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "CRC32",
@@ -2240,7 +2255,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new_flags("isFile", ArgumentDefinitionFlags::Crc32),
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "PcbMac",
@@ -2250,7 +2265,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("str", VariableType::String),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ActMSGNum",
@@ -2258,7 +2273,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::ACTMSGNUM,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "StackLeft",
@@ -2266,7 +2281,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::STACKLEFT,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "StackErr",
@@ -2274,7 +2289,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::STACKERR,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "DGetAlias",
@@ -2284,7 +2299,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DBOF",
@@ -2294,7 +2309,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DChanged",
@@ -2304,7 +2319,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DDecimals",
@@ -2315,7 +2330,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("channel", VariableType::Integer),
                 ArgumentDefinition::new("name", VariableType::String),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "DDeleted",
@@ -2325,7 +2340,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DEof",
@@ -2335,7 +2350,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DErr",
@@ -2345,7 +2360,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DFields",
@@ -2355,7 +2370,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DLength",
@@ -2365,7 +2380,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "DName",
@@ -2376,7 +2391,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("channel", VariableType::Integer),
                 ArgumentDefinition::new("number", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "DRecCount",
@@ -2386,7 +2401,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DRecNo",
@@ -2396,7 +2411,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DType",
@@ -2407,7 +2422,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("channel", VariableType::Integer),
                 ArgumentDefinition::new("name", VariableType::String),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "FNext",
@@ -2415,7 +2430,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::FNEXT,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "DNext",
@@ -2423,7 +2438,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::DNEXT,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "ToDDate",
@@ -2433,7 +2448,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("exp", VariableType::None),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DCloseAll",
@@ -2441,7 +2456,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::DCLOSEALL,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "DOpen",
@@ -2453,7 +2468,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("name", VariableType::String),
                 ArgumentDefinition::new("exclusive", VariableType::Boolean),
             ]),
-            arg_descr: 0x03,
+            signature: FunctionSignature::FixedParameters(3),
         },
         FunctionDefinition {
             name: "DClose",
@@ -2463,7 +2478,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DSetAlias",
@@ -2474,7 +2489,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("channel", VariableType::Integer),
                 ArgumentDefinition::new("name", VariableType::String),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "DPack",
@@ -2484,7 +2499,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DLockF",
@@ -2494,7 +2509,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DLock",
@@ -2504,7 +2519,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DLockR",
@@ -2515,7 +2530,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("channel", VariableType::Integer),
                 ArgumentDefinition::new("recNo", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "DUnLock",
@@ -2525,7 +2540,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DNOpen",
@@ -2536,7 +2551,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("channel", VariableType::Integer),
                 ArgumentDefinition::new("name", VariableType::String),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "DNClose",
@@ -2547,7 +2562,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("channel", VariableType::Integer),
                 ArgumentDefinition::new("name", VariableType::String),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "DNCloseAll",
@@ -2557,7 +2572,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DNew",
@@ -2567,7 +2582,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DAdd",
@@ -2577,7 +2592,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DAppend",
@@ -2587,7 +2602,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DTop",
@@ -2597,7 +2612,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DGo",
@@ -2608,7 +2623,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("channel", VariableType::Integer),
                 ArgumentDefinition::new("recNo", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "DBottom",
@@ -2618,7 +2633,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DSkip",
@@ -2629,7 +2644,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("channel", VariableType::Integer),
                 ArgumentDefinition::new("number", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "DBLank",
@@ -2639,7 +2654,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DDelete",
@@ -2649,7 +2664,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DRecall",
@@ -2659,7 +2674,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DTag",
@@ -2670,7 +2685,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("channel", VariableType::Integer),
                 ArgumentDefinition::new("name", VariableType::String),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "DSeek",
@@ -2681,7 +2696,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("channel", VariableType::Integer),
                 ArgumentDefinition::new("expression", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "DFBlank",
@@ -2692,7 +2707,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("channel", VariableType::Integer),
                 ArgumentDefinition::new("name", VariableType::String),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "DGet",
@@ -2703,7 +2718,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("channel", VariableType::Integer),
                 ArgumentDefinition::new("name", VariableType::String),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "DPut",
@@ -2715,7 +2730,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("name", VariableType::String),
                 ArgumentDefinition::new("expr", VariableType::String),
             ]),
-            arg_descr: 0x03,
+            signature: FunctionSignature::FixedParameters(3),
         },
         FunctionDefinition {
             name: "DFCopy",
@@ -2728,7 +2743,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("dstchannel", VariableType::Integer),
                 ArgumentDefinition::new("dstname", VariableType::String),
             ]),
-            arg_descr: 0x04,
+            signature: FunctionSignature::FixedParameters(4),
         },
         FunctionDefinition {
             name: "DSelect",
@@ -2738,7 +2753,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("alias", VariableType::String),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DChkStat",
@@ -2748,7 +2763,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("channel", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "PCBAccount",
@@ -2758,7 +2773,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("field", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "PCBAccStat",
@@ -2768,7 +2783,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("field", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "DErrMsg",
@@ -2778,7 +2793,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("errcode", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Account",
@@ -2788,7 +2803,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("field", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ScanMsgHdr",
@@ -2801,7 +2816,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("field", VariableType::Integer),
                 ArgumentDefinition::new("test", VariableType::String),
             ]),
-            arg_descr: 0x04,
+            signature: FunctionSignature::FixedParameters(4),
         },
         FunctionDefinition {
             name: "CheckRIP",
@@ -2809,7 +2824,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::CHECKRIP,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "RIPVer",
@@ -2817,7 +2832,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::RIPVER,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "QWKLimits",
@@ -2825,7 +2840,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::QWKLIMITS,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "FindFirst",
@@ -2835,7 +2850,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("file", VariableType::String),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "FindNext",
@@ -2843,7 +2858,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::FINDNEXT,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "UseLMRs",
@@ -2851,7 +2866,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::USELMRS,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "ConfInfo",
@@ -2862,7 +2877,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("conf", VariableType::Integer),
                 ArgumentDefinition::new("field", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "TInkey",
@@ -2872,7 +2887,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("ticks", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "CWD",
@@ -2880,7 +2895,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::CWD,
             return_type: VariableType::String,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "InStrr",
@@ -2891,7 +2906,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("str", VariableType::BigStr),
                 ArgumentDefinition::new("pattern", VariableType::String),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "FDORDAKA",
@@ -2899,7 +2914,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::FDORDAKA,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "FDORDOrg",
@@ -2907,7 +2922,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::FDORDORG,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "FDORDArea",
@@ -2915,7 +2930,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::FDORDAREA,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "FDOQRd",
@@ -2923,7 +2938,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::FDOQRD,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x06,
+            signature: FunctionSignature::FixedParameters(6),
         },
         FunctionDefinition {
             name: "GetDrive",
@@ -2931,7 +2946,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::GETDRIVE,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "SetDrive",
@@ -2941,7 +2956,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("drive", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "BS2I",
@@ -2951,7 +2966,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("r", VariableType::BigStr),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "BD2I",
@@ -2961,7 +2976,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("r", VariableType::Double),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "I2BS",
@@ -2971,7 +2986,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("r", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "I2BD",
@@ -2981,7 +2996,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("r", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "FTell",
@@ -2991,7 +3006,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("chan", VariableType::Integer),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "OS",
@@ -2999,7 +3014,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::OS,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "ShortDesc",
@@ -3007,7 +3022,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::SHORT_DESC,
             return_type: VariableType::Boolean,
             args: None,
-            arg_descr: 0x00,
+            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "GetBankBal",
@@ -3017,7 +3032,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("field", VariableType::Integer),
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
             name: "GetMsgHdr",
@@ -3029,7 +3044,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("msgNum", VariableType::Integer),
                 ArgumentDefinition::new("field", VariableType::Integer),
             ]),
-            arg_descr: 0x03,
+            signature: FunctionSignature::FixedParameters(3),
         },
         FunctionDefinition {
             name: "SetMsgHdr",
@@ -3042,7 +3057,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("field", VariableType::Integer),
                 ArgumentDefinition::new("value", VariableType::String),
             ]),
-            arg_descr: 0x04,
+            signature: FunctionSignature::FixedParameters(4),
         },
         // New Functions
         FunctionDefinition {
@@ -3052,7 +3067,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MemberReference,
             return_type: VariableType::None,
             args: None,
-            arg_descr: -1,
+            signature: FunctionSignature::Invalid,
         },
         FunctionDefinition {
             // SPECIAL CASE!
@@ -3061,7 +3076,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::MemberCall,
             return_type: VariableType::None,
             args: None,
-            arg_descr: -1,
+            signature: FunctionSignature::Invalid,
         },
         FunctionDefinition {
             name: "ConfInfo",
@@ -3069,7 +3084,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::NewConfInfo,
             return_type: VariableType::UserData(30),
             args: None,
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "AreaId",
@@ -3080,7 +3095,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("conf", VariableType::Integer),
                 ArgumentDefinition::new("area", VariableType::Integer)
             ]),
-            arg_descr: 0x02,
+            signature: FunctionSignature::FixedParameters(2),
         },
 
         FunctionDefinition {
@@ -3091,7 +3106,7 @@ lazy_static::lazy_static! {
             args: Some(vec![
                 ArgumentDefinition::new("url", VariableType::String),
             ]),
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
 
         // ALIASES (need to be last in the list)
@@ -3101,7 +3116,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::TOSTRING,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ToInt",
@@ -3109,7 +3124,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::TOSWORD, // Note: This is correct it's not TOINTEGER for some reason.
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "ToDWord",
@@ -3117,7 +3132,7 @@ lazy_static::lazy_static! {
             opcode: FuncOpCode::TOUNSIGNED,
             return_type: VariableType::Integer,
             args: None,
-            arg_descr: 0x01,
+            signature: FunctionSignature::FixedParameters(1),
         },
     ];
 }

@@ -719,7 +719,7 @@ impl AstVisitor<()> for TooltipVisitor {
             if identifier.get_identifier_token().span.contains(&self.offset) {
                 let predef = FunctionDefinition::get_function_definitions(identifier.get_identifier());
                 for p in predef {
-                    if FUNCTION_DEFINITIONS[p].arg_descr as usize == call.get_arguments().len() {
+                    if FUNCTION_DEFINITIONS[p].parameter_count() == call.get_arguments().len() {
                         self.tooltip = get_function_hover(&FUNCTION_DEFINITIONS[p]);
                         return;
                     }

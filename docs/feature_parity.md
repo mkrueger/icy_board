@@ -82,7 +82,7 @@ If something is missing just let me know.
 | MENU  | Redisplay Menu | 💯 | 
 | REPLY  | Reply Message | 💯 | 
 | USER  | User List | 90% | 
-| WHO  |WHO isi Online | 90% | 
+| WHO  |WHO is Online | 90% | 
 | QWK  | QWK command | 0% | 
 | CHAT  | Group Chat| 0% | Note: There are working PPEs for that
 | BD/DB  | Batch Download | 0% | 
