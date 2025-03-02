@@ -62,8 +62,57 @@ pub async fn invalid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 /// 0 means empty string
 /// According to specs 256 is the maximum returned
 pub async fn len(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let str = vm.eval_expr(&args[0]).await?.as_string();
-    Ok(VariableValue::new_int(str.chars().count() as i32))
+    let str = vm.eval_expr(&args[0]).await?;
+    let val = match str.generic_data {
+        GenericVariableData::String(str) => str.chars().count(),
+        GenericVariableData::Dim1(items) => items.len() - 1,
+        GenericVariableData::Dim2(items) => items.len() - 1,
+        GenericVariableData::Dim3(items) => items.len() - 1,
+        _ => {
+            log::warn!("len: called on invalid type.");
+            0
+        }
+    };
+    Ok(VariableValue::new_int(val as i32))
+}
+
+pub async fn len_dim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let arr = vm.eval_expr(&args[0]).await?;
+    let dim = vm.eval_expr(&args[1]).await?.as_int();
+
+    let val = match arr.generic_data {
+        GenericVariableData::String(str) => {
+            if dim == 0 {
+                str.chars().count()
+            } else {
+                0
+            }
+        }
+        GenericVariableData::Dim1(items) => {
+            if dim == 0 {
+                items.len()
+            } else {
+                0
+            }
+        }
+        GenericVariableData::Dim2(items) => match dim {
+            0 => items.len() - 1,
+            1 => items[0].len() - 1,
+            _ => 0,
+        },
+        GenericVariableData::Dim3(items) => match dim {
+            0 => items.len() - 1,
+            1 => items[0].len() - 1,
+            2 => items[0][0].len() - 1,
+            _ => 0,
+        },
+        _ => {
+            log::warn!("len({dim}): called on invalid type.");
+            0
+        }
+    };
+
+    Ok(VariableValue::new_int(val as i32))
 }
 
 /// Returns the lowercase equivalent of a string

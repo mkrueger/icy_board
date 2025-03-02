@@ -40,3 +40,16 @@ Gets data from a web server and stores it as a file.
 `url`  An string expression stating the url to get data from.
 
 `file` An string expression stating the file to save the data to.
+
+## `Len()`  Function (4.00)
+
+### Function
+With this overload of the len function it's possible to get the length of an array dimension.
+Note: With 400 Len(arr, 0) behaves like Len(arr) - the len function works on arrays as well.
+
+### Syntax
+`Len(array, dim)`
+
+`array`    An array expresison to get the length of
+
+`dim`      The dimension to get the length of

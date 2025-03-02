@@ -1201,6 +1201,11 @@ hint-function-webrequest=Gets data from a web server and returns it as a string.
 
     ### Returns
     The web request value as STRING.
+hint-function-len_dim=
+    @1 = The array to get the length of
+    @2 = The dimension to get the length of
+    ### Returns
+        Returns the length of the array @1 on dimension @2
 
 hint-const-true=BOOLEAN `TRUE` value
 hint-const-false=BOOLEAN `FALSE` value
