@@ -1,6 +1,7 @@
 pub mod accounting_rates;
 pub mod areas;
 pub mod bullettins;
+pub mod command;
 pub mod dirs;
 pub mod door;
 pub mod languages;

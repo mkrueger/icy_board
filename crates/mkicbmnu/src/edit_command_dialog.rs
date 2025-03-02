@@ -50,7 +50,8 @@ impl<'a> EditCommandDialog<'a> {
 
         let command_arc = Arc::new(Mutex::new(command.clone()));
         let cmd3 = command_arc.clone();
-        let file = icy_board.lock().unwrap().resolve_file(&menu.lock().unwrap().display_file);
+        let disp_file = menu.lock().unwrap().display_file.clone();
+        let file = icy_board.lock().unwrap().resolve_file(&disp_file);
 
         let buffer = if file.exists() {
             icy_engine::Buffer::load_buffer(&file, true, None).unwrap()
@@ -377,7 +378,6 @@ impl<'a> EditCommandDialog<'a> {
     pub fn ui(&mut self, frame: &mut Frame, screen: Rect) {
         let area = screen.inner(Margin::new(2, 2));
         Clear.render(area, frame.buffer_mut());
-
         let block = Block::new()
             .title_alignment(Alignment::Center)
             .title(Title::from(

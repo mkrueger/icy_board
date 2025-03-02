@@ -479,6 +479,12 @@ impl CommandType {
             CommandType::GotoXY,
             CommandType::PrintText,
             CommandType::RefreshDisplayString,
+            CommandType::ChangeMessageArea,
+            CommandType::QWK,
+            CommandType::SelectConferences,
+            CommandType::BatchDownload,
+            CommandType::BatchUpload,
+            CommandType::ReadMemorizedMessage,
         ]
         .into_iter()
     }
@@ -691,7 +697,7 @@ pub struct CommandAction {
     pub trigger: ActionTrigger,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct CommandList {
     #[serde(rename = "command")]
     pub commands: Vec<Command>,

@@ -17,7 +17,7 @@ If something is missing just let me know.
 | MKPCBTXT  | 💯 | Much better |
 | ICBSysMgr  | 40% | Edit user files work but nothing else |
 | MKPCBMNU  | 💯 | MKICBMNU can do much more |
-| PCBSETUP  | 90% | Still some editors to do but mostly better  |
+| PCBSETUP  | 90% | Most is implemented  |
 | Call Waiting Screen  | 💯 | Almost the same, some improvements |
 | New User Creation  | 💯 | Much better & detailed |
 | Security Level check  | 💯 | |

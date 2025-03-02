@@ -40,7 +40,14 @@ impl ConfigurationFiles {
                     lock
                 ),
                 cfg_entry_path!("paths_language_file", label_width, paths, language_file, Box::new(edit_languages), lock),
-                cfg_entry_path!("paths_command_file", label_width, paths, command_file, lock),
+                cfg_entry_path!(
+                    "paths_command_file",
+                    label_width,
+                    paths,
+                    command_file,
+                    Box::new(crate::editors::command::edit_commands),
+                    lock
+                ),
                 ConfigEntry::Separator,
                 cfg_entry_path!("paths_trashcan_upload_files", label_width, paths, trashcan_upload_files, lock),
                 cfg_entry_path!("paths_trashcan_user", label_width, paths, trashcan_user, lock),

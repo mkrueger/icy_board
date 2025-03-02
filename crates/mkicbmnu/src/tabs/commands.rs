@@ -28,15 +28,17 @@ impl<'a> CommandsTab<'a> {
             table_state: TableState::default().with_selected(0),
             headers: vec!["   ".to_string(), "Keyword".to_string(), "Display".to_string()],
             get_content: Box::new(move |_table, i, j| {
-                if *i >= mnu2.lock().unwrap().commands.len() {
-                    return Line::from("".to_string());
+                if let Ok(mnu2) = mnu2.lock() {
+                    if *i < mnu2.commands.len() {
+                        return match j {
+                            0 => Line::from(format!("{})", i + 1)),
+                            1 => Line::from(mnu2.commands[*i].keyword.clone()),
+                            2 => get_styled_pcb_line(&mnu2.commands[*i].display),
+                            _ => Line::from("".to_string()),
+                        };
+                    }
                 }
-                match j {
-                    0 => Line::from(format!("{})", i + 1)),
-                    1 => Line::from(mnu2.lock().unwrap().commands[*i].keyword.clone()),
-                    2 => get_styled_pcb_line(&mnu2.lock().unwrap().commands[*i].display),
-                    _ => Line::from("".to_string()),
-                }
+                return Line::from("".to_string());
             }),
             content_length: len,
         };
@@ -48,6 +50,7 @@ impl<'a> CommandsTab<'a> {
             icy_board,
         }
     }
+
     fn insert(&mut self) {
         self.menu
             .lock()
@@ -60,8 +63,16 @@ impl<'a> CommandsTab<'a> {
 
     fn remove(&mut self) {
         if let Some(selected) = self.insert_table.table_state.selected() {
+            let len = if let Ok(menu) = self.menu.lock() {
+                menu.commands.len()
+            } else {
+                return;
+            };
+
+            if selected >= len {
+                return;
+            }
             self.menu.lock().unwrap().commands.remove(selected);
-            let len = self.menu.lock().unwrap().commands.len();
             if len > 0 {
                 self.insert_table.table_state.select(Some(selected.min(len - 1)))
             } else {
@@ -74,8 +85,9 @@ impl<'a> CommandsTab<'a> {
     fn move_up(&mut self) {
         if let Some(selected) = self.insert_table.table_state.selected() {
             if selected > 0 {
-                let mut menu = self.menu.lock().unwrap();
-                menu.commands.swap(selected, selected - 1);
+                if let Ok(mut menu) = self.menu.lock() {
+                    menu.commands.swap(selected, selected - 1);
+                }
                 self.insert_table.table_state.select(Some(selected - 1));
             }
         }
@@ -83,9 +95,11 @@ impl<'a> CommandsTab<'a> {
 
     fn move_down(&mut self) {
         if let Some(selected) = self.insert_table.table_state.selected() {
-            if selected + 1 < self.menu.lock().unwrap().commands.len() {
-                let mut menu = self.menu.lock().unwrap();
-                menu.commands.swap(selected, selected + 1);
+            let count = self.menu.lock().unwrap().commands.len();
+            if selected + 1 < count {
+                if let Ok(mut menu) = self.menu.lock() {
+                    menu.commands.swap(selected, selected + 1);
+                }
                 self.insert_table.table_state.select(Some(selected + 1));
             }
         }
@@ -136,10 +150,14 @@ impl<'a> TabPage for CommandsTab<'a> {
 
             KeyCode::Enter => {
                 if let Some(selected) = self.insert_table.table_state.selected() {
-                    if let Some(cmd) = self.menu.lock().unwrap().commands.get(selected) {
-                        let m = self.menu.clone();
-                        self.edit_cmd_dialog = Some(EditCommandDialog::new(self.icy_board.clone(), m, cmd.clone(), selected + 1));
-                    }
+                    let cmd = if let Some(cmd) = self.menu.lock().unwrap().commands.get(selected) {
+                        cmd.clone()
+                    } else {
+                        return ResultState::default();
+                    };
+                    let m = self.menu.clone();
+                    self.edit_cmd_dialog = Some(EditCommandDialog::new(self.icy_board.clone(), m, cmd.clone(), selected + 1));
+
                     return ResultState::status_line(String::new());
                 }
             }

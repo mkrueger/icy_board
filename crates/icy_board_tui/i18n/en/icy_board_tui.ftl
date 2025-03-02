@@ -1831,3 +1831,15 @@ protocol_editor_send_cmd-help=TODO
 protocol_editor_recv_cmd=Receive Command
 protocol_editor_recv_cmd-status=Receive Command
 protocol_editor_recv_cmd-help=TODO
+
+command_editor_title=CMD.LST Editor
+command_editor_header_command=Command
+command_editor_header_action=Action
+
+command_editor_editor=Edit Command
+command_editor_keyword=Keyword
+command_editor_help=Help
+command_editor_security=Security
+command_editor_action=Action
+command_editor_parameter=Parameter
+command_editor_command_type=Command Type
