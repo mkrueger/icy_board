@@ -7,7 +7,6 @@ use crate::icy_board::{icb_text::IceText, state::functions::display_flags};
 impl IcyBoardState {
     pub async fn area_change_command(&mut self) -> Res<()> {
         let conference = self.session.current_conference_number as usize;
-        let menu = self.get_board().await.conferences[conference].area_menu.clone();
         let areas = self.get_board().await.conferences[conference].areas.clone().unwrap_or_default();
 
         if areas.is_empty() {
@@ -24,8 +23,7 @@ impl IcyBoardState {
             if self.session.tokens.is_empty() {
                 if display_menu {
                     display_menu = false;
-                    self.session.disp_options.no_change();
-                    self.display_menu(&menu).await?;
+                    self.show_area_menu().await?;
                     self.new_line().await?;
                 }
 
@@ -59,7 +57,7 @@ impl IcyBoardState {
                             search_text.push(' ');
                         } else {
                             if let Ok(num) = token.parse::<i32>() {
-                                area_num = num;
+                                area_num = num - 1;
                             } else {
                                 if name.len() > 0 {
                                     name.push(' ');

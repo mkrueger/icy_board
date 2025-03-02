@@ -368,11 +368,11 @@ impl IcyBoardCreator {
         let mut list = AreaList::default();
         let fd = MessageArea {
             name: "General".to_string(),
-            filename: PathBuf::from("conferences/main/messages/general"),
+            path: PathBuf::from("conferences/main/messages/general"),
             ..Default::default()
         };
         fs::create_dir_all(&self.destination.join("conferences/main/messages"))?;
-        let mut msg_base = JamMessageBase::create(&self.destination.join(&fd.filename))?;
+        let mut msg_base = JamMessageBase::create(&self.destination.join(&fd.path))?;
         msg_base.write_message(&write_welcome_msg())?;
         msg_base.write_jhr_header()?;
 

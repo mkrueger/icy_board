@@ -16,7 +16,7 @@ BEGIN
     
     IF !a.HasAccess() CONTINUE
 
-    PRINT "@X0E", Left(String(i),2), "- "
+    PRINT "@X0E", Left(String(i + 1),2), "- "
     IF (STRIP(a.Name, " ") = "Unused") then
       COLOR @X08
     ELSE

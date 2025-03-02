@@ -509,7 +509,7 @@ impl IcyBoardState {
             self.get_email_msgbase(&user_name).await
         } else {
             let msg_base = self.get_board().await.conferences[conf as usize].areas.as_ref().unwrap()[area as usize]
-                .filename
+                .path
                 .clone();
             if msg_base.with_extension("jhr").exists() {
                 JamMessageBase::open(msg_base)

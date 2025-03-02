@@ -63,7 +63,7 @@ impl<'a> MessageAreasEditor<'a> {
                 match j {
                     0 => Line::from(format!("{})", *i + 1)),
                     1 => Line::from(format!("{}", dl2.lock().unwrap()[*i].name)),
-                    2 => Line::from(format!("{}", dl2.lock().unwrap()[*i].filename.display())),
+                    2 => Line::from(format!("{}", dl2.lock().unwrap()[*i].path.display())),
                     _ => Line::from("".to_string()),
                 }
             }),
@@ -232,10 +232,10 @@ impl<'a> Page for MessageAreasEditor<'a> {
                                         }),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(get_text("area_editor_file"), ListValue::Path(item.filename.clone()))
+                                    ListItem::new(get_text("area_editor_file"), ListValue::Path(item.path.clone()))
                                         .with_label_width(16)
                                         .with_update_path_value(&|(i, list): &(usize, Arc<Mutex<AreaList>>), value: PathBuf| {
-                                            list.lock().unwrap()[*i].filename = value;
+                                            list.lock().unwrap()[*i].path = value;
                                         }),
                                 ),
                                 ConfigEntry::Item(

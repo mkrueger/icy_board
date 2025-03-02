@@ -1276,7 +1276,14 @@ impl IcyBoardState {
     }
 
     async fn show_dir_menu(&mut self) -> Res<()> {
-        let mnu = self.session.current_conference.dir_menu.clone();
+        let mnu: PathBuf = self.session.current_conference.dir_menu.clone();
+        self.display_menu(&mnu).await?;
+        self.session.disp_options.num_lines_printed = 0;
+        Ok(())
+    }
+
+    async fn show_area_menu(&mut self) -> Res<()> {
+        let mnu = self.session.current_conference.area_menu.clone();
         self.display_menu(&mnu).await?;
         self.session.disp_options.num_lines_printed = 0;
         Ok(())
@@ -1755,6 +1762,13 @@ impl IcyBoardState {
                     result = "0".to_string();
                 }
             }
+            MacroCommand::NumArea => {
+                if let Some(areas) = &self.session.current_conference.areas {
+                    result = areas.len().to_string();
+                } else {
+                    result = "0".to_string();
+                }
+            }
             MacroCommand::DirName => {
                 if let Some(dirs) = &self.session.current_conference.directories {
                     result = dirs[self.session.current_file_directory].name.to_string();
@@ -1765,19 +1779,15 @@ impl IcyBoardState {
             MacroCommand::DirNum => {
                 result = self.session.current_file_directory.to_string();
             }
-            MacroCommand::Area => {
+            MacroCommand::AreaName => {
                 if let Some(areas) = &self.session.current_conference.areas {
                     result = areas[self.session.current_message_area].name.to_string();
                 } else {
                     result = String::new();
                 }
             }
-            MacroCommand::NumArea => {
-                if let Some(areas) = &self.session.current_conference.areas {
-                    result = areas.len().to_string();
-                } else {
-                    result = "0".to_string();
-                }
+            MacroCommand::AreaNum => {
+                result = (self.session.current_message_area + 1).to_string();
             }
             MacroCommand::NumTimesOn => {
                 if let Some(user) = &self.session.current_user {

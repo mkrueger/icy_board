@@ -1526,7 +1526,7 @@ pub async fn kbdfilusued(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<V
 
 pub async fn lomsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let area = 0;
-    let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].filename.clone();
+    let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].path.clone();
     match JamMessageBase::open(msg_base) {
         Ok(base) => Ok(VariableValue::new_int(base.base_messagenumber() as i32)),
         Err(err) => {
@@ -1538,7 +1538,7 @@ pub async fn lomsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 
 pub async fn himsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let area = 0;
-    let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].filename.clone();
+    let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].path.clone();
     match JamMessageBase::open(&msg_base) {
         Ok(base) => Ok(VariableValue::new_int((base.base_messagenumber() + base.active_messages() - 1) as i32)),
         Err(err) => {
@@ -1597,7 +1597,7 @@ pub async fn pcbmac(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 }
 pub async fn actmsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let area = vm.icy_board_state.session.current_message_area;
-    let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].filename.clone();
+    let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].path.clone();
     match jamjam::jam::JamMessageBase::open(msg_base) {
         Ok(base) => Ok(VariableValue::new_int(base.active_messages() as i32)),
         Err(err) => {
@@ -2213,7 +2213,7 @@ pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
             log::error!("Can't read area {area_num} from {conf_num}");
             return Ok(VariableValue::new_bool(false));
         };
-        area.filename.clone()
+        area.path.clone()
     };
 
     let base = JamMessageBase::open(msg_base)?;

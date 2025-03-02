@@ -589,7 +589,7 @@ impl PCBoardImporter {
             match AreaList::load(&destination.join("area.toml")) {
                 Ok(mut list) => {
                     for area in list.iter_mut() {
-                        area.filename = self.convert_message_base(&destination, &output, &area.filename)?;
+                        area.path = self.convert_message_base(&destination, &output, &area.path)?;
                     }
                     list.save(&destination.join("area.toml"))?;
                 }

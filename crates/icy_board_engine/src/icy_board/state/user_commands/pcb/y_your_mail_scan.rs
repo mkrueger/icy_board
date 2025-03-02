@@ -167,8 +167,8 @@ impl IcyBoardState {
         let mut msg_from = 0;
         let mut msg_to = 0;
         for area in conf.areas.as_ref().unwrap().iter() {
-            let Ok(msg_base) = JamMessageBase::open(&area.filename) else {
-                log::error!("can't open message base: {}", area.filename.display());
+            let Ok(msg_base) = JamMessageBase::open(&area.path) else {
+                log::error!("can't open message base: {}", area.path.display());
                 continue;
             };
 

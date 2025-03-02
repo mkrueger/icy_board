@@ -308,8 +308,8 @@ impl IcyBoard {
                 match AreaList::load(&area_file) {
                     Ok(mut areas) => {
                         for area in areas.iter_mut() {
-                            if !area.filename.is_absolute() {
-                                area.filename = board.root_path.join(&area.filename);
+                            if !area.path.is_absolute() {
+                                area.path = board.root_path.join(&area.path);
                             }
                         }
                         conf.areas = Some(areas);

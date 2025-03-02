@@ -18,7 +18,7 @@ use super::{IcyBoardSerializer, security_expr::SecurityExpression};
 #[derive(Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MessageArea {
     pub name: String,
-    pub filename: PathBuf,
+    pub path: PathBuf,
     pub is_read_only: bool,
     pub allow_aliases: bool,
 

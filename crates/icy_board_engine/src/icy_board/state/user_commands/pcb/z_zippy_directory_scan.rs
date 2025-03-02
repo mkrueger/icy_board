@@ -27,7 +27,7 @@ pub struct DirNumbers {
 
 impl IcyBoardState {
     pub async fn zippy_directory_scan(&mut self) -> Res<()> {
-        if self.session.current_conference.directories.as_ref().unwrap().is_empty() {
+        if self.session.current_conference.directories.is_none() || self.session.current_conference.directories.as_ref().unwrap().is_empty() {
             self.display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
             return Ok(());
@@ -72,7 +72,7 @@ impl IcyBoardState {
                 .await?
             };
             if search_area.is_empty() {
-                return Ok(());
+                break;
             }
 
             if search_area == "L" {
@@ -130,6 +130,8 @@ impl IcyBoardState {
                 }
             }
         }
+        self.stop_search();
+        Ok(())
     }
 
     pub async fn get_dir_numbers(&mut self) -> Res<DirNumbers> {

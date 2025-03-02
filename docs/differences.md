@@ -56,7 +56,3 @@ Header is separated from questions with a line starting by "*****". Note that th
 * Access system time limit - so it's only open at certain days & times - however only command where that makes sense to me is the sysop page.
 But I like the RA "DayTimes" system.
 
-## New @ Sequences
-
-@GFXMODE@ = Off, Ansi, Avatar or Rip (for now) depending on the current graphics mode
-@NUMAREA@ = Number of message areas in current conference

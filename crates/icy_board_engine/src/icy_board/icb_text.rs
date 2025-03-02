@@ -1578,9 +1578,18 @@ pub enum IceText {
 
     /// `This password is not secure. Try a different one.`
     PasswordTooWeak = 770,
+
+    /// `Areas: (1-@NUMAREA@), (A), (Enter)=none`
+    AreaNumberExpertmode = 771,
+
+    /// `Areas: (1-@NUMAREA@), (A)ll, (Enter)=none`
+    AreaNumberNovice = 772,
+
+    /// `Scanning Area`
+    ScanningArea = 773,
 }
 
-const LAST_ENTRY: usize = 770;
+const LAST_ENTRY: usize = 773;
 
 impl IceText {
     pub fn from(i: usize) -> Self {

@@ -10,7 +10,7 @@ use jamjam::jam::JamMessageBase;
 
 impl IcyBoardState {
     pub async fn delete_message(&mut self) -> Res<()> {
-        let message_base_file = self.session.current_conference.areas.as_ref().unwrap()[0].filename.clone();
+        let message_base_file = self.session.current_conference.areas.as_ref().unwrap()[0].path.clone();
 
         match JamMessageBase::open(&message_base_file) {
             Ok(message_base) => {

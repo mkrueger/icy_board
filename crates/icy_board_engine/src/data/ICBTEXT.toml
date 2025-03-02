@@ -2947,3 +2947,15 @@ style = "Yellow"
 [PasswordTooWeak]
 text = "This password is not secure. Try a different one."
 style = "Red"
+
+[AreaNumberExpertmode]
+text = "Areas: (1-@NUMAREA@), (A), (Enter)=none"
+style = "Yellow"
+
+[AreaNumberNovice]
+text = "Areas: (1-@NUMAREA@), (A)ll, (Enter)=none"
+style = "Yellow"
+
+[ScanningArea]
+text = "Scanning Area"
+style = "White"

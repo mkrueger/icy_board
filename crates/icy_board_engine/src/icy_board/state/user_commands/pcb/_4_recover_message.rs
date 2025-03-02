@@ -12,7 +12,7 @@ impl IcyBoardState {
         let Some(areas) = &self.session.current_conference.areas else {
             return Ok(());
         };
-        let message_base_file = areas[0].filename.clone();
+        let message_base_file = areas[0].path.clone();
 
         match JamMessageBase::open(&message_base_file) {
             Ok(message_base) => {

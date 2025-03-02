@@ -74,7 +74,7 @@ impl IcyBoardState {
             );
             self.println(crate::vm::TerminalTarget::Both, &area_str).await?;
             let msg_base = self.get_board().await.conferences[conf as usize].areas.as_ref().unwrap()[area as usize]
-                .filename
+                .path
                 .clone();
 
             let mut subject = String::new();

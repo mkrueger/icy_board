@@ -243,6 +243,9 @@ pub enum MacroCommand {
     /// Displays the total number of file directories available in the current conference. Example output: 60
     NumDir,
 
+    /// Displays the total number of message areas available in the current conference. Example output: 60
+    NumArea,
+
     /// This macro will display the number of times the caller has called this BBS system. This number is stored in the user record. Example output: 365
     NumTimesOn,
 
@@ -384,10 +387,10 @@ pub enum MacroCommand {
     GfxMode,
 
     /// New in ICB : Current Message Area name,
-    Area,
+    AreaName,
 
     /// New in ICB : Current Message Area number,
-    NumArea,
+    AreaNum,
 }
 
 #[derive(Debug, PartialEq)]
@@ -440,8 +443,8 @@ pub enum PcbToken {
     #[token("FNUM", |_| MacroCommand::FNum, ignore(ascii_case))]
     #[token("FREESPACE", |_| MacroCommand::FreeSpace, ignore(ascii_case))]
     #[token("GFXMODE", |_| MacroCommand::GfxMode, ignore(ascii_case))]
-    #[token("AREA", |_| MacroCommand::Area, ignore(ascii_case))]
-    #[token("NUMAREA", |_| MacroCommand::NumArea, ignore(ascii_case))]
+    #[token("AREANAME", |_| MacroCommand::AreaName, ignore(ascii_case))]
+    #[token("AREANUM", |_| MacroCommand::AreaNum, ignore(ascii_case))]
     #[token("HANGUP", |_| MacroCommand::Hangup, ignore(ascii_case))]
     #[token("HOMEPHONE", |_| MacroCommand::HomePhone, ignore(ascii_case))]
     #[token("HIGHMSGNUM", |_| MacroCommand::HighMSGNum, ignore(ascii_case))]
@@ -469,6 +472,7 @@ pub enum PcbToken {
     #[token("NUMCALLS", |_| MacroCommand::NumCalls, ignore(ascii_case))]
     #[token("NUMCONF", |_| MacroCommand::NumConf, ignore(ascii_case))]
     #[token("NUMDIR", |_| MacroCommand::NumDir, ignore(ascii_case))]
+    #[token("NUMAREA", |_| MacroCommand::NumArea, ignore(ascii_case))]
     #[token("NUMTIMESON", |_| MacroCommand::NumTimesOn, ignore(ascii_case))]
     #[token("OFFHOURS", |_| MacroCommand::OffHours, ignore(ascii_case))]
     #[token("OPTEXT", |_| MacroCommand::OpText, ignore(ascii_case))]

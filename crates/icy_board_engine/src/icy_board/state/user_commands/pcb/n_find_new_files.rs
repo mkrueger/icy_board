@@ -16,7 +16,7 @@ use crate::{
 
 impl IcyBoardState {
     pub async fn find_new_files(&mut self) -> Res<()> {
-        if self.session.current_conference.directories.as_ref().unwrap().is_empty() {
+        if self.session.current_conference.directories.is_none() || self.session.current_conference.directories.as_ref().unwrap().is_empty() {
             self.display_text(IceText::NoDirectoriesAvailable, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
             return Ok(());

@@ -24,7 +24,7 @@ impl IcyBoardState {
         self.set_activity(NodeStatus::HandlingMail).await;
 
         let message_base_file = self.session.current_conference.areas.as_ref().unwrap()[self.session.current_message_area]
-            .filename
+            .path
             .clone();
         match JamMessageBase::open(&message_base_file) {
             Ok(message_base) => {

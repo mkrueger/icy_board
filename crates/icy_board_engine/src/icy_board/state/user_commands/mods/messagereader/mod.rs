@@ -151,17 +151,29 @@ impl MessageViewer {
         let c1 = state.get_board().await.config.color_configuration.msg_hdr_to.clone();
         state.set_color(TerminalTarget::Both, c1).await?;
         let txt = self.format_hdr_text(&self.to_line.text, &header.get_to().unwrap().to_string(), "");
-        state.print(TerminalTarget::Both, &txt).await?;
+        if state.session.search_pattern.is_some() {
+            state.print_found_text(TerminalTarget::Both, &txt).await?;
+        } else {
+            state.print(TerminalTarget::Both, &txt).await?;
+        }
 
         let c1 = state.get_board().await.config.color_configuration.msg_hdr_from.clone();
         state.set_color(TerminalTarget::Both, c1).await?;
         let txt = self.format_hdr_text(&self.from_line.text, &header.get_from().unwrap().to_string(), "");
-        state.print(TerminalTarget::Both, &txt).await?;
+        if state.session.search_pattern.is_some() {
+            state.print_found_text(TerminalTarget::Both, &txt).await?;
+        } else {
+            state.print(TerminalTarget::Both, &txt).await?;
+        }
 
         let c1 = state.get_board().await.config.color_configuration.msg_hdr_subj.clone();
         state.set_color(TerminalTarget::Both, c1).await?;
         let txt = self.format_hdr_text(&self.subj_line.text, &header.get_subject().unwrap().to_string(), "");
-        state.print(TerminalTarget::Both, &txt).await?;
+        if state.session.search_pattern.is_some() {
+            state.print_found_text(TerminalTarget::Both, &txt).await?;
+        } else {
+            state.print(TerminalTarget::Both, &txt).await?;
+        }
 
         let c1 = state.get_board().await.config.color_configuration.msg_hdr_read.clone();
         state.set_color(TerminalTarget::Both, c1).await?;
@@ -184,7 +196,11 @@ impl MessageViewer {
     }
 
     async fn display_body(&self, state: &mut IcyBoardState, text: &str) -> Res<()> {
-        state.print(TerminalTarget::Both, text).await
+        if state.session.search_pattern.is_some() {
+            state.print_found_text(TerminalTarget::Both, text).await
+        } else {
+            state.print(TerminalTarget::Both, text).await
+        }
     }
 }
 
@@ -238,7 +254,7 @@ impl IcyBoardState {
                     self.display_text(IceText::NoMailFound, display_flags::NEWLINE).await?;
                     continue;
                 }
-                self.read_message_number(&mut message_base, &viewer, number, None).await?;
+                self.read_message_number(&mut message_base, &viewer, number, Box::new(|_, _| true)).await?;
             }
         }
         Ok(())
@@ -249,7 +265,7 @@ impl IcyBoardState {
         message_base: &mut JamMessageBase,
         viewer: &MessageViewer,
         mut number: u32,
-        matches: Option<Vec<(usize, usize)>>,
+        _filter: Box<dyn Fn(&JamMessageHeader, &str) -> bool>,
     ) -> Res<()> {
         if number == 0 {
             return Ok(());
@@ -273,21 +289,8 @@ impl IcyBoardState {
         loop {
             match message_base.read_header(number) {
                 Ok(header) => {
-                    let mut text = message_base.read_msg_text(&header)?.to_string();
+                    let text = message_base.read_msg_text(&header)?.to_string();
                     viewer.display_header(self, message_base, &header).await?;
-                    if let Some(matches) = &matches {
-                        let mut new_text = String::new();
-                        let mut last = 0;
-                        for (start, end) in matches {
-                            new_text.push_str(&text[last..*start]);
-                            new_text.push_str("@X70");
-                            new_text.push_str(&text[*start..*end]);
-                            new_text.push_str("@X07");
-                            last = *end;
-                        }
-                        new_text.push_str(&text[last..]);
-                        text = new_text;
-                    }
                     if header.needs_password() {
                         if self
                             .check_password(IceText::PasswordToReadMessage, 0, |pwd| header.is_password_valid(pwd))
