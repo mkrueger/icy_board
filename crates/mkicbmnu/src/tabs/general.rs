@@ -7,14 +7,14 @@ use std::{
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::menu::{Menu, MenuType};
 use icy_board_tui::{
-    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, EditMode, ListItem, ListValue, ResultState},
+    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, EditMessage, ListItem, ListValue, ResultState},
     tab_page::TabPage,
     theme::get_tui_theme,
 };
 use ratatui::{
     Frame,
     layout::{Margin, Rect},
-    widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, Widget},
+    widgets::{Block, BorderType, Borders, Clear, Padding, Widget},
 };
 
 pub struct GeneralTab {
@@ -58,8 +58,9 @@ impl GeneralTab {
                         "Menu Type".to_string(),
                         ListValue::ComboBox(ComboBox {
                             cur_value: ComboBoxValue::new(format!("{:?}", mnu.menu_type), format!("{:?}", mnu.menu_type)),
-                            first: 0,
-                            scroll_state: ScrollbarState::default(),
+                            selected_item: 0,
+                            is_edit_open: false,
+                            first_item: 0,
                             values: MenuType::iter()
                                 .map(|x| ComboBoxValue::new(format!("{:?}", x), format!("{:?}", x)))
                                 .collect::<Vec<ComboBoxValue>>(),
@@ -134,7 +135,7 @@ impl TabPage for GeneralTab {
 
     fn request_status(&self) -> ResultState {
         return ResultState {
-            edit_mode: EditMode::None,
+            edit_msg: EditMessage::None,
             status_line: if self.state.selected < self.config.entry.len() {
                 "".to_string()
             } else {

@@ -17,7 +17,6 @@ use icy_board_tui::{
     config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
     get_text,
     insert_table::InsertTable,
-    pcb_line::get_styled_pcb_line,
     save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
@@ -44,10 +43,10 @@ pub struct CommandsEditor<'a> {
 impl<'a> CommandsEditor<'a> {
     pub(crate) fn new(path: &std::path::PathBuf) -> Res<Self> {
         let command_list_orig = if path.exists() { CommandList::load(&path)? } else { CommandList::default() };
-        let command_list = Arc::new(Mutex::new(command_list_orig.clone()));
+        let command_list: Arc<Mutex<CommandList>> = Arc::new(Mutex::new(command_list_orig.clone()));
         let scroll_state = ScrollbarState::default().content_length(command_list_orig.len());
         let content_length = command_list_orig.len();
-        let mnu2 = command_list.clone();
+        let mnu2: Arc<Mutex<CommandList>> = command_list.clone();
         let insert_table = InsertTable {
             scroll_state,
             table_state: TableState::default().with_selected(0),
@@ -55,6 +54,7 @@ impl<'a> CommandsEditor<'a> {
                 "#".to_string(),
                 get_text("command_editor_header_command"),
                 get_text("command_editor_header_action"),
+                get_text("command_editor_header_parameter"),
             ],
             get_content: Box::new(move |_table, i, j| {
                 if let Ok(mnu2) = mnu2.lock() {
@@ -62,7 +62,8 @@ impl<'a> CommandsEditor<'a> {
                         return match j {
                             0 => Line::from(format!("{})", i + 1)),
                             1 => Line::from(mnu2.commands[*i].keyword.clone()),
-                            2 => get_styled_pcb_line(&mnu2.commands[*i].display),
+                            2 => Line::from(mnu2.commands[*i].actions[0].command_type.to_string()),
+                            3 => Line::from(mnu2.commands[*i].actions[0].parameter.to_string()),
                             _ => Line::from("".to_string()),
                         };
                     }
@@ -206,14 +207,10 @@ impl<'a> Page for CommandsEditor<'a> {
             };
         }
         if let Some(edit_config) = &mut self.edit_config {
-            match key.code {
-                KeyCode::Esc => {
-                    self.edit_config = None;
-                    return PageMessage::None;
-                }
-                _ => {
-                    edit_config.handle_key_press(key, &mut self.edit_config_state);
-                }
+            let res = edit_config.handle_key_press(key, &mut self.edit_config_state);
+            if res.edit_msg == icy_board_tui::config_menu::EditMessage::Close {
+                self.edit_config = None;
+                return PageMessage::None;
             }
             return PageMessage::None;
         }
@@ -240,7 +237,7 @@ impl<'a> Page for CommandsEditor<'a> {
                 KeyCode::Enter => {
                     self.edit_config_state = ConfigMenuState::default();
                     if let Some(selected_item) = self.insert_table.table_state.selected() {
-                        let mut cmd = self.command_list.lock().unwrap();
+                        let mut cmd: std::sync::MutexGuard<'_, CommandList> = self.command_list.lock().unwrap();
                         let Some(cur_prot) = cmd.get_mut(selected_item) else {
                             return PageMessage::None;
                         };
@@ -284,17 +281,18 @@ impl<'a> Page for CommandsEditor<'a> {
                                                 format!("{:?}", cur_prot.actions[0].command_type),
                                                 format!("{:?}", cur_prot.actions[0].command_type),
                                             ),
-                                            first: 0,
-                                            scroll_state: ScrollbarState::default(),
+                                            selected_item: 0,
+                                            is_edit_open: false,
+                                            first_item: 0,
                                             values: CommandType::iter()
                                                 .map(|x| ComboBoxValue::new(format!("{:?}", x), format!("{:?}", x)))
                                                 .collect::<Vec<ComboBoxValue>>(),
                                         }),
                                     )
                                     .with_label_width(16)
-                                    .with_update_text_value(
-                                        &|(i, list): &(usize, Arc<Mutex<CommandList>>), value: String| {
-                                            list.lock().unwrap()[*i].actions[0].command_type = CommandType::from_str(&value).unwrap();
+                                    .with_update_combobox_value(
+                                        &|(i, list): &(usize, Arc<Mutex<CommandList>>), value: &ComboBox| {
+                                            list.lock().unwrap()[*i].actions[0].command_type = CommandType::from_str(&value.cur_value.value).unwrap();
                                         },
                                     ),
                                 ),

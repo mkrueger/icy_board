@@ -27,7 +27,7 @@ fn edit_icbtext(_board: Arc<Mutex<IcyBoard>>, path: PathBuf) -> PageMessage {
             Err(e) => {
                 log::error!("Error opening mkicbtxt: {}", e);
                 return PageMessage::ResultState(ResultState {
-                    edit_mode: icy_board_tui::config_menu::EditMode::None,
+                    edit_msg: icy_board_tui::config_menu::EditMessage::None,
                     status_line: format!("Error: {}", e),
                 });
             }
@@ -36,7 +36,7 @@ fn edit_icbtext(_board: Arc<Mutex<IcyBoard>>, path: PathBuf) -> PageMessage {
             log::error!("Error opening mkicbtxt: {}", e);
             ratatui::init();
             return PageMessage::ResultState(ResultState {
-                edit_mode: icy_board_tui::config_menu::EditMode::None,
+                edit_msg: icy_board_tui::config_menu::EditMessage::None,
                 status_line: format!("Error: {}", e),
             });
         }

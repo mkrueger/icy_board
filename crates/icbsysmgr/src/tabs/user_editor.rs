@@ -509,7 +509,7 @@ impl Page for UserEditor {
 
     fn request_status(&self) -> ResultState {
         ResultState {
-            edit_mode: icy_board_tui::config_menu::EditMode::None,
+            edit_msg: icy_board_tui::config_menu::EditMessage::None,
             status_line: self.menu.current_status_line(&self.state),
         }
     }
@@ -532,14 +532,14 @@ impl Page for UserEditor {
             };
         }
 
-        if key.code == crossterm::event::KeyCode::Esc {
+        let res = self.menu.handle_key_press(key, &mut self.state);
+        if res.edit_msg == icy_board_tui::config_menu::EditMessage::Close {
             if *self.menu.obj.lock().unwrap() == self.icy_board.lock().unwrap().users[self.num_user] {
                 return PageMessage::Close;
             }
             self.save_dialog = Some(SaveChangesDialog::new());
             return PageMessage::None;
         }
-        let res = self.menu.handle_key_press(key, &mut self.state);
         PageMessage::ResultState(res)
     }
 }

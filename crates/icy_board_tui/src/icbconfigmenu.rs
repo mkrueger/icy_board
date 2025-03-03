@@ -10,7 +10,7 @@ use ratatui::{
 
 use crate::{
     BORDER_SET,
-    config_menu::{ConfigMenu, ConfigMenuState, EditMode, ListValue, ResultState},
+    config_menu::{ConfigMenu, ConfigMenuState, EditMessage, ListValue, ResultState},
     get_text,
     tab_page::PageMessage,
     theme::get_tui_theme,
@@ -87,7 +87,7 @@ impl ICBConfigMenuUI {
 
     pub fn request_status(&self) -> ResultState {
         ResultState {
-            edit_mode: EditMode::None,
+            edit_msg: EditMessage::None,
             status_line: self.menu.current_status_line(&self.state),
         }
     }
@@ -110,7 +110,7 @@ impl ICBConfigMenuUI {
                             Err(e) => {
                                 log::error!("Error opening editor: {}", e);
                                 return PageMessage::ResultState(ResultState {
-                                    edit_mode: EditMode::None,
+                                    edit_msg: EditMessage::None,
                                     status_line: format!("Error: {}", e),
                                 });
                             }
@@ -119,7 +119,7 @@ impl ICBConfigMenuUI {
                             log::error!("Error opening editor: {}", e);
                             ratatui::init();
                             return PageMessage::ResultState(ResultState {
-                                edit_mode: EditMode::None,
+                                edit_msg: EditMessage::None,
                                 status_line: format!("Error: {}", e),
                             });
                         }
@@ -128,10 +128,10 @@ impl ICBConfigMenuUI {
             }
         }
 
-        if key.code == crossterm::event::KeyCode::Esc {
+        let res = self.menu.handle_key_press(key, &mut self.state);
+        if res.edit_msg == EditMessage::Close {
             return PageMessage::Close;
         }
-        let res = self.menu.handle_key_press(key, &mut self.state);
         PageMessage::ResultState(res)
     }
 }

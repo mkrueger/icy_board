@@ -184,14 +184,10 @@ impl<'a> Page for LanguageListEditor<'a> {
         }
 
         if let Some(edit_config) = &mut self.edit_config {
-            match key.code {
-                KeyCode::Esc => {
-                    self.edit_config = None;
-                    return PageMessage::None;
-                }
-                _ => {
-                    edit_config.handle_key_press(key, &mut self.edit_config_state);
-                }
+            let res = edit_config.handle_key_press(key, &mut self.edit_config_state);
+            if res.edit_msg == icy_board_tui::config_menu::EditMessage::Close {
+                self.edit_config = None;
+                return PageMessage::None;
             }
             return PageMessage::None;
         }

@@ -9,7 +9,7 @@ use ratatui::{prelude::*, widgets::*};
 use crate::{
     TerminalType,
     colors::RgbSwatch,
-    config_menu::EditMode,
+    config_menu::EditMessage,
     get_text,
     help_view::HelpViewState,
     tab_page::TabPage,
@@ -124,11 +124,11 @@ impl App {
 
         if self.get_tab().has_control() {
             let state = self.get_tab_mut().handle_key_press(key);
-            match state.edit_mode {
-                EditMode::ExternalProgramStarted => {
+            match state.edit_msg {
+                EditMessage::ExternalProgramStarted => {
                     let _ = terminal.clear();
                 }
-                EditMode::DisplayHelp(help) => {
+                EditMessage::DisplayHelp(help) => {
                     self.help_state.set_content(&help);
                     self.mode = Mode::ShowHelp;
                 }
@@ -151,11 +151,11 @@ impl App {
 
             _ => {
                 let state = self.get_tab_mut().handle_key_press(key);
-                match state.edit_mode {
-                    EditMode::ExternalProgramStarted => {
+                match state.edit_msg {
+                    EditMessage::ExternalProgramStarted => {
                         let _ = terminal.clear();
                     }
-                    EditMode::DisplayHelp(help) => {
+                    EditMessage::DisplayHelp(help) => {
                         self.help_state.set_content(&help);
                         self.mode = Mode::ShowHelp;
                     }

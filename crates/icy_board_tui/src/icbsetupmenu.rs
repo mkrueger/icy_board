@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::{
     BORDER_SET,
-    config_menu::{EditMode, ResultState},
+    config_menu::{EditMessage, ResultState},
     get_text,
     select_menu::{SelectMenu, SelectMenuState},
     tab_page::{Page, PageMessage},
@@ -145,7 +145,7 @@ impl IcbSetupMenuUI {
                 PageMessage::ExternalProgramStarted => {
                     return (
                         ResultState {
-                            edit_mode: EditMode::ExternalProgramStarted,
+                            edit_msg: EditMessage::ExternalProgramStarted,
                             ..Default::default()
                         },
                         None,
@@ -160,7 +160,7 @@ impl IcbSetupMenuUI {
             if let Some(str) = self.menu.help(&mut self.state) {
                 return (
                     ResultState {
-                        edit_mode: EditMode::DisplayHelp(str.to_string()),
+                        edit_msg: EditMessage::DisplayHelp(str.to_string()),
                         ..Default::default()
                     },
                     None,
@@ -173,7 +173,7 @@ impl IcbSetupMenuUI {
 
     pub fn request_status(&self) -> ResultState {
         ResultState {
-            edit_mode: EditMode::None,
+            edit_msg: EditMessage::None,
             status_line: String::new(),
         }
     }

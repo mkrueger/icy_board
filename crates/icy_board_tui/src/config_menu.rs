@@ -19,10 +19,13 @@ use crate::{
     theme::get_tui_theme,
 };
 
-#[derive(Default)]
-pub enum EditMode {
+#[derive(Default, PartialEq)]
+pub enum EditMessage {
     #[default]
     None,
+    PrevItem,
+    NextItem,
+    Close,
     Open(String, PathBuf),
     ExternalProgramStarted,
     DisplayHelp(String),
@@ -30,14 +33,32 @@ pub enum EditMode {
 
 #[derive(Default)]
 pub struct ResultState {
-    pub edit_mode: EditMode,
+    pub edit_msg: EditMessage,
     pub status_line: String,
 }
 impl ResultState {
     pub fn status_line(status_line: String) -> ResultState {
         ResultState {
-            edit_mode: EditMode::None,
+            edit_msg: EditMessage::None,
             status_line,
+        }
+    }
+    pub fn up() -> ResultState {
+        ResultState {
+            edit_msg: EditMessage::PrevItem,
+            status_line: String::new(),
+        }
+    }
+    pub fn down() -> ResultState {
+        ResultState {
+            edit_msg: EditMessage::NextItem,
+            status_line: String::new(),
+        }
+    }
+    pub fn close() -> ResultState {
+        ResultState {
+            edit_msg: EditMessage::Close,
+            status_line: String::new(),
         }
     }
 }
@@ -71,45 +92,38 @@ impl ComboBoxValue {
 }
 
 pub struct ComboBox {
+    pub is_edit_open: bool,
     pub values: Vec<ComboBoxValue>,
     pub cur_value: ComboBoxValue,
-    pub first: usize,
-    pub scroll_state: ScrollbarState,
+    pub selected_item: usize,
+    pub first_item: usize,
 }
 
 impl ComboBox {
     fn handle_input(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Home => {
-                self.first = 0;
-                self.cur_value = self.values.get(0).unwrap().clone();
-                self.scroll_state = self.scroll_state.position(0);
+                self.selected_item = 0;
+                self.first_item = 0;
             }
             KeyCode::End => {
-                self.first = self.values.len().saturating_sub(10);
-                self.cur_value = self.values.get(self.values.len() - 1).unwrap().clone();
-                self.scroll_state = self.scroll_state.position(self.values.len() - 1);
+                self.selected_item = self.values.len().saturating_sub(1);
+                self.first_item = self.values.len().saturating_sub(4);
             }
             KeyCode::Char('k') | KeyCode::Up => {
-                let i = self.values.iter().position(|v| v.value == self.cur_value.value).unwrap_or(0).saturating_sub(1);
-                self.cur_value = self.values.get(i).unwrap().clone();
-                self.scroll_state = self.scroll_state.position(i);
-                if i < self.first {
-                    self.first = i;
+                if self.selected_item > 0 {
+                    self.selected_item = self.selected_item.saturating_sub(1);
+                    if self.selected_item < self.first_item {
+                        self.first_item = self.selected_item;
+                    }
                 }
             }
             KeyCode::Char('j') | KeyCode::Down => {
-                let i = self
-                    .values
-                    .iter()
-                    .position(|v| v.value == self.cur_value.value)
-                    .unwrap_or(0)
-                    .saturating_add(1)
-                    .min(self.values.len() - 1);
-                self.cur_value = self.values.get(i).unwrap().clone();
-                self.scroll_state = self.scroll_state.position(i);
-                if i >= self.first + 10 {
-                    self.first = i - 9;
+                if self.selected_item < self.values.len().saturating_sub(1) {
+                    self.selected_item = self.selected_item + 1;
+                    if self.selected_item >= self.first_item + 4 {
+                        self.first_item = self.selected_item - 3;
+                    }
                 }
             }
             _ => {}
@@ -580,9 +594,15 @@ impl<T> ListItem<T> {
                 Text::from(cur_value.clone()).style(get_tui_theme().edit_value).render(area, frame.buffer_mut());
             }
             ListValue::ComboBox(c) => {
+                if !c.is_edit_open {
+                    Text::from(c.cur_value.display.clone())
+                        .style(get_tui_theme().edit_value)
+                        .render(area, frame.buffer_mut());
+                    return true;
+                }
                 let mut area = area;
                 area.width = c.values.iter().map(|l| l.display.len()).max().unwrap_or(0) as u16 + 2;
-                area.height = (c.values.len() + 2).min(12) as u16;
+                area.height = (c.values.len() + 2).clamp(3, 6) as u16;
                 Clear.render(area, frame.buffer_mut());
 
                 let block = Block::new()
@@ -599,15 +619,16 @@ impl<T> ListItem<T> {
                 line.width -= 2;
                 line.y += 1;
                 line.height = 1;
-                for l in c.values.iter().skip(c.first).take(10) {
-                    if l.value == c.cur_value.value {
+                for (i, l) in c.values.iter().skip(c.first_item).take((area.height as usize).saturating_sub(2)).enumerate() {
+                    if i + c.first_item == c.selected_item {
                         Text::from(l.display.clone()).style(get_tui_theme().edit_value).render(line, frame.buffer_mut());
                     } else {
                         Text::from(l.display.clone()).style(get_tui_theme().value).render(line, frame.buffer_mut());
                     }
                     line.y += 1;
                 }
-                Scrollbar::new(ScrollbarOrientation::VerticalRight).render(area, frame.buffer_mut(), &mut c.scroll_state);
+                let mut scroll_state = ScrollbarState::new(c.values.len()).position(c.first_item);
+                Scrollbar::new(ScrollbarOrientation::VerticalRight).render(area, frame.buffer_mut(), &mut scroll_state);
             }
             ListValue::Position(show_editor, _, pos) => {
                 show_editor(frame, pos);
@@ -626,18 +647,21 @@ impl<T> ListItem<T> {
             KeyEvent { code: KeyCode::F(1), .. } => {
                 if !self.help.is_empty() {
                     return ResultState {
-                        edit_mode: EditMode::DisplayHelp(self.help.clone()),
+                        edit_msg: EditMessage::DisplayHelp(self.help.clone()),
                         status_line: self.status.clone(),
                     };
                 }
             }
-            KeyEvent { code: KeyCode::Enter, .. } => {
-                return ResultState::status_line(self.status.clone());
-            }
-            KeyEvent { code: KeyCode::Esc, .. } => {
-                return ResultState::status_line(self.status.clone());
-            }
             _ => {}
+        }
+
+        if !matches!(self.value, ListValue::ComboBox(_)) {
+            match key.code {
+                KeyCode::Up => return ResultState::up(),
+                KeyCode::Down | KeyCode::Enter => return ResultState::down(),
+                KeyCode::Esc => return ResultState::close(),
+                _ => {}
+            }
         }
 
         match &mut self.value {
@@ -722,7 +746,36 @@ impl<T> ListItem<T> {
                 }
             }
             ListValue::ComboBox(combo) => {
-                combo.handle_input(key);
+                if !combo.is_edit_open {
+                    match key.code {
+                        KeyCode::Up => return ResultState::up(),
+                        KeyCode::Down => return ResultState::down(),
+                        KeyCode::Esc => return ResultState::close(),
+                        KeyCode::Enter => {
+                            combo.is_edit_open = true;
+                            for (i, val) in combo.values.iter().enumerate() {
+                                if val.value == combo.cur_value.value {
+                                    combo.selected_item = i;
+                                    combo.first_item = i.saturating_sub(2);
+                                }
+                            }
+                            return ResultState::default();
+                        }
+                        _ => {}
+                    }
+                } else {
+                    if key.code == KeyCode::Esc {
+                        combo.is_edit_open = false;
+                        return ResultState::default();
+                    }
+                    if key.code == KeyCode::Enter {
+                        combo.is_edit_open = false;
+                        combo.cur_value = combo.values[combo.selected_item].clone();
+                        return ResultState::default();
+                    }
+                    combo.handle_input(key);
+                }
+                return ResultState::default();
             }
             ListValue::Position(_, input, pos) => {
                 *pos = input(key, pos);
@@ -1139,11 +1192,12 @@ impl<T> ConfigMenu<T> {
     }
 
     pub fn handle_key_press(&mut self, key: KeyEvent, state: &mut ConfigMenuState) -> ResultState {
-        match key.code {
-            KeyCode::Up => Self::prev(self.count(), state),
-            KeyCode::Down | KeyCode::Enter => Self::next(self.count(), state),
+        let res = self.get_item_mut(state.selected).unwrap().handle_key_press(key, state);
+        match res.edit_msg {
+            EditMessage::PrevItem => Self::prev(self.count(), state),
+            EditMessage::NextItem => Self::next(self.count(), state),
             _ => {
-                return self.get_item_mut(state.selected).unwrap().handle_key_press(key, state);
+                return res;
             }
         }
 

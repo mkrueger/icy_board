@@ -1835,6 +1835,7 @@ protocol_editor_recv_cmd-help=TODO
 command_editor_title=CMD.LST Editor
 command_editor_header_command=Command
 command_editor_header_action=Action
+command_editor_header_parameter=Parameter
 
 command_editor_editor=Edit Command
 command_editor_keyword=Keyword

@@ -124,8 +124,9 @@ impl<'a> EditCommandDialog<'a> {
                     "Autorun".to_string(),
                     ListValue::ComboBox(ComboBox {
                         cur_value: ComboBoxValue::new(format!("{:?}", command.auto_run), format!("{:?}", command.auto_run)),
-                        first: 0,
-                        scroll_state: ScrollbarState::default(),
+                        selected_item: 0,
+                        first_item: 0,
+                        is_edit_open: false,
                         values: AutoRun::iter()
                             .map(|x| ComboBoxValue::new(format!("{:?}", x), format!("{:?}", x)))
                             .collect::<Vec<ComboBoxValue>>(),
@@ -280,12 +281,12 @@ impl<'a> EditCommandDialog<'a> {
                                 return Ok(true);
                             };
                             let parameter = action.parameter.clone();
-                            let mut first = 0;
+                            let mut first_item = 0;
                             let values = CommandType::iter()
                                 .enumerate()
                                 .map(|(i, x)| {
                                     if x == action.command_type {
-                                        first = i.saturating_sub(4);
+                                        first_item = i.saturating_sub(4);
                                     }
                                     ComboBoxValue::new(format!("{}", x), format!("{:?}", x))
                                 })
@@ -298,10 +299,11 @@ impl<'a> EditCommandDialog<'a> {
                                         ListItem::new(
                                             "Command Type".to_string(),
                                             ListValue::ComboBox(ComboBox {
-                                                first,
-                                                scroll_state: ScrollbarState::default().content_length(CommandType::iter().count()),
+                                                selected_item,
+                                                first_item: 0,
                                                 cur_value: ComboBoxValue::new(format!("{}", action.command_type), format!("{:?}", action.command_type)),
                                                 values,
+                                                is_edit_open: false,
                                             }),
                                         )
                                         .with_label_width(16),

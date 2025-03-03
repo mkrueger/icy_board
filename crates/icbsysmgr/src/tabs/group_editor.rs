@@ -221,17 +221,13 @@ impl Page for GroupEditor {
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         if self.in_edit_mode {
-            match key.code {
-                KeyCode::Esc => {
-                    self.in_edit_mode = false;
-                    return PageMessage::None;
-                }
-                _ => {
-                    self.conference_config.handle_key_press(key, &mut self.state);
-                    self.save_groups();
-                    return PageMessage::None;
-                }
+            let res = self.conference_config.handle_key_press(key, &mut self.state);
+            if res.edit_msg == icy_board_tui::config_menu::EditMessage::Close {
+                self.in_edit_mode = false;
+                return PageMessage::None;
             }
+            self.save_groups();
+            return PageMessage::None;
         }
         match key.code {
             KeyCode::Esc => {

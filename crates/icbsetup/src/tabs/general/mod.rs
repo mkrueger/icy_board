@@ -11,7 +11,7 @@ use event_setup::EventSetup;
 use file_locations::FileLocations;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
-    config_menu::{EditMode, ResultState},
+    config_menu::{EditMessage, ResultState},
     get_text, get_text_args,
     icbsetupmenu::IcbSetupMenuUI,
     select_menu::{MenuItem, SelectMenu},
@@ -86,7 +86,7 @@ impl TabPage for GeneralTab {
 
     fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
         let (state, opt) = self.page.handle_key_press(key);
-        if matches!(state.edit_mode, EditMode::DisplayHelp(_)) {
+        if matches!(state.edit_msg, EditMessage::DisplayHelp(_)) {
             return state;
         }
         if let Some(selected) = opt {
