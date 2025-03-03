@@ -439,10 +439,14 @@ pub struct User {
     #[serde(default)]
     #[serde(with = "conference_flags_format")]
     pub conference_flags: HashMap<usize, ConferenceFlags>,
+
+    #[serde(default)]
+    #[serde(with = "lastread_ptr_flags")]
+    pub lastread_ptr_flags: HashMap<(usize, usize), LastReadStatus>,
 }
 
 #[bitflag(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum ConferenceFlags {
     None = 0b0000_0000,
     UserSelected = 0b0000_0001,
@@ -452,6 +456,73 @@ pub enum ConferenceFlags {
     CON = 0b0000_1000,
     MFL = 0b0001_0000,
     NET = 0b0010_0000,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
+pub struct LastReadStatus {
+    pub last_read: usize,
+    pub highest_msg_read: usize,
+    pub include_qwk: bool,
+}
+
+mod lastread_ptr_flags {
+    use std::collections::HashMap;
+
+    use serde::{self, Deserialize, Deserializer, Serializer};
+
+    use super::LastReadStatus;
+
+    pub fn serialize<S>(date: &HashMap<(usize, usize), LastReadStatus>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = String::new();
+        for ((conf, area), v) in date {
+            // Only these flags get stored in PCBoard - rest is for use at runtime.
+            s.push_str(&format!(
+                "{},{},{},{},{};",
+                conf,
+                area,
+                v.last_read,
+                v.highest_msg_read,
+                if v.include_qwk { 1 } else { 0 }
+            ));
+        }
+        serializer.serialize_str(&s)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<HashMap<(usize, usize), LastReadStatus>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let mut map = HashMap::new();
+        s.split(';').for_each(|item| {
+            if item.is_empty() {
+                return;
+            }
+            let mut iter = item.split(',');
+            if let (Some(c), Some(a), Some(lr), Some(hr), Some(flags)) = (iter.next(), iter.next(), iter.next(), iter.next(), iter.next()) {
+                if let (Ok(c), Ok(a), Ok(lr), Ok(hr), Ok(flags)) = (
+                    c.parse::<usize>(),
+                    a.parse::<usize>(),
+                    lr.parse::<usize>(),
+                    hr.parse::<usize>(),
+                    flags.parse::<usize>(),
+                ) {
+                    map.insert(
+                        (c, a),
+                        LastReadStatus {
+                            last_read: lr,
+                            highest_msg_read: hr,
+                            include_qwk: flags == 1,
+                        },
+                    );
+                }
+            }
+        });
+        Ok(map)
+    }
 }
 
 mod conference_flags_format {
@@ -638,6 +709,21 @@ impl User {
             }
         }
 
+        let mut lastread_ptr_flags = HashMap::new();
+        for (i, lmr) in u.user.last_message_read_ptr.iter().enumerate() {
+            if *lmr == 0 {
+                continue;
+            }
+            lastread_ptr_flags.insert(
+                (i, 0),
+                LastReadStatus {
+                    last_read: *lmr as usize,
+                    highest_msg_read: *lmr as usize,
+                    include_qwk: true,
+                },
+            );
+        }
+
         // for x in 0..u.user.
 
         Self {
@@ -743,6 +829,7 @@ impl User {
                 minutes_today: 0,
             },
             conference_flags,
+            lastread_ptr_flags,
         }
     }
 
