@@ -1,6 +1,7 @@
-use std::path::Path;
+use std::path::PathBuf;
 
-use dizbase::file_base::FileEntry;
+use dizbase::file_base::file_header::FileHeader;
+use dizbase::file_base::metadata::MetadataHeader;
 
 use crate::Res;
 use crate::icy_board::commands::CommandType;
@@ -65,7 +66,8 @@ impl IcyBoardState {
                 if 1 <= number && (number as usize) <= self.session.current_conference.directories.as_ref().unwrap().len() {
                     let area = &self.session.current_conference.directories.as_ref().unwrap()[number as usize - 1];
                     if area.list_security.session_can_access(&self.session) {
-                        self.display_file_area(&area.path.to_path_buf(), Box::new(|_f| true)).await?;
+                        self.display_file_area(&area.path.to_path_buf(), &area.metadata_path.clone(), Box::new(|_f, _| true))
+                            .await?;
                         self.new_line().await?;
                         continue;
                     }
@@ -79,13 +81,21 @@ impl IcyBoardState {
             } else {
                 match directory_number.to_ascii_uppercase().as_str() {
                     "U" => {
-                        self.display_file_area(&self.session.current_conference.pub_upload_location.clone(), Box::new(|_f| true))
-                            .await?;
+                        self.display_file_area(
+                            &self.session.current_conference.pub_upload_location.clone(),
+                            &self.session.current_conference.private_upload_metadata.clone(),
+                            Box::new(|_f, _| true),
+                        )
+                        .await?;
                     }
                     "P" => {
                         if self.session.is_sysop {
-                            self.display_file_area(&self.session.current_conference.private_upload_location.clone(), Box::new(|_f| true))
-                                .await?;
+                            self.display_file_area(
+                                &self.session.current_conference.private_upload_location.clone(),
+                                &self.session.current_conference.private_upload_metadata.clone(),
+                                Box::new(|_f, _| true),
+                            )
+                            .await?;
                         }
                     }
                     "F" | "FL" | "FLA" | "FLAG" => {
@@ -128,10 +138,9 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub async fn display_file_area(&mut self, path: &Path, f: Box<dyn Fn(&mut FileEntry) -> bool>) -> Res<()> {
+    pub async fn display_file_area(&mut self, dir: &PathBuf, meta_data_path: &PathBuf, f: Box<dyn Fn(&FileHeader, &[MetadataHeader]) -> bool>) -> Res<()> {
         let colors = self.get_board().await.config.color_configuration.clone();
-        let file_base_path = self.resolve_path(&path);
-        let Ok(base) = self.get_filebase(&file_base_path).await else {
+        let Ok(base) = self.get_filebase(dir, meta_data_path).await else {
             return Ok(());
         };
 
@@ -146,17 +155,7 @@ impl IcyBoardState {
         )
         .await?;
 
-        let files = {
-            let mut base: tokio::sync::MutexGuard<'_, dizbase::file_base::FileBase> = base.lock().await;
-            base.file_headers
-                .iter_mut()
-                .map(|f| {
-                    let _ = f.get_metadata();
-                    f.clone()
-                })
-                .collect::<Vec<_>>()
-        };
-        let mut list = FileList::new(file_base_path.clone(), files);
+        let mut list = FileList::new(dir.to_path_buf(), base);
         let lines = self.session.disp_options.num_lines_printed;
         list.display_file_list(self, f).await?;
 

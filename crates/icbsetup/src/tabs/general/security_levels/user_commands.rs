@@ -19,12 +19,11 @@ impl UserCommands {
         let menu = {
             let lock = icy_board.lock().unwrap();
             let label_width = 22;
-            let edit_width = 14;
             let entry = vec![
                 ConfigEntry::Table(
                     2,
                     vec![
-                        cfg_entry_sec_level!("user_sec_cmd_a", label_width, user_command_level, cmd_a, lock, edit_width),
+                        cfg_entry_sec_level!("user_sec_cmd_a", label_width, user_command_level, cmd_a, lock),
                         cfg_entry_sec_level!("user_sec_cmd_b", label_width, user_command_level, cmd_b, lock),
                         cfg_entry_sec_level!("user_sec_cmd_c", label_width, user_command_level, cmd_c, lock),
                         cfg_entry_sec_level!("user_sec_cmd_d", label_width, user_command_level, cmd_d, lock),

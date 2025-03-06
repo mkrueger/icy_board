@@ -1,3 +1,5 @@
+use std::fs;
+
 use dizbase::file_base::pattern::{MatchOptions, Pattern};
 use humanize_bytes::humanize_bytes_decimal;
 
@@ -33,13 +35,14 @@ impl IcyBoardState {
             self.display_text(IceText::CheckingArchiveView, display_flags::NEWLINE | display_flags::LFAFTER)
                 .await?;
 
-            let files = self.get_filebase(&cur_dir_path).await?;
             let mut options = MatchOptions::new();
             options.case_sensitive = false;
             if let Ok(pattern) = Pattern::new(&input) {
-                for f in &mut files.lock().await.file_headers {
-                    if pattern.matches_with(&f.name(), &options) {
-                        flagged.push(f.full_path.clone());
+                for entry in fs::read_dir(&cur_dir_path)?.flatten() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    let path = entry.path();
+                    if pattern.matches_with(&name, &options) {
+                        flagged.push(path);
                         break;
                     }
                 }

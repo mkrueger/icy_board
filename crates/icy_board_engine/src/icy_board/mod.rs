@@ -27,7 +27,7 @@ use self::{
     pcboard_data::PcbBoardData,
     sec_levels::SecurityLevelDefinitions,
     statistics::Statistics,
-    user_base::{User, UserBase},
+    user_base::UserBase,
     xfer_protocols::SupportedProtocols,
 };
 
@@ -158,7 +158,6 @@ impl IcyBoard {
 
         self.config.paths.logoff_answer = get_path(&self.root_path, &self.config.paths.logon_answer);
         self.config.paths.logoff_survey = get_path(&self.root_path, &self.config.paths.logoff_survey);
-
         for c in self.conferences.iter_mut() {
             c.command_file = get_path(&self.root_path, &c.command_file);
             c.intro_file = get_path(&self.root_path, &c.intro_file);
@@ -189,6 +188,7 @@ impl IcyBoard {
             if let Some(directories) = &mut c.directories {
                 for dir in directories.iter_mut() {
                     dir.path = get_path(&self.root_path, &dir.path);
+                    dir.metadata_path = get_path(&self.root_path, &dir.metadata_path);
                 }
             }
 
@@ -676,7 +676,7 @@ impl IcyBoard {
 
         Ok(())
     }
-
+    /*
     pub fn set_user(&mut self, new_user: User, i: usize) -> Res<()> {
         let home_dir = UserBase::get_user_home_dir(&self.config.paths.user_file, new_user.get_name());
         std::fs::create_dir_all(&home_dir).unwrap();
@@ -684,7 +684,7 @@ impl IcyBoard {
         fs::write(home_dir.join("user.toml"), user_txt)?;
         self.users[i] = new_user;
         Ok(())
-    }
+    }*/
 
     pub fn save_statistics(&self) -> Res<()> {
         let r = &self.config.paths.statistics_file;

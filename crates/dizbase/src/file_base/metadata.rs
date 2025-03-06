@@ -2,10 +2,10 @@
 pub enum MetadataType {
     /// Unknown meta data type
     Unknown(u8),
-    /// The full file name of the file
-    FilePath,
+    /// XxHash3_64 hash
+    Hash,
     /// The uploader of the file.
-    UploaderName,
+    Uploader,
     /// The password of the file  (Murmur64a hash)
     Password,
     /// A csv list of tags
@@ -15,11 +15,12 @@ pub enum MetadataType {
     /// Sauce (128 bytes)
     Sauce,
 }
+
 impl MetadataType {
     pub fn from_data(data: u8) -> Self {
         match data {
-            0 => MetadataType::FilePath,
-            1 => MetadataType::UploaderName,
+            0 => MetadataType::Hash,
+            1 => MetadataType::Uploader,
             2 => MetadataType::Password,
             3 => MetadataType::Tags,
             4 => MetadataType::FileID,
@@ -31,8 +32,8 @@ impl MetadataType {
     pub fn to_data(&self) -> u8 {
         match self {
             MetadataType::Unknown(data) => *data,
-            MetadataType::FilePath => 0,
-            MetadataType::UploaderName => 1,
+            MetadataType::Hash => 0,
+            MetadataType::Uploader => 1,
             MetadataType::Password => 2,
             MetadataType::Tags => 3,
             MetadataType::FileID => 4,

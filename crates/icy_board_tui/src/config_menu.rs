@@ -995,17 +995,19 @@ impl<T> ConfigMenu<T> {
         frame: &mut Frame,
         state: &mut ConfigMenuState,
         display_editor: bool,
+        rows: usize,
     ) -> bool {
         let x1 = *x;
-        let mut x2 = 0;
+        let mut x2 = x1;
 
+        let mut x_m = x1;
         for (j, item) in items.iter_mut().enumerate() {
-            if j % 2 == 0 {
-                x2 = x2.max(item.measure_value(area) as u16);
+            x_m += item.measure_value(area);
+            if j > 0 && j % rows == 0 {
+                x2 = x2.max(x_m);
+                x_m = x1;
             }
         }
-
-        x2 += *x;
 
         for (j, item) in items.iter_mut().enumerate() {
             match item {
@@ -1056,11 +1058,11 @@ impl<T> ConfigMenu<T> {
                     }
 
                     state.item_pos.insert(*i, *y);
-                    if j % 2 == 0 {
-                        *x = x2;
-                    } else {
+                    if j > 0 && (j + 1) % rows == 0 {
                         *x = x1;
                         *y += 1;
+                    } else {
+                        *x += item.measure_value(area) as u16;
                     }
                     *i += 1;
                 }
@@ -1149,8 +1151,8 @@ impl<T> ConfigMenu<T> {
                         return false;
                     }
                 }
-                ConfigEntry::Table(_cols, items) => {
-                    if !Self::display_table(val, i, items, area, y, x, frame, state, display_editor) {
+                ConfigEntry::Table(rows, items) => {
+                    if !Self::display_table(val, i, items, area, y, x, frame, state, display_editor, *rows) {
                         return false;
                     }
                 }

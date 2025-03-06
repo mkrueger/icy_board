@@ -22,7 +22,7 @@ use crate::{
 pub struct DirNumbers {
     pub flag_files: bool,
     pub date_time: Option<chrono::prelude::DateTime<chrono::prelude::Local>>,
-    pub numbers: Vec<(usize, String, std::path::PathBuf)>,
+    pub numbers: Vec<(usize, String, std::path::PathBuf, std::path::PathBuf)>,
 }
 
 impl IcyBoardState {
@@ -85,7 +85,7 @@ impl IcyBoardState {
                 self.session.disp_options.no_change();
                 let r = self.session.search_pattern.as_ref().unwrap().clone();
 
-                for (num, desc, path) in dir_numbers.numbers {
+                for (num, desc, path, metadata) in dir_numbers.numbers {
                     self.display_text(IceText::ScanningDirectory, display_flags::DEFAULT).await?;
                     self.print(TerminalTarget::Both, &format!(" {}", num)).await?;
                     if !desc.is_empty() {
@@ -98,7 +98,8 @@ impl IcyBoardState {
                     let date_time = dir_numbers.date_time.clone();
                     self.display_file_area(
                         &path,
-                        Box::new(move |p| {
+                        &metadata,
+                        Box::new(move |p, md| {
                             if let Some(date) = date_time {
                                 if p.date() < date {
                                     return false;
@@ -109,15 +110,13 @@ impl IcyBoardState {
                                 return true;
                             }
 
-                            if let Ok(md) = p.get_metadata() {
-                                for d in md {
-                                    if d.metadata_type != MetadataType::FileID {
-                                        continue;
-                                    }
-                                    let desc = import_cp437_string(&d.data, true);
-                                    if r.is_match(&desc) {
-                                        return true;
-                                    }
+                            for d in md {
+                                if d.metadata_type != MetadataType::FileID {
+                                    continue;
+                                }
+                                let desc = import_cp437_string(&d.data, true);
+                                if r.is_match(&desc) {
+                                    return true;
                                 }
                             }
                             false
@@ -197,13 +196,18 @@ impl IcyBoardState {
                 0,
                 self.get_display_text(IceText::RecentUploads)?,
                 self.session.current_conference.private_upload_location.clone(),
+                self.session.current_conference.private_upload_metadata.clone(),
             ))
         }
 
         for p in numbers {
             let desc = self.session.current_conference.directories.as_ref().unwrap()[p - 1].name.clone();
-            res.numbers
-                .push((p, desc, self.session.current_conference.directories.as_ref().unwrap()[p - 1].path.clone()));
+            res.numbers.push((
+                p,
+                desc,
+                self.session.current_conference.directories.as_ref().unwrap()[p - 1].path.clone(),
+                self.session.current_conference.directories.as_ref().unwrap()[p - 1].metadata_path.clone(),
+            ));
         }
 
         if public_upload {
@@ -211,6 +215,7 @@ impl IcyBoardState {
                 max_dirs + 1,
                 self.get_display_text(IceText::RecentUploads)?,
                 self.session.current_conference.pub_upload_location.clone(),
+                self.session.current_conference.private_upload_metadata.clone(),
             ))
         }
 

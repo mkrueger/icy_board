@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::{
     datetime::IcbDate,
     icy_board::{
@@ -80,7 +82,7 @@ impl IcyBoardState {
                 self.session.disp_options.no_change();
                 // let r = self.session.search_pattern.as_ref().unwrap().clone();
 
-                for (num, desc, path) in area_numbers.numbers {
+                for (num, desc, path, _) in area_numbers.numbers {
                     self.display_text(IceText::ScanningArea, display_flags::DEFAULT).await?;
                     self.print(TerminalTarget::Both, &format!(" {}", num)).await?;
                     if !desc.is_empty() {
@@ -141,8 +143,12 @@ impl IcyBoardState {
 
         for p in numbers {
             let desc = self.session.current_conference.areas.as_ref().unwrap()[p - 1].name.clone();
-            res.numbers
-                .push((p, desc, self.session.current_conference.areas.as_ref().unwrap()[p - 1].path.clone()));
+            res.numbers.push((
+                p,
+                desc,
+                self.session.current_conference.areas.as_ref().unwrap()[p - 1].path.clone(),
+                PathBuf::new(),
+            ));
         }
 
         Ok(res)

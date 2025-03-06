@@ -32,21 +32,20 @@ impl IcyBoardState {
             )
             .await?
         };
-
         if !input.is_empty() {
             let saved_list = self.session.disp_options.in_file_list.take();
             let mut flagged = Vec::new();
             self.display_text(IceText::CheckingFileTransfer, display_flags::NEWLINE).await?;
 
             for dir in self.session.current_conference.directories.as_ref().unwrap().clone().iter() {
-                let files = self.get_filebase(&dir.path).await?;
+                let files = self.get_filebase(&dir.path, &dir.metadata_path).await?;
                 let mut options = MatchOptions::new();
                 options.case_sensitive = false;
                 if let Ok(pattern) = Pattern::new(&input) {
-                    for f in &mut files.lock().await.file_headers {
+                    for f in files.lock().await.iter() {
                         if pattern.matches_with(&f.name(), &options) {
                             let size = f.size();
-                            flagged.push((f.full_path.clone(), size));
+                            flagged.push((dir.path.join(f.name.clone()), size));
                         }
                     }
                 }
@@ -72,7 +71,6 @@ impl IcyBoardState {
                 }
                 self.add_flagged_file(file, false, true).await?;
             }
-
             self.session.disp_options.in_file_list = saved_list;
         }
         Ok(())

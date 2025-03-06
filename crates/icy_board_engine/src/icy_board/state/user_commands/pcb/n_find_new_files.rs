@@ -79,7 +79,7 @@ impl IcyBoardState {
                 self.new_line().await?;
                 self.session.disp_options.no_change();
 
-                for (num, desc, path) in dir_numbers.numbers {
+                for (num, desc, path, metadata) in dir_numbers.numbers {
                     self.display_text(IceText::ScanningDirectory, display_flags::DEFAULT).await?;
                     self.print(TerminalTarget::Both, &format!(" {}", num)).await?;
                     if !desc.is_empty() {
@@ -89,7 +89,7 @@ impl IcyBoardState {
                     self.new_line().await?;
                     self.reset_color(TerminalTarget::Both).await?;
                     let r = search_date.clone();
-                    self.display_file_area(&path, Box::new(move |p| p.date() >= r)).await?;
+                    self.display_file_area(&path, &metadata, Box::new(move |p, _| p.date() >= r)).await?;
                     if self.session.disp_options.abort_printout {
                         break;
                     }

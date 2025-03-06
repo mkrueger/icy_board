@@ -183,11 +183,15 @@ pub struct Conference {
     #[serde(skip_serializing_if = "is_null_8")]
     pub pub_upload_sort: u8,
     pub pub_upload_location: PathBuf,
+    #[serde(default)]
+    pub pub_upload_metadata: PathBuf,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_8")]
     pub private_upload_sort: u8,
     pub private_upload_location: PathBuf,
+    #[serde(default)]
+    pub private_upload_metadata: PathBuf,
 
     pub command_file: PathBuf,
     pub intro_file: PathBuf,
@@ -300,8 +304,10 @@ impl ConferenceBase {
                 attachment_location: PathBuf::from(&d.attach_loc),
                 pub_upload_sort: c.pub_upload_sort,
                 pub_upload_location: PathBuf::from(&c.pub_upload_location),
+                pub_upload_metadata: PathBuf::from(&c.pub_upload_location).join("dir"),
                 private_upload_sort: c.private_upload_sort,
                 private_upload_location: PathBuf::from(&c.private_upload_location),
+                private_upload_metadata: PathBuf::from(&c.private_upload_location).join("dir"),
                 command_file: PathBuf::from(&d.cmd_lst),
                 intro_file: PathBuf::from(&d.intro),
                 doors_menu: PathBuf::from(&c.doors_menu),

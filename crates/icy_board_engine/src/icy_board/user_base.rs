@@ -842,15 +842,15 @@ impl User {
         self.name = name;
     }
 
-    pub fn save(&self, home_dir: &Path) -> Res<()> {
+    pub fn save(&self, _home_dir: &Path) -> Res<()> {
         let user_txt = toml::to_string(self)?;
         if let Some(path) = self.path.as_ref() {
             fs::write(path, user_txt)?;
-        } else {
-            let home_dir = UserBase::get_user_home_dir(home_dir, self.get_name());
-            std::fs::create_dir_all(&home_dir)?;
-            fs::write(home_dir.join("user.toml"), user_txt)?;
-        }
+        } /* else {
+        let home_dir = UserBase::get_user_home_dir(home_dir, self.get_name());
+        std::fs::create_dir_all(&home_dir)?;
+        fs::write(home_dir.join("user.toml"), user_txt)?;
+        }*/
         Ok(())
     }
 }
@@ -881,10 +881,10 @@ impl UserBase {
         self.users.push(new_user);
         self.users.len() - 1
     }
-
+    /*
     pub fn get_user_home_dir(home_dir: &Path, user_name: &str) -> PathBuf {
         home_dir.join(user_name.to_ascii_lowercase().replace(' ', "_"))
-    }
+    }*/
 }
 
 impl IcyBoardSerializer for UserBase {

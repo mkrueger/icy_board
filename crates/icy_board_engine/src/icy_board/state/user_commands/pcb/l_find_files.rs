@@ -77,7 +77,7 @@ impl IcyBoardState {
                 self.new_line().await?;
                 self.session.disp_options.no_change();
 
-                for (num, desc, path) in dir_numbers.numbers {
+                for (num, desc, path, metadata) in dir_numbers.numbers {
                     self.display_text(IceText::ScanningDirectory, display_flags::DEFAULT).await?;
                     self.print(TerminalTarget::Both, &format!(" {}", num)).await?;
                     if !desc.is_empty() {
@@ -89,7 +89,8 @@ impl IcyBoardState {
                     let r = search_regex.clone();
                     self.display_file_area(
                         &path,
-                        Box::new(move |p| {
+                        &metadata,
+                        Box::new(move |p, _| {
                             if r.is_match(p.name()) {
                                 return true;
                             }

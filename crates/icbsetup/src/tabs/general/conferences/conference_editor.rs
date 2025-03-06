@@ -147,7 +147,7 @@ impl ConferenceEditor {
                 ConfigEntry::Separator,
                 ConfigEntry::Label(get_text("conf_sort_loc_label")),
                 ConfigEntry::Table(
-                    2,
+                    3,
                     vec![
                         ConfigEntry::Item(
                             ListItem::new(get_text("conf_pub_upld"), ListValue::U32(conf.pub_upload_sort as u32, 0, 4))
@@ -159,8 +159,16 @@ impl ConferenceEditor {
                                 }),
                         ),
                         ConfigEntry::Item(
+                            ListItem::new("".to_string(), ListValue::Path(conf.pub_upload_metadata.clone()))
+                                .with_edit_width(27)
+                                .with_update_path_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: PathBuf| {
+                                    let mut ib = board.1.lock().unwrap();
+                                    ib.conferences[board.0].pub_upload_metadata = value;
+                                }),
+                        ),
+                        ConfigEntry::Item(
                             ListItem::new("".to_string(), ListValue::Path(conf.pub_upload_location.clone()))
-                                .with_edit_width(55)
+                                .with_edit_width(25)
                                 .with_update_path_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: PathBuf| {
                                     let mut ib = board.1.lock().unwrap();
                                     ib.conferences[board.0].pub_upload_location = value;
@@ -176,8 +184,16 @@ impl ConferenceEditor {
                                 }),
                         ),
                         ConfigEntry::Item(
+                            ListItem::new("".to_string(), ListValue::Path(conf.private_upload_metadata.clone()))
+                                .with_edit_width(27)
+                                .with_update_path_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: PathBuf| {
+                                    let mut ib = board.1.lock().unwrap();
+                                    ib.conferences[board.0].private_upload_metadata = value;
+                                }),
+                        ),
+                        ConfigEntry::Item(
                             ListItem::new("".to_string(), ListValue::Path(conf.private_upload_location.clone()))
-                                .with_edit_width(55)
+                                .with_edit_width(25)
                                 .with_update_path_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: PathBuf| {
                                     let mut ib = board.1.lock().unwrap();
                                     ib.conferences[board.0].private_upload_location = value;

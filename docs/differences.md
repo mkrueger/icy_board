@@ -11,7 +11,7 @@ The goal is to be as compatible as possible but enhancing PCBoard for the modere
 * Message base format changed to JAM
   * Planned is to support multiple message base formats
   * Means all PPEs/tools break that may read the old format
-* DIR files are no longer used. Just throw the files in the directory, icy board takes care of everything.
+* 'DIR' files are now binary - they're no longer a text file. They contain meta data.
 
 ## CP437 is dead
 

@@ -992,7 +992,7 @@ impl IcyBoardState {
             let mut board = self.get_board().await;
             for u in 0..board.users.len() {
                 if board.users[u].get_name() == user.get_name() {
-                    board.set_user(user.clone(), u)?;
+                    board.users[u] = user.clone();
                     board.save_userbase()?;
                     return Ok(());
                 }
@@ -2394,19 +2394,19 @@ impl IcyBoardState {
         Ok(false)
     }
 
-    pub async fn get_filebase(&mut self, file_base_path: &PathBuf) -> Res<Arc<Mutex<FileBase>>> {
-        if let Some(some) = self.file_bases.get(file_base_path) {
+    pub async fn get_filebase(&mut self, dir: &PathBuf, metadata_path: &PathBuf) -> Res<Arc<Mutex<FileBase>>> {
+        if let Some(some) = self.file_bases.get(dir) {
             return Ok(some.clone());
         }
-        match FileBase::open(file_base_path) {
+        match FileBase::open(&dir, metadata_path) {
             Ok(new_base) => {
-                let arc = Arc::new(Mutex::new(new_base));
-                self.file_bases.insert(file_base_path.clone(), arc.clone());
+                let arc: Arc<Mutex<FileBase>> = Arc::new(Mutex::new(new_base));
+                self.file_bases.insert(dir.clone(), arc.clone());
                 return Ok(arc);
             }
             Err(err) => {
-                log::error!("Could not open file base ({}) : {} ", file_base_path.display(), err);
-                self.session.op_text = file_base_path.display().to_string();
+                log::error!("Could not open file base ({}) : {} ", dir.display(), err);
+                self.session.op_text = dir.display().to_string();
                 self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
                 Err(err)

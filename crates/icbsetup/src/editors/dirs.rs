@@ -243,6 +243,13 @@ impl<'a> Page for DirsEditor<'a> {
                                     }),
                             ),
                             ConfigEntry::Item(
+                                ListItem::new(get_text("dirs_metadata_path"), ListValue::Path(item.metadata_path.clone()))
+                                    .with_label_width(16)
+                                    .with_update_path_value(&|(i, list): &(usize, Arc<Mutex<DirectoryList>>), value: PathBuf| {
+                                        list.lock().unwrap()[*i].metadata_path = value;
+                                    }),
+                            ),
+                            ConfigEntry::Item(
                                 ListItem::new(get_text("dirs_edit_password"), ListValue::Text(12, item.password.to_string()))
                                     .with_label_width(16)
                                     .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DirectoryList>>), value: String| {

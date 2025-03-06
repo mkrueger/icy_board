@@ -67,7 +67,7 @@ itertools = "0.14.0"
 fern = "0.7.0"
 ariadne = "0.5.0"
 relative-path = "1.9.3"
-
+bitflags ="2.9.0"
 tui-textarea  = "0.7.0"
 tui-markdown = "0.3.1"
 tui-input = "0.11.0"

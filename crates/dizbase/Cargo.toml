@@ -21,12 +21,14 @@ regex = { workspace = true }
 zip = "2.2.0"
 delharc = "0.6.0"
 unrar = "0.5.7"
-icy_sauce = { git ="https://github.com/mkrueger/icy_tools" }
+twox-hash = { version="2.1.0", features=["xxhash3_64", "std"] }
 
+icy_sauce = { git ="https://github.com/mkrueger/icy_tools" }
 tempfile = { workspace = true }
 rayon = { workspace = true }
 walkdir = { workspace = true }
 codepages = { workspace = true}
+bitflags = { workspace = true}
 
 [dev-dependencies]
 tempfile = { workspace = true }

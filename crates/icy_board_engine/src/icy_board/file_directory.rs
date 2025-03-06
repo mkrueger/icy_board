@@ -61,6 +61,8 @@ pub enum SortDirection {
 pub struct FileDirectory {
     pub name: String,
     pub path: PathBuf,
+    #[serde(default)]
+    pub metadata_path: PathBuf,
 
     pub password: Password,
 
@@ -163,10 +165,11 @@ impl PCBoardRecordImporter<FileDirectory> for DirectoryList {
             4 => (SortOrder::FileDate, SortDirection::Descending),
             _ => return Err(IcyBoardError::InvalidDirListSortOrder(data[0]).into()),
         };
-
+        let metadata_path = path.join("dir");
         Ok(FileDirectory {
             name,
             path,
+            metadata_path,
             sort_order,
             sort_direction,
             password: Password::default(),

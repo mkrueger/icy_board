@@ -1236,7 +1236,7 @@ conf_cmd_lst_file=Conf. CMD.LST File
 conf_cmd_lst_file-status=Conf. CMD.LST File
 conf_cmd_lst_file-help=TODO
 
-conf_sort_loc_label={"              "}Sort  Location of Uploads
+conf_sort_loc_label={"              "}Sort  Name/Loc METADATA             Location of Uploads
 
 conf_pub_upld=Public  Upld
 conf_pub_upld-status=Public Upld
@@ -1584,6 +1584,10 @@ dirs_edit_name-help=TODO
 dirs_edit_path=Path
 dirs_edit_path-status=Path
 dirs_edit_path-help=TODO
+
+dirs_metadata_path=Metadata Path
+dirs_metadata_path-status=Stores additional info about the files
+dirs_metadata_path-help=TODO
 
 dirs_edit_password=Password
 dirs_edit_password-status=Password

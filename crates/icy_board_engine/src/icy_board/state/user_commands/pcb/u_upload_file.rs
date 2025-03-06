@@ -10,12 +10,15 @@ use crate::{
     },
     vm::TerminalTarget,
 };
+use dizbase::file_base::metadata::{MetadataHeader, MetadataType};
+use dizbase::file_base_scanner::scan_file;
 use icy_net::protocol::{Protocol, TransferProtocolType, XYModemVariant, XYmodem, Zmodem};
 
 impl IcyBoardState {
     pub async fn upload_file(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::Transfer).await;
         let upload_location = self.session.current_conference.pub_upload_location.clone();
+        let upload_metadata = self.session.current_conference.pub_upload_metadata.clone();
         if !upload_location.exists() {
             self.display_text(
                 IceText::NoDirectoriesAvailable,
@@ -113,7 +116,15 @@ impl IcyBoardState {
                     for (x, path) in state.recieve_state.finished_files {
                         let dest = upload_location.join(x);
                         std::fs::copy(&path, &dest)?;
-                        // todo: scan
+
+                        let file_base = self.get_filebase(&upload_location, &upload_metadata).await?;
+                        let mut metadata = scan_file(&dest)?;
+                        metadata.push(MetadataHeader {
+                            data: self.session.get_username_or_alias().as_bytes().to_vec(),
+                            metadata_type: MetadataType::Uploader,
+                        });
+                        file_base.lock().await.add_file(&dest, metadata.clone())?;
+
                         std::fs::remove_file(&path)?;
                     }
                 }
