@@ -613,7 +613,7 @@ impl CommandType {
             CommandType::RunPPE => "hlpppe",
             CommandType::TextSearch => "hlpts",
             CommandType::ChangeMessageArea => "hlparea",
-
+            CommandType::QWK => "hlpqwk",
             _ => "",
         }
     }

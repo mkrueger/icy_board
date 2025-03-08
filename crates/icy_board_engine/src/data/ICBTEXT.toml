@@ -2233,11 +2233,11 @@ text = "(H)elp, (1-@NUMDIR@), File List Command"
 style = "Yellow"
 
 [ConferenceHeader1]
-text = "Conference                                                   Last   High"
+text = "Conference"
 style = "White"
 
 [ConferenceHeader2]
-text = "  #   Name                                                   Read   Num. Flags"
+text = "#   Name                                                   Flags"
 style = "White"
 
 [CTTYOn]
@@ -2595,7 +2595,7 @@ text = "Error compressing file."
 style = "Red"
 
 [QWKCommands]
-text = "QWK Commands: (D)ownload, (U)pload"
+text = "QWK Commands: (D)ownload, (U)pload, (S)canned bases"
 style = "Green"
 
 [ExtractingMessages]
@@ -2959,3 +2959,23 @@ style = "Yellow"
 [ScanningArea]
 text = "Scanning Area"
 style = "White"
+
+[QWKListCommands]
+text = "Enter Area Numbers, (S)elect All, (D)eselect All, (Enter)=none"
+style = "Yellow"
+
+[QWKListCommandsExpertmode]
+text = "(S), (D), (Enter)"
+style = "Yellow"
+
+[MessageAreaListHeader1]
+text = "Message Area                                                 Last   High"
+style = "White"
+
+[MessageAreaListHeader2]
+text = "  #   Name                                                   Read   Num."
+style = "White"
+
+[SelectArea]
+text = "@OPTEXT@ Select Area"
+style = "Yellow"

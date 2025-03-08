@@ -83,7 +83,7 @@ If something is missing just let me know.
 | REPLY  | Reply Message | 💯 | 
 | USER  | User List | 90% | 
 | WHO  |WHO is Online | 90% | 
-| QWK  | QWK command | 0% | 
+| QWK  | QWK command | 50% | Needed some changes. Upload missing atm [^2]
 | CHAT  | Group Chat| 0% | Note: There are working PPEs for that
 | BD/DB  | Batch Download | 0% | 
 | BU/UB  | Batch Upload | 0% | 
@@ -93,6 +93,8 @@ If something is missing just let me know.
 
 [^1]: PCBTEXT #586 changed to `Conference`,
   #587 changed to `#   Name                                                   Flags`
+
+[^2]: PCBTEXT #678 `QWK Commands: (D)ownload, (U)pload, (S)canned bases`
 
 # Unsupported Features
 

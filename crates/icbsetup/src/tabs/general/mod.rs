@@ -26,6 +26,7 @@ mod configuration_options;
 mod connection_info;
 mod event_setup;
 mod file_locations;
+mod msg_networking;
 mod new_user_options;
 mod security_levels;
 mod subscription_information;
@@ -55,7 +56,7 @@ impl GeneralTab {
                 MenuItem::new(7, 'H', get_text("icb_setup_main_sec_levels")).with_help(get_text("icb_setup_main_sec_levels-help")),
                 MenuItem::new(8, 'I', get_text("icb_setup_main_acc_cfg")).with_help(get_text("icb_setup_main_acc_cfg-help")),
                 MenuItem::new(9, 'J', get_text("icb_setup_main_new_user")).with_help(get_text("icb_setup_main_new_user-help")),
-                MenuItem::new(10, 'K', "TODO: Mailer/Tosser".to_string()),
+                MenuItem::new(10, 'K', get_text("icb_setup_msg_networking")).with_help(get_text("icb_setup_msg_networking-help")),
                 MenuItem::new(11, 'L', get_text("icb_setup_mb_conf")).with_help(get_text("icb_setup_mb_conf-help")),
                 MenuItem::new(12, 'M', get_text("icb_setup_conferences")).with_help(get_text("icb_setup_conferences-help")),
             ]))
@@ -134,6 +135,11 @@ impl TabPage for GeneralTab {
 
                 9 => {
                     let page = new_user_options::NewUserOptions::new(self.icy_board.clone());
+                    return self.page.open_sup_page(Box::new(page));
+                }
+
+                10 => {
+                    let page = msg_networking::MsgNetworking::new(self.icy_board.clone());
                     return self.page.open_sup_page(Box::new(page));
                 }
 

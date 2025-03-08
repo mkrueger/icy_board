@@ -17,7 +17,7 @@ use icy_board_engine::{
         group_list::GroupList,
         icb_config::{
             BoardInformation, BoardOptions, ColorConfiguration, ConfigPaths, DEFAULT_PCBOARD_DATE_FORMAT, DisplayNewsBehavior, IcbColor, IcbConfig,
-            NewUserSettings, SubscriptionMode, SysopCommandLevels, SysopInformation,
+            NewUserSettings, QwkSettings, SubscriptionMode, SysopCommandLevels, SysopInformation,
         },
         icb_text::IcbTextFile,
         language::SupportedLanguages,
@@ -508,6 +508,7 @@ impl PCBoardImporter {
                 logoff_file: accounting_logoff_file,
                 accounting_config: None,
             },
+            qwk_settings: QwkSettings::default(),
         };
         icb_cfg.board.allow_iemsi = false;
         icb_cfg.login_server.telnet.port = 1337;

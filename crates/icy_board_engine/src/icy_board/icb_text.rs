@@ -1374,7 +1374,7 @@ pub enum IceText {
     CreatingQWK = 676,
     /// `Error compressing file.`
     ErrorCompressing = 677,
-    /// `QWK Commands: (D)ownload, (U)pload`
+    /// `QWK Commands: (D)ownload, (U)pload, (S)canned bases`
     QWKCommands = 678,
     /// `Extracting messages, please wait...`
     ExtractingMessages = 679,
@@ -1587,9 +1587,24 @@ pub enum IceText {
 
     /// `Scanning Area`
     ScanningArea = 773,
+
+    /// `Enter Area Numbers, (S)elect All, (D)eselect All, (L)ast Read, (Enter)=none`
+    QWKListCommands = 774,
+
+    /// `(S), (D), (L), (Enter)`
+    QWKListCommandsExpertmode = 775,
+
+    /// `Message Area                                                 Last   High`
+    MessageAreaListHeader1 = 776,
+
+    /// `    # Name                                                   Read   Num.  Include`
+    MessageAreaListHeader2 = 777,
+
+    /// `@OPTEXT@ Select Area`
+    SelectArea = 778,
 }
 
-const LAST_ENTRY: usize = 773;
+const LAST_ENTRY: usize = 778;
 
 impl IceText {
     pub fn from(i: usize) -> Self {

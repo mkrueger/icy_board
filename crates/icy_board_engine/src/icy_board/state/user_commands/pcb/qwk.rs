@@ -1,8 +1,448 @@
-use crate::{Res, icy_board::state::IcyBoardState};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{BufWriter, Write},
+};
+
+use bstr::BString;
+use chrono::{DateTime, Local, Utc};
+use jamjam::{
+    jam::JamMessageBase,
+    qwk::{control::ControlDat, qwk_message::QWKMessage},
+    util::basic_real::BasicReal,
+};
+use tokio::fs;
+use zip::write::SimpleFileOptions;
+
+use crate::{
+    Res,
+    icy_board::{
+        commands::CommandType,
+        icb_config::IcbColor,
+        icb_text::IceText,
+        message_area::MessageArea,
+        state::{IcyBoardState, functions::display_flags},
+        user_base::LastReadStatus,
+    },
+    vm::TerminalTarget,
+};
+
+const MASK_CONFNUMBERS: &str = "0123456789-SDL?";
 
 impl IcyBoardState {
+    async fn set_last_read(&mut self, table: &Vec<(usize, usize)>) -> Res<()> {
+        self.session.op_text = format!("(1-{})", table.len());
+        let input = self
+            .input_field(
+                IceText::SelectArea,
+                9,
+                &crate::icy_board::state::functions::MASK_NUM,
+                CommandType::QWK.get_help(),
+                None,
+                display_flags::UPCASE | display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+            )
+            .await?;
+
+        let Ok(number) = input.parse::<usize>() else {
+            return Ok(());
+        };
+        let Some((conf_num, area_num)) = table.get(number) else {
+            return Ok(());
+        };
+        let high_msg = self.board.lock().await.conferences[*conf_num].areas.as_ref().unwrap()[*area_num].get_high_msg() as usize;
+
+        self.session.op_text = format!("(1-{})", high_msg);
+
+        let input = self
+            .input_field(
+                IceText::SetLastMessageReadPointer,
+                9,
+                &crate::icy_board::state::functions::MASK_NUM,
+                CommandType::QWK.get_help(),
+                Some(self.session.page_len.to_string()),
+                display_flags::UPCASE | display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+            )
+            .await?;
+        let Ok(number) = input.parse::<usize>() else {
+            return Ok(());
+        };
+        let number = number.min(high_msg);
+        if let Some(user) = &mut self.session.current_user {
+            user.lastread_ptr_flags
+                .entry((*conf_num, *area_num))
+                .or_insert_with(|| LastReadStatus {
+                    include_qwk: true,
+                    highest_msg_read: 0,
+                    last_read: 0,
+                })
+                .last_read = number;
+        }
+        Ok(())
+    }
+
     pub async fn qwk_command(&mut self) -> Res<()> {
-        // TODO
+        loop {
+            if self.session.tokens.is_empty() {
+                let input = self
+                    .input_field(
+                        IceText::QWKCommands,
+                        2,
+                        &"DSU",
+                        CommandType::QWK.get_help(),
+                        Some(self.session.page_len.to_string()),
+                        display_flags::UPCASE | display_flags::STACKED | display_flags::NEWLINE | display_flags::LFBEFORE,
+                    )
+                    .await?;
+                self.session.push_tokens(&input);
+            };
+
+            if let Some(token) = self.session.tokens.pop_front() {
+                match token.as_str() {
+                    "D" => {
+                        self.create_qwk_packet().await?;
+                        break;
+                    }
+                    "U" => {
+                        // TODO
+                        break;
+                    }
+                    "S" => {
+                        self.select_qwk_areas().await?;
+                    }
+                    _ => {}
+                }
+            } else {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    async fn select_qwk_areas(&mut self) -> Res<()> {
+        let divider = "-".repeat(79);
+        let num_lines = if self.session.page_len < 4 || self.session.page_len > 50 {
+            19
+        } else {
+            self.session.page_len as usize - 4
+        };
+        let conferences = &self.board.lock().await.conferences.clone();
+        let mut done = false;
+
+        let mut number_to_msgid = Vec::new();
+
+        for (i, conf) in conferences.iter().enumerate() {
+            if let Some(areas) = &conf.areas {
+                for (j, _area) in areas.iter().enumerate() {
+                    number_to_msgid.push((i, j));
+                }
+            }
+        }
+
+        while !done {
+            if self.session.tokens.is_empty() {
+                self.print_area_header(&divider).await?;
+                let mut line_number = 0;
+                for (i, conf) in conferences.iter().enumerate() {
+                    if let Some(areas) = &conf.areas {
+                        for (j, area) in areas.iter().enumerate() {
+                            self.print_area_line(line_number, i, j, area).await?;
+                            line_number += 1;
+                        }
+                    }
+                }
+                for _ in line_number..num_lines {
+                    self.new_line().await?;
+                }
+                self.set_color(TerminalTarget::Both, IcbColor::dos_white()).await?;
+                self.println(TerminalTarget::Both, &divider).await?;
+
+                let txt = if self.session.expert_mode() {
+                    IceText::QWKListCommandsExpertmode
+                } else {
+                    IceText::QWKListCommands
+                };
+                let help = "hlpqwk";
+                let text = self
+                    .input_field(
+                        txt,
+                        58,
+                        MASK_CONFNUMBERS,
+                        help,
+                        None,
+                        display_flags::ERASELINE | display_flags::STACKED | display_flags::UPCASE,
+                    )
+                    .await?;
+                self.session.push_tokens(&text);
+            } else {
+                done = true;
+            }
+            if self.session.tokens.is_empty() {
+                break;
+            }
+            while let Some(token) = self.session.tokens.pop_front() {
+                match token.as_str() {
+                    "Q" => {
+                        done = true;
+                        break;
+                    }
+                    "S" => {
+                        self.change_qkw_selection(&number_to_msgid, 0, number_to_msgid.len(), Some(true)).await?;
+                    }
+                    "D" => {
+                        self.change_qkw_selection(&number_to_msgid, 0, number_to_msgid.len(), Some(false)).await?;
+                    }
+                    "L" => {
+                        self.set_last_read(&number_to_msgid).await?;
+                    }
+                    _ => {
+                        let mut str = token;
+                        let value;
+                        if str.ends_with('D') {
+                            value = Some(false);
+                            str.pop();
+                        } else if str.ends_with('S') {
+                            value = Some(true);
+                            str.pop();
+                        } else {
+                            value = None;
+                        }
+
+                        if str.contains('-') {
+                            let mut parts = str.split('-');
+                            if let (Some(from), Some(to)) = (parts.next(), parts.next()) {
+                                if let (Ok(from), Ok(to)) = (from.parse::<usize>(), to.parse::<usize>()) {
+                                    self.change_qkw_selection(&number_to_msgid, from, to, value).await?;
+                                }
+                            }
+                        } else {
+                            if let Ok(num) = str.parse::<usize>() {
+                                self.change_qkw_selection(&number_to_msgid, num, num, value).await?;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn print_area_header(&mut self, divider: &str) -> Res<()> {
+        self.clear_screen(TerminalTarget::Both).await?;
+        self.display_text(IceText::MessageAreaListHeader1, display_flags::NEWLINE).await?;
+        self.display_text(IceText::MessageAreaListHeader2, display_flags::NEWLINE).await?;
+        self.set_color(TerminalTarget::Both, IcbColor::dos_white()).await?;
+        self.println(TerminalTarget::Both, divider).await?;
+        self.reset_color(TerminalTarget::Both).await?;
+        Ok(())
+    }
+
+    async fn print_area_line(&mut self, area_number: usize, conference: usize, num: usize, area: &MessageArea) -> Res<()> {
+        self.reset_color(TerminalTarget::Both).await?;
+
+        let str = format!("{:5}{}", area_number, ' ');
+        self.print(TerminalTarget::Both, &str).await?;
+
+        self.print(TerminalTarget::Both, &area.name).await?;
+        self.set_color(TerminalTarget::Both, IcbColor::dos_dark_gray()).await?;
+
+        for i in area.name.len()..54 {
+            self.print(TerminalTarget::Both, if i % 2 == 0 { " " } else { "." }).await?;
+        }
+        self.set_color(TerminalTarget::Both, IcbColor::dos_gray()).await?;
+
+        if let Some(user) = &self.session.current_user {
+            let (include, last_read) = if let Some(last_read) = user.lastread_ptr_flags.get(&(conference, num)) {
+                (last_read.include_qwk, last_read.highest_msg_read)
+            } else {
+                (true, 0)
+            };
+
+            let high = area.get_high_msg();
+
+            self.set_color(TerminalTarget::Both, IcbColor::dos_white()).await?;
+
+            self.print(TerminalTarget::Both, &format!(" {:<6}", last_read)).await?;
+            self.print(TerminalTarget::Both, &format!(" {:<6}", high)).await?;
+            if include {
+                self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
+                self.print(TerminalTarget::Both, &"X").await?;
+            }
+        }
+        self.new_line().await?;
+
+        Ok(())
+    }
+
+    async fn change_qkw_selection(&mut self, table: &Vec<(usize, usize)>, from: usize, to: usize, set_selection_to: Option<bool>) -> Res<()> {
+        if let Some(user) = &mut self.session.current_user {
+            for i in from..=to {
+                if let Some((conference, num)) = table.get(i) {
+                    user.lastread_ptr_flags
+                        .entry((*conference, *num))
+                        .or_insert_with(|| LastReadStatus {
+                            include_qwk: true,
+                            highest_msg_read: 0,
+                            last_read: 0,
+                        })
+                        .include_qwk = set_selection_to.unwrap_or(
+                        !user
+                            .lastread_ptr_flags
+                            .entry((*conference, *num))
+                            .or_insert_with(|| LastReadStatus {
+                                include_qwk: true,
+                                highest_msg_read: 0,
+                                last_read: 0,
+                            })
+                            .include_qwk,
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn create_qwk_packet(&mut self) -> Res<()> {
+        let output_path = temp_file::empty().path().to_path_buf();
+        fs::create_dir_all(&output_path).await?;
+        let qwk_package = output_path.join("mail.qwk");
+
+        {
+            let board = self.board.lock().await;
+            let bbs_name: BString = if board.config.qwk_settings.bbs_name.is_empty() {
+                board.config.board.name.clone().into()
+            } else {
+                board.config.qwk_settings.bbs_name.clone().into()
+            };
+            let mut control_dat = ControlDat {
+                bbs_name: bbs_name.clone(),
+                bbs_city_and_state: if board.config.qwk_settings.bbs_city_and_state.is_empty() {
+                    board.config.board.location.clone().into()
+                } else {
+                    board.config.qwk_settings.bbs_city_and_state.clone().into()
+                },
+                bbs_phone_number: if board.config.qwk_settings.bbs_phone_number.is_empty() {
+                    board.config.board.notice.clone().into()
+                } else {
+                    board.config.qwk_settings.bbs_phone_number.clone().into()
+                },
+                bbs_sysop_name: if board.config.qwk_settings.bbs_sysop_name.is_empty() {
+                    board.config.board.operator.clone().into()
+                } else {
+                    board.config.qwk_settings.bbs_sysop_name.clone().into()
+                },
+                bbs_id: if board.config.qwk_settings.bbs_id.is_empty() {
+                    bbs_name.clone().into()
+                } else {
+                    board.config.qwk_settings.bbs_id.clone().into()
+                },
+                serial_number: 0,
+                creation_time: Local::now().format("%m/%d/%y,%H:%M").to_string().into(),
+                qmail_user_name: self.session.user_name.clone().into(),
+                qmail_menu_name: BString::from(""),
+                zero_line: "0".into(),
+                message_count: 0,
+                conferences: Vec::new(),
+                welcome_screen: BString::from(""),
+                news_screen: BString::from(""),
+                logoff_screen: BString::from(""),
+            };
+            let Some(user) = &mut self.session.current_user else {
+                return Ok(());
+            };
+
+            let conferences: crate::icy_board::conferences::ConferenceBase = board.conferences.clone();
+            let mut conference_number = 1;
+            let messages_dat: File = File::create(&output_path.join("messages.dat"))?;
+            let mut msg_writer = BufWriter::new(messages_dat);
+            let mut header = format!("Produced by Icy Board {}", env!("CARGO_PKG_VERSION")).bytes().collect::<Vec<u8>>();
+            header.resize(128, b' ');
+            msg_writer.write_all(&header)?;
+            let mut cur_block = 2;
+            let mut ndx_data = HashMap::new();
+            for (i, conf) in conferences.iter().enumerate() {
+                if let Some(areas) = &conf.areas {
+                    for (j, area) in areas.iter().enumerate() {
+                        let ptr = if let Some(ptr) = user.lastread_ptr_flags.get(&(i, j)) {
+                            ptr.clone()
+                        } else {
+                            LastReadStatus::default()
+                        };
+                        if !ptr.include_qwk {
+                            continue;
+                        }
+                        let number = control_dat.conferences.len() as u16 + 1;
+                        control_dat.conferences.push(jamjam::qwk::control::Conference {
+                            number,
+                            name: area.name.clone().into(),
+                        });
+
+                        let is_extended = true;
+                        let message_base_file = area.path.clone();
+
+                        match JamMessageBase::open(&message_base_file) {
+                            Ok(message_base) => {
+                                let base = message_base.base_messagenumber();
+                                let active = message_base.active_messages();
+
+                                ndx_data.insert(conference_number, Vec::new());
+                                for i in ptr.highest_msg_read as u32..(base + active) {
+                                    if let Ok(header) = message_base.read_header(i) {
+                                        if let Ok(text) = message_base.read_msg_text(&header) {
+                                            let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
+                                            let qwk_msg = QWKMessage {
+                                                msg_number: header.message_number,
+                                                from: header.get_from().unwrap().clone(),
+                                                to: header.get_to().unwrap().clone(),
+                                                subj: header.get_subject().unwrap().clone(),
+                                                date_time: date_time.format("%m-%d-%y%H:%M").to_string().into(),
+                                                text,
+                                                status: b' ',
+                                                password: BString::from(""),
+                                                ref_msg_number: header.reply_to,
+                                                logical_message_number: control_dat.message_count as u16,
+                                                active_flag: if header.is_deleted() { 226 } else { 225 },
+                                                conference_number,
+                                                net_tag: b' ',
+                                            };
+                                            let blocks = qwk_msg.write(&mut msg_writer, is_extended)?;
+                                            ndx_data.get_mut(&conference_number).unwrap().push(BasicReal::from(cur_block));
+                                            control_dat.message_count += 1;
+                                            cur_block += blocks as i32;
+                                        }
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                log::error!("Message index load error {}", err);
+                                log::error!("Creating new message index at {}", message_base_file.display());
+                            }
+                        }
+                        conference_number += 1;
+                    }
+                }
+            }
+
+            let file = std::fs::File::create(&qwk_package).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+            zip.start_file("control.dat", SimpleFileOptions::default())?;
+            zip.write_all(&control_dat.to_vec())?;
+
+            zip.start_file("messages.dat", SimpleFileOptions::default())?;
+            zip.write_all(&fs::read(output_path.join("messages.dat")).await?)?;
+
+            for (cnf, ndx) in ndx_data.iter() {
+                zip.start_file(&format!("{:03}.ndx", cnf), SimpleFileOptions::default())?;
+                for br in ndx {
+                    zip.write_all(br.bytes())?;
+                    zip.write(&[*cnf as u8])?;
+                }
+            }
+            zip.finish()?;
+        }
+        self.add_flagged_file(&qwk_package, true, false).await?;
+        self.download(false).await?;
+        self.session.flagged_files.retain(|f| f != &qwk_package);
+        fs::remove_dir_all(output_path).await?;
         Ok(())
     }
 }

@@ -237,6 +237,13 @@ icb_setup_main_new_user-help=
     This includes the default security level, the default groups, and the
     default questions to ask new users.
 
+icb_setup_msg_networking=Messaging & Networking
+icb_setup_msg_networking-help=
+    # Messaging & Networking
+
+    Messaging & Networking is a menu for setting up the QWK/FTN etc. settings
+    for Icy Board.
+
 icb_setup_mb_conf=Main Board Configuration
 icb_setup_mb_conf-help=
     # Main Board Configuration
@@ -1848,3 +1855,43 @@ command_editor_security=Security
 command_editor_action=Action
 command_editor_parameter=Parameter
 command_editor_command_type=Command Type
+
+msg_networking_title=Message Networking
+msg_networking_qwk=QWK Settings
+
+qwk_settings_title=QWK Settings
+
+qwk_bbs_label=BBS Information
+qwk_bbs_name=Name
+qwk_bbs_name-status=BBS Name
+qwk_bbs_name-help=TODO
+
+qwk_bbs_city_and_state=City and State
+qwk_bbs_city_and_state-status=BBS City and State
+qwk_bbs_city_and_state-help=TODO
+
+qwk_bbs_phone_number=Phone
+qwk_bbs_phone_number-status=BBS Phone
+qwk_bbs_phone_number-help=TODO
+
+qwk_bbs_sysop_name=Sysop
+qwk_bbs_sysop_name-status=BBS Sysop
+qwk_bbs_sysop_name-help=TODO
+
+qwk_bbs_id=ID
+qwk_bbs_id-status=BBS ID
+qwk_bbs_id-help=TODO
+
+qwk_files_label=QWK Files
+
+qwk_welcome_screen=Welcome Screen
+qwk_welcome_screen-status=QWK Welcome Screen
+qwk_welcome_screen-help=TODO
+
+qwk_goodbye_screen=Goodbye Screen
+qwk_goodbye_screen-status=QWK Goodbye Screen
+qwk_goodbye_screen-help=TODO
+
+qwk_news_sceen=News Screen
+qwk_news_sceen-status=QWK News Screen
+qwk_news_sceen-help=TODO

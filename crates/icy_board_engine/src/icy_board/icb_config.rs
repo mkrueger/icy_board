@@ -691,6 +691,8 @@ pub struct IcbConfig {
     pub options: BoardOptions,
     pub event: EventOptions,
     pub accounting: AccountingOptions,
+    #[serde(default)]
+    pub qwk_settings: QwkSettings,
 
     pub login_server: LoginServer,
 
@@ -962,6 +964,7 @@ impl IcbConfig {
                 logoff_file: PathBuf::new(),
                 accounting_config: None,
             },
+            qwk_settings: QwkSettings::default(),
         }
     }
 }
@@ -974,4 +977,17 @@ impl Default for IcbConfig {
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[derive(Default, Clone, Serialize, Deserialize, PartialEq)]
+pub struct QwkSettings {
+    pub bbs_name: String,
+    pub bbs_city_and_state: String,
+    pub bbs_phone_number: String,
+    pub bbs_sysop_name: String,
+    pub bbs_id: String,
+
+    pub welcome_screen: PathBuf,
+    pub goodbye_screen: PathBuf,
+    pub news_sceen: PathBuf,
 }

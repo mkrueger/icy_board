@@ -24,6 +24,7 @@ semver = { workspace = true }
 regex = { workspace = true }
 walkdir = { workspace = true }
 bitflag = { workspace = true }
+tempfile = { workspace = true }
 
 unicase = { workspace = true }
 rand = { workspace = true }
@@ -48,6 +49,7 @@ temp-file = "0.1.9"
 glob = "0.3.2"
 chumsky = "0.9.3"
 creditcard = "0.1.0"
+zip = "2.2.3"
 
 # interpreter deps
 [dev-dependencies]

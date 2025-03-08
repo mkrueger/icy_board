@@ -26,6 +26,9 @@ pub struct ControlDat {
     /// Mail door registration #, BBSID
     pub bbs_id: bstr::BString,
 
+    /// Serial number of the bbs_id
+    pub serial_number: i32,
+
     /// Mail packet creation time
     pub creation_time: bstr::BString,
 
@@ -65,7 +68,21 @@ impl ControlDat {
         let bbs_city_and_state = BString::from(lines.next().unwrap_or_default());
         let bbs_phone_number = BString::from(lines.next().unwrap_or_default());
         let bbs_sysop_name = BString::from(lines.next().unwrap_or_default());
-        let bbs_id = BString::from(lines.next().unwrap_or_default());
+
+        let id_line = lines.next().unwrap_or_default();
+        let mut bbs_id = BString::from(id_line);
+        let mut serial_number = 0;
+        for i in 0..id_line.len() {
+            if id_line[i] == b',' {
+                let (serial, id) = id_line.split_at(i);
+                bbs_id = BString::from(&id[1..]);
+                if let Ok(num) = serial.to_str()?.parse::<i32>() {
+                    serial_number = num;
+                }
+                break;
+            }
+        }
+
         let creation_time = BString::from(lines.next().unwrap_or_default());
         let qmail_user_name = BString::from(lines.next().unwrap_or_default());
         let qmail_menu_name = BString::from(lines.next().unwrap_or_default());
@@ -138,6 +155,7 @@ impl ControlDat {
             bbs_phone_number,
             bbs_sysop_name,
             bbs_id,
+            serial_number,
             creation_time,
             qmail_user_name,
             qmail_menu_name,
@@ -150,11 +168,9 @@ impl ControlDat {
         })
     }
 
-    pub fn write(&self) -> Vec<u8> {
-        let mut s: Vec<u8> = Vec::new();
-
+    pub fn to_vec(&self) -> Vec<u8> {
+        let mut s = Vec::new();
         s.extend(self.bbs_name.bytes());
-
         s.extend(EOL);
         s.extend(self.bbs_city_and_state.bytes());
         s.extend(EOL);
@@ -162,6 +178,8 @@ impl ControlDat {
         s.extend(EOL);
         s.extend(self.bbs_sysop_name.bytes());
         s.extend(EOL);
+
+        s.extend(format!("{},", self.serial_number).as_bytes());
         s.extend(self.bbs_id.bytes());
         s.extend(EOL);
         s.extend(self.creation_time.bytes());

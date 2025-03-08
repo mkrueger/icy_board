@@ -4,6 +4,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use jamjam::jam::JamMessageBase;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -36,6 +37,14 @@ pub struct MessageArea {
     #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
     #[serde_as(as = "DisplayFromStr")]
     pub req_level_to_save_attach: SecurityExpression,
+}
+
+impl MessageArea {
+    pub fn get_high_msg(&self) -> u32 {
+        JamMessageBase::open(&self.path)
+            .map(|jam| jam.base_messagenumber() + jam.active_messages())
+            .unwrap_or(0)
+    }
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, PartialEq)]

@@ -465,6 +465,16 @@ pub struct LastReadStatus {
     pub include_qwk: bool,
 }
 
+impl Default for LastReadStatus {
+    fn default() -> Self {
+        Self {
+            last_read: 0,
+            highest_msg_read: 0,
+            include_qwk: true,
+        }
+    }
+}
+
 mod lastread_ptr_flags {
     use std::collections::HashMap;
 

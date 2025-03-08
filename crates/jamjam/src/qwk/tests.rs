@@ -29,7 +29,8 @@ fn test_parse_control_dat() {
     assert_eq!(dat.bbs_city_and_state, "New York");
     assert_eq!(dat.bbs_phone_number, "212-555");
     assert_eq!(dat.bbs_sysop_name, "John Doe");
-    assert_eq!(dat.bbs_id, "20052,MYBBS");
+    assert_eq!(dat.bbs_id, "MYBBS");
+    assert_eq!(dat.serial_number, 20052);
     assert_eq!(dat.creation_time, "01-01-1991,23:59:59");
     assert_eq!(dat.qmail_user_name, "JANE DOE");
     assert_eq!(dat.qmail_menu_name, "");
@@ -49,12 +50,13 @@ fn test_generate_control_dat() {
         bbs_city_and_state: BString::from("New York"),
         bbs_phone_number: BString::from("212-555"),
         bbs_sysop_name: BString::from("John Doe"),
-        bbs_id: BString::from("20052,MYBBS"),
+        bbs_id: BString::from("MYBBS"),
         creation_time: BString::from("01-01-1991,23:59:59"),
         qmail_user_name: BString::from("JANE DOE"),
         qmail_menu_name: BString::from(""),
         zero_line: BString::from("0"),
         message_count: 999,
+        serial_number: 20052,
         conferences: vec![Conference {
             number: 0,
             name: BString::from("Main Board"),
@@ -64,7 +66,7 @@ fn test_generate_control_dat() {
         logoff_screen: BString::from("SCRIPT0"),
     };
 
-    assert_eq!(dat.write(), TEST_CONTROL_DAT);
+    assert_eq!(dat.to_vec(), TEST_CONTROL_DAT);
 }
 
 #[test]
