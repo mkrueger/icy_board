@@ -31,8 +31,8 @@ use super::u_upload_file::create_protocol;
 const MASK_CONFNUMBERS: &str = "0123456789-SDL?";
 
 impl IcyBoardState {
-    async fn set_last_read(&mut self, table: &Vec<(usize, usize)>) -> Res<()> {
-        self.session.op_text = format!("(1-{})", table.len());
+    async fn set_last_read(&mut self, table: &HashMap<u16, (usize, usize)>) -> Res<()> {
+        self.session.op_text = format!("(1-{})", table.keys().max().unwrap_or(&0));
         let input = self
             .input_field(
                 IceText::SelectArea,
@@ -44,10 +44,10 @@ impl IcyBoardState {
             )
             .await?;
 
-        let Ok(number) = input.parse::<usize>() else {
+        let Ok(number) = input.parse::<u16>() else {
             return Ok(());
         };
-        let Some((conf_num, area_num)) = table.get(number) else {
+        let Some((conf_num, area_num)) = table.get(&number) else {
             return Ok(());
         };
         let high_msg = self.board.lock().await.conferences[*conf_num].areas.as_ref().unwrap()[*area_num].get_high_msg() as usize;
@@ -119,6 +119,42 @@ impl IcyBoardState {
         Ok(())
     }
 
+    async fn get_number_to_msgid(&self) -> (HashMap<u16, (usize, usize)>, HashMap<(usize, usize), u16>) {
+        let conferences = &self.board.lock().await.conferences;
+        let mut number_to_msgid = HashMap::new();
+        for (i, conf) in conferences.iter().enumerate() {
+            if let Some(areas) = &conf.areas {
+                for (j, area) in areas.iter().enumerate() {
+                    if area.qwk_conference_number != 0 {
+                        number_to_msgid.insert(area.qwk_conference_number, (i, j));
+                    }
+                }
+            }
+        }
+
+        let mut number = 1;
+        for (i, conf) in conferences.iter().enumerate() {
+            if let Some(areas) = &conf.areas {
+                for (j, area) in areas.iter().enumerate() {
+                    if area.qwk_conference_number != 0 {
+                        while number_to_msgid.contains_key(&number) {
+                            number += 1;
+                        }
+                        number_to_msgid.insert(number, (i, j));
+                        number += 1;
+                    }
+                }
+            }
+        }
+        let mut msgid_to_number = HashMap::new();
+
+        for (k, v) in number_to_msgid.iter() {
+            msgid_to_number.insert(*v, *k);
+        }
+
+        (number_to_msgid, msgid_to_number)
+    }
+
     async fn select_qwk_areas(&mut self) -> Res<()> {
         let divider = "-".repeat(79);
         let num_lines = if self.session.page_len < 4 || self.session.page_len > 50 {
@@ -129,14 +165,7 @@ impl IcyBoardState {
         let mut done = false;
 
         let conferences = &self.board.lock().await.conferences.clone();
-        let mut number_to_msgid = Vec::new();
-        for (i, conf) in conferences.iter().enumerate() {
-            if let Some(areas) = &conf.areas {
-                for (j, _area) in areas.iter().enumerate() {
-                    number_to_msgid.push((i, j));
-                }
-            }
-        }
+        let (number_to_msgid, msgid_to_number) = self.get_number_to_msgid().await;
 
         while !done {
             if self.session.tokens.is_empty() {
@@ -145,7 +174,7 @@ impl IcyBoardState {
                 for (i, conf) in conferences.iter().enumerate() {
                     if let Some(areas) = &conf.areas {
                         for (j, area) in areas.iter().enumerate() {
-                            self.print_area_line(line_number, i, j, area).await?;
+                            self.print_area_line(*msgid_to_number.get(&(i, j)).unwrap(), i, j, area).await?;
                             line_number += 1;
                         }
                     }
@@ -236,7 +265,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    async fn print_area_line(&mut self, area_number: usize, conference: usize, num: usize, area: &MessageArea) -> Res<()> {
+    async fn print_area_line(&mut self, area_number: u16, conference: usize, num: usize, area: &MessageArea) -> Res<()> {
         self.reset_color(TerminalTarget::Both).await?;
 
         let str = format!("{:5}{}", area_number, ' ');
@@ -273,10 +302,10 @@ impl IcyBoardState {
         Ok(())
     }
 
-    async fn change_qkw_selection(&mut self, table: &Vec<(usize, usize)>, from: usize, to: usize, set_selection_to: Option<bool>) -> Res<()> {
+    async fn change_qkw_selection(&mut self, table: &HashMap<u16, (usize, usize)>, from: usize, to: usize, set_selection_to: Option<bool>) -> Res<()> {
         if let Some(user) = &mut self.session.current_user {
             for i in from..=to {
-                if let Some((conference, num)) = table.get(i) {
+                if let Some((conference, num)) = table.get(&(i as u16)) {
                     user.lastread_ptr_flags
                         .entry((*conference, *num))
                         .or_insert_with(|| LastReadStatus {
@@ -305,6 +334,7 @@ impl IcyBoardState {
         let output_path = temp_file::empty().path().to_path_buf();
         fs::create_dir_all(&output_path).await?;
         let mut qwk_package = output_path.join("mail.qwk");
+        let (_number_to_msgid, msgid_to_number) = self.get_number_to_msgid().await;
 
         {
             let board = self.board.lock().await;
@@ -355,7 +385,6 @@ impl IcyBoardState {
             }
 
             let conferences = board.conferences.clone();
-            let mut conference_number = 1;
             let mut msg_writer = format!("Produced by Icy Board {}", env!("CARGO_PKG_VERSION")).bytes().collect::<Vec<u8>>();
             msg_writer.resize(128, b' ');
 
@@ -372,10 +401,14 @@ impl IcyBoardState {
                         if !ptr.include_qwk {
                             continue;
                         }
-                        let number = control_dat.conferences.len() as u16 + 1;
+                        let conference_number = *msgid_to_number.get(&(i, j)).unwrap();
                         control_dat.conferences.push(jamjam::qwk::control::Conference {
-                            number,
-                            name: area.name.clone().into(),
+                            number: conference_number,
+                            name: if area.qwk_name.is_empty() {
+                                area.name.clone().into()
+                            } else {
+                                area.qwk_name.clone().into()
+                            },
                         });
 
                         let is_extended = true;
@@ -419,7 +452,6 @@ impl IcyBoardState {
                                 log::error!("Creating new message index at {}", message_base_file.display());
                             }
                         }
-                        conference_number += 1;
                     }
                 }
             }
@@ -484,7 +516,7 @@ impl IcyBoardState {
                 self.display_text(IceText::TransferSuccessful, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
 
-                for (x, path) in state.recieve_state.finished_files {
+                for (_x, path) in state.recieve_state.finished_files {
                     self.display_text(IceText::ExtractingMessages, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
 

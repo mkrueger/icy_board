@@ -1631,6 +1631,11 @@ area_editor_name=Name
 area_editor_name-status=Name
 area_editor_name-help=TODO
 
+area_editor_qwk_name=QWK Name
+area_editor_qwk_name-status=QWK Name (BLANK=Use Name)
+area_editor_qwk_name-help=
+    Area name as it appears in QWK packets.
+
 area_editor_file=File
 area_editor_file-status=File
 area_editor_file-help=TODO
@@ -1654,6 +1659,12 @@ area_editor_enter_sec-help=TODO
 area_editor_attach_sec=Attach Security
 area_editor_attach_sec-status=Attach Security
 area_editor_attach_sec-help=TODO
+
+area_editor_qwk_number=QWK Number
+area_editor_qwk_number-status=QWK Number (=0 automatic)
+area_editor_qwk_number-help=
+    Area number as it appears in QWK packets. This allows to use fixed numbers for QWK packets.
+    This is useful for beeing able to add/remove areas without changing the QWK numbers.
 
 doors_editor_title=DOORS File Editor { $conference }
 doors_editor_edit_title=Edit Door

@@ -228,6 +228,13 @@ impl<'a> Page for MessageAreasEditor<'a> {
                                         }),
                                 ),
                                 ConfigEntry::Item(
+                                    ListItem::new(get_text("area_editor_qwk_name"), ListValue::Text(25, item.qwk_name.to_string()))
+                                        .with_label_width(16)
+                                        .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<AreaList>>), value: String| {
+                                            list.lock().unwrap()[*i].qwk_name = value;
+                                        }),
+                                ),
+                                ConfigEntry::Item(
                                     ListItem::new(get_text("area_editor_file"), ListValue::Path(item.path.clone()))
                                         .with_label_width(16)
                                         .with_update_path_value(&|(i, list): &(usize, Arc<Mutex<AreaList>>), value: PathBuf| {
@@ -283,6 +290,16 @@ impl<'a> Page for MessageAreasEditor<'a> {
                                             list.lock().unwrap()[*i].req_level_to_save_attach = value;
                                         },
                                     ),
+                                ),
+                                ConfigEntry::Item(
+                                    ListItem::new(
+                                        get_text("area_editor_qwk_number"),
+                                        ListValue::U32(item.qwk_conference_number as u32, 0, u16::MAX as u32),
+                                    )
+                                    .with_label_width(16)
+                                    .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<AreaList>>), value: String| {
+                                        list.lock().unwrap()[*i].qwk_name = value;
+                                    }),
                                 ),
                             ],
                         });

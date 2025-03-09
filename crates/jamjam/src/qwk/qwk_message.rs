@@ -1,10 +1,7 @@
 use bstr::{BString, ByteSlice};
 
 use crate::{pcboard::PCB_TXT_EOL_PTR, qwk::QwkError};
-use std::{
-    fs::File,
-    io::{BufReader, Read, Write},
-};
+use std::io::{Read, Write};
 
 pub enum MessageType {
     Public,

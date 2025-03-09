@@ -11,6 +11,7 @@ use serde_with::{DisplayFromStr, serde_as};
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
     executable::{VariableType, VariableValue},
+    icy_board::is_null_16,
 };
 
 use super::{IcyBoardSerializer, security_expr::SecurityExpression};
@@ -19,6 +20,15 @@ use super::{IcyBoardSerializer, security_expr::SecurityExpression};
 #[derive(Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MessageArea {
     pub name: String,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub qwk_name: String,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_null_16")]
+    pub qwk_conference_number: u16,
+
     pub path: PathBuf,
     pub is_read_only: bool,
     pub allow_aliases: bool,
