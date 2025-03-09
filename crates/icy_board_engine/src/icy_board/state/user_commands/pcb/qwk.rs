@@ -1,13 +1,12 @@
 use std::{
     collections::HashMap,
-    fs::File,
-    io::{BufWriter, Write},
+    io::{Cursor, Read, Seek, Write},
 };
 
 use bstr::BString;
 use chrono::{DateTime, Local, Utc};
 use jamjam::{
-    jam::JamMessageBase,
+    jam::{JamMessage, JamMessageBase},
     qwk::{control::ControlDat, qwk_message::QWKMessage},
     util::basic_real::BasicReal,
 };
@@ -26,6 +25,8 @@ use crate::{
     },
     vm::TerminalTarget,
 };
+
+use super::u_upload_file::create_protocol;
 
 const MASK_CONFNUMBERS: &str = "0123456789-SDL?";
 
@@ -103,7 +104,7 @@ impl IcyBoardState {
                         break;
                     }
                     "U" => {
-                        // TODO
+                        self.upload_qwk_reply().await?;
                         break;
                     }
                     "S" => {
@@ -125,11 +126,10 @@ impl IcyBoardState {
         } else {
             self.session.page_len as usize - 4
         };
-        let conferences = &self.board.lock().await.conferences.clone();
         let mut done = false;
 
+        let conferences = &self.board.lock().await.conferences.clone();
         let mut number_to_msgid = Vec::new();
-
         for (i, conf) in conferences.iter().enumerate() {
             if let Some(areas) = &conf.areas {
                 for (j, _area) in areas.iter().enumerate() {
@@ -304,7 +304,7 @@ impl IcyBoardState {
     async fn create_qwk_packet(&mut self) -> Res<()> {
         let output_path = temp_file::empty().path().to_path_buf();
         fs::create_dir_all(&output_path).await?;
-        let qwk_package = output_path.join("mail.qwk");
+        let mut qwk_package = output_path.join("mail.qwk");
 
         {
             let board = self.board.lock().await;
@@ -350,13 +350,15 @@ impl IcyBoardState {
                 return Ok(());
             };
 
-            let conferences: crate::icy_board::conferences::ConferenceBase = board.conferences.clone();
+            if !control_dat.bbs_id.is_empty() {
+                qwk_package = output_path.join(format!("{}.qwk", control_dat.bbs_id));
+            }
+
+            let conferences = board.conferences.clone();
             let mut conference_number = 1;
-            let messages_dat: File = File::create(&output_path.join("messages.dat"))?;
-            let mut msg_writer = BufWriter::new(messages_dat);
-            let mut header = format!("Produced by Icy Board {}", env!("CARGO_PKG_VERSION")).bytes().collect::<Vec<u8>>();
-            header.resize(128, b' ');
-            msg_writer.write_all(&header)?;
+            let mut msg_writer = format!("Produced by Icy Board {}", env!("CARGO_PKG_VERSION")).bytes().collect::<Vec<u8>>();
+            msg_writer.resize(128, b' ');
+
             let mut cur_block = 2;
             let mut ndx_data = HashMap::new();
             for (i, conf) in conferences.iter().enumerate() {
@@ -428,7 +430,7 @@ impl IcyBoardState {
             zip.write_all(&control_dat.to_vec())?;
 
             zip.start_file("messages.dat", SimpleFileOptions::default())?;
-            zip.write_all(&fs::read(output_path.join("messages.dat")).await?)?;
+            zip.write_all(&msg_writer)?;
 
             for (cnf, ndx) in ndx_data.iter() {
                 zip.start_file(&format!("{:03}.ndx", cnf), SimpleFileOptions::default())?;
@@ -443,6 +445,91 @@ impl IcyBoardState {
         self.download(false).await?;
         self.session.flagged_files.retain(|f| f != &qwk_package);
         fs::remove_dir_all(output_path).await?;
+        Ok(())
+    }
+
+    async fn upload_qwk_reply(&mut self) -> Res<()> {
+        let cur_protocol = if let Some(user) = &self.session.current_user {
+            user.protocol.clone()
+        } else {
+            String::new()
+        };
+
+        let prot_str = self.ask_protocols(&cur_protocol).await?;
+        if prot_str.is_empty() {
+            return Ok(());
+        }
+        let Some(protocol) = self.get_protocol(prot_str).await else {
+            return Ok(());
+        };
+
+        let mut prot = create_protocol(&protocol);
+        let bbs_id = {
+            let board = self.board.lock().await;
+            if board.config.qwk_settings.bbs_id.is_empty() {
+                board.config.board.name.clone()
+            } else {
+                board.config.qwk_settings.bbs_id.clone()
+            }
+        };
+        match prot.initiate_recv(&mut *self.connection).await {
+            Ok(mut state) => {
+                while !state.is_finished {
+                    if let Err(e) = prot.update_transfer(&mut *self.connection, &mut state).await {
+                        log::error!("Error while updating file transfer with {:?} : {}", protocol, e);
+                        self.display_text(IceText::TransferAborted, display_flags::NEWLINE).await?;
+                        break;
+                    }
+                }
+                self.display_text(IceText::TransferSuccessful, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
+
+                for (x, path) in state.recieve_state.finished_files {
+                    self.display_text(IceText::ExtractingMessages, display_flags::NEWLINE | display_flags::LFBEFORE)
+                        .await?;
+
+                    let mut archive = zip::ZipArchive::new(std::fs::File::open(&path)?)?;
+                    if let Ok(mut arch) = archive.by_name(&format!("{}.MSG", bbs_id)) {
+                        let mut buf = Vec::new();
+                        arch.read_to_end(&mut buf)?;
+                        let mut cursor = Cursor::new(buf);
+                        cursor.seek(std::io::SeekFrom::Start(128))?;
+
+                        let conferences = &self.board.lock().await.conferences.clone();
+                        let mut number_to_msgid = Vec::new();
+                        for (i, conf) in conferences.iter().enumerate() {
+                            if let Some(areas) = &conf.areas {
+                                for (j, _area) in areas.iter().enumerate() {
+                                    number_to_msgid.push((i, j));
+                                }
+                            }
+                        }
+
+                        while let Ok(msg) = QWKMessage::read(&mut cursor, true) {
+                            if let Some((conf, area)) = number_to_msgid.get(msg.msg_number as usize) {
+                                let jam_msg = JamMessage::default()
+                                    .with_from(msg.from)
+                                    .with_to(msg.to)
+                                    .with_subject(msg.subj)
+                                    .with_date_time(Utc::now())
+                                    .with_text(msg.text);
+                                self.send_message(*conf as i32, *area as i32, jam_msg, IceText::ReplySuccessful).await?;
+                            } else {
+                                self.display_text(IceText::ReplyFailed, display_flags::NEWLINE).await?;
+                            }
+                        }
+                    } else {
+                        self.display_text(IceText::ErrorExtracting, display_flags::NEWLINE).await?;
+                    }
+
+                    std::fs::remove_file(&path)?;
+                }
+            }
+            Err(e) => {
+                log::error!("Error while initiating file transfer with {:?} : {}", protocol, e);
+                self.println(TerminalTarget::Both, &format!("Error: {}", e)).await?;
+            }
+        }
         Ok(())
     }
 }

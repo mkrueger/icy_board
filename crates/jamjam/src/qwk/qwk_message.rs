@@ -3,7 +3,7 @@ use bstr::{BString, ByteSlice};
 use crate::{pcboard::PCB_TXT_EOL_PTR, qwk::QwkError};
 use std::{
     fs::File,
-    io::{BufReader, BufWriter, Read, Write},
+    io::{BufReader, Read, Write},
 };
 
 pub enum MessageType {
@@ -97,7 +97,7 @@ impl QWKMessage {
         self.active_flag != MSG_ACTIVE
     }
 
-    pub fn read(file: &mut BufReader<File>, is_extended: bool) -> crate::Result<Self> {
+    pub fn read(mut file: impl Read, is_extended: bool) -> crate::Result<Self> {
         let data = &mut [0; Self::HEADER_SIZE];
         file.read_exact(data)?;
         let mut data = &data[..];
@@ -164,7 +164,7 @@ impl QWKMessage {
         })
     }
 
-    pub fn write(&self, file: &mut BufWriter<File>, is_extended: bool) -> crate::Result<usize> {
+    pub fn write(&self, mut file: impl Write, is_extended: bool) -> crate::Result<usize> {
         let mut header: Vec<u8> = Vec::with_capacity(128);
         header.push(self.status);
         header.extend(format!("{:<7}", self.msg_number).as_bytes());

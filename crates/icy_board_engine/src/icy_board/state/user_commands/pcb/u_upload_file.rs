@@ -76,28 +76,10 @@ impl IcyBoardState {
         }
 
         let protocol_str: String = self.session.current_user.as_ref().unwrap().protocol.clone();
-        let mut protocol = None;
-        for p in self.get_board().await.protocols.iter() {
-            if p.is_enabled && p.char_code == protocol_str {
-                protocol = Some(p.send_command.clone());
-                break;
-            }
-        }
+        let protocol = self.get_protocol(protocol_str).await;
 
         if let Some(protocol) = protocol {
-            let mut prot: Box<dyn Protocol> = match protocol {
-                TransferProtocolType::None => todo!(),
-                TransferProtocolType::ASCII => todo!(),
-                TransferProtocolType::XModem => Box::new(XYmodem::new(XYModemVariant::XModem)),
-                TransferProtocolType::XModemCRC => Box::new(XYmodem::new(XYModemVariant::XModemCRC)),
-                TransferProtocolType::XModem1k => Box::new(XYmodem::new(XYModemVariant::XModem1k)),
-                TransferProtocolType::XModem1kG => Box::new(XYmodem::new(XYModemVariant::XModem1kG)),
-                TransferProtocolType::YModem => Box::new(XYmodem::new(XYModemVariant::YModem)),
-                TransferProtocolType::YModemG => Box::new(XYmodem::new(XYModemVariant::YModemG)),
-                TransferProtocolType::ZModem => Box::new(Zmodem::new(1024)),
-                TransferProtocolType::ZModem8k => Box::new(Zmodem::new(8 * 1024)),
-                TransferProtocolType::External(_) => todo!(),
-            };
+            let mut prot = create_protocol(&protocol);
 
             match prot.initiate_recv(&mut *self.connection).await {
                 Ok(mut state) => {
@@ -138,5 +120,32 @@ impl IcyBoardState {
             self.goodbye().await?;
         }
         Ok(())
+    }
+
+    pub async fn get_protocol(&mut self, protocol_str: String) -> Option<TransferProtocolType> {
+        let mut protocol = None;
+        for p in self.get_board().await.protocols.iter() {
+            if p.is_enabled && p.char_code == protocol_str {
+                protocol = Some(p.send_command.clone());
+                break;
+            }
+        }
+        protocol
+    }
+}
+
+pub fn create_protocol(protocol: &TransferProtocolType) -> Box<dyn Protocol> {
+    match *protocol {
+        TransferProtocolType::None => todo!(),
+        TransferProtocolType::ASCII => todo!(),
+        TransferProtocolType::XModem => Box::new(XYmodem::new(XYModemVariant::XModem)),
+        TransferProtocolType::XModemCRC => Box::new(XYmodem::new(XYModemVariant::XModemCRC)),
+        TransferProtocolType::XModem1k => Box::new(XYmodem::new(XYModemVariant::XModem1k)),
+        TransferProtocolType::XModem1kG => Box::new(XYmodem::new(XYModemVariant::XModem1kG)),
+        TransferProtocolType::YModem => Box::new(XYmodem::new(XYModemVariant::YModem)),
+        TransferProtocolType::YModemG => Box::new(XYmodem::new(XYModemVariant::YModemG)),
+        TransferProtocolType::ZModem => Box::new(Zmodem::new(1024)),
+        TransferProtocolType::ZModem8k => Box::new(Zmodem::new(8 * 1024)),
+        TransferProtocolType::External(_) => todo!(),
     }
 }
