@@ -9,7 +9,7 @@ use icy_sauce::SauceInformation;
 use unrar::Archive;
 
 use crate::file_base::{
-    FileBase, FileBaseError,
+    FileBase,
     metadata::{MetadataHeader, MetadataType},
 };
 pub mod repack;
@@ -17,17 +17,17 @@ pub mod repack;
 pub mod bbstro_fingerprint;
 
 pub fn scan_file(path: &Path) -> crate::Result<Vec<MetadataHeader>> {
-    let Some(extension) = path.extension() else {
-        return Err(FileBaseError::NoExtension.into());
-    };
-    let extension = extension.to_string_lossy().to_uppercase();
-
     let mut info = Vec::new();
     let hash = FileBase::get_hash(path)?;
     info.push(MetadataHeader {
         metadata_type: MetadataType::Hash,
         data: hash.to_le_bytes().to_vec(),
     });
+
+    let Some(extension) = path.extension() else {
+        return Ok(info);
+    };
+    let extension = extension.to_string_lossy().to_uppercase();
 
     match extension.as_str() {
         "ZIP" => scan_zip(info, &path),

@@ -89,7 +89,7 @@ If something is missing just let me know.
 | BU/UB  | Batch Upload | 0% | 
 | RM  | Read Message | 0% | Read remembered message
 | SELECT | Select Conference | 99% | Changes were needed due to message areas [^1]
-| TEST | Test File | 0% | 
+| TEST | Test File | 💯 | Slight improvements - search for pattern
 
 [^1]: PCBTEXT #586 changed to `Conference`,
   #587 changed to `#   Name                                                   Flags`

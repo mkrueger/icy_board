@@ -26,7 +26,7 @@ impl QwkSettings {
                 cfg_entry_text!("qwk_bbs_city_and_state", label_width, 25, qwk_settings, bbs_city_and_state, lock),
                 cfg_entry_text!("qwk_bbs_phone_number", label_width, 25, qwk_settings, bbs_phone_number, lock),
                 cfg_entry_text!("qwk_bbs_sysop_name", label_width, 25, qwk_settings, bbs_sysop_name, lock),
-                cfg_entry_text!("qwk_bbs_id", label_width, 25, qwk_settings, bbs_id, lock),
+                cfg_entry_text!("qwk_bbs_id", label_width, 8, qwk_settings, bbs_id, lock),
                 ConfigEntry::Separator,
                 ConfigEntry::Label(get_text("qwk_files_label")),
                 cfg_entry_path!("qwk_welcome_screen", label_width, qwk_settings, welcome_screen, lock),

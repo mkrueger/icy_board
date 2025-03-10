@@ -140,7 +140,6 @@ impl FileBase {
         let header = if let Some(index) = self.name_map.get(&file_name).clone() {
             if self.file_headers[*index].metadata_offset() == u64::MAX {
                 let res = self.create_header(*index, &path);
-                self.save()?;
                 return res;
             }
             &self.file_headers[*index]
@@ -204,18 +203,20 @@ impl FileBase {
 
     pub fn get_hash(path: &Path) -> crate::Result<u64> {
         let data = fs::read(&path)?;
-        Ok(XxHash3_64::oneshot(&data))
+        let hash = XxHash3_64::oneshot(&data);
+        Ok(hash)
     }
 
     fn create_header(&mut self, index: usize, path: &Path) -> crate::Result<Vec<MetadataHeader>> {
         match scan_file(&path) {
             Ok(meta_data) => {
                 let metadata_file_name = self.meta_data_path.with_extension(extensions::FILE_METADATA);
+                let md_len = if let Ok(md) = fs::metadata(&metadata_file_name) { md.len() } else { 0 };
                 let Ok(mut file) = OpenOptions::new().append(true).create(true).open(&metadata_file_name) else {
                     log::error!("Error opening metadata file: {}", metadata_file_name.display());
                     return Err(FileBaseError::CantOpenMetadata.into());
                 };
-                self.file_headers[index].metadata_offset = file.seek(std::io::SeekFrom::Current(0))?;
+                self.file_headers[index].metadata_offset = md_len;
                 file.write(&[meta_data.len() as u8])?;
                 for meta in &meta_data {
                     file.write(&[meta.get_type().to_data()])?;
@@ -223,6 +224,7 @@ impl FileBase {
                     file.write(&len.to_le_bytes())?;
                     file.write(&meta.data)?;
                 }
+                self.save()?;
                 Ok(meta_data)
             }
             Err(err) => {
@@ -265,7 +267,7 @@ impl FileBase {
         for _ in 0..size {
             reader.read_exact(&mut data)?;
             let metadata_type = MetadataType::from_data(data[0]);
-            let data_len = u32::from_le_bytes(data[1..].try_into().unwrap()) as usize;
+            let data_len = u32::from_le_bytes(data[1..5].try_into().unwrap()) as usize;
 
             let mut data = vec![0; data_len];
             reader.read_exact(&mut data)?;
