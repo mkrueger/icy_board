@@ -87,7 +87,7 @@ If something is missing just let me know.
 | CHAT  | Group Chat| 0% | Note: There are working PPEs for that
 | BD/DB  | Batch Download | 0% | 
 | BU/UB  | Batch Upload | 0% | 
-| RM  | Read Message | 0% | Read remembered message
+| RM  | Read Message | 💯 | Read remembered message
 | SELECT | Select Conference | 99% | Changes were needed due to message areas [^1]
 | TEST | Test File | 💯 | Slight improvements - search for pattern
 

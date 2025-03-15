@@ -235,26 +235,78 @@ impl IcyBoardState {
             };
             self.session.op_text = format!("{}-{}", base_number, active_messages);
 
-            let text = self
-                .input_field(
-                    prompt,
-                    40,
-                    MASK_COMMAND,
-                    &CommandType::ReadMessages.get_help(),
-                    None,
-                    display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
-                )
-                .await?;
-            if text.is_empty() {
-                break;
+            if self.session.tokens.is_empty() {
+                let text = self
+                    .input_field(
+                        prompt,
+                        40,
+                        MASK_COMMAND,
+                        &CommandType::ReadMessages.get_help(),
+                        None,
+                        display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
+                    )
+                    .await?;
+                if text.is_empty() {
+                    break;
+                }
+                self.session.push_tokens(&text);
             }
 
-            if let Ok(number) = text.parse::<u32>() {
-                if only_personal && !messages.contains(&number) {
-                    self.display_text(IceText::NoMailFound, display_flags::NEWLINE).await?;
-                    continue;
+            if let Some(text) = self.session.tokens.pop_front() {
+                match text.as_str() {
+                    "RM" => {
+                        let Some((area, number)) = self.session.memorized_msg else {
+                            self.display_text(IceText::NotMemorized, display_flags::NEWLINE | display_flags::LFBEFORE)
+                                .await?;
+                            return Ok(());
+                        };
+                        if area != self.session.current_message_area {
+                            self.display_text(IceText::NotMemorized, display_flags::NEWLINE | display_flags::LFBEFORE)
+                                .await?;
+                            return Ok(());
+                        }
+                        self.read_message_number(&mut message_base, &viewer, number, number, false, Box::new(|_, _| true))
+                            .await?;
+                    }
+                    "RM+" => {
+                        let Some((area, number)) = self.session.memorized_msg else {
+                            self.display_text(IceText::NotMemorized, display_flags::NEWLINE | display_flags::LFBEFORE)
+                                .await?;
+                            return Ok(());
+                        };
+                        if area != self.session.current_message_area {
+                            self.display_text(IceText::NotMemorized, display_flags::NEWLINE | display_flags::LFBEFORE)
+                                .await?;
+                            return Ok(());
+                        }
+                        self.read_message_number(&mut message_base, &viewer, number, u32::MAX, true, Box::new(|_, _| true))
+                            .await?;
+                    }
+                    "RM-" => {
+                        let Some((area, number)) = self.session.memorized_msg else {
+                            self.display_text(IceText::NotMemorized, display_flags::NEWLINE | display_flags::LFBEFORE)
+                                .await?;
+                            return Ok(());
+                        };
+                        if area != self.session.current_message_area {
+                            self.display_text(IceText::NotMemorized, display_flags::NEWLINE | display_flags::LFBEFORE)
+                                .await?;
+                            return Ok(());
+                        }
+                        self.read_message_number(&mut message_base, &viewer, number, 1, true, Box::new(|_, _| true))
+                            .await?;
+                    }
+                    text => {
+                        if let Ok(number) = text.parse::<u32>() {
+                            if only_personal && !messages.contains(&number) {
+                                self.display_text(IceText::NoMailFound, display_flags::NEWLINE).await?;
+                                continue;
+                            }
+                            self.read_message_number(&mut message_base, &viewer, number, number, false, Box::new(|_, _| true))
+                                .await?;
+                        }
+                    }
                 }
-                self.read_message_number(&mut message_base, &viewer, number, Box::new(|_, _| true)).await?;
             }
         }
         Ok(())
@@ -264,14 +316,17 @@ impl IcyBoardState {
         &mut self,
         message_base: &mut JamMessageBase,
         viewer: &MessageViewer,
-        mut number: u32,
+        mut first: u32,
+        mut last: u32,
+        mut keep_going: bool,
         _filter: Box<dyn Fn(&JamMessageHeader, &str) -> bool>,
     ) -> Res<()> {
+        let mut number = first;
         if number == 0 {
             return Ok(());
         }
         self.session.current_messagenumber = number;
-        self.session.high_msg_num = message_base.base_messagenumber();
+        self.session.low_msg_num = message_base.base_messagenumber();
         self.session.high_msg_num = message_base.base_messagenumber() + message_base.active_messages();
 
         unsafe {
@@ -287,33 +342,34 @@ impl IcyBoardState {
             message_base.write_last_read(opt)?;
         }
         let mut flag = ReadLoopType::InsideReadLoop;
-        let mut first = number;
-        let mut last = number;
         let mut since = false;
-        let mut keep_going = false;
-
+        let mut display_msg = true;
         loop {
-            match message_base.read_header(number) {
-                Ok(header) => {
-                    let text = message_base.read_msg_text(&header)?.to_string();
-                    viewer.display_header(self, message_base, &header).await?;
-                    if header.needs_password() {
-                        if self
-                            .check_password(IceText::PasswordToReadMessage, 0, |pwd| header.is_password_valid(pwd))
-                            .await?
-                        {
+            if display_msg {
+                display_msg = false;
+                match message_base.read_header(number) {
+                    Ok(header) => {
+                        let text = message_base.read_msg_text(&header)?.to_string();
+                        viewer.display_header(self, message_base, &header).await?;
+                        if header.needs_password() {
+                            if self
+                                .check_password(IceText::PasswordToReadMessage, 0, |pwd| header.is_password_valid(pwd))
+                                .await?
+                            {
+                                viewer.display_body(self, &text).await?;
+                            }
+                        } else {
                             viewer.display_body(self, &text).await?;
                         }
-                    } else {
-                        viewer.display_body(self, &text).await?;
+                        self.new_line().await?;
                     }
-                    self.new_line().await?;
-                }
-                Err(err) => {
-                    log::error!("Error reading message header: {}", err);
-                    self.display_text(IceText::NoMailFound, display_flags::NEWLINE | display_flags::LFAFTER).await?;
+                    Err(err) => {
+                        log::error!("Error reading message header: {}", err);
+                        self.display_text(IceText::NoMailFound, display_flags::NEWLINE | display_flags::LFAFTER).await?;
+                    }
                 }
             }
+
             let prompt = if self.session.expert_mode() {
                 IceText::EndOfMessageExpertmode
             } else {
@@ -412,6 +468,7 @@ impl IcyBoardState {
                     }
                     "/" => {
                         // Redisplay
+                        display_msg = true;
                         continue;
                     }
                     text => {
@@ -425,8 +482,16 @@ impl IcyBoardState {
             if keep_going {
                 if last < number {
                     number -= 1;
+
+                    if number < self.session.low_msg_num {
+                        break;
+                    }
                 } else if number > first {
                     number += 1;
+
+                    if number > self.session.high_msg_num {
+                        break;
+                    }
                 }
             }
         }

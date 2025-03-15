@@ -814,7 +814,9 @@ impl IcyBoardState {
             "B" => convert_cmd(CommandType::BulletinList),
             "C" => convert_cmd(CommandType::CommentToSysop),
             "E" => convert_cmd(CommandType::EnterMessage),
-            "RM" | "RM+" | "RM-" => convert_cmd(CommandType::ReadMemorizedMessage), // backward
+            "RM" => convert_cmd(CommandType::ReadMemorizedMessage(0)),
+            "RM+" => convert_cmd(CommandType::ReadMemorizedMessage(1)),
+            "RM-" => convert_cmd(CommandType::ReadMemorizedMessage(2)),
             "F" => convert_cmd(CommandType::FileDirectory),
             "BD" => convert_cmd(CommandType::BatchDownload),
             "BU" => convert_cmd(CommandType::BatchUpload),

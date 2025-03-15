@@ -8,14 +8,17 @@ use crate::{Res, icy_board::state::IcyBoardState};
 
 impl IcyBoardState {
     pub async fn read_messages(&mut self) -> Res<()> {
+        self.read_messages_in_area(self.session.current_message_area).await?;
+        Ok(())
+    }
+
+    pub async fn read_messages_in_area(&mut self, msg_area: usize) -> Res<()> {
         self.set_activity(NodeStatus::HandlingMail).await;
         // loop for recreating the message base without async recursion problem.
         let mut tries = 0;
         while tries < 2 {
             tries += 1;
-            let message_base_file = self.session.current_conference.areas.as_ref().unwrap()[self.session.current_message_area]
-                .path
-                .clone();
+            let message_base_file = self.session.current_conference.areas.as_ref().unwrap()[msg_area].path.clone();
             match JamMessageBase::open(&message_base_file) {
                 Ok(message_base) => {
                     self.read_msgs_from_base(message_base, false).await?;

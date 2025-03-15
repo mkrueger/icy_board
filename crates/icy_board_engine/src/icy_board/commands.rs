@@ -251,7 +251,7 @@ pub enum CommandType {
     BatchUpload,
 
     /// RM command
-    ReadMemorizedMessage,
+    ReadMemorizedMessage(u8),
 
     // 'AREA'
     ChangeMessageArea,
@@ -328,7 +328,7 @@ impl Display for CommandType {
             CommandType::BatchDownload => write!(f, "BatchDownload"),
             CommandType::BatchUpload => write!(f, "BatchUpload"),
             CommandType::ChangeMessageArea => write!(f, "MessageArea"),
-            CommandType::ReadMemorizedMessage => write!(f, "ReadMemorizedMessage"),
+            CommandType::ReadMemorizedMessage(_) => write!(f, "ReadMemorizedMessage"),
             CommandType::GotoXY => write!(f, "GotoXY"),
             CommandType::PrintText => write!(f, "PrintText"),
             CommandType::RefreshDisplayString => write!(f, "RefreshDisplayString"),
@@ -561,7 +561,9 @@ impl CommandType {
             CommandType::SelectConferences,
             CommandType::BatchDownload,
             CommandType::BatchUpload,
-            CommandType::ReadMemorizedMessage,
+            CommandType::ReadMemorizedMessage(0),
+            CommandType::ReadMemorizedMessage(1),
+            CommandType::ReadMemorizedMessage(2),
         ]
         .into_iter()
     }

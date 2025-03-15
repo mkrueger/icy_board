@@ -94,7 +94,7 @@ impl IcyBoardState {
                     let viewer = MessageViewer::load(&self.display_text)?;
                     match JamMessageBase::open(path) {
                         Ok(mut message_base) => {
-                            self.read_message_number(&mut message_base, &viewer, 1, Box::new(|_, _| true)).await?;
+                            self.read_message_number(&mut message_base, &viewer, 1, 1, false, Box::new(|_, _| true)).await?;
                             return Ok(());
                         }
                         Err(_err) => {

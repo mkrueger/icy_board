@@ -542,13 +542,12 @@ impl IcyBoardState {
                 // BU
                 self.batch_upload_command().await?;
             }
-            CommandType::ReadMemorizedMessage => {
+            CommandType::ReadMemorizedMessage(t) => {
                 let sec = self.session.user_command_level.cmd_r.clone();
                 if !self.check_sec("RM", &sec).await? {
                     return Ok(());
                 }
-                // QWK
-                self.read_memorized_messages_command().await?;
+                self.read_memorized_messages_command(t).await?;
             }
             CommandType::ChangeMessageArea => {
                 let sec: SecurityExpression = self.session.user_command_level.cmd_j.clone();
