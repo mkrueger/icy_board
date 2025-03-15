@@ -241,6 +241,8 @@ pub struct Session {
     /// The current default answer on last input_string
     pub default_answer: Option<String>,
     pub last_answer: Option<String>,
+
+    pub memorized_msg: Option<(usize, u32)>,
 }
 
 impl Session {
@@ -301,6 +303,7 @@ impl Session {
             search_pattern: None,
             default_answer: None,
             last_answer: None,
+            memorized_msg: None,
         }
     }
 

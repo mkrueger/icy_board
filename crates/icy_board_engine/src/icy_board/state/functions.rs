@@ -181,11 +181,11 @@ impl IcyBoardState {
                         self.run_ppe(&file, None).await?;
                     }
                     PPECallType::Menu => {
-                        self.display_menu(&call.file).await?;
+                        let _ = self.display_menu(&call.file).await?;
                     }
                     PPECallType::File => {
                         let file = self.get_board().await.resolve_file(&call.file);
-                        self.display_file(&file).await?;
+                        let _ = self.display_file(&file).await?;
                     }
                 }
                 return Ok(());

@@ -286,6 +286,12 @@ impl IcyBoardState {
             opt.high_read_msg = opt.high_read_msg.max(number);
             message_base.write_last_read(opt)?;
         }
+        let mut flag = ReadLoopType::InsideReadLoop;
+        let mut first = number;
+        let mut last = number;
+        let mut since = false;
+        let mut keep_going = false;
+
         loop {
             match message_base.read_header(number) {
                 Ok(header) => {
@@ -325,20 +331,116 @@ impl IcyBoardState {
                 .await?;
 
             if text.is_empty() {
-                break;
-            }
-            self.session.push_tokens(&text);
+                if !keep_going {
+                    break;
+                }
+            } else {
+                self.session.push_tokens(&text);
+                let token = self.session.tokens.pop_front().unwrap_or_default();
+                match token.as_str() {
+                    "-" | "L" => {
+                        if token == "L" {
+                            flag = ReadLoopType::OutsideReadLoop;
+                        }
+                        first = if flag == ReadLoopType::InsideReadLoop { number - 1 } else { number };
+                        last = 1;
+                    }
+                    "+" => {
+                        if flag == ReadLoopType::InsideReadLoop {
+                            first = 1;
+                            last = i32::MAX as u32;
+                        } else {
+                            since = true;
+                        }
 
-            match self.session.tokens.pop_front().unwrap_or_default() {
-                text => {
-                    if let Ok(new_number) = text.parse::<u32>() {
-                        number = new_number;
+                        keep_going = true;
+                    }
+                    // "A" => {}  // Abandon
+                    "Z" | "D" | "C" => {
+                        let zip_msg = token == "Z";
+                        let cap_ask = token != "D";
+                        // todo capture!
+                    }
+                    "*" | "S" => {
+                        // Read new messages
+                        since = true;
+                        keep_going = true;
+                        // todo
+                    }
+                    "E" => {
+                        self.edit_header(message_base, number).await?;
+                    }
+                    "F" => {
+                        // TODO
+                    }
+                    "G" => {
+                        self.goodbye().await?;
+                    }
+                    "M" => {
+                        // memorize msg
+                        self.session.memorized_msg = Some((self.session.current_message_area, number));
+                        self.display_text(IceText::MessageNumberMemorized, display_flags::LFBEFORE).await?;
+                    }
+                    "N" => {
+                        // STOP
+                        break;
+                    }
+                    "P" => { // Make cur msg private
+                        // TODO
+                    }
+                    "Q" => { // Quickscan
+                        // TODO
+                    }
+                    "T" => { // Threading
+                        // TODO
+                    }
+
+                    "U" => { // Unprotect
+                        // TODO
+                    }
+
+                    "V" => { // View File
+                        // TODO
+                    }
+
+                    "X" => { // export
+                        // TODO
+                    }
+
+                    "Y" => { // YourMessages
+                        // TODO
+                    }
+                    "/" => {
+                        // Redisplay
                         continue;
                     }
+                    text => {
+                        if let Ok(new_number) = text.parse::<u32>() {
+                            number = new_number;
+                            continue;
+                        }
+                    }
+                }
+            }
+            if keep_going {
+                if last < number {
+                    number -= 1;
+                } else if number > first {
+                    number += 1;
                 }
             }
         }
 
         Ok(())
     }
+
+    async fn edit_header(&self, message_base: &mut jamjam::jam::JamMessageBase, number: u32) -> Res<()> {
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum ReadLoopType {
+    InsideReadLoop,
+    OutsideReadLoop,
 }

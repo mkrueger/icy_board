@@ -1564,7 +1564,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             if matches!(self.references[idx].0, ReferenceType::Function(_)) {
                 let f = self.function_containers.iter().find(|p| p.name == call.get_identifier()).unwrap();
                 if let FunctionDeclaration::Function(f) = &f.functions.clone() {
-                    self.check_arg_count(f.get_parameters().len(), call.get_arguments().len(), call.get_identifier_token());
+                    let param_count = f.get_parameters().len();
+                    let arg_count = call.get_arguments().len();
+                    let identifier_token = call.get_identifier_token();
+                    self.check_arg_count(param_count, arg_count, identifier_token);
                     self.check_arg_types(f.get_parameters(), call.get_arguments());
                 }
 
