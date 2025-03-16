@@ -2,7 +2,7 @@
 	"name": "ppl-language-server",
 	"description": "PCBoard Programming Language server",
 	"license": "MIT",
-	"version": "0.1.4",
+	"version": "0.1.5",
 	"categories": [],
 	"keywords": [
 		"language-server",
