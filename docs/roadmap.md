@@ -1,8 +1,8 @@
 # Roadmap/TODO
 
 - [x] Implement all search commands (text/file search)
-- [ ] Mail QWK support
-- [ ] Solution for file base meta data 
+- [x] Mail QWK support
+- [x] Solution for file base meta data 
   - I don't want a "DIRS" file but there is metadata that is not included in the .ZIP - let's say uploader.
     Every other thing is easy to extract from the ZIP file.
 - [ ] Support more compression algorithms - there is a ZIP Library PR pending which I need to take care of.
@@ -14,7 +14,7 @@
 - [x] Look at the NEWS/INTRO feature of PCBOARD how that really works
 - [ ] Logon mail scan
 - [ ] Finish internal message reader - I don't like it have a message reader PPE going but needs to be finished in any case…
-- [ ] Implement RM command
+- [x] Implement RM command
 - [x] Implement SELECT command
 - [ ] Implement group chat (CHAT command)
 - [ ] Finish SSH/Websocket support - works somewhat but SSH only with icy term so far
