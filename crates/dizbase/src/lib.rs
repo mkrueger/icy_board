@@ -1,5 +1,9 @@
 use std::{fs, io::BufReader, path::Path};
 
+use unarc_rs::{
+    arc::arc_archive::ArcArchieve, arj::arj_archive::ArjArchieve, hyp::hyp_archive::HypArchieve, sq::sq_archive::SqArchieve, sqz::sqz_archive::SqzArchieve,
+    zoo::zoo_archive::ZooArchieve,
+};
 use unrar::Archive;
 use zip::DateTime;
 
@@ -27,14 +31,126 @@ pub fn scan_file_contents(path: &std::path::PathBuf) -> crate::Result<Vec<FileIn
     match extension.as_str() {
         "ZIP" => scan_zip(path),
         "LHA" | "LZH" => scan_lha(path),
-
         "RAR" => scan_rar(path),
+        "ARJ" => scan_arj(path),
+        "ARC" => scan_arc(path),
+        "ZOO" => scan_zoo(path),
+        "SQZ" => scan_sqz(path),
+        "HYP" => scan_hyp(path),
+        "SQ" | "SQ2" | "QQQ" => scan_sq(path),
 
         ext => {
             println!("Unknown extension {:?}", ext);
             Err("evlvevl".into())
         }
     }
+}
+
+fn scan_arj(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
+    let file = fs::File::open(path)?;
+    let mut archieve = ArjArchieve::new(file)?;
+    let mut info = Vec::new();
+
+    while let Ok(Some(header)) = archieve.get_next_entry() {
+        let (date, time) = header.date_time_modified.into();
+        info.push(FileInfo {
+            name: header.name.clone(),
+            size: header.original_size as u64,
+            compressed_size: header.compressed_size as u64,
+            date: unsafe { DateTime::from_msdos_unchecked(date, time) },
+        });
+    }
+
+    Ok(info)
+}
+
+fn scan_arc(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
+    let file = fs::File::open(path)?;
+    let mut archieve = ArcArchieve::new(file)?;
+    let mut info = Vec::new();
+
+    while let Ok(Some(header)) = archieve.get_next_entry() {
+        let (date, time) = header.date_time.into();
+        info.push(FileInfo {
+            name: header.name.clone(),
+            size: header.original_size as u64,
+            compressed_size: header.compressed_size as u64,
+            date: unsafe { DateTime::from_msdos_unchecked(date, time) },
+        });
+    }
+
+    Ok(info)
+}
+
+fn scan_zoo(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
+    let file = fs::File::open(path)?;
+    let mut archieve = ZooArchieve::new(file)?;
+    let mut info = Vec::new();
+
+    while let Ok(Some(header)) = archieve.get_next_entry() {
+        let (date, time) = header.date_time.into();
+        info.push(FileInfo {
+            name: header.name.clone(),
+            size: header.org_size as u64,
+            compressed_size: header.size_now as u64,
+            date: unsafe { DateTime::from_msdos_unchecked(date, time) },
+        });
+    }
+
+    Ok(info)
+}
+
+fn scan_sqz(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
+    let file = fs::File::open(path)?;
+    let mut archieve = SqzArchieve::new(file)?;
+    let mut info = Vec::new();
+
+    while let Ok(Some(header)) = archieve.get_next_entry() {
+        let (date, time) = header.date_time.into();
+        info.push(FileInfo {
+            name: header.name.clone(),
+            size: header.original_size as u64,
+            compressed_size: header.compressed_size as u64,
+            date: unsafe { DateTime::from_msdos_unchecked(date, time) },
+        });
+    }
+
+    Ok(info)
+}
+
+fn scan_sq(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
+    let file = fs::File::open(path)?;
+    let mut archieve = SqArchieve::new(file)?;
+    let mut info = Vec::new();
+
+    while let Ok(Some(header)) = archieve.get_next_entry() {
+        info.push(FileInfo {
+            name: header.name.clone(),
+            size: 0,
+            compressed_size: 0,
+            date: unsafe { DateTime::from_msdos_unchecked(0, 0) },
+        });
+    }
+
+    Ok(info)
+}
+
+fn scan_hyp(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
+    let file = fs::File::open(path)?;
+    let mut archieve = HypArchieve::new(file)?;
+    let mut info = Vec::new();
+
+    while let Ok(Some(header)) = archieve.get_next_entry() {
+        let (date, time) = header.date_time.into();
+        info.push(FileInfo {
+            name: header.name.clone(),
+            size: header.original_size as u64,
+            compressed_size: header.compressed_size as u64,
+            date: unsafe { DateTime::from_msdos_unchecked(date, time) },
+        });
+    }
+
+    Ok(info)
 }
 
 fn scan_zip(path: &Path) -> crate::Result<Vec<FileInfo>> {

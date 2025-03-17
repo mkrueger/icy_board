@@ -1,4 +1,5 @@
 use std::{
+    ffi::OsStr,
     fs,
     io::{BufReader, Read, Seek, SeekFrom},
     path::Path,
@@ -6,6 +7,9 @@ use std::{
 
 use codepages::{normalize_file, tables::get_utf8};
 use icy_sauce::SauceInformation;
+use unarc_rs::{
+    arc::arc_archive::ArcArchieve, arj::arj_archive::ArjArchieve, hyp::hyp_archive::HypArchieve, sq::sq_archive::SqArchieve, zoo::zoo_archive::ZooArchieve,
+};
 use unrar::Archive;
 
 use crate::file_base::{
@@ -37,6 +41,13 @@ pub fn scan_file(path: &Path) -> crate::Result<Vec<MetadataHeader>> {
 
         "RAR" => scan_rar(info, path),
         "EXE" | "COM" | "BAT" | "BMP" | "GIF" | "JPG" => Ok(info),
+
+        "ARJ" => scan_arj(info, path),
+        "ARC" => scan_arc(info, path),
+        "ZOO" => scan_zoo(info, path),
+        "SQZ" => scan_sqz(info, path),
+        "HYP" => scan_hyp(info, path),
+        "SQ" | "SQ2" | "QQQ" => scan_sq(info, path),
 
         _ext => Ok(info),
     }
@@ -162,6 +173,147 @@ fn scan_rar(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<Met
                 short_descr = fs::read("out.tmp")?;
             } else {
                 archive = header.skip()?
+            }
+        }
+    }
+
+    if !short_descr.is_empty() {
+        info.push(MetadataHeader::new(MetadataType::FileID, get_file_id(short_descr).as_bytes().to_vec()));
+    }
+
+    Ok(info)
+}
+
+fn scan_arj(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<MetadataHeader>> {
+    let file = fs::File::open(path)?;
+    let mut short_descr = Vec::new();
+    let mut last_prio = -1;
+
+    let mut archieve = ArjArchieve::new(file)?;
+    while let Ok(Some(header)) = archieve.get_next_entry() {
+        if let Some(prio) = is_short_desc(OsStr::new(&header.name)) {
+            if prio <= last_prio {
+                continue;
+            }
+            last_prio = prio;
+            short_descr = archieve.read(&header)?;
+        }
+    }
+
+    if !short_descr.is_empty() {
+        info.push(MetadataHeader::new(MetadataType::FileID, get_file_id(short_descr).as_bytes().to_vec()));
+    }
+
+    Ok(info)
+}
+
+fn scan_arc(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<MetadataHeader>> {
+    let file = fs::File::open(path)?;
+    let mut short_descr = Vec::new();
+    let mut last_prio = -1;
+
+    let mut archieve = ArcArchieve::new(file)?;
+    while let Ok(Some(header)) = archieve.get_next_entry() {
+        if let Some(prio) = is_short_desc(OsStr::new(&header.name)) {
+            if prio <= last_prio {
+                continue;
+            }
+            last_prio = prio;
+            short_descr = archieve.read(&header)?;
+        }
+    }
+
+    if !short_descr.is_empty() {
+        info.push(MetadataHeader::new(MetadataType::FileID, get_file_id(short_descr).as_bytes().to_vec()));
+    }
+
+    Ok(info)
+}
+
+fn scan_zoo(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<MetadataHeader>> {
+    let file = fs::File::open(path)?;
+    let mut short_descr = Vec::new();
+    let mut last_prio = -1;
+
+    let mut archieve = ZooArchieve::new(file)?;
+    while let Ok(Some(header)) = archieve.get_next_entry() {
+        if let Some(prio) = is_short_desc(OsStr::new(&header.name)) {
+            if prio <= last_prio {
+                continue;
+            }
+            last_prio = prio;
+            short_descr = archieve.read(&header)?;
+        }
+    }
+
+    if !short_descr.is_empty() {
+        info.push(MetadataHeader::new(MetadataType::FileID, get_file_id(short_descr).as_bytes().to_vec()));
+    }
+
+    Ok(info)
+}
+
+fn scan_sqz(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<MetadataHeader>> {
+    let file = fs::File::open(path)?;
+    let mut short_descr = Vec::new();
+    let mut last_prio = -1;
+
+    let mut archieve = ZooArchieve::new(file)?;
+    while let Ok(Some(header)) = archieve.get_next_entry() {
+        if let Some(prio) = is_short_desc(OsStr::new(&header.name)) {
+            if prio <= last_prio {
+                continue;
+            }
+            last_prio = prio;
+            short_descr = archieve.read(&header)?;
+        }
+    }
+
+    if !short_descr.is_empty() {
+        info.push(MetadataHeader::new(MetadataType::FileID, get_file_id(short_descr).as_bytes().to_vec()));
+    }
+
+    Ok(info)
+}
+
+fn scan_sq(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<MetadataHeader>> {
+    let file = fs::File::open(path)?;
+    let mut short_descr = Vec::new();
+    let mut last_prio = -1;
+
+    let mut archieve = SqArchieve::new(file)?;
+    while let Ok(Some(header)) = archieve.get_next_entry() {
+        if let Some(prio) = is_short_desc(OsStr::new(&header.name)) {
+            if prio <= last_prio {
+                continue;
+            }
+            last_prio = prio;
+            short_descr = archieve.read(&header)?;
+        }
+    }
+
+    if !short_descr.is_empty() {
+        info.push(MetadataHeader::new(MetadataType::FileID, get_file_id(short_descr).as_bytes().to_vec()));
+    }
+
+    Ok(info)
+}
+
+fn scan_hyp(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<MetadataHeader>> {
+    let file = fs::File::open(path)?;
+    let mut short_descr = Vec::new();
+    let mut last_prio = -1;
+
+    let mut archieve = HypArchieve::new(file)?;
+    while let Ok(Some(header)) = archieve.get_next_entry() {
+        if let Some(prio) = is_short_desc(OsStr::new(&header.name)) {
+            // only uncompressed files are supported, so it's likely to fail.
+            if let Ok(buffer) = archieve.read(&header) {
+                if prio <= last_prio {
+                    continue;
+                }
+                last_prio = prio;
+                short_descr = buffer;
             }
         }
     }

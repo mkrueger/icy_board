@@ -67,7 +67,7 @@ impl IcyBoardState {
                     let sav = self.session.disp_options.in_file_list.take();
                     self.session.disp_options.abort_printout = false;
                     let mut len = 0;
-                    let colors = self.get_board().await.config.color_configuration.clone();
+                    let colors: crate::icy_board::icb_config::ColorConfiguration = self.get_board().await.config.color_configuration.clone();
                     self.set_color(TerminalTarget::Both, colors.file_head.clone()).await?;
                     self.println(TerminalTarget::Both, &format!(" Archive: {}", file.file_name().unwrap().to_string_lossy()))
                         .await?;
