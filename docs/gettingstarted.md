@@ -17,7 +17,7 @@ I develop this software on linux - next time I set up I'll add a more detailed d
 I recommend putting the bin/ directory in the path but you can just `cd bin` for now.
 
 First create a new BBS: `./icbsetup create FOO`
-Then start it: `./icyboard FOO`
+Then start it: `./icboard FOO`
 
 This will fire up a new call waiting screen where you can log in as sysop. By defaulut telnet is enabled on port 1337.
 
