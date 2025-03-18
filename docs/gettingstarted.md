@@ -10,6 +10,10 @@ It's installing a [rust development](https://www.rust-lang.org/tools/install) en
 
 If something is missing on your system cargo build will tell you. If you know hat a development environment is it should be straightforward.
 
+Update: On my pi I needed to install openssl-dev:
+`sudo apt-get install openssl-dev`
+
+
 I develop this software on linux - next time I set up I'll add a more detailed description.
 
 # Startup Icy Board

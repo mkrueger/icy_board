@@ -17,10 +17,6 @@ jobs:
         rustup  update
         cargo fmt --all -- --check
     - run: rustup component add clippy
-    - name: Install Dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install build-essential libgtk-3-dev libasound2-dev libxcb-shape0-dev libxcb-xfixes0-dev
     - name: Run tests
       run: |
         cargo test --all-features
