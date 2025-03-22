@@ -61,7 +61,8 @@ jobs:
    - name: Build
      id: build
      run: |
-       rustup  update
+       rustup update
+       set RUSTFLAGS=-C target-feature=+crt-static
        cargo build --release
        echo "Copy $DEB to icy_board.deb"
        mkdir bin
