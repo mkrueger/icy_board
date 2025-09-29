@@ -79,6 +79,7 @@ lazy_static::lazy_static! {
 
 fn main() {
     let arguments: Cli = argh::from_env();
+    println!("PPLC v{} - PCBoard Programming Language Compiler", *VERSION);
 
     if let Some(version) = arguments.runtime {
         let valid_versions: Vec<u16> = vec![100, 200, 300, 310, 320, 330, 340, 400];
@@ -133,17 +134,21 @@ fn main() {
     };
 
     if !file.exists() {
-        execute!(
-            stdout(),
-            SetAttribute(Attribute::Bold),
-            SetForegroundColor(Color::Red),
-            Print("File not found.".to_string()),
-            SetAttribute(Attribute::Reset),
-            SetAttribute(Attribute::Reset),
-        )
-        .unwrap();
-        println!();
-        println!();
+        if arguments.file.is_none() {
+            if let Err(err) = Cli::from_args(&["pplc"], &["--help"]) {
+                eprintln!("{}", err.output);
+            }
+        } else {
+            execute!(
+                stdout(),
+                SetAttribute(Attribute::Bold),
+                SetForegroundColor(Color::Red),
+                Print(format!("ERROR: {} not found on disk, aborting...", file.display())),
+                SetAttribute(Attribute::Reset),
+                SetAttribute(Attribute::Reset),
+            )
+            .unwrap();
+        }
         std::process::exit(1);
     }
 
