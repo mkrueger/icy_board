@@ -51,7 +51,7 @@ lazy_static::lazy_static! {
 
 fn main() {
     let arguments: Cli = argh::from_env();
-    println!("PPLD v{} - PCBoard Programming Language Decompiler", *VERSION);
+    println!("PPLD v{} - PCBoard Programming Language v", *VERSION);
     let mut output_func = OutputFunc::Upper;
     match arguments.style {
         Some('u') => output_func = OutputFunc::Upper,

@@ -18,14 +18,14 @@ tokio = { workspace = true }
 unicase = { workspace = true }
 thiserror = { workspace = true }
 
-chumsky = "0.9.3"
+chumsky = "0.11.1"
 env_logger = "0.11.6"
 ropey = "1.6.1"
 serde_json = "1.0.135"
 tower-lsp = { version = "0.20.0", features = ["proposed"]}
 dashmap = "6.1.0"
 im-rc = "15.0.0"
-oxc_index = "0.36.0"
+oxc_index = "4.0.0"
 anyhow = "1.0.95"
 rust-lapper = "1.1.0"
 
