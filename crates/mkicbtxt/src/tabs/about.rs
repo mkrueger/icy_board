@@ -67,7 +67,7 @@ impl TabPage for AboutTab {
         let width = (2 + text.iter().map(String::len).max().unwrap() as u16 + 2).min(area.width);
 
         let lines = (2 + text.len() as u16 + 2).min(area.height);
-        let area = Rect::new(area.x + (area.width - width) / 2, (area.y + area.height - lines) / 2, width + 2, lines);
+        let area = Rect::new(area.x + (area.width - width) / 2, area.y + (area.height - lines) / 2, width + 2, lines);
 
         Clear.render(area, frame.buffer_mut());
         let text: Vec<Line<'_>> = text

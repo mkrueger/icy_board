@@ -64,8 +64,8 @@ impl TabPage for AboutTab {
 
         let lines = (2 + text.len() as u16 + 2).min(area.height);
         let area = Rect::new(
-            area.x + (area.width.saturating_sub(width)) / 2,
-            (area.y + area.height).saturating_sub(lines) / 2,
+            area.x + area.width.saturating_sub(width) / 2,
+            area.y + area.height.saturating_sub(lines) / 2,
             width + 2,
             lines,
         );

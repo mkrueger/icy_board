@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{Res, tables::import_cp437_string};
-use codepages::tables::UNICODE_TO_CP437;
+use codepages::tables::{UNICODE_TO_CP437, get_utf8};
 use strum_macros::{Display, EnumString};
 use thiserror::Error;
 use toml::Value;
@@ -1883,10 +1883,10 @@ impl TextEntry {
 }
 
 fn load_ice_format(data: &[u8], file: String) -> Res<Vec<TextEntry>> {
-    let text = std::str::from_utf8(data)?;
+    let text = get_utf8(data);
     match text.parse::<Value>() {
         Ok(Value::Table(entries)) => {
-            let mut res = vec![None; LAST_ENTRY + 1];
+            let mut res: Vec<Option<TextEntry>> = vec![None; LAST_ENTRY + 1];
             res[0] = Some(TextEntry::default());
             for (k, v) in entries {
                 let Ok(ice_text) = k.parse::<IceText>() else {
@@ -1918,7 +1918,7 @@ fn load_ice_format(data: &[u8], file: String) -> Res<Vec<TextEntry>> {
             Ok(res.into_iter().flatten().collect())
         }
         Ok(_) => {
-            log::error!("IcbText file doesn't conatin a table ({})", file);
+            log::error!("IcbText file doesn't contain a table ({})", file);
             Err(Box::new(TextError::NoValidIceTextFile("no table".to_string())))
         }
         Err(err) => {
