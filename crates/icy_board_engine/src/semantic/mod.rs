@@ -409,8 +409,24 @@ impl SemanticVisitor {
             if r.usages.is_empty() {
                 continue;
             }
+
+            // Skip user variables - they've already been added above
+            // Check if this is a predefined user variable by checking if it has no declaration
+            // but has usages (predefined variables have no declaration)
+            if self.require_user_variables && r.declaration.is_none() {
+                // This is a predefined variable that's being used
+                // Find it in the already-added user variables and update the reference
+                if let Some(name) = r.usages.first().map(|(_, s)| &s.token) {
+                    if let Some(idx) = variable_table.lookup_variable_index(&unicase::Ascii::new(name.clone())) {
+                        r.variable_table_index = idx;
+                        continue;
+                    }
+                }
+            }
+
             r.variable_table_index = variable_table.len() + 1;
-            variable_table.push(r.create_table_entry());
+            let entry = r.create_table_entry();
+            variable_table.push(entry);
         }
 
         for f in &self.function_containers.clone() {
@@ -721,6 +737,10 @@ impl SemanticVisitor {
     }
 
     fn add_predefined_variable(&mut self, name: &str, val: &VariableValue) {
+        if self.has_variable_defined(&unicase::Ascii::new(name.to_string())) {
+            panic!("Variable {} already exists", name);
+        }
+
         let val = val.clone();
         let id = self.references.len();
         let header = VarHeader {
@@ -769,6 +789,10 @@ impl SemanticVisitor {
             flags: 0,
         };
         self.references.last_mut().unwrap().1.header = Some(header);
+
+        if self.has_variable_defined(&unicase::Ascii::new(identifier.token.to_string())) {
+            panic!("Variable {} already exists", identifier.token.to_string());
+        }
 
         if let Some(local_lookup) = &mut self.local_variable_lookup {
             local_lookup.variable_lookup.insert(unicase::Ascii::new(identifier.token.to_string()), id);

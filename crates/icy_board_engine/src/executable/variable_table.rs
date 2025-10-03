@@ -659,6 +659,10 @@ impl VariableTable {
     }
 
     pub fn set_value(&mut self, id: usize, value: VariableValue) {
+        if id == 15 {
+            log::info!("Setting variable #15 to {}", value);
+        }
+
         let val = value.convert_to(self.entries[id - 1].value.vtype);
         self.get_var_entry_mut(id).value = val;
     }

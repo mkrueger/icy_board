@@ -169,14 +169,16 @@ impl DiskIO {
 }
 
 impl PCBoardIO for DiskIO {
-    fn fappend(&mut self, channel: usize, file: &str) {
-        if let Err(err) = self.fopen(channel, file, O_APPEND, 0) {
+    fn fappend(&mut self, channel: usize, file_name: &str) {
+        log::info!("FAPPEND: {}, {}", channel, file_name);
+        if let Err(err) = self.fopen(channel, file_name, O_APPEND, 0) {
             log::error!("error appending file: {}", err);
         }
     }
 
-    fn fcreate(&mut self, channel: usize, file: &str, _am: i32, sm: i32) {
-        if let Err(err) = self.fopen(channel, file, O_WR, sm) {
+    fn fcreate(&mut self, channel: usize, file_name: &str, _am: i32, sm: i32) {
+        log::info!("FCREATE: {}, {}", channel, file_name);
+        if let Err(err) = self.fopen(channel, file_name, O_WR, sm) {
             log::error!("error creating file: {}", err);
         }
     }
@@ -388,6 +390,8 @@ impl PCBoardIO for DiskIO {
     }
 
     fn fclose(&mut self, channel: usize) -> Res<()> {
+        log::info!("FCLOSE: {}", channel);
+
         self.channels.remove(&channel);
 
         Ok(())

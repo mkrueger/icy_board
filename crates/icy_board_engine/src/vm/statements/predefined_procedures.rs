@@ -167,6 +167,7 @@ pub async fn fputln(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
     for value in &args[1..] {
         let text = vm.eval_expr(value).await?.as_string();
+        log::info!("FPUTLN: channel={}, text={}", channel, text);
         vm.io.fput(channel, text)?;
     }
     vm.io.fput(channel, "\n".to_string())?;
@@ -1288,9 +1289,11 @@ pub async fn getaltuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
     let user_record = vm.eval_expr(&args[0]).await?.as_int();
     if user_record <= 0 || user_record as usize > vm.icy_board_state.get_board().await.users.len() {
         // it's expected behavior, user record is unchanged.
+        log::warn!("PPE getaltuser: invalid user record #{}", user_record);
         return Ok(());
     }
     vm.user = vm.icy_board_state.get_board().await.users[user_record as usize - 1].clone();
+    log::info!("PPE getaltuser: switched to user #{} ({})", user_record, vm.user.name);
     vm.set_user_variables()?;
     Ok(())
 }

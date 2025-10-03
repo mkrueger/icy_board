@@ -119,7 +119,7 @@ impl UserEditor {
                         }),
                 ),
                 ConfigEntry::Item(
-                    ListItem::new(get_text("user_editor_protocol"), ListValue::Text(1, user.protocol.clone()))
+                    ListItem::new(get_text("user_editor_protocol"), ListValue::Text(5, user.protocol.clone()))
                         .with_status(get_text("user_editor_protocol-status"))
                         .with_help(get_text("user_editor_protocol-help"))
                         .with_label_width(label_width)

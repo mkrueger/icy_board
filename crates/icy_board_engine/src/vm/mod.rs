@@ -173,8 +173,10 @@ pub struct VirtualMachine<'a> {
 impl<'a> VirtualMachine<'a> {
     fn set_user_variables(&mut self) -> Res<()> {
         if !self.variable_table.has_user_vars() {
+            log::warn!("Tried to set user variables, but no user variables defined.");
             return Ok(());
         }
+        log::info!("Setting user variables for user ({})", self.user.name);
         let cur_user = &self.user;
         self.variable_table.set_value(U_EXPERT, VariableValue::new_bool(cur_user.flags.expert_mode));
         match cur_user.flags.fse_mode {
@@ -212,6 +214,7 @@ impl<'a> VirtualMachine<'a> {
             .set_value(U_CMNT2, VariableValue::new_string(cur_user.sysop_comment.clone()));
         match &cur_user.password.password {
             Password::PlainText(pwd) => {
+                log::info!("Setting user password in PPE VM (plain text) PW ({})", pwd);
                 self.variable_table
                     .set_value(U_PWD, VariableValue::new_string(pwd.clone().to_ascii_uppercase()));
             }
