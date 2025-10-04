@@ -2202,7 +2202,7 @@ pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
     let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_id();
     let field_num = vm.eval_expr(&args[2]).await?.as_int();
     let msg_num = vm.eval_expr(&args[1]).await?.as_int() as u32;
-
+    log::info!("GETMSGHDR: conf_num={conf_num}, area_num={area_num}, msg_num={msg_num}, field_num={field_num}");
     if let Some((cn, an, mn, header)) = &vm.cached_msg_header {
         if conf_num == *cn && area_num == *an && msg_num == *mn {
             return get_field(field_num, header);
@@ -2277,8 +2277,10 @@ fn get_field(field_num: i32, header: &JamMessageHeader) -> Res<VariableValue> {
         }
         HDR_SUBJ => {
             if let Some(subj) = header.get_subject() {
+                log::info!("Subject: {}", subj);
                 Ok(VariableValue::new_string(subj.to_string()))
             } else {
+                log::info!("Subject: None");
                 Ok(VariableValue::new_string(String::new()))
             }
         }

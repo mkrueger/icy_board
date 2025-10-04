@@ -322,6 +322,12 @@ pub enum LexerState {
     BeyondEOL,
 }
 
+#[derive(Debug, Clone)]
+struct IfFrame {
+    taken: bool,  // has any prior branch executed?
+    active: bool, // emit tokens for this branch?
+}
+
 pub struct Lexer {
     lookup_table: &'static HashMap<unicase::Ascii<String>, Token>,
     define_table: HashMap<unicase::Ascii<String>, Constant>,
@@ -334,7 +340,7 @@ pub struct Lexer {
     lexer_state: LexerState,
     token_start: usize,
     token_end: usize,
-    if_level: i32,
+    if_stack: Vec<IfFrame>,
 
     include_lexer: Option<Box<Lexer>>,
 }
@@ -504,8 +510,12 @@ impl Lexer {
             token_start: 0,
             token_end: 0,
             include_lexer: None,
-            if_level: 0,
+            if_stack: Vec::new(),
         }
+    }
+
+    pub fn span(&self) -> std::ops::Range<usize> {
+        self.token_start..self.token_end
     }
 
     pub fn get_define(&self, key: &str) -> Option<&Constant> {
@@ -537,6 +547,7 @@ impl Lexer {
     /// # Panics
     ///
     /// Panics if .
+    /*
     pub fn next_token(&mut self) -> Option<Token> {
         if let Some(lexer) = &mut self.include_lexer {
             let result = lexer.next_token();
@@ -1067,6 +1078,7 @@ impl Lexer {
         state
     }
 
+    */
     #[allow(clippy::unnecessary_wraps)]
     fn read_identifier(&mut self) -> Option<Token> {
         self.lexer_state = LexerState::BeyondEOL;
@@ -1119,7 +1131,204 @@ impl Lexer {
             None
         }
     }
+    fn collect_inactive_block(&mut self, mut collected: String, starting_depth: usize) -> Token {
+        // We entered with an inactive branch. We know the current top if_stack depth == starting_depth - 1 (just pushed or existing).
+        // We'll scan raw lines (including their comment markers) until we:
+        //  * reach an activating $ELSE / $ELSEIF at starting_depth
+        //  * or consume matching $ENDIF leaving depth < starting_depth
+        //  * nested $IF blocks are absorbed entirely.
+        let mut depth = 0usize; // depth relative to the skipped branch root
+        let mut line_buf = String::new();
+        let mut line_start_pos;
+        loop {
+            line_buf.clear();
+            line_start_pos = self.token_end;
 
+            // EOF: stop
+            if self.token_end >= self.text.len() {
+                break;
+            }
+
+            // Read one physical line (including trailing newline if present)
+            // Capture first non-space to detect comment marker easily.
+            let mut first_non_ws: Option<char> = None;
+            let mut raw_line_chars: Vec<char> = Vec::new();
+            while let Some(ch) = self.next_ch() {
+                raw_line_chars.push(ch);
+                if ch == '\n' {
+                    break;
+                }
+                if first_non_ws.is_none() && !ch.is_whitespace() {
+                    first_non_ws = Some(ch);
+                }
+            }
+
+            if raw_line_chars.is_empty() {
+                break;
+            }
+
+            let line_str: String = raw_line_chars.iter().collect();
+            line_buf.push_str(&line_str);
+            collected.push_str(&line_str);
+
+            // Only lines that are comment-start lines can contain directives
+            let is_comment_line = matches!(first_non_ws, Some(';') | Some('\'') | Some('*'));
+
+            if !is_comment_line {
+                continue; // just plain skipped code
+            }
+
+            // Extract after the first marker char (keep original marker in collected text)
+            // Find directive body roughly:
+            let after_marker = {
+                // find the first_non_ws index
+                let idx = raw_line_chars.iter().position(|c| !c.is_ascii_whitespace()).unwrap_or(0);
+                raw_line_chars[idx + 1..].iter().collect::<String>()
+            };
+            let upper = after_marker.trim_start().to_ascii_uppercase();
+
+            // Recognize directives
+            if upper.starts_with("$IF ") || upper == "$IF" {
+                depth += 1;
+                continue;
+            }
+            if upper.starts_with("$ENDIF") {
+                if depth == 0 {
+                    // matched the $IF level we’re skipping
+                    // We consumed the endif line already; stop here.
+                    break;
+                } else {
+                    depth -= 1;
+                    continue;
+                }
+            }
+            if depth == 0 {
+                // Potential activating branch at our root
+                if upper.starts_with("$ELSEIF") || upper.starts_with("$ELSE") {
+                    // We reached a sibling branch; back up so next token processing can re-read this line.
+                    // Rewind token_end to line_start to let read_comment see it fresh.
+                    self.token_end = line_start_pos;
+                    // Remove the just appended line from collected (since we rewound).
+                    let remove_len = line_buf.len();
+                    let new_len = collected.len().saturating_sub(remove_len);
+                    collected.truncate(new_len);
+                    break;
+                }
+            }
+        }
+
+        Token::Comment(CommentType::BlockComment, collected)
+    }
+
+    // Collect skipped inactive region starting at a false $IF or untaken $ELSEIF.
+    // Includes lines until:
+    //  * an activating $ELSE or $ELSEIF true branch (includes that directive line, then stops)
+    //  * OR the matching $ENDIF (excludes that line so it becomes its own comment token)
+    // Nested inactive $IF blocks are fully absorbed.
+    fn collect_inactive_region(&mut self, mut collected: String, marker: CommentType) -> Token {
+        if !collected.ends_with('\n') {
+            collected.push('\n');
+        }
+        let mut nest = 0usize;
+
+        loop {
+            if self.token_end >= self.text.len() {
+                break;
+            }
+            let line_start = self.token_end;
+            let mut line_chars: Vec<char> = Vec::new();
+            let mut first_non_ws: Option<char> = None;
+
+            while let Some(ch) = self.next_ch() {
+                line_chars.push(ch);
+                if ch == '\n' {
+                    break;
+                }
+                if first_non_ws.is_none() && !ch.is_whitespace() {
+                    first_non_ws = Some(ch);
+                }
+            }
+            if line_chars.is_empty() {
+                break;
+            }
+
+            let line_str: String = line_chars.iter().collect();
+            let is_comment_line = matches!(first_non_ws, Some(';') | Some('\'') | Some('*'));
+
+            if !is_comment_line {
+                collected.push_str(&line_str);
+                continue;
+            }
+
+            // Extract directive body (after first marker)
+            let marker_pos = line_str.find(|c: char| !c.is_whitespace()).unwrap_or(0);
+            let after_marker = &line_str[marker_pos + 1..];
+            let upper = after_marker.trim_start().to_ascii_uppercase();
+
+            // Nested IF
+            if upper.starts_with("$IF ") || upper == "$IF" {
+                nest += 1;
+                collected.push_str(&line_str);
+                continue;
+            }
+
+            // ENDIF
+            if upper.starts_with("$ENDIF") {
+                if nest == 0 {
+                    // Stop BEFORE consuming this line: rewind so it becomes its own comment token.
+                    self.token_end = line_start;
+                    break;
+                } else {
+                    nest -= 1;
+                    collected.push_str(&line_str);
+                    continue;
+                }
+            }
+
+            // At root level, sibling directives might activate or also be skipped
+            if nest == 0 && (upper.starts_with("$ELSEIF") || upper.starts_with("$ELSE")) {
+                let activating = if upper.starts_with("$ELSE") {
+                    // $ELSE activates only if no branch taken yet
+                    if let Some(frame) = self.if_stack.last() { !frame.taken } else { false }
+                } else {
+                    // $ELSEIF
+                    if let Some(frame) = self.if_stack.last() {
+                        if frame.taken {
+                            false
+                        } else {
+                            // Evaluate expression (slice off "$ELSEIF")
+                            let expr_src = &after_marker[after_marker.to_ascii_uppercase().find("$ELSEIF").unwrap() + "$ELSEIF".len()..];
+                            self.eval_preproc_bool(expr_src)
+                        }
+                    } else {
+                        false
+                    }
+                };
+
+                if activating {
+                    // Include this directive line then stop so following code is active.
+                    collected.push_str(&line_str);
+                    if let Some(f) = self.if_stack.last_mut() {
+                        f.active = true;
+                        f.taken = true;
+                    }
+                    break;
+                } else {
+                    // Still inactive, include and continue.
+                    collected.push_str(&line_str);
+                    continue;
+                }
+            }
+
+            // Any other comment line in skipped region
+            collected.push_str(&line_str);
+        }
+
+        // Return as a normal comment (NOT BlockComment) with the original marker type.
+        Token::Comment(marker, collected)
+    }
+
+    // Adjust read_comment to call collect_inactive_region with marker and NOT produce BlockComment
     fn read_comment(&mut self, ch: char) -> Option<Token> {
         let cmt_type = match ch {
             ';' => CommentType::SingleLineSemicolon,
@@ -1127,214 +1336,919 @@ impl Lexer {
             _ => CommentType::SingleLineQuote,
         };
         let mut comment = Vec::new();
-        loop {
-            let Some(ch) = self.next_ch() else {
-                break;
-            };
-            if ch == '\n' {
+        while let Some(ch2) = self.next_ch() {
+            if ch2 == '\n' {
                 break;
             }
-            if comment.is_empty() && ch == '#' {
+            if comment.is_empty() && ch2 == '#' {
                 return self.read_define();
             }
-            comment.push(ch);
+            comment.push(ch2);
         }
         self.lexer_state = LexerState::AfterEol;
 
-        if comment.len() > "$INCLUDE:".len() && comment.iter().take("$INCLUDE:".len()).collect::<String>().to_ascii_uppercase() == "$INCLUDE:" {
-            let include_file = comment.iter().skip("$INCLUDE:".len()).collect::<String>().trim().to_string();
-            let Some(parent) = self.file.parent() else {
-                self.errors.lock().unwrap().report_error(
-                    self.token_start..self.token_end,
-                    LexingErrorType::PathError(self.file.to_string_lossy().to_string()),
-                );
-                return None;
-            };
-            let path = parent.join(include_file.clone());
+        let raw = comment.iter().collect::<String>();
+        let upper = raw.trim_start().to_ascii_uppercase();
 
-            match load_with_encoding(&path, self.encoding) {
-                Ok(k) => {
-                    self.include_lexer = Some(Box::new(Self {
-                        lookup_table: self.lookup_table,
-                        file: path.clone(),
-                        lang_version: self.lang_version,
-                        define_table: self.define_table.clone(),
-                        encoding: self.encoding,
-                        text: k.chars().collect(),
-                        lexer_state: LexerState::AfterEol,
-                        errors: self.errors.clone(),
-                        token_start: 0,
-                        token_end: 0,
-                        include_lexer: None,
-                        if_level: 0,
-                    }));
+        if upper.starts_with("$INCLUDE:") {
+            return self.next_token();
+        }
+        if upper.starts_with("$USEFUNCS") {
+            return Some(Token::UseFuncs(cmt_type, raw));
+        }
+
+        // $IF
+        if upper.starts_with("$IF ") || upper == "$IF" {
+            let expr_src = &raw[upper.find("$IF").unwrap() + 3..];
+            let cond = self.eval_preproc_bool(expr_src);
+            self.if_stack.push(IfFrame { taken: cond, active: cond });
+            if !cond {
+                let first_line = format!("{cmt_type}{raw}");
+                return Some(self.collect_inactive_region(first_line, cmt_type));
+            }
+            return self.next_token();
+        }
+
+        // $ELSEIF
+        if upper.starts_with("$ELSEIF") {
+            if self.if_stack.is_empty() {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(self.token_start..self.token_end, LexingErrorType::ElseIfWithoutIf);
+                return self.next_token();
+            }
+            let already = self.if_stack.last().unwrap().taken;
+            if already {
+                if let Some(f) = self.if_stack.last_mut() {
+                    f.active = false;
                 }
-                Err(err) => {
-                    self.errors.lock().unwrap().report_error(
-                        self.token_start..self.token_end,
-                        LexingErrorType::ErrorLoadingIncludeFile(include_file.to_string(), err.to_string()),
-                    );
-                    return None;
+                let first_line = format!("{cmt_type}{raw}");
+                return Some(self.collect_inactive_region(first_line, cmt_type));
+            } else {
+                let expr_src = &raw[raw.to_ascii_uppercase().find("$ELSEIF").unwrap() + 7..];
+                let cond = self.eval_preproc_bool(expr_src);
+                if let Some(f) = self.if_stack.last_mut() {
+                    f.active = cond;
+                    if cond {
+                        f.taken = true;
+                    }
                 }
+                if !cond {
+                    let first_line = format!("{cmt_type}{raw}");
+                    return Some(self.collect_inactive_region(first_line, cmt_type));
+                }
+                return self.next_token();
             }
         }
-        if comment.len() > "$USEFUNCS".len() && comment.iter().take("$USEFUNCS".len()).collect::<String>().to_ascii_uppercase() == "$USEFUNCS" {
-            return Some(Token::UseFuncs(cmt_type, comment.iter().collect()));
-        }
-        if comment.len() >= "$ENDIF".len() && comment.iter().take("$ENDIF".len()).collect::<String>().to_ascii_uppercase() == "$ENDIF" {
-            self.if_level -= 1;
-        }
 
-        if comment.len() > "$ELSE".len() && comment.iter().take("$ELSE".len()).collect::<String>().to_ascii_uppercase() == "$ELSE" {
-            if self.if_level == 0 {
+        // $ELSE
+        if upper.starts_with("$ELSE") {
+            if self.if_stack.is_empty() {
                 self.errors
                     .lock()
                     .unwrap()
                     .report_error(self.token_start..self.token_end, LexingErrorType::ElseWithoutIf);
+                return self.next_token();
             }
-            loop {
-                let Some(ch) = self.next_ch() else {
-                    break;
-                };
-                comment.push(ch);
-                if comment.ends_with(&";$ENDIF".chars().collect::<Vec<char>>()) {
-                    self.if_level -= 1;
-                    break;
+            let activate = {
+                let f = self.if_stack.last().unwrap();
+                !f.taken
+            };
+            if let Some(f) = self.if_stack.last_mut() {
+                if activate {
+                    f.active = true;
+                    f.taken = true;
+                } else {
+                    f.active = false;
                 }
             }
-            return Some(Token::Comment(cmt_type, comment.iter().collect()));
+            if !activate {
+                let first_line = format!("{cmt_type}{raw}");
+                return Some(self.collect_inactive_region(first_line, cmt_type));
+            }
+            return self.next_token();
         }
 
-        let is_if = comment.len() > "$IF".len() && comment.iter().take("$IF".len()).collect::<String>().to_ascii_uppercase() == "$IF";
-        let if_elif = comment.len() > "$ELIF".len() && comment.iter().take("$ELIF".len()).collect::<String>().to_ascii_uppercase() == "$ELIF";
-        if is_if || if_elif {
-            if is_if {
-                self.if_level += 1;
-            } else {
-                if self.if_level == 0 {
-                    self.errors
-                        .lock()
-                        .unwrap()
-                        .report_error(self.token_start..self.token_end, LexingErrorType::ElseIfWithoutIf);
-                }
+        // $ENDIF: return as normal single-line comment, do NOT absorb earlier
+        if upper.starts_with("$ENDIF") {
+            if self.if_stack.pop().is_none() {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(self.token_start..self.token_end, LexingErrorType::MissingEndIf);
             }
-            let reg = UserTypeRegistry::default();
-            let input = comment.iter().skip(if is_if { "$IF".len() } else { "$ELIF".len() }).collect::<String>();
-            let mut parser = Parser::new(PathBuf::from("."), self.errors.clone(), &reg, &input, Encoding::Utf8, &Workspace::default());
-            parser.next_token();
-            let res = parser.parse_expression().unwrap();
+            return Some(Token::Comment(cmt_type, raw));
+        }
+
+        if upper.starts_with("$DEFINE") {
+            let define_src = raw[upper.find("$DEFINE").unwrap() + 7..].trim();
+            self.handle_define(define_src);
+            return self.next_token();
+        }
+
+        Some(Token::Comment(cmt_type, raw))
+    }
+    fn eval_preproc_bool(&mut self, src: &str) -> bool {
+        let expr = src.trim();
+        if expr.is_empty() {
+            return false;
+        }
+        let reg = UserTypeRegistry::default();
+        let mut parser = Parser::new(PathBuf::from("."), self.errors.clone(), &reg, expr, Encoding::Utf8, &Workspace::default());
+        parser.next_token();
+        if let Some(ast) = parser.parse_expression() {
             let mut visitor = PreProcessorVisitor {
                 define_table: &self.define_table,
                 errors: self.errors.clone(),
             };
-            let value = res.visit(&mut visitor);
-            if let Some(value) = value {
-                if value.as_bool() {
-                    return Some(Token::Comment(cmt_type, comment.iter().collect()));
-                }
-            } else {
-                self.errors
-                    .lock()
-                    .unwrap()
-                    .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefineValue(input.to_string()));
-                return Some(Token::Comment(cmt_type, comment.iter().collect()));
+            if let Some(val) = ast.visit(&mut visitor) {
+                return val.as_bool();
             }
-            loop {
-                let Some(ch) = self.next_ch() else {
-                    break;
-                };
-                comment.push(ch);
-                if comment.ends_with(&";$ENDIF".chars().collect::<Vec<char>>()) {
-                    self.if_level -= 1;
-                    break;
-                } else if comment.ends_with(&";$ELSE".chars().collect::<Vec<char>>()) {
-                }
-            }
-            return Some(Token::Comment(cmt_type, comment.iter().collect()));
         }
+        false
+    }
 
-        if comment.len() > "$DEFINE".len() && comment.iter().take("$DEFINE".len()).collect::<String>().to_ascii_uppercase() == "$DEFINE" {
-            let reg = UserTypeRegistry::default();
-            let input = comment.iter().skip("$DEFINE".len()).collect::<String>().trim().to_string();
-            let (variable, value) = if input.chars().all(|c| c.is_ascii_alphabetic()) {
-                (input, Constant::Boolean(true))
-            } else {
-                let mut parser = Parser::new(PathBuf::from("."), self.errors.clone(), &reg, &input, Encoding::Utf8, &Workspace::default());
-                parser.next_token();
-                if let Some(res) = parser.parse_statement() {
-                    match res {
-                        Statement::Let(expr) => {
-                            let mut visitor = PreProcessorVisitor {
-                                define_table: &self.define_table,
-                                errors: self.errors.clone(),
-                            };
-                            let value = expr.get_value_expression().visit(&mut visitor);
-                            if let Some(value) = value {
-                                match value.get_type() {
-                                    crate::executable::VariableType::Boolean => (expr.get_identifier().to_string(), Constant::Boolean(value.as_bool())),
-                                    crate::executable::VariableType::Integer => {
-                                        (expr.get_identifier().to_string(), Constant::Integer(value.as_int(), NumberFormat::Default))
-                                    }
-                                    _ => {
-                                        self.errors
-                                            .lock()
-                                            .unwrap()
-                                            .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefineValue(input.to_string()));
-                                        ("".to_string(), Constant::Boolean(false))
-                                    }
-                                }
-                            } else {
-                                self.errors
-                                    .lock()
-                                    .unwrap()
-                                    .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefineValue(input.to_string()));
-                                ("".to_string(), Constant::Boolean(false))
-                            }
-                        }
+    fn handle_define(&mut self, input: &str) {
+        // parse like before; reuse existing logic but moved out of read_comment
+        let reg = UserTypeRegistry::default();
+        if input.is_empty() {
+            return;
+        }
+        if input.chars().all(|c| c.is_ascii_alphabetic()) {
+            self.define_table.insert(Ascii::new(input.to_string()), Constant::Boolean(true));
+            return;
+        }
+        let mut parser = Parser::new(PathBuf::from("."), self.errors.clone(), &reg, input, Encoding::Utf8, &Workspace::default());
+        parser.next_token();
+        if let Some(stmt) = parser.parse_statement() {
+            if let Statement::Let(expr) = stmt {
+                let mut visitor = PreProcessorVisitor {
+                    define_table: &self.define_table,
+                    errors: self.errors.clone(),
+                };
+                if let Some(val) = expr.get_value_expression().visit(&mut visitor) {
+                    let (k, v) = match val.get_type() {
+                        crate::executable::VariableType::Boolean => (expr.get_identifier().to_string(), Constant::Boolean(val.as_bool())),
+                        crate::executable::VariableType::Integer => (expr.get_identifier().to_string(), Constant::Integer(val.as_int(), NumberFormat::Default)),
                         _ => {
                             self.errors
                                 .lock()
                                 .unwrap()
                                 .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefineValue(input.to_string()));
-                            ("".to_string(), Constant::Boolean(false))
+                            return;
                         }
+                    };
+                    if self.define_table.insert(Ascii::new(k.clone()), v).is_some() {
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_warning(self.token_start..self.token_end, LexingErrorType::AlreadyDefined(k));
                     }
-                } else {
-                    self.errors
-                        .lock()
-                        .unwrap()
-                        .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefineValue(input.to_string()));
-                    ("".to_string(), Constant::Boolean(false))
                 }
-            };
-
-            if self.define_table.insert(Ascii::new(variable.clone()), value.clone()).is_some() {
-                self.errors
-                    .lock()
-                    .unwrap()
-                    .report_warning(self.token_start..self.token_end, LexingErrorType::AlreadyDefined(variable.to_string()));
             }
-            return Some(Token::Define(cmt_type, variable, value));
         }
-        Some(Token::Comment(cmt_type, comment.iter().collect()))
     }
 
-    pub fn span(&self) -> std::ops::Range<usize> {
-        self.token_start..self.token_end
-    }
-
+    // In check_eof():
     fn check_eof(&mut self) {
-        if self.if_level > 0 {
+        if !self.if_stack.is_empty() {
             self.errors
                 .lock()
                 .unwrap()
                 .report_error(self.token_start..self.token_end, LexingErrorType::MissingEndIf);
         }
     }
+    // ...existing code...
+
+    pub fn next_token(&mut self) -> Option<Token> {
+        // Handle include files first
+        if let Some(lexer) = &mut self.include_lexer {
+            let result = lexer.next_token();
+            match result {
+                Some(token) => {
+                    return Some(token);
+                }
+                None => {
+                    self.check_eof();
+                    self.include_lexer = None;
+                }
+            }
+        }
+
+        // Check if we're in an inactive conditional branch
+        if !self.if_stack.is_empty() && !self.if_stack.last().unwrap().active {
+            // Collect entire skipped block as a comment
+            let block_start = self.token_end;
+            let mut skipped_content = String::new();
+
+            // Skip tokens while in inactive conditional branch
+            while !self.if_stack.is_empty() && !self.if_stack.last().unwrap().active {
+                // We need to consume tokens until we find a directive that changes our state
+                let ch;
+                loop {
+                    self.token_start = self.token_end;
+                    if let Some(next_ch) = self.next_ch() {
+                        if next_ch != ' ' && next_ch != '\t' {
+                            ch = next_ch;
+                            break;
+                        }
+                        skipped_content.push(next_ch);
+                    } else {
+                        self.check_eof();
+                        // Return collected content as comment if we had any
+                        if !skipped_content.is_empty() {
+                            return Some(get_comment(skipped_content));
+                        }
+                        return None;
+                    }
+                }
+
+                // Collect the character
+                skipped_content.push(ch);
+
+                // Only process comment lines that might contain directives
+                if ch == '\'' || ch == ';' || (ch == '*' && self.lexer_state == LexerState::AfterEol) {
+                    let mut comment = Vec::new();
+                    while let Some(ch) = self.next_ch() {
+                        skipped_content.push(ch);
+                        if ch == '\n' {
+                            self.lexer_state = LexerState::AfterEol;
+                            break;
+                        }
+                        comment.push(ch);
+                    }
+
+                    let raw = comment.iter().collect::<String>();
+                    let upper = raw.trim_start().to_ascii_uppercase();
+
+                    // Check for directives that affect flow
+                    if upper.starts_with("$ELSEIF") {
+                        if self.if_stack.is_empty() {
+                            self.errors
+                                .lock()
+                                .unwrap()
+                                .report_error(self.token_start..self.token_end, LexingErrorType::ElseIfWithoutIf);
+                            continue;
+                        }
+
+                        let prior_taken = self.if_stack.last().unwrap().taken;
+                        if !prior_taken {
+                            let expr_src = &raw[raw.to_ascii_uppercase().find("$ELSEIF").unwrap() + 7..];
+                            let cond = self.eval_preproc_bool(expr_src);
+                            if let Some(frame) = self.if_stack.last_mut() {
+                                frame.active = cond;
+                                if cond {
+                                    frame.taken = true;
+                                    // Return the skipped block as a comment
+                                    if !skipped_content.is_empty() {
+                                        return Some(get_comment(skipped_content));
+                                    }
+                                    break; // Exit skip loop, we're now active
+                                }
+                            }
+                        }
+                    } else if upper.starts_with("$ELSE") {
+                        if self.if_stack.is_empty() {
+                            self.errors
+                                .lock()
+                                .unwrap()
+                                .report_error(self.token_start..self.token_end, LexingErrorType::ElseWithoutIf);
+                            continue;
+                        }
+                        if let Some(frame) = self.if_stack.last_mut() {
+                            if !frame.taken {
+                                frame.active = true;
+                                frame.taken = true;
+                                // Return the skipped block as a comment
+                                if !skipped_content.is_empty() {
+                                    return Some(get_comment(skipped_content));
+                                }
+                                break; // Exit skip loop, we're now active
+                            }
+                        }
+                    } else if upper.starts_with("$ENDIF") {
+                        if self.if_stack.pop().is_none() {
+                            self.errors
+                                .lock()
+                                .unwrap()
+                                .report_error(self.token_start..self.token_end, LexingErrorType::MissingEndIf);
+                        }
+                        // Return the skipped block as a comment
+                        if !skipped_content.is_empty() {
+                            return Some(get_comment(skipped_content));
+                        }
+                        break; // Exit skip loop, check next level
+                    } else if upper.starts_with("$IF") {
+                        // Nested IF while skipping - push an inactive frame
+                        self.if_stack.push(IfFrame { taken: false, active: false });
+                    }
+                } else {
+                    // Collect non-comment content in inactive regions
+                    if ch == '\n' {
+                        self.lexer_state = LexerState::AfterEol;
+                    } else if ch == '\r' {
+                        if let Some('\n') = self.next_ch() {
+                            skipped_content.push('\n');
+                            self.lexer_state = LexerState::AfterEol;
+                        }
+                    } else {
+                        // Read the rest of the line/token
+                        while let Some(ch) = self.next_ch() {
+                            if ch == '\n' || ch == '\r' {
+                                self.put_back();
+                                break;
+                            }
+                            skipped_content.push(ch);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Now process normal tokens (we're in an active region or no conditionals)
+        let ch;
+        loop {
+            self.token_start = self.token_end;
+            if let Some(next_ch) = self.next_ch() {
+                if next_ch != ' ' && next_ch != '\t' {
+                    ch = next_ch;
+                    break;
+                }
+            } else {
+                self.check_eof();
+                return None;
+            }
+        }
+
+        let state = match ch {
+            '\'' | ';' => {
+                return self.read_comment(ch);
+            }
+            '"' => {
+                let mut string_result = String::new();
+                loop {
+                    let Some(sch) = self.next_ch() else {
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(self.token_start..self.token_end, LexingErrorType::UnexpectedEOFInString);
+                        return None;
+                    };
+                    if sch == '"' {
+                        match self.next_ch() {
+                            Some('"') => {
+                                string_result.push('"');
+                                continue;
+                            }
+                            None => {
+                                break;
+                            }
+                            _ => {
+                                self.put_back();
+                                break;
+                            }
+                        }
+                    }
+                    string_result.push(sch);
+                }
+                Some(Token::Const(Constant::String(string_result)))
+            }
+            '\\' => {
+                // eol continuation
+                let next = self.next_ch();
+                if let Some('\r') = next {
+                    if let Some('\n') = self.next_ch() {
+                        return self.next_token();
+                    }
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(self.token_start..self.token_end, LexingErrorType::InvalidToken);
+                    return None;
+                }
+                if let Some('\n') = next {
+                    return self.next_token();
+                }
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(self.token_start..self.token_end, LexingErrorType::InvalidToken);
+                return None;
+            }
+            '_' => {
+                // eol continuation
+                let next = self.next_ch();
+                if let Some('\r') = next {
+                    if let Some('\n') = self.next_ch() {
+                        return self.next_token();
+                    }
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(self.token_start..self.token_end, LexingErrorType::InvalidToken);
+                    return None;
+                }
+                if let Some('\n') = next {
+                    return self.next_token();
+                }
+                return self.read_identifier();
+            }
+            '\r' => {
+                return if let Some('\n') = self.next_ch() {
+                    self.lexer_state = LexerState::AfterEol;
+                    Some(Token::Eol)
+                } else {
+                    self.put_back();
+                    self.lexer_state = LexerState::AfterEol;
+                    Some(Token::Eol)
+                };
+            }
+            '\n' => {
+                self.lexer_state = LexerState::AfterEol;
+                return Some(Token::Eol);
+            }
+            ':' => {
+                if self.lexer_state == LexerState::BeyondEOL {
+                    self.lexer_state = LexerState::AfterColonEol;
+                    return Some(Token::Eol);
+                }
+                let mut got_non_ws = false;
+                let mut label_start = 0;
+                loop {
+                    let Some(ch) = self.next_ch() else {
+                        break;
+                    };
+                    if !got_non_ws && (ch == ' ' || ch == '\t') {
+                        label_start += 1;
+                        continue;
+                    }
+                    //assert!(ch.is_some(), "Unexpected eof in string_literal at ({}, {}).", self.line, self.col);
+                    if !(ch.is_ascii_alphanumeric() || "_@#$¢£¥€".contains(ch)) {
+                        self.put_back();
+                        break;
+                    }
+                    got_non_ws = true;
+                }
+
+                let identifier = unicase::Ascii::new(self.text[self.token_start + 1 + label_start..self.token_end].iter().collect::<String>());
+                Some(Token::Label(identifier))
+            }
+            '(' => Some(Token::LPar),
+            ')' => Some(Token::RPar),
+            '[' => {
+                if self.lang_version < 350 {
+                    Some(Token::LPar)
+                } else {
+                    Some(Token::LBracket)
+                }
+            }
+            ']' => {
+                if self.lang_version < 350 {
+                    Some(Token::RPar)
+                } else {
+                    Some(Token::RBracket)
+                }
+            }
+            '{' => {
+                if self.lang_version < 350 {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_warning(self.token_start..self.token_end, LexingErrorType::DontUseBraces);
+                    Some(Token::LPar)
+                } else {
+                    Some(Token::LBrace)
+                }
+            }
+            '}' => {
+                if self.lang_version < 350 {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_warning(self.token_start..self.token_end, LexingErrorType::DontUseBraces);
+                    Some(Token::RPar)
+                } else {
+                    Some(Token::RBrace)
+                }
+            }
+            ',' => Some(Token::Comma),
+            '^' => Some(Token::PoW),
+            '*' => {
+                if self.lexer_state != LexerState::BeyondEOL {
+                    return self.read_comment(ch);
+                }
+                let next = self.next_ch();
+                if let Some('*') = next {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_warning(self.token_start..self.token_end, LexingErrorType::PowWillGetRemoved);
+                    Some(Token::PoW)
+                } else {
+                    if self.lang_version >= 350 && next == Some('=') {
+                        return Some(Token::MulAssign);
+                    }
+                    self.put_back();
+                    Some(Token::Mul)
+                }
+            }
+            '/' => {
+                if self.lang_version >= 350 {
+                    let next = self.next_ch();
+                    if next == Some('=') {
+                        return Some(Token::DivAssign);
+                    }
+                    self.put_back();
+                }
+                Some(Token::Div)
+            }
+            '%' => {
+                if self.lang_version >= 350 {
+                    let next = self.next_ch();
+                    if next == Some('=') {
+                        return Some(Token::ModAssign);
+                    }
+                    self.put_back();
+                }
+                Some(Token::Mod)
+            }
+            '+' => {
+                if self.lang_version >= 350 {
+                    let next = self.next_ch();
+                    if next == Some('=') {
+                        return Some(Token::AddAssign);
+                    }
+                    self.put_back();
+                }
+                Some(Token::Add)
+            }
+            '-' => {
+                if self.lang_version >= 350 {
+                    let next = self.next_ch();
+                    if next == Some('=') {
+                        return Some(Token::SubAssign);
+                    }
+                    self.put_back();
+                }
+                Some(Token::Sub)
+            }
+            '=' => {
+                let next = self.next_ch();
+                match next {
+                    Some('<') => Some(Token::LowerEq),
+                    Some('>') => Some(Token::GreaterEq),
+                    Some('=') => Some(Token::Eq),
+                    _ => {
+                        self.put_back();
+                        Some(Token::Eq)
+                    }
+                }
+            }
+            '&' => {
+                let next = self.next_ch();
+                if let Some('&') = next {
+                    Some(Token::And)
+                } else {
+                    if self.lang_version >= 350 {
+                        if next == Some('=') {
+                            return Some(Token::AndAssign);
+                        }
+                    }
+                    self.put_back();
+                    Some(Token::And)
+                }
+            }
+            '|' => {
+                let next = self.next_ch();
+                if let Some('|') = next {
+                    Some(Token::Or)
+                } else {
+                    if self.lang_version >= 350 {
+                        if next == Some('=') {
+                            return Some(Token::OrAssign);
+                        }
+                    }
+                    self.put_back();
+                    Some(Token::Or)
+                }
+            }
+            '!' => {
+                let next = self.next_ch();
+                if let Some('=') = next {
+                    Some(Token::NotEq)
+                } else {
+                    self.put_back();
+                    Some(Token::Not)
+                }
+            }
+            '@' => {
+                let ch = self.next_ch();
+                if Some('X') != ch && Some('x') != ch {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(self.token_start..self.token_end, LexingErrorType::InvalidToken);
+                    return None;
+                }
+                let Some(first) = self.next_ch() else {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(self.token_start..self.token_end, LexingErrorType::InvalidToken);
+                    return None;
+                };
+                let Some(second) = self.next_ch() else {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(self.token_start..self.token_end, LexingErrorType::InvalidToken);
+                    return None;
+                };
+                if !first.is_ascii_hexdigit() || !second.is_ascii_hexdigit() {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(self.token_start..self.token_end, LexingErrorType::InvalidToken);
+                    return None;
+                }
+                Some(Token::Const(Constant::Integer(
+                    conv_hex(first) * 16 + conv_hex(second),
+                    NumberFormat::ColorCode,
+                )))
+            }
+            '$' => {
+                let mut identifier = String::new();
+                let mut is_last = false;
+                loop {
+                    let Some(ch) = self.next_ch() else {
+                        is_last = true;
+                        break;
+                    };
+                    if !ch.is_ascii_digit() && ch != '.' {
+                        break;
+                    }
+                    identifier.push(ch);
+                }
+                if !is_last {
+                    self.put_back();
+                }
+                let Ok(r) = identifier.parse::<f64>() else {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(self.token_start..self.token_end, LexingErrorType::InvalidToken);
+                    return None;
+                };
+                Some(Token::Const(Constant::Money((r * 100.0) as i32)))
+            }
+            '<' => {
+                let next = self.next_ch();
+                match next {
+                    Some('>') => Some(Token::NotEq),
+                    Some('=') => Some(Token::LowerEq),
+                    _ => {
+                        self.put_back();
+                        Some(Token::Lower)
+                    }
+                }
+            }
+            '>' => {
+                let next = self.next_ch();
+                match next {
+                    Some('<') => Some(Token::NotEq),
+                    Some('=') => Some(Token::GreaterEq),
+                    _ => {
+                        self.put_back();
+                        Some(Token::Greater)
+                    }
+                }
+            }
+            '.' => {
+                let next = self.next_ch();
+                if next == Some('.') {
+                    Some(Token::DotDot)
+                } else {
+                    self.put_back();
+                    if self.lang_version >= 400 {
+                        return Some(Token::Dot);
+                    }
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(self.token_start..self.token_end, LexingErrorType::InvalidToken);
+                    return None;
+                }
+            }
+            _ => {
+                if ch.is_ascii_alphabetic() || ch == '_' {
+                    return self.read_identifier();
+                }
+
+                if ch.is_ascii_digit() {
+                    self.lexer_state = LexerState::BeyondEOL;
+                    // ... (rest of numeric handling unchanged) ...
+                    let start = self.token_start;
+                    let mut cur_ch = ch;
+                    loop {
+                        let Some(ch) = self.next_ch() else {
+                            break;
+                        };
+                        cur_ch = ch;
+
+                        match ch {
+                            '.' => {
+                                break;
+                            }
+                            'D' | 'd' => {
+                                let r = self.text[start..self.token_end - 1].iter().collect::<String>().parse::<i32>();
+                                match r {
+                                    Ok(i) => {
+                                        return Some(Token::Const(Constant::Integer(i, NumberFormat::Dec)));
+                                    }
+                                    Err(r) => {
+                                        self.errors.lock().unwrap().report_warning(
+                                            self.token_start..self.token_end,
+                                            LexingErrorType::InvalidInteger(
+                                                r.to_string(),
+                                                self.text[self.token_start..self.token_end].iter().collect::<String>(),
+                                            ),
+                                        );
+                                        return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
+                                    }
+                                }
+                            }
+                            'H' | 'h' => {
+                                let r = i32::from_str_radix(&self.text[start..self.token_end - 1].iter().collect::<String>(), 16);
+                                match r {
+                                    Ok(i) => {
+                                        return Some(Token::Const(Constant::Integer(i, NumberFormat::Hex)));
+                                    }
+                                    Err(r) => {
+                                        self.errors.lock().unwrap().report_warning(
+                                            self.token_start..self.token_end,
+                                            LexingErrorType::InvalidInteger(
+                                                r.to_string(),
+                                                self.text[self.token_start..self.token_end].iter().collect::<String>(),
+                                            ),
+                                        );
+                                        return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
+                                    }
+                                }
+                            }
+                            'O' | 'o' => {
+                                let r = i32::from_str_radix(&self.text[start..self.token_end - 1].iter().collect::<String>(), 8);
+                                match r {
+                                    Ok(i) => {
+                                        return Some(Token::Const(Constant::Integer(i, NumberFormat::Octal)));
+                                    }
+                                    Err(r) => {
+                                        self.errors.lock().unwrap().report_warning(
+                                            self.token_start..self.token_end,
+                                            LexingErrorType::InvalidInteger(
+                                                r.to_string(),
+                                                self.text[self.token_start..self.token_end].iter().collect::<String>(),
+                                            ),
+                                        );
+                                        return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
+                                    }
+                                }
+                            }
+                            'B' | 'b' => {
+                                if let Some(ch) = self.next_ch() {
+                                    if ch.is_ascii_hexdigit() {
+                                        continue;
+                                    }
+                                    self.put_back();
+                                }
+
+                                let r = i32::from_str_radix(&self.text[start..self.token_end - 1].iter().collect::<String>(), 2);
+
+                                match r {
+                                    Ok(i) => {
+                                        return Some(Token::Const(Constant::Integer(i, NumberFormat::Binary)));
+                                    }
+                                    Err(r) => {
+                                        self.errors.lock().unwrap().report_warning(
+                                            self.token_start..self.token_end,
+                                            LexingErrorType::InvalidInteger(
+                                                r.to_string(),
+                                                self.text[self.token_start..self.token_end].iter().collect::<String>(),
+                                            ),
+                                        );
+
+                                        return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                        if !ch.is_ascii_hexdigit() {
+                            self.put_back();
+                            break;
+                        }
+                    }
+                    let mut end = self.token_end;
+                    if cur_ch == '.' {
+                        let mut found_dot_dot = false;
+                        if let Some(ch) = self.next_ch() {
+                            // got dotdot, put back
+                            if ch == '.' {
+                                self.put_back();
+                                self.put_back();
+                                end -= 1;
+                                found_dot_dot = true;
+                            }
+                        } else {
+                            self.put_back();
+                        }
+                        if !found_dot_dot {
+                            let mut is_last = false;
+                            loop {
+                                let Some(ch) = self.next_ch() else {
+                                    is_last = true;
+                                    break;
+                                };
+                                if !ch.is_ascii_digit() && ch != '.' {
+                                    break;
+                                }
+                            }
+                            if !is_last {
+                                self.put_back();
+                            }
+                            end = self.token_end;
+                            let r = self.text[start..end].iter().collect::<String>().parse::<f64>();
+                            match r {
+                                Ok(f) => {
+                                    return Some(Token::Const(Constant::Double(f)));
+                                }
+                                Err(r) => {
+                                    self.errors.lock().unwrap().report_warning(
+                                        self.token_start..self.token_end,
+                                        LexingErrorType::InvalidInteger(r.to_string(), self.text[self.token_start..self.token_end].iter().collect::<String>()),
+                                    );
+                                    return Some(Token::Const(Constant::Double(-1.0)));
+                                }
+                            }
+                        }
+                    }
+
+                    let r = self.text[start..end].iter().collect::<String>().parse::<i64>();
+                    match r {
+                        Ok(i) => {
+                            if i32::try_from(i).is_ok() {
+                                return Some(Token::Const(Constant::Integer(i as i32, NumberFormat::Default)));
+                            }
+                            if i >= 0 {
+                                return Some(Token::Const(Constant::Unsigned(i as u64)));
+                            }
+                        }
+                        Err(r) => {
+                            let r2 = self.text[start..end].iter().collect::<String>().parse::<u64>();
+                            if let Ok(i) = r2 {
+                                return Some(Token::Const(Constant::Unsigned(i)));
+                            }
+                            self.errors.lock().unwrap().report_warning(
+                                self.token_start..self.token_end,
+                                LexingErrorType::InvalidInteger(r.to_string(), self.text[self.token_start..self.token_end].iter().collect::<String>()),
+                            );
+                            return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
+                        }
+                    }
+                    return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
+                }
+
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(self.token_start..self.token_end, LexingErrorType::InvalidToken);
+                return None;
+            }
+        };
+
+        self.lexer_state = LexerState::BeyondEOL;
+        state
+    }
+
+    // ...existing code...
     /*
     pub(crate) fn define(&mut self, variable: &str, value: Constant)  {
         self.define_table.insert(Ascii::new(variable.to_string()), value);
     }*/
+}
+
+fn get_comment(skipped_content: String) -> Token {
+    let comment_type = if skipped_content.starts_with(';') {
+        CommentType::SingleLineSemicolon
+    } else if skipped_content.starts_with('\'') {
+        CommentType::SingleLineQuote
+    } else if skipped_content.starts_with('*') {
+        CommentType::SingleLineStar
+    } else {
+        CommentType::SingleLineSemicolon
+    };
+
+    Token::Comment(comment_type, skipped_content)
 }
 
 fn conv_hex(first: char) -> i32 {

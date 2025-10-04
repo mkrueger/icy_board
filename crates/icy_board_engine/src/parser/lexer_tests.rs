@@ -378,7 +378,6 @@ fn test_if() {
         Encoding::Utf8,
         Arc::new(Mutex::new(ErrorReporter::default())),
     );
-    lex.next_token().unwrap();
     assert_eq!(Token::Identifier(unicase::Ascii::new("PRIINT".to_string())), lex.next_token().unwrap());
 }
 
@@ -397,5 +396,82 @@ fn test_if2() {
         Arc::new(Mutex::new(ErrorReporter::default())),
     );
     lex.next_token().unwrap();
+    assert_eq!(None, lex.next_token());
+}
+
+#[test]
+fn test_if_else_branch() {
+    let src = ";$IF 1 == 2\nFOO\n;$ELSE\nBAR\n;$ENDIF";
+    let mut lex = Lexer::new(
+        PathBuf::from("."),
+        &Workspace::default(),
+        src,
+        Encoding::Utf8,
+        Arc::new(Mutex::new(ErrorReporter::default())),
+    );
+
+    // 1) Aggregated skipped block comment
+    let c1 = lex.next_token().expect("expected aggregated comment");
+    match c1 {
+        Token::Comment(CommentType::SingleLineSemicolon, text) => {
+            assert_eq!(";$IF 1 == 2\nFOO\n;$ELSE\n", text, "unexpected collected skipped text");
+        }
+        other => panic!("unexpected first token: {other:?}"),
+    }
+
+    // 2) BAR
+    assert_eq!(Some(Token::Identifier(unicase::Ascii::new("BAR".to_string()))), lex.next_token());
+
+    // 3) EOL after BAR
+    assert_eq!(Some(Token::Eol), lex.next_token());
+
+    // 4) $ENDIF comment
+    let c2 = lex.next_token().expect("expected $ENDIF comment");
+    assert_eq!(Token::Comment(CommentType::SingleLineSemicolon, "$ENDIF".to_string()), c2);
+
+    // 5) EOF
+    assert_eq!(None, lex.next_token());
+}
+
+#[test]
+fn test_if_elseif_branch() {
+    let src = ";$IF 0 == 1\nFOO\n;$ELSEIF 2 == 2\nBAR\n;$ELSE\nBAZ\n;$ENDIF";
+    let mut lex = Lexer::new(
+        PathBuf::from("."),
+        &Workspace::default(),
+        src,
+        Encoding::Utf8,
+        Arc::new(Mutex::new(ErrorReporter::default())),
+    );
+
+    // 1) Aggregated skipped IF + ELSEIF directive line (false branch + activating directive)
+    let t1 = lex.next_token().expect("expected first aggregated comment");
+    match t1 {
+        Token::Comment(CommentType::SingleLineSemicolon, text) => {
+            assert_eq!(";$IF 0 == 1\nFOO\n;$ELSEIF 2 == 2\n", text, "unexpected aggregated false IF + ELSEIF block");
+        }
+        other => panic!("unexpected first token: {other:?}"),
+    }
+
+    // 2) Active code: BAR
+    assert_eq!(Some(Token::Identifier(unicase::Ascii::new("BAR".into()))), lex.next_token());
+
+    // 3) EOL after BAR (depends on newline presence; BAR line ends with '\n')
+    assert_eq!(Some(Token::Eol), lex.next_token(), "expected EOL after BAR");
+
+    // 4) Skipped ELSE block aggregated (since branch already taken)
+    let t4 = lex.next_token().expect("expected aggregated ELSE skip");
+    match t4 {
+        Token::Comment(CommentType::SingleLineSemicolon, text) => {
+            assert_eq!(";$ELSE\nBAZ\n", text, "unexpected aggregated ELSE block");
+        }
+        other => panic!("unexpected token for ELSE block: {other:?}"),
+    }
+
+    // 5) Standalone $ENDIF comment
+    let t5 = lex.next_token().expect("expected $ENDIF comment");
+    assert_eq!(Token::Comment(CommentType::SingleLineSemicolon, ";$ENDIF".to_string()), t5);
+
+    // 6) EOF
     assert_eq!(None, lex.next_token());
 }
