@@ -407,7 +407,7 @@ fn promote_to(l: VariableType, r: VariableType) -> VariableType {
     if l == r {
         return l;
     }
-    if (l == VariableType::String || l == VariableType::BigStr) && (r == VariableType::String || r == VariableType::BigStr) {
+    if l == VariableType::String || l == VariableType::BigStr || r == VariableType::String || r == VariableType::BigStr {
         return VariableType::BigStr;
     }
     if l == VariableType::Float || l == VariableType::Double || r == VariableType::Float || r == VariableType::Double {
@@ -1091,11 +1091,11 @@ impl VariableValue {
     /// Panics if .
     pub fn as_int(&self) -> i32 {
         if let GenericVariableData::String(s) = &self.generic_data {
-            let mut res = 0;
+            let mut res: i32 = 0;
             for c in s.chars() {
                 if c.is_digit(10) {
                     if let Some(c) = c.to_digit(10) {
-                        res = res * 10 + c as i32;
+                        res = res.wrapping_mul(10).wrapping_add(c as i32);
                     } else {
                         break;
                     }

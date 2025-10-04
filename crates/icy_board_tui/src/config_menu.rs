@@ -598,6 +598,10 @@ impl<T> ListItem<T> {
                     Text::from(c.cur_value.display.clone())
                         .style(get_tui_theme().edit_value)
                         .render(area, frame.buffer_mut());
+
+                    if let Some(update) = self.update_value.as_ref() {
+                        update(val, &self.value);
+                    }
                     return true;
                 }
                 let mut area = area;

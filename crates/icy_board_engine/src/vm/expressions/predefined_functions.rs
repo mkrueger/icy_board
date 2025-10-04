@@ -824,10 +824,13 @@ pub async fn reges(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     log::error!("not implemented function!");
     panic!("TODO")
 }
+
 pub async fn b2w(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("not implemented function!");
-    panic!("TODO")
+    let hi = vm.eval_expr(&args[0]).await?.as_int();
+    let low = vm.eval_expr(&args[1]).await?.as_int();
+    Ok(VariableValue::new_int((hi << 8) | (low & 0xFF)))
 }
+
 pub async fn peekb(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("not implemented function!");
     panic!("TODO")
@@ -1276,12 +1279,12 @@ pub async fn u_inconf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     let board = vm.icy_board_state.get_board().await;
     if let Some(user) = board.users.get(record as usize) {
         if let Some(conf) = &board.conferences.get(conf as usize) {
-            if !conf.required_security.user_can_access(user) {
+            if conf.required_security.user_can_access(user) {
                 return Ok(VariableValue::new_bool(true));
             }
             if let Some(areas) = &conf.areas {
                 if let Some(area) = areas.get(area as usize) {
-                    if !area.req_level_to_enter.user_can_access(user) {
+                    if area.req_level_to_enter.user_can_access(user) {
                         return Ok(VariableValue::new_bool(true));
                     }
                 }

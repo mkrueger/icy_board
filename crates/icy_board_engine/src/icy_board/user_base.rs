@@ -1047,7 +1047,7 @@ impl User {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct UserBase {
     users: Vec<User>,
 }

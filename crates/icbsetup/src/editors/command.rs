@@ -62,8 +62,20 @@ impl<'a> CommandsEditor<'a> {
                         return match j {
                             0 => Line::from(format!("{})", i + 1)),
                             1 => Line::from(mnu2.commands[*i].keyword.clone()),
-                            2 => Line::from(mnu2.commands[*i].actions[0].command_type.to_string()),
-                            3 => Line::from(mnu2.commands[*i].actions[0].parameter.to_string()),
+                            2 => {
+                                if let Some(act) = mnu2.commands[*i].actions.get(0) {
+                                    Line::from(act.command_type.to_string())
+                                } else {
+                                    Line::from("No Action")
+                                }
+                            }
+                            3 => {
+                                if let Some(act) = mnu2.commands[*i].actions.get(0) {
+                                    Line::from(act.parameter.to_string())
+                                } else {
+                                    Line::from("No Action")
+                                }
+                            }
                             _ => Line::from("".to_string()),
                         };
                     }
@@ -264,7 +276,7 @@ impl<'a> Page for CommandsEditor<'a> {
                                 ConfigEntry::Item(
                                     ListItem::new(
                                         get_text("command_editor_security"),
-                                        ListValue::Security(cur_prot.security.clone(), String::new()),
+                                        ListValue::Security(cur_prot.security.clone(), cur_prot.security.to_string()),
                                     )
                                     .with_label_width(16)
                                     .with_update_sec_value(

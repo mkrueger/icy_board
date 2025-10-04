@@ -3,12 +3,19 @@ use ratatui::{Frame, layout::Rect};
 
 use crate::config_menu::ResultState;
 
+pub enum InfoState {
+    Info,
+    Warning,
+    Error,
+}
+
 pub enum PageMessage {
     None,
     Close,
     ResultState(ResultState),
     OpenSubPage(Box<dyn Page>),
     ExternalProgramStarted,
+    InfoBox(InfoState, String, Box<PageMessage>),
 }
 
 pub trait Page {
