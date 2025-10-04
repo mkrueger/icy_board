@@ -160,6 +160,22 @@ impl IcbDate {
         Self::new(month as u8, day as u8, year as u16)
     }
 
+    pub(crate) fn to_pcb_str(&self) -> String {
+        // PCBoard uses MM-DD-YY format (6 characters)
+        // Year is stored as 2 digits:
+        // 00-78 = 2000-2078
+        // 79-99 = 1979-1999
+        let year_2digit = if self.year >= 2000 {
+            (self.year - 2000) % 100
+        } else if self.year >= 1900 {
+            self.year - 1900
+        } else {
+            self.year % 100
+        };
+
+        format!("{:02}-{:02}-{:02}", self.month, self.day, year_2digit)
+    }
+
     pub fn from_pcboard(jd: u32) -> Self {
         juilian_to_date(jd as i64)
     }
@@ -346,6 +362,12 @@ impl IcbTime {
             second: second as u8,
         }
     }
+
+    pub(crate) fn to_pcb_str(&self) -> String {
+        // PCBoard uses HH:MM format (5 characters) for time fields
+        format!("{:02}:{:02}", self.hour, self.minute)
+    }
+
     pub fn from_pcboard(time: i32) -> Self {
         let hour = time / 3600;
         let minute = (time % 3600) / 60;

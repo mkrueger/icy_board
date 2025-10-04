@@ -22,7 +22,6 @@ use ppl_language_server::reference::get_reference;
 use ppl_language_server::semantic_token::{LEGEND_TYPE, semantic_token_from_ast};
 use ppl_language_server::{ImCompleteSemanticToken, offset_to_position};
 use ropey::Rope;
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
@@ -444,11 +443,6 @@ impl LanguageServer for Backend {
 
         Ok(None)
     }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct InlayHintParams {
-    path: String,
 }
 
 struct TextDocumentItem {

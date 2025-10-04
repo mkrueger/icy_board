@@ -130,7 +130,7 @@ impl PcbBoard {
             paths,
         };
 
-        let r = res.resolve_file(&res.data.path.usr_file);
+        let r: String = res.resolve_file(&res.data.path.usr_file);
         let users = PcbUserRecord::read_users(&PathBuf::from(&r))?;
 
         let r = res.resolve_file(&res.data.path.inf_file);

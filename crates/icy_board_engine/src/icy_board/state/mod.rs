@@ -1141,7 +1141,7 @@ impl IcyBoardState {
         "SECRET".to_string()
     }
 
-    pub async fn get_board(&self) -> tokio::sync::MutexGuard<IcyBoard> {
+    pub async fn get_board(&'_ self) -> tokio::sync::MutexGuard<'_, IcyBoard> {
         self.board.lock().await
     }
 

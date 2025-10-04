@@ -1145,15 +1145,18 @@ pub async fn psa(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
 #[allow(clippy::unnecessary_wraps)]
 pub async fn fileinf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let file = vm.eval_expr(&args[0]).await?.as_string();
+    if file.is_empty() {
+        log::error!("fileinf: empty filename");
+        return Ok(VariableValue::new_int(0));
+    }
     let item = vm.eval_expr(&args[1]).await?.as_int();
 
-    let file = vm.resolve_file(&file).await;
-    let path = PathBuf::from(&file);
+    let path = vm.resolve_file(&file).await;
     match item {
-        1 => Ok(VariableValue::new_bool(file.exists())),
+        1 => Ok(VariableValue::new_bool(path.exists())),
         2 => Ok(VariableValue::new(VariableType::Date, VariableData::default())), // TODO: File date
         3 => Ok(VariableValue::new(VariableType::Time, VariableData::default())), // TODO: File time
-        4 => Ok(VariableValue::new_int(file.metadata()?.len() as i32)),
+        4 => Ok(VariableValue::new_int(path.metadata()?.len() as i32)),
         5 => Ok(VariableValue::new_int(0)),                   // TODO: File attributes
         6 => Ok(VariableValue::new_string("C:".to_string())), // Drive
         7 => {

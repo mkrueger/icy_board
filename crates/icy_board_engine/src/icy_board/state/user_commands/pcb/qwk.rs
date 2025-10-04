@@ -90,10 +90,11 @@ impl IcyBoardState {
                         2,
                         &"DSU",
                         CommandType::QWK.get_help(),
-                        Some(self.session.page_len.to_string()),
+                        None,
                         display_flags::UPCASE | display_flags::STACKED | display_flags::NEWLINE | display_flags::LFBEFORE,
                     )
                     .await?;
+                log::info!("QWK command input: '{}'", input);
                 self.session.push_tokens(&input);
             };
 
@@ -174,7 +175,9 @@ impl IcyBoardState {
                 for (i, conf) in conferences.iter().enumerate() {
                     if let Some(areas) = &conf.areas {
                         for (j, area) in areas.iter().enumerate() {
-                            self.print_area_line(*msgid_to_number.get(&(i, j)).unwrap(), i, j, area).await?;
+                            if let Some(number) = msgid_to_number.get(&(i, j)) {
+                                self.print_area_line(*number, i, j, area).await?;
+                            }
                             line_number += 1;
                         }
                     }
@@ -401,7 +404,10 @@ impl IcyBoardState {
                         if !ptr.include_qwk {
                             continue;
                         }
-                        let conference_number = *msgid_to_number.get(&(i, j)).unwrap();
+                        let Some(conference_number) = msgid_to_number.get(&(i, j)) else {
+                            continue;
+                        };
+                        let conference_number = *conference_number;
                         control_dat.conferences.push(jamjam::qwk::control::Conference {
                             number: conference_number,
                             name: if area.qwk_name.is_empty() {

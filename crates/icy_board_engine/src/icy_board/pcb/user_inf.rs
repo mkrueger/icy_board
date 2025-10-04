@@ -171,6 +171,177 @@ impl PcbUserInf {
 
         Ok(users)
     }
+
+    pub(crate) fn write_with_apps(&self, writer: &mut impl std::io::Write, apps: &[(String, usize, u32)]) -> Res<()> {
+        use crate::tables::export_cp437_string;
+        use byteorder::{LittleEndian, WriteBytesExt};
+
+        // Write base user info record (33 bytes)
+        writer.write_all(&export_cp437_string(&self.name, 25, b' '))?;
+        writer.write_u32::<LittleEndian>(self.messages_read as u32)?;
+        writer.write_u32::<LittleEndian>(self.messages_left as u32)?;
+
+        // Write application sections in the order declared in the header
+        for (app_name, app_size, _) in apps {
+            match app_name.as_str() {
+                "PCBALIAS" => {
+                    if let Some(alias) = &self.alias {
+                        alias.write(writer)?;
+                    } else {
+                        // Write empty alias record
+                        writer.write_all(&vec![b' '; *app_size])?;
+                    }
+                }
+                "PCBVERIFY" => {
+                    if let Some(verify) = &self.verify {
+                        verify.write(writer)?;
+                    } else {
+                        writer.write_all(&vec![b' '; *app_size])?;
+                    }
+                }
+                "PCBADDRESS" => {
+                    if let Some(address) = &self.address {
+                        address.write(writer)?;
+                    } else {
+                        writer.write_all(&vec![b' '; *app_size])?;
+                    }
+                }
+                "PCBPASSWORD" => {
+                    if let Some(password) = &self.password {
+                        password.write(writer)?;
+                    } else {
+                        writer.write_all(&vec![0u8; *app_size])?;
+                    }
+                }
+                "PCBSTATS" => {
+                    if let Some(call_stats) = &self.call_stats {
+                        call_stats.write(writer)?;
+                    } else {
+                        writer.write_all(&vec![0u8; *app_size])?;
+                    }
+                }
+                "PCBNOTES" => {
+                    if let Some(notes) = &self.notes {
+                        notes.write(writer)?;
+                    } else {
+                        writer.write_all(&vec![b' '; *app_size])?;
+                    }
+                }
+                "PCBQWKCONFIG" => {
+                    if let Some(qwk_config) = &self.qwk_config {
+                        qwk_config.write(writer)?;
+                    } else {
+                        writer.write_all(&vec![0u8; *app_size])?;
+                    }
+                }
+                "PCBACCOUNT" => {
+                    if let Some(account) = &self.account {
+                        account.write(writer)?;
+                    } else {
+                        writer.write_all(&vec![0u8; *app_size])?;
+                    }
+                }
+                "PCBPERSONAL" => {
+                    if let Some(personal) = &self.personal {
+                        personal.write(writer)?;
+                    } else {
+                        writer.write_all(&vec![0u8; *app_size])?;
+                    }
+                }
+                "PCBBANK" => {
+                    if let Some(bank) = &self.bank {
+                        bank.write(writer)?;
+                    } else {
+                        writer.write_all(&vec![0u8; *app_size])?;
+                    }
+                }
+                _ => {
+                    // Unknown app, write zeros
+                    writer.write_all(&vec![0u8; *app_size])?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn write_users(users: &[PcbUserInf], writer: &mut impl std::io::Write) -> Res<()> {
+        use crate::tables::export_cp437_string;
+        use byteorder::{LittleEndian, WriteBytesExt};
+
+        // Determine which applications are present across all users
+        let mut apps = Vec::new();
+        let mut offset = Self::REC_SIZE as u32;
+
+        // Check if any user has each application type and build app list
+        if users.iter().any(|u| u.alias.is_some()) {
+            apps.push((AliasUserInf::NAME.to_string(), AliasUserInf::REC_SIZE, offset));
+            offset += AliasUserInf::REC_SIZE as u32;
+        }
+        if users.iter().any(|u| u.verify.is_some()) {
+            apps.push((VerifyUserInf::NAME.to_string(), VerifyUserInf::REC_SIZE, offset));
+            offset += VerifyUserInf::REC_SIZE as u32;
+        }
+        if users.iter().any(|u| u.address.is_some()) {
+            apps.push((AddressUserInf::NAME.to_string(), AddressUserInf::REC_SIZE, offset));
+            offset += AddressUserInf::REC_SIZE as u32;
+        }
+        if users.iter().any(|u| u.password.is_some()) {
+            apps.push((PasswordUserInf::NAME.to_string(), PasswordUserInf::REC_SIZE, offset));
+            offset += PasswordUserInf::REC_SIZE as u32;
+        }
+        if users.iter().any(|u| u.call_stats.is_some()) {
+            apps.push((CallStatsUserInf::NAME.to_string(), CallStatsUserInf::REC_SIZE, offset));
+            offset += CallStatsUserInf::REC_SIZE as u32;
+        }
+        if users.iter().any(|u| u.notes.is_some()) {
+            apps.push((NotesUserInf::NAME.to_string(), NotesUserInf::REC_SIZE, offset));
+            offset += NotesUserInf::REC_SIZE as u32;
+        }
+        if users.iter().any(|u| u.qwk_config.is_some()) {
+            apps.push((QwkConfigUserInf::NAME.to_string(), QwkConfigUserInf::REC_SIZE, offset));
+            offset += QwkConfigUserInf::REC_SIZE as u32;
+        }
+        if users.iter().any(|u| u.account.is_some()) {
+            apps.push((AccountUserInf::NAME.to_string(), AccountUserInf::REC_SIZE, offset));
+            offset += AccountUserInf::REC_SIZE as u32;
+        }
+        if users.iter().any(|u| u.personal.is_some()) {
+            apps.push((PersonalUserInf::NAME.to_string(), PersonalUserInf::REC_SIZE, offset));
+            offset += PersonalUserInf::REC_SIZE as u32;
+        }
+        if users.iter().any(|u| u.bank.is_some()) {
+            apps.push((BankUserInf::NAME.to_string(), BankUserInf::REC_SIZE, offset));
+            offset += BankUserInf::REC_SIZE as u32;
+        }
+
+        let total_record_size = offset;
+
+        // Write header (16 bytes)
+        writer.write_u16::<LittleEndian>(6)?; // version
+        writer.write_u16::<LittleEndian>(0)?; // num_conf
+        writer.write_u16::<LittleEndian>(Self::REC_SIZE as u16)?; // base record size
+        writer.write_u32::<LittleEndian>(0)?; // conf_size
+        writer.write_u16::<LittleEndian>(apps.len() as u16)?; // number of applications
+        writer.write_u32::<LittleEndian>(total_record_size)?; // total record size
+
+        // Write application headers (32 bytes each)
+        for (name, size, offset) in &apps {
+            writer.write_all(&export_cp437_string(name, 15, 0))?; // app name
+            writer.write_u16::<LittleEndian>(1)?; // version
+            writer.write_u16::<LittleEndian>(*size as u16)?; // record size
+            writer.write_u16::<LittleEndian>(0)?; // conf record size
+            writer.write_all(&[0u8; 9])?; // keyword (unused)
+            writer.write_u32::<LittleEndian>(*offset)?; // offset
+        }
+
+        // Write user records
+        for user in users {
+            user.write_with_apps(writer, &apps)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -189,6 +360,12 @@ impl AliasUserInf {
         let alias = convert_str(data);
         Ok(Self { alias })
     }
+
+    fn write(&self, writer: &mut impl std::io::Write) -> Res<()> {
+        use crate::tables::export_cp437_string;
+        writer.write_all(&export_cp437_string(&self.alias, Self::REC_SIZE, b' '))?;
+        Ok(())
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -206,6 +383,12 @@ impl VerifyUserInf {
         }
         let alias = convert_str(data);
         Ok(Self { verify: alias })
+    }
+
+    fn write(&self, writer: &mut impl std::io::Write) -> Res<()> {
+        use crate::tables::export_cp437_string;
+        writer.write_all(&export_cp437_string(&self.verify, Self::REC_SIZE, b' '))?;
+        Ok(())
     }
 }
 
@@ -248,6 +431,17 @@ impl AddressUserInf {
             country,
         })
     }
+
+    fn write(&self, writer: &mut impl std::io::Write) -> Res<()> {
+        use crate::tables::export_cp437_string;
+        writer.write_all(&export_cp437_string(&self.street1, 50, b' '))?;
+        writer.write_all(&export_cp437_string(&self.street2, 50, b' '))?;
+        writer.write_all(&export_cp437_string(&self.city, 25, b' '))?;
+        writer.write_all(&export_cp437_string(&self.state, 10, b' '))?;
+        writer.write_all(&export_cp437_string(&self.zip, 10, b' '))?;
+        writer.write_all(&export_cp437_string(&self.country, 15, b' '))?;
+        Ok(())
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -289,6 +483,28 @@ impl PasswordUserInf {
             times_changed,
             expire_date: IcbDate::from_pcboard(expire_date),
         })
+    }
+
+    fn write(&self, writer: &mut impl std::io::Write) -> Res<()> {
+        use crate::tables::export_cp437_string;
+        use byteorder::{LittleEndian, WriteBytesExt};
+
+        // Write 3 previous passwords
+        for i in 0..3 {
+            let pwd = self.prev_pwd.get(i).map(|s| s.as_str()).unwrap_or("");
+            writer.write_all(&export_cp437_string(pwd, Self::PWD_LEN, b' '))?;
+        }
+
+        // Last password change date
+        writer.write_u16::<LittleEndian>(self.last_change.to_pcboard_date() as u16)?;
+
+        // Times changed
+        writer.write_u16::<LittleEndian>(self.times_changed as u16)?;
+
+        // Password expiration date
+        writer.write_u16::<LittleEndian>(self.expire_date.to_pcboard_date() as u16)?;
+
+        Ok(())
     }
 }
 
@@ -371,6 +587,27 @@ impl CallStatsUserInf {
             num_verify_errors,
         })
     }
+
+    fn write(&self, writer: &mut impl std::io::Write) -> Res<()> {
+        use byteorder::{LittleEndian, WriteBytesExt};
+
+        writer.write_i16::<LittleEndian>(self.first_date_on.to_pcboard_date() as i16)?;
+        writer.write_u16::<LittleEndian>(self.num_sysop_pages as u16)?;
+        writer.write_u16::<LittleEndian>(self.num_group_chats as u16)?;
+        writer.write_u16::<LittleEndian>(self.num_comments as u16)?;
+        writer.write_u16::<LittleEndian>(self.num300 as u16)?;
+        writer.write_u16::<LittleEndian>(self.num1200 as u16)?;
+        writer.write_u16::<LittleEndian>(self.num2400 as u16)?;
+        writer.write_u16::<LittleEndian>(self.num9600 as u16)?;
+        writer.write_u16::<LittleEndian>(self.num14400 as u16)?;
+        writer.write_u16::<LittleEndian>(self.num_sec_viol as u16)?;
+        writer.write_u16::<LittleEndian>(self.num_not_reg as u16)?;
+        writer.write_u16::<LittleEndian>(self.num_reach_dnld_lim as u16)?;
+        writer.write_u16::<LittleEndian>(self.num_file_not_found as u16)?;
+        writer.write_u16::<LittleEndian>(self.num_pwrd_errors as u16)?;
+        writer.write_u16::<LittleEndian>(self.num_verify_errors as u16)?;
+        Ok(())
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -398,6 +635,16 @@ impl NotesUserInf {
             notes.push(note);
         }
         Ok(Self { notes })
+    }
+
+    fn write(&self, writer: &mut impl std::io::Write) -> Res<()> {
+        use crate::tables::export_cp437_string;
+
+        for i in 0..Self::NOTE_COUNT {
+            let note = self.notes.get(i).map(|s| s.as_str()).unwrap_or("");
+            writer.write_all(&export_cp437_string(note, Self::NOTE_SIZE, b' '))?;
+        }
+        Ok(())
     }
 }
 
@@ -437,6 +684,22 @@ impl QwkConfigUserInf {
             new_blt_limit,
             new_files,
         })
+    }
+
+    fn write(&self, writer: &mut impl std::io::Write) -> Res<()> {
+        use byteorder::{LittleEndian, WriteBytesExt};
+
+        writer.write_u16::<LittleEndian>(self.max_msgs)?;
+        writer.write_u16::<LittleEndian>(self.max_msgs_per_conf)?;
+        writer.write_i16::<LittleEndian>(self.personal_attach_limit as i16)?;
+        writer.write_i16::<LittleEndian>(self.public_attach_limit as i16)?;
+        writer.write_i16::<LittleEndian>(self.new_blt_limit as i16)?;
+        writer.write_u8(if self.new_files { 1 } else { 0 })?;
+
+        // Pad to REC_SIZE (30 bytes total, we've written 11 bytes)
+        writer.write_all(&[0u8; 19])?;
+
+        Ok(())
     }
 }
 
@@ -513,6 +776,30 @@ impl AccountUserInf {
             drop_sec_level,
         })
     }
+
+    fn write(&self, writer: &mut impl std::io::Write) -> Res<()> {
+        use byteorder::{LittleEndian, WriteBytesExt};
+
+        writer.write_f64::<LittleEndian>(self.starting_balance)?;
+        writer.write_f64::<LittleEndian>(self.start_this_session)?;
+        writer.write_f64::<LittleEndian>(self.debit_call)?;
+        writer.write_f64::<LittleEndian>(self.debit_time)?;
+        writer.write_f64::<LittleEndian>(self.debit_msg_read)?;
+        writer.write_f64::<LittleEndian>(self.debit_msg_read_capture)?;
+        writer.write_f64::<LittleEndian>(self.debit_msg_write)?;
+        writer.write_f64::<LittleEndian>(self.debit_msg_write_echoed)?;
+        writer.write_f64::<LittleEndian>(self.debit_msg_write_private)?;
+        writer.write_f64::<LittleEndian>(self.debit_download_file)?;
+        writer.write_f64::<LittleEndian>(self.debit_download_bytes)?;
+        writer.write_f64::<LittleEndian>(self.debit_group_chat)?;
+        writer.write_f64::<LittleEndian>(self.debit_tpu)?;
+        writer.write_f64::<LittleEndian>(self.debit_special)?;
+        writer.write_f64::<LittleEndian>(self.credit_upload_file)?;
+        writer.write_f64::<LittleEndian>(self.credit_upload_bytes)?;
+        writer.write_f64::<LittleEndian>(self.credit_special)?;
+        writer.write_u8(self.drop_sec_level)?;
+        Ok(())
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -552,6 +839,40 @@ impl PersonalUserInf {
             web,
         })
     }
+
+    fn write(&self, writer: &mut impl std::io::Write) -> Res<()> {
+        use crate::tables::export_cp437_string;
+
+        // Gender - 1 byte
+        let gender_byte = if self.gender.is_empty() {
+            b' '
+        } else {
+            self.gender.chars().next().unwrap_or(' ') as u8
+        };
+        writer.write_all(&[gender_byte])?;
+
+        // Birth date - 9 bytes
+        let birth_str = if self.birth_date == IcbDate::default() {
+            String::new()
+        } else {
+            self.birth_date.to_string()
+        };
+        writer.write_all(&export_cp437_string(&birth_str, 9, b' '))?;
+
+        // Email - 60 bytes
+        writer.write_all(&export_cp437_string(&self.email, 60, b' '))?;
+
+        // Unknown - 61 bytes
+        writer.write_all(&[0u8; 61])?;
+
+        // Web - 60 bytes
+        writer.write_all(&export_cp437_string(&self.web, 60, b' '))?;
+
+        // Unknown - 61 bytes
+        writer.write_all(&[0u8; 61])?;
+
+        Ok(())
+    }
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -581,6 +902,18 @@ impl BankInfo {
             max_stored_amount,
         })
     }
+
+    fn write(&self, writer: &mut impl std::io::Write) -> Res<()> {
+        use byteorder::{LittleEndian, WriteBytesExt};
+
+        writer.write_u32::<LittleEndian>(self.last_deposite_date.to_pcboard_date() as u32)?;
+        writer.write_u32::<LittleEndian>(self.last_withdraw_date.to_pcboard_date() as u32)?;
+        writer.write_u32::<LittleEndian>(self.last_transaction_amount)?;
+        writer.write_u32::<LittleEndian>(self.amount_saved)?;
+        writer.write_u32::<LittleEndian>(self.max_withdrawl_per_day)?;
+        writer.write_u32::<LittleEndian>(self.max_stored_amount)?;
+        Ok(())
+    }
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -603,5 +936,11 @@ impl BankUserInf {
         let byte_info = BankInfo::read(&mut cursor)?;
 
         Ok(Self { time_info, byte_info })
+    }
+
+    fn write(&self, writer: &mut impl std::io::Write) -> Res<()> {
+        self.time_info.write(writer)?;
+        self.byte_info.write(writer)?;
+        Ok(())
     }
 }

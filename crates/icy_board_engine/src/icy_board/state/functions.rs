@@ -292,13 +292,13 @@ impl IcyBoardState {
         if let Some(front) = self.char_buffer.front() {
             if front.source == KeySource::StuffedHidden {
                 let mut result = String::new();
+                log::info!("PPE stuffed input: {}", result);
                 while let Some(key) = self.char_buffer.pop_front() {
                     if key.ch == '\n' || key.ch == '\r' {
                         break;
                     }
                     result.push(key.ch);
                 }
-                log::info!("PPE stuffed input: {}", result);
                 self.session.push_tokens(&result);
                 if let Some(token) = self.session.tokens.pop_front() {
                     self.session.last_answer = Some(token.clone());
@@ -334,13 +334,13 @@ impl IcyBoardState {
         if let Some(front) = self.char_buffer.front() {
             if front.source == KeySource::StuffedHidden {
                 let mut result = String::new();
+                log::info!("PPE stuffed input: {}", result);
                 while let Some(key) = self.char_buffer.pop_front() {
                     if key.ch == '\n' || key.ch == '\r' {
                         break;
                     }
                     result.push(key.ch);
                 }
-                log::info!("PPE stuffed input: {}", result);
                 self.session.last_answer = Some(result.clone());
                 return Ok(result);
             }

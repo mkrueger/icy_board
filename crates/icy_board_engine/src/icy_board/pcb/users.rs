@@ -275,4 +275,160 @@ impl PcbUserRecord {
         }
         Ok(users)
     }
+
+    pub(crate) fn write(&self, writer: &mut impl std::io::Write) -> Res<()> {
+        use crate::tables::export_cp437_string;
+        use jamjam::util::basic_real::BasicReal;
+
+        // Name - 25 bytes
+        writer.write_all(&export_cp437_string(&self.name, 25, b' '))?;
+
+        // City - 24 bytes
+        writer.write_all(&export_cp437_string(&self.city, 24, b' '))?;
+
+        // Password - 12 bytes
+        writer.write_all(&export_cp437_string(&self.password, 12, b' '))?;
+
+        // Bus/Data Phone - 13 bytes
+        writer.write_all(&export_cp437_string(&self.bus_data_phone, 13, b' '))?;
+
+        // Home/Voice Phone - 13 bytes
+        writer.write_all(&export_cp437_string(&self.home_voice_phone, 13, b' '))?;
+
+        // Last Date On - 6 bytes (MM-DD-YY format)
+        let last_date_str = self.last_date_on.to_pcb_str();
+        writer.write_all(&export_cp437_string(&last_date_str, 6, b' '))?;
+
+        // Last Time On - 5 bytes (HH:MM format)
+        let last_time_str = self.last_time_on.to_pcb_str();
+        writer.write_all(&export_cp437_string(&last_time_str, 5, b' '))?;
+
+        // Expert mode - 1 byte
+        writer.write_all(&[if self.expert_mode { b'Y' } else { b'N' }])?;
+
+        // Protocol - 1 byte
+        writer.write_all(&[self.protocol as u8])?;
+
+        // Packed flags - 1 byte
+        let mut packet_flags = 0u8;
+        if self.is_dirty {
+            packet_flags |= 1 << 0;
+        }
+        if self.msg_clear {
+            packet_flags |= 1 << 1;
+        }
+        if self.has_mail {
+            packet_flags |= 1 << 2;
+        }
+        if self.dont_ask_fse {
+            packet_flags |= 1 << 3;
+        }
+        if self.use_fsedefault {
+            packet_flags |= 1 << 4;
+        }
+        if self.scroll_msg_body {
+            packet_flags |= 1 << 5;
+        }
+        if !self.long_msg_header {
+            packet_flags |= 1 << 6;
+        } // Note: inverted logic
+        if self.wide_editor {
+            packet_flags |= 1 << 7;
+        }
+        writer.write_all(&[packet_flags])?;
+
+        // Date Last Dir Read - 6 bytes
+        let date_last_dir_str = self.date_last_dir_read.to_pcb_str();
+        writer.write_all(&export_cp437_string(&date_last_dir_str, 6, b' '))?;
+
+        // Security Level - 1 byte
+        writer.write_all(&[self.security_level])?;
+
+        // Number of times on - 2 bytes (little endian)
+        writer.write_all(&(self.num_times_on as u16).to_le_bytes())?;
+
+        // Page length - 1 byte
+        writer.write_all(&[self.page_len])?;
+
+        // Number of uploads - 2 bytes (little endian)
+        writer.write_all(&(self.num_uploads as u16).to_le_bytes())?;
+
+        // Number of downloads - 2 bytes (little endian)
+        writer.write_all(&(self.num_downloads as u16).to_le_bytes())?;
+
+        // Daily downloaded bytes - 8 bytes (as string)
+        let daily_dl_str = format!("{}", self.daily_downloaded_bytes);
+        writer.write_all(&export_cp437_string(&daily_dl_str, 8, b' '))?;
+
+        // User comment - 30 bytes
+        writer.write_all(&export_cp437_string(&self.user_comment, 30, b' '))?;
+
+        // Sysop comment - 30 bytes
+        writer.write_all(&export_cp437_string(&self.sysop_comment, 30, b' '))?;
+
+        // Elapsed time on - 2 bytes (little endian)
+        writer.write_all(&self.elapsed_time_on.to_le_bytes())?;
+
+        // Registration expiration date - 6 bytes
+        let exp_date_str = self.exp_date.to_pcb_str();
+        writer.write_all(&export_cp437_string(&exp_date_str, 6, b' '))?;
+
+        // Expired security level - 1 byte
+        writer.write_all(&[self.exp_security_level])?;
+
+        // Last conference (old) - 1 byte (using low byte of last_conference)
+        writer.write_all(&[(self.last_conference & 0xFF) as u8])?;
+
+        // Conference registration flags - 5 bytes
+        writer.write_all(&self.conf_reg_flags)?;
+
+        // Conference expiration flags - 5 bytes
+        writer.write_all(&self.conf_exp_flags)?;
+
+        // Conference user selected flags - 5 bytes
+        writer.write_all(&self.conf_usr_flags)?;
+
+        // Total download bytes - 8 bytes (as string)
+        let tot_dl_str = format!("{}", self.ul_tot_dnld_bytes);
+        writer.write_all(&export_cp437_string(&tot_dl_str, 8, b' '))?;
+
+        // Total upload bytes - 8 bytes (as string)
+        let tot_ul_str = format!("{}", self.ul_tot_upld_bytes);
+        writer.write_all(&export_cp437_string(&tot_ul_str, 8, b' '))?;
+
+        // Delete flag - 1 byte
+        writer.write_all(&[if self.delete_flag { b'Y' } else { b'N' }])?;
+
+        // Last Message Read pointers - 40 x 4 bytes (BasicReal format)
+        for i in 0..40 {
+            let ptr_value = if i < self.last_message_read_ptr.len() {
+                self.last_message_read_ptr[i]
+            } else {
+                0
+            };
+            let real = BasicReal::from(ptr_value);
+            writer.write_all(real.bytes())?;
+        }
+
+        // Record number - 4 bytes (little endian, 1-based)
+        writer.write_all(&(self.rec_num + 1).to_le_bytes())?;
+
+        // Flags2 - 1 byte
+        let mut flags2 = 0u8;
+        if !self.is_chat_available {
+            flags2 |= 1 << 0;
+        } // Note: inverted logic
+        if !self.short_file_descr {
+            flags2 |= 1 << 1;
+        } // Note: inverted logic
+        writer.write_all(&[flags2])?;
+
+        // Reserved - 8 bytes
+        writer.write_all(&[0u8; 8])?;
+
+        // Last conference - 2 bytes (little endian)
+        writer.write_all(&self.last_conference.to_le_bytes())?;
+
+        Ok(())
+    }
 }

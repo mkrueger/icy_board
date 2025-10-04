@@ -449,6 +449,7 @@ impl IcyBoard {
     }
 
     pub fn export_pcboard(&self, file: &Path) -> Res<()> {
+        let base_loc = file.parent().unwrap();
         let mut pcb_dat = PcbBoardData::default();
         pcb_dat.sysop_info.require_pwrd_to_exit = self.config.sysop.require_password_to_exit;
 
@@ -469,8 +470,14 @@ impl IcyBoard {
         // Line 25
         pcb_dat.path.sec_loc = self.resolve_file(&self.config.paths.user_file).to_string_lossy().to_string();
 
+        // Line 29  Name/Location of USERS File
+        let users_file = base_loc.join("users");
+        let users_inf_file = base_loc.join("users.inf");
+        self.users.export_pcboard(&users_file, &users_inf_file)?;
+
+        pcb_dat.path.usr_file = users_file.to_string_lossy().to_string();
+
         // Line 31
-        let base_loc = file.parent().unwrap();
         let cnames = base_loc.join("cnames");
         self.export_conference_files(&base_loc, &cnames)?;
         pcb_dat.path.conference_file = cnames.to_string_lossy().to_string();
@@ -523,6 +530,9 @@ impl IcyBoard {
 
         // Line 149
         pcb_dat.user_levels.agree_to_register = self.config.new_user_settings.sec_level as i32;
+
+        // Line 180
+        pcb_dat.path.inf_file = users_inf_file.to_string_lossy().to_string();
 
         // Line 202
         pcb_dat.path.no_ansi = self.resolve_file(&self.config.paths.no_ansi).to_string_lossy().to_string();

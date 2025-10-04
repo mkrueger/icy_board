@@ -342,7 +342,7 @@ impl IcyBoardState {
             message_base.write_last_read(opt)?;
         }
         let mut flag = ReadLoopType::InsideReadLoop;
-        let mut since = false;
+        let mut _since = false;
         let mut display_msg = true;
         loop {
             if display_msg {
@@ -406,20 +406,20 @@ impl IcyBoardState {
                             first = 1;
                             last = i32::MAX as u32;
                         } else {
-                            since = true;
+                            _since = true;
                         }
 
                         keep_going = true;
                     }
                     // "A" => {}  // Abandon
                     "Z" | "D" | "C" => {
-                        let zip_msg = token == "Z";
-                        let cap_ask = token != "D";
+                        // let zip_msg = token == "Z";
+                        // let cap_ask = token != "D";
                         // todo capture!
                     }
                     "*" | "S" => {
                         // Read new messages
-                        since = true;
+                        _since = true;
                         keep_going = true;
                         // todo
                     }
@@ -499,7 +499,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    async fn edit_header(&self, message_base: &mut jamjam::jam::JamMessageBase, number: u32) -> Res<()> {
+    async fn edit_header(&self, _message_base: &mut jamjam::jam::JamMessageBase, _number: u32) -> Res<()> {
         Ok(())
     }
 }

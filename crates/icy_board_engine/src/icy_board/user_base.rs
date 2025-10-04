@@ -6,7 +6,14 @@ use std::{
     str::FromStr,
 };
 
-use crate::{Res, datetime::IcbDate};
+use crate::{
+    Res,
+    datetime::IcbDate,
+    icy_board::{
+        user_inf::{AddressUserInf, AliasUserInf, CallStatsUserInf, NotesUserInf, PasswordUserInf, PcbUserInf, PersonalUserInf, VerifyUserInf},
+        users::PcbUserRecord,
+    },
+};
 use bitflag::bitflag;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -863,6 +870,181 @@ impl User {
         }*/
         Ok(())
     }
+
+    fn to_pcboard(&self) -> PcbUser {
+        // Build base PCBoard user record
+        let mut rec = PcbUserRecord {
+            name: self.name.clone(),
+            password: self.password.password.to_string(),
+            city: self.city_or_state.clone(),
+            bus_data_phone: self.bus_data_phone.clone(),
+            home_voice_phone: self.home_voice_phone.clone(),
+            user_comment: self.user_comment.clone(),
+            sysop_comment: self.sysop_comment.clone(),
+            security_level: self.security_level as u8,
+            exp_date: self.exp_date.clone(),
+            exp_security_level: self.exp_security_level as u8,
+            expert_mode: self.flags.expert_mode,
+            is_dirty: self.flags.is_dirty,
+            msg_clear: self.flags.msg_clear,
+            has_mail: self.flags.has_mail,
+            use_fsedefault: matches!(self.flags.fse_mode, FSEMode::Yes),
+            dont_ask_fse: matches!(self.flags.fse_mode, FSEMode::No),
+            scroll_msg_body: self.flags.scroll_msg_body,
+            short_file_descr: self.flags.use_short_filedescr,
+            long_msg_header: self.flags.long_msg_header,
+            wide_editor: self.flags.wide_editor,
+            delete_flag: self.flags.delete_flag,
+            protocol: self.protocol.chars().next().unwrap_or('Z'),
+            page_len: self.page_len as u8,
+            last_conference: self.last_conference,
+            elapsed_time_on: self.elapsed_time_on,
+            date_last_dir_read: IcbDate::from_utc(self.date_last_dir_read),
+            is_chat_available: matches!(self.chat_status, ChatStatus::Available),
+            last_date_on: IcbDate::from_utc(self.stats.last_on),
+            num_times_on: self.stats.num_times_on as usize,
+            num_uploads: self.stats.num_uploads as i32,
+            num_downloads: self.stats.num_downloads as i32,
+            ul_tot_dnld_bytes: self.stats.total_dnld_bytes,
+            ul_tot_upld_bytes: self.stats.total_upld_bytes,
+            daily_downloaded_bytes: self.stats.today_dnld_bytes as usize,
+            // Arrays and remaining fields defaulted:
+            last_message_read_ptr: [0; 40].to_vec(),
+            ..Default::default()
+        };
+
+        // Pack conference flags (0..40) into 5 bytes each
+        for (conf, flags) in &self.conference_flags {
+            if *conf >= 40 {
+                continue;
+            }
+            let byte = conf / 8;
+            let bit = conf % 8;
+            if flags.contains(ConferenceFlags::Registered) {
+                rec.conf_reg_flags[byte] |= 1 << bit;
+            }
+            if flags.contains(ConferenceFlags::Expired) {
+                rec.conf_exp_flags[byte] |= 1 << bit;
+            }
+            if flags.contains(ConferenceFlags::UserSelected) {
+                rec.conf_usr_flags[byte] |= 1 << bit;
+            }
+        }
+
+        // Last message read pointers
+        for ((conf, _area), status) in &self.lastread_ptr_flags {
+            if *conf >= 40 {
+                continue;
+            }
+            rec.last_message_read_ptr[*conf] = status.last_read as i32;
+            //            rec.last_read_high_msg_read[*conf] = status.highest_msg_read as u32;
+        }
+
+        // Build extended INF structure
+        let mut inf = PcbUserInf { ..Default::default() };
+
+        if !self.alias.is_empty() {
+            inf.alias = Some(AliasUserInf { alias: self.alias.clone() });
+        }
+        if !self.verify_answer.is_empty() {
+            inf.verify = Some(VerifyUserInf {
+                verify: self.verify_answer.clone(),
+            });
+        }
+        if !(self.street1.is_empty()
+            && self.street2.is_empty()
+            && self.city.is_empty()
+            && self.state.is_empty()
+            && self.zip.is_empty()
+            && self.country.is_empty())
+        {
+            inf.address = Some(AddressUserInf {
+                street1: self.street1.clone(),
+                street2: self.street2.clone(),
+                city: self.city.clone(),
+                state: self.state.clone(),
+                zip: self.zip.clone(),
+                country: self.country.clone(),
+            });
+        }
+        if !(self.gender.is_empty() && self.birth_day.is_none() && self.email.is_empty() && self.web.is_empty()) {
+            inf.personal = Some(PersonalUserInf {
+                gender: self.gender.clone(),
+                birth_date: self.birth_day.clone().unwrap_or_else(|| IcbDate::new(0, 0, 0)),
+                email: self.email.clone(),
+                web: self.web.clone(),
+            });
+        }
+        if (!self.password.prev_pwd.is_empty()) || self.password.times_changed > 0 {
+            // PCBoard expects exactly 3 previous passwords, pad with empty strings if needed
+            let mut prev = Vec::new();
+            for i in 0..3 {
+                if i < self.password.prev_pwd.len() {
+                    prev.push(self.password.prev_pwd[i].to_string());
+                } else {
+                    prev.push(String::new());
+                }
+            }
+            inf.password = Some(PasswordUserInf {
+                prev_pwd: prev.try_into().expect("prev should have exactly 3 elements"),
+                last_change: IcbDate::from_utc(self.password.last_change),
+                times_changed: self.password.times_changed as usize,
+                expire_date: IcbDate::from_utc(self.password.expire_date),
+            });
+        }
+
+        // Call statistics (mirror fields used on import)
+        let any_stats = self.stats.first_date_on.timestamp() != 0
+            || self.stats.num_sysop_pages > 0
+            || self.stats.num_group_chats > 0
+            || self.stats.num_comments > 0
+            || self.stats.num_sec_viol > 0
+            || self.stats.num_not_reg > 0
+            || self.stats.num_reach_dnld_lim > 0
+            || self.stats.num_file_not_found > 0
+            || self.stats.num_password_failures > 0
+            || self.stats.num_verify_errors > 0;
+
+        if any_stats {
+            inf.call_stats = Some(CallStatsUserInf {
+                first_date_on: IcbDate::from_utc(self.stats.first_date_on),
+                num_sysop_pages: self.stats.num_sysop_pages as usize,
+                num_group_chats: self.stats.num_group_chats as usize,
+                num_comments: self.stats.num_comments as usize,
+                num_sec_viol: self.stats.num_sec_viol as usize,
+                num_not_reg: self.stats.num_not_reg as usize,
+                num_reach_dnld_lim: self.stats.num_reach_dnld_lim as usize,
+                num_file_not_found: self.stats.num_file_not_found as usize,
+                num_pwrd_errors: self.stats.num_password_failures as usize,
+                num_verify_errors: self.stats.num_verify_errors as usize,
+                ..Default::default()
+            });
+        }
+
+        if !(self.custom_comment1.is_empty()
+            && self.custom_comment2.is_empty()
+            && self.custom_comment3.is_empty()
+            && self.custom_comment4.is_empty()
+            && self.custom_comment5.is_empty())
+        {
+            inf.notes = Some(NotesUserInf {
+                notes: vec![
+                    self.custom_comment1.clone(),
+                    self.custom_comment2.clone(),
+                    self.custom_comment3.clone(),
+                    self.custom_comment4.clone(),
+                    self.custom_comment5.clone(),
+                ],
+            });
+        }
+
+        // Direct passthrough optional sections
+        inf.qwk_config = self.qwk_config.clone();
+        inf.account = self.account.clone();
+        inf.bank = self.bank.clone();
+
+        PcbUser { user: rec, inf }
+    }
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -890,6 +1072,48 @@ impl UserBase {
     pub fn new_user(&mut self, new_user: User) -> usize {
         self.users.push(new_user);
         self.users.len() - 1
+    }
+
+    pub fn export_pcboard(&self, users_file: &PathBuf, users_inf_file: &PathBuf) -> Res<()> {
+        use std::fs::File;
+        use std::io::BufWriter;
+
+        // Convert all users to PCBoard format
+        let mut pcb_users = Vec::new();
+        let mut pcb_infs = Vec::new();
+
+        for (idx, user) in self.users.iter().enumerate() {
+            let mut pcb = user.to_pcboard();
+            // Set record number based on position in the database (1-based)
+            pcb.user.rec_num = idx as u32;
+
+            // Also set the name in the inf structure
+            pcb.inf.name = pcb.user.name.clone();
+            pcb.inf.messages_read = user.stats.messages_read as usize;
+            pcb.inf.messages_left = user.stats.messages_left as usize;
+
+            pcb_users.push(pcb.user);
+            pcb_infs.push(pcb.inf);
+        }
+
+        // Write USERS file (main user records)
+        {
+            let file = File::create(users_file)?;
+            let mut writer = BufWriter::new(file);
+
+            for pcb_user in &pcb_users {
+                pcb_user.write(&mut writer)?;
+            }
+        }
+
+        // Write USERS.INF file using the static write_users method
+        {
+            let file = File::create(users_inf_file)?;
+            let mut writer = BufWriter::new(file);
+
+            PcbUserInf::write_users(&pcb_infs, &mut writer)?;
+        }
+        Ok(())
     }
     /*
     pub fn get_user_home_dir(home_dir: &Path, user_name: &str) -> PathBuf {
