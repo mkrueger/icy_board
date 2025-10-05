@@ -1,0 +1,360 @@
+DECLARE PROCEDURE PROC001(INTEGER PAR001, INTEGER PAR002, INTEGER PAR003, VAR STRING PAR004)
+STRING STR001
+STRING STR003(200)
+STRING STR004
+STRING STR005
+STRING STR006
+STRING STR007
+STRING STR008
+INTEGER INT001
+INTEGER INT002
+INTEGER i
+INTEGER j
+STRING STR009
+STRING STR010
+STRING STR011
+STRING STR012
+STRING STR013
+
+STR001 = ""
+STR009 = "@X03"
+STR010 = "@X0B"
+STR011 = "@X09"
+STR012 = "@X02"
+STR013 = "@X0E"
+GOSUB LABEL008
+STR008 = ""
+PROC001(35, 12, 24, STR008)
+STR008 = UPPER(STR008)
+STR005 = STR008
+IF (UPPER(STR005) = "SYSOP") STR008 = UPPER(READLINE(PCBDAT(), 2))
+
+IF (LEN(STR008) = 0) THEN
+    STR008 = "ALL"
+    PRINT "@X0BALL"
+    STR005 = "ALL"
+ENDIF
+
+IF (STR008 <> "ALL" & U_RECNUM(STR008) = -1) THEN
+    CLS 
+    PRINT "@X0BU@X03ser not found@X02"
+    DELAY 2
+    END 
+ENDIF
+
+STR008 = ""
+PROC001(35, 13, 24, STR008)
+STR006 = STR008
+IF (STR008 = "") THEN
+    CLS 
+    PRINT "@X0BM@X03essage aborted@X02."
+    DELAY 2
+    END 
+ENDIF
+
+ANSIPOS 51, 14
+STR008 = ""
+STR007 = "N"
+IF (STR005 <> "ALL") THEN
+    INPUTYN "", STR008, @X09
+    IF (STR008 = "Y") STR007 = "R"
+
+ENDIF
+
+FOR i = 1 TO 200 
+    STR003(i) = "               "
+NEXT
+
+GOSUB LABEL009
+ANSIPOS 9, 2
+PRINT "@X1F" + STR005
+ANSIPOS 9, 3
+PRINT "@X1F" + STR006
+i = 0
+PRINT "@X0E"
+ANSIPOS 2, 5
+WHILE (STR004 <> CHR(19)) DO
+    IF (GETX() < 2) ANSIPOS 2, GETY()
+
+    STR004 = ""
+    WHILE (STR004 = "") STR004 = INKEY()
+
+    IF (GETX() > 78) THEN
+        ANSIPOS 2, GETY() + 1
+    ENDIF
+
+    IF (STR004 = "UP") ANSIPOS GETX(), GETY() - 1
+
+    IF (STR004 = "DOWN") ANSIPOS GETX(), GETY() + 1
+
+    IF (STR004 = "LEFT") ANSIPOS GETX() - 1, GETY()
+
+    IF (STR004 = "RIGHT") ANSIPOS GETX() + 1, GETY()
+
+    IF (STR004 = "HOME") ANSIPOS 2, GETY()
+
+    IF (STR004 = "END") ANSIPOS 78, GETY()
+
+    IF (GETX() > 78) THEN
+        ANSIPOS 2, GETY() + 1
+    ENDIF
+
+    IF (GETX() < 2) THEN
+        ANSIPOS 78, GETY() - 1
+    ENDIF
+
+    IF (GETY() < 5) THEN
+        INT001 = GETX() - 1
+        IF (i > 0) THEN
+            i = i - 1
+            FOR j = 5 TO 22 
+                IF (STR003[j - 4 + i] <> STR003[j - 3 + i]) THEN
+                    ANSIPOS 2, j
+                    PRINT LEFT(STR003[j - 4 + i], 77)
+                ENDIF
+
+            NEXT
+
+        ENDIF
+
+        ANSIPOS INT001 + 1, 5
+    ENDIF
+
+    IF (GETY() > 22) THEN
+        INT001 = GETX() - 1
+        IF (i + 19 < 100) THEN
+            i = i + 1
+            j = 5
+            WHILE (j <= 22) DO
+                IF (STR003[j - 4 + i] <> STR003[j - 5 + i]) THEN
+                    ANSIPOS 2, j
+                    PRINT LEFT(STR003[j - 4 + i], 77)
+                ENDIF
+
+                j = j + 1
+            ENDWHILE
+
+        ENDIF
+
+        ANSIPOS INT001 + 1, 22
+    ENDIF
+
+    IF (STR004 = CHR(13)) THEN
+        ANSIPOS 2, GETY() + 1
+    ENDIF
+
+    IF (STR004 = CHR(8) & GETX() > 2) THEN
+        INT001 = GETX() - 1
+        INT002 = GETY() + i
+        PRINT CHR(8) + " " + CHR(8)
+        STR003(INT002 - 4) = LEFT(STR003[INT002 - 4], INT001 - 2) + " " + MID(STR003[INT002 - 4], INT001, LEN(STR003[INT002 - 4]) - 1)
+    ENDIF
+
+    IF (GETX() < 2) ANSIPOS 2, GETY()
+
+    GOSUB LABEL004
+    INT001 = GETX() - 1
+    INT002 = GETY() + i
+    IF (STR004 <> "" & STR004 <> CHR(19) & STR004 <> CHR(1)) THEN
+        PRINT STR004
+        INT001 = GETX() - 1
+        INT002 = GETY() + i
+        STR003(INT002 - 4) = LEFT(STR003[INT002 - 4], INT001 - 2) + STR004 + MID(STR003[INT002 - 4], INT001, LEN(STR003[INT002 - 4]) - 1)
+    ENDIF
+
+    IF (ASC(STR004) = 1) END 
+
+ENDWHILE
+
+GOTO LABEL005
+
+:LABEL004
+IF (STR004 = CHR(13)) STR004 = ""
+
+IF (STR004 = CHR(8)) STR004 = ""
+
+IF (STR004 = CHR(9)) STR004 = ""
+
+IF (STR004 = CHR(10)) STR004 = ""
+
+IF (STR004 = CHR(7)) STR004 = ""
+
+IF (STR004 = CHR(11)) STR004 = ""
+
+IF (LEN(STR004) > 1) STR004 = ""
+
+RETURN 
+
+:LABEL005
+INT001 = 1
+i = 1
+:LABEL006
+IF (i <= 100) THEN
+    IF (STR003[i] <> "               ") INT001 = i
+
+    i = i + 1
+    GOTO LABEL006
+ENDIF
+
+FCREATE 1, "C:\MSG.TMP", O_WR, S_DB
+i = 1
+:LABEL007
+IF (i <= INT001) THEN
+    FPUTLN 1, STR003[i]
+    i = i + 1
+    GOTO LABEL007
+ENDIF
+
+FCLOSE 1
+MESSAGE CURCONF(), STR005, U_NAME(), STR006, STR007, DATE(), FALSE, FALSE, "C:\MSG.TMP"
+END 
+END
+
+:LABEL008
+PRINTLN "@POFF@@CLS@[0m[37C[1;35mWrite a"
+PRINTLN "    [45m█▀▀▀░▀▀▀▀▀▀[40m█ [45m█▀▀▀░▀▀▀█[0m [1;35;45m█▀▀▀░▀▀▀█[0m [1;35;45m█▀▀▀░▀▀▀█[0m [1;35;45m█▀▀▀░▀▀▀[40m█ [45m█▀▀▀░▀▀▀█[0m [1;35;45m█▀▀▀░▀▀▀█[0m"
+PRINTLN "    [1;35;45m█   ░[0m [1;35;45m█[0m  [1;35;45m  ░[0m [1;35;45m█   ░[0m [1;35;45m▄▄█[0m [1;35;45m█   ░[0m [1;35;45m▄▄█[0m [1;35;45m█   ░[0m [1;35;45m▄▄█[0m [1;35;45m█   ░[0m [1;35;45m  ░[0m [1;35;45m█   ░[0m "
+PRINTLN "[1A[63C[1;35;45m▄▄█[0m [1;35;45m█   ░[0m [1;35;45m▄▄█[0m"
+PRINTLN "    [1;35;45m▓   ▒[0m [1;35;45m▓[0m  [1;35;45m░ ▒[0m [1;35;45m▓   ▒[0m     [1;35;45m▓   ▒[0m     [1;35;45m▓   ▒[0m     [1;35;45m▓   ▒[0m [1;35;45m░ ▒[0m [1;35;45m▓   ▒[0m     [1;35;45m▓   ▒[0m"
+PRINTLN "    [1;35;45m▒   ▒[0m [1;35;45m▒[0m  [1;35;45m▒ ▒[0m [1;35;45m▒   ▒▄▄[0m   [1;35m▀▀▀▀▀▀[45m▀▀▓[0m [1;35m▀▀▀▀▀▀[45m▀▀▓[0m [1;35;45m▒   ▒[0m [1;35;45m▒ ▒[0m [1;35;45m▒   ▒[0m [1;35;45m▀▀█[0m [1;35;45m▒   ▒▄▄[0m"
+PRINTLN "    [1;35;45m▒   ▓[0m    [1;35;45m░ ▓[0m [1;35;45m▒   ▓[0m     [1;35;45m▒   ▓[0m [1;35;45m  ▒[0m [1;35;45m▒   ▓[0m [1;35;45m  ▒[0m [1;35;45m▒   ▓[40m▀[45m░ ▓[0m [1;35;45m▒   ▓[0m  [1;35;45m ░[0m [1;35;45m▒   "
+PRINTLN "[1A[71C▓[0m"
+PRINTLN "    [1;35;45m░   ▓[0m    [1;35;45m▒ ▓[0m [1;35;45m░   ▓[0m [1;35;45m▀▀█[0m [1;35;45m░   ▓[0m [1;35;45m  ░[0m [1;35;45m░   ▓[0m [1;35;45m  ░[0m [1;35;45m░   ▓[0m [1;35;45m▒ ▓[0m [1;35;45m░   ▓[0m  [1;35;45m ▒[0m"
+PRINTLN "[1A[66C [1;35;45m░   ▓[0m [1;35;45m▀▀█[0m"
+PRINTLN "    [1;35;45m░▄▄▄█[0m    [1;35;45m▄▄[40m█ [45m░▄▄▄█▄▄▄█[0m [1;35;45m░▄▄▄█▄▄▄█[0m [1;35;45m░▄▄▄█▄▄▄█[0m [1;35;45m░▄▄▄█[0m [1;35;45m▄▄[40m█ [45m░▄▄▄█▄▄▄▓[0m [1;35;45m░▄▄▄█▄▄▄█[0m"
+PRINTLN ""
+PRINTLN ""
+PRINTLN "[15C[0;34m┌────────[1m───[0;34m───────────────[1m───[0;34m────────────[1m──┐"
+PRINTLN "[15C│ [0mT[1mo [34m(Enter=ALL) : [0m························ [1;34m│"
+PRINTLN "[15C│ [0mS[1mubject[8C[34m: [0m························ [0;34m│"
+PRINTLN "[15C│     [0mI[1ms this message private [34m([0mY[1;34m/[0mN[1;34m)? ( )    [0;34m│"
+PRINTLN "[15C└──────────[1m──────────────[0;34m───────────────────┘"
+PRINTLN ""
+PRINTLN ""
+PRINTLN ""
+PRINTLN ""
+PRINTLN ""
+PRINTLN ""
+PRINT "[51C[0;31mLiQUiD Edit 1.0 by S∩b ZΣr()[0m"
+RETURN 
+
+:LABEL009
+PRINTLN "[0;1;33m[2J[0;34m┌────────[1m─────────────────────────[0;34m────────────────────────────────────────────┐"
+PRINTLN "│[1;37;44mTo   :                                              L[0;44mi[1mQU[0;44mi[1mD Edit V1.0         [0;34m│"
+PRINTLN "│[1;37;44mSubj :                                     Str+A - Abort  Str+S - Save & Quit[0;34m│"
+PRINTLN "├────────────────────────────────────────────────────────────────────────────[1m─┤"
+PRINTLN "[0;34m│[77C[1m│"
+PRINTLN "[0;34m│[77C[1m│"
+PRINTLN "[0;34m│[77C│"
+PRINTLN "│[77C│"
+PRINTLN "│[77C│"
+PRINTLN "│[77C│"
+PRINTLN "│[77C│"
+PRINTLN "│[77C│"
+PRINTLN "│[77C│"
+PRINTLN "│[77C│"
+PRINTLN "│[77C│"
+PRINTLN "[1m│[77C[0;34m│"
+PRINTLN "[1m│[77C[0;34m│"
+PRINTLN "[1m│[77C[0;34m│"
+PRINTLN "[1m│[77C[0;34m│"
+PRINTLN "[1m│[77C│"
+PRINTLN "│[77C│"
+PRINTLN "[0;34m│[77C[1m│"
+PRINT "[0;34m└──────────────────────────────[1m───────────────[0;34m──────────────────────────────[1m──┘"
+
+RETURN 
+END 
+
+PROCEDURE PROC001(INTEGER PAR001, INTEGER PAR002, INTEGER PAR003, VAR STRING PAR004)
+    INTEGER LOC001
+    INTEGER k
+    INTEGER LOC003
+    STRING LOC006
+    ANSIPOS PAR001, PAR002
+    LOC001 = PAR001 + PAR003
+    PRINT "@X07"
+    FOR k = 1 TO PAR003 
+        PRINT "·"
+    NEXT
+
+    ANSIPOS PAR001, PAR002
+    PAR004 = ""
+    :LABEL010
+    LOC006 = ""
+    WHILE (LOC006 = "") LOC006 = INKEY()
+
+    IF (PAR004 = "") LOC006 = UPPER(LOC006)
+
+    IF (RIGHT(PAR004, 1) = " ") LOC006 = UPPER(LOC006)
+
+    GOSUB LABEL012
+    IF (LOC006 <> CHR(8) & GETX() < LOC001 & LOC006 <> CHR(13)) PAR004 = PAR004 + LOC006
+
+    IF (LOC006 <> CHR(13) & LOC006 <> CHR(8) & GETX() < LOC001) THEN
+        GOSUB LABEL013
+    ENDIF
+
+    IF (LOC006 = CHR(8) & GETX() > PAR001) GOSUB LABEL011
+
+    IF (LOC006 <> CHR(13)) THEN
+        GOTO LABEL010
+        :LABEL011
+        PAR004 = LEFT(PAR004, LEN(PAR004) - 1)
+        PRINT CHR(8)
+        PRINT "@X07·"
+        PRINT CHR(8)
+        RETURN 
+        :LABEL012
+        IF (LOC006 = CHR(9)) LOC006 = ""
+
+        IF (LOC006 = CHR(10)) LOC006 = ""
+
+        IF (LOC006 = CHR(7)) LOC006 = ""
+
+        IF (LOC006 = CHR(11)) LOC006 = ""
+
+        IF (LOC006 = "LEFT") LOC006 = ""
+
+        IF (LOC006 = "BADKEY") LOC006 = ""
+
+        IF (LOC006 = "RIGHT") LOC006 = ""
+
+        IF (LOC006 = "HOME") LOC006 = ""
+
+        IF (LOC006 = "UP") LOC006 = ""
+
+        IF (LOC006 = "DEL") LOC006 = ""
+
+        IF (LOC006 = "END") LOC006 = ""
+
+        IF (LOC006 = "PGDN") LOC006 = ""
+
+        IF (LOC006 = "PGUP") LOC006 = ""
+
+        IF (LOC006 = "INS") LOC006 = ""
+
+        IF (LOC006 = "DOWN") LOC006 = ""
+
+        RETURN 
+        :LABEL013
+        LOC003 = ASC(LOC006)
+        IF (LOC003 < 48) PRINT STR012 + LOC006
+
+        IF (LOC003 < 65 & LOC003 > 57) PRINT STR012 + LOC006
+
+        IF (LOC003 > 47 & LOC003 < 58) PRINT STR011 + LOC006
+
+        IF (LOC003 > 64 & LOC003 < 91) PRINT STR010 + LOC006
+
+        IF (LOC003 > 96 & LOC003 < 123) PRINT STR009 + LOC006
+
+        IF (LOC003 > 128) PRINT STR013 + LOC006
+
+        RETURN 
+    ENDIF
+
+    STR008 = PAR004
+ENDPROC
+
+
