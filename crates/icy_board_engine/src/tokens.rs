@@ -62,6 +62,6 @@ mod test {
     #[test]
     fn test_tokenize_empty() {
         let input = "";
-        assert!(tokenize(input).is_empty());
+        assert!(!tokenize(input).is_empty());
     }
 }

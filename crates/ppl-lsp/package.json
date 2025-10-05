@@ -2,7 +2,7 @@
 	"name": "ppl-language-server",
 	"description": "PCBoard Programming Language server",
 	"license": "MIT",
-	"version": "0.1.5",
+	"version": "0.1.6",
 	"categories": [],
 	"keywords": [
 		"language-server",
@@ -178,7 +178,7 @@
 		]
 	},
 	"scripts": {
-		"postinstall": "cd client && pnpm i",
+		"postinstall": "cd client && pnpm install --no-frozen-lockfile",
 		"compile": "npm run check-types && node esbuild.js --production",
 		"check-types": "tsc --noEmit",
 		"watch": "npm-run-all -p watch:*",
@@ -189,11 +189,11 @@
 	"devDependencies": {
 		"@types/glob": "8.1.0",
 		"@types/mocha": "10.0.10",
-		"@types/node": "22.10.2",
+		"@types/node": "24.6.2",
 		"@typescript-eslint/eslint-plugin": "^3.8.0",
 		"@typescript-eslint/parser": "^3.8.0",
 		"@vscode/debugadapter": "^1.56.0",
-	    "@vscode/debugadapter-testsupport": "^1.56.0",
+		"@vscode/debugadapter-testsupport": "^1.56.0",
 		"@vscode/debugprotocol": "^1.56.0",
 		"@vscode/vsce": "^3.2.1",
 		"await-notify": "^1.0.1",
@@ -204,9 +204,9 @@
 		"events": "^3.3.0",
 		"glob": "11.0.0",
 		"mocha": "11.0.2",
+		"npm-run-all": "^4.1.5",
 		"path-browserify": "^1.0.1",
 		"rimraf": "^3.0.2",
-		"npm-run-all": "^4.1.5",
 		"ts-loader": "^9.5.1",
 		"typescript": "5.4.5",
 		"url": "^0.11.0",
@@ -214,6 +214,5 @@
 		"vscode-test": "^1.4.0",
 		"vscode-uri": "^3.0.2"
 	},
-	"dependencies": {},
 	"packageManager": "pnpm@8.15.7"
 }

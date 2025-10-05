@@ -11,8 +11,8 @@ dependencies:
 
 devDependencies:
   '@types/node':
-    specifier: ^17.0.18
-    version: 17.0.21
+    specifier: 24.6.2
+    version: 24.6.2
   '@types/vscode':
     specifier: 1.85.0
     version: 1.85.0
@@ -27,8 +27,10 @@ packages:
     engines: {node: '>= 6'}
     dev: true
 
-  /@types/node@17.0.21:
-    resolution: {integrity: sha512-DBZCJbhII3r90XbQxI8Y9IjjiiOGlZ0Hr32omXIZvwwZ7p4DMMXGrKXVyPfuoBOri9XNtL0UK69jYIBIsRX3QQ==}
+  /@types/node@24.6.2:
+    resolution: {integrity: sha512-d2L25Y4j+W3ZlNAeMKcy7yDsK425ibcAOO2t7aPTz6gNMH0z2GThtwENCDc0d/Pw9wgyRqE5Px1wkV7naz8ang==}
+    dependencies:
+      undici-types: 7.13.0
     dev: true
 
   /@types/vscode@1.85.0:
@@ -278,6 +280,10 @@ packages:
 
   /traverse@0.3.9:
     resolution: {integrity: sha1-cXuPIgzAu3tE5AUUwisui7xw2Lk=}
+    dev: true
+
+  /undici-types@7.13.0:
+    resolution: {integrity: sha512-Ov2Rr9Sx+fRgagJ5AX0qvItZG/JKKoBRAVITs1zk7IqZGTJUwgUr7qoYBpWwakpWilTZFM98rG/AFRocu10iIQ==}
     dev: true
 
   /unzipper@0.10.11:
