@@ -305,7 +305,7 @@ GOTO PAGE_SYSOP
     SYSOP_NAME = ReadLine(PCBDat(), 2)
     IF (Upper(ARG) == "/A") GOTO START_CHAT
 
-    DISPFILE PPEPath() + "pagescr.pcb", GRAPH
+    DISPFILE PPEPath() + "data\pagescr.pcb", GRAPH
     ANSIPOS 13, 10
     INTEGER REASON_LEN = 0
     PAGEON
@@ -495,7 +495,7 @@ PROCEDURE SysopUnavailable()
 ENDPROC
 
 PROCEDURE DisplayChatBackground()
-    DISPFILE PPEPath() + "lchat.pcb", GRAPH
+    DISPFILE PPEPath() + "data\lchat.pcb", GRAPH
     
     ANSIPOS (80 - Len(SYSOP_NAME) + 2) / 2, 1
     PRINT "@X0F[@X0B", SYSOP_NAME, "@X0F]"

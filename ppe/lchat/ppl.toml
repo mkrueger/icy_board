@@ -1,0 +1,15 @@
+[package]
+name = "lchat"
+version = "1.2.0"
+language_version = 350
+authors = ["Mike Krüger <mkrueger@posteo.de>"]
+
+[data]
+text_files = [
+    "lchat.cfg",
+]
+
+art_files = [
+    "data/lchat.icy",
+    "data/pagescr.icy",
+]
