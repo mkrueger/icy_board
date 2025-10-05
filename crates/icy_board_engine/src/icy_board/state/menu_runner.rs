@@ -156,14 +156,14 @@ impl IcyBoardState {
             return Ok(true);
         }
         for cmd_action in &command.actions {
-            self.run_action(command, cmd_action).await?;
+            self.run_action(command, cmd_action, false).await?;
         }
         self.session.tokens.clear();
 
         Ok(true)
     }
 
-    async fn run_action(&mut self, command: &Command, cmd_action: &CommandAction) -> Res<()> {
+    async fn run_action(&mut self, command: &Command, cmd_action: &CommandAction, check_security: bool) -> Res<()> {
         match cmd_action.command_type {
             CommandType::StuffText => {
                 self.session.push_tokens(&cmd_action.parameter);
@@ -188,7 +188,7 @@ impl IcyBoardState {
             }
             CommandType::BulletinList => {
                 let sec = self.session.user_command_level.cmd_b.clone();
-                if !self.check_sec("B", &sec).await? {
+                if check_security && !self.check_sec("B", &sec).await? {
                     return Ok(());
                 }
                 // B
@@ -196,7 +196,7 @@ impl IcyBoardState {
             }
             CommandType::CommentToSysop => {
                 let sec = self.session.user_command_level.cmd_c.clone();
-                if !self.check_sec("C", &sec).await? {
+                if check_security && !self.check_sec("C", &sec).await? {
                     return Ok(());
                 }
                 // C
@@ -204,7 +204,7 @@ impl IcyBoardState {
             }
             CommandType::Download => {
                 let sec = self.session.user_command_level.cmd_d.clone();
-                if !self.check_sec("D", &sec).await? {
+                if check_security && !self.check_sec("D", &sec).await? {
                     return Ok(());
                 }
                 // D
@@ -212,7 +212,7 @@ impl IcyBoardState {
             }
             CommandType::FlagFiles => {
                 let sec = self.session.user_command_level.cmd_d.clone();
-                if !self.check_sec("FLAG", &sec).await? {
+                if check_security && !self.check_sec("FLAG", &sec).await? {
                     return Ok(());
                 }
                 // FLAG
@@ -220,7 +220,7 @@ impl IcyBoardState {
             }
             CommandType::EnterMessage => {
                 let sec = self.session.user_command_level.cmd_e.clone();
-                if !self.check_sec("E", &sec).await? {
+                if check_security && !self.check_sec("E", &sec).await? {
                     return Ok(());
                 }
                 // E
@@ -228,7 +228,7 @@ impl IcyBoardState {
             }
             CommandType::FileDirectory => {
                 let sec = self.session.user_command_level.cmd_f.clone();
-                if !self.check_sec("F", &sec).await? {
+                if check_security && !self.check_sec("F", &sec).await? {
                     return Ok(());
                 }
                 // F
@@ -244,7 +244,7 @@ impl IcyBoardState {
             }
             CommandType::Help => {
                 let sec = self.session.user_command_level.cmd_h.clone();
-                if !self.check_sec("H", &sec).await? {
+                if check_security && !self.check_sec("H", &sec).await? {
                     return Ok(());
                 }
                 // H
@@ -252,7 +252,7 @@ impl IcyBoardState {
             }
             CommandType::InitialWelcome => {
                 let sec = self.session.user_command_level.cmd_i.clone();
-                if !self.check_sec("I", &sec).await? {
+                if check_security && !self.check_sec("I", &sec).await? {
                     return Ok(());
                 }
                 // I
@@ -260,7 +260,7 @@ impl IcyBoardState {
             }
             CommandType::JoinConference => {
                 let sec = self.session.user_command_level.cmd_j.clone();
-                if !self.check_sec("J", &sec).await? {
+                if check_security && !self.check_sec("J", &sec).await? {
                     return Ok(());
                 }
                 // J
@@ -268,7 +268,7 @@ impl IcyBoardState {
             }
             CommandType::DeleteMessage => {
                 let sec = self.session.user_command_level.cmd_k.clone();
-                if !self.check_sec("K", &sec).await? {
+                if check_security && !self.check_sec("K", &sec).await? {
                     return Ok(());
                 }
                 // K
@@ -276,7 +276,7 @@ impl IcyBoardState {
             }
             CommandType::LocateFile => {
                 let sec = self.session.user_command_level.cmd_l.clone();
-                if !self.check_sec("L", &sec).await? {
+                if check_security && !self.check_sec("L", &sec).await? {
                     return Ok(());
                 }
                 // L
@@ -284,7 +284,7 @@ impl IcyBoardState {
             }
             CommandType::ToggleGraphics => {
                 let sec = self.session.user_command_level.cmd_m.clone();
-                if !self.check_sec("M", &sec).await? {
+                if check_security && !self.check_sec("M", &sec).await? {
                     return Ok(());
                 }
                 // M
@@ -292,7 +292,7 @@ impl IcyBoardState {
             }
             CommandType::NewFileScan => {
                 let sec = self.session.user_command_level.cmd_n.clone();
-                if !self.check_sec("N", &sec).await? {
+                if check_security && !self.check_sec("N", &sec).await? {
                     return Ok(());
                 }
                 // N
@@ -300,7 +300,7 @@ impl IcyBoardState {
             }
             CommandType::PageSysop => {
                 let sec = self.session.user_command_level.cmd_o.clone();
-                if !self.check_sec("O", &sec).await? {
+                if check_security && !self.check_sec("O", &sec).await? {
                     return Ok(());
                 }
                 // O
@@ -308,7 +308,7 @@ impl IcyBoardState {
             }
             CommandType::SetPageLength => {
                 let sec = self.session.user_command_level.cmd_p.clone();
-                if !self.check_sec("P", &sec).await? {
+                if check_security && !self.check_sec("P", &sec).await? {
                     return Ok(());
                 }
                 // P
@@ -316,7 +316,7 @@ impl IcyBoardState {
             }
             CommandType::QuickMessageScan => {
                 let sec = self.session.user_command_level.cmd_q.clone();
-                if !self.check_sec("Q", &sec).await? {
+                if check_security && !self.check_sec("Q", &sec).await? {
                     return Ok(());
                 }
                 // Q
@@ -324,7 +324,7 @@ impl IcyBoardState {
             }
             CommandType::ReadMessages => {
                 let sec = self.session.user_command_level.cmd_r.clone();
-                if !self.check_sec("R", &sec).await? {
+                if check_security && !self.check_sec("R", &sec).await? {
                     return Ok(());
                 }
                 // R
@@ -332,7 +332,7 @@ impl IcyBoardState {
             }
             CommandType::Survey => {
                 let sec = self.session.user_command_level.cmd_s.clone();
-                if !self.check_sec("S", &sec).await? {
+                if check_security && !self.check_sec("S", &sec).await? {
                     return Ok(());
                 }
                 // S
@@ -340,7 +340,7 @@ impl IcyBoardState {
             }
             CommandType::SetTransferProtocol => {
                 let sec = self.session.user_command_level.cmd_t.clone();
-                if !self.check_sec("T", &sec).await? {
+                if check_security && !self.check_sec("T", &sec).await? {
                     return Ok(());
                 }
                 // T
@@ -348,7 +348,7 @@ impl IcyBoardState {
             }
             CommandType::UploadFile => {
                 let sec = self.session.user_command_level.cmd_u.clone();
-                if !self.check_sec("R", &sec).await? {
+                if check_security && !self.check_sec("U", &sec).await? {
                     return Ok(());
                 }
                 // U
@@ -356,7 +356,7 @@ impl IcyBoardState {
             }
             CommandType::ViewSettings => {
                 let sec = self.session.user_command_level.cmd_v.clone();
-                if !self.check_sec("V", &sec).await? {
+                if check_security && !self.check_sec("V", &sec).await? {
                     return Ok(());
                 }
                 // V
@@ -364,7 +364,7 @@ impl IcyBoardState {
             }
             CommandType::WriteSettings => {
                 let sec = self.session.user_command_level.cmd_w.clone();
-                if !self.check_sec("W", &sec).await? {
+                if check_security && !self.check_sec("W", &sec).await? {
                     return Ok(());
                 }
                 // W
@@ -372,7 +372,7 @@ impl IcyBoardState {
             }
             CommandType::ExpertMode => {
                 let sec = self.session.user_command_level.cmd_x.clone();
-                if !self.check_sec("X", &sec).await? {
+                if check_security && !self.check_sec("X", &sec).await? {
                     return Ok(());
                 }
                 // X
@@ -380,7 +380,7 @@ impl IcyBoardState {
             }
             CommandType::YourMailScan => {
                 let sec = self.session.user_command_level.cmd_y.clone();
-                if !self.check_sec("Y", &sec).await? {
+                if check_security && !self.check_sec("Y", &sec).await? {
                     return Ok(());
                 }
                 // Y
@@ -388,7 +388,7 @@ impl IcyBoardState {
             }
             CommandType::ZippyDirectoryScan => {
                 let sec = self.session.user_command_level.cmd_z.clone();
-                if !self.check_sec("Z", &sec).await? {
+                if check_security && !self.check_sec("Z", &sec).await? {
                     return Ok(());
                 }
                 // Z
@@ -405,7 +405,7 @@ impl IcyBoardState {
             }
             CommandType::UserList => {
                 let sec = self.session.user_command_level.cmd_show_user_list.clone();
-                if !self.check_sec("USER", &sec).await? {
+                if check_security && !self.check_sec("USER", &sec).await? {
                     return Ok(());
                 }
                 // USER
@@ -421,7 +421,7 @@ impl IcyBoardState {
             }
             CommandType::WhoIsOnline => {
                 let sec = self.session.user_command_level.cmd_who.clone();
-                if !self.check_sec("WHO", &sec).await? {
+                if check_security && !self.check_sec("WHO", &sec).await? {
                     return Ok(());
                 }
                 // WHO
@@ -429,7 +429,7 @@ impl IcyBoardState {
             }
             CommandType::OpenDoor => {
                 let sec = self.session.user_command_level.cmd_open_door.clone();
-                if !self.check_sec("DOOR", &sec).await? {
+                if check_security && !self.check_sec("DOOR", &sec).await? {
                     return Ok(());
                 }
                 // DOOR/OPEN
@@ -437,7 +437,7 @@ impl IcyBoardState {
             }
             CommandType::TestFile => {
                 let sec = self.session.user_command_level.cmd_test_file.clone();
-                if !self.check_sec("TEST", &sec).await? {
+                if check_security && !self.check_sec("TEST", &sec).await? {
                     return Ok(());
                 }
                 // TEST
@@ -445,7 +445,7 @@ impl IcyBoardState {
             }
             CommandType::GroupChat => {
                 let sec = self.session.user_command_level.cmd_chat.clone();
-                if !self.check_sec("CHAT", &sec).await? {
+                if check_security && !self.check_sec("CHAT", &sec).await? {
                     return Ok(());
                 }
                 // CHAT
@@ -453,7 +453,7 @@ impl IcyBoardState {
             }
             CommandType::RestoreMessage => {
                 let sec = self.session.sysop_command_level.sec_4_recover_deleted_msg.clone();
-                if !self.check_sec("CHAT", &sec).await? {
+                if check_security && !self.check_sec("CHAT", &sec).await? {
                     return Ok(());
                 }
                 // 4
@@ -461,7 +461,7 @@ impl IcyBoardState {
             }
             CommandType::ReadEmail => {
                 let sec = self.session.user_command_level.cmd_r.clone();
-                if !self.check_sec("@", &sec).await? {
+                if check_security && !self.check_sec("@", &sec).await? {
                     return Ok(());
                 }
                 // @
@@ -469,7 +469,7 @@ impl IcyBoardState {
             }
             CommandType::WriteEmail => {
                 let sec = self.session.user_command_level.cmd_e.clone();
-                if !self.check_sec("@W", &sec).await? {
+                if check_security && !self.check_sec("@W", &sec).await? {
                     return Ok(());
                 }
                 // @W
@@ -477,7 +477,7 @@ impl IcyBoardState {
             }
             CommandType::RunPPE => {
                 let sec = self.session.sysop_command_level.sec_10_shelled_dos_func.clone();
-                if !self.check_sec("PPE", &sec).await? {
+                if check_security && !self.check_sec("PPE", &sec).await? {
                     return Ok(());
                 }
                 // PPE
@@ -488,7 +488,7 @@ impl IcyBoardState {
             }
             CommandType::TextSearch => {
                 let sec = self.session.user_command_level.cmd_r.clone();
-                if !self.check_sec("TS", &sec).await? {
+                if check_security && !self.check_sec("TS", &sec).await? {
                     return Ok(());
                 }
                 // TS
@@ -496,7 +496,7 @@ impl IcyBoardState {
             }
             CommandType::Broadcast => {
                 let sec = self.session.sysop_command_level.use_broadcast_command.clone();
-                if !self.check_sec("PPE", &sec).await? {
+                if check_security && !self.check_sec("PPE", &sec).await? {
                     return Ok(());
                 }
                 // BR
@@ -504,7 +504,7 @@ impl IcyBoardState {
             }
             CommandType::ReplyMessage => {
                 let sec = self.session.user_command_level.cmd_e.clone();
-                if !self.check_sec("REPLY", &sec).await? {
+                if check_security && !self.check_sec("REPLY", &sec).await? {
                     return Ok(());
                 }
                 // REPLY
@@ -512,7 +512,7 @@ impl IcyBoardState {
             }
             CommandType::QWK => {
                 let sec = self.session.user_command_level.cmd_r.clone();
-                if !self.check_sec("QWK", &sec).await? {
+                if check_security && !self.check_sec("QWK", &sec).await? {
                     return Ok(());
                 }
                 // QWK
@@ -520,7 +520,7 @@ impl IcyBoardState {
             }
             CommandType::SelectConferences => {
                 let sec = self.session.user_command_level.cmd_j.clone();
-                if !self.check_sec("SELECT", &sec).await? {
+                if check_security && !self.check_sec("SELECT", &sec).await? {
                     return Ok(());
                 }
                 // SELECT
@@ -528,7 +528,7 @@ impl IcyBoardState {
             }
             CommandType::BatchDownload => {
                 let sec = self.session.user_command_level.batch_file_transfer.clone();
-                if !self.check_sec("DB", &sec).await? {
+                if check_security && !self.check_sec("DB", &sec).await? {
                     return Ok(());
                 }
                 // BD
@@ -536,7 +536,7 @@ impl IcyBoardState {
             }
             CommandType::BatchUpload => {
                 let sec = self.session.user_command_level.batch_file_transfer.clone();
-                if !self.check_sec("UB", &sec).await? {
+                if check_security && !self.check_sec("UB", &sec).await? {
                     return Ok(());
                 }
                 // BU
@@ -544,14 +544,14 @@ impl IcyBoardState {
             }
             CommandType::ReadMemorizedMessage(t) => {
                 let sec = self.session.user_command_level.cmd_r.clone();
-                if !self.check_sec("RM", &sec).await? {
+                if check_security && !self.check_sec("RM", &sec).await? {
                     return Ok(());
                 }
                 self.read_memorized_messages_command(t).await?;
             }
             CommandType::ChangeMessageArea => {
                 let sec: SecurityExpression = self.session.user_command_level.cmd_j.clone();
-                if !self.check_sec("AREA", &sec).await? {
+                if check_security && !self.check_sec("AREA", &sec).await? {
                     return Ok(());
                 }
                 // AREA
@@ -642,7 +642,7 @@ impl IcyBoardState {
 
             for a in &cmd.actions {
                 if a.trigger == ActionTrigger::Selection {
-                    self.run_action(cmd, a).await?;
+                    self.run_action(cmd, a, true).await?;
                 }
             }
             self.print(TerminalTarget::Both, "\x1b[u").await?;

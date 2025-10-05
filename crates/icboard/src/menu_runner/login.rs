@@ -511,6 +511,8 @@ impl PcbBoardCommand {
         log::info!("NEW USER: '{}'", self.state.session.user_name);
 
         self.state.display_news().await?;
+        self.logon_questions().await?;
+
         return Ok(true);
     }
 
@@ -537,7 +539,7 @@ impl PcbBoardCommand {
 
     async fn logon_questions(&mut self) -> Res<()> {
         let survey: Survey = {
-            let board = self.state.get_board().await;
+            let board: tokio::sync::MutexGuard<'_, icy_board_engine::icy_board::IcyBoard> = self.state.get_board().await;
             Survey {
                 survey_file: board.config.paths.logon_survey.clone(),
                 answer_file: board.config.paths.logon_answer.clone(),
