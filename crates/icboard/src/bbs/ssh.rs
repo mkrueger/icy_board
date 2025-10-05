@@ -1,4 +1,4 @@
-use std::{borrow::Cow, io::ErrorKind, sync::Arc};
+use std::{borrow::Cow, io::ErrorKind, sync::Arc, time::Duration};
 
 use crate::Res;
 use async_trait::async_trait;
@@ -8,6 +8,7 @@ use russh_keys::{Certificate, ssh_key};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::Mutex,
+    time::timeout,
 };
 
 use russh::{
@@ -67,12 +68,12 @@ impl server::Handler for SshSession {
 
     async fn channel_open_session(&mut self, channel: Channel<Msg>, _session: &mut Session) -> Result<bool, Self::Error> {
         let bbs2 = self.bbs.clone();
-        let node = self.bbs.lock().await.create_new_node(ConnectionType::Telnet).await;
+        let node = self.bbs.lock().await.create_new_node(ConnectionType::SSH).await;
         let node_list = self.bbs.lock().await.get_open_connections().await.clone();
         let board = self.board.clone();
         let connection = SSHConnection::new(channel);
 
-        std::thread::Builder::new()
+        let handle = std::thread::Builder::new()
             .name("SSH handle".to_string())
             .spawn(move || {
                 tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
@@ -82,6 +83,7 @@ impl server::Handler for SshSession {
                 });
             })
             .unwrap();
+        self.bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
         Ok(true)
     }
 
@@ -158,19 +160,23 @@ impl Connection for SSHConnection {
     }
 
     async fn try_read(&mut self, buf: &mut [u8]) -> icy_net::Result<usize> {
-        match self.channel.read(buf).await {
-            Ok(size) => Ok(size),
-            Err(e) => match e.kind() {
+        // Non-blocking attempt: immediate timeout -> treat Pending as no data (return 0)
+        match timeout(Duration::from_millis(0), self.channel.read(buf)).await {
+            // Future completed within the timeout
+            Ok(Ok(size)) => Ok(size),
+            Ok(Err(e)) => match e.kind() {
                 ErrorKind::ConnectionAborted | ErrorKind::NotConnected => {
-                    log::error!("telnet error - connection aborted.");
-                    return Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into());
+                    log::error!("ssh try_read - connection aborted.");
+                    Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into())
                 }
                 ErrorKind::WouldBlock => Ok(0),
                 _ => {
-                    log::error!("Error {:?} reading from SSH connection: {:?}", e.kind(), e);
+                    log::error!("ssh try_read error {:?}: {:?}", e.kind(), e);
                     Ok(0)
                 }
             },
+            // Timed out: underlying read not ready yet
+            Err(_elapsed) => Ok(0),
         }
     }
 

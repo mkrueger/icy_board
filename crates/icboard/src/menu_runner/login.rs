@@ -114,6 +114,7 @@ impl PcbBoardCommand {
                         display_flags::UPCASE | display_flags::NEWLINE | display_flags::STACKED,
                     )
                     .await?;
+
                 if !self.state.get_board().await.config.new_user_settings.allow_one_name_users && last_name.is_empty() {
                     self.state
                         .display_text(
@@ -124,7 +125,6 @@ impl PcbBoardCommand {
                     continue;
                 }
                 self.state.session.user_name = format!("{} {}", first_name, last_name.trim()).trim().to_string();
-
                 for (i, user) in self.state.get_board().await.users.iter().enumerate() {
                     if user.is_valid_loginname(&self.state.session.user_name) {
                         found_user = Some(i);
@@ -153,7 +153,6 @@ impl PcbBoardCommand {
                     display_flags::UPCASE | display_flags::NEWLINE | display_flags::FIELDLEN,
                 )
                 .await?;
-
             if re_enter.trim().is_empty() || re_enter == "C" {
                 let new_file = self.state.get_board().await.config.paths.newuser.clone();
                 self.state.display_file(&self.state.resolve_path(&new_file)).await?;
@@ -545,6 +544,7 @@ impl PcbBoardCommand {
                 required_security: SecurityExpression::default(),
             }
         };
+
         Ok(if survey.survey_file.exists() {
             // skip the survey question.
             self.state.session.tokens.push_front(self.state.session.yes_char.to_string());

@@ -154,9 +154,9 @@ impl IcyBoard {
         self.config.paths.newask_survey = get_path(&self.root_path, &self.config.paths.newask_survey);
 
         self.config.paths.logon_answer = get_path(&self.root_path, &self.config.paths.logon_answer);
-        self.config.paths.logoff_survey = get_path(&self.root_path, &self.config.paths.logoff_survey);
+        self.config.paths.logon_survey = get_path(&self.root_path, &self.config.paths.logon_survey);
 
-        self.config.paths.logoff_answer = get_path(&self.root_path, &self.config.paths.logon_answer);
+        self.config.paths.logoff_answer = get_path(&self.root_path, &self.config.paths.logoff_answer);
         self.config.paths.logoff_survey = get_path(&self.root_path, &self.config.paths.logoff_survey);
         for c in self.conferences.iter_mut() {
             c.command_file = get_path(&self.root_path, &c.command_file);
@@ -723,6 +723,7 @@ fn get_path(parent_path: &Path, home_dir: &PathBuf) -> PathBuf {
     } else {
         parent_path.join(home_dir)
     };
+
     res
 }
 

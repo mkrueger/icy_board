@@ -82,6 +82,7 @@ impl IcyBoardState {
         let answer_file = &survey.answer_file;
 
         if !answer_file.exists() || !answer_file.is_file() {
+            log::info!("DISPLAY: {}", question.display());
             self.display_file(&question).await?;
             return Ok(());
         }

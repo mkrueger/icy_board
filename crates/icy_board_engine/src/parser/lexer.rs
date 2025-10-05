@@ -4,7 +4,6 @@ use crate::{
         constant::{BUILTIN_CONSTS, NumberFormat},
     },
     compiler::workspace::Workspace,
-    parser::load_with_encoding,
 };
 use core::fmt;
 use std::{
@@ -331,9 +330,7 @@ struct IfFrame {
 pub struct Lexer {
     lookup_table: &'static HashMap<unicase::Ascii<String>, Token>,
     define_table: HashMap<unicase::Ascii<String>, Constant>,
-    file: PathBuf,
     lang_version: u16,
-    encoding: Encoding,
     text: Vec<char>,
 
     errors: Arc<Mutex<ErrorReporter>>,
@@ -480,7 +477,7 @@ lazy_static::lazy_static! {
 }
 
 impl Lexer {
-    pub fn new(file: PathBuf, workspace: &Workspace, text: &str, encoding: Encoding, errors: Arc<Mutex<ErrorReporter>>) -> Self {
+    pub fn new(_file: PathBuf, workspace: &Workspace, text: &str, _encoding: Encoding, errors: Arc<Mutex<ErrorReporter>>) -> Self {
         let mut define_table = HashMap::new();
         define_table.insert(Ascii::new("VERSION".into()), Constant::String(workspace.package.version.to_string()));
         let lang_version = workspace.language_version();
@@ -500,10 +497,8 @@ impl Lexer {
             } else {
                 &*TOKEN_LOOKUP_TABLE_350
             },
-            file,
             lang_version,
             define_table,
-            encoding,
             text: text.chars().collect(),
             lexer_state: LexerState::AfterEol,
             errors,
@@ -1131,94 +1126,6 @@ impl Lexer {
             None
         }
     }
-    fn collect_inactive_block(&mut self, mut collected: String, starting_depth: usize) -> Token {
-        // We entered with an inactive branch. We know the current top if_stack depth == starting_depth - 1 (just pushed or existing).
-        // We'll scan raw lines (including their comment markers) until we:
-        //  * reach an activating $ELSE / $ELSEIF at starting_depth
-        //  * or consume matching $ENDIF leaving depth < starting_depth
-        //  * nested $IF blocks are absorbed entirely.
-        let mut depth = 0usize; // depth relative to the skipped branch root
-        let mut line_buf = String::new();
-        let mut line_start_pos;
-        loop {
-            line_buf.clear();
-            line_start_pos = self.token_end;
-
-            // EOF: stop
-            if self.token_end >= self.text.len() {
-                break;
-            }
-
-            // Read one physical line (including trailing newline if present)
-            // Capture first non-space to detect comment marker easily.
-            let mut first_non_ws: Option<char> = None;
-            let mut raw_line_chars: Vec<char> = Vec::new();
-            while let Some(ch) = self.next_ch() {
-                raw_line_chars.push(ch);
-                if ch == '\n' {
-                    break;
-                }
-                if first_non_ws.is_none() && !ch.is_whitespace() {
-                    first_non_ws = Some(ch);
-                }
-            }
-
-            if raw_line_chars.is_empty() {
-                break;
-            }
-
-            let line_str: String = raw_line_chars.iter().collect();
-            line_buf.push_str(&line_str);
-            collected.push_str(&line_str);
-
-            // Only lines that are comment-start lines can contain directives
-            let is_comment_line = matches!(first_non_ws, Some(';') | Some('\'') | Some('*'));
-
-            if !is_comment_line {
-                continue; // just plain skipped code
-            }
-
-            // Extract after the first marker char (keep original marker in collected text)
-            // Find directive body roughly:
-            let after_marker = {
-                // find the first_non_ws index
-                let idx = raw_line_chars.iter().position(|c| !c.is_ascii_whitespace()).unwrap_or(0);
-                raw_line_chars[idx + 1..].iter().collect::<String>()
-            };
-            let upper = after_marker.trim_start().to_ascii_uppercase();
-
-            // Recognize directives
-            if upper.starts_with("$IF ") || upper == "$IF" {
-                depth += 1;
-                continue;
-            }
-            if upper.starts_with("$ENDIF") {
-                if depth == 0 {
-                    // matched the $IF level we’re skipping
-                    // We consumed the endif line already; stop here.
-                    break;
-                } else {
-                    depth -= 1;
-                    continue;
-                }
-            }
-            if depth == 0 {
-                // Potential activating branch at our root
-                if upper.starts_with("$ELSEIF") || upper.starts_with("$ELSE") {
-                    // We reached a sibling branch; back up so next token processing can re-read this line.
-                    // Rewind token_end to line_start to let read_comment see it fresh.
-                    self.token_end = line_start_pos;
-                    // Remove the just appended line from collected (since we rewound).
-                    let remove_len = line_buf.len();
-                    let new_len = collected.len().saturating_sub(remove_len);
-                    collected.truncate(new_len);
-                    break;
-                }
-            }
-        }
-
-        Token::Comment(CommentType::BlockComment, collected)
-    }
 
     // Collect skipped inactive region starting at a false $IF or untaken $ELSEIF.
     // Includes lines until:
@@ -1539,7 +1446,6 @@ impl Lexer {
         // Check if we're in an inactive conditional branch
         if !self.if_stack.is_empty() && !self.if_stack.last().unwrap().active {
             // Collect entire skipped block as a comment
-            let block_start = self.token_end;
             let mut skipped_content = String::new();
 
             // Skip tokens while in inactive conditional branch
