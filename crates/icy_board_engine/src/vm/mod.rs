@@ -212,13 +212,9 @@ impl<'a> VirtualMachine<'a> {
         self.variable_table.set_value(U_CMNT1, VariableValue::new_string(cur_user.user_comment.clone()));
         self.variable_table
             .set_value(U_CMNT2, VariableValue::new_string(cur_user.sysop_comment.clone()));
-        match &cur_user.password.password {
-            Password::PlainText(pwd) => {
-                log::info!("Setting user password in PPE VM (plain text) PW ({})", pwd);
-                self.variable_table
-                    .set_value(U_PWD, VariableValue::new_string(pwd.clone().to_ascii_uppercase()));
-            }
-        }
+        self.variable_table.get_value_mut(U_PWD).vtype = VariableType::Password;
+        self.variable_table
+            .set_value(U_PWD, VariableValue::new_password(cur_user.password.password.clone()));
 
         self.variable_table.set_value(U_SCROLL, VariableValue::new_bool(cur_user.flags.scroll_msg_body));
         self.variable_table
@@ -338,7 +334,13 @@ impl<'a> VirtualMachine<'a> {
         cur_user.user_comment = self.variable_table.get_value(U_CMNT1).as_string();
         cur_user.sysop_comment = self.variable_table.get_value(U_CMNT2).as_string();
 
-        cur_user.password.password = Password::PlainText(self.variable_table.get_value(U_PWD).as_string());
+        let pwd_value = self.variable_table.get_value(U_PWD);
+        cur_user.password.password = if let GenericVariableData::Password(ref pwd) = pwd_value.generic_data {
+            pwd.clone()
+        } else {
+            // Fallback: create a password from the string representation
+            Password::new_argon2(pwd_value.as_string())
+        };
 
         cur_user.flags.scroll_msg_body = self.variable_table.get_value(U_SCROLL).as_bool();
         cur_user.flags.use_short_filedescr = self.variable_table.get_value(U_LONGHDR).as_bool();

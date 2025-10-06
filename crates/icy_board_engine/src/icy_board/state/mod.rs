@@ -2383,7 +2383,7 @@ impl IcyBoardState {
         let exp_days = self.get_board().await.config.limits.password_expire_days;
         if let Some(user) = &mut self.session.current_user {
             let old = user.password.password.clone();
-            user.password.password = Password::PlainText(new_pwd.to_string());
+            user.password.password = Password::new_argon2(new_pwd.to_string());
             user.password.times_changed = user.password.times_changed.wrapping_add(1);
             user.password.last_change = Utc::now();
             user.password.prev_pwd.push(old);

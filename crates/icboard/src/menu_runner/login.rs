@@ -253,7 +253,7 @@ impl PcbBoardCommand {
             };
 
             if pw1 == pw2 {
-                new_user.password.password = Password::PlainText(pw1);
+                new_user.password.password = Password::new_argon2(pw1);
                 break;
             }
             let exp_days = self.state.get_board().await.config.limits.password_expire_days;
@@ -675,7 +675,7 @@ impl PcbBoardCommand {
             if pw1 == pw2 {
                 let exp_days = self.state.get_board().await.config.limits.password_expire_days;
                 if let Some(cur_user) = &mut self.state.session.current_user {
-                    cur_user.password.password = Password::PlainText(pw1);
+                    cur_user.password.password = Password::new_argon2(pw1);
                     if exp_days > 0 {
                         cur_user.password.expire_date = Utc::now() + chrono::Duration::days(exp_days as i64);
                     }

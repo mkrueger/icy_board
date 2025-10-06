@@ -14,8 +14,12 @@ use crate::{
         users::PcbUserRecord,
     },
 };
+use argon2::{
+    Argon2,
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
+};
 use bitflag::bitflag;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, format};
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -25,15 +29,30 @@ use super::{
     user_inf::{AccountUserInf, BankUserInf, QwkConfigUserInf},
 };
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum Password {
     PlainText(String),
+    Argon2(String),
 }
 
-impl std::fmt::Display for Password {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Password::PlainText(s) => write!(f, "{}", s),
+impl PartialEq for Password {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::PlainText(l0), Self::PlainText(r0)) => l0 == r0,
+            // Argon2 to Argon2: exact hash comparison
+            (Self::Argon2(l0), Self::Argon2(r0)) => {
+                log::warn!("Comparing two Argon2 hashes directly. This is not recommended.");
+                l0 == r0
+            }
+
+            // Plain to Argon2: verify the plain password against the hash
+            (Self::PlainText(plain), Self::Argon2(hash)) | (Self::Argon2(hash), Self::PlainText(plain)) => {
+                if let Ok(parsed_hash) = PasswordHash::new(hash) {
+                    Argon2::default().verify_password(plain.as_bytes(), &parsed_hash).is_ok()
+                } else {
+                    false
+                }
+            }
         }
     }
 }
@@ -45,16 +64,48 @@ impl Default for Password {
 }
 
 impl Password {
+    pub fn from_str(s: &str) -> Res<Self> {
+        Ok(Password::PlainText(s.to_string()))
+    }
+
+    pub fn to_argon2(&self) -> Self {
+        match self {
+            Password::PlainText(text) => {
+                let argon2 = Argon2::default();
+                let salt = SaltString::generate(&mut OsRng);
+
+                let password_hash = argon2.hash_password(text.to_lowercase().as_bytes(), &salt).unwrap().to_string();
+                Password::Argon2(password_hash)
+            }
+
+            Password::Argon2(x) => Password::Argon2(x.clone()),
+        }
+    }
+
+    pub fn new_argon2(str: impl Into<String>) -> Password {
+        Password::PlainText(str.into()).to_argon2()
+    }
+}
+
+impl std::fmt::Display for Password {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Password::PlainText(s) => write!(f, "{}", s),
+            Password::Argon2(_s) => write!(f, "******"),
+        }
+    }
+}
+
+impl Password {
     pub fn is_empty(&self) -> bool {
         match self {
             Password::PlainText(s) => s.is_empty(),
+            Password::Argon2(s) => s.is_empty(),
         }
     }
 
     pub fn is_valid(&self, pwd: &str) -> bool {
-        match self {
-            Password::PlainText(s) => s.eq_ignore_ascii_case(pwd),
-        }
+        self == &Password::PlainText(pwd.to_lowercase().to_string())
     }
 }
 
@@ -63,7 +114,18 @@ impl<'de> Deserialize<'de> for Password {
     where
         D: serde::Deserializer<'de>,
     {
-        String::deserialize(deserializer).map(Password::PlainText)
+        String::deserialize(deserializer).map(|p| {
+            if p.starts_with("$argon2") {
+                Password::Argon2(p)
+            } else {
+                if p.len() >= 2 && p.starts_with('"') && p.ends_with('"') {
+                    Password::PlainText(p[1..p.len() - 1].to_string())
+                } else {
+                    // Plain text password without quotes (legacy)
+                    Password::PlainText(p)
+                }
+            }
+        })
     }
 }
 
@@ -73,7 +135,8 @@ impl serde::Serialize for Password {
         S: serde::Serializer,
     {
         match self {
-            Password::PlainText(key) => key.serialize(serializer),
+            Password::PlainText(key) => format!("\"{key}\"").serialize(serializer),
+            Password::Argon2(key) => key.serialize(serializer),
         }
     }
 }

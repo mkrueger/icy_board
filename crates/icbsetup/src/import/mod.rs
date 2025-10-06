@@ -268,7 +268,7 @@ impl PCBoardImporter {
         let mut icb_cfg = IcbConfig {
             sysop: SysopInformation {
                 name: self.data.sysop_info.sysop.clone(),
-                password: Password::from_str(self.data.sysop_info.password.as_str()).unwrap(),
+                password: Password::new_argon2(self.data.sysop_info.password.as_str()),
                 require_password_to_exit: self.data.sysop_info.require_pwrd_to_exit,
                 use_real_name: self.data.sysop_info.use_real_name,
                 external_editor: "nano".to_string(),

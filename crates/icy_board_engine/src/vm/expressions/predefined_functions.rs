@@ -68,8 +68,10 @@ pub async fn len(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
         GenericVariableData::Dim1(items) => items.len() - 1,
         GenericVariableData::Dim2(items) => items.len() - 1,
         GenericVariableData::Dim3(items) => items.len() - 1,
+        GenericVariableData::Password(_) => 6, // always return 6 for passwords
+        GenericVariableData::None if str.vtype == VariableType::String || str.vtype == VariableType::BigStr => 0,
         _ => {
-            log::warn!("len: called on invalid type.");
+            log::warn!("len: called on invalid type: '{}'.", str.vtype);
             0
         }
     };
@@ -106,6 +108,13 @@ pub async fn len_dim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
             2 => items[0][0].len() - 1,
             _ => 0,
         },
+        GenericVariableData::Password(_) => {
+            if dim == 0 {
+                6 // always return 6 for passwords
+            } else {
+                0
+            }
+        }
         _ => {
             log::warn!("len({dim}): called on invalid type.");
             0

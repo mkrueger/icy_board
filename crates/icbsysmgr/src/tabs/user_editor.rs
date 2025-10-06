@@ -58,13 +58,13 @@ impl UserEditor {
                         }),
                 ),
                 ConfigEntry::Item(
-                    ListItem::new(get_text("user_editor_password"), ListValue::Text(25, user.password.password.to_string()))
+                    ListItem::new(get_text("user_editor_password"), ListValue::Text(25, String::new()))
                         .with_status(get_text("user_editor_password-status"))
                         .with_help(get_text("user_editor_password-help"))
                         .with_label_width(label_width)
                         .with_update_text_value(&|board: &Arc<Mutex<User>>, value: String| {
                             let mut user = board.lock().unwrap();
-                            user.password.password = Password::PlainText(value);
+                            user.password.password = Password::new_argon2(value);
                         }),
                 ),
                 ConfigEntry::Item(

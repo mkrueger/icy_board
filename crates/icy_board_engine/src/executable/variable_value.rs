@@ -9,6 +9,7 @@ use crate::{
     Res,
     datetime::{IcbDate, IcbTime},
     executable::{FunctionValue, ProcedureValue, VMError},
+    icy_board::user_base::Password,
 };
 
 use super::{MsgAreaIdValue, Signature};
@@ -76,6 +77,8 @@ pub enum VariableType {
 
     MessageAreaID,
 
+    Password,
+
     UserData(u8),
 }
 
@@ -108,6 +111,7 @@ impl From<VariableType> for u8 {
             VariableType::DDate => 17,
             VariableType::Table => 18,
             VariableType::MessageAreaID => 19,
+            VariableType::Password => 20,
             VariableType::UserData(b) => b,
             VariableType::None => 255,
         }
@@ -143,6 +147,8 @@ impl VariableType {
             16 => VariableType::Procedure,
             17 => VariableType::DDate,
             18 => VariableType::Table,
+            19 => VariableType::MessageAreaID,
+            20 => VariableType::Password,
             _ => VariableType::UserData(b),
         }
     }
@@ -169,6 +175,7 @@ impl VariableType {
             VariableType::DDate => "DDATE".to_string(),
             VariableType::Table => "TABLE".to_string(),
             VariableType::MessageAreaID => "MSGAREAID".to_string(),
+            VariableType::Password => "PASSWORD".to_string(),
             VariableType::UserData(u) => format!("USERDATA({})", u),
             VariableType::None => "NONE".to_string(),
         };
@@ -200,6 +207,7 @@ impl fmt::Display for VariableType {
             VariableType::DDate => write!(f, "DDate"),             // i32
             VariableType::Table => write!(f, "Table"),             // Generic key-value table
             VariableType::MessageAreaID => write!(f, "MsgAreaID"), // 2*u8
+            VariableType::Password => write!(f, "Password"),       // Password type
             VariableType::UserData(u) => write!(f, "UserData({})", u),
         }
     }
@@ -272,6 +280,8 @@ pub enum GenericVariableData {
     Dim3(Vec<Vec<Vec<VariableValue>>>),
 
     Table(PPLTable),
+
+    Password(crate::icy_board::user_base::Password),
 
     UserData(usize),
 }
@@ -368,7 +378,11 @@ impl fmt::Display for VariableValue {
 
 impl PartialEq for VariableValue {
     fn eq(&self, other: &Self) -> bool {
-        let dest_type: VariableType = promote_to(self.vtype, other.vtype);
+        let dest_type: VariableType = if self.vtype == VariableType::Password || other.vtype == VariableType::Password {
+            VariableType::Password
+        } else {
+            promote_to(self.vtype, other.vtype)
+        };
         unsafe {
             match dest_type {
                 VariableType::Boolean => self.as_bool() == other.as_bool(),
@@ -396,6 +410,32 @@ impl PartialEq for VariableValue {
                 VariableType::Double => self.as_double() == other.as_double(),
                 VariableType::Byte | VariableType::SByte => self.as_byte() == other.as_byte(),
                 VariableType::Word | VariableType::SWord => self.as_word() == other.as_word(),
+
+                VariableType::Password => {
+                    // Convert both sides to Password and compare
+                    let left_pwd = if self.vtype == VariableType::Password {
+                        if let GenericVariableData::Password(ref pwd) = self.generic_data {
+                            pwd.clone()
+                        } else {
+                            Password::PlainText(self.as_string().to_lowercase())
+                        }
+                    } else {
+                        Password::PlainText(self.as_string().to_lowercase())
+                    };
+
+                    let right_pwd = if other.vtype == VariableType::Password {
+                        if let GenericVariableData::Password(ref pwd) = other.generic_data {
+                            pwd.clone()
+                        } else {
+                            Password::PlainText(other.as_string().to_lowercase())
+                        }
+                    } else {
+                        Password::PlainText(other.as_string().to_lowercase())
+                    };
+
+                    log::info!("Comparing passwords: '{:?}' == '{:?}' -> {}", left_pwd, right_pwd, left_pwd == right_pwd);
+                    left_pwd == right_pwd
+                }
 
                 _ => false,
             }
@@ -725,7 +765,11 @@ impl Rem<VariableValue> for VariableValue {
 
 impl PartialOrd for VariableValue {
     fn partial_cmp(&self, other: &VariableValue) -> Option<Ordering> {
-        let dest_type: VariableType = promote_to(self.vtype, other.vtype);
+        let dest_type: VariableType = if self.vtype == VariableType::Password || other.vtype == VariableType::Password {
+            VariableType::Password
+        } else {
+            promote_to(self.vtype, other.vtype)
+        };
         unsafe {
             match dest_type {
                 VariableType::Boolean => Some(self.as_bool().cmp(&other.as_bool())),
@@ -743,6 +787,36 @@ impl PartialOrd for VariableValue {
                 VariableType::Double => self.as_double().partial_cmp(&other.as_double()),
                 VariableType::Byte | VariableType::SByte => Some(self.as_byte().cmp(&other.as_byte())),
                 VariableType::Word | VariableType::SWord => Some(self.as_word().cmp(&other.as_word())),
+
+                VariableType::Password => {
+                    // Passwords can only be equal or not equal, no ordering
+                    // Use the same comparison logic as PartialEq
+                    let left_pwd = if self.vtype == VariableType::Password {
+                        if let GenericVariableData::Password(ref pwd) = self.generic_data {
+                            pwd.clone()
+                        } else {
+                            Password::PlainText(self.as_string().to_lowercase())
+                        }
+                    } else {
+                        Password::PlainText(self.as_string().to_lowercase())
+                    };
+
+                    let right_pwd = if other.vtype == VariableType::Password {
+                        if let GenericVariableData::Password(ref pwd) = other.generic_data {
+                            pwd.clone()
+                        } else {
+                            Password::PlainText(other.as_string().to_lowercase())
+                        }
+                    } else {
+                        Password::PlainText(other.as_string().to_lowercase())
+                    };
+
+                    if left_pwd == right_pwd {
+                        Some(Ordering::Equal)
+                    } else {
+                        None // Incomparable - passwords have no ordering beyond equality
+                    }
+                }
 
                 _ => None,
             }
@@ -1417,6 +1491,7 @@ impl VariableValue {
         unsafe {
             match &self.generic_data {
                 GenericVariableData::String(s) => s.to_string(),
+                GenericVariableData::Password(_) => "******".to_string(),
                 _ => match self.vtype {
                     VariableType::Boolean => {
                         if self.as_bool() {
@@ -1440,6 +1515,7 @@ impl VariableValue {
                     VariableType::Word => self.data.word_value.to_string(),
                     VariableType::SByte => self.data.sbyte_value.to_string(),
                     VariableType::SWord => self.data.sword_value.to_string(),
+
                     _ => String::new(),
                 },
             }
@@ -1690,11 +1766,22 @@ impl VariableValue {
                 log::error!("can't convert {:?} to user data type {x}", self);
                 data.int_value = -1;
             }
+            VariableType::Password => {
+                return VariableValue::new_password(Password::new_argon2(self.as_string()));
+            }
             VariableType::None => {
                 panic!("Unknown variable type")
             }
         }
         VariableValue::new(convert_to_type, data)
+    }
+
+    pub(crate) fn new_password(password: crate::icy_board::user_base::Password) -> VariableValue {
+        VariableValue {
+            vtype: VariableType::Password,
+            data: VariableData::default(),
+            generic_data: GenericVariableData::Password(password),
+        }
     }
 }
 
@@ -1709,7 +1796,13 @@ pub fn convert_to(var_type: VariableType, value: &VariableValue) -> VariableValu
     if var_type == VariableType::String || var_type == VariableType::BigStr {
         res.generic_data = GenericVariableData::String(value.as_string());
     }
-
+    if var_type == VariableType::Password {
+        if let GenericVariableData::Password(p) = &value.generic_data {
+            res.generic_data = GenericVariableData::Password(p.clone());
+        } else {
+            res.generic_data = GenericVariableData::Password(Password::new_argon2(value.as_string()));
+        }
+    }
     res
 }
 
