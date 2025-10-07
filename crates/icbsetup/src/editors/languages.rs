@@ -12,7 +12,7 @@ use icy_board_engine::{
     },
 };
 use icy_board_tui::{
-    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
+    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
     get_text,
     insert_table::InsertTable,
     save_changes_dialog::SaveChangesDialog,
@@ -228,43 +228,68 @@ impl<'a> Page for LanguageListEditor<'a> {
                         obj: (selected_item, self.lang_list.clone()),
                         entry: vec![
                             ConfigEntry::Item(
-                                ListItem::new(get_text("lang_editor_edit_lang_label"), ListValue::Text(25, item.description.to_string()))
-                                    .with_label_width(16)
-                                    .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SupportedLanguages>>), value: String| {
+                                ListItem::new(
+                                    get_text("lang_editor_edit_lang_label"),
+                                    ListValue::Text(25, TextFlags::None, item.description.to_string()),
+                                )
+                                .with_label_width(16)
+                                .with_update_text_value(
+                                    &|(i, list): &(usize, Arc<Mutex<SupportedLanguages>>), value: String| {
                                         list.lock().unwrap()[*i].description = value;
-                                    }),
+                                    },
+                                ),
                             ),
                             ConfigEntry::Item(
-                                ListItem::new(get_text("lang_editor_edit_extension"), ListValue::Text(25, item.extension.to_string()))
-                                    .with_label_width(16)
-                                    .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SupportedLanguages>>), value: String| {
+                                ListItem::new(
+                                    get_text("lang_editor_edit_extension"),
+                                    ListValue::Text(25, TextFlags::None, item.extension.to_string()),
+                                )
+                                .with_label_width(16)
+                                .with_update_text_value(
+                                    &|(i, list): &(usize, Arc<Mutex<SupportedLanguages>>), value: String| {
                                         list.lock().unwrap()[*i].extension = value;
-                                    }),
+                                    },
+                                ),
                             ),
                             ConfigEntry::Item(
-                                ListItem::new(get_text("lang_editor_edit_locale"), ListValue::Text(25, item.locale.to_string()))
-                                    .with_label_width(16)
-                                    .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SupportedLanguages>>), value: String| {
+                                ListItem::new(
+                                    get_text("lang_editor_edit_locale"),
+                                    ListValue::Text(25, TextFlags::None, item.locale.to_string()),
+                                )
+                                .with_label_width(16)
+                                .with_update_text_value(
+                                    &|(i, list): &(usize, Arc<Mutex<SupportedLanguages>>), value: String| {
                                         list.lock().unwrap()[*i].locale = value;
-                                    }),
+                                    },
+                                ),
                             ),
                             ConfigEntry::Item(
-                                ListItem::new(get_text("lang_editor_edit_yes_char"), ListValue::Text(1, item.yes_char.to_string()))
-                                    .with_label_width(16)
-                                    .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SupportedLanguages>>), value: String| {
+                                ListItem::new(
+                                    get_text("lang_editor_edit_yes_char"),
+                                    ListValue::Text(1, TextFlags::None, item.yes_char.to_string()),
+                                )
+                                .with_label_width(16)
+                                .with_update_text_value(
+                                    &|(i, list): &(usize, Arc<Mutex<SupportedLanguages>>), value: String| {
                                         if let Some(c) = value.chars().next() {
                                             list.lock().unwrap()[*i].yes_char = c;
                                         }
-                                    }),
+                                    },
+                                ),
                             ),
                             ConfigEntry::Item(
-                                ListItem::new(get_text("lang_editor_edit_no_char"), ListValue::Text(1, item.no_char.to_string()))
-                                    .with_label_width(16)
-                                    .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SupportedLanguages>>), value: String| {
+                                ListItem::new(
+                                    get_text("lang_editor_edit_no_char"),
+                                    ListValue::Text(1, TextFlags::None, item.no_char.to_string()),
+                                )
+                                .with_label_width(16)
+                                .with_update_text_value(
+                                    &|(i, list): &(usize, Arc<Mutex<SupportedLanguages>>), value: String| {
                                         if let Some(c) = value.chars().next() {
                                             list.lock().unwrap()[*i].no_char = c;
                                         }
-                                    }),
+                                    },
+                                ),
                             ),
                         ],
                     });

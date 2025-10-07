@@ -12,6 +12,7 @@ use icy_board_tui::config_menu::ConfigMenu;
 use icy_board_tui::config_menu::ConfigMenuState;
 use icy_board_tui::config_menu::ListItem;
 use icy_board_tui::config_menu::ListValue;
+use icy_board_tui::config_menu::TextFlags;
 use icy_board_tui::tab_page::Page;
 use icy_board_tui::tab_page::PageMessage;
 use icy_board_tui::theme::get_tui_theme;
@@ -176,8 +177,10 @@ impl GroupEditor {
         let ib = self.icy_board.lock().unwrap();
         let group = ib.groups.get(index).unwrap();
         let items = vec![
-            ConfigEntry::Item(ListItem::new("Name".to_string(), ListValue::Text(60, group.name.to_string())).with_label_width(14)),
-            ConfigEntry::Item(ListItem::new("Members".to_string(), ListValue::Text(60, group.members.join(",").to_string())).with_label_width(14)),
+            ConfigEntry::Item(ListItem::new("Name".to_string(), ListValue::Text(60, TextFlags::None, group.name.to_string())).with_label_width(14)),
+            ConfigEntry::Item(
+                ListItem::new("Members".to_string(), ListValue::Text(60, TextFlags::None, group.members.join(",").to_string())).with_label_width(14),
+            ),
         ];
         self.conference_config.entry = items;
     }

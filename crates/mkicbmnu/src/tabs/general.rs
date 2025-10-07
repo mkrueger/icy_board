@@ -7,7 +7,7 @@ use std::{
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::menu::{Menu, MenuType};
 use icy_board_tui::{
-    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, EditMessage, ListItem, ListValue, ResultState},
+    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, EditMessage, ListItem, ListValue, ResultState, TextFlags},
     tab_page::TabPage,
     theme::get_tui_theme,
 };
@@ -30,7 +30,7 @@ impl GeneralTab {
         let items = if let Ok(mnu) = menu.lock() {
             vec![
                 ConfigEntry::Item(
-                    ListItem::new("Title".to_string(), ListValue::Text(25, mnu.title.clone()))
+                    ListItem::new("Title".to_string(), ListValue::Text(25, TextFlags::None, mnu.title.clone()))
                         .with_status("Enter the title of the menu.")
                         .with_label_width(info_width)
                         .with_update_text_value(&|mnu: &Arc<Mutex<Menu>>, value: String| {
@@ -78,7 +78,7 @@ impl GeneralTab {
                     }),
                 ),
                 ConfigEntry::Item(
-                    ListItem::new("Prompt".to_string(), ListValue::Text(25, mnu.prompt.clone()))
+                    ListItem::new("Prompt".to_string(), ListValue::Text(25, TextFlags::None, mnu.prompt.clone()))
                         .with_status("The prompt for the menu.")
                         .with_label_width(info_width)
                         .with_update_text_value(&|mnu: &Arc<Mutex<Menu>>, value: String| {

@@ -15,7 +15,7 @@ use icy_board_engine::{
 };
 use icy_board_tui::{
     BORDER_SET,
-    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
+    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
     get_text, get_text_args,
     insert_table::InsertTable,
     save_changes_dialog::SaveChangesDialog,
@@ -221,18 +221,21 @@ impl<'a> Page for MessageAreasEditor<'a> {
                             obj: (selected_item, self.area_list.clone()),
                             entry: vec![
                                 ConfigEntry::Item(
-                                    ListItem::new(get_text("area_editor_name"), ListValue::Text(25, item.name.to_string()))
+                                    ListItem::new(get_text("area_editor_name"), ListValue::Text(25, TextFlags::None, item.name.to_string()))
                                         .with_label_width(16)
                                         .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<AreaList>>), value: String| {
                                             list.lock().unwrap()[*i].name = value;
                                         }),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(get_text("area_editor_qwk_name"), ListValue::Text(25, item.qwk_name.to_string()))
-                                        .with_label_width(16)
-                                        .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<AreaList>>), value: String| {
-                                            list.lock().unwrap()[*i].qwk_name = value;
-                                        }),
+                                    ListItem::new(
+                                        get_text("area_editor_qwk_name"),
+                                        ListValue::Text(25, TextFlags::None, item.qwk_name.to_string()),
+                                    )
+                                    .with_label_width(16)
+                                    .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<AreaList>>), value: String| {
+                                        list.lock().unwrap()[*i].qwk_name = value;
+                                    }),
                                 ),
                                 ConfigEntry::Item(
                                     ListItem::new(get_text("area_editor_file"), ListValue::Path(item.path.clone()))

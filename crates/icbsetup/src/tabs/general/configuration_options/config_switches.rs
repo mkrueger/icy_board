@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use icy_board_engine::icy_board::{IcyBoard, icb_config::DisplayNewsBehavior};
 use icy_board_tui::{
     cfg_entry_bool,
-    config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState},
+    config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState, TextFlags},
     get_text,
     icbconfigmenu::ICBConfigMenuUI,
     tab_page::Page,
@@ -26,7 +26,7 @@ impl ConfigSwitches {
                 ConfigEntry::Item(
                     ListItem::new(
                         get_text("display_news_behavior"),
-                        ListValue::Text(1, lock.config.switches.display_news_behavior.to_pcb_char().to_string()),
+                        ListValue::Text(1, TextFlags::None, lock.config.switches.display_news_behavior.to_pcb_char().to_string()),
                     )
                     .with_status(&get_text("display_news_behavior-status"))
                     .with_label_width(label_width)

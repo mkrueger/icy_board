@@ -747,6 +747,12 @@ allow_password_failure_comment=Allow Password Failure Comment
 allow_password_failure_comment-status=On PW failures message to sysop can be entered.
 allow_password_failure_comment-help=TODO
 
+password_storage_method=Password Storage Method
+password_storage_method-status=Turn on/off plaintext storage
+password_storage_method-help=TODO
+password_storage_method_plain_text=Plain Text
+password_storage_method_argon2=Argon 2 Hash
+
 guard_logoff=Warning on Logoff Command
 guard_logoff-status=Show Warning on 'g' command.
 guard_logoff-help=TODO

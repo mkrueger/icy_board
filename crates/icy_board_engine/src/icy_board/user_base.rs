@@ -19,12 +19,12 @@ use argon2::{
     password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
 };
 use bitflag::bitflag;
-use chrono::{DateTime, Utc, format};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::{
     IcyBoardSerializer, PcbUser,
-    icb_config::{DEFAULT_PCBOARD_DATE_FORMAT, PasswordStorageMethod},
+    icb_config::DEFAULT_PCBOARD_DATE_FORMAT,
     is_false, is_null_16, is_null_64,
     user_inf::{AccountUserInf, BankUserInf, QwkConfigUserInf},
 };
@@ -165,10 +165,6 @@ pub struct PasswordInfo {
 
     #[serde(default)]
     pub expire_date: DateTime<Utc>,
-
-    #[serde(default)]
-    #[serde(skip_serializing_if = "PasswordStorageMethod::is_default")]
-    pub password_storage_method: PasswordStorageMethod,
 }
 
 #[derive(Default, Clone, Serialize, Deserialize, PartialEq)]
@@ -838,7 +834,6 @@ impl User {
                 last_change: last_change.to_utc_date_time(),
                 times_changed: times_changed as u64,
                 expire_date: expire_date.to_utc_date_time(),
-                password_storage_method: PasswordStorageMethod::PlainText,
             },
 
             qwk_config,

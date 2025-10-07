@@ -1491,7 +1491,10 @@ impl VariableValue {
         unsafe {
             match &self.generic_data {
                 GenericVariableData::String(s) => s.to_string(),
-                GenericVariableData::Password(_) => "******".to_string(),
+                GenericVariableData::Password(p) => match p {
+                    Password::PlainText(s) => s.to_string(),
+                    _ => "******".to_string(),
+                },
                 _ => match self.vtype {
                     VariableType::Boolean => {
                         if self.as_bool() {
@@ -1767,7 +1770,7 @@ impl VariableValue {
                 data.int_value = -1;
             }
             VariableType::Password => {
-                return VariableValue::new_password(Password::new_argon2(self.as_string()));
+                return VariableValue::new_password(Password::PlainText(self.as_string().to_lowercase()));
             }
             VariableType::None => {
                 panic!("Unknown variable type")

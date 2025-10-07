@@ -14,7 +14,7 @@ use icy_board_engine::{
     },
 };
 use icy_board_tui::{
-    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
+    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
     get_text,
     insert_table::InsertTable,
     save_changes_dialog::SaveChangesDialog,
@@ -230,13 +230,18 @@ impl<'a> Page for BullettinsEditor<'a> {
                                         }),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new("Security".to_string(), ListValue::Text(25, action.required_security.to_string()))
-                                        .with_label_width(16)
-                                        .with_update_text_value(&|board: &(usize, Arc<Mutex<Vec<Bullettin>>>), value: String| {
+                                    ListItem::new(
+                                        "Security".to_string(),
+                                        ListValue::Text(25, TextFlags::None, action.required_security.to_string()),
+                                    )
+                                    .with_label_width(16)
+                                    .with_update_text_value(
+                                        &|board: &(usize, Arc<Mutex<Vec<Bullettin>>>), value: String| {
                                             if let Ok(expr) = SecurityExpression::from_str(&value) {
                                                 board.1.lock().unwrap()[board.0].required_security = expr;
                                             }
-                                        }),
+                                        },
+                                    ),
                                 ),
                             ],
                         });

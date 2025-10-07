@@ -43,7 +43,6 @@ fn create_test_user(name: &str, idx: u8) -> User {
             last_change: DateTime::from_timestamp(1000000 + idx as i64 * 1000, 0).unwrap(),
             times_changed: idx as u64,
             expire_date: DateTime::from_timestamp(2000000 + idx as i64 * 1000, 0).unwrap(),
-            password_storage_method: PasswordStorageMethod::PlainText,
         },
         security_level: 10 + idx,
         exp_date: IcbDate::new(12, 31, 2025),

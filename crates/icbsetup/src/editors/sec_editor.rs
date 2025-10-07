@@ -12,7 +12,7 @@ use icy_board_engine::{
     },
 };
 use icy_board_tui::{
-    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
+    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
     get_text,
     insert_table::InsertTable,
     save_changes_dialog::SaveChangesDialog,
@@ -312,18 +312,28 @@ impl<'a> Page for SecurityLevelEditor<'a> {
                                         }),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(get_text("sec_level_editor_description"), ListValue::Text(30, action.description.clone()))
-                                        .with_label_width(16)
-                                        .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: String| {
+                                    ListItem::new(
+                                        get_text("sec_level_editor_description"),
+                                        ListValue::Text(30, TextFlags::None, action.description.clone()),
+                                    )
+                                    .with_label_width(16)
+                                    .with_update_text_value(
+                                        &|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: String| {
                                             list.lock().unwrap()[*i].description = value;
-                                        }),
+                                        },
+                                    ),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(get_text("sec_level_editor_password"), ListValue::Text(30, action.password.clone()))
-                                        .with_label_width(16)
-                                        .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: String| {
+                                    ListItem::new(
+                                        get_text("sec_level_editor_password"),
+                                        ListValue::Text(30, TextFlags::None, action.password.clone()),
+                                    )
+                                    .with_label_width(16)
+                                    .with_update_text_value(
+                                        &|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: String| {
                                             list.lock().unwrap()[*i].password = value;
-                                        }),
+                                        },
+                                    ),
                                 ),
                                 ConfigEntry::Item(
                                     ListItem::new(

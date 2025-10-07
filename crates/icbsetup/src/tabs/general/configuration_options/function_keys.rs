@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
-    config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState},
+    config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState, TextFlags},
     get_text,
     icbconfigmenu::ICBConfigMenuUI,
     tab_page::Page,
@@ -23,14 +23,17 @@ impl FunctionKeys {
 
             for i in 0..10 {
                 entry.push(ConfigEntry::Item(
-                    ListItem::new(format!("F-Key #{}", i + 1), ListValue::Text(50, lock.config.func_keys[i].to_string()))
-                        .with_label_width(function_keys_width)
-                        .with_update_value(Box::new(move |board: &Arc<Mutex<IcyBoard>>, value: &ListValue| {
-                            let ListValue::Text(_, text) = value else {
-                                return;
-                            };
-                            board.lock().unwrap().config.func_keys[i] = text.clone();
-                        })),
+                    ListItem::new(
+                        format!("F-Key #{}", i + 1),
+                        ListValue::Text(50, TextFlags::None, lock.config.func_keys[i].to_string()),
+                    )
+                    .with_label_width(function_keys_width)
+                    .with_update_value(Box::new(move |board: &Arc<Mutex<IcyBoard>>, value: &ListValue| {
+                        let ListValue::Text(_, _, text) = value else {
+                            return;
+                        };
+                        board.lock().unwrap().config.func_keys[i] = text.clone();
+                    })),
                 ));
             }
             ConfigMenu { obj: icy_board.clone(), entry }

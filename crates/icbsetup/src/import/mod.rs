@@ -17,7 +17,7 @@ use icy_board_engine::{
         group_list::GroupList,
         icb_config::{
             BoardInformation, BoardOptions, ColorConfiguration, ConfigPaths, DEFAULT_PCBOARD_DATE_FORMAT, DisplayNewsBehavior, IcbColor, IcbConfig,
-            NewUserSettings, QwkSettings, SubscriptionMode, SysopCommandLevels, SysopInformation,
+            NewUserSettings, PasswordStorageMethod, QwkSettings, SubscriptionMode, SysopCommandLevels, SysopInformation,
         },
         icb_text::IcbTextFile,
         language::SupportedLanguages,
@@ -457,6 +457,7 @@ impl PCBoardImporter {
                 is_multi_lingual: self.data.multi_lingual,
                 enforce_daily_time_limit: self.data.enforce_time,
                 allow_password_failure_comment: self.data.allow_pwrd_comment,
+                password_storage_method: PasswordStorageMethod::default(),
             },
             switches: ConfigSwitches {
                 display_news_behavior: DisplayNewsBehavior::from_pcb_char(self.data.display_news),

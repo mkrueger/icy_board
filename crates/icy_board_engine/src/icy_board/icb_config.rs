@@ -86,17 +86,21 @@ pub struct UserCommandLevels {
     pub edit_own_messages: SecurityExpression,
 }
 
-#[derive(Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Copy, Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub enum PasswordStorageMethod {
-    ///  Passwords are stored in plain text
     #[default]
+    #[serde(rename = "argon2")]
+    Argon2,
+
+    /// Passwords are stored in plain text
+    /// This is not recommended for security reasons but may be needed for legacy compatibility!
     #[serde(rename = "plain")]
     PlainText,
 }
 
 impl PasswordStorageMethod {
     pub fn is_default(&self) -> bool {
-        *self == PasswordStorageMethod::PlainText
+        *self == PasswordStorageMethod::Argon2
     }
 }
 
@@ -493,6 +497,10 @@ pub struct SystemControlOptions {
 
     /// G command will ask for logoff (bye will skip that)
     pub guard_logoff: bool,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "PasswordStorageMethod::is_default")]
+    pub password_storage_method: PasswordStorageMethod,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -913,6 +921,7 @@ impl IcbConfig {
                 allow_alias_change: false,
                 is_multi_lingual: false,
                 allow_password_failure_comment: false,
+                password_storage_method: PasswordStorageMethod::default(),
             },
             switches: ConfigSwitches {
                 display_news_behavior: DisplayNewsBehavior::OnlyNewer,

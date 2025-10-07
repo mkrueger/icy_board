@@ -68,7 +68,12 @@ pub async fn len(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
         GenericVariableData::Dim1(items) => items.len() - 1,
         GenericVariableData::Dim2(items) => items.len() - 1,
         GenericVariableData::Dim3(items) => items.len() - 1,
-        GenericVariableData::Password(_) => 6, // always return 6 for passwords
+        GenericVariableData::Password(p) => {
+            match p {
+                Password::PlainText(s) => s.chars().count(),
+                _ => 6, // always return 6 for passwords
+            }
+        }
         GenericVariableData::None if str.vtype == VariableType::String || str.vtype == VariableType::BigStr => 0,
         _ => {
             log::warn!("len: called on invalid type: '{}'.", str.vtype);
@@ -130,7 +135,16 @@ pub async fn len_dim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 /// # Returns
 ///  `VariableValue::String` - lowercase equivalent of `str`
 pub async fn lower(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let str = vm.eval_expr(&args[0]).await?.as_string();
+    let value = vm.eval_expr(&args[0]).await?;
+
+    // Check if it's a non-plaintext password and return unchanged
+    if let GenericVariableData::Password(ref pwd) = value.generic_data {
+        if !matches!(pwd, Password::PlainText(_)) {
+            return Ok(value.clone());
+        }
+    }
+
+    let str = value.as_string();
     Ok(VariableValue::new_string(str.to_lowercase()))
 }
 
@@ -140,7 +154,16 @@ pub async fn lower(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 /// # Returns
 ///  `VariableValue::String` - uppercase equivalent of `str`
 pub async fn upper(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let str = vm.eval_expr(&args[0]).await?.as_string();
+    let value = vm.eval_expr(&args[0]).await?;
+
+    // Check if it's a non-plaintext password and return unchanged
+    if let GenericVariableData::Password(ref pwd) = value.generic_data {
+        if !matches!(pwd, Password::PlainText(_)) {
+            return Ok(value.clone());
+        }
+    }
+
+    let str = value.as_string();
     Ok(VariableValue::new_string(str.to_uppercase()))
 }
 
@@ -300,25 +323,17 @@ pub async fn ltrim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 ///  * `old` - A string with the old character
 ///  * `new` - A string with the new character
 pub async fn replace(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let str = vm.eval_expr(&args[0]).await?.as_string();
+    let s = vm.eval_expr(&args[0]).await?.as_string();
     let old = vm.eval_expr(&args[1]).await?.as_string();
     let new = vm.eval_expr(&args[2]).await?.as_string();
-
-    let mut res = String::new();
-    let Some(old) = old.chars().next() else {
-        return Ok(VariableValue::new_string(str));
+    let Some(old_ch) = old.chars().next() else {
+        return Ok(VariableValue::new_string(s));
     };
-
-    if let Some(new) = new.chars().next() {
-        for c in str.chars() {
-            if c == old {
-                res.push(new);
-            } else {
-                res.push(c);
-            }
-        }
+    if new.is_empty() {
+        return Ok(VariableValue::new_string(s.chars().filter(|c| *c != old_ch).collect()));
     }
-    Ok(VariableValue::new_string(res))
+    let new_ch = new.chars().next().unwrap();
+    Ok(VariableValue::new_string(s.chars().map(|c| if c == old_ch { new_ch } else { c }).collect()))
 }
 
 /// Remove all occurences of a given character in a string
@@ -372,6 +387,7 @@ pub async fn stripatx(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
                     state = 3;
                 } else {
                     res.push('@');
+                    res.push('X');
                     res.push(c);
                     ch1 = c;
                     state = 0;
@@ -880,22 +896,18 @@ pub async fn i2s(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
 ///  An integer representation of `s` in the specified base.
 pub async fn s2i(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let src = vm.eval_expr(&args[0]).await?.as_string();
-    let base = vm.eval_expr(&args[1]).await?.as_int();
-    if src.is_empty() {
+    let base = vm.eval_expr(&args[1]).await?.as_int() as u32;
+    if !(2..=36).contains(&base) || src.is_empty() {
         return Ok(VariableValue::new_int(0));
     }
-
-    let mut res = 0;
-    for c in src.chars() {
-        if c.is_digit(base as u32) {
-            if let Some(c) = c.to_digit(base as u32) {
-                res = res * base + c as i32;
-            } else {
-                break;
-            }
+    let mut acc: u32 = 0;
+    for ch in src.chars() {
+        match ch.to_digit(base) {
+            Some(d) => acc = acc.wrapping_mul(base).wrapping_add(d),
+            None => break,
         }
     }
-    Ok(VariableValue::new_int(res))
+    Ok(VariableValue::new_int(acc as i32))
 }
 pub async fn carrier(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.icy_board_state.get_bps()))
@@ -1000,7 +1012,7 @@ pub async fn u_pwdhist(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
     match hist {
         1..3 => {
             if let Some(pwd) = vm.user.password.prev_pwd.get(hist as usize - 1) {
-                return Ok(VariableValue::new_string(format!("{}", pwd)));
+                return Ok(VariableValue::new_password(pwd.clone()));
             }
             Ok(VariableValue::new_string(String::new()))
         }
@@ -1276,7 +1288,7 @@ pub async fn u_recnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     let user_name = vm.eval_expr(&args[0]).await?.as_string().to_uppercase();
     for (i, user) in vm.icy_board_state.get_board().await.users.iter().enumerate() {
         if user.get_name().to_uppercase() == user_name {
-            return Ok(VariableValue::new_int(i as i32));
+            return Ok(VariableValue::new_int(1 + i as i32));
         }
     }
     Ok(VariableValue::new_int(-1))
@@ -1487,15 +1499,17 @@ pub async fn lastans(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub fn to_base_36(number: i32) -> String {
-    let mut res = String::new();
-    let mut number = number;
-    while number > 0 {
-        let num2 = (number % 36) as u8;
-        let ch2 = if num2 < 10 { (num2 + b'0') as char } else { (num2 - 10 + b'A') as char };
-        res = ch2.to_string() + res.as_str();
-        number /= 36;
+    if number <= 0 {
+        return "0".into();
     }
-    res
+    let mut n = number;
+    let mut out = Vec::new();
+    while n > 0 {
+        let d = (n % 36) as u8;
+        out.push(if d < 10 { (b'0' + d) as char } else { (b'A' + d - 10) as char });
+        n /= 36;
+    }
+    out.iter().rev().collect()
 }
 
 pub async fn meganum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

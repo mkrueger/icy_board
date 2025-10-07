@@ -14,7 +14,7 @@ use icy_board_engine::{
     },
 };
 use icy_board_tui::{
-    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
+    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
     get_text, get_text_args,
     insert_table::InsertTable,
     save_changes_dialog::SaveChangesDialog,
@@ -68,9 +68,13 @@ impl<'a> DoorEditor<'a> {
         let items = vec![ConfigEntry::Group(
             "BBSLink credentials".to_string(),
             vec![
-                ConfigEntry::Item(ListItem::new("System Code".to_string(), ListValue::Text(25, bbs_link.system_code.clone())).with_label_width(l)),
-                ConfigEntry::Item(ListItem::new("Auth Code".to_string(), ListValue::Text(25, bbs_link.auth_code.clone())).with_label_width(l)),
-                ConfigEntry::Item(ListItem::new("Scheme Code".to_string(), ListValue::Text(25, bbs_link.sheme_code.clone())).with_label_width(l)),
+                ConfigEntry::Item(
+                    ListItem::new("System Code".to_string(), ListValue::Text(25, TextFlags::None, bbs_link.system_code.clone())).with_label_width(l),
+                ),
+                ConfigEntry::Item(ListItem::new("Auth Code".to_string(), ListValue::Text(25, TextFlags::None, bbs_link.auth_code.clone())).with_label_width(l)),
+                ConfigEntry::Item(
+                    ListItem::new("Scheme Code".to_string(), ListValue::Text(25, TextFlags::None, bbs_link.sheme_code.clone())).with_label_width(l),
+                ),
             ],
         )];
 
@@ -280,28 +284,38 @@ impl<'a> Page for DoorEditor<'a> {
                                 obj: (selected_item, self.door_list.clone()),
                                 entry: vec![
                                     ConfigEntry::Item(
-                                        ListItem::new(get_text("door_editor_name"), ListValue::Text(30, action.name.clone()))
+                                        ListItem::new(get_text("door_editor_name"), ListValue::Text(30, TextFlags::None, action.name.clone()))
                                             .with_label_width(16)
                                             .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
                                                 list.lock().unwrap()[*i].name = value;
                                             }),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(get_text("door_editor_description"), ListValue::Text(30, action.description.clone()))
-                                            .with_label_width(16)
-                                            .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
+                                        ListItem::new(
+                                            get_text("door_editor_description"),
+                                            ListValue::Text(30, TextFlags::None, action.description.clone()),
+                                        )
+                                        .with_label_width(16)
+                                        .with_update_text_value(
+                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
                                                 list.lock().unwrap()[*i].description = value;
-                                            }),
+                                            },
+                                        ),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(get_text("door_editor_password"), ListValue::Text(30, action.password.clone()))
-                                            .with_label_width(16)
-                                            .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
+                                        ListItem::new(
+                                            get_text("door_editor_password"),
+                                            ListValue::Text(30, TextFlags::Password, action.password.clone()),
+                                        )
+                                        .with_label_width(16)
+                                        .with_update_text_value(
+                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
                                                 list.lock().unwrap()[*i].password = value;
-                                            }),
+                                            },
+                                        ),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(get_text("door_editor_path"), ListValue::Text(30, action.path.clone()))
+                                        ListItem::new(get_text("door_editor_path"), ListValue::Text(30, TextFlags::None, action.path.clone()))
                                             .with_label_width(16)
                                             .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
                                                 list.lock().unwrap()[*i].path = value;

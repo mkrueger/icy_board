@@ -14,7 +14,7 @@ use icy_board_engine::{
             functions::{MASK_ALNUM, MASK_PHONE, MASK_WEB, display_flags, pwd_flags},
         },
         surveys::Survey,
-        user_base::{Password, User},
+        user_base::User,
     },
     vm::TerminalTarget,
 };
@@ -253,7 +253,7 @@ impl PcbBoardCommand {
             };
 
             if pw1 == pw2 {
-                new_user.password.password = Password::new_argon2(pw1);
+                new_user.password.password = self.state.create_password(pw1).await;
                 break;
             }
             let exp_days = self.state.get_board().await.config.limits.password_expire_days;
@@ -673,9 +673,10 @@ impl PcbBoardCommand {
             };
 
             if pw1 == pw2 {
+                let pw = self.state.create_password(pw1).await;
                 let exp_days = self.state.get_board().await.config.limits.password_expire_days;
                 if let Some(cur_user) = &mut self.state.session.current_user {
-                    cur_user.password.password = Password::new_argon2(pw1);
+                    cur_user.password.password = pw;
                     if exp_days > 0 {
                         cur_user.password.expire_date = Utc::now() + chrono::Duration::days(exp_days as i64);
                     }

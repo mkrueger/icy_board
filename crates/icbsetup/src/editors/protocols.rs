@@ -12,7 +12,7 @@ use icy_board_engine::{
     },
 };
 use icy_board_tui::{
-    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
+    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
     get_text,
     insert_table::InsertTable,
     save_changes_dialog::SaveChangesDialog,
@@ -226,18 +226,28 @@ impl<'a> Page for ProtocolEditor<'a> {
                             obj: (selected_item, self.protocols.clone()),
                             entry: vec![
                                 ConfigEntry::Item(
-                                    ListItem::new(get_text("protocol_editor_char_code"), ListValue::Text(1, cur_prot.char_code.clone()))
-                                        .with_label_width(16)
-                                        .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SupportedProtocols>>), value: String| {
+                                    ListItem::new(
+                                        get_text("protocol_editor_char_code"),
+                                        ListValue::Text(1, TextFlags::None, cur_prot.char_code.clone()),
+                                    )
+                                    .with_label_width(16)
+                                    .with_update_text_value(
+                                        &|(i, list): &(usize, Arc<Mutex<SupportedProtocols>>), value: String| {
                                             list.lock().unwrap()[*i].char_code = value;
-                                        }),
+                                        },
+                                    ),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(get_text("protocol_editor_description"), ListValue::Text(30, cur_prot.description.clone()))
-                                        .with_label_width(16)
-                                        .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SupportedProtocols>>), value: String| {
+                                    ListItem::new(
+                                        get_text("protocol_editor_description"),
+                                        ListValue::Text(30, TextFlags::None, cur_prot.description.clone()),
+                                    )
+                                    .with_label_width(16)
+                                    .with_update_text_value(
+                                        &|(i, list): &(usize, Arc<Mutex<SupportedProtocols>>), value: String| {
                                             list.lock().unwrap()[*i].description = value;
-                                        }),
+                                        },
+                                    ),
                                 ),
                                 ConfigEntry::Item(
                                     ListItem::new(get_text("protocol_editor_is_enabled"), ListValue::Bool(cur_prot.is_enabled))
@@ -261,18 +271,28 @@ impl<'a> Page for ProtocolEditor<'a> {
                                         }),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(get_text("protocol_editor_send_cmd"), ListValue::Text(40, cur_prot.send_command.to_string()))
-                                        .with_label_width(16)
-                                        .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SupportedProtocols>>), value: String| {
+                                    ListItem::new(
+                                        get_text("protocol_editor_send_cmd"),
+                                        ListValue::Text(40, TextFlags::None, cur_prot.send_command.to_string()),
+                                    )
+                                    .with_label_width(16)
+                                    .with_update_text_value(
+                                        &|(i, list): &(usize, Arc<Mutex<SupportedProtocols>>), value: String| {
                                             list.lock().unwrap()[*i].send_command = TransferProtocolType::from(value);
-                                        }),
+                                        },
+                                    ),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(get_text("protocol_editor_recv_cmd"), ListValue::Text(40, cur_prot.recv_command.to_string()))
-                                        .with_label_width(16)
-                                        .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<SupportedProtocols>>), value: String| {
+                                    ListItem::new(
+                                        get_text("protocol_editor_recv_cmd"),
+                                        ListValue::Text(40, TextFlags::None, cur_prot.recv_command.to_string()),
+                                    )
+                                    .with_label_width(16)
+                                    .with_update_text_value(
+                                        &|(i, list): &(usize, Arc<Mutex<SupportedProtocols>>), value: String| {
                                             list.lock().unwrap()[*i].recv_command = TransferProtocolType::from(value);
-                                        }),
+                                        },
+                                    ),
                                 ),
                             ],
                         });

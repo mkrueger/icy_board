@@ -228,7 +228,7 @@ pub async fn getuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> 
 /// Errors if the variable is not found.
 pub async fn putuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
     if let Some(mut user) = vm.icy_board_state.session.current_user.take() {
-        vm.put_user_variables(&mut user);
+        vm.put_user_variables(&mut user).await;
         vm.icy_board_state.session.current_user = Some(user);
     }
     Ok(())
@@ -499,7 +499,8 @@ pub async fn delay(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     // 1 tick is ~1/18.2s
     let ticks = vm.eval_expr(&args[0]).await?.as_int();
     if ticks > 0 {
-        thread::sleep(Duration::from_millis((ticks as f32 * 1000.0 / 18.2) as u64));
+        let ms = (ticks as f32 * 1000.0 / 18.2) as u64;
+        tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
     }
     Ok(())
 }

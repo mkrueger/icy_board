@@ -15,7 +15,7 @@ use icy_board_engine::{
     },
 };
 use icy_board_tui::{
-    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
+    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
     get_text, get_text_args,
     insert_table::InsertTable,
     save_changes_dialog::SaveChangesDialog,
@@ -229,7 +229,7 @@ impl<'a> Page for DirsEditor<'a> {
 
                         entry: vec![
                             ConfigEntry::Item(
-                                ListItem::new(get_text("dirs_edit_name"), ListValue::Text(25, item.name.to_string()))
+                                ListItem::new(get_text("dirs_edit_name"), ListValue::Text(25, TextFlags::None, item.name.to_string()))
                                     .with_label_width(16)
                                     .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DirectoryList>>), value: String| {
                                         list.lock().unwrap()[*i].name = value;
@@ -250,7 +250,7 @@ impl<'a> Page for DirsEditor<'a> {
                                     }),
                             ),
                             ConfigEntry::Item(
-                                ListItem::new(get_text("dirs_edit_password"), ListValue::Text(12, item.password.to_string()))
+                                ListItem::new(get_text("dirs_edit_password"), ListValue::Text(12, TextFlags::None, item.password.to_string()))
                                     .with_label_width(16)
                                     .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DirectoryList>>), value: String| {
                                         list.lock().unwrap()[*i].password = Password::PlainText(value);

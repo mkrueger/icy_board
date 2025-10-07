@@ -8,7 +8,7 @@ use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::{IcyBoard, security_expr::SecurityExpression, user_base::Password};
 use icy_board_tui::{
     BORDER_SET,
-    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
+    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState, TextFlags},
     get_text, get_text_args,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
@@ -54,7 +54,7 @@ impl ConferenceEditor {
 
             let entry = vec![
                 ConfigEntry::Item(
-                    ListItem::new(conf_name, ListValue::Text(25, conf.name.clone()))
+                    ListItem::new(conf_name, ListValue::Text(25, TextFlags::None, conf.name.clone()))
                         .with_label_width(13)
                         .with_update_text_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: String| {
                             let mut ib = board.1.lock().unwrap();
@@ -88,12 +88,15 @@ impl ConferenceEditor {
                     ],
                 ),
                 ConfigEntry::Item(
-                    ListItem::new(get_text("conf_pw_join_priv"), ListValue::Text(12, conf.password.to_string()))
-                        .with_label_width(27)
-                        .with_update_text_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: String| {
-                            let mut ib = board.1.lock().unwrap();
-                            ib.conferences[board.0].password = Password::PlainText(value);
-                        }),
+                    ListItem::new(
+                        get_text("conf_pw_join_priv"),
+                        ListValue::Text(12, TextFlags::Password, conf.password.to_string()),
+                    )
+                    .with_label_width(27)
+                    .with_update_text_value(&|board: &(usize, Arc<Mutex<IcyBoard>>), value: String| {
+                        let mut ib = board.1.lock().unwrap();
+                        ib.conferences[board.0].password = Password::PlainText(value);
+                    }),
                 ),
                 ConfigEntry::Separator,
                 ConfigEntry::Item(

@@ -6,7 +6,7 @@ use std::{
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
-    config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState},
+    config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState, TextFlags},
     get_text,
     icbconfigmenu::ICBConfigMenuUI,
     tab_page::{Page, PageMessage},
@@ -45,7 +45,7 @@ impl Telnet {
                 ConfigEntry::Item(
                     ListItem::new(
                         get_text("connection_info_address"),
-                        ListValue::Text(60, lock.config.login_server.telnet.address.clone()),
+                        ListValue::Text(60, TextFlags::None, lock.config.login_server.telnet.address.clone()),
                     )
                     .with_status(&get_text("connection_info_address-status"))
                     .with_label_width(label_width)

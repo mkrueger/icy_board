@@ -14,7 +14,7 @@ use icy_board_engine::{
     },
 };
 use icy_board_tui::{
-    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
+    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
     get_text,
     insert_table::InsertTable,
     save_changes_dialog::SaveChangesDialog,
@@ -260,14 +260,19 @@ impl<'a> Page for CommandsEditor<'a> {
                             obj: (selected_item, self.command_list.clone()),
                             entry: vec![
                                 ConfigEntry::Item(
-                                    ListItem::new(get_text("command_editor_keyword"), ListValue::Text(16, cur_prot.keyword.clone()))
-                                        .with_label_width(16)
-                                        .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<CommandList>>), value: String| {
+                                    ListItem::new(
+                                        get_text("command_editor_keyword"),
+                                        ListValue::Text(16, TextFlags::None, cur_prot.keyword.clone()),
+                                    )
+                                    .with_label_width(16)
+                                    .with_update_text_value(
+                                        &|(i, list): &(usize, Arc<Mutex<CommandList>>), value: String| {
                                             list.lock().unwrap()[*i].keyword = value;
-                                        }),
+                                        },
+                                    ),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(get_text("command_editor_help"), ListValue::Text(16, cur_prot.help.clone()))
+                                    ListItem::new(get_text("command_editor_help"), ListValue::Text(16, TextFlags::None, cur_prot.help.clone()))
                                         .with_label_width(16)
                                         .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<CommandList>>), value: String| {
                                             list.lock().unwrap()[*i].help = value;
@@ -309,11 +314,16 @@ impl<'a> Page for CommandsEditor<'a> {
                                     ),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(get_text("command_editor_parameter"), ListValue::Text(43, cur_prot.actions[0].parameter.clone()))
-                                        .with_label_width(16)
-                                        .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<CommandList>>), value: String| {
+                                    ListItem::new(
+                                        get_text("command_editor_parameter"),
+                                        ListValue::Text(43, TextFlags::None, cur_prot.actions[0].parameter.clone()),
+                                    )
+                                    .with_label_width(16)
+                                    .with_update_text_value(
+                                        &|(i, list): &(usize, Arc<Mutex<CommandList>>), value: String| {
                                             list.lock().unwrap()[*i].actions[0].parameter = value;
-                                        }),
+                                        },
+                                    ),
                                 ),
                             ],
                         });

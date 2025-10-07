@@ -10,7 +10,7 @@ use icy_board_engine::{
     },
 };
 use icy_board_tui::{
-    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
+    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
     insert_table::InsertTable,
     pcb_line::{get_styled_pcb_line, get_styled_pcb_line_with_highlight},
     position_editor::PositionEditor,
@@ -65,15 +65,18 @@ impl<'a> EditCommandDialog<'a> {
         let items = vec![
             ConfigEntry::Separator,
             ConfigEntry::Item(
-                ListItem::new("Display Text".to_string(), ListValue::Text(25, command.display.clone()))
+                ListItem::new("Display Text".to_string(), ListValue::Text(25, TextFlags::None, command.display.clone()))
                     .with_status("Text displayed.")
                     .with_label_width(info_width),
             ),
             ConfigEntry::Separator,
             ConfigEntry::Item(
-                ListItem::new("Highlighted Text".to_string(), ListValue::Text(25, command.lighbar_display.clone()))
-                    .with_status("Text displayed, when highlighted.")
-                    .with_label_width(info_width),
+                ListItem::new(
+                    "Highlighted Text".to_string(),
+                    ListValue::Text(25, TextFlags::None, command.lighbar_display.clone()),
+                )
+                .with_status("Text displayed, when highlighted.")
+                .with_label_width(info_width),
             ),
             ConfigEntry::Item(
                 ListItem::new(
@@ -115,7 +118,7 @@ impl<'a> EditCommandDialog<'a> {
                 .with_label_width(info_width),
             ),
             ConfigEntry::Item(
-                ListItem::new("Keyword".to_string(), ListValue::Text(10, command.keyword.to_string()))
+                ListItem::new("Keyword".to_string(), ListValue::Text(10, TextFlags::None, command.keyword.to_string()))
                     .with_status("The help file to display.")
                     .with_label_width(info_width),
             ),
@@ -309,7 +312,7 @@ impl<'a> EditCommandDialog<'a> {
                                         .with_label_width(16),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new("Parameter".to_string(), ListValue::Text(10, parameter))
+                                        ListItem::new("Parameter".to_string(), ListValue::Text(10, TextFlags::None, parameter))
                                             .with_status("The help file to display.")
                                             .with_label_width(16),
                                     ),

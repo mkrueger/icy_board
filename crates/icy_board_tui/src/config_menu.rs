@@ -131,9 +131,14 @@ impl ComboBox {
     }
 }
 
+pub enum TextFlags {
+    None,
+    Password,
+}
+
 pub enum ListValue {
     ComboBox(ComboBox),
-    Text(u16, String),
+    Text(u16, TextFlags, String),
     Path(PathBuf),
     /// value, min, max
     U32(u32, u32, u32),
@@ -228,7 +233,7 @@ impl<T> ListItem<T> {
 
     pub fn with_update_text_value(mut self, update_value: &'static dyn Fn(&T, String) -> ()) -> Self {
         let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
-            let ListValue::Text(_, text) = value else {
+            let ListValue::Text(_, _, text) = value else {
                 return;
             };
             update_value(val, text.clone());
@@ -341,7 +346,7 @@ impl<T> ListItem<T> {
             self.edit_width as usize
         } else {
             match &self.value {
-                ListValue::Text(len, _text) => *len as usize,
+                ListValue::Text(len, _, _text) => *len as usize,
                 ListValue::ComboBox(v) => v.cur_value.display.len(),
 
                 ListValue::Path(_) => area.width as usize,
@@ -377,7 +382,12 @@ impl<T> ListItem<T> {
 
     fn render_value(&self, area: Rect, frame: &mut Frame) {
         match &self.value {
-            ListValue::Text(_, text) => {
+            ListValue::Text(_, flags, text) => {
+                let text = if matches!(flags, TextFlags::Password) {
+                    "*".repeat(text.len().min(6))
+                } else {
+                    text.clone()
+                };
                 Text::from(text.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
             }
             ListValue::ComboBox(v) => {
@@ -482,7 +492,7 @@ impl<T> ListItem<T> {
 
     fn render_editor(&mut self, val: &T, mut area: Rect, frame: &mut Frame) -> bool {
         match &mut self.value {
-            ListValue::Text(edit_len, text) => {
+            ListValue::Text(edit_len, _, text) => {
                 let field = TextField::new().with_value(text.to_string());
                 area.width = area.width.min(*edit_len);
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
@@ -669,7 +679,7 @@ impl<T> ListItem<T> {
         }
 
         match &mut self.value {
-            ListValue::Text(_edit_len, text) => {
+            ListValue::Text(_edit_len, _, text) => {
                 self.text_field_state.handle_input(key, text);
             }
 
@@ -832,7 +842,7 @@ impl<T> ConfigEntry<T> {
             ConfigEntry::Item(item) => item.measure_value(area) as u16,
             ConfigEntry::Group(_, items) => items.iter().map(|item| item.measure_value(area)).max().unwrap_or(0),
             ConfigEntry::Table(_, items) => items.iter().map(|item| item.measure_value(area)).max().unwrap_or(0),
-            ConfigEntry::Label(_) | ConfigEntry::Separator => 0,
+            ConfigEntry::Label(_) | ConfigEntry::Separator => 01,
         }
     }
 }
@@ -999,75 +1009,90 @@ impl<T> ConfigMenu<T> {
         frame: &mut Frame,
         state: &mut ConfigMenuState,
         display_editor: bool,
-        rows: usize,
+        cols: usize, // Renamed from 'rows' for clarity
     ) -> bool {
-        let x1 = *x;
-        let mut x2 = x1;
-
-        let mut x_m = x1;
-        for (j, item) in items.iter_mut().enumerate() {
-            x_m += item.measure_value(area);
-            if j > 0 && j % rows == 0 {
-                x2 = x2.max(x_m);
-                x_m = x1;
-            }
+        let cols = cols.max(1); // Guard against 0
+        if items.is_empty() {
+            return true;
         }
 
-        for (j, item) in items.iter_mut().enumerate() {
+        // First pass: calculate column widths
+        let mut col_widths: Vec<u16> = vec![0; cols];
+        for (idx, item) in items.iter().enumerate() {
+            let col = idx % cols;
+            let item_width = item.measure_value(area) as u16;
+            col_widths[col] = col_widths[col].max(item_width);
+        }
+
+        // Second pass: render items
+        let start_x = *x;
+        let start_y = *y;
+
+        for (idx, item) in items.iter_mut().enumerate() {
+            let col = idx % cols;
+            let row = idx / cols;
+
+            // Calculate x position for this column
+            let mut col_x = start_x;
+            for c in 0..col {
+                col_x += col_widths[c] + 1; // +1 for spacing between columns
+            }
+
+            // Calculate y position for this row
+            let item_y = start_y + row as u16;
+
             match item {
                 ConfigEntry::Item(item) => {
-                    if *y >= state.first_row && *y < area.height + state.first_row {
+                    if item_y >= state.first_row && item_y < area.height + state.first_row {
                         let left_area = Rect {
-                            x: area.x + *x,
-                            y: area.y + *y - state.first_row,
+                            x: area.x + col_x,
+                            y: area.y + item_y - state.first_row,
                             width: item.label_width,
                             height: 1,
                         };
 
-                        if !display_editor {
+                        if !display_editor || *i != state.selected {
                             item.render_label(left_area, frame, *i == state.selected, true);
                         }
-                        let xright = if *x >= x2 { area.right() - 1 } else { area.x + x2 };
 
+                        // Render separator
                         Text::from(":").style(get_tui_theme().item_separator).render(
                             Rect {
-                                x: left_area.left() + item.label_width + 1,
-                                y: area.y + *y - state.first_row,
+                                x: left_area.x + item.label_width + 1,
+                                y: left_area.y,
                                 width: 1,
                                 height: 1,
                             },
                             frame.buffer_mut(),
                         );
 
+                        // Calculate value area
+                        let value_x = left_area.x + item.label_width + 3;
+                        let value_width = if item.edit_width > 0 {
+                            item.edit_width
+                        } else {
+                            // Calculate remaining width in this column
+                            let col_end = area.x + col_x + col_widths[col];
+                            col_end.saturating_sub(value_x)
+                        };
+
                         let right_area = Rect {
-                            x: left_area.left() + item.label_width + 3,
-                            y: area.y + *y - state.first_row,
-                            width: if item.edit_width > 0 {
-                                item.edit_width
-                            } else {
-                                xright.saturating_sub(item.label_width + 1)
-                            },
+                            x: value_x,
+                            y: left_area.y,
+                            width: value_width,
                             height: 1,
                         };
 
-                        if *i == state.selected {
-                            if display_editor {
-                                if !item.render_editor(val, right_area, frame) {
-                                    return false;
-                                }
+                        if *i == state.selected && display_editor {
+                            if !item.render_editor(val, right_area, frame) {
+                                return false;
                             }
                         } else if !display_editor {
                             item.render_value(right_area, frame);
                         }
                     }
 
-                    state.item_pos.insert(*i, *y);
-                    if j > 0 && (j + 1) % rows == 0 {
-                        *x = x1;
-                        *y += 1;
-                    } else {
-                        *x += item.measure_value(area) as u16;
-                    }
+                    state.item_pos.insert(*i, item_y);
                     *i += 1;
                 }
                 _ => {
@@ -1075,7 +1100,12 @@ impl<T> ConfigMenu<T> {
                 }
             }
         }
-        *x = x1;
+
+        // Update y to point after the table
+        let total_rows = (items.len() + cols - 1) / cols;
+        *y = start_y + total_rows as u16;
+        *x = start_x;
+
         true
     }
 

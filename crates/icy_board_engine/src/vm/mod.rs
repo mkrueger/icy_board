@@ -311,7 +311,7 @@ impl<'a> VirtualMachine<'a> {
         Ok(())
     }
 
-    pub fn put_user_variables(&self, cur_user: &mut User) {
+    pub async fn put_user_variables(&self, cur_user: &mut User) {
         cur_user.flags.expert_mode = self.variable_table.get_value(U_EXPERT).as_bool();
         if self.variable_table.get_value(U_FSE).as_bool() {
             cur_user.flags.fse_mode = FSEMode::Yes;
@@ -336,7 +336,10 @@ impl<'a> VirtualMachine<'a> {
 
         let pwd_value = self.variable_table.get_value(U_PWD);
         cur_user.password.password = if let GenericVariableData::Password(ref pwd) = pwd_value.generic_data {
-            pwd.clone()
+            match pwd {
+                Password::PlainText(s) => self.icy_board_state.create_password(s).await,
+                pwd => pwd.clone(),
+            }
         } else {
             // Fallback: create a password from the string representation
             Password::new_argon2(pwd_value.as_string())
