@@ -50,7 +50,7 @@ Leading & traling whitespaces are ignored
 * New 'vip' users vip_users.txt (same as trashcan). But a list of users which the sysop gets a notification for logon (from RemoteAccess)
 * Surveys (questionnaires) header can now have a different header length than 5 lines
 Header is separated from questions with a line starting by "*****". Note that the pcb importer inserts a "*****" line after the 5th during import.
-* IcyBoard supports storing passwords as hashes (Argon 2 -  Argon2id variant)
+* IcyBoard supports storing passwords as hashes (bycypt & Argon 2 -  Argon2id variant)
   - There is a new setting for fallback to plain text storage since it may affect PPEs. Tested 'w' command replacements and PNALogin - they're working but it may be that some PPEs/Plugins break so a fallback is provided. Recommended is altering the PPE files - storing user passwords as plain text is considered a strong security risk.
 
 

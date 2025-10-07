@@ -1,11 +1,11 @@
          -* ICY BOARD #VERSION *-
 
-BBS system that aims for PCBoard compatibility.
+Modern PCBoard-Compatible modernized
+BBS in Rust for modern computers.
 
-- Written in pure rust
-- PPE support (up to PCB 15.4)
+- PPE script engine (up to PCB 15.4)
 - Includes PPL development system
-- pre alpha state
+- TUI setup & admin tools
+- JAM message bases
 
-Development
-GitHub https://github.com/mkrueger/icy_board
+https://github.com/mkrueger/icy_board
