@@ -18,6 +18,7 @@ fn password_storage_method_text(method: PasswordStorageMethod) -> String {
     match method {
         PasswordStorageMethod::Argon2 => icy_board_tui::get_text("password_storage_method_argon2"),
         PasswordStorageMethod::PlainText => icy_board_tui::get_text("password_storage_method_plain_text"),
+        PasswordStorageMethod::BCrypt => icy_board_tui::get_text("password_storage_method_bcrypt"),
     }
 }
 
@@ -51,8 +52,9 @@ impl SystemControl {
                             is_edit_open: false,
                             first_item: 0,
                             values: vec![
-                                ComboBoxValue::new(password_storage_method_text(PasswordStorageMethod::Argon2), "Argon2"),
                                 ComboBoxValue::new(password_storage_method_text(PasswordStorageMethod::PlainText), "PlainText"),
+                                ComboBoxValue::new(password_storage_method_text(PasswordStorageMethod::BCrypt), "BCrypt"),
+                                ComboBoxValue::new(password_storage_method_text(PasswordStorageMethod::Argon2), "Argon2"),
                             ],
                         }),
                     )
@@ -61,6 +63,8 @@ impl SystemControl {
                         let mut b = board.lock().unwrap();
                         b.config.system_control.password_storage_method = if combo.cur_value.value == "PlainText" {
                             PasswordStorageMethod::PlainText
+                        } else if combo.cur_value.value == "BCrypt" {
+                            PasswordStorageMethod::BCrypt
                         } else {
                             PasswordStorageMethod::Argon2
                         };

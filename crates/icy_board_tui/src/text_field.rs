@@ -27,7 +27,8 @@ impl TextfieldState {
         self.max_len
     }
 
-    pub fn handle_input(&mut self, key: KeyEvent, value: &mut String) {
+    pub fn handle_input(&mut self, key: KeyEvent, value: &mut String) -> bool {
+        let mut update = false;
         self.cursor_position = self.cursor_position.min(value.len() as u16);
         match key {
             KeyEvent { code: KeyCode::Left, .. } => {
@@ -55,6 +56,7 @@ impl TextfieldState {
                 ..
             } => {
                 self.insert_key(value, ch);
+                update = true;
             }
             KeyEvent {
                 code: KeyCode::Char(ch),
@@ -62,11 +64,13 @@ impl TextfieldState {
                 ..
             } => {
                 self.insert_key(value, ch.to_ascii_uppercase());
+                update = true;
             }
 
             KeyEvent { code: KeyCode::Delete, .. } => {
                 if self.cursor_position < value.len() as u16 {
                     value.remove(self.cursor_position as usize);
+                    update = true;
                 }
             }
 
@@ -74,6 +78,7 @@ impl TextfieldState {
                 if self.cursor_position > 0 {
                     self.cursor_position -= 1;
                     value.remove(self.cursor_position as usize);
+                    update = true;
                 }
             }
 
@@ -84,6 +89,7 @@ impl TextfieldState {
         } else if self.cursor_position >= self.first_char as u16 + self.area.width {
             self.first_char = (self.cursor_position as usize + 1 - self.area.width as usize).min(value.len());
         }
+        update
     }
 
     fn insert_key(&mut self, value: &mut String, ch: char) {

@@ -750,8 +750,9 @@ allow_password_failure_comment-help=TODO
 password_storage_method=Password Storage Method
 password_storage_method-status=Turn on/off plaintext storage
 password_storage_method-help=TODO
-password_storage_method_plain_text=Plain Text
-password_storage_method_argon2=Argon 2 Hash
+password_storage_method_plain_text=Plain text
+password_storage_method_bcrypt=BCrypt hash
+password_storage_method_argon2=Argon 2 hash
 
 guard_logoff=Warning on Logoff Command
 guard_logoff-status=Show Warning on 'g' command.

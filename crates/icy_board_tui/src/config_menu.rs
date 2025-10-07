@@ -166,6 +166,7 @@ pub struct ListItem<T> {
     pub help: String,
 
     pub update_value: Option<Box<dyn Fn(&T, &ListValue) -> ()>>,
+    need_update: bool,
 
     pub path_editor: Option<Box<dyn Fn(T, PathBuf) -> PageMessage>>,
 }
@@ -184,6 +185,7 @@ impl<T> ListItem<T> {
             edit_width: 0,
             path_editor: None,
             editable: true,
+            need_update: false,
         }
     }
 
@@ -649,9 +651,11 @@ impl<T> ListItem<T> {
                 return false;
             }
         }
-
-        if let Some(update) = self.update_value.as_ref() {
-            update(val, &self.value);
+        if self.need_update {
+            if let Some(update) = self.update_value.as_ref() {
+                update(val, &self.value);
+                self.need_update = false;
+            }
         }
         true
     }
@@ -680,42 +684,42 @@ impl<T> ListItem<T> {
 
         match &mut self.value {
             ListValue::Text(_edit_len, _, text) => {
-                self.text_field_state.handle_input(key, text);
+                self.need_update |= self.text_field_state.handle_input(key, text);
             }
 
             ListValue::Path(path) => {
                 let mut text = format!("{}", path.display());
-                self.text_field_state.handle_input(key, &mut text);
+                self.need_update |= self.text_field_state.handle_input(key, &mut text);
                 *path = PathBuf::from(text);
             }
             ListValue::Float(val, str) => {
-                self.text_field_state.handle_input(key, str);
+                self.need_update |= self.text_field_state.handle_input(key, str);
                 if let Ok(f) = str.parse::<f64>() {
                     *val = f;
                 }
             }
             ListValue::Time(val, str) => {
-                self.text_field_state.handle_input(key, str);
+                self.need_update |= self.text_field_state.handle_input(key, str);
                 *val = IcbTime::parse(str);
             }
             ListValue::Date(val, str) => {
-                self.text_field_state.handle_input(key, str);
+                self.need_update |= self.text_field_state.handle_input(key, str);
                 *val = IcbDate::parse(str);
             }
             ListValue::DoW(val, str) => {
-                self.text_field_state.handle_input(key, str);
+                self.need_update |= self.text_field_state.handle_input(key, str);
                 *val = IcbDoW::from(str.clone());
             }
 
             ListValue::Security(val, str) => {
-                self.text_field_state.handle_input(key, str);
+                self.need_update |= self.text_field_state.handle_input(key, str);
                 if let Ok(res) = SecurityExpression::from_str(str) {
                     *val = res;
                 }
             }
             ListValue::U32(cur, min, max) => {
                 let mut text = format!("{}", *cur);
-                self.text_field_state.handle_input(key, &mut text);
+                self.need_update |= self.text_field_state.handle_input(key, &mut text);
                 if let Ok(u) = text.parse::<u32>() {
                     *cur = u.clamp(*min, *max);
                 }
@@ -724,6 +728,7 @@ impl<T> ListItem<T> {
                 match key.code {
                     KeyCode::BackTab | KeyCode::Left | KeyCode::Tab | KeyCode::Right | KeyCode::Char(' ') => {
                         *b = !*b;
+                        self.need_update = true;
                     }
                     _ => {}
                 }
@@ -735,10 +740,12 @@ impl<T> ListItem<T> {
                         match key.code {
                             KeyCode::BackTab | KeyCode::Left => {
                                 *cur_value = list[(i + list.len() - 1) % list.len()].value.clone();
+                                self.need_update = true;
                                 return ResultState::default();
                             }
                             KeyCode::Tab | KeyCode::Right => {
                                 *cur_value = list[(i + 1) % list.len()].value.clone();
+                                self.need_update = true;
                                 return ResultState::default();
                             }
                             _ => {}
@@ -753,7 +760,7 @@ impl<T> ListItem<T> {
             ListValue::Color(col) => {
                 if let IcbColor::Dos(u) = col {
                     let mut text = format!("{:02X}", u);
-                    self.text_field_state.handle_input(key, &mut text);
+                    self.need_update |= self.text_field_state.handle_input(key, &mut text);
                     if let Ok(u) = u8::from_str_radix(&text, 16) {
                         *col = IcbColor::Dos(u);
                     }
@@ -771,6 +778,7 @@ impl<T> ListItem<T> {
                                 if val.value == combo.cur_value.value {
                                     combo.selected_item = i;
                                     combo.first_item = i.saturating_sub(2);
+                                    self.need_update = true;
                                 }
                             }
                             return ResultState::default();
@@ -785,6 +793,7 @@ impl<T> ListItem<T> {
                     if key.code == KeyCode::Enter {
                         combo.is_edit_open = false;
                         combo.cur_value = combo.values[combo.selected_item].clone();
+                        self.need_update = true;
                         return ResultState::default();
                     }
                     combo.handle_input(key);
@@ -793,6 +802,7 @@ impl<T> ListItem<T> {
             }
             ListValue::Position(_, input, pos) => {
                 *pos = input(key, pos);
+                self.need_update = true;
             }
         }
         return ResultState::status_line(self.status.clone());

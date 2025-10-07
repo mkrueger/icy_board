@@ -89,6 +89,9 @@ pub struct UserCommandLevels {
 #[derive(Default, Copy, Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub enum PasswordStorageMethod {
     #[default]
+    #[serde(rename = "bcrypt")]
+    BCrypt,
+
     #[serde(rename = "argon2")]
     Argon2,
 
@@ -96,12 +99,6 @@ pub enum PasswordStorageMethod {
     /// This is not recommended for security reasons but may be needed for legacy compatibility!
     #[serde(rename = "plain")]
     PlainText,
-}
-
-impl PasswordStorageMethod {
-    pub fn is_default(&self) -> bool {
-        *self == PasswordStorageMethod::Argon2
-    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -499,7 +496,6 @@ pub struct SystemControlOptions {
     pub guard_logoff: bool,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "PasswordStorageMethod::is_default")]
     pub password_storage_method: PasswordStorageMethod,
 }
 

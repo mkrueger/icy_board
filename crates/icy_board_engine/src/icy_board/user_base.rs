@@ -32,6 +32,7 @@ use super::{
 #[derive(Clone, Debug)]
 pub enum Password {
     PlainText(String),
+    BCrypt(String),
     Argon2(String),
 }
 
@@ -39,13 +40,7 @@ impl PartialEq for Password {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::PlainText(l0), Self::PlainText(r0)) => l0 == r0,
-            // Argon2 to Argon2: exact hash comparison
-            (Self::Argon2(l0), Self::Argon2(r0)) => {
-                log::warn!("Comparing two Argon2 hashes directly. This is not recommended.");
-                l0 == r0
-            }
 
-            // Plain to Argon2: verify the plain password against the hash
             (Self::PlainText(plain), Self::Argon2(hash)) | (Self::Argon2(hash), Self::PlainText(plain)) => {
                 if let Ok(parsed_hash) = PasswordHash::new(hash) {
                     Argon2::default().verify_password(plain.as_bytes(), &parsed_hash).is_ok()
@@ -53,6 +48,16 @@ impl PartialEq for Password {
                     false
                 }
             }
+
+            (Self::BCrypt(l), Self::BCrypt(r)) => l == r,
+
+            (Self::PlainText(plain), Self::BCrypt(hash)) | (Self::BCrypt(hash), Self::PlainText(plain)) => match bcrypt::verify(plain, hash) {
+                Ok(v) => v,
+                Err(_) => false,
+            },
+
+            // Everything else is not equal
+            _ => false,
         }
     }
 }
@@ -64,26 +69,21 @@ impl Default for Password {
 }
 
 impl Password {
-    pub fn from_str(s: &str) -> Res<Self> {
-        Ok(Password::PlainText(s.to_string()))
-    }
-
-    pub fn to_argon2(&self) -> Self {
-        match self {
-            Password::PlainText(text) => {
-                let argon2 = Argon2::default();
-                let salt = SaltString::generate(&mut OsRng);
-
-                let password_hash = argon2.hash_password(text.to_lowercase().as_bytes(), &salt).unwrap().to_string();
-                Password::Argon2(password_hash)
-            }
-
-            Password::Argon2(x) => Password::Argon2(x.clone()),
-        }
+    pub fn new_plaintext(str: impl Into<String>) -> Res<Self> {
+        Ok(Password::PlainText(str.into().to_lowercase()))
     }
 
     pub fn new_argon2(str: impl Into<String>) -> Password {
-        Password::PlainText(str.into()).to_argon2()
+        let argon2 = Argon2::default();
+        let salt = SaltString::generate(&mut OsRng);
+
+        let password_hash = argon2.hash_password(str.into().to_lowercase().as_bytes(), &salt).unwrap().to_string();
+        Password::Argon2(password_hash)
+    }
+
+    pub fn new_bcrypt(str: impl Into<String>) -> Password {
+        let hashed = bcrypt::hash(str.into().to_lowercase(), bcrypt::DEFAULT_COST).unwrap();
+        Password::BCrypt(hashed)
     }
 }
 
@@ -91,7 +91,7 @@ impl std::fmt::Display for Password {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Password::PlainText(s) => write!(f, "{}", s),
-            Password::Argon2(_s) => write!(f, "******"),
+            Password::Argon2(_s) | Password::BCrypt(_s) => write!(f, "******"),
         }
     }
 }
@@ -101,6 +101,7 @@ impl Password {
         match self {
             Password::PlainText(s) => s.is_empty(),
             Password::Argon2(s) => s.is_empty(),
+            Password::BCrypt(s) => s.is_empty(),
         }
     }
 
@@ -115,6 +116,9 @@ impl<'de> Deserialize<'de> for Password {
         D: serde::Deserializer<'de>,
     {
         String::deserialize(deserializer).map(|p| {
+            if let Some(rest) = p.strip_prefix("bcrypt:") {
+                return Password::BCrypt(rest.to_string());
+            }
             if p.starts_with("$argon2") {
                 Password::Argon2(p)
             } else {
@@ -137,6 +141,7 @@ impl serde::Serialize for Password {
         match self {
             Password::PlainText(key) => format!("\"{key}\"").serialize(serializer),
             Password::Argon2(key) => key.serialize(serializer),
+            Password::BCrypt(key) => format!("bcrypt:{key}").serialize(serializer),
         }
     }
 }
@@ -704,7 +709,7 @@ impl User {
                     .prev_pwd
                     .iter()
                     .filter(|s| !s.is_empty())
-                    .map(|pwd| Password::from_str(pwd).unwrap())
+                    .map(|pwd| Password::new_plaintext(pwd).unwrap())
                     .collect(),
                 password.last_change.clone(),
                 password.times_changed,
@@ -829,7 +834,7 @@ impl User {
             custom_comment5,
 
             password: PasswordInfo {
-                password: Password::from_str(&u.user.password).unwrap(),
+                password: Password::new_plaintext(&u.user.password).unwrap(),
                 prev_pwd,
                 last_change: last_change.to_utc_date_time(),
                 times_changed: times_changed as u64,

@@ -64,7 +64,7 @@ impl UserEditor {
                         .with_status(get_text("user_editor_password-status"))
                         .with_help(get_text("user_editor_password-help"))
                         .with_label_width(label_width);
-
+                    println!("Password storage method: {:?}", password_storage_method);
                     match password_storage_method {
                         PasswordStorageMethod::Argon2 => item.with_update_text_value(&|user: &Arc<Mutex<User>>, value: String| {
                             let mut user = user.lock().unwrap();
@@ -73,6 +73,10 @@ impl UserEditor {
                         PasswordStorageMethod::PlainText => item.with_update_text_value(&|user: &Arc<Mutex<User>>, value: String| {
                             let mut user = user.lock().unwrap();
                             user.password.password = Password::PlainText(value.to_lowercase());
+                        }),
+                        PasswordStorageMethod::BCrypt => item.with_update_text_value(&|user: &Arc<Mutex<User>>, value: String| {
+                            let mut user = user.lock().unwrap();
+                            user.password.password = Password::new_bcrypt(value);
                         }),
                     }
                 }),

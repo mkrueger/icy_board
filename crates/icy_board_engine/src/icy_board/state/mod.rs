@@ -1298,6 +1298,7 @@ impl IcyBoardState {
         let pw1 = pw1.into().to_lowercase();
         match self.get_board().await.config.system_control.password_storage_method {
             super::icb_config::PasswordStorageMethod::Argon2 => Password::new_argon2(pw1),
+            super::icb_config::PasswordStorageMethod::BCrypt => Password::new_bcrypt(pw1),
             super::icb_config::PasswordStorageMethod::PlainText => Password::PlainText(pw1),
         }
     }

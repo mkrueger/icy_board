@@ -51,6 +51,7 @@ chumsky = "0.9.3"
 creditcard = "0.1.0"
 zip = "2.2.3"
 argon2 = "0.5.3"
+bcrypt = "0.17.1"
 
 # interpreter deps
 [dev-dependencies]
