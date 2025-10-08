@@ -2177,7 +2177,16 @@ pub async fn ftell(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 }
 
 pub async fn os(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(0))
+    let os_code = if cfg!(target_os = "windows") {
+        1
+    } else if cfg!(target_os = "linux") {
+        3
+    } else if cfg!(target_os = "macos") {
+        4
+    } else {
+        0 // Unknown/other (BSDs, etc.)
+    };
+    Ok(VariableValue::new_int(os_code))
 }
 
 pub async fn shortdesc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
