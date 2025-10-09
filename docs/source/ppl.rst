@@ -15,7 +15,7 @@ Icy Board ships with a modern, memory-safe, fully reimplemented PPL toolchain:
 * Extended language versions introducing optional new syntax and data types
 
 Core Goals
-----------
+~~~~~~~~~~
 
 1. High compatibility with PCBoard PPEs up to 15.4 (run, decompile, recompile)
 2. Safe modernization (UTF-8 source, stricter diagnostics, secure password handling)
@@ -24,7 +24,7 @@ Core Goals
 5. Eliminate “anti-decompile” era tricks—make maintenance possible again
 
 Vocabulary: Runtime vs Language Version
----------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You will see two related version notions:
 
@@ -36,7 +36,7 @@ You can (for example) generate a PPE in runtime format 400 but restrict yourself
 to language features of 340 to stay compatible with older boards (where applicable).
 
 Toolchain Overview
-------------------
+~~~~~~~~~~~~~~~~~~
 
 +-----------+------------------------------------------------------------+
 | Tool      | Purpose                                                    |
@@ -49,7 +49,7 @@ Toolchain Overview
 
 
 ``ppld`` - The Decompiler
--------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
@@ -60,7 +60,7 @@ instead of flat GOTO spaghetti. Use ``-d`` to view a disassembly and ``-r`` for
 a minimal (raw) form.
 
 Encoding & Character Set
-------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 * **Preferred input**: UTF-8 (modern editors)
 * **Legacy**: Original DOS sources were CP437. Use ``--cp437`` if auto-detection fails.
@@ -68,7 +68,7 @@ Encoding & Character Set
 * You may convert existing PPE data files to UTF-8 with: ``icbsetup ppe-convert <PATH>`` (make backups first).
 
 Key Differences vs Legacy PPLC (Summary)
-----------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 (See the detailed “PPL differences” section in ``ppl.md`` for the full list.)
 
@@ -80,7 +80,7 @@ Key Differences vs Legacy PPLC (Summary)
 * More (and safer) warnings for suspicious code; treat warnings seriously when porting.
 
 Evolution by Language Version
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * **&lt;= 340**: Classic era; close to PCBoard 15.4 semantics.
 * **350** (PPL 4.0 modernization stage 1):
@@ -109,7 +109,7 @@ Use language gating to write compatible code:
    ;$ENDIF
 
 Preprocessor Summary
---------------------
+~~~~~~~~~~~~~~~~~~~~
 
 Directives (start with ``;$`` on their own line):
 
@@ -127,7 +127,7 @@ Simple example:
    ;$ENDIF
 
 Types & Data Model (High Level)
--------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * Scalars: Integer, Unsigned, Byte / Word, Boolean, Float, Double, Money, Date, Time
 * Strings: Normal and “BigStr” (large string buffers) 
@@ -136,14 +136,14 @@ Types & Data Model (High Level)
 * (Planned / partial in 400) Domain objects: Conference, MessageArea, FileArea, with member-like accessors or function wrappers.
 
 Security & Safety Notes
------------------------
+~~~~~~~~~~~~~~~~~~~~~~~
 
 * Passwords: Hashing (Argon2 / BCrypt) is enforced by configuration; scripts that attempt to transform (uppercase/lowercase) hashed values should expect no-ops.
 * Avoid relying on internal hashes—display calls typically mask them.
 * VM isolates runtime; catastrophic host crashes from buggy PPE logic are far harder now (memory safety from Rust).
 
 Migration Workflow (Legacy PPE → Modern PPL)
---------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. **Decompile** legacy ``FOO.PPE`` → ``FOO.PPS`` with ``ppld``.
 2. **Review warnings** when recompiling with ``pplc``; fix shadowed variables, questionable assignments, or deprecated idioms.
@@ -152,7 +152,7 @@ Migration Workflow (Legacy PPE → Modern PPL)
 5. **Iterate**: Use LSP tooling for rename, find references, and incremental modernization.
 
 Disassembly for Learning
-------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Use:
 
@@ -165,7 +165,7 @@ Use:
 This produces a low-level opcode view. Helpful for verifying optimizer or diagnosing control-flow reconstruction.
 
 Quick Reference Cheat Card
---------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: text
 
@@ -521,6 +521,218 @@ Return with value (350+):
 PPL Functions
 -----------------
 
+ABS (1.00)
+~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER ABS(INTEGER value)`
+
+  **Parameters**
+    * :PPL:`value` – Integer input (may be negative)
+
+  **Returns**
+    Absolute value of :PPL:`value`.
+
+  **Description**
+    Classic absolute value. Legacy edge case: the most negative 16‑bit value may remain unchanged.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       DIFF = ABS(A - B)
+
+ASC (1.00)
+~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER ASC(STRING ch)`
+
+  **Parameters**
+    * :PPL:`ch` – String (first character used)
+
+  **Returns**
+    Code (0–255) of the first character (CP437 semantics).
+
+  **Example**
+
+    .. code-block:: PPL
+
+       CODE = ASC("#")
+
+CALLID (1.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING CALLID()`
+
+  **Parameters**
+    None
+
+  **Returns**
+    Session / call identifier (may be empty on local sessions).
+
+  **Description**
+    Provides a per‑connection identifier where supported.
+
+CARRIER (1.00)
+~~~~~~~~~~~~~~
+:PPL:FUNCTION INTEGER CARRIER()
+
+Parameters
+None
+
+Returns
+1 if carrier (remote link) is active, 0 otherwise.
+
+Description
+Legacy modem carrier detect abstraction; always 1 on purely local / emulated sessions.
+
+CHR (1.00)
+~~~~~~~~~~
+:PPL:`FUNCTION STRING CHR(INTEGER code)`
+
+  **Parameters**
+    * :PPL:`code` – 0–255
+
+  **Returns**
+    Single-character string.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       NL = CHR(13)
+
+CONFINFO (3.20)
+~~~~~~~~~~~~~~~
+:PPL:FUNCTION <VARIANT> CONFINFO(INTEGER confnum, INTEGER field)
+
+**Parameters**
+  * :PPL:confnum – Conference number
+  * :PPL:field – Field selector (1–54)
+
+**Returns**
+  Value of the requested field (type varies).
+
+**Description**
+  Reads a conference configuration attribute. (See field table earlier in this document.)
+
+**Example**
+
+.. code-block:: PPL
+
+   IF (CONFINFO(100,50) = 5) PRINTLN "Conference 100 is FIDO type"
+
+
+CONFINFO (Delete Queue Record) (3.20)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ :PPL:`FUNCTION CONFINFO(INTEGER recnum)`
+
+  **Parameters**
+    * :PPL:`recnum` – Queue record number to delete
+
+  **Returns**
+    None
+
+  **Description**
+    Legacy overload used to delete Fido queue queue records (retained for compatibility).
+
+  **Example**
+
+    .. code-block:: PPL
+
+       CONFINFO(6)
+
+CURCOLOR (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER CURCOLOR()`
+
+  **Returns**
+    Current display attribute (packed color value).
+
+CURCONF (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER CURCONF()`
+
+  **Returns**
+    Current active conference number.
+
+CURSEC (1.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER CURSEC()`
+
+  **Returns**
+    Effective / current security level.
+
+CWD (3.20)
+~~~~~~~~~~
+  :PPL:`FUNCTION STRING CWD()`
+
+  **Returns**
+    Current working directory path.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       PRINTLN "PWD = ", CWD()
+
+DATE (1.00)
+~~~~~~~~~~~
+  :PPL:`FUNCTION DATE DATE()`
+
+  **Returns**
+    Current system date.
+
+DAY (1.00)
+~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER DAY(DATE d)`
+
+  **Returns**
+    Day component (1–31).
+
+DEFcolor (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER DEFCOLOR()`
+
+  **Returns**
+    User’s configured default color attribute.
+
+DOW (1.00)
+~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER DOW(DATE d)`
+
+  **Returns**
+    Day of week (implementation-defined 0–6).
+
+EXIST (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN EXIST(STRING file)`
+
+  **Parameters**
+    * :PPL:`file` – Path
+
+  **Returns**
+    TRUE if file exists.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       IF NOT EXIST("CONFIG.TXT") PRINTLN "Missing config."
+
+FINDNEXT (3.20)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING FINDNEXT()`
+
+  **Returns**
+    Next filename from active wildcard scan, or empty when exhausted.
+
+FINDFIRST (3.20)
+~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING FINDFIRST(STRING file)`
+
+  **Parameters**
+    * :PPL:`file` – Pattern (wildcards allowed)
+
+  **Returns**
+    First matching filename or empty if none.
+
 FTELL (3.20)
 ~~~~~~~~~~~~
 
@@ -545,6 +757,205 @@ FTELL (3.20)
         FSEEK 1,10,SEEK_SET
         PRINTLN "Current file offset for MYFILE.TXT is ",FTELL(1)
         FCLOSE 1
+
+GETDRIVE (3.20)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER GETDRIVE()`
+
+  **Returns**
+    Current logical drive index (DOS semantics; virtual elsewhere).
+
+GETENV (1.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING GETENV(STRING var)`
+
+  **Parameters**
+    * :PPL:`var` – Environment variable name
+
+  **Returns**
+    Value or empty if unset.
+
+GETX (1.00)
+~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER GETX()`
+
+  **Returns**
+    Current cursor column (1-based).
+
+GETY (1.00)
+~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER GETY()`
+
+  **Returns**
+    Current cursor row (1-based).
+
+HOUR (1.00)
+~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER HOUR(TIME t)`
+
+  **Returns**
+    Hour component (0–23).
+
+I2BD (3.20)
+~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR I2BD(INTEGER value)`
+
+  **Parameters**
+    * :PPL:`value` – Integer to serialize
+
+  **Returns**
+    8-byte BASIC double representation.
+
+INKEY (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING INKEY()`
+
+  **Returns**
+    Key (if immediately available) or empty.
+
+INSTR (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER INSTR(BIGSTR str, STRING search)`
+
+  **Parameters**
+    * :PPL:`str` – Source text
+    * :PPL:`search` – Substring
+
+  **Returns**
+    1-based position or 0 if not found.
+
+KINKEY (1.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING KINKEY()`
+
+  **Returns**
+    Last key pressed (blocking semantics differ from :PPL:`INKEY` historically).
+
+LEN (1.00)
+~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER LEN(BIGSTR str)`
+
+  **Returns**
+    Length of :PPL:`str`.
+
+LOGGEDON (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN LOGGEDON()`
+
+  **Returns**
+    TRUE if a user is fully logged in.
+
+LOWER (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR LOWER(BIGSTR str)`
+
+  **Returns**
+    Lower-case version.
+
+LTRIM (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR LTRIM(BIGSTR str, STRING charSet)`
+
+  **Returns**
+    :PPL:`str` with leading run of any chars in :PPL:`charSet` removed.
+
+MASK_ALNUM (1.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING MASK_ALNUM()`
+
+  **Returns**
+    Alphanumeric mask token (used with certain masked input ops).
+
+MASK_ALPHA (1.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING MASK_ALPHA()`
+
+  **Returns**
+    Alphabetic mask token.
+
+MASK_ASCII (1.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING MASK_ASCII()`
+
+  **Returns**
+    Printable ASCII mask token.
+
+MASK_FILE (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING MASK_FILE()`
+
+  **Returns**
+    Filename mask token.
+
+MASK_NUM (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING MASK_NUM()`
+
+  **Returns**
+    Numeric input mask token.
+
+MASK_PATH (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING MASK_PATH()`
+
+  **Returns**
+    Path input mask token.
+
+MASK_PWD (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING MASK_PWD()`
+
+  **Returns**
+    Password mask token (input obscured).
+
+MID (1.00)
+~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR MID(BIGSTR str, INTEGER pos, INTEGER len)`
+
+  **Returns**
+    Substring starting at 1-based :PPL:`pos` up to :PPL:`len` characters.
+
+MIN (1.00)
+~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER MIN(TIME t)`
+
+  **Returns**
+    Minute component (0–59).
+
+MINLEFT (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER MINLEFT()`
+
+  **Returns**
+    Minutes remaining in session.
+
+MINON (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER MINON()`
+
+  **Returns**
+    Minutes elapsed in current session.
+
+MKDATE (1.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION DATE MKDATE(INTEGER year, INTEGER month, INTEGER day)`
+
+  **Returns**
+    Constructed date (invalid inputs may produce undefined / sentinel).
+
+MONTH (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER MONTH(DATE d)`
+
+  **Returns**
+    Month (1–12).
+
+NOCHAR (1.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING NOCHAR()`
+
+  **Returns**
+    System “No” confirmation character.
 
 OS (3.20)
 ~~~~~~~~~
@@ -878,9 +1289,473 @@ FINDNEXT (3.20)
   **See Also**
     * :PPL:`FINDFIRST()`, :PPL:`FILEINF()`, :PPL:`EXIST()`
 
+RANDOM (1.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER RANDOM(INTEGER max)`
+
+  **Parameters**
+    * :PPL:`max` – Upper bound
+
+  **Returns**
+    Pseudo-random integer 0..max (legacy inclusive semantics).
+
+READLINE (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING READLINE(STRING file, INTEGER line)`
+
+  **Returns**
+    Contents of the specified (1-based) line or empty if out of range / not found.
+
+REPLACE (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR REPLACE(BIGSTR str, STRING search, STRING replace)`
+
+  **Returns**
+    :PPL:`str` with all :PPL:`search` occurrences replaced.
+
+REPLACESTR (2.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR REPLACESTR(BIGSTR str, STRING search, STRING replace)`
+
+  **Returns**
+    Same effect as :PPL:`REPLACE` (alternate historical opcode).
+
+RIGHT (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR RIGHT(BIGSTR str, INTEGER count)`
+
+  **Returns**
+    Last :PPL:`count` characters (or whole string if shorter).
+
+RTRIM (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR RTRIM(BIGSTR str, STRING charSet)`
+
+  **Returns**
+    :PPL:`str` without trailing chars from :PPL:`charSet`.
+
+SCRTEXT (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING SCRTEXT(INTEGER col, INTEGER row, INTEGER len, BOOLEAN rawCodes)`
+
+  **Returns**
+    Screen slice (optionally stripping or preserving color codes).
+
+SEC (1.00)
+~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER SEC(TIME t)`
+
+  **Returns**
+    Seconds (0–59).
+
+SHOWSTAT (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN SHOWSTAT()`
+
+  **Returns**
+    TRUE if user status line currently displayed.
+
+SPACE (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR SPACE(INTEGER count)`
+
+  **Returns**
+    String of :PPL:`count` spaces.
+
+STRIP (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR STRIP(BIGSTR str, STRING charSet)`
+
+  **Returns**
+    :PPL:`str` with every character in :PPL:`charSet` removed.
+
+STRIPATX (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR STRIPATX(BIGSTR str)`
+
+  **Returns**
+    :PPL:`str` minus @Xnn color codes.
+
+STRIPSTR (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR STRIPSTR(BIGSTR str, STRING search)`
+
+  **Returns**
+    :PPL:`str` with all occurrences of :PPL:`search` removed.
+
+TIME (1.00)
+~~~~~~~~~~~
+  :PPL:`FUNCTION TIME TIME()`
+
+  **Returns**
+    Current system time.
+
+TIMEAP (1.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING TIMEAP(TIME t)`
+
+  **Returns**
+    12-hour formatted time with AM/PM.
+
+TINKEY (3.20)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING TINKEY(INTEGER ticks)`
+
+  **Parameters**
+    * :PPL:`ticks` – Clock ticks to wait (0 = indefinite bound)
+
+  **Returns**
+    Pressed key or empty on timeout.
+
+TOKCOUNT (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER TOKCOUNT()`
+
+  **Returns**
+    Remaining token count in current parse buffer.
+
+TOKENSTR (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING TOKENSTR()`
+
+  **Returns**
+    Unconsumed token remainder as a string.
+
+TOBIGSTR (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR TOBIGSTR(<ANY> value)`
+
+  **Returns**
+    :PPL:`value` coerced to BIGSTR.
+
+TOSTRING (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING STRING(<ANY> value)`
+
+  **Returns**
+    String form of :PPL:`value` (numbers decimal, BOOLEAN 0/1).
+
+U_BDL (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER U_BDL()`
+
+  **Returns**
+    Total bytes downloaded (cumulative).
+
+U_BDLDAY (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER U_BDLDAY()`
+
+  **Returns**
+    Bytes downloaded today.
+
+U_BUL (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER U_BUL()`
+
+  **Returns**
+    Total bytes uploaded.
+
+U_FDL (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER U_FDL()`
+
+  **Returns**
+    Files downloaded count.
+
+U_FUL (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER U_FUL()`
+
+  **Returns**
+    Files uploaded count.
+
+U_INCONF (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN U_INCONF(INTEGER record, INTEGER conf)`
+
+  **Returns**
+    TRUE if user record belongs to conference :PPL:`conf`.
+
+U_LDATE (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION DATE U_LDATE()`
+
+  **Returns**
+    Last logon date.
+
+U_LDIR (1.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION DATE U_LDIR()`
+
+  **Returns**
+    Date user last scanned file directory (legacy metric).
+
+U_LTIME (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION TIME U_LTIME()`
+
+  **Returns**
+    Last logon time.
+
+U_LOGONS (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER U_LOGONS()`
+
+  **Returns**
+    Number of prior completed logons.
+
+U_MSGRD (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER U_MSGRD()`
+
+  **Returns**
+    Messages read count.
+
+U_MSGWR (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER U_MSGWR()`
+
+  **Returns**
+    Messages written count.
+
+U_NAME (1.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING U_NAME()`
+
+  **Returns**
+    Current user’s name.
+
+U_PWDHIST (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING U_PWDHIST(INTEGER index)`
+
+  **Returns**
+    Opaque historical password hash (don’t display to callers).
+
+U_PWDLC (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION DATE U_PWDLC()`
+
+  **Returns**
+    Date of last password change.
+
+U_PWDTC (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER U_PWDTC()`
+
+  **Returns**
+    Times password changed.
+
+U_RECNUM (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER U_RECNUM(STRING username)`
+
+  **Returns**
+    Record number for :PPL:`username` (0 if not found).
+
+U_STAT (1.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION <VARIANT> U_STAT(INTEGER option)`
+
+  **Parameters**
+    * :PPL:`option` – Field selector (legacy; engine-defined meanings)
+
+  **Returns**
+    Stat value (type varies). Provided for compatibility; prefer explicit functions.
+
+U_TIMEON (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER U_TIMEON()`
+
+  **Returns**
+    Minutes used this call.
+
+UPPER (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR UPPER(BIGSTR str)`
+
+  **Returns**
+    Upper-case version.
+
+VALCC (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN VALCC(STRING ccNum)`
+
+  **Returns**
+    TRUE if credit card number passes format/Luhn checks (legacy commerce support).
+
+VALDATE (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN VALDATE(STRING dateStr)`
+
+  **Returns**
+    TRUE if :PPL:`dateStr` matches accepted date formats.
+
+VALTIME (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN VALTIME(STRING timeStr)`
+
+  **Returns**
+    TRUE if :PPL:`timeStr` is valid.
+
+VER (1.00)
+~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER VER()`
+
+  **Returns**
+    Legacy PCBoard version code (mapped / emulated).
+
+YEAR (1.00)
+~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER YEAR(DATE d)`
+
+  **Returns**
+    Year component.
+
+YESCHAR (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING YESCHAR()`
+
+  **Returns**
+    System “Yes” confirmation character.
 
 PPL Statements
 --------------
+CLS (1.00)
+~~~~~~~~~~
+  :PPL:`STATEMENT CLS`
+
+  **Parameters**
+    * None
+
+  **Returns**
+    None
+
+  **Description**
+    Clears the caller’s (and local) display screen and resets cursor to home position.
+
+  **Example**
+    .. code-block:: PPL
+
+       CLS
+       PRINTLN "Welcome."
+
+CLREOL (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT CLREOL`
+
+  **Description**
+    Clears from the current cursor position to the end of the line.
+
+COLOR (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT COLOR(INTEGER attr)`
+
+  **Parameters**
+    * :PPL:`attr` – Packed color (foreground/background + attributes)
+
+  **Description**
+    Sets current output color. Use :PPL:`DEFCOLOR` / :PPL:`CURCOLOR()` to query defaults.
+
+  **Example**
+    .. code-block:: PPL
+
+       COLOR 14
+       PRINTLN "Yellow text"
+
+PRINT (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT PRINT <expr_list>`
+
+  **Description**
+    Writes expressions to the console without appending a newline. Adjacent arguments separated by commas.
+
+  **Example**
+    .. code-block:: PPL
+
+       PRINT "User: ", U_NAME()
+
+PRINTLN (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT PRINTLN <expr_list>`
+
+  **Description**
+    Same as :PPL:`PRINT` but appends a newline at end.
+
+  **Example**
+    .. code-block:: PPL
+
+       PRINTLN "Bytes left:", MINLEFT()
+
+SPRINT / SPRINTLN (1.00)
+~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT SPRINT <expr_list>`
+  :PPL:`STATEMENT SPRINTLN <expr_list>`
+
+  **Description**
+    “Secure” print variants that typically filter control/high ASCII or respect user flags (implementation dependent).
+
+MPRINT / MPRINTLN (1.00)
+~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT MPRINT <expr_list>`
+  :PPL:`STATEMENT MPRINTLN <expr_list>`
+
+  **Description**
+    Message-area context print (legacy differentiation; acts like PRINT/PRINTLN under modern engine unless specialized).
+
+NEWLINE (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT NEWLINE`
+
+  **Description**
+    Emits a single CR/LF pair (same as empty PRINTLN).
+
+NEWLINES (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT NEWLINES(INTEGER count)`
+
+  **Parameters**
+    * :PPL:`count` – Number of blank lines to emit (<=0 no-op)
+
+INPUT (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT INPUT(<VAR> target)`
+
+  **Parameters**
+    * :PPL:`target` – Variable to receive a raw line (basic editing)
+
+  **Description**
+    Reads a full line of user input (no masking/validation) into the variable.
+
+INPUTSTR / INPUTINT / INPUTDATE / INPUTTIME / INPUTMONEY / INPUTCC (1.00)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT INPUTSTR(<VAR> target, INTEGER flags)`
+  :PPL:`STATEMENT INPUTINT(<VAR> target, INTEGER flags)`
+  :PPL:`STATEMENT INPUTDATE(<VAR> target, INTEGER flags)`
+  :PPL:`STATEMENT INPUTTIME(<VAR> target, INTEGER flags)`
+  :PPL:`STATEMENT INPUTMONEY(<VAR> target, INTEGER flags)`
+  :PPL:`STATEMENT INPUTCC(<VAR> target, INTEGER flags)`
+
+  **Parameters**
+    * :PPL:`target` – Variable to fill
+    * :PPL:`flags` – Bitwise OR of input behavior flags (e.g. FIELDLEN, UPCASE, ECHODOTS)
+
+  **Description**
+    Validating input routines specialized for type. For credit cards, format and Luhn validation can occur.
+
+  **Example**
+    .. code-block:: PPL
+
+       INTEGER Age
+       INPUTINT Age, FIELDLEN + UPCASE
+
+INPUTYN (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT INPUTYN(<VAR> target, INTEGER flags)`
+
+  **Description**
+    Prompts for a Yes/No style single-key answer; stores 'Y' or 'N' (or configured YESCHAR/NOCHAR) into :PPL:`target`.
 
 KILLMSG (3.20)
 ~~~~~~~~~~~~~~
@@ -1268,3 +2143,388 @@ CONFINFO (Modify) (3.20)
 
   **See Also**
     * :PPL:`CONFINFO()` (read / variant form)
+
+
+PROMPTSTR (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT PROMPTSTR(<VAR> target, INTEGER flags)`
+
+  **Description**
+    Like INPUTSTR but prints a system prompt first (legacy UI consistency).
+
+TOKENIZE (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT TOKENIZE(STRING line)`
+
+  **Parameters**
+    * :PPL:`line` – Source to break into tokens for later :PPL:`GETTOKEN()` / :PPL:`TOKCOUNT()`
+
+  **Description**
+    Loads the internal token buffer with split tokens (whitespace / delimiter rules legacy-defined).
+
+GETTOKEN (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT GETTOKEN(<VAR> target)`
+
+  **Description**
+    Pops next token (or empty if none) into :PPL:`target`.
+
+SHELL (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT SHELL(STRING command)`
+
+  **Description**
+    Executes a system shell / external program (availability/security can be restricted).
+
+BYE / GOODBYE (1.00)
+~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT BYE`
+  :PPL:`STATEMENT GOODBYE`
+
+  **Description**
+    Terminates user session gracefully (GOODBYE synonym). May trigger logoff scripts, accounting flush.
+
+HANGUP (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT HANGUP`
+
+  **Description**
+    Immediate disconnect / carrier drop (hard termination). Prefer BYE for clean logout.
+
+LOG (1.00)
+~~~~~~~~~~
+  :PPL:`STATEMENT LOG(STRING line)`
+
+  **Description**
+    Appends :PPL:`line` to the system activity / event log.
+
+DELAY (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT DELAY(INTEGER ticks)`
+
+  **Parameters**
+    * :PPL:`ticks` – ~18 per second
+
+  **Description**
+    Sleeps (non-busy) for specified ticks unless carrier loss or abort condition.
+
+WAIT (1.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT WAIT(INTEGER ticks)`
+
+  **Description**
+    Similar to DELAY but may flush output first or enforce a minimum pacing (legacy pacing semantics).
+
+BEEP (1.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT BEEP`
+
+  **Description**
+    Emits an audible terminal bell (Ctrl-G) if user’s terminal supports it.
+
+KBDSTUFF (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT KBDSTUFF(STRING text)`
+
+  **Description**
+    Queues keystrokes into the input buffer as if typed by the caller.
+
+KBDFLUSH / KBDCHKON / KBDCHKOFF (1.00)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT KBDFLUSH`
+  :PPL:`STATEMENT KBDCHKON`
+  :PPL:`STATEMENT KBDCHKOFF`
+
+  **Description**
+    Manage keyboard buffering and carrier/abort key checks.
+
+SENDMODEM (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT SENDMODEM(STRING raw)`
+
+  **Description**
+    Sends raw bytes (unfiltered) to remote terminal/modem (legacy; may be sanitized in modern environments).
+
+PAGEON / PAGEOFF (1.00)
+~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT PAGEON`
+  :PPL:`STATEMENT PAGEOFF`
+
+  **Description**
+    Enable/disable user “page” requests (sysop chat paging).
+
+CHAT (1.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT CHAT`
+
+  **Description**
+    Enters sysop chat mode if available (toggles live keyboard sharing).
+
+FLAG (1.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT FLAG(INTEGER flagId)`
+
+  **Description**
+    Sets a transient per‑session flag bit (implementation-defined). Often used with prompt display logic.
+
+ALIAS (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT ALIAS(STRING newName)`
+
+  **Description**
+    Temporarily changes display name (legacy; may not persist).
+
+GETUSER / PUTUSER (1.00)
+~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT GETUSER(INTEGER record)`
+  :PPL:`STATEMENT PUTUSER`
+
+  **Parameters (GETUSER)**
+    * :PPL:`record` – User record number
+
+  **Description**
+    Loads user record into current context / writes modified current user back to storage.
+
+GETALTUSER / FREALTUSER / PUTALTUSER (1.00 / 3.20+ semantics)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT GETALTUSER(INTEGER record)`
+  :PPL:`STATEMENT FREALTUSER`
+  (Persist changes with :PPL:`PUTALTUSER` (if provided) or :PPL:`PUTUSER` after adjusting context.)
+
+  **Description**
+    Loads an alternate user profile (for inspection/modification) while preserving original active user data.
+
+ADJTIME (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT ADJTIME(INTEGER deltaMinutes)`
+
+  **Description**
+    Adjusts remaining time this call by :PPL:`deltaMinutes` (negative to subtract).
+
+ADJBYTES / ADJTBYTES / ADJDBYTES / ADJTFILES (1.00+)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT ADJBYTES(INTEGER delta)`
+  :PPL:`STATEMENT ADJTBYTES(INTEGER delta)` (uploads)
+  :PPL:`STATEMENT ADJDBYTES(INTEGER delta)` (downloads)
+  :PPL:`STATEMENT ADJTFILES(INTEGER delta)` (upload file count)
+
+  **Description**
+    Adjust quota/accounting counters. Prefer the more explicit *T*/*D* forms when available.  
+    (You already documented :PPL:`ADJTUBYTES`—the upload bytes variant in expanded semantics.)
+
+DELETE / RENAME (1.00)
+~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT DELETE(STRING file)`
+  :PPL:`STATEMENT RENAME(STRING old, STRING new)`
+
+  **Description**
+    Remove or rename a filesystem entry (basic DOS semantics; silent failure if missing or permission denied).
+
+FCREATE / FOPEN / FAPPEND (1.00)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FCREATE(INTEGER ch, STRING file, INTEGER access, INTEGER share)`
+  :PPL:`STATEMENT FOPEN(INTEGER ch, STRING file, INTEGER access, INTEGER share)`
+  :PPL:`STATEMENT FAPPEND(INTEGER ch, STRING file, INTEGER access, INTEGER share)`
+
+  **Parameters**
+    * :PPL:`ch` – Channel number (1–8)
+    * :PPL:`file` – Path
+    * :PPL:`access` – One of :PPL:`O_RD`, :PPL:`O_WR`, :PPL:`O_RW`
+    * :PPL:`share` – One of :PPL:`S_DN`, :PPL:`S_DR`, :PPL:`S_DW`, :PPL:`S_DB`
+
+  **Description**
+    Opens a file for subsequent buffered I/O. Create always truncates/creates; Append opens write and seeks end.
+
+  **Example**
+    .. code-block:: PPL
+
+       FCREATE 1,"log.txt",O_WR,S_DN
+       FPUTLN 1,"Session start"
+       FCLOSE 1
+
+FPUT / FPUTLN / FPUTPAD (1.00)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FPUT(INTEGER ch, STRING data)`
+  :PPL:`STATEMENT FPUTLN(INTEGER ch, STRING data)`
+  :PPL:`STATEMENT FPUTPAD(INTEGER ch, STRING data, INTEGER width)`
+
+  **Description**
+    Write text (optionally newline or right-pad to width).
+
+FGET (1.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT FGET(INTEGER ch, <VAR> target, INTEGER length)`
+
+  **Description**
+    Reads up to :PPL:`length` bytes (or line depending on legacy mode) into :PPL:`target`.
+
+FSEEK (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT FSEEK(INTEGER ch, INTEGER offset, INTEGER whence)`
+
+  **Parameters**
+    * :PPL:`whence` – :PPL:`SEEK_SET`, :PPL:`SEEK_CUR`, :PPL:`SEEK_END`
+
+FFLUSH (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT FFLUSH(INTEGER ch)`
+
+  **Description**
+    Forces buffered channel output to disk.
+
+FCLOSE / FCLOSEALL (1.00)
+~~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FCLOSE(INTEGER ch)`
+  :PPL:`STATEMENT FCLOSEALL`
+
+  **Description**
+    Close one or all open channels (releases locks).
+
+FREAD / FWRITE (1.00)
+~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FREAD(INTEGER ch, <VAR> bigstrTarget, INTEGER bytes)`
+  :PPL:`STATEMENT FWRITE(INTEGER ch, BIGSTR buffer, INTEGER bytes)`
+
+  **Description**
+    Raw byte read/write (binary).
+
+FREWIND (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FREWIND(INTEGER ch)`
+
+  **Description**
+    Equivalent to :PPL:`FSEEK ch,0,SEEK_SET`.
+
+DISPFILE / DISPTEXT / DISPSTR (1.00)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT DISPFILE(STRING file, INTEGER flags)`
+  :PPL:`STATEMENT DISPTEXT(STRING text, INTEGER flags)`
+  :PPL:`STATEMENT DISPSTR(STRING text)`
+
+  **Description**
+    Display PCBoard @-code aware content (file or inline). Flags may control paging, security, or language substitution.
+
+RESETDISP / STARTDISP (1.00)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT RESETDISP`
+  :PPL:`STATEMENT STARTDISP(INTEGER flags)`
+
+  **Description**
+    Manage internal buffered display/paging state.
+
+JOIN (1.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT JOIN(INTEGER confnum)`
+
+  **Description**
+    Switches current conference (permission verified).
+
+CONFFLAG / CONFUNFLAG (1.00)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT CONFFLAG(INTEGER confnum, INTEGER flagMask)`
+  :PPL:`STATEMENT CONFUNFLAG(INTEGER confnum, INTEGER flagMask)`
+
+  **Description**
+    Set / clear specific conference attribute bits (F_MW, F_SYS, etc.).
+
+BITSET / BITCLEAR (1.00)
+~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT BITSET(<VAR> var, INTEGER bit)`
+  :PPL:`STATEMENT BITCLEAR(<VAR> var, INTEGER bit)`
+
+  **Description**
+    Sets or clears (0-based) bit in integer variable.
+
+INC / DEC (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT INC(<VAR> var)`
+  :PPL:`STATEMENT DEC(<VAR> var)`
+
+  **Description**
+    var = var ± 1 (legacy bytecode convenience).
+
+ALIAS (already documented above, retained for clarity)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+SAVESCRN / RESTSCRN (1.00)
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT SAVESCRN`
+  :PPL:`STATEMENT RESTSCRN`
+
+  **Description**
+    Save/restore current screen buffer (local + remote if supported).
+
+ANSIPOS (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT ANSIPOS(INTEGER col, INTEGER row)`
+
+  **Description**
+    Directly positions cursor (1-based coordinates).
+
+KBDSTRING (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT KBDSTRING(STRING str)`
+
+  **Description**
+    Inject entire string into keyboard buffer (contrast :PPL:`KBDSTUFF` which may differ historically).
+
+SETENV (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT SETENV(STRING name, STRING value)`
+
+  **Description**
+    Sets (or overrides) an environment variable for subsequent processes / shell calls.
+
+CHDIR (3.20)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT CHDIR(STRING path)`
+
+  **Description**
+    Changes the current working directory.
+
+RENAME (already included above)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+SHORTDESC (3.20)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT SHORTDESC(STRING text)`
+
+  **Description**
+    Sets a short descriptive string for the PPE (shown in sysop listings / logs).
+
+MOVEmsg (3.20)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT MOVEMSG(INTEGER fromConf, INTEGER msgNum, INTEGER toConf)`
+
+  **Description**
+    Moves a message between conferences (permissions & existence required).
+
+SETBANKBAL (3.20)
+~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT SETBANKBAL(INTEGER userRec, MONEY amount)`
+
+  **Description**
+    Adjusts stored “bank” balance (economy/game feature – semantics engine-defined).
+
+WEBREQUEST (400 tentative)
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT WEBREQUEST(STRING url, <VAR> responseBigStr)`
+
+  **Description**
+    Experimental HTTP GET/HEAD style fetch populating response data (subject to change; may require runtime 400).
+
+D* Database / Table Primitives (Overview)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  (Full per-statement docs can be added—summary here)
+
+  * :PPL:`DCREATE name, layout…` – Create structured data file
+  * :PPL:`DOPEN name` / :PPL:`DCLOSE` / :PPL:`DCLOSEALL`
+  * Record navigation: :PPL:`DTOP`, :PPL:`DBOTTOM`, :PPL:`DGO n`, :PPL:`DSKIP delta`
+  * CRUD: :PPL:`DADD`, :PPL:`DAPPEND`, :PPL:`DBLANK` (new empty), :PPL:`DDELETE`, :PPL:`DRECALL`
+  * Locking: :PPL:`DLOCK`, :PPL:`DLOCKR`, :PPL:`DLOCKG`, :PPL:`DUNLOCK`
+  * Field IO: :PPL:`DGET`, :PPL:`DPUT`
+  * Index / seek: :PPL:`DSEEK`, :PPL:`DFCOPY`
+  * Alias / pack: :PPL:`DSETALIAS`, :PPL:`DPACK`
+  * NewName variants (DN*) manage named index or alt dataset.
+
+  Add a request if you want these expanded in the same detailed template.

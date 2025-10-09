@@ -1,5 +1,5 @@
 Introduction
-=======================
+============
 
 .. image:: _images/login_screen.png
    :alt: Login screen
@@ -20,8 +20,15 @@ time/byte bank, accounting scaffolding, PPL execution, and TUI
 administration—providing a foundation that is both compatible *and*
 extensible.
 
-Key Goals
+Icy Board
 ---------
+
+Due to its inheritance of PCBoard's architecture, Icy Board aims to
+provide a familiar experience for long-time users while introducing 
+modern features and improvements.
+
+Key Goals
+~~~~~~~~~
 
 * High compatibility with PCBoard 15.4 behaviors and PPE ecosystem
 * Safe modernization: UTF-8, Internet protocols (Telnet, SSH, WebSockets)
@@ -31,7 +38,7 @@ Key Goals
 * Extend with new objects / APIs *without* breaking old PPE plugins
 
 Non-Goals (by design)
----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
 * “One-click shiny” out-of-box board—historical complexity retained
    * PCBoard was never simple; neither is IcyBoard
@@ -39,16 +46,16 @@ Non-Goals (by design)
 * Running on DOS / Windows 9x / OS/2
 
 License
--------
+~~~~~~~
 
 Dual-licensed (Apache 2.0 / MIT) — see repository LICENSE files.
 
 Building
---------
+~~~~~~~~
 
 Prerequisites:
   * Rust toolchain (stable) — https://www.rust-lang.org/tools/install
-  * A UTF‑8 capable terminal (most modern terminals)
+  * A UTF-8 capable terminal (most modern terminals)
   * (Optional) VS Code for PPL editing
 
 Build everything:
@@ -62,7 +69,7 @@ Build everything:
 This will create a target/release/ directory with all executables.
 
 Getting started
----------------
+~~~~~~~~~~~~~~~
 
 I recommend putting the bin/ directory in the path but you can just `cd bin` for now.
 
@@ -74,8 +81,7 @@ This will fire up a new call waiting screen where you can log in as sysop. By de
 NOTE: Ensure that your terminal screen is big enough - 80x25 at least.
 
 Tools
------
-
+~~~~~
 
 Icy Board includes a comprehensive suite of tools for BBS management and development:
 
@@ -90,7 +96,7 @@ Icy Board includes a comprehensive suite of tools for BBS management and develop
 * ``ppl-language-server`` - Language server for PPL (for IDE integration)
 
 Directory Layout
-----------------
+~~~~~~~~~~~~~~~~
 
 I tried to simplify the PCBoard system a bit but it has limits.
 
@@ -109,7 +115,8 @@ A typical Icy Board installation follows this structure:
    └── tmp/                # Generated Files for backwards compatibility
 
 main/ files 
------------
+~~~~~~~~~~~
+
 The ``main/`` directory contains core system configuration and data files:
 
 **Configuration Files**
@@ -117,11 +124,11 @@ The ``main/`` directory contains core system configuration and data files:
 +------------------------+---------------------------------------------------------------+
 | File                   | Description                                                   |
 +========================+===============================================================+
-| ``commands.toml``      | Command definitions and keyboard shortcuts                   |
-| ``conferences.toml``   | Conference structure and access controls                     |
-| ``languages.toml``     | Language definitions (date formats, yes/no chars, locale)    |
-| ``protocols.toml``     | File transfer protocol configurations                        |
-| ``security_levels.toml`` | Security level definitions and user limits                |
+| ``commands.toml``      | Command definitions and keyboard shortcuts                    |
+| ``conferences.toml``   | Conference structure and access controls                      |
+| ``languages.toml``     | Language definitions (date formats, yes/no chars, locale)     |
+| ``protocols.toml``     | File transfer protocol configurations                         |
+| ``security_levels.toml`` | Security level definitions and user limits                  |
 +------------------------+---------------------------------------------------------------+
 
 **User Management**
@@ -129,9 +136,9 @@ The ``main/`` directory contains core system configuration and data files:
 +------------------------+---------------------------------------------------------------+
 | File                   | Description                                                   |
 +========================+===============================================================+
-| ``users.toml``         | User database with all registered accounts                   |
-| ``groups``             | Unix-style groups file for permission management             |
-| ``vip_user.txt``       | VIP users list (sysop notified on login)                    |
+| ``users.toml``         | User database with all registered accounts                    |
+| ``groups``             | Unix-style groups file for permission management              |
+| ``vip_user.txt``       | VIP users list (sysop notified on login)                      |
 +------------------------+---------------------------------------------------------------+
 
 **Security & Validation**
@@ -139,10 +146,10 @@ The ``main/`` directory contains core system configuration and data files:
 +------------------------+---------------------------------------------------------------+
 | File                   | Description                                                   |
 +========================+===============================================================+
-| ``tcan_user.txt``      | Forbidden usernames (one per line)                          |
-| ``tcan_passwords.txt`` | Forbidden passwords (weak/common passwords)                  |
-| ``tcan_email.txt``     | Blocked email domains or addresses                           |
-| ``tcan_uploads.txt``   | Prohibited upload filenames/patterns                         |
+| ``tcan_user.txt``      | Forbidden usernames (one per line)                            |
+| ``tcan_passwords.txt`` | Forbidden passwords (weak/common passwords)                   |
+| ``tcan_email.txt``     | Blocked email domains or addresses                            |
+| ``tcan_uploads.txt``   | Prohibited upload filenames/patterns                          |
 +------------------------+---------------------------------------------------------------+
 
 **System Files**
@@ -150,16 +157,15 @@ The ``main/`` directory contains core system configuration and data files:
 +------------------------+---------------------------------------------------------------+
 | File                   | Description                                                   |
 +========================+===============================================================+
-| ``icbtext.toml``       | System messages and prompts (customizable)                   |
-|                        | Localized versions: ``icbtext_de.toml``, etc.               |
-| ``email.*``            | Email message base files (JAM format)                        |
+| ``icbtext.toml``       | System messages and prompts (customizable)                    |
+|                        | Localized versions: ``icbtext_de.toml``, etc.                 |
+| ``email.*``            | Email message base files (JAM format)                         |
 +------------------------+---------------------------------------------------------------+
 
 art/ files
------------
+~~~~~~~~~~
 
-It's recommended to use .pcb, .ans, .rip, 
-.asc extensions instead of the old *G, *R sheme. 
+It's recommended to use .pcb, .ans, .rip, .asc extensions instead of the old …G, …R sheme. 
 This makes it easier to draw files with an ansi 
 drawing tool as well. And file name lengths ar no longer an issue.
 Files can either be CP437 or UTF-8 - IcyBoard will do 
@@ -170,7 +176,7 @@ fast and correct decision about the file encoding.
 Note: UTF-8 is recommended for everything.
 
 icbsetup
---------
+~~~~~~~~
 
 `icbsetup` is the interactive TUI (text user interface) utility 
 used to create, configure and maintain an Icy Board installation.  
@@ -182,7 +188,7 @@ It's more than the classic PCBoard PCBSETUP untility.
 * Help converting PPE plugins to modern systems
 
 Create new BBS installations
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. Pick an identifier (letters / digits / underscore). Example: ``FOO``  
 2. Create the instance:
@@ -200,7 +206,7 @@ Create new BBS installations
 Then the call waiting screen appears. You can access the setup or log in as user or sysop.
 
 Import legacy PCBoard systems
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Icy Board can ingest an existing PCBoard installation directly from your original
 ``PCBOARD.DAT`` (plus the related files it references). The importer converts
@@ -226,7 +232,7 @@ Limitations are that the importer may import wrong/old paths - they may need to 
 PPE plugins need to be manually converted as well.
 
 Post-import tasks
-------------------
+~~~~~~~~~~~~~~~~~
 
 1. See ``importlog.txt`` for warnings/errors (missing files, malformed records).
 2. Manual convert PPE plugins (see below).
@@ -237,7 +243,7 @@ Post-import tasks
 4. Enable network services (telnet/ssh) only after verifying console launch works.
 
 Converting PPE plugins to modern systems
-----------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Even if .PPE files don't need to be recompiled (they may work as-is) they may need to be adjusted to work with Icy Board.
 Most of them have a configuration that hint to old paths or files that don't exist anymore. So they need to be manually adjusted.
@@ -248,8 +254,9 @@ WARNING: Backup your original PPE files before conversion!
 
 For that icbsetup has a PPE conversion assistant:
 
-  .. code-block:: bash
-       ./icbsetup ppe-convert /path/to/ppe
+.. code-block:: bash
+   
+   ./icbsetup ppe-convert /path/to/ppe
 
 
 This will lowercase all files and convert most fils from CP437 to UTF-8 with BOM. If a file is CP437 and is not converted.
@@ -257,8 +264,9 @@ This will lowercase all files and convert most fils from CP437 to UTF-8 with BOM
 
 Manual convert a single file with
 
-   .. code-block:: bash
-       ./icbsetup ppe-convert /path/to/file.nfo
+.. code-block:: bash
+   
+   ./icbsetup ppe-convert /path/to/file.nfo
 
 This will convert a single CP437 file to UTF-8 with BOM. The PPE engine will automatically detect the encoding and convert to CP437 if needed.
 
