@@ -65,16 +65,16 @@ icb_system_statistics_header = Statistic
 icb_system_statistics_total_calls = All Time Calls
 icb_system_statistics_total_messages = All Time Messages
 icb_system_statistics_total_uploads = All Time Uploads
-icb_system_statistics_total_uploads_kb = All Time kb Uploaded
+icb_system_statistics_total_uploads_kb = All Time KB Uploaded
 icb_system_statistics_total_downloads = All Time Downloads
-icb_system_statistics_total_downloads_kb = All Time kb Downloaded
+icb_system_statistics_total_downloads_kb = All Time KB Downloaded
 
 icb_system_statistics_today_calls = Today Calls
 icb_system_statistics_today_messages = Today Messages
 icb_system_statistics_today_uploads = Today Uploads
-icb_system_statistics_today_uploads_kb = Today kb Uploaded
+icb_system_statistics_today_uploads_kb = Today KB Uploaded
 icb_system_statistics_today_downloads = Today Downloads
-icb_system_statistics_today_downloads_kb = Today kb Downloaded
+icb_system_statistics_today_downloads_kb = Today KB Downloaded
 
 # Node Monitioring Utility
 icbmoni_title = [ IcyBoard Node Monitoring Utility ]
@@ -700,7 +700,7 @@ user_sec_cmd_show_user_list=USER Search/Display
 user_sec_cmd_show_user_list-status= TODO
 user_sec_cmd_show_user_list-help= TODO
 
-user_sec_cmd_who=WHO is On Another Node
+user_sec_cmd_who=WHO is on Another Node
 user_sec_cmd_who-status= TODO
 user_sec_cmd_who-help= TODO
 
@@ -803,7 +803,7 @@ password_expire_days=Number Days Before FORCES Password Change
 password_expire_days-status=0=disable
 password_expire_days-help=TODO
 
-password_expire_warn_days=Number Days tow Warn Prior to FORCED Change
+password_expire_warn_days=Number Days to Warn Prior to FORCED Change
 password_expire_warn_days-status=0=disable
 password_expire_warn_days-help=TODO
 
@@ -849,7 +849,7 @@ default_graphics_at_login=Default to Graphics At Login
 default_graphics_at_login-status=Set default answer to 'Do you want graphics?' question
 default_graphics_at_login-help=TODO
 
-non_graphics=Usa Non-Graphics Mode Only
+non_graphics=Use Non-Graphics Mode Only
 non_graphics-status=Disables all graphics
 non_graphics-help=TODO
 
@@ -862,7 +862,7 @@ display_news_behavior-status=Y (Always New), N (Once per Day), A (Always)
 display_news_behavior-help=TODO
 
 
-display_userinfo_at_login=User InDisplayfo at Login
+display_userinfo_at_login=Display User Info at Login
 display_userinfo_at_login-status=Display (V)iew Stats on login.
 display_userinfo_at_login-help=TODO
 

@@ -32,11 +32,36 @@ pub async fn await_ssh_connections(ssh: SSH, board: Arc<tokio::sync::Mutex<IcyBo
         ..Default::default()
     };
     let config = Arc::new(config);
-    let mut sh = Server { board, bbs };
-    let addr = if ssh.address.is_empty() { "0.0.0.0".to_string() } else { ssh.address.clone() };
+    let mut server_impl = Server { board, bbs };
+    let configured_addr = if ssh.address.trim().is_empty() {
+        "0.0.0.0".to_string()
+    } else {
+        ssh.address.clone()
+    };
 
-    server::Server::run_on_address(&mut sh, config, (addr, ssh.port)).await.unwrap();
-    Ok(())
+    match russh::server::Server::run_on_address(&mut server_impl, config.clone(), (configured_addr.as_str(), ssh.port)).await {
+        Ok(_) => {
+            log::info!("SSH listening on {}:{}", configured_addr, ssh.port);
+            return Ok(());
+        }
+        Err(e) => {
+            log::error!("SSH bind failed on {}:{} -> {e}; kind={:?}", configured_addr, ssh.port, e);
+            // Only attempt fallback if user supplied a non-wildcard that failed
+            if configured_addr != "0.0.0.0" && e.kind() == std::io::ErrorKind::AddrNotAvailable {
+                let fallback = "0.0.0.0";
+                log::warn!("Retrying SSH listener on fallback {}:{}", fallback, ssh.port);
+                if let Err(e2) = russh::server::Server::run_on_address(&mut server_impl, config, (fallback, ssh.port)).await {
+                    log::error!("SSH fallback bind also failed on {}:{} -> {e2}", fallback, ssh.port);
+                    return Err(e2.into());
+                } else {
+                    log::info!("SSH listening on fallback {}:{}", fallback, ssh.port);
+                    return Ok(());
+                }
+            } else {
+                return Err(e.into());
+            }
+        }
+    }
 }
 
 struct SshSession {
