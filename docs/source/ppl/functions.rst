@@ -970,7 +970,7 @@ GETENV (1.00)
        PRINTLN "System PATH: ", path
 
   **See Also**
-    * :PPL:`PCBDAT()` – Get PCBoard data directory
+    * :PPL:`PCBDAT()` – Get PCBoard data directory (IcyBoard generates that)
 
 GETX (1.00)
 ~~~~~~~~~~~
@@ -1501,7 +1501,7 @@ MGETBYTE (1.00)
     Byte value (0-255) from modem buffer, or -1 if empty.
 
   **Remarks**
-    Bypasses PCBoard's normal string filtering to access raw incoming bytes. 
+    Bypasses BBS's normal string filtering to access raw incoming bytes. 
     Use CHR() to convert values to characters if needed.
 
   **Example**
@@ -1847,7 +1847,7 @@ OS (3.20)
     None
   
   **Returns**
-    An integer indicating which operating system/PCBoard version the PPE is running under:
+    An integer indicating which operating system/BBS version the PPE is running under:
     
     * 0 = Unknown
     * 1 = DOS/Windows
@@ -2092,7 +2092,7 @@ PSA (1.00)
       4=Password, 5=Statistics, 6=Notes
 
   **Returns**
-    TRUE if specified PSA (PCBoard Supported Allocation) is installed, FALSE otherwise.
+    TRUE if specified PSA (PCBoard Supported Allocation - IcyBoard always returns TRUE) is installed, FALSE otherwise.
 
   **Remarks**
     Check availability of optional extended user data areas before accessing them.
@@ -2215,814 +2215,647 @@ REG... (1.00)
     * :PPL:`DOINTR` – Execute interrupt
     * :PPL:`MKADDR()` – Make memory address
 
-REPLACE() Function (1.00)
-----------------------
-
-Replaces all occurrences of a character in a string with another character.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   REPLACE(str, old, new)
-
-**Parameters**
-
-- ``str`` - String expression to process
-- ``old`` - Character to find and replace
-- ``new`` - Character to replace with
-
-**Returns**
-
-Returns ``str`` with all occurrences of ``old`` replaced by ``new``.
-
-**Remarks**
-
-Searches a string for a given character and replaces all instances with another character. Useful for text formatting and string manipulation tasks.
-
-**Example**
-
-.. code-block:: PPL
-
-   PRINTLN "Your internet address on this system is:"
-   PRINTLN REPLACE(LOWER(U_NAME()), " ", "."), "@clarkdev.com"
-
-**See Also**
-
-[`STRIP()`](#strip-function), [`STRIPATX()`](#stripatx-function)
-
-REPLACESTR() Function (2.00)
-----------------------------
-
-Replaces all occurrences of a substring with another substring in a string.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   REPLACESTR(str, search, replace)
-
-**Parameters**
-
-- ``str`` - String expression to process
-- ``search`` - Substring to find and replace
-- ``replace`` - Substring to replace with
-
-**Returns**
-
-Returns ``str`` with all occurrences of ``search`` replaced by ``replace``.
-
-**Remarks**
-
-Similar to REPLACE() but operates on substrings instead of single characters. Searches a string for all instances of a substring and replaces them with another substring. Useful for text processing and string manipulation tasks.
-
-**Example**
-
-.. code-block:: PPL
-
-   STRING msg
-   LET msg = "Hello World! World is great!"
-   PRINTLN REPLACESTR(msg, "World", "Universe")
-   ' Prints: "Hello Universe! Universe is great!"
-
-**See Also**
-
-[`REPLACE()`](#replace-function), [`STRIPSTR()`](#stripstr-function), [`STRIP()`](#strip-function)
-
-
-RIGHT() Function (1.00)
------------------------
-
-Returns the rightmost characters from a string.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   RIGHT(str, chars)
-
-**Parameters**
-
-- ``str`` - String expression to extract from
-- ``chars`` - Number of characters to extract from the right end
-
-**Returns**
-
-Returns a string with the rightmost ``chars`` characters of ``str``.
-
-**Remarks**
-
-Returns a substring with the rightmost characters of a specified string. If ``chars`` is ≤ 0, returns an empty string. If ``chars`` exceeds the string length, spaces are added to pad the result.
-
-**Example**
-
-.. code-block:: PPL
-
-   STRING s
-   FOPEN 1, "DATA.TXT", O_RD, S_DN
-   WHILE (!FERR(1)) DO
-      FGET 1, s
-      PRINT RTRIM(LEFT(s, 25), " "), " - "
-      PRINTLN RIGHT(s, LEN(s) - 25)
-   ENDWHILE
-   FCLOSE 1
-
-**See Also**
-
-[`LEFT()`](#left-function), [`MID()`](#mid-function)
-
-
-RTRIM() Function (1.00)
------------------------
-
-Removes a specified character from the right end of a string.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   RTRIM(str, ch)
-
-**Parameters**
-
-- ``str`` - String expression to trim
-- ``ch`` - Character to strip from the right end
-
-**Returns**
-
-Returns the trimmed string.
-
-**Remarks**
-
-Strips a specified character from the right end of a string and returns the trimmed result. Commonly used to remove trailing spaces or other characters.
-
-**Example**
-
-.. code-block:: PPL
-
-   STRING s
-   LET s = " TEST "
-   PRINTLN RTRIM(s, " ")  ' Will print " TEST"
-
-**See Also**
-
-[`LTRIM()`](#ltrim-function), [`TRIM()`](#trim-function)
-
-
-S2I() Function (1.00)
----------------------
-
-Converts a string in a specified number base to an integer.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   S2I(str, base)
-
-**Parameters**
-
-- ``str`` - String expression to convert
-- ``base`` - Number base (2 through 36) to convert from
-
-**Returns**
-
-Returns ``str`` converted from the specified number base to an integer.
-
-**Remarks**
-
-Converts a string in any number base from 2 to 36 to an integer. For example, ``S2I("1010", 2)`` returns 10; ``S2I("Z", 36)`` returns 35. Useful for parsing numbers stored in non-decimal formats.
-
-**Example**
-
-.. code-block:: PPL
-
-   INTEGER i
-   STRING s
-   INPUTTEXT "Enter a string (any base)", s, 0X0E, 40
-   FOR i = 2 TO 36
-      PRINTLN s, " = ", S2I(s, i), " base ", i
-   NEXT
-
-**See Also**
-
-[`I2S()`](#i2s-function)
-
-
-SCRTEXT() Function (1.00)
--------------------------
-
-Reads text and attribute information directly from screen memory.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   SCRTEXT(x, y, len, color)
-
-**Parameters**
-
-- ``x`` - X coordinate (column) to read from
-- ``y`` - Y coordinate (row) to read from
-- ``len`` - Length in columns to read
-- ``color`` - TRUE to include color codes, FALSE otherwise
-
-**Returns**
-
-Returns the specified region of screen memory as a string.
-
-**Remarks**
-
-Useful for saving portions of screen memory with or without color information. Color information is included as embedded @X codes when ``color`` is TRUE. Due to the 256 character string limit, limit length to 51 characters or less when including color information to avoid exceeding the limit.
-
-**Example**
-
-.. code-block:: PPL
-
-   ' Scroll the screen left 5 columns and down 3 rows
-   INTEGER r
-   STRING s
-   FOR r = 20 TO 1 STEP -1
-      LET s = SCRTEXT(6, r, 75, TRUE)
-      ANSIPOS 1, r + 3
-      CLREOL
-      PRINT s
-   NEXT
-
-**See Also**
-
-[`INSTR()`](#instr-function), [`LEN()`](#len-function), [`SPACE()`](#space-function)
-
-
-SEC() Function (1.00)
----------------------
-
-Returns the second component from a time expression.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   SEC(texp)
-
-**Parameters**
-
-- ``texp`` - Time expression
-
-**Returns**
-
-Returns the second of the minute from the specified time (0-59).
-
-**Remarks**
-
-Extracts the second component from a TIME value. Useful for time parsing and display formatting.
-
-**Example**
-
-.. code-block:: PPL
-
-   PRINTLN "The second is ", SEC(TIME())
-
-**See Also**
-
-[`HOUR()`](#hour-function), [`MIN()`](#min-function), [`TIME()`](#time-function)
-
-
-SHOWSTAT() Function (1.00)
---------------------------
-
-Determines if data is being displayed on the screen.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   SHOWSTAT()
-
-**Returns**
-
-Returns TRUE if data is being shown on the display, FALSE otherwise.
-
-**Remarks**
-
-Determines the current display status. Used with OPENCAP, CLOSECAP, SHOWON, and SHOWOFF statements to control screen output and capture operations. Useful for automating features while capturing output to files.
-
-**Example**
-
-.. code-block:: PPL
-
-   BOOLEAN ss
-   LET ss = SHOWSTAT()
-   SHOWOFF
-   OPENCAP "CAP" + STRING(PCBNODE()), ocFlag
-   IF (ocFlag) THEN
-      DIR "U;NS"
-      CLOSECAP
-      KBDSTUFF "FLAG CAP" + STRING(PCBNODE()) + CHR(13)
-   ENDIF
-   IF (ss) THEN SHOWON ELSE SHOWOFF
-
-**See Also**
-
-[`CLOSECAP`](#closecap-statement), [`OPENCAP`](#opencap-statement), [`SHOWOFF`](#showoff-statement), [`SHOWON`](#showon-statement)
-
-
-SLPATH() Function (1.00)
-------------------------
-
-Returns the path of login security files as defined in PCBSetup.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   SLPATH()
-
-**Returns**
-
-Returns the path of the PCBoard login security files.
-
-**Remarks**
-
-Returns the path where login security files are located as defined in PCBSetup. Can be used to create and modify security files dynamically.
-
-**Example**
-
-.. code-block:: PPL
-
-   FAPPEND 1, SLPATH() + STRING(CURSEC()), O_WR, S_DB
-   FPUTLN 1, U_NAME()
-   FCLOSE 1
-
-**See Also**
-
-[`HELPPATH()`](#helppath-function), [`PPEPATH()`](#ppepath-function), [`TEMPPATH()`](#temppath-function)
-
-
-SPACE() Function (1.00)
------------------------
-
-Creates a string with a specified number of spaces.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   SPACE(len)
-
-**Parameters**
-
-- ``len`` - Number of spaces for the new string (0-256)
-
-**Returns**
-
-Returns a string of ``len`` spaces.
-
-**Remarks**
-
-Creates a string of the specified length filled with spaces. Useful for formatting screen displays and writing formatted data to files.
-
-**Example**
-
-.. code-block:: PPL
-
-   PRINT RANDOM(9), SPACE(5), RANDOM(9), SPACE(5), RANDOM(9)
-
-**See Also**
-
-[`INSTR()`](#instr-function), [`LEN()`](#len-function), [`STRING()`](#string-function)
-
-
-STRING() Function (1.00)
-------------------------
-
-Converts any expression to a string.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   STRING(exp)
-
-**Parameters**
-
-- ``exp`` - Any expression
-
-**Returns**
-
-Returns ``exp`` formatted as a string.
-
-**Remarks**
-
-Converts any expression to string format. Useful when appending non-string types to strings via the + operator, forcing compatible type addition. PPL automatically converts incompatible types when possible, so this function is mainly needed for explicit string concatenation.
-
-**Example**
-
-.. code-block:: PPL
-
-   INTEGER i
-   STRING s(5)
-   FOR i = 1 TO 5
-      LET s(i) = "This is string " + STRING(i)
-   NEXT
-
-**See Also**
-
-[`I2S()`](#i2s-function), [`S2I()`](#s2i-function)
-
-
-STRIP() Function (1.00)
------------------------
-
-Removes all occurrences of a character from a string.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   STRIP(str, ch)
-
-**Parameters**
-
-- ``str`` - String expression to process
-- ``ch`` - Character to remove from ``str``
-
-**Returns**
-
-Returns ``str`` with all occurrences of ``ch`` removed.
-
-**Remarks**
-
-Strips all instances of a selected character from a string. Useful for removing formatting characters, such as slashes and hyphens from date strings.
-
-**Example**
-
-.. code-block:: PPL
-
-   STRING s
-   INPUTSTR "Enter date (MM-DD-YY)", s, 0X0E, 8, "0123456789-", DEFS
-   LET s = STRIP(s, "-")
-   PRINTLN "Date (MMDDYY): ", s
-
-**See Also**
-
-[`REPLACE()`](#replace-function), [`STRIPATX()`](#stripatx-function)
-
-
-STRIPATX() Function (1.00)
---------------------------
-
-Removes @X color codes from a string.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   STRIPATX(sexp)
-
-**Parameters**
-
-- ``sexp`` - String expression
-
-**Returns**
-
-Returns ``sexp`` with all @X codes removed.
-
-**Remarks**
-
-Strips PCBoard @X color codes from a string. Useful for logging information to files without the @X codes used in screen display.
-
-**Example**
-
-.. code-block:: PPL
-
-   STRING Question, Answer
-   LET Question = "@X0EWhat is your street address?"
-   PRINTLN Question
-   INPUT "", Answer
-   FPUTLN 0, "Q: ", STRIPATX(Question)
-   FPUTLN 0, "A: ", Answer
-
-**See Also**
-
-[`REPLACE()`](#replace-function), [`STRIP()`](#strip-function)
-
-STRIPSTR() Function (2.00)
---------------------------
-
-Removes all occurrences of a substring from a string.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   STRIPSTR(str, search)
-
-**Parameters**
-
-- ``str`` - String expression to process
-- ``search`` - Substring to remove from ``str``
-
-**Returns**
-
-Returns ``str`` with all occurrences of ``search`` removed.
-
-**Remarks**
-
-Similar to STRIP() but operates on substrings instead of single characters. Removes all instances of a specified substring from a string. Useful for cleaning up strings by removing multi-character patterns.
-
-**Example**
-
-.. code-block:: PPL
-
-   STRING filename
-   LET filename = "document_backup_old_backup.txt"
-   PRINTLN STRIPSTR(filename, "_backup")
-   ' Prints: "document_old.txt"
-
-**See Also**
-
-[`STRIP()`](#strip-function), [`REPLACESTR()`](#replacestr-function), [`REPLACE()`](#replace-function)
-
-SYSOPSEC() Function (1.00)
---------------------------
-
-Returns the SysOp security level as defined in PCBSetup.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   SYSOPSEC()
-
-**Returns**
-
-Returns the SysOp security level.
-
-**Remarks**
-
-Returns the configured SysOp security level from PCBSetup. Useful for limiting functionality in PPL applications to users with security levels greater than or equal to the SysOp level.
-
-**Example**
-
-.. code-block:: PPL
-
-   INTEGER min
-   IF (CURSEC() >= SYSOPSEC()) THEN
-      LET min = 60
-   ELSE
-      LET min = 5
-   ENDIF
-   ADJTIME min
-
-**See Also**
-
-[`CURSEC()`](#cursec-function)
-
-
-TEMPPATH() Function (1.00)
---------------------------
-
-Returns the path to the temporary work directory as defined in PCBSetup.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   TEMPPATH()
-
-**Returns**
-
-Returns the path of the node temporary work files area.
-
-**Remarks**
-
-Returns the path for temporary work files as defined in PCBSetup. Often points to a RAM drive or other fast local storage, making it ideal for small temporary files that need not be kept permanently.
-
-**Example**
-
-.. code-block:: PPL
-
-   INTEGER rc
-   SHELL TRUE, rc, "DIR", ">" + TEMPPATH() + "TMPDIR"
-   DISPFILE TEMPPATH() + "TMPDIR", DEFS
-   DELETE TEMPPATH() + "TMPDIR"
-
-**See Also**
-
-[`HELPPATH()`](#helppath-function), [`PPEPATH()`](#ppepath-function), [`SLPATH()`](#slpath-function)
-
-
-TIME() Function (1.00)
-----------------------
-
-Returns the current time.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   TIME()
-
-**Returns**
-
-Returns the current time.
-
-**Remarks**
-
-Returns the current time represented internally as seconds elapsed since midnight (0-86399). 00:00:00 has a value of 0, 00:01:00 has a value of 60, 01:00:00 has a value of 3600, and 23:59:59 has a value of 86399. May be displayed, stored, or assigned to an integer for arithmetic operations.
-
-**Example**
-
-.. code-block:: PPL
-
-   PRINTLN "The time is ", TIME()
-
-**See Also**
-
-[`DATE()`](#date-function), [`HOUR()`](#hour-function), [`MIN()`](#min-function), [`SEC()`](#sec-function), [`TIMEAP()`](#timeap-function)
-
-
-TIMEAP() Function (1.00)
-------------------------
-
-Converts a time value to 12-hour AM/PM format.
-
-**Syntax**
-
-.. code-block:: PPL
-
-   TIMEAP(texp)
-
-**Parameters**
-
-- ``texp`` - Time expression
-
-**Returns**
-
-Returns a string formatted in 12-hour AM/PM format (HH:MM:SS XM).
-
-**Remarks**
-
-TIME values default to military time format ("HH:MM:SS"). This function converts them to 12-hour AM/PM format, where HH = hour, MM = minute, SS = second, and X = A or P.
-
-**Example**
-
-.. code-block:: PPL
-
-   PRINTLN "The current time is ", TIMEAP(TIME())
-
-**See Also**
-
-[`TIME()`](#time-function)
-
-TINKEY (3.20)
-~~~~~~~~~~~~~
-  :PPL:`FUNCTION STRING TINKEY(INTEGER ticks)`
+REPLACE (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR REPLACE(BIGSTR str, STRING old, STRING new)`
+
+  Replaces all occurrences of a character in a string with another character.
 
   **Parameters**
-    * :PPL:`ticks` – Maximum clock ticks to wait (~18 ticks per second).  
-      Use 0 to wait indefinitely (implementation–limited upper bound ~4 hours or until carrier loss).
+    * :PPL:`str` – String expression to process
+    * :PPL:`old` – Character to find and replace
+    * :PPL:`new` – Character to replace with
 
   **Returns**
-    * :PPL:`STRING` – Key pressed (special names like UP / DOWN / PGUP) or empty string if timed out
+    String with all occurrences of old replaced by new.
 
-  **Description**
-    Waits for user input for up to the specified number of clock ticks.
+  **Remarks**
+    Searches a string for a given character and replaces all instances with another 
+    character. Useful for text formatting and string manipulation tasks.
 
   **Example**
 
     .. code-block:: PPL
 
-       STRING resp
-       PRINTLN "Press a key (10 second timeout)…"
-       resp = TINKEY(180)
-       IF (resp = "") THEN
-           PRINTLN "Timeout."
-       ELSE
-           PRINTLN "You pressed: ", resp
+       PRINTLN "Your internet address on this system is:"
+       PRINTLN REPLACE(LOWER(U_NAME())," ","."),"@clarkdev.com"
+
+  **See Also**
+    * :PPL:`REPLACESTR()` – Replace substring
+    * :PPL:`STRIP()` – Remove character
+    * :PPL:`STRIPATX()` – Remove color codes
+
+REPLACESTR (2.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR REPLACESTR(BIGSTR str, STRING search, STRING replace)`
+
+  Replaces all occurrences of a substring with another substring in a string.
+
+  **Parameters**
+    * :PPL:`str` – String expression to process
+    * :PPL:`search` – Substring to find and replace
+    * :PPL:`replace` – Substring to replace with
+
+  **Returns**
+    String with all occurrences of search replaced by replace.
+
+  **Remarks**
+    Similar to REPLACE() but operates on substrings instead of single characters. 
+    Searches a string for all instances of a substring and replaces them with 
+    another substring. Useful for text processing and string manipulation tasks.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING msg
+       LET msg = "Hello World! World is great!"
+       PRINTLN REPLACESTR(msg,"World","Universe")
+       ; Prints: "Hello Universe! Universe is great!"
+
+  **See Also**
+    * :PPL:`REPLACE()` – Replace character
+    * :PPL:`STRIPSTR()` – Remove substring
+    * :PPL:`STRIP()` – Remove character
+
+RIGHT (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR RIGHT(BIGSTR str, INTEGER chars)`
+
+  Returns the rightmost characters from a string.
+
+  **Parameters**
+    * :PPL:`str` – String expression to extract from
+    * :PPL:`chars` – Number of characters to extract from the right end
+
+  **Returns**
+    String with the rightmost chars characters of str. If chars ≤ 0, returns 
+    empty string. If chars exceeds string length, spaces are added to pad the result.
+
+  **Remarks**
+    Returns a substring with the rightmost characters of a specified string.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING s
+       FOPEN 1,"DATA.TXT",O_RD,S_DN
+       WHILE (!FERR(1)) DO
+           FGET 1,s
+           PRINT RTRIM(LEFT(s,25)," ")," - "
+           PRINTLN RIGHT(s,LEN(s)-25)
+       ENDWHILE
+       FCLOSE 1
+
+  **See Also**
+    * :PPL:`LEFT()` – Extract from start
+    * :PPL:`MID()` – Extract from middle
+
+RTRIM (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR RTRIM(BIGSTR str, STRING ch)`
+
+  Removes a specified character from the right end of a string.
+
+  **Parameters**
+    * :PPL:`str` – String expression to trim
+    * :PPL:`ch` – Character to strip from the right end
+
+  **Returns**
+    Trimmed string.
+
+  **Remarks**
+    Strips a specified character from the right end of a string and returns the 
+    trimmed result. Commonly used to remove trailing spaces or other characters.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING s
+       LET s = " TEST "
+       PRINTLN RTRIM(s," ")  ; Will print " TEST"
+
+  **See Also**
+    * :PPL:`LTRIM()` – Trim from left
+    * :PPL:`TRIM()` – Trim from both ends
+
+S2I (1.00)
+~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER S2I(STRING str, INTEGER base)`
+
+  Converts a string in a specified number base to an integer.
+
+  **Parameters**
+    * :PPL:`str` – String expression to convert
+    * :PPL:`base` – Number base (2 through 36) to convert from
+
+  **Returns**
+    Integer value of str converted from the specified number base.
+
+  **Remarks**
+    Converts a string in any number base from 2 to 36 to an integer. For example, 
+    S2I("1010",2) returns 10; S2I("Z",36) returns 35. Useful for parsing numbers 
+    stored in non-decimal formats.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER i
+       STRING s
+       INPUTTEXT "Enter a string (any base)",s,@X0E,40
+       FOR i = 2 TO 36
+           PRINTLN s," = ",S2I(s,i)," base ",i
+       NEXT
+
+  **See Also**
+    * :PPL:`I2S()` – Convert integer to string in base
+
+SCRTEXT (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING SCRTEXT(INTEGER x, INTEGER y, INTEGER len, BOOLEAN color)`
+
+  Reads text and attribute information directly from screen memory.
+
+  **Parameters**
+    * :PPL:`x` – X coordinate (column) to read from
+    * :PPL:`y` – Y coordinate (row) to read from
+    * :PPL:`len` – Length in columns to read
+    * :PPL:`color` – TRUE to include color codes, FALSE otherwise
+
+  **Returns**
+    Specified region of screen memory as a string.
+
+  **Remarks**
+    Useful for saving portions of screen memory with or without color information. 
+    Color information is included as embedded @X codes when color is TRUE. Due to 
+    the 256 character string limit, limit length to 51 characters or less when 
+    including color information to avoid exceeding the limit.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Scroll the screen left 5 columns and down 3 rows
+       INTEGER r
+       STRING s
+       FOR r = 20 TO 1 STEP -1
+           LET s = SCRTEXT(6,r,75,TRUE)
+           ANSIPOS 1,r+3
+           CLREOL
+           PRINT s
+       NEXT
+
+  **See Also**
+    * :PPL:`ANSIPOS` – Position cursor
+    * :PPL:`GETX()` – Get cursor column
+    * :PPL:`GETY()` – Get cursor row
+
+SEC (1.00)
+~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER SEC(TIME texp)`
+
+  Returns the second component from a time expression.
+
+  **Parameters**
+    * :PPL:`texp` – Time expression
+
+  **Returns**
+    Second of the minute from the specified time (0-59).
+
+  **Remarks**
+    Extracts the second component from a TIME value. Useful for time parsing and 
+    display formatting.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       PRINTLN "The second is ",SEC(TIME())
+
+  **See Also**
+    * :PPL:`HOUR()` – Extract hour
+    * :PPL:`MIN()` – Extract minute
+    * :PPL:`TIME()` – Get current time
+
+SHOWSTAT (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN SHOWSTAT()`
+
+  Determines if data is being displayed on the screen.
+
+  **Returns**
+    TRUE if data is being shown on the display, FALSE otherwise.
+
+  **Remarks**
+    Determines the current display status. Used with OPENCAP, CLOSECAP, SHOWON, and 
+    SHOWOFF statements to control screen output and capture operations. Useful for 
+    automating features while capturing output to files.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       BOOLEAN ss
+       LET ss = SHOWSTAT()
+       SHOWOFF
+       OPENCAP "CAP"+STRING(PCBNODE()),ocFlag
+       IF (ocFlag) THEN
+           DIR "U;NS"
+           CLOSECAP
+           KBDSTUFF "FLAG CAP"+STRING(PCBNODE())+CHR(13)
        ENDIF
+       IF (ss) THEN SHOWON ELSE SHOWOFF
 
+  **See Also**
+    * :PPL:`CLOSECAP` – Close capture file
+    * :PPL:`OPENCAP` – Open capture file
+    * :PPL:`SHOWOFF` – Turn off display
+    * :PPL:`SHOWON` – Turn on display
 
-TOKCOUNT() Function (1.00)
---------------------------
+SLPATH (1.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING SLPATH()`
 
-Returns the number of tokens pending.
+  Returns the path of login security files as defined in PCBSetup.
 
-**Syntax**
+  **Returns**
+    Path of the BBS login security files.
 
-.. code-block:: PPL
+  **Remarks**
+    Returns the path where login security files are located as defined in PCBSetup. 
+    Can be used to create and modify security files dynamically.
 
-   TOKCOUNT()
+  **Example**
 
-**Returns**
+    .. code-block:: PPL
 
-Returns the number of tokens available.
+       FAPPEND 1,SLPATH()+STRING(CURSEC()),O_WR,S_DB
+       FPUTLN 1,U_NAME()
+       FCLOSE 1
 
-**Remarks**
+  **See Also**
+    * :PPL:`HELPPATH()` – Get help files path
+    * :PPL:`PPEPATH()` – Get PPE files path
+    * :PPL:`TEMPPATH()` – Get temporary files path
 
-Returns the number of tokens available via GETTOKEN statement and GETTOKEN() function. The count decrements after each token retrieval until reaching 0. TOKENIZE overwrites pending tokens and reinitializes the count; TOKENSTR() clears the count to 0 and returns all tokens.
+SPACE (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING SPACE(INTEGER len)`
 
-**Example**
+  Creates a string with a specified number of spaces.
 
-.. code-block:: PPL
+  **Parameters**
+    * :PPL:`len` – Number of spaces for the new string (0-256)
 
-   PRINTLN "There are ", TOKCOUNT(), " tokens"
-   WHILE (TOKCOUNT() > 0)
-      PRINTLN GETTOKEN()
-   ENDWHILE
+  **Returns**
+    String of len spaces.
 
-**See Also**
+  **Remarks**
+    Creates a string of the specified length filled with spaces. Useful for formatting 
+    screen displays and writing formatted data to files.
 
-[`GETTOKEN`](#gettoken-statement), [`GETTOKEN()`](#gettoken-function), [`TOKENIZE`](#tokenize-statement), [`TOKENSTR()`](#tokenstr-function)
+  **Example**
 
+    .. code-block:: PPL
 
-TOKENSTR() Function (1.00)
---------------------------
+       PRINT RANDOM(9),SPACE(5),RANDOM(9),SPACE(5),RANDOM(9)
 
-Rebuilds and returns a previously tokenized string.
+  **See Also**
+    * :PPL:`INSTR()` – Find substring
+    * :PPL:`LEN()` – Get string length
+    * :PPL:`STRING()` – Convert to string
 
-**Syntax**
+STRING (1.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING STRING(ANY exp)`
 
-.. code-block:: PPL
+  Converts any expression to a string.
 
-   TOKENSTR()
+  **Parameters**
+    * :PPL:`exp` – Any expression
 
-**Returns**
+  **Returns**
+    String representation of exp.
 
-Returns the rebuilt string with semi-colon separators between tokens.
+  **Remarks**
+    Converts any expression to string format. Useful when appending non-string types 
+    to strings via the + operator, forcing compatible type addition. PPL automatically 
+    converts incompatible types when possible, so this function is mainly needed for 
+    explicit string concatenation.
 
-**Remarks**
+  **Example**
 
-Takes all pending tokens and builds a string with semi-colon separators. For example, tokens "R", "A", and "S" are returned as "R;A;S". Regardless of the original separator, semi-colons are always used in the rebuilt string.
+    .. code-block:: PPL
 
-**Example**
+       INTEGER i
+       STRING s(5)
+       FOR i = 1 TO 5
+           LET s(i) = "This is string "+STRING(i)
+       NEXT
 
-.. code-block:: PPL
+  **See Also**
+    * :PPL:`I2S()` – Convert to string in base
+    * :PPL:`S2I()` – Parse string to integer
 
-   STRING cmdline
-   INPUT "Command", cmdline
-   TOKENIZE cmdline
-   PRINTLN "You entered ", TOKCOUNT(), " tokens"
-   PRINTLN "Original string: ", cmdline
-   PRINTLN " TOKENSTR(): ", TOKENSTR()
+STRIP (1.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR STRIP(BIGSTR str, STRING ch)`
 
-**See Also**
+  Removes all occurrences of a character from a string.
 
-[`GETTOKEN`](#gettoken-statement), [`GETTOKEN()`](#gettoken-function), [`TOKCOUNT()`](#tokcount-function), [`TOKENIZE`](#tokenize-statement)
+  **Parameters**
+    * :PPL:`str` – String expression to process
+    * :PPL:`ch` – Character to remove from str
 
+  **Returns**
+    String with all occurrences of ch removed.
 
-TRIM() Function (1.00)
-----------------------
+  **Remarks**
+    Strips all instances of a selected character from a string. Useful for removing 
+    formatting characters, such as slashes and hyphens from date strings.
 
-Removes a specified character from both ends of a string.
+  **Example**
 
-**Syntax**
+    .. code-block:: PPL
 
-.. code-block:: PPL
+       STRING s
+       INPUTSTR "Enter date (MM-DD-YY)",s,@X0E,8,"0123456789-",DEFS
+       LET s = STRIP(s,"-")
+       PRINTLN "Date (MMDDYY): ",s
 
-   TRIM(str, ch)
+  **See Also**
+    * :PPL:`REPLACE()` – Replace character
+    * :PPL:`STRIPATX()` – Remove color codes
+    * :PPL:`STRIPSTR()` – Remove substring
 
-**Parameters**
+STRIPATX (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR STRIPATX(BIGSTR sexp)`
 
-- ``str`` - String expression to trim
-- ``ch`` - Character to strip from both ends
+  Removes @X color codes from a string.
 
-**Returns**
+  **Parameters**
+    * :PPL:`sexp` – String expression
 
-Returns the trimmed string.
+  **Returns**
+    String with all @X codes removed.
 
-**Remarks**
+  **Remarks**
+    Strips PCBoard @X color codes from a string. Useful for logging information to 
+    files without the @X codes used in screen display.
 
-Strips a specified character from both ends of a string and returns the trimmed result. Commonly used to remove leading and trailing spaces or other characters.
+  **Example**
 
-**Example**
+    .. code-block:: PPL
 
-.. code-block:: PPL
+       STRING Question, Answer
+       LET Question = "@X0EWhat is your street address?"
+       PRINTLN Question
+       INPUT "",Answer
+       FPUTLN 0,"Q: ",STRIPATX(Question)
+       FPUTLN 0,"A: ",Answer
 
-   STRING s
-   LET s = " TEST "
-   PRINTLN TRIM(s, " ")  ' Will print "TEST"
+  **See Also**
+    * :PPL:`REPLACE()` – Replace character
+    * :PPL:`STRIP()` – Remove character
 
-**See Also**
+STRIPSTR (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR STRIPSTR(BIGSTR str, STRING search)`
 
-[`LTRIM()`](#ltrim-function), [`RTRIM()`](#rtrim-function)
+  Removes all occurrences of a substring from a string.
 
+  **Parameters**
+    * :PPL:`str` – String expression to process
+    * :PPL:`search` – Substring to remove from str
 
+  **Returns**
+    String with all occurrences of search removed.
+
+  **Remarks**
+    Similar to STRIP() but operates on substrings instead of single characters. 
+    Removes all instances of a specified substring from a string. Useful for 
+    cleaning up strings by removing multi-character patterns.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING filename
+       LET filename = "document_backup_old_backup.txt"
+       PRINTLN STRIPSTR(filename,"_backup")
+       ; Prints: "document_old.txt"
+
+  **See Also**
+    * :PPL:`STRIP()` – Remove character
+    * :PPL:`REPLACESTR()` – Replace substring
+    * :PPL:`REPLACE()` – Replace character
+
+SYSOPSEC (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER SYSOPSEC()`
+
+  Returns the SysOp security level as defined in PCBSetup.
+
+  **Returns**
+    SysOp security level.
+
+  **Remarks**
+    Returns the configured SysOp security level from PCBSetup. Useful for limiting 
+    functionality in PPL applications to users with security levels greater than or 
+    equal to the SysOp level.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER min
+       IF (CURSEC() >= SYSOPSEC()) THEN
+           LET min = 60
+       ELSE
+           LET min = 5
+       ENDIF
+       ADJTIME min
+
+  **See Also**
+    * :PPL:`CURSEC()` – Get current security level
+
+TEMPPATH (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING TEMPPATH()`
+
+  Returns the path to the temporary work directory as defined in PCBSetup.
+
+  **Returns**
+    Path of the node temporary work files area.
+
+  **Remarks**
+    Returns the path for temporary work files as defined in PCBSetup. Often points 
+    to a RAM drive or other fast local storage, making it ideal for small temporary 
+    files that need not be kept permanently.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER rc
+       SHELL TRUE,rc,"DIR",">"+TEMPPATH()+"TMPDIR"
+       DISPFILE TEMPPATH()+"TMPDIR",DEFS
+       DELETE TEMPPATH()+"TMPDIR"
+
+  **See Also**
+    * :PPL:`HELPPATH()` – Get help files path
+    * :PPL:`PPEPATH()` – Get PPE files path
+    * :PPL:`SLPATH()` – Get security levels path
+
+TIME (1.00)
+~~~~~~~~~~~
+  :PPL:`FUNCTION TIME TIME()`
+
+  Returns the current time.
+
+  **Returns**
+    Current time.
+
+  **Remarks**
+    Returns the current time represented internally as seconds elapsed since midnight 
+    (0-86399). 00:00:00 has a value of 0, 00:01:00 has a value of 60, 01:00:00 has 
+    a value of 3600, and 23:59:59 has a value of 86399. May be displayed, stored, 
+    or assigned to an integer for arithmetic operations.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       PRINTLN "The time is ",TIME()
+
+  **See Also**
+    * :PPL:`DATE()` – Get current date
+    * :PPL:`HOUR()` – Extract hour
+    * :PPL:`MIN()` – Extract minute
+    * :PPL:`SEC()` – Extract second
+    * :PPL:`TIMEAP()` – Format as AM/PM
+
+TIMEAP (1.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING TIMEAP(TIME texp)`
+
+  Converts a time value to 12-hour AM/PM format.
+
+  **Parameters**
+    * :PPL:`texp` – Time expression
+
+  **Returns**
+    String formatted in 12-hour AM/PM format (HH:MM:SS XM).
+
+  **Remarks**
+    TIME values default to military time format ("HH:MM:SS"). This function converts 
+    them to 12-hour AM/PM format, where HH = hour, MM = minute, SS = second, and 
+    X = A or P.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       PRINTLN "The current time is ",TIMEAP(TIME())
+
+  **See Also**
+    * :PPL:`TIME()` – Get current time
+
+// ...existing code...
 
 TOKCOUNT (1.00)
 ~~~~~~~~~~~~~~~
   :PPL:`FUNCTION INTEGER TOKCOUNT()`
 
+  Returns the number of tokens pending.
+
   **Returns**
-    Remaining token count in current parse buffer.
+    Number of tokens available.
+
+  **Remarks**
+    Returns the number of tokens available via GETTOKEN statement and GETTOKEN() function. 
+    The count decrements after each token retrieval until reaching 0. TOKENIZE overwrites 
+    pending tokens and reinitializes the count; TOKENSTR() clears the count to 0 and 
+    returns all tokens.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       PRINTLN "There are ",TOKCOUNT()," tokens"
+       WHILE (TOKCOUNT() > 0)
+           PRINTLN GETTOKEN()
+       ENDWHILE
+
+  **See Also**
+    * :PPL:`GETTOKEN` – Get next token statement
+    * :PPL:`GETTOKEN()` – Get next token function
+    * :PPL:`TOKENIZE` – Parse string into tokens
+    * :PPL:`TOKENSTR()` – Rebuild tokenized string
 
 TOKENSTR (1.00)
 ~~~~~~~~~~~~~~~
   :PPL:`FUNCTION STRING TOKENSTR()`
 
+  Rebuilds and returns a previously tokenized string.
+
   **Returns**
-    Unconsumed token remainder as a string.
+    Rebuilt string with semi-colon separators between tokens.
+
+  **Remarks**
+    Takes all pending tokens and builds a string with semi-colon separators. For example, 
+    tokens "R", "A", and "S" are returned as "R;A;S". Regardless of the original separator, 
+    semi-colons are always used in the rebuilt string.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING cmdline
+       INPUT "Command",cmdline
+       TOKENIZE cmdline
+       PRINTLN "You entered ",TOKCOUNT()," tokens"
+       PRINTLN "Original string: ",cmdline
+       PRINTLN "TOKENSTR(): ",TOKENSTR()
+
+  **See Also**
+    * :PPL:`GETTOKEN` – Get next token statement
+    * :PPL:`GETTOKEN()` – Get next token function
+    * :PPL:`TOKCOUNT()` – Count remaining tokens
+    * :PPL:`TOKENIZE` – Parse string into tokens
+
+TRIM (1.00)
+~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR TRIM(BIGSTR str, STRING ch)`
+
+  Removes a specified character from both ends of a string.
+
+  **Parameters**
+    * :PPL:`str` – String expression to trim
+    * :PPL:`ch` – Character to strip from both ends
+
+  **Returns**
+    Trimmed string.
+
+  **Remarks**
+    Strips a specified character from both ends of a string and returns the trimmed 
+    result. Commonly used to remove leading and trailing spaces or other characters.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING s
+       LET s = " TEST "
+       PRINTLN TRIM(s," ")  ; Will print "TEST"
+
+  **See Also**
+    * :PPL:`LTRIM()` – Trim from left
+    * :PPL:`RTRIM()` – Trim from right
 
 TOBIGSTR (2.00)
 ~~~~~~~~~~~~~~~
@@ -3031,12 +2864,6 @@ TOBIGSTR (2.00)
   **Returns**
     :PPL:`value` coerced to BIGSTR.
 
-TOSTRING (1.00)
-~~~~~~~~~~~~~~~
-  :PPL:`FUNCTION STRING STRING(<ANY> value)`
-
-  **Returns**
-    String form of :PPL:`value` (numbers decimal, BOOLEAN 0/1).
 
 UN_...() Functions (1.00)
 -------------------------
@@ -3162,7 +2989,7 @@ U_BDL (1.00)
     Current user's total bytes downloaded.
 
   **Remarks**
-    Returns information useful for modifying PCBoard's built-in ratio management system 
+    Returns information useful for modifying BBS's built-in ratio management system 
     and the view user information command. Unlike the predefined U_... user variables, 
     this function does not require GETUSER to return valid information.
 
@@ -3188,7 +3015,7 @@ U_BDLDAY (1.00)
     Current user's bytes downloaded today.
 
   **Remarks**
-    Returns information useful for modifying PCBoard's built-in ratio management system 
+    Returns information useful for modifying BBS's built-in ratio management system 
     and the view user information command. Unlike the predefined U_... user variables, 
     this function does not require GETUSER to return valid information.
 
@@ -3214,7 +3041,7 @@ U_BUL (1.00)
     Current user's total bytes uploaded.
 
   **Remarks**
-    Returns information useful for modifying PCBoard's built-in ratio management system 
+    Returns information useful for modifying BBS's built-in ratio management system 
     and the view user information command. Unlike the predefined U_... user variables, 
     this function does not require GETUSER to return valid information.
 
@@ -3240,7 +3067,7 @@ U_FDL (1.00)
     Current user's total files downloaded.
 
   **Remarks**
-    Returns information useful for modifying PCBoard's built-in ratio management system 
+    Returns information useful for modifying BBS's built-in ratio management system 
     and the view user information command. Unlike the predefined U_... user variables, 
     this function does not require GETUSER to return valid information.
 
@@ -3266,7 +3093,7 @@ U_FUL (1.00)
     Current user's total files uploaded.
 
   **Remarks**
-    Returns information useful for modifying PCBoard's built-in ratio management system 
+    Returns information useful for modifying BBS's built-in ratio management system 
     and the view user information command. Unlike the predefined U_... user variables, 
     this function does not require GETUSER to return valid information.
 
@@ -3328,7 +3155,7 @@ U_LDATE (1.00)
     Current user's last log on date.
 
   **Remarks**
-    PCBoard tracks the last log on date for each user. This function returns that date 
+    The BBS tracks the last log on date for each user. This function returns that date 
     for the user currently online. Unlike the predefined U_... user variables, this 
     function does not require GETUSER to return valid information.
 
@@ -3353,7 +3180,7 @@ U_LDIR (1.00)
     Latest file date found by the current user.
 
   **Remarks**
-    PCBoard tracks the latest file found by each user. This function returns that date 
+    The BBS tracks the latest file found by each user. This function returns that date 
     for the user currently online. Unlike the predefined U_... user variables, this 
     function does not require GETUSER to return valid information.
 
@@ -3377,7 +3204,7 @@ U_LOGONS (1.00)
     Current user's total system logons.
 
   **Remarks**
-    PCBoard tracks the total number of logons for each user. This function returns that 
+    The BBS tracks the total number of logons for each user. This function returns that 
     number for the user currently online. Unlike the predefined U_... user variables, 
     this function does not require GETUSER to return valid information.
 
@@ -3402,7 +3229,7 @@ U_LTIME (1.00)
     Time of day of the current user's last log on.
 
   **Remarks**
-    PCBoard tracks the last time of day of the last log on for each user. This function 
+    The BBS tracks the last time of day of the last log on for each user. This function 
     returns that time for the user currently online. Unlike the predefined U_... user 
     variables, this function does not require GETUSER to return valid information.
 
@@ -3426,7 +3253,7 @@ U_MSGRD (1.00)
     Current user's total messages read.
 
   **Remarks**
-    PCBoard tracks the total number of messages read by each user. This function returns 
+    The BBS tracks the total number of messages read by each user. This function returns 
     that number for the user currently online. One quick idea for use: a message/file 
     ratio enforcement door. Unlike the predefined U_... user variables, this function 
     does not require GETUSER to return valid information.
@@ -3453,7 +3280,7 @@ U_MSGWR (1.00)
     Current user's total messages written.
 
   **Remarks**
-    PCBoard tracks the total number of messages written by each user. This function 
+    The BBS tracks the total number of messages written by each user. This function 
     returns that number for the user currently online. One quick idea for use: a 
     message/file ratio enforcement door. Unlike the predefined U_... user variables, 
     this function does not require GETUSER to return valid information.
@@ -3551,7 +3378,7 @@ U_PWDHIST (1.00)
     Specified password from the history.
 
   **Remarks**
-    PCBoard has the ability to track the last three passwords used by each user. This 
+    The BBS has the ability to track the last three passwords used by each user. This 
     function returns one of those passwords from the history for the user currently 
     online. Unlike the predefined U_... user variables, this function does not require 
     GETUSER to return valid information. However, it does require that the password 
@@ -3586,7 +3413,7 @@ U_PWDLC (1.00)
     Last date the user changed their password.
 
   **Remarks**
-    PCBoard has the ability to track the last date of a password change for each user. 
+    The BBS has the ability to track the last date of a password change for each user. 
     This function returns that date for the user currently online. Unlike the predefined 
     U_... user variables, this function does not require GETUSER to return valid 
     information. However, it does require that the password PSA has been installed 
@@ -3616,7 +3443,7 @@ U_PWDTC (1.00)
     Number of times the user has changed their password.
 
   **Remarks**
-    PCBoard has the ability to track the total number of times each user changes their 
+    The BBS has the ability to track the total number of times each user changes their 
     password. This function returns that count for the user currently online. Unlike 
     the predefined U_... user variables, this function does not require GETUSER to 
     return valid information. However, it does require that the password PSA has been 
@@ -3702,7 +3529,7 @@ U_STAT (1.00)
       * 15: Number of verify errors to access account
 
   **Remarks**
-    PCBoard has the ability to track a number of statistics about the user. This 
+    The BBS has the ability to track a number of statistics about the user. This 
     function returns the desired statistic for the user currently online. Unlike the 
     predefined U_... user variables, this function does not require GETUSER to return 
     valid information. However, it does require that the statistics PSA has been 
@@ -3734,7 +3561,7 @@ U_TIMEON (1.00)
     User's time online today in minutes.
 
   **Remarks**
-    PCBoard tracks the user's time online each day. This function returns the elapsed 
+    The BBS tracks the user's time online each day. This function returns the elapsed 
     time for the user currently online. Unlike the predefined U_... user variables, 
     this function does not require GETUSER to return valid information.
 
@@ -3862,8 +3689,8 @@ VER (1.00)
     Version number of PPL running.
 
   **Remarks**
-    As time passes, new features will be added to PCBoard and PPL. This function returns 
-    the version of PCBoard (and PPL). For PCBoard version 15.0 this value is 1500. 
+    As time passes, new features will be added to BBS and PPL. This function returns 
+    the version of BBS (and PPL). For BBS version 15.0 this value is 1500. 
     The major version is accessible via VER()/100, and the minor version via VER()%100. 
     Everything documented herein is available for versions ≥ 1500.
 
@@ -3965,4 +3792,4 @@ YESCHAR (1.00)
 
   **See Also**
     * :PPL:`NOCHAR()` – Get no character
-    * :PPL:`YESNO` – Yes/no input flag constant    
+    * :PPL:`YESNO` – Yes/no input flag constant
