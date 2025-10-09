@@ -5,140 +5,2050 @@
 Statements
 ----------
 
-CLS (1.00)
-~~~~~~~~~~
-  :PPL:`STATEMENT CLS`
+ADDUSER (3.20)
+~~~~~~~~~~~~~~
+
+  :PPL:`STATEMENT ADDUSER(STRING username, BOOLEAN keepAltVars)`
 
   **Parameters**
-    * None
+    * :PPL:`username`     – Name of the new user
+    * :PPL:`keepAltVars`  – TRUE leaves new user vars active (as if GETALTUSER on the new record); FALSE restores current user
 
   **Returns**
     None
 
   **Description**
-    Clears the caller’s (and local) display screen and resets cursor to home position.
+    Creates a new user record with system defaults for all fields except the supplied name.
 
   **Example**
+
+    .. code-block:: PPL
+
+       ADDUSER "New Caller", TRUE
+       PRINTLN "Created & switched context to: New Caller"
+
+  **Notes**
+    Validate for duplicates before creation if possible.
+
+  **See Also**
+    * :PPL:`GETALTUSER`
+    * :PPL:`PUTALTUSER`
+
+
+ADJTIME (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT ADJTIME(INTEGER minutes)`
+
+  Adjust the user's time up or down for the current session.
+
+  **Parameters**
+    * :PPL:`minutes` – Number of minutes to adjust (positive adds time, negative deducts time)
+
+  **Remarks**
+    Rewards or penalizes the user with more or less time. The adjustment only applies to the 
+    current call and is not saved after hangup, except it's reflected in time online today. 
+    Time can only be added if the user's time has not been adjusted for an event. Time can 
+    always be subtracted.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING yn
+       INPUTYN "Do you wish to gamble 5 minutes for 10",yn,@X0E
+       IF (yn = YESCHAR()) THEN
+           IF (RANDOM(1) = 1) THEN
+               PRINTLN "You *WON*! 10 extra minutes awarded."
+               ADJTIME 10
+           ELSE
+               PRINTLN "You lost. Sorry, but I have to take 5 minutes now."
+               ADJTIME -5
+           ENDIF
+       ELSE
+           PRINTLN "Chicken! ;)"
+       ENDIF
+
+  **See Also**
+    * :PPL:`MINLEFT()` – Minutes remaining
+    * :PPL:`MINON()` – Minutes online
+    * :PPL:`U_TIMEON()` – User's time online today
+
+ADJTUBYTES (3.20)
+~~~~~~~~~~~~~~~~~
+
+  :PPL:`STATEMENT ADJTUBYTES(INTEGER deltaBytes)`
+
+  **Parameters**
+    * :PPL:`deltaBytes` – Positive or negative number of bytes to adjust the user's upload total
+
+  **Returns**
+    None
+
+  **Description**
+    Adjusts the tracked total upload bytes for the (current or alternate) user.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       GETALTUSER 10
+       ADJTUBYTES -2000
+       PUTALTUSER
+
+  **Notes**
+    Pair with :PPL:`GETALTUSER` / :PPL:`PUTALTUSER` to persist for alternate users.
+
+  **See Also**
+    (future accounting helpers)
+
+
+ANSIPOS (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT ANSIPOS(INTEGER xpos, INTEGER ypos)`
+
+  Position the cursor anywhere on the screen using ANSI escape sequences.
+
+  **Parameters**
+    * :PPL:`xpos` – Screen column (1-80)
+    * :PPL:`ypos` – Screen row (1-23)
+
+  **Remarks**
+    Positions the cursor at the specified (X,Y) coordinate but only if the caller has ANSI 
+    support. If ANSI is not available, this statement is ignored. Check ANSION() before 
+    using if ANSI positioning is required.
+
+  **Example**
+
     .. code-block:: PPL
 
        CLS
-       PRINTLN "Welcome."
+       IF (ANSION()) THEN
+           ANSIPOS 1,1
+           PRINTLN "This starts at (1,1)"
+           ANSIPOS 3,3
+           PRINTLN "This starts at (3,3)"
+           ANSIPOS 2,2
+           PRINTLN "And *THIS* starts at (2,2)"
+       ENDIF
+
+  **See Also**
+    * :PPL:`ANSION()` – Check ANSI availability
+    * :PPL:`BACKUP` – Move cursor backward
+    * :PPL:`FORWARD` – Move cursor forward
+    * :PPL:`GETX()` – Get cursor column
+    * :PPL:`GETY()` – Get cursor row
+
+BACKUP (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT BACKUP(INTEGER numcols)`
+
+  Move the cursor backward a specified number of columns.
+
+  **Parameters**
+    * :PPL:`numcols` – Number of columns to move backward (1-79)
+
+  **Remarks**
+    Moves the cursor backward non-destructively. Works with or without ANSI - uses ANSI 
+    positioning if available, otherwise uses backspace characters. Cannot move beyond 
+    column 1 without ANSI. Has no effect if already at column 1.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       PRINT "Rolling dice -- "
+       FOR i = 1 TO 10
+           LET d1 = RANDOM(5) + 1
+           LET d2 = RANDOM(5) + 1
+           PRINT d1,"-",d2
+           BACKUP 3
+       NEXT
+       NEWLINE
+
+  **See Also**
+    * :PPL:`ANSION()` – Check ANSI availability
+    * :PPL:`ANSIPOS` – Position cursor
+    * :PPL:`FORWARD` – Move cursor forward
+    * :PPL:`GETX()` – Get cursor column
+    * :PPL:`GETY()` – Get cursor row
+
+BLT (1.00)
+~~~~~~~~~~
+  :PPL:`STATEMENT BLT(INTEGER bltnum)`
+
+  Display a specified bulletin number to the user.
+
+  **Parameters**
+    * :PPL:`bltnum` – Bulletin number to display (1 through max bulletins)
+
+  **Remarks**
+    Displays the specified bulletin from the BLT.LST file for the current conference. 
+    If the bulletin number is invalid, nothing is displayed.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER num
+       INPUT "Bulletin to view",num
+       BLT num
+
+  **See Also**
+    * :PPL:`DIR` – Display directory
+    * :PPL:`JOIN` – Join conference
+    * :PPL:`QUEST` – Run questionnaire
+
+BROADCAST (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT BROADCAST(INTEGER lonode, INTEGER hinode, STRING message)`
+
+  Broadcast a single line message to a range of nodes.
+
+  **Parameters**
+    * :PPL:`lonode` – Low node number for broadcast range
+    * :PPL:`hinode` – High node number for broadcast range
+    * :PPL:`message` – Message text to broadcast
+
+  **Remarks**
+    Functions like the PCBoard BROADCAST command (normally SysOp only). Allows 
+    programmatic broadcasting without giving users manual broadcast ability.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Broadcast to a specific node
+       BROADCAST 5,5,"This broadcast from "+STRING(PCBNODE())
+       
+       ; Broadcast to a range of nodes
+       BROADCAST 4,8,"Stand-by for log off in 10 seconds"
+       
+       ; Broadcast to all nodes
+       BROADCAST 1,65535,"Hello all!"
+
+  **See Also**
+    * :PPL:`RDUNET` – Read USERNET record
+    * :PPL:`UN_CITY()` – Get USERNET city field
+    * :PPL:`UN_NAME()` – Get USERNET name field
+    * :PPL:`UN_OPER()` – Get USERNET operation field
+    * :PPL:`UN_STAT()` – Get USERNET status field
+    * :PPL:`WRUNET` – Write USERNET record
+
+BYE (1.00)
+~~~~~~~~~~
+  :PPL:`STATEMENT BYE`
+
+  Log the user off immediately without confirmation prompts.
+
+  **Remarks**
+    Logs off the user as if they typed the BYE command. Unlike GOODBYE, this assumes the user 
+    really wants to log off and skips download warnings and confirmation prompts. Intended for 
+    providing the same functionality as PCBoard prompts where G or BYE can be entered.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING s
+       INPUT "What do you want to do",s
+       IF (s = "G") THEN GOODBYE
+       ELSEIF (s = "BYE") THEN BYE
+       ELSE KBDSTUFF s
+       ENDIF
+
+  **See Also**
+    * :PPL:`DTROFF` – Turn off DTR signal
+    * :PPL:`DTRON` – Turn on DTR signal
+    * :PPL:`GOODBYE` – Log off with confirmation
+    * :PPL:`HANGUP` – Immediate disconnect
+
+CALL (1.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT CALL(STRING filename)`
+
+  Execute another PPE file and return to the current PPE.
+
+  **Parameters**
+    * :PPL:`filename` – Complete path and filename of PPE file to execute
+
+  **Remarks**
+    Loads and runs another PPE file, then returns control to the statement after the CALL. 
+    The second PPE is completely separate from the first. Pass values via TOKENIZE statement. 
+    Return values require creating your own parameter passing convention (e.g., via files).
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING s
+       INPUT "What PPE file do you wish to run",s
+       CALL "C:\PCB\PPE\"+s+".PPE"
+
+  **See Also**
+    * :PPL:`SHELL` – Execute external program
+    * :PPL:`TOKENIZE` – Tokenize string for parameter passing
+
+CDCHKOFF (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT CDCHKOFF`
+
+  Turn off automatic carrier detect checking.
+
+  **Remarks**
+    Disables PCBoard's automatic carrier detection. Useful for applications that need to 
+    continue processing after hangup (e.g., callback verification). Use CDCHKON to re-enable 
+    checking when the carrier-independent section is complete.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       CDCHKOFF
+       DTROFF
+       DELAY 18
+       DTRON
+       SENDMODEM "ATDT1800DATAFON"+CHR(13)
+       WAITFOR "CONNECT",60
+       CDCHKON
+
+  **See Also**
+    * :PPL:`CDCHKON` – Turn on carrier checking
+    * :PPL:`CDON()` – Check carrier status
+    * :PPL:`KBDCHKOFF` – Turn off keyboard checking
+    * :PPL:`KBDCHKON` – Turn on keyboard checking
+
+CDCHKON (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT CDCHKON`
+
+  Turn on carrier detect checking.
+
+  **Remarks**
+    Re-enables PCBoard's automatic carrier detection after it was disabled with CDCHKOFF. 
+    Should be called after completing code sections that need to run regardless of carrier status.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       CDCHKOFF
+       ; Carrier-independent code here
+       CDCHKON
+
+  **See Also**
+    * :PPL:`CDCHKOFF` – Turn off carrier checking
+    * :PPL:`CDON()` – Check carrier status
+    * :PPL:`KBDCHKOFF` – Turn off keyboard checking
+    * :PPL:`KBDCHKON` – Turn on keyboard checking
+
+CHAT (1.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT CHAT`
+
+  Enter SysOp chat mode.
+
+  **Remarks**
+    Starts a chat session between the SysOp and user. Generally used after confirming SysOp 
+    availability via paging. The SysOp can still initiate chat with F10 or the O command. 
+    Users cannot exit chat mode themselves.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       PAGEON
+       FOR i = 1 TO 10
+           PRINT "@BEEP@"
+           DELAY 18
+           IF (INKEY() = " ") THEN
+               CHAT
+               GOTO exit
+           ENDIF
+       NEXT
+       :exit
+
+  **See Also**
+    * :PPL:`PAGEON` – Enable operator paging
+    * :PPL:`PAGEOFF` – Disable operator paging
+    * :PPL:`PAGESTAT()` – Check page status
+
+CHDIR (3.20)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT CHDIR(STRING path)`
+
+  Changes the current working directory.
+
+CLOSECAP (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT CLOSECAP`
+
+  Close the screen capture file.
+
+  **Remarks**
+    Closes the capture file opened with OPENCAP and stops screen capturing. Useful for 
+    capturing command output for later viewing or download. Use with SHOWON/SHOWOFF to 
+    control whether output is displayed while being captured.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       BOOLEAN ss, ocFlag
+       LET ss = SHOWSTAT()
+       SHOWOFF
+       OPENCAP "CAP"+STRING(PCBNODE()),ocFlag
+       IF (ocFlag) THEN
+           DIR "U;NS"
+           CLOSECAP
+           KBDSTUFF "FLAG CAP"+STRING(PCBNODE())+CHR(13)
+       ENDIF
+       IF (ss) THEN SHOWON ELSE SHOWOFF
+
+  **See Also**
+    * :PPL:`OPENCAP` – Open capture file
+    * :PPL:`SHOWOFF` – Hide display output
+    * :PPL:`SHOWON` – Show display output
+    * :PPL:`SHOWSTAT()` – Check display status
 
 CLREOL (1.00)
 ~~~~~~~~~~~~~
   :PPL:`STATEMENT CLREOL`
 
-  **Description**
-    Clears from the current cursor position to the end of the line.
+  Clear from cursor position to end of line using current color.
+
+  **Remarks**
+    In graphics/ANSI mode, sends ANSI clear-to-end-of-line sequence. In non-ANSI mode, 
+    writes spaces to column 80 then backspaces to original position. Does not clear 
+    column 80 in non-ANSI mode to keep cursor on current line.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       COLOR @X47
+       CLS
+       PRINT "This is some sample text. (This will disappear.)"
+       WHILE (INKEY() = "") DELAY 1
+       BACKUP 22
+       COLOR @X1F
+       CLREOL
+       PRINT "This goes to the end of the line."
+
+  **See Also**
+    * :PPL:`CLS` – Clear screen
+
+CLS (1.00)
+~~~~~~~~~~
+  :PPL:`STATEMENT CLS`
+
+  Clear the screen using the current color.
+
+  **Remarks**
+    In graphics/ANSI mode, sends ANSI clear screen sequence. In non-ANSI mode, sends 
+    ASCII 12 (form feed) character. Not all terminals support form feed, so some users 
+    may see the character instead of a cleared screen.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       COLOR @X47
+       CLS
+       PRINTLN "Welcome to a clean screen"
+
+  **See Also**
+    * :PPL:`CLREOL` – Clear to end of line
+
+CLREOL (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT CLREOL`
+
+  Clears from the current cursor position to the end of the line.
 
 COLOR (1.00)
 ~~~~~~~~~~~~
-  :PPL:`STATEMENT COLOR(INTEGER attr)`
+  :PPL:`STATEMENT COLOR(INTEGER newcolor)`
+
+  Change the current active color.
 
   **Parameters**
-    * :PPL:`attr` – Packed color (foreground/background + attributes)
+    * :PPL:`newcolor` – New color value (use @X codes or numeric values)
 
-  **Description**
-    Sets current output color. Use :PPL:`DEFCOLOR` / :PPL:`CURCOLOR()` to query defaults.
-
-  **Example**
-    .. code-block:: PPL
-
-       COLOR 14
-       PRINTLN "Yellow text"
-
-PRINT (1.00)
-~~~~~~~~~~~~
-  :PPL:`STATEMENT PRINT <expr_list>`
-
-  **Description**
-    Writes expressions to the console without appending a newline. Adjacent arguments separated by commas.
+  **Remarks**
+    Changes the color used by PCBoard and sends appropriate ANSI sequences to the remote 
+    terminal. Only affects color if user is in graphics mode; ignored in non-graphics mode.
 
   **Example**
+
     .. code-block:: PPL
 
-       PRINT "User: ", U_NAME()
+       COLOR @X47
+       CLS
+       PRINT "This is some sample text. (This will disappear.)"
+       WHILE (INKEY() = "") DELAY 1
+       BACKUP 22
+       COLOR @X1F
+       CLREOL
+       PRINT "This goes to the end of the line."
 
-PRINTLN (1.00)
-~~~~~~~~~~~~~~
-  :PPL:`STATEMENT PRINTLN <expr_list>`
+  **See Also**
+    * :PPL:`CURCOLOR()` – Get current color
+    * :PPL:`DEFCOLOR` – Set default color
+    * :PPL:`DEFCOLOR()` – Get default color
 
-  **Description**
-    Same as :PPL:`PRINT` but appends a newline at end.
-
-  **Example**
-    .. code-block:: PPL
-
-       PRINTLN "Bytes left:", MINLEFT()
-
-SPRINT / SPRINTLN (1.00)
-~~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT SPRINT <expr_list>`
-  :PPL:`STATEMENT SPRINTLN <expr_list>`
-
-  **Description**
-    “Secure” print variants that typically filter control/high ASCII or respect user flags (implementation dependent).
-
-MPRINT / MPRINTLN (1.00)
-~~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT MPRINT <expr_list>`
-  :PPL:`STATEMENT MPRINTLN <expr_list>`
-
-  **Description**
-    Message-area context print (legacy differentiation; acts like PRINT/PRINTLN under modern engine unless specialized).
-
-NEWLINE (1.00)
-~~~~~~~~~~~~~~
-  :PPL:`STATEMENT NEWLINE`
-
-  **Description**
-    Emits a single CR/LF pair (same as empty PRINTLN).
-
-NEWLINES (1.00)
+CONFFLAG (1.00)
 ~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT NEWLINES(INTEGER count)`
+  :PPL:`STATEMENT CONFFLAG(INTEGER confnum, INTEGER flags)`
+
+  Set specified flags in a conference for the current user.
 
   **Parameters**
-    * :PPL:`count` – Number of blank lines to emit (<=0 no-op)
+    * :PPL:`confnum` – Conference number to affect
+    * :PPL:`flags` – Flags to set (F_REG, F_EXP, F_SEL, F_MW, F_SYS)
+
+  **Remarks**
+    Each user has five flags per conference controlling registration, expired status, 
+    selection, mail waiting, and SysOp privileges. Use predefined constants F_REG, 
+    F_EXP, F_SEL, F_MW, and F_SYS. Add constants together to set multiple flags.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Automatically register them in selected conferences
+       INTEGER i
+       FOR i = 1 TO 10
+           CONFFLAG i,F_REG+F_EXP+F_SEL
+       NEXT
+       FOR i = 11 TO 20
+           CONFFLAG i,F_REG+F_SEL
+       NEXT
+
+  **See Also**
+    * :PPL:`CONFUNFLAG` – Clear conference flags
+
+CONFINFO (Modify) (3.20)
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+  :PPL:`STATEMENT CONFINFO(INTEGER confnum, INTEGER field, VAR newValue)`
+
+  **Parameters**
+    * :PPL:`confnum`  – Conference number
+    * :PPL:`field`    – Field selector (1–54)
+    * :PPL:`newValue` – Value to assign (type must match field definition)
+
+  **Returns**
+    None
+
+  **Description**
+    Writes a single conference configuration field. Field meanings mirror the FUNCTION
+    form (see earlier table for 1–54). Only appropriate types are accepted.
+
+    Security / Privacy:
+      Field 40 (Join Password) SHOULD be handled carefully. Avoid logging or echoing this value.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       CONFINFO 200,1,"Stan's New Conference Name"
+
+  **Notes**
+    Writing invalid types may produce runtime errors or be ignored depending on implementation.
+
+  **See Also**
+    * :PPL:`CONFINFO()` (read / variant form)
+
+CONFUNFLAG (1.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT CONFUNFLAG(INTEGER confnum, INTEGER flags)`
+
+  Clear specified flags in a conference for the current user.
+
+  **Parameters**
+    * :PPL:`confnum` – Conference number to affect
+    * :PPL:`flags` – Flags to clear (F_REG, F_EXP, F_SEL, F_MW, F_SYS)
+
+  **Remarks**
+    Clears user's conference flags controlling registration, expired status, selection, 
+    mail waiting, and SysOp privileges. Use predefined constants F_REG, F_EXP, F_SEL, 
+    F_MW, and F_SYS. Add constants together to clear multiple flags.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Automatically deregister them from selected conferences
+       INTEGER i
+       FOR i = 1 TO 10
+           CONFUNFLAG i,F_REG+F_EXP+F_SEL
+       NEXT
+       FOR i = 11 TO 20
+           CONFUNFLAG i,F_REG+F_SEL
+       NEXT
+
+  **See Also**
+    * :PPL:`CONFFLAG` – Set conference flags
+
+DBGLEVEL (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT DBGLEVEL(INTEGER level)`
+
+  Set a new debug level for PCBoard.
+
+  **Parameters**
+    * :PPL:`level` – Debug level (0=none, 1-3=increasing debug info)
+
+  **Remarks**
+    Controls debug information written to the caller's log. Level 0 disables debug 
+    output. Levels 1 through 3 provide increasing amounts of debug information. 
+    Useful for debugging PPL programs. Changes debug level without requiring 
+    SysOp to exit and modify BOARD.BAT.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER newlvl
+       INPUT "New level",newlvl
+       NEWLINE
+       DBGLEVEL newlvl
+
+  **See Also**
+    * :PPL:`DBGLEVEL()` – Get current debug level
+    * :PPL:`LOG` – Write to log file
+
+DEC (1.00)
+~~~~~~~~~~
+  :PPL:`STATEMENT DEC(VAR var)`
+
+  Decrement the value of a variable by 1.
+
+  **Parameters**
+    * :PPL:`var` – Variable to decrement
+
+  **Remarks**
+    Provides a shorter, more efficient method of decreasing a value by 1 than using 
+    LET i = i - 1. Commonly used in countdown loops and counters.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER i
+       PRINTLN "Countdown:"
+       LET i = 10
+       WHILE (i >= 0) DO
+           PRINTLN "T minus ",i
+           DEC i
+       ENDWHILE
+
+  **See Also**
+    * :PPL:`INC` – Increment variable
+
+DEFCOLOR (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT DEFCOLOR`
+
+  Change the current color to the system default color.
+
+  **Remarks**
+    Changes the color to the system default and sends appropriate ANSI sequences. 
+    Equivalent to COLOR DEFCOLOR(). Only affects color if user is in graphics mode; 
+    ignored in non-graphics mode.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       COLOR @X47
+       CLS
+       PRINT "This is some sample text. (This will disappear.)"
+       WHILE (INKEY() = "") DELAY 1
+       BACKUP 22
+       DEFCOLOR
+       CLREOL
+       PRINT "This goes to the end of the line."
+
+  **See Also**
+    * :PPL:`COLOR` – Set color
+    * :PPL:`CURCOLOR()` – Get current color
+    * :PPL:`DEFCOLOR()` – Get default color
+
+DELAY (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT DELAY(INTEGER ticks)`
+
+  Pause execution for a specified number of clock ticks.
+
+  **Parameters**
+    * :PPL:`ticks` – Number of clock ticks to pause (18.2 ticks = 1 second)
+
+  **Remarks**
+    Pauses execution for a precise time interval. One clock tick is approximately 1/18.2 
+    seconds. To delay for one second, use DELAY 18. For runtime calculations, use 
+    (seconds * 182) / 10 since PPL doesn't support floating point.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER i
+       PRINTLN "Countdown:"
+       LET i = 10
+       WHILE (i >= 0) DO
+           PRINTLN "T minus ",i
+           DEC i
+           DELAY 18
+       ENDWHILE
+
+  **See Also**
+    * :PPL:`SOUND` – Generate sound
+
+DELETE (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT DELETE(STRING file)`
+
+  Delete a specified file from disk.
+
+  **Parameters**
+    * :PPL:`file` – Drive, path and filename to delete
+
+  **Remarks**
+    Deletes files from disk. Useful for cleaning up temporary files created by your PPE. 
+    Always clean up temporary files to avoid cluttering the system.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER retcode
+       STRING s
+       FCREATE 1,"TMP.LST",O_WR,S_DB
+       ; ... write data ...
+       FCLOSE 1
+       SHELL 1,retcode,"SORT","< TMP.LST > TMP.SRT"
+       DISPFILE "TMP.SRT",DEFS
+       DELETE "TMP.LST"
+       DELETE "TMP.SRT"
+
+  **See Also**
+    * :PPL:`EXIST()` – Check file existence
+    * :PPL:`FILEINF()` – Get file information
+    * :PPL:`RENAME` – Rename file
+
+DELUSER (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT DELUSER`
+
+  Flag the current user for deletion.
+
+  **Remarks**
+    Sets the delete flag for the user record. The user will be packed out during the next 
+    pack operation. To prevent re-login before packing, use GETUSER, set U_SEC and 
+    U_EXPSEC to 0, then PUTUSER.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       GETUSER
+       IF (U_CMNT2 = "BAD USER") THEN
+           PRINTLN "User flagged for deletion..."
+           DELUSER
+           LET U_SEC = 0
+           LET U_EXPSEC = 0
+           PUTUSER
+       ENDIF
+
+  **See Also**
+    * :PPL:`GETUSER` – Load user record
+    * :PPL:`PUTUSER` – Save user record
+    * :PPL:`U_SEC` – User security level
+    * :PPL:`U_EXPSEC` – User expired security
+
+DIR (1.00)
+~~~~~~~~~~
+  :PPL:`STATEMENT DIR(STRING cmds)`
+
+  Execute the file directories command with sub-commands.
+
+  **Parameters**
+    * :PPL:`cmds` – Sub-commands for the file directory (e.g., "N;S;A;NS")
+
+  **Remarks**
+    Accesses file directories (F command) under PPE control. Destroys any previously 
+    tokenized string expression. Save tokens before using DIR if needed.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER retcode
+       SHOWOFF
+       OPENCAP "NEWFILES.LST",retcode
+       KBDSTUFF CHR(13)
+       DIR "N;S;A;NS"
+       CLOSECAP
+       SHOWON
+       SHELL TRUE,retcode,"PKZIP","-mex NEWFILES NEWFILES.LST"
+       KBDSTUFF "FLAG NEWFILES.ZIP"
+
+  **See Also**
+    * :PPL:`BLT` – Display bulletin
+    * :PPL:`JOIN` – Join conference
+    * :PPL:`QUEST` – Run questionnaire
+
+DISPFILE (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT DISPFILE(STRING file, INTEGER flags)`
+
+  Display a file with optional alternate file searching.
+
+  **Parameters**
+    * :PPL:`file` – Filename or base filename to display
+    * :PPL:`flags` – Alternate file flags (0=none, GRAPH=1, SEC=2, LANG=4, or combinations)
+
+  **Remarks**
+    Displays a file to the user. Can search for alternate security, graphics, and/or 
+    language specific files based on flags. Use 0 for no alternate searching, or combine 
+    GRAPH, SEC, and LANG flags for multiple searches.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING s
+       DISPFILE "MNUA",SEC+GRAPH+LANG
+       INPUT "Option",s
+
+  **See Also**
+    * :PPL:`DISPSTR` – Display string
+    * :PPL:`DISPTEXT` – Display PCBTEXT prompt
+    * :PPL:`OPTEXT` – Display with options
+
+DISPSTR (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT DISPSTR(STRING str)`
+
+  Display a string, file, or execute a PPE.
+
+  **Parameters**
+    * :PPL:`str` – String to display, %filename to display file, or !PPEfile to execute
+
+  **Remarks**
+    Displays a string to the user. If string begins with %, displays the specified file. 
+    If string begins with !, executes the specified PPE file.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING s
+       INPUT "String",s
+       DISPSTR s
+       DISPSTR "Regular string"
+       DISPSTR "%C:\PCB\GEN\BRDM"
+       DISPSTR "!"+PPEPATH()+"SUBSCR.PPE"
+
+  **See Also**
+    * :PPL:`DISPFILE` – Display file
+    * :PPL:`DISPTEXT` – Display PCBTEXT prompt
+
+DISPTEXT (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT DISPTEXT(INTEGER rec, INTEGER flags)`
+
+  Display a prompt from the PCBTEXT file.
+
+  **Parameters**
+    * :PPL:`rec` – PCBTEXT record number to display
+    * :PPL:`flags` – Display flags (BELL, DEFS, LFAFTER, LFBEFORE, LOGIT, LOGITLEFT, NEWLINE)
+
+  **Remarks**
+    Displays any prompt from the PCBTEXT file according to display flags. Combine flags 
+    with + operator for multiple effects.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       DISPTEXT 192,BELL+NEWLINE+LOGIT
+       HANGUP
+
+  **See Also**
+    * :PPL:`DISPFILE` – Display file
+    * :PPL:`DISPSTR` – Display string
+
+DOINTR (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT DOINTR(INTEGER int, INTEGER ax, INTEGER bx, INTEGER cx, INTEGER dx, INTEGER si, INTEGER di, INTEGER flags, INTEGER ds, INTEGER es)`
+
+  Generate a system interrupt.
+
+  **Parameters**
+    * :PPL:`int` – Interrupt number (0-255)
+    * :PPL:`ax,bx,cx,dx,si,di` – General purpose register values
+    * :PPL:`flags` – Processor status register
+    * :PPL:`ds,es` – Segment register values
+
+  **Remarks**
+    Provides access to system services via BIOS, DOS, or third-party interfaces. Return 
+    values accessible via REG...() functions. WARNING: Can be destructive if used 
+    improperly. Use at your own risk!
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Create subdirectory - DOS function 39h
+       INTEGER addr
+       STRING path
+       LET path = "C:\$TMPDIR$"
+       VARADDR path,addr
+       DOINTR 0x21,0x39,0,0,addr*0x10000,0,0,0,addr/0x10000,0
+       IF (REGCF() & (REGAX() = 3)) THEN
+           PRINTLN "Error: Path not found"
+       ENDIF
+
+  **See Also**
+    * :PPL:`B2W()` – Byte to word conversion
+    * :PPL:`REG...()` – Register access functions
+
+DTROFF (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT DTROFF`
+
+  Turn off the serial port DTR signal.
+
+  **Remarks**
+    Turns off DTR signal, causing most modems to hang up. Used when you need to hangup 
+    without PCBoard's logoff processing. Should remain off for at least 9 clock ticks 
+    (~0.5 seconds) for modem to react.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       KBDCHKOFF
+       CDCHKOFF
+       DTROFF
+       DELAY 18
+       DTRON
+       SENDMODEM "ATDT5551212"
+       WAITFOR "CONNECT",flag,60
+       CDCHKON
+       KBDCHKON
+
+  **See Also**
+    * :PPL:`BYE` – Log off immediately
+    * :PPL:`DTRON` – Turn on DTR signal
+    * :PPL:`GOODBYE` – Log off with confirmation
+    * :PPL:`HANGUP` – Disconnect immediately
+
+DTRON (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT DTRON`
+
+  Turn on the serial port DTR signal.
+
+  **Remarks**
+    Turns on DTR signal after using DTROFF. DTR should remain off for at least 9 clock 
+    ticks before turning back on to ensure modem has time to react.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       DTROFF
+       DELAY 18
+       DTRON
+
+  **See Also**
+    * :PPL:`BYE` – Log off immediately
+    * :PPL:`DTROFF` – Turn off DTR signal
+    * :PPL:`GOODBYE` – Log off with confirmation
+    * :PPL:`HANGUP` – Disconnect immediately
+
+END (1.00)
+~~~~~~~~~~
+  :PPL:`STATEMENT END`
+
+  Terminate PPE execution.
+
+  **Remarks**
+    Normally terminates PPE execution. Automatically inserted at end of source if not 
+    present. For script questionnaires, saves any responses written to channel 0 to the 
+    script answer file.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       DATE d
+       LET d = "01-20-93"
+       IF (DATE() < d) THEN
+           PRINTLN "Your calendar is off!"
+           END
+       ENDIF
+       PRINTLN "Processing continues..."
+
+  **See Also**
+    * :PPL:`RETURN` – Return from subroutine
+    * :PPL:`STOP` – Stop execution
+
+FAPPEND (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FAPPEND(INTEGER chan, STRING file, INTEGER am, INTEGER sm)`
+
+  Open a file for append access.
+
+  **Parameters**
+    * :PPL:`chan` – Channel number (0-7)
+    * :PPL:`file` – File specification to open
+    * :PPL:`am` – Access mode (O_RD, O_WR, O_RW)
+    * :PPL:`sm` – Share mode (S_DN, S_DR, S_DW, S_DB)
+
+  **Remarks**
+    Opens a file for appending data to the end without destroying existing content. Creates 
+    the file if it doesn't exist. Channel 0 is reserved for script questionnaires but 
+    available otherwise. FAPPEND requires O_RW access regardless of specification.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FAPPEND 1,"C:\PCB\MAIN\PPE.LOG",O_RW,S_DB
+       FPUTLN 1,"Ran "+PPENAME()+" on "+STRING(DATE())+" at "+STRING(TIME())
+       FCLOSE 1
+
+  **See Also**
+    * :PPL:`FCLOSE` – Close file
+    * :PPL:`FCREATE` – Create file
+    * :PPL:`FOPEN` – Open file
+    * :PPL:`FREWIND` – Rewind file
+
+FCLOSE (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT FCLOSE(INTEGER chan)`
+
+  Close an open file.
+
+  **Parameters**
+    * :PPL:`chan` – Open channel to close (0-7)
+
+  **Remarks**
+    Closes a file channel opened with FCREATE, FOPEN, or FAPPEND. PPL automatically 
+    closes all open files at program end, but explicit closing is recommended when 
+    processing multiple files.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FOPEN 1,"C:\PCB\MAIN\PPE.LOG",O_RD,S_DW
+       FGET 1,hdr
+       FCLOSE 1
+       IF (hdr <> "Creating PPE.LOG file...") THEN
+           PRINTLN "Error: PPE.LOG invalid"
+           END
+       ENDIF
+
+  **See Also**
+    * :PPL:`FAPPEND` – Append to file
+    * :PPL:`FCREATE` – Create file
+    * :PPL:`FOPEN` – Open file
+
+FCREATE (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FCREATE(INTEGER chan, STRING file, INTEGER am, INTEGER sm)`
+
+  Create and open a new file.
+
+  **Parameters**
+    * :PPL:`chan` – Channel number (0-7)
+    * :PPL:`file` – File specification to create
+    * :PPL:`am` – Access mode (O_RD, O_WR, O_RW)
+    * :PPL:`sm` – Share mode (S_DN, S_DR, S_DW, S_DB)
+
+  **Remarks**
+    Creates a new file, destroying any existing file with the same name. Channel 0 is 
+    reserved for script questionnaires but available otherwise. Using O_RD doesn't make 
+    sense for a newly created empty file.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FCREATE 1,"C:\PCB\MAIN\PPE.LOG",O_WR,S_DN
+       FPUTLN 1,"Creating PPE.LOG file..."
+       FCLOSE 1
+
+  **See Also**
+    * :PPL:`FAPPEND` – Append to file
+    * :PPL:`FCLOSE` – Close file
+    * :PPL:`FOPEN` – Open file
+
+
+FDOQADD (3.20)
+~~~~~~~~~~~~~~
+
+  :PPL:`STATEMENT FDOQADD(STRING addr, STRING file, INTEGER flags)`
+
+  **Parameters**
+    * :PPL:`addr`  – FidoNet destination address
+    * :PPL:`file`  – Packet / file to queue
+    * :PPL:`flags` – Delivery mode: 1=NORMAL, 2=CRASH, 3=HOLD
+
+  **Returns**
+    None
+
+  **Description**
+    Adds a record to the Fido queue for later processing.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FDOQADD "1/311/40","C:\PKTS\094FC869.PKT",2
+
+  **Notes**
+    Paths should be validated; behavior undefined if file not present.
+
+  **See Also**
+    * :PPL:`FDOQMOD()`
+    * :PPL:`FDOQDEL()`
+
+
+FDOQDEL (3.20)
+~~~~~~~~~~~~~~
+
+  :PPL:`STATEMENT FDOQDEL(INTEGER recnum)`
+
+  **Parameters**
+    * :PPL:`recnum` – Queue record to delete
+
+  **Returns**
+    None
+
+  **Description**
+    Deletes a Fido queue record.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FDOQDEL 6
+
+  **Notes**
+    Deleting a non-existent record has no effect (legacy behavior).
+
+  **See Also**
+    * :PPL:`FDOQADD()`
+    * :PPL:`FDOQMOD()`
+
+FDOQMOD (3.20)
+~~~~~~~~~~~~~~
+
+  :PPL:`STATEMENT FDOQMOD(INTEGER recnum, STRING addr, STRING file, INTEGER flags)`
+
+  **Parameters**
+    * :PPL:`recnum` – Existing queue record number to modify
+    * :PPL:`addr`   – Updated FidoNet address
+    * :PPL:`file`   – Updated file path
+    * :PPL:`flags`  – 1=NORMAL, 2=CRASH, 3=HOLD
+
+  **Returns**
+    None
+
+  **Description**
+    Modifies an existing Fido queue entry.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FDOQMOD 6,"1/311/40","C:\PKTS\UPDATED.PKT",1
+
+  **Notes**
+    Duplicate legacy doc blocks collapsed into one canonical entry.
+
+  **See Also**
+    * :PPL:`FDOQADD()`
+    * :PPL:`FDOQDEL()`
+
+FGET (1.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT FGET(INTEGER chan, VAR var)`
+
+  Get (read) a line from an open file.
+
+  **Parameters**
+    * :PPL:`chan` – Channel to read from (0-7)
+    * :PPL:`var` – Variable to store the line read
+
+  **Remarks**
+    Reads information a line at a time from a file opened with read access. If multiple 
+    fields exist on the line, you must parse them manually. Sets file error flag if 
+    end of file is reached.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER i
+       STRING s
+       FOPEN 1,"FILE.DAT",O_RD,S_DW
+       IF (FERR(1)) THEN
+           PRINTLN "Error, exiting..."
+           END
+       ENDIF
+       FGET 1,s
+       WHILE (!FERR(1)) DO
+           INC i
+           PRINTLN "Line ",RIGHT(i,3),": ",s
+           FGET 1,s
+       ENDWHILE
+       FCLOSE 1
+
+  **See Also**
+    * :PPL:`FPUT` – Write to file
+    * :PPL:`FPUTLN` – Write line to file
+    * :PPL:`FPUTPAD` – Write padded line
+
+FOPEN (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT FOPEN(INTEGER chan, STRING file, INTEGER am, INTEGER sm)`
+
+  Open an existing file.
+
+  **Parameters**
+    * :PPL:`chan` – Channel number (0-7)
+    * :PPL:`file` – File specification to open
+    * :PPL:`am` – Access mode (O_RD, O_WR, O_RW)
+    * :PPL:`sm` – Share mode (S_DN, S_DR, S_DW, S_DB)
+
+  **Remarks**
+    Opens a file for read/write access with specified sharing. O_RD expects the file to 
+    exist; O_WR and O_RW create the file if it doesn't exist. Channel 0 is reserved for 
+    script questionnaires but available otherwise.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING hdr
+       FOPEN 1,"C:\PCB\MAIN\PPE.LOG",O_RD,S_DW
+       FGET 1,hdr
+       FCLOSE 1
+       IF (hdr <> "Creating PPE.LOG file...") THEN
+           PRINTLN "Error: PPE.LOG invalid"
+           END
+       ENDIF
+
+  **See Also**
+    * :PPL:`FAPPEND` – Open for append
+    * :PPL:`FCLOSE` – Close file
+    * :PPL:`FCREATE` – Create new file
+    * :PPL:`FREWIND` – Rewind file
+
+FORWARD (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FORWARD(INTEGER numcols)`
+
+  Move the cursor forward a specified number of columns.
+
+  **Parameters**
+    * :PPL:`numcols` – Number of columns to move forward (1-79)
+
+  **Remarks**
+    Moves cursor forward non-destructively. Uses ANSI positioning if available, otherwise 
+    re-displays existing characters. Cannot move beyond column 80. Has no effect if 
+    already at column 80.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       PRINT "PIRNT is wrong"
+       DELAY 5*182/10
+       BACKUP 13
+       PRINT "PRI"
+       FORWARD 6
+       PRINT "RIGHT"
+       DELAY 5*182/10
+       NEWLINE
+
+  **See Also**
+    * :PPL:`ANSION()` – Check ANSI support
+    * :PPL:`ANSIPOS` – Position cursor
+    * :PPL:`BACKUP` – Move backward
+    * :PPL:`GETX()` – Get cursor column
+    * :PPL:`GETY()` – Get cursor row
+
+FPUT (1.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT FPUT(INTEGER chan, ANY exp [, ANY exp...])`
+
+  Write expression(s) to an open file without newline.
+
+  **Parameters**
+    * :PPL:`chan` – Channel to write to (0-7)
+    * :PPL:`exp` – Expression(s) to write (at least one required)
+
+  **Remarks**
+    Evaluates one or more expressions of any type and writes results to the specified 
+    channel. Does not append carriage return/line feed. At least one expression required.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FAPPEND 1,"FILE.DAT",O_WR,S_DB
+       FPUT 1,U_NAME()," ",DATE()
+       FPUT 1," Logged!"
+       FCLOSE 1
+
+  **See Also**
+    * :PPL:`FGET` – Read from file
+    * :PPL:`FPUTLN` – Write line with newline
+    * :PPL:`FPUTPAD` – Write padded line
+
+FPUTLN (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT FPUTLN(INTEGER chan [, ANY exp...])`
+
+  Write expression(s) to an open file with newline.
+
+  **Parameters**
+    * :PPL:`chan` – Channel to write to (0-7)
+    * :PPL:`exp` – Expression(s) to write (optional)
+
+  **Remarks**
+    Evaluates zero or more expressions and writes results to the specified channel with 
+    carriage return/line feed appended. Can be called with just channel number to write 
+    blank line.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FAPPEND 1,"FILE.DAT",O_WR,S_DB
+       FPUTLN 1,U_NAME()," ",DATE()," ",TIME()," ",CURSEC()
+       FPUTLN 1
+       FPUTLN 1,"Have a nice"+" day!"
+       FCLOSE 1
+
+  **See Also**
+    * :PPL:`FGET` – Read from file
+    * :PPL:`FPUT` – Write without newline
+    * :PPL:`FPUTPAD` – Write padded line
+
+FPUTPAD (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FPUTPAD(INTEGER chan, ANY exp, INTEGER width)`
+
+  Write a padded line of specified width to a file.
+
+  **Parameters**
+    * :PPL:`chan` – Channel to write to (0-7)
+    * :PPL:`exp` – Expression to write
+    * :PPL:`width` – Width for padding (-256 to 256)
+
+  **Remarks**
+    Writes expression padded to specified width with spaces, then appends newline. 
+    Positive width: right-justified (left-padded). Negative width: left-justified 
+    (right-padded).
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FAPPEND 1,"FILE.DAT",O_WR,S_DB
+       FPUTPAD 1,U_NAME(),40
+       FPUTPAD 1,DATE(),20
+       FPUTPAD 1,TIME(),-20
+       FCLOSE 1
+
+  **See Also**
+    * :PPL:`FGET` – Read from file
+    * :PPL:`FPUT` – Write without newline
+    * :PPL:`FPUTLN` – Write with newline
+
+FRESHLINE (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FRESHLINE`
+
+  Move cursor to a fresh line for output.
+
+  **Remarks**
+    Checks if cursor is in column 1. If not, calls NEWLINE to move to next line. 
+    Ensures clean line before continuing output.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER i, end
+       LET end = RANDOM(20)
+       FOR i = 1 TO end
+           PRINT RIGHT(RANDOM(10000),8)
+       NEXT
+       FRESHLINE
+       PRINTLN "Now we continue..."
+
+  **See Also**
+    * :PPL:`NEWLINE` – Move to next line
+    * :PPL:`NEWLINES` – Move multiple lines
+
+FREWIND (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FREWIND(INTEGER chan)`
+
+  Rewind an open file to the beginning.
+
+  **Parameters**
+    * :PPL:`chan` – Open channel to rewind (0-7)
+
+  **Remarks**
+    Rewinds file channel opened with FCREATE, FOPEN, or FAPPEND. Flushes buffers, 
+    commits file to disk, and repositions pointer to beginning. Useful for reprocessing 
+    a file without closing and reopening.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING s
+       FAPPEND 1,"C:\PCB\MAIN\PPE.LOG",O_RW,S_DN
+       FPUTLN 1,U_NAME()
+       FREWIND 1
+       WHILE (!FERR(1)) DO
+           FGET 1,s
+           PRINTLN s
+       ENDWHILE
+       FCLOSE 1
+
+  **See Also**
+    * :PPL:`FAPPEND` – Open for append
+    * :PPL:`FCLOSE` – Close file
+    * :PPL:`FCREATE` – Create file
+    * :PPL:`FOPEN` – Open file
+
+GETTOKEN (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT GETTOKEN(VAR var)`
+
+  Retrieve the next token from a tokenized string.
+
+  **Parameters**
+    * :PPL:`var` – Variable to store the retrieved token
+
+  **Remarks**
+    Retrieves tokens one at a time from a string previously processed with TOKENIZE. 
+    The token count decreases with each retrieval. Use TOKCOUNT() to check remaining 
+    tokens.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING cmdline
+       INPUT "Command",cmdline
+       TOKENIZE cmdline
+       PRINTLN "You entered ",TOKCOUNT()," tokens"
+       WHILE (TOKCOUNT() > 0) DO
+           GETTOKEN cmdline
+           PRINTLN "Token: ",CHR(34),cmdline,CHR(34)
+       ENDWHILE
+
+  **See Also**
+    * :PPL:`GETTOKEN()` – Function version
+    * :PPL:`TOKCOUNT()` – Count remaining tokens
+    * :PPL:`TOKENIZE` – Parse string into tokens
+    * :PPL:`TOKENSTR()` – Rebuild tokenized string
+
+GETUSER (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT GETUSER`
+
+  Fill predeclared user variables with values from current user record.
+
+  **Remarks**
+    Loads current user's information into predeclared U_XXX variables. Variables are 
+    undefined until GETUSER is executed. Changes don't take effect until PUTUSER 
+    is called.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       IF (PSA(3)) THEN
+           GETUSER
+           INPUT "Addr 1",U_ADDR(0)
+           INPUT "Addr 2",U_ADDR(1)
+           INPUT "City  ",U_ADDR(2)
+           INPUT "State ",U_ADDR(3)
+           INPUT "ZIP   ",U_ADDR(4)
+           INPUT "Cntry ",U_ADDR(5)
+           PUTUSER
+       ENDIF
+
+  **See Also**
+    * :PPL:`PUTUSER` – Save user record
+    * :PPL:`GETALTUSER` – Load alternate user
+    * :PPL:`U_...` variables
+
+GOODBYE (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT GOODBYE`
+
+  Log user off with confirmation and download warnings.
+
+  **Remarks**
+    Logs off user as if they typed G command. Warns about flagged files and optionally 
+    confirms logoff. Performs same processing as PCBoard's G command.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING s
+       INPUT "What do you want to do",s
+       IF (s = "G") THEN GOODBYE
+       ELSEIF (s = "BYE") THEN BYE
+       ELSE KBDSTUFF s
+       ENDIF
+
+  **See Also**
+    * :PPL:`BYE` – Immediate logoff
+    * :PPL:`DTROFF` – Turn off DTR
+    * :PPL:`DTRON` – Turn on DTR
+    * :PPL:`HANGUP` – Disconnect immediately
+
+GOSUB (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT GOSUB(LABEL label)`
+
+  Transfer control to subroutine and save return address.
+
+  **Parameters**
+    * :PPL:`label` – Label to jump to
+
+  **Remarks**
+    Saves address of next line and transfers control to specified label. RETURN statement 
+    at end of subroutine resumes execution at line following GOSUB. Useful for code reuse.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING Question, Answer
+       LET Question = "What is your street address..."
+       GOSUB ask
+       LET Question = "What is your city, state and zip..."
+       GOSUB ask
+       END
+       
+       :ask
+       LET Answer = ""
+       PRINTLN "@X0E",Question
+       INPUT "",Answer
+       NEWLINES 2
+       FPUTLN 0,"Q: ",STRIPATX(Question)
+       FPUTLN 0,"A: ",Answer
+       RETURN
+
+  **See Also**
+    * :PPL:`GOTO` – Unconditional jump
+    * :PPL:`RETURN` – Return from subroutine
+    * :PPL:`FOR`/`NEXT` – Loop statements
+    * :PPL:`IF`/`ENDIF` – Conditional statements
+    * :PPL:`WHILE`/`ENDWHILE` – Loop statements
+
+GOTO (1.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT GOTO(LABEL label)`
+
+  Transfer program control unconditionally.
+
+  **Parameters**
+    * :PPL:`label` – Label to jump to
+
+  **Remarks**
+    Unconditional jump to specified label. Often overused - consider using structured 
+    programming constructs (IF, WHILE, FOR) instead. Useful for exiting deeply nested 
+    loops on critical errors.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER i
+       STRING s
+       FOPEN 1,"FILE.DAT",O_RD,S_DW
+       WHILE (UPPER(s) <> "QUIT") DO
+           FGET 1,s
+           IF (FERR(1)) THEN
+               PRINTLN "Error, aborting..."
+               GOTO exit
+           ENDIF
+           INC i
+           PRINTLN "Line ",i,": ",s
+       ENDWHILE
+       :exit
+       FCLOSE 1
+
+  **See Also**
+    * :PPL:`GOSUB` – Call subroutine
+    * :PPL:`FOR`/`NEXT` – Loop statements
+    * :PPL:`IF`/`ENDIF` – Conditional statements
+    * :PPL:`WHILE`/`ENDWHILE` – Loop statements
+
+GRAFMODE (3.20)
+~~~~~~~~~~~~~~~
+
+  :PPL:`STATEMENT GRAFMODE(INTEGER mode)`
+
+  **Parameters**
+    * :PPL:`mode` – Display mode selector:
+      * 1 = Color ANSI (if user supports)
+      * 2 = Force color ANSI
+      * 3 = ANSI black & white
+      * 4 = Non-ANSI (plain)
+      * 5 = RIP (if supported)
+
+  **Returns**
+    None
+
+  **Description**
+    Switches the caller’s graphics/terminal capability mode.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       PRINTLN "Switching to color ANSI…"
+       GRAFMODE 1
+
+  **Notes**
+    Forcing modes unsupported by user terminal may cause display corruption.
+
+  **See Also**
+    Terminal / capability query functions (future)
+
+HANGUP (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT HANGUP`
+
+  Immediately disconnect user with abnormal logoff.
+
+  **Remarks**
+    Immediately hangs up on caller without delay or notice. Performs logoff processing 
+    and logs abnormal logoff to caller's log.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING s
+       INPUT "What do you want to do",s
+       IF (s = "G") THEN GOODBYE
+       ELSEIF (s = "BYE") THEN BYE
+       ELSEIF (s = "HANG") THEN HANGUP
+       ELSE KBDSTUFF s
+       ENDIF
+
+  **See Also**
+    * :PPL:`BYE` – Immediate logoff
+    * :PPL:`DTROFF` – Turn off DTR
+    * :PPL:`DTRON` – Turn on DTR
+    * :PPL:`GOODBYE` – Normal logoff
+
+INC (1.00)
+~~~~~~~~~~
+  :PPL:`STATEMENT INC(VAR var)`
+
+  Increment a variable by 1.
+
+  **Parameters**
+    * :PPL:`var` – Variable to increment
+
+  **Remarks**
+    Provides shorter, more efficient method of increasing a value by 1 than using 
+    LET i = i + 1. Commonly used in loops and counters.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER i
+       PRINTLN "Countdown:"
+       LET i = 0
+       WHILE (i <= 10) DO
+           PRINTLN "T plus ",i
+           INC i
+       ENDWHILE
+
+  **See Also**
+    * :PPL:`DEC` – Decrement variable
 
 INPUT (1.00)
 ~~~~~~~~~~~~
-  :PPL:`STATEMENT INPUT(<VAR> target)`
+  :PPL:`STATEMENT INPUT(STRING prompt, VAR var)`
+
+  Prompt user for text input.
 
   **Parameters**
-    * :PPL:`target` – Variable to receive a raw line (basic editing)
+    * :PPL:`prompt` – Prompt to display
+    * :PPL:`var` – Variable to store input
 
-  **Description**
-    Reads a full line of user input (no masking/validation) into the variable.
-
-INPUTSTR / INPUTINT / INPUTDATE / INPUTTIME / INPUTMONEY / INPUTCC (1.00)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT INPUTSTR(<VAR> target, INTEGER flags)`
-  :PPL:`STATEMENT INPUTINT(<VAR> target, INTEGER flags)`
-  :PPL:`STATEMENT INPUTDATE(<VAR> target, INTEGER flags)`
-  :PPL:`STATEMENT INPUTTIME(<VAR> target, INTEGER flags)`
-  :PPL:`STATEMENT INPUTMONEY(<VAR> target, INTEGER flags)`
-  :PPL:`STATEMENT INPUTCC(<VAR> target, INTEGER flags)`
-
-  **Parameters**
-    * :PPL:`target` – Variable to fill
-    * :PPL:`flags` – Bitwise OR of input behavior flags (e.g. FIELDLEN, UPCASE, ECHODOTS)
-
-  **Description**
-    Validating input routines specialized for type. For credit cards, format and Luhn validation can occur.
+  **Remarks**
+    Accepts any string up to 60 characters. Displays parentheses around input field in 
+    ANSI mode. Limit prompts to 15 characters or less due to parentheses.
 
   **Example**
+
     .. code-block:: PPL
 
-       INTEGER Age
-       INPUTINT Age, FIELDLEN + UPCASE
+       BOOLEAN b
+       DATE d
+       INTEGER i
+       MONEY m
+       STRING s
+       TIME t
+       INPUT "Enter BOOLEAN",b
+       INPUT "Enter DATE",d
+       INPUT "Enter INTEGER",i
+       INPUT "Enter MONEY",m
+       INPUT "Enter STRING",s
+       INPUT "Enter TIME",t
+
+  **See Also**
+    * :PPL:`INPUTSTR` – Input with validation
+    * :PPL:`INPUTTEXT` – Multi-line input
+    * :PPL:`PROMPTSTR` – Display prompt
+
+INPUTCC (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT INPUTCC(STRING prompt, VAR var, INTEGER color)`
+
+  Input credit card number with validation.
+
+  **Parameters**
+    * :PPL:`prompt` – Prompt to display
+    * :PPL:`var` – Variable to store input
+    * :PPL:`color` – Display color
+
+  **Remarks**
+    Accepts credit card number input. Valid characters: "0123456789". Maximum length: 16. 
+    Limit prompt to 80-16-4=60 characters.
+
+  **See Also**
+    * :PPL:`INPUTDATE` – Input date
+    * :PPL:`INPUTINT` – Input integer
+    * :PPL:`INPUTMONEY` – Input money
+    * :PPL:`INPUTTIME` – Input time
+    * :PPL:`INPUTYN` – Input yes/no
+
+INPUTDATE (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT INPUTDATE(STRING prompt, VAR var, INTEGER color)`
+
+  Input date with validation.
+
+  **Parameters**
+    * :PPL:`prompt` – Prompt to display
+    * :PPL:`var` – Variable to store input
+    * :PPL:`color` – Display color
+
+  **Remarks**
+    Accepts date input. Valid characters: "0123456789-/". Maximum length: 8. 
+    Limit prompt to 80-8-4=68 characters.
+
+INPUTINT (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT INPUTINT(STRING prompt, VAR var, INTEGER color)`
+
+  Input integer with validation.
+
+  **Parameters**
+    * :PPL:`prompt` – Prompt to display
+    * :PPL:`var` – Variable to store input
+    * :PPL:`color` – Display color
+
+  **Remarks**
+    Accepts integer input. Valid characters: "0123456789+-". Maximum length: 11. 
+    Limit prompt to 80-11-4=65 characters.
+
+INPUTMONEY (1.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT INPUTMONEY(STRING prompt, VAR var, INTEGER color)`
+
+  Input money amount with validation.
+
+  **Parameters**
+    * :PPL:`prompt` – Prompt to display
+    * :PPL:`var` – Variable to store input
+    * :PPL:`color` – Display color
+
+  **Remarks**
+    Accepts money input. Valid characters: "0123456789+-$.". Maximum length: 13. 
+    Limit prompt to 80-13-4=63 characters.
+
+INPUTTIME (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT INPUTTIME(STRING prompt, VAR var, INTEGER color)`
+
+  Input time with validation.
+
+  **Parameters**
+    * :PPL:`prompt` – Prompt to display
+    * :PPL:`var` – Variable to store input
+    * :PPL:`color` – Display color
+
+  **Remarks**
+    Accepts time input. Valid characters: "0123456789:". Maximum length: 8. 
+    Limit prompt to 80-8-4=68 characters.
 
 INPUTYN (1.00)
 ~~~~~~~~~~~~~~
-  :PPL:`STATEMENT INPUTYN(<VAR> target, INTEGER flags)`
+  :PPL:`STATEMENT INPUTYN(STRING prompt, VAR var, INTEGER color)`
 
-  **Description**
-    Prompts for a Yes/No style single-key answer; stores 'Y' or 'N' (or configured YESCHAR/NOCHAR) into :PPL:`target`.
+  Input yes/no response with language support.
+
+  **Parameters**
+    * :PPL:`prompt` – Prompt to display
+    * :PPL:`var` – Variable to store input
+    * :PPL:`color` – Display color
+
+  **Remarks**
+    Accepts yes/no input. Valid characters depend on language selection (usually "YN" 
+    for English). Maximum length: 1. Characters defined in PCBML.DAT for each language.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING yn
+       INPUTYN "Continue (Y/N)",yn,@X0E
+       IF (yn = YESCHAR()) THEN
+           PRINTLN "Continuing..."
+       ENDIF
+
+INPUTSTR (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT INPUTSTR(STRING prompt, VAR var, INTEGER color, INTEGER len, STRING valid, INTEGER flags)`
+
+  Prompt user for formatted text input with validation.
+
+  **Parameters**
+    * :PPL:`prompt` – Prompt to display
+    * :PPL:`var` – Variable to store input
+    * :PPL:`color` – Display color for prompt
+    * :PPL:`len` – Maximum input length
+    * :PPL:`valid` – Valid characters allowed
+    * :PPL:`flags` – Input behavior flags
+
+  **Remarks**
+    Accepts string input up to specified length. Only characters in valid parameter are accepted. 
+    Flags modify prompt display and input behavior. Use predefined mask functions for common 
+    character sets: MASK_ALNUM(), MASK_ALPHA(), MASK_ASCII(), MASK_FILE(), MASK_NUM(), 
+    MASK_PATH(), MASK_PWD(). Flag values: AUTO, DEFS, ECHODOTS, ERASELINE, FIELDLEN, 
+    GUIDE, HIGHASCII, LFAFTER, LFBEFORE, NEWLINE, NOCLEAR, STACKED, UPCASE, WORDWRAP, YESNO.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       BOOLEAN b
+       DATE d
+       INTEGER i
+       MONEY m
+       STRING s
+       TIME t
+       INPUTSTR "Enter BOOLEAN",b,@X0E,1,"10",LFBEFORE+NEWLINE
+       INPUTSTR "Enter DATE",d,@X0F,8,"0123456789-",NEWLINE+NOCLEAR
+       INPUTSTR "Enter INTEGER",i,@X07,20,MASK_NUM(),NEWLINE
+       INPUTSTR "Enter MONEY",m,@X08,9,MASK_NUM()+".",NEWLINE+DEFS+FIELDLEN
+       INPUTSTR "Enter STRING",s,@X09,63,MASK_ASCII(),NEWLINE+FIELDLEN+GUIDE
+       INPUTSTR "Enter TIME",t,@X0A,5,"0123456789"+":",NEWLINE+LFAFTER
+
+  **See Also**
+    * :PPL:`INPUT` – Basic input
+    * :PPL:`INPUTTEXT` – Simpler text input
+    * :PPL:`PROMPTSTR` – Display prompt
+
+INPUTTEXT (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT INPUTTEXT(STRING prompt, VAR var, INTEGER color, INTEGER len)`
+
+  Prompt user for text input with specified length and color.
+
+  **Parameters**
+    * :PPL:`prompt` – Prompt to display
+    * :PPL:`var` – Variable to store input
+    * :PPL:`color` – Display color for prompt
+    * :PPL:`len` – Maximum input length
+
+  **Remarks**
+    Accepts any string input up to specified length. Displays parentheses around input field 
+    in ANSI mode. Limit prompts to (80-len-4) characters or less to accommodate parentheses.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       BOOLEAN b
+       DATE d
+       INTEGER i
+       MONEY m
+       STRING s
+       TIME t
+       INPUTTEXT "Enter BOOLEAN",b,@X0E,1
+       INPUTTEXT "Enter DATE",d,@X0F,8
+       INPUTTEXT "Enter INTEGER",i,@X07,20
+       INPUTTEXT "Enter MONEY",m,@X08,9
+       INPUTTEXT "Enter STRING",s,@X09,63
+       INPUTTEXT "Enter TIME",t,@X0A,5
+
+  **See Also**
+    * :PPL:`INPUT` – Basic input
+    * :PPL:`INPUTSTR` – Advanced formatted input
+    * :PPL:`PROMPTSTR` – Display prompt
+
+JOIN (1.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT JOIN(STRING cmds)`
+
+  Execute the join conference command with sub-commands.
+
+  **Parameters**
+    * :PPL:`cmds` – Sub-commands for the join conference command
+
+  **Remarks**
+    Accesses the join conference command (J command) under PPE control. Destroys any 
+    previously tokenized string expression. Save tokens before using JOIN if needed.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING yn
+       INPUTYN "Join SysOp conference",yn,@X0E
+       IF (yn = YESCHAR()) JOIN "4"
+
+  **See Also**
+    * :PPL:`BLT` – Display bulletin
+    * :PPL:`DIR` – File directories
+    * :PPL:`QUEST` – Run questionnaire
+
+KBDCHKOFF (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT KBDCHKOFF`
+
+  Turn off keyboard timeout checking.
+
+  **Remarks**
+    Disables PCBoard's automatic keyboard timeout detection. Use for processes that take 
+    time without user interaction. Re-enable with KBDCHKON when done to prevent PCBoard 
+    from recycling due to perceived inactivity.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       KBDCHKOFF
+       WHILE (RANDOM(10000) <> 0) PRINT "."  ; Time-consuming process
+       KBDCHKON
+
+  **See Also**
+    * :PPL:`CDCHKOFF` – Turn off carrier checking
+    * :PPL:`CDCHKON` – Turn on carrier checking
+    * :PPL:`KBDCHKON` – Turn on keyboard checking
+
+KBDCHKON (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT KBDCHKON`
+
+  Turn on keyboard timeout checking.
+
+  **Remarks**
+    Re-enables PCBoard's automatic keyboard timeout detection after it was disabled with 
+    KBDCHKOFF. Should be called after completing processes that don't require user input.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       KBDCHKOFF
+       ; Long process without user input
+       KBDCHKON
+
+  **See Also**
+    * :PPL:`CDCHKOFF` – Turn off carrier checking
+    * :PPL:`CDCHKON` – Turn on carrier checking
+    * :PPL:`KBDCHKOFF` – Turn off keyboard checking
+
+KBDFILE (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT KBDFILE(STRING file)`
+
+  Stuff the contents of a text file into the keyboard buffer.
+
+  **Parameters**
+    * :PPL:`file` – Filename whose contents to stuff into keyboard buffer
+
+  **Remarks**
+    Feeds file contents to PCBoard as if typed by user. Useful for command sequences 
+    exceeding 256 characters (KBDSTUFF limit).
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER retcode
+       SHOWOFF
+       OPENCAP "NEWFILES.LST",retcode
+       KBDSTUFF CHR(13)
+       DIR "N;S;A;NS"
+       CLOSECAP
+       SHOWON
+       SHELL TRUE,retcode,"PKZIP","-mex NEWFILES NEWFILES.LST"
+       KBDFILE "FLAGFILE.CMD"
+
+  **See Also**
+    * :PPL:`KBDSTUFF` – Stuff string to keyboard
+
+KBDSTUFF (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT KBDSTUFF(STRING str)`
+
+  Stuff a string into the keyboard buffer.
+
+  **Parameters**
+    * :PPL:`str` – String to stuff into keyboard buffer (max 256 chars)
+
+  **Remarks**
+    Feeds keystrokes to PCBoard as if typed by user. Useful for replacing commands or 
+    chaining built-in operations. Cannot access CMD.LST defined commands. Use KBDFILE 
+    for sequences over 256 characters.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER retcode
+       SHOWOFF
+       OPENCAP "NEWFILES.LST",retcode
+       KBDSTUFF CHR(13)
+       DIR "N;S;A;NS"
+       CLOSECAP
+       SHOWON
+       KBDSTUFF "FLAG NEWFILES.ZIP"
+
+  **See Also**
+    * :PPL:`KBDFILE` – Stuff file contents
 
 KILLMSG (3.20)
 ~~~~~~~~~~~~~~
@@ -167,10 +2077,1079 @@ KILLMSG (3.20)
   **See Also**
     (future) message management functions / queries
 
+LOG (1.00)
+~~~~~~~~~~
+  :PPL:`STATEMENT LOG(STRING msg, BOOLEAN left)`
+
+  Log a message to the caller's log.
+
+  **Parameters**
+    * :PPL:`msg` – Message to write to log
+    * :PPL:`left` – TRUE for left-justified, FALSE to indent 6 spaces
+
+  **Remarks**
+    Keeps SysOp informed of user actions and helps track PPE debugging information.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       BOOLEAN flag
+       PRINT "Type QUIT to exit..."
+       WAITFOR "QUIT",flag,60
+       IF (!flag) LOG "User did not type QUIT",FALSE
+       LOG "***EXITING PPE***",TRUE
+
+  **See Also**
+    * :PPL:`DBGLEVEL` – Set debug level
+    * :PPL:`DBGLEVEL()` – Get debug level
+
+MESSAGE (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT MESSAGE(INTEGER conf, STRING to, STRING from, STRING sub, STRING sec, DATE pack, BOOLEAN rr, BOOLEAN echo, STRING file)`
+
+  Enter a message under PPL control.
+
+  **Parameters**
+    * :PPL:`conf` – Conference number for message
+    * :PPL:`to` – Recipient name
+    * :PPL:`from` – Sender name
+    * :PPL:`sub` – Message subject
+    * :PPL:`sec` – Security ("N"=none, "R"=receiver only)
+    * :PPL:`pack` – Packout date (0 for none)
+    * :PPL:`rr` – Return receipt flag
+    * :PPL:`echo` – Echo message flag
+    * :PPL:`file` – Path to text file for message body
+
+  **Remarks**
+    Allows leaving messages from any name to any user. Useful for notifications that should 
+    be downloaded in QWK packets or might be missed as on-screen messages.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       IF (CURSEC() < 20) THEN
+           MESSAGE 0,U_NAME(),"SYSOP","REGISTER","R",DATE(),TRUE,FALSE,"REG.TXT"
+       ENDIF
+
+  **See Also**
+    * :PPL:`CURCONF()` – Current conference
+    * :PPL:`U_NAME()` – User name
+
+MKDIR (3.20)
+~~~~~~~~~~~~
+
+  :PPL:`STATEMENT MKDIR(STRING path)`
+
+  **Parameters**
+    * :PPL:`path` – Directory path to create
+
+  **Returns**
+    None
+
+  **Description**
+    Creates a directory (legacy DOS semantics). Intermediate path components are not automatically created.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       MKDIR "\PPE\TEST"
+
+  **Notes**
+    May fail silently if already exists or permissions deny.
+
+  **See Also**
+    * :PPL:`RMDIR()`
+    * :PPL:`CWD()`
+
+MORE (1.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT MORE`
+
+  Pause display and ask user how to continue.
+
+  **Remarks**
+    Prompts user to continue (Y), abort (N), or continue non-stop (NS). Displays prompt 
+    196 from PCBTEXT. Language-specific responses supported.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       PRINTLN "Your account has expired!"
+       PRINTLN "You are about to be logged off"
+       MORE
+       PRINTLN "Call me voice to renew your subscription"
+
+  **See Also**
+    * :PPL:`ABORT()` – Check abort status
+    * :PPL:`DISPTEXT` – Display PCBTEXT prompt
+    * :PPL:`WAIT` – Wait for keypress
+
+MOVEMSG (3.20)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT MOVEMSG(INTEGER fromConf, INTEGER msgNum, INTEGER toConf)`
+
+  Moves a message between conferences (permissions & existence required).
+
+MPRINT (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT MPRINT(ANY exp [, ANY exp...])`
+
+  Print to modem only without newline.
+
+  **Parameters**
+    * :PPL:`exp` – Expression(s) to print (at least one required)
+
+  **Remarks**
+    Sends output only to modem, not local display. Does not interpret @ codes. ANSI 
+    interpreted if remote caller has ANSI support. At least one expression required.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       MPRINT "The PPE file is "
+       MPRINT PPENAME(),"."
+
+  **See Also**
+    * :PPL:`MPRINTLN` – Print to modem with newline
+    * :PPL:`PRINT` – Print to screen
+    * :PPL:`SPRINT` – Print to local only
+
+MPRINTLN (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT MPRINTLN([ANY exp...])`
+
+  Print to modem only with newline.
+
+  **Parameters**
+    * :PPL:`exp` – Expression(s) to print (optional)
+
+  **Remarks**
+    Sends output only to modem with newline appended. Does not interpret @ codes. 
+    Can be called without arguments to print blank line.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       MPRINTLN "The path is ",PPEPATH(),"."
+       MPRINTLN
+
+  **See Also**
+    * :PPL:`MPRINT` – Print to modem without newline
+    * :PPL:`PRINTLN` – Print to screen with newline
+    * :PPL:`SPRINTLN` – Print to local with newline
+
+NEWLINE (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT NEWLINE`
+
+  Move cursor to beginning of next line.
+
+  **Remarks**
+    Moves to next line regardless of current cursor position, scrolling if necessary. 
+    Unlike FRESHLINE which only moves if not at column 1.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER i, end
+       LET end = RANDOM(20)
+       FOR i = 1 TO end
+           PRINT RIGHT(RANDOM(10000),8)
+       NEXT
+       FRESHLINE
+       NEWLINE
+       PRINTLN "Now we continue with a blank line between"
+
+  **See Also**
+    * :PPL:`FRESHLINE` – Ensure fresh line
+    * :PPL:`NEWLINES` – Multiple newlines
+
+NEWLINES (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT NEWLINES(INTEGER count)`
+
+  Execute multiple NEWLINE statements.
+
+  **Parameters**
+    * :PPL:`count` – Number of newlines to execute
+
+  **Remarks**
+    Convenient for executing multiple or variable NEWLINE statements for screen formatting. 
+    Automatically executes specified number of NEWLINEs without loops or multiple statements.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER i, end
+       LET end = RANDOM(20)
+       FOR i = 1 TO end
+           PRINT RIGHT(RANDOM(10000),8)
+       NEXT
+       FRESHLINE
+       NEWLINES 5
+       PRINTLN "Now we continue with 5 blank lines between"
+
+  **See Also**
+    * :PPL:`FRESHLINE` – Ensure fresh line
+    * :PPL:`NEWLINE` – Single newline
+
+NEWPWD (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT NEWPWD(STRING pwd, VAR BOOLEAN var)`
+
+  Change user's password with PSA support.
+
+  **Parameters**
+    * :PPL:`pwd` – New password
+    * :PPL:`var` – Returns TRUE if changed, FALSE if failed
+
+  **Remarks**
+    Changes password with full PSA (Password Security Application) support. Validates 
+    password, checks history, updates expiration dates, and increments change counter. 
+    Sets var to FALSE if password fails validity tests.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       BOOLEAN changed
+       STRING pwd
+       INPUTSTR "Enter a new password",pwd,@X0E,12,MASK_PWD(),ECHODOTS
+       NEWLINE
+       NEWPWD pwd,changed
+       IF (!changed) PRINTLN "Password not changed"
+
+  **See Also**
+    * :PPL:`MASK_PWD()` – Password character mask
+    * :PPL:`U_PWD` – User password variable
+    * :PPL:`U_PWDEXP` – Password expiration
+
+OPENCAP (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT OPENCAP(STRING file, VAR BOOLEAN ocFlag)`
+
+  Open screen capture file.
+
+  **Parameters**
+    * :PPL:`file` – Capture filename
+    * :PPL:`ocFlag` – Returns TRUE if opened successfully
+
+  **Remarks**
+    Opens a file to capture screen output. Use with SHOWON/SHOWOFF to control display 
+    while capturing. Close with CLOSECAP when done.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       BOOLEAN ss, ocFlag
+       LET ss = SHOWSTAT()
+       SHOWOFF
+       OPENCAP "CAP"+STRING(PCBNODE()),ocFlag
+       IF (ocFlag) THEN
+           DIR "U;NS"
+           CLOSECAP
+           KBDSTUFF "FLAG CAP"+STRING(PCBNODE())+CHR(13)
+       ENDIF
+       IF (ss) THEN SHOWON ELSE SHOWOFF
+
+  **See Also**
+    * :PPL:`CLOSECAP` – Close capture file
+    * :PPL:`SHOWOFF` – Hide display
+    * :PPL:`SHOWON` – Show display
+    * :PPL:`SHOWSTAT()` – Check display status
+
+OPTEXT (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT OPTEXT(STRING str)`
+
+  Set text for @OPTEXT@ macro.
+
+  **Parameters**
+    * :PPL:`str` – Text to use for @OPTEXT@
+
+  **Remarks**
+    Sets the text used by @OPTEXT@ macro in prompts and display files. Text must be used 
+    immediately after setting (in print statement or display file).
+
+  **Example**
+
+    .. code-block:: PPL
+
+       OPTEXT STRING(DATE())+" & "+STRING(TIME())
+       PRINTLN "The date and time are @OPTEXT@"
+       DISPFILE "FILE",GRAPH+SEC+LANG
+
+  **See Also**
+    * :PPL:`DISPFILE` – Display file
+    * :PPL:`DISPSTR` – Display string
+    * :PPL:`PRINT` – Print statement
+
+PAGEOFF (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT PAGEOFF`
+
+  Turn off SysOp paged indicator.
+
+  **Remarks**
+    Turns off the paged indicator. Used with PAGEON, CHAT, and PAGESTAT() to implement 
+    custom operator page functionality.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       PAGEON
+       FOR i = 1 TO 10
+           PRINT "@BEEP@"
+           DELAY 18
+           IF (INKEY() = " ") THEN
+               PAGEOFF
+               SHELL TRUE,i,"SUPERCHT",""
+               GOTO exit
+           ENDIF
+       NEXT
+       :exit
+
+  **See Also**
+    * :PPL:`CHAT` – Enter chat mode
+    * :PPL:`PAGEON` – Turn on paging
+    * :PPL:`PAGESTAT()` – Check page status
+
+PAGEON (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT PAGEON`
+
+  Turn on SysOp paged indicator and update statistics.
+
+  **Remarks**
+    Turns on paged indicator and updates caller's statistics PSA if installed. Used with 
+    PAGEOFF, CHAT, and PAGESTAT() for custom page functionality.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       PAGEON
+       FOR i = 1 TO 10
+           PRINT "@BEEP@"
+           DELAY 18
+           IF (INKEY() = " ") THEN
+               CHAT
+               GOTO exit
+           ENDIF
+       NEXT
+       :exit
+
+  **See Also**
+    * :PPL:`CHAT` – Enter chat mode
+    * :PPL:`PAGEOFF` – Turn off paging
+    * :PPL:`PAGESTAT()` – Check page status
+
+POKEB (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT POKEB(INTEGER addr, INTEGER value)`
+
+  Write a byte to memory address.
+
+  **Parameters**
+    * :PPL:`addr` – Memory address
+    * :PPL:`value` – Byte value to write (0-255)
+
+  **Remarks**
+    Writes a byte value directly to memory. Complements PEEKB() function for low-level 
+    memory access.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       BOOLEAN flag
+       INTEGER addr
+       VARADDR flag,addr
+       POKEB addr,TRUE  ; Set flag to TRUE the hard way
+
+  **See Also**
+    * :PPL:`PEEKB()` – Read byte from memory
+    * :PPL:`POKEDW` – Write double word
+    * :PPL:`POKEW` – Write word
+    * :PPL:`VARADDR` – Get variable address
+
+POKEDW (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT POKEDW(INTEGER addr, INTEGER value)`
+
+  Write a double word to memory address.
+
+  **Parameters**
+    * :PPL:`addr` – Memory address
+    * :PPL:`value` – Double word value (-2,147,483,648 to +2,147,483,647)
+
+  **Remarks**
+    Writes a 32-bit value directly to memory. Complements PEEKDW() function.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       MONEY amt
+       INTEGER addr
+       VARADDR amt,addr
+       POKEDW addr,123456  ; Set amt to $1234.56
+
+  **See Also**
+    * :PPL:`PEEKDW()` – Read double word
+    * :PPL:`POKEB` – Write byte
+    * :PPL:`POKEW` – Write word
+
+POKEW (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT POKEW(INTEGER addr, INTEGER value)`
+
+  Write a word to memory address.
+
+  **Parameters**
+    * :PPL:`addr` – Memory address
+    * :PPL:`value` – Word value (0-65,535)
+
+  **Remarks**
+    Writes a 16-bit value directly to memory. Complements PEEKW() function.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       DATE dob
+       INTEGER addr
+       VARADDR dob,addr
+       POKEW addr,MKDATE(1967,10,31)  ; Set date of birth
+
+  **See Also**
+    * :PPL:`PEEKW()` – Read word from memory
+    * :PPL:`POKEB` – Write byte
+    * :PPL:`POKEDW` – Write double word
+
+POP (1.00)
+~~~~~~~~~~
+  :PPL:`STATEMENT POP(VAR var [, VAR var...])`
+
+  Pop values from stack into variables.
+
+  **Parameters**
+    * :PPL:`var` – Variable(s) to receive popped values
+
+  **Remarks**
+    Retrieves values previously pushed with PUSH statement. Used for parameter passing, 
+    creating 'local' variables, or reversing argument order. Values popped in LIFO order.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER i, tc
+       STRING s
+       LET tc = TOKCOUNT()
+       WHILE (TOKCOUNT() > 0) PUSH GETTOKEN()  ; Push in order
+       FOR i = 1 TO tc
+           POP s  ; Pop in reverse
+           PRINTLN s
+       NEXT
+
+  **See Also**
+    * :PPL:`PUSH` – Push values to stack
+
+PRINT (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT PRINT(ANY exp [, ANY exp...])`
+
+  Print to screen without newline.
+
+  **Parameters**
+    * :PPL:`exp` – Expression(s) to print (at least one required)
+
+  **Remarks**
+    Evaluates and displays expressions without newline. Processes @ codes. At least one 
+    expression required.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       PRINT "The PPE file is "
+       PRINT PPENAME(),"."
+       PRINT "@X1FThis is bright white on blue..."
+
+  **See Also**
+    * :PPL:`PRINTLN` – Print with newline
+    * :PPL:`MPRINT` – Print to modem only
+    * :PPL:`SPRINT` – Print to local only
+
+PRINTLN (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT PRINTLN([ANY exp...])`
+
+  Print to screen with newline.
+
+  **Parameters**
+    * :PPL:`exp` – Expression(s) to print (optional)
+
+  **Remarks**
+    Evaluates and displays expressions with newline appended. Processes @ codes. Can be 
+    called without arguments for blank line.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       PRINTLN "The path is ",PPEPATH(),"."
+       PRINTLN
+       PRINTLN "@X0EHow do you like it @FIRST@?"
+
+  **See Also**
+    * :PPL:`PRINT` – Print without newline
+    * :PPL:`MPRINTLN` – Print to modem with newline
+    * :PPL:`SPRINTLN` – Print to local with newline
+
+PROMPTSTR (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT PROMPTSTR(INTEGER prompt, VAR var, INTEGER len, STRING valid, INTEGER flags)`
+
+  Prompt using PCBTEXT entry with validation.
+
+  **Parameters**
+    * :PPL:`prompt` – PCBTEXT prompt number
+    * :PPL:`var` – Variable for input
+    * :PPL:`len` – Maximum input length
+    * :PPL:`valid` – Valid characters
+    * :PPL:`flags` – Input behavior flags
+
+  **Remarks**
+    Uses PCBTEXT prompt with color. Validates input against character mask. Flag values: 
+    AUTO, DEFS, ECHODOTS, ERASELINE, FIELDLEN, GUIDE, HIGHASCII, LFAFTER, LFBEFORE, 
+    NEWLINE, NOCLEAR, STACKED, UPCASE, WORDWRAP, YESNO.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING s
+       PROMPTSTR 706,s,63,MASK_ASCII(),NEWLINE+FIELDLEN+GUIDE
+
+  **See Also**
+    * :PPL:`INPUT` – Basic input
+    * :PPL:`INPUTSTR` – Advanced input
+    * :PPL:`INPUTTEXT` – Text input
+
+PUSH (1.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT PUSH(ANY exp [, ANY exp...])`
+
+  Push values onto stack.
+
+  **Parameters**
+    * :PPL:`exp` – Expression(s) to push (at least one required)
+
+  **Remarks**
+    Evaluates expressions and pushes results onto stack for temporary storage. Retrieved 
+    with POP statement. Used for parameter passing, local variables, or reversing arguments.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER v
+       PRINT "A cube with dimensions 2x3x4"
+       PUSH 2,3,4  ; Pass parameters
+       GOSUB vol
+       POP v  ; Get result
+       PRINTLN " has volume ",v
+       END
+       
+       :vol
+       INTEGER w,h,d
+       POP d,h,w  ; Get parameters
+       PUSH w*h*d  ; Return result
+       RETURN
+
+  **See Also**
+    * :PPL:`POP` – Pop values from stack
+
+// ...existing code...
+
+PUTUSER (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT PUTUSER`
+
+  Copy values from predeclared user variables to user record.
+
+  **Remarks**
+    Saves changes made to U_XXX variables back to the user record. Variables must first be 
+    populated with GETUSER. Changes are not permanent until PUTUSER is called.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       IF (PSA(3)) THEN
+           GETUSER
+           INPUT "Addr 1",U_ADDR(0)
+           INPUT "Addr 2",U_ADDR(1)
+           INPUT "City  ",U_ADDR(2)
+           INPUT "State ",U_ADDR(3)
+           INPUT "ZIP   ",U_ADDR(4)
+           INPUT "Cntry ",U_ADDR(5)
+           PUTUSER
+       ENDIF
+
+  **See Also**
+    * :PPL:`GETUSER` – Load user record
+
+QUEST (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT QUEST(INTEGER scrnum)`
+
+  Allow the user to answer a script questionnaire.
+
+  **Parameters**
+    * :PPL:`scrnum` – Script number to run (1 to max available)
+
+  **Remarks**
+    Presents the specified script questionnaire from SCR.LST for the current conference. 
+    If script number is invalid, nothing is displayed.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER num
+       INPUT "Script to answer",num
+       QUEST num
+
+  **See Also**
+    * :PPL:`BLT` – Display bulletin
+    * :PPL:`DIR` – File directory
+    * :PPL:`JOIN` – Join conference
+
+RDUNET (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT RDUNET(INTEGER node)`
+
+  Read information from USERNET file for a specific node.
+
+  **Parameters**
+    * :PPL:`node` – Node number to read
+
+  **Remarks**
+    Reads USERNET.XXX file entry for specified node. Used for internode communications, 
+    preventing simultaneous logins, and by the BROADCAST command. After reading, use 
+    UN_XXX() functions to access the data.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       RDUNET PCBNODE()
+       WRUNET PCBNODE(),UN_STAT(),UN_NAME(),UN_CITY(),"Running "+PPENAME(),""
+       RDUNET 1
+       WRUNET 1,UN_STAT(),UN_NAME(),UN_CITY(),UN_OPER(),"Hello there node 1"
+
+  **See Also**
+    * :PPL:`BROADCAST` – Send message to nodes
+    * :PPL:`UN_...()` – USERNET field functions
+    * :PPL:`WRUNET` – Write USERNET record
+
+RDUSYS (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT RDUSYS`
+
+  Read a USERS.SYS file from disk.
+
+  **Remarks**
+    Reads USERS.SYS file back into memory after a DOOR application may have modified it. 
+    Should only be used after SHELL statement that was preceded by WRUSYS.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER ret
+       WRUSYS
+       SHELL FALSE,ret,"MYAPP.EXE",""
+       RDUSYS
+
+  **See Also**
+    * :PPL:`SHELL` – Execute external program
+    * :PPL:`WRUSYS` – Write USERS.SYS file
+
+RENAME (3.20)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT RENAME(STRING old, STRING new)`
+
+  Rename or move a file.
+
+  **Parameters**
+    * :PPL:`old` – Old path and/or filename
+    * :PPL:`new` – New path and/or filename
+
+  **Remarks**
+    Renames or moves a file on the same drive. Unlike DOS RENAME, doesn't accept wildcards. 
+    Can move files between directories on same drive but not between drives.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Swap PCBOARD.DAT & NXT files
+       RENAME "PCBOARD.DAT","PCBOARD.TMP"
+       RENAME "PCBOARD.NXT","PCBOARD.DAT"
+       RENAME "PCBOARD.TMP","PCBOARD.NXT"
+       
+       ; Move file to backup directory
+       RENAME "PPE.LOG","LOGBAK\"+I2S(DATE()*86400+TIME(),36)
+
+  **See Also**
+    * :PPL:`DELETE` – Delete file
+    * :PPL:`EXIST()` – Check file existence
+    * :PPL:`FILEINF()` – Get file information
+
+RESETDISP (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT RESETDISP`
+
+  Reset display to allow more information after an abort.
+
+  **Remarks**
+    Resets display after user aborts with MORE? prompt or ^K/^X. No further information 
+    displays until RESETDISP is called. Use ABORT() to check if reset is needed.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER i
+       STARTDISP FCL
+       ; While user has not aborted, continue
+       WHILE (!ABORT()) DO
+           PRINTLN "I is equal to ",i
+           INC i
+       ENDWHILE
+       RESETDISP
+
+  **See Also**
+    * :PPL:`ABORT()` – Check abort status
+    * :PPL:`STARTDISP` – Start display mode
+
+RESTSCRN (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT RESTSCRN`
+
+  Restore screen from previously saved buffer.
+
+  **Remarks**
+    Restores screen saved with SAVESCRN. Works regardless of ANSI availability. Screen 
+    is saved up to cursor position and restored using standard teletype scrolling. Memory 
+    allocated by SAVESCRN is freed.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       SAVESCRN
+       CLS
+       PRINTLN "We interrupt your regular BBS session"
+       PRINTLN "with this important message:"
+       NEWLINE
+       PRINTLN "A subscription to this system only costs $5!"
+       PRINTLN "Subscribe today!"
+       NEWLINES 2
+       WAIT
+       RESTSCRN
+
+  **See Also**
+    * :PPL:`SAVESCRN` – Save screen to buffer
+
+RETURN (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT RETURN`
+
+  Transfer control back to previously saved address.
+
+  **Remarks**
+    Returns execution to the line following the most recent GOSUB. Used at end of 
+    subroutines to resume main program flow.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING Question, Answer
+       LET Question = "What is your street address..."
+       GOSUB ask
+       LET Question = "What is your city, state and zip..."
+       GOSUB ask
+       END
+       
+       :ask  ; Subroutine
+       LET Answer = ""
+       PRINTLN "@X0E",Question
+       INPUT "",Answer
+       NEWLINES 2
+       FPUTLN 0,"Q: ",STRIPATX(Question)
+       FPUTLN 0,"A: ",Answer
+       RETURN
+
+  **See Also**
+    * :PPL:`END` – End program
+    * :PPL:`GOSUB` – Call subroutine
+    * :PPL:`GOTO` – Jump to label
+
+RMDIR (3.20)
+~~~~~~~~~~~~
+
+  :PPL:`STATEMENT RMDIR(STRING path)`
+
+  **Parameters**
+    * :PPL:`path` – Directory path to remove (must be empty)
+
+  **Returns**
+    None
+
+  **Description**
+    Removes an empty directory.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       RMDIR "\PPE\TEST"
+
+  **Notes**
+    Will not remove non-empty directories.
+
+  **See Also**
+    * :PPL:`MKDIR()`
+    * :PPL:`CWD()`
+
+SAVESCRN (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT SAVESCRN`
+
+  Save screen to buffer for later restoration.
+
+  **Remarks**
+    Saves current screen up to cursor position. Allocates memory for buffer. Must be 
+    followed by RESTSCRN to free memory. Works regardless of ANSI availability.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       SAVESCRN
+       CLS
+       PRINTLN "We interrupt your regular BBS session"
+       PRINTLN "with this important message:"
+       NEWLINE
+       PRINTLN "A subscription costs only $5!"
+       PRINTLN "Subscribe today!"
+       NEWLINES 2
+       WAIT
+       RESTSCRN
+
+  **See Also**
+    * :PPL:`RESTSCRN` – Restore screen
+
+SENDMODEM (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT SENDMODEM(STRING str)`
+
+  Send a string to the modem.
+
+  **Parameters**
+    * :PPL:`str` – String to send to modem
+
+  **Remarks**
+    Sends commands or data to modem. Primary use is sending commands when no one is 
+    online (e.g., callback PPL). Does not automatically append carriage return, allowing 
+    multi-stage command building.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       BOOLEAN flag
+       CDCHKOFF
+       KBDCHKOFF
+       DTROFF
+       DELAY 18
+       DTRON
+       SENDMODEM "ATDT"
+       SENDMODEM "5551212"
+       SENDMODEM CHR(13)
+       WAITFOR "CONNECT",flag,60
+       IF (!flag) LOG "No CONNECT after 60 seconds",FALSE
+       KBDCHKON
+       CDCHKON
+
+  **See Also**
+    * :PPL:`WAITFOR` – Wait for modem response
+
+SETBANKBAL (3.20)
+~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT SETBANKBAL(INTEGER userRec, MONEY amount)`
+
+  Adjusts stored “bank” balance (economy/game feature – semantics engine-defined).
+
+SHELL (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT SHELL(BOOLEAN viacc, VAR INTEGER retcode, STRING prog, STRING cmds)`
+
+  Execute an external program or batch file.
+
+  **Parameters**
+    * :PPL:`viacc` – TRUE to shell via COMMAND.COM, FALSE for direct execution
+    * :PPL:`retcode` – Variable to store return code
+    * :PPL:`prog` – Program filename to execute
+    * :PPL:`cmds` – Command line arguments
+
+  **Remarks**
+    Runs COM, EXE, or BAT files. If viacc is TRUE, PATH is searched and extensions are 
+    assumed. If FALSE, full path and extension required. Return code only meaningful 
+    when viacc is FALSE.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER rc
+       SHELL TRUE,rc,"DOOR",""
+       
+       ; Direct execution with full path
+       INTEGER rc
+       STRING p,c
+       LET p = "DOORWAY.EXE"
+       LET c = "com2 /v:d^O /m:600 /g:on /o: /k:v0 /x: /c:dos"
+       SHELL FALSE,rc,p,c
+
+  **See Also**
+    * :PPL:`CALL` – Execute another PPE
+    * :PPL:`RDUSYS` – Read USERS.SYS
+    * :PPL:`WRUSYS` – Write USERS.SYS
+
+SHORTDESC (3.20)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT SHORTDESC(STRING text)`
+
+  **Description**
+    Sets a short descriptive string for the PPE (shown in sysop listings / logs).
+
+SHOWOFF (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT SHOWOFF`
+
+  Turn off display output.
+
+  **Remarks**
+    Disables writing to local and remote displays. Used with OPENCAP/CLOSECAP to capture 
+    output without displaying it. Useful for automating features and allowing download of 
+    capture files.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       BOOLEAN ss, ocFlag
+       LET ss = SHOWSTAT()
+       SHOWOFF
+       OPENCAP "CAP"+STRING(PCBNODE()),ocFlag
+       IF (ocFlag) THEN
+           DIR "U;NS"
+           CLOSECAP
+           KBDSTUFF "FLAG CAP"+STRING(PCBNODE())+CHR(13)
+       ENDIF
+       IF (ss) THEN SHOWON ELSE SHOWOFF
+
+  **See Also**
+    * :PPL:`CLOSECAP` – Close capture file
+    * :PPL:`OPENCAP` – Open capture file
+    * :PPL:`SHOWON` – Turn on display
+    * :PPL:`SHOWSTAT()` – Get display status
+
+SHOWON (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT SHOWON`
+
+  Turn on display output.
+
+  **Remarks**
+    Re-enables writing to local and remote displays after SHOWOFF. Used with capture 
+    functions to control when output is visible.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       BOOLEAN ss, ocFlag
+       LET ss = SHOWSTAT()
+       SHOWOFF
+       OPENCAP "CAP"+STRING(PCBNODE()),ocFlag
+       IF (ocFlag) THEN
+           DIR "U;NS"
+           CLOSECAP
+           KBDSTUFF "FLAG CAP"+STRING(PCBNODE())+CHR(13)
+       ENDIF
+       IF (ss) THEN SHOWON ELSE SHOWOFF
+
+  **See Also**
+    * :PPL:`CLOSECAP` – Close capture file
+    * :PPL:`OPENCAP` – Open capture file
+    * :PPL:`SHOWOFF` – Turn off display
+    * :PPL:`SHOWSTAT()` – Get display status
+
+SOUND (1.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT SOUND(INTEGER freq)`
+
+  Turn on speaker at specified frequency.
+
+  **Parameters**
+    * :PPL:`freq` – Frequency in hertz (0 to turn off)
+
+  **Remarks**
+    Generates tones on local PC speaker only. No effect on remote computer. Works only with 
+    built-in speaker, not sound cards. Pass frequency in hertz to generate tone, or 0 to turn off.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       PAGEON
+       FOR i = 1 TO 10
+           MPRINT CHR(7)
+           SOUND 440  ; A note
+           DELAY 9
+           SOUND 0    ; Turn off
+           DELAY 9
+           IF (INKEY() = " ") THEN
+               CHAT
+               GOTO exit
+           ENDIF
+       NEXT
+       :exit
+
+  **See Also**
+    * :PPL:`DELAY` – Pause execution
+    * :PPL:`SOUNDDELAY` – Sound with duration
 
 SOUNDDELAY (3.20)
 ~~~~~~~~~~~~~~~~~
-
   :PPL:`STATEMENT SOUNDDELAY(INTEGER frequency, INTEGER duration)`
 
   **Parameters**
@@ -193,9 +3172,158 @@ SOUNDDELAY (3.20)
   **Notes**
     May be a no-op on non-emulated systems. Consider providing a visual fallback.
 
-  **See Also**
-    (None)
+SPRINT (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT SPRINT(ANY exp [, ANY exp...])`
 
+  Print to local screen only without newline.
+
+  **Parameters**
+    * :PPL:`exp` – Expression(s) to print (at least one required)
+
+  **Remarks**
+    Sends output only to local BBS display for SysOp viewing. Does not interpret @ codes 
+    but complete ANSI sequences are interpreted. At least one expression required.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       SPRINT "The PPE file is "
+       SPRINT PPENAME(),"."
+
+  **See Also**
+    * :PPL:`SPRINTLN` – Print local with newline
+    * :PPL:`PRINT` – Print to both screens
+    * :PPL:`MPRINT` – Print to modem only
+
+SPRINTLN (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT SPRINTLN([ANY exp...])`
+
+  Print to local screen only with newline.
+
+  **Parameters**
+    * :PPL:`exp` – Expression(s) to print (optional)
+
+  **Remarks**
+    Sends output only to local BBS display with newline appended. Does not interpret @ codes 
+    but complete ANSI sequences are interpreted. Can be called without arguments for blank line.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       SPRINTLN "The path is ",PPEPATH(),"."
+       SPRINTLN "The date is ",DATE()," and time is ",TIME(),"."
+       SPRINTLN
+
+  **See Also**
+    * :PPL:`SPRINT` – Print local without newline
+    * :PPL:`PRINTLN` – Print to both with newline
+    * :PPL:`MPRINTLN` – Print to modem with newline
+
+STARTDISP (1.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT STARTDISP(INTEGER mode)`
+
+  Start display routines in specified mode.
+
+  **Parameters**
+    * :PPL:`mode` – Display mode (FNS=force non-stop, FCL=force count lines, NC=no change)
+
+  **Remarks**
+    Controls PCBoard's display mode. FNS displays without pausing. FCL counts lines and 
+    pauses every screenful. NC reinitializes counters without changing mode.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STARTDISP FCL
+       FOR i = 1 TO 100
+           PRINTLN "Line ",i
+       NEXT
+       
+       STARTDISP FNS
+       FOR i = 1 TO 100
+           PRINTLN "Line ",i
+       NEXT
+       
+       STARTDISP NC
+       FOR i = 1 TO 100
+           PRINTLN "Line ",i
+       NEXT
+
+  **See Also**
+    * :PPL:`ABORT()` – Check abort status
+    * :PPL:`RESETDISP` – Reset after abort
+
+STOP (1.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT STOP`
+
+  Abort PPE execution without saving script output.
+
+  **Remarks**
+    Abnormally terminates PPE execution. Unlike END, does not save channel 0 output to 
+    script answer file. Use when you need to abort without saving partial results.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING Question, Answer
+       LET Question = "What is your street address..."
+       GOSUB ask
+       INPUTYN "Save address",Answer,@X0E
+       IF (Answer = NOCHAR()) STOP
+       END
+       
+       :ask
+       LET Answer = ""
+       PRINTLN "@X0E",Question
+       INPUT "",Answer
+       NEWLINES 2
+       FPUTLN 0,"Q: ",STRIPATX(Question)
+       FPUTLN 0,"A: ",Answer
+       RETURN
+
+  **See Also**
+    * :PPL:`END` – Normal termination
+    * :PPL:`RETURN` – Return from subroutine
+
+TOKENIZE (1.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT TOKENIZE(STRING sexp)`
+
+  Split string into tokens separated by semicolons or spaces.
+
+  **Parameters**
+    * :PPL:`sexp` – String expression to tokenize
+
+  **Remarks**
+    Breaks command line into individual tokens like PCBoard's command stacking. Tokens 
+    are accessed with TOKCOUNT() for count and GETTOKEN statement or function to retrieve. 
+    Allows processing of multiple stacked commands.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING cmdline
+       INPUT "Command",cmdline
+       TOKENIZE cmdline
+       PRINTLN "You entered ",TOKCOUNT()," tokens"
+       WHILE (TOKCOUNT() > 0) 
+           PRINTLN "Token: ",CHR(34),GETTOKEN(),CHR(34)
+       ENDWHILE
+
+  **See Also**
+    * :PPL:`GETTOKEN` – Retrieve next token
+    * :PPL:`GETTOKEN()` – Function version
+    * :PPL:`TOKCOUNT()` – Count remaining tokens
+    * :PPL:`TOKENSTR()` – Rebuild token string
 
 USELMRS (3.20)
 ~~~~~~~~~~~~~~
@@ -230,637 +3358,246 @@ USELMRS (3.20)
     * :PPL:`GETALTUSER`
 
 
-ADDUSER (3.20)
+VARADDR (1.00)
 ~~~~~~~~~~~~~~
+  :PPL:`STATEMENT VARADDR(VAR src, VAR INTEGER dest)`
 
-  :PPL:`STATEMENT ADDUSER(STRING username, BOOLEAN keepAltVars)`
+  Get the complete memory address of a variable.
 
   **Parameters**
-    * :PPL:`username`     – Name of the new user
-    * :PPL:`keepAltVars`  – TRUE leaves new user vars active (as if GETALTUSER on the new record); FALSE restores current user
+    * :PPL:`src` – Variable to get the address of
+    * :PPL:`dest` – Variable to store the address
 
-  **Returns**
-    None
-
-  **Description**
-    Creates a new user record with system defaults for all fields except the supplied name.
+  **Remarks**
+    Primarily useful with DOINTR statement for passing memory addresses to interrupts. 
+    Gets the complete segment:offset address as a single value.
 
   **Example**
 
     .. code-block:: PPL
 
-       ADDUSER "New Caller", TRUE
-       PRINTLN "Created & switched context to: New Caller"
-
-  **Notes**
-    Validate for duplicates before creation if possible.
-
-  **See Also**
-    * :PPL:`GETALTUSER`
-    * :PPL:`PUTALTUSER`
-
-
-MKDIR (3.20)
-~~~~~~~~~~~~
-
-  :PPL:`STATEMENT MKDIR(STRING path)`
-
-  **Parameters**
-    * :PPL:`path` – Directory path to create
-
-  **Returns**
-    None
-
-  **Description**
-    Creates a directory (legacy DOS semantics). Intermediate path components are not automatically created.
-
-  **Example**
-
-    .. code-block:: PPL
-
-       MKDIR "\PPE\TEST"
-
-  **Notes**
-    May fail silently if already exists or permissions deny.
+       ; Create subdirectory - DOS function 39h
+       INTEGER addr
+       STRING path
+       LET path = "C:\$TMPDIR$"
+       VARADDR path,addr
+       DOINTR 0x21,0x39,0,0,addr*0x10000,0,0,0,addr/0x10000,0
+       IF (REGCF() & (REGAX() = 3)) THEN
+           PRINTLN "Error: Path not found"
+       ELSEIF (REGCF() & (REGAX() = 5)) THEN
+           PRINTLN "Error: Access Denied"
+       ELSEIF (REGCF()) THEN
+           PRINTLN "Error: Unknown Error"
+       ELSE
+           PRINTLN "Directory successfully created..."
+       ENDIF
 
   **See Also**
-    * :PPL:`RMDIR()`
-    * :PPL:`CWD()`
-
-
-RMDIR (3.20)
-~~~~~~~~~~~~
-
-  :PPL:`STATEMENT RMDIR(STRING path)`
-
-  **Parameters**
-    * :PPL:`path` – Directory path to remove (must be empty)
-
-  **Returns**
-    None
-
-  **Description**
-    Removes an empty directory.
-
-  **Example**
-
-    .. code-block:: PPL
-
-       RMDIR "\PPE\TEST"
-
-  **Notes**
-    Will not remove non-empty directories.
-
-  **See Also**
-    * :PPL:`MKDIR()`
-    * :PPL:`CWD()`
-
-
-
-ADJTUBYTES (3.20)
-~~~~~~~~~~~~~~~~~
-
-  :PPL:`STATEMENT ADJTUBYTES(INTEGER deltaBytes)`
-
-  **Parameters**
-    * :PPL:`deltaBytes` – Positive or negative number of bytes to adjust the user's upload total
-
-  **Returns**
-    None
-
-  **Description**
-    Adjusts the tracked total upload bytes for the (current or alternate) user.
-
-  **Example**
-
-    .. code-block:: PPL
-
-       GETALTUSER 10
-       ADJTUBYTES -2000
-       PUTALTUSER
-
-  **Notes**
-    Pair with :PPL:`GETALTUSER` / :PPL:`PUTALTUSER` to persist for alternate users.
-
-  **See Also**
-    (future accounting helpers)
-
-
-GRAFMODE (3.20)
-~~~~~~~~~~~~~~~
-
-  :PPL:`STATEMENT GRAFMODE(INTEGER mode)`
-
-  **Parameters**
-    * :PPL:`mode` – Display mode selector:
-      * 1 = Color ANSI (if user supports)
-      * 2 = Force color ANSI
-      * 3 = ANSI black & white
-      * 4 = Non-ANSI (plain)
-      * 5 = RIP (if supported)
-
-  **Returns**
-    None
-
-  **Description**
-    Switches the caller’s graphics/terminal capability mode.
-
-  **Example**
-
-    .. code-block:: PPL
-
-       PRINTLN "Switching to color ANSI…"
-       GRAFMODE 1
-
-  **Notes**
-    Forcing modes unsupported by user terminal may cause display corruption.
-
-  **See Also**
-    Terminal / capability query functions (future)
-
-
-FDOQADD (3.20)
-~~~~~~~~~~~~~~
-
-  :PPL:`STATEMENT FDOQADD(STRING addr, STRING file, INTEGER flags)`
-
-  **Parameters**
-    * :PPL:`addr`  – FidoNet destination address
-    * :PPL:`file`  – Packet / file to queue
-    * :PPL:`flags` – Delivery mode: 1=NORMAL, 2=CRASH, 3=HOLD
-
-  **Returns**
-    None
-
-  **Description**
-    Adds a record to the Fido queue for later processing.
-
-  **Example**
-
-    .. code-block:: PPL
-
-       FDOQADD "1/311/40","C:\PKTS\094FC869.PKT",2
-
-  **Notes**
-    Paths should be validated; behavior undefined if file not present.
-
-  **See Also**
-    * :PPL:`FDOQMOD()`
-    * :PPL:`FDOQDEL()`
-
-
-FDOQMOD (3.20)
-~~~~~~~~~~~~~~
-
-  :PPL:`STATEMENT FDOQMOD(INTEGER recnum, STRING addr, STRING file, INTEGER flags)`
-
-  **Parameters**
-    * :PPL:`recnum` – Existing queue record number to modify
-    * :PPL:`addr`   – Updated FidoNet address
-    * :PPL:`file`   – Updated file path
-    * :PPL:`flags`  – 1=NORMAL, 2=CRASH, 3=HOLD
-
-  **Returns**
-    None
-
-  **Description**
-    Modifies an existing Fido queue entry.
-
-  **Example**
-
-    .. code-block:: PPL
-
-       FDOQMOD 6,"1/311/40","C:\PKTS\UPDATED.PKT",1
-
-  **Notes**
-    Duplicate legacy doc blocks collapsed into one canonical entry.
-
-  **See Also**
-    * :PPL:`FDOQADD()`
-    * :PPL:`FDOQDEL()`
-
-
-FDOQDEL (3.20)
-~~~~~~~~~~~~~~
-
-  :PPL:`STATEMENT FDOQDEL(INTEGER recnum)`
-
-  **Parameters**
-    * :PPL:`recnum` – Queue record to delete
-
-  **Returns**
-    None
-
-  **Description**
-    Deletes a Fido queue record.
-
-  **Example**
-
-    .. code-block:: PPL
-
-       FDOQDEL 6
-
-  **Notes**
-    Deleting a non-existent record has no effect (legacy behavior).
-
-  **See Also**
-    * :PPL:`FDOQADD()`
-    * :PPL:`FDOQMOD()`
-
-
-CONFINFO (Modify) (3.20)
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-  :PPL:`STATEMENT CONFINFO(INTEGER confnum, INTEGER field, VAR newValue)`
-
-  **Parameters**
-    * :PPL:`confnum`  – Conference number
-    * :PPL:`field`    – Field selector (1–54)
-    * :PPL:`newValue` – Value to assign (type must match field definition)
-
-  **Returns**
-    None
-
-  **Description**
-    Writes a single conference configuration field. Field meanings mirror the FUNCTION
-    form (see earlier table for 1–54). Only appropriate types are accepted.
-
-    Security / Privacy:
-      Field 40 (Join Password) SHOULD be handled carefully. Avoid logging or echoing this value.
-
-  **Example**
-
-    .. code-block:: PPL
-
-       CONFINFO 200,1,"Stan's New Conference Name"
-
-  **Notes**
-    Writing invalid types may produce runtime errors or be ignored depending on implementation.
-
-  **See Also**
-    * :PPL:`CONFINFO()` (read / variant form)
-
-
-PROMPTSTR (1.00)
-~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT PROMPTSTR(<VAR> target, INTEGER flags)`
-
-  **Description**
-    Like INPUTSTR but prints a system prompt first (legacy UI consistency).
-
-TOKENIZE (1.00)
-~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT TOKENIZE(STRING line)`
-
-  **Parameters**
-    * :PPL:`line` – Source to break into tokens for later :PPL:`GETTOKEN()` / :PPL:`TOKCOUNT()`
-
-  **Description**
-    Loads the internal token buffer with split tokens (whitespace / delimiter rules legacy-defined).
-
-GETTOKEN (1.00)
-~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT GETTOKEN(<VAR> target)`
-
-  **Description**
-    Pops next token (or empty if none) into :PPL:`target`.
-
-SHELL (1.00)
-~~~~~~~~~~~~
-  :PPL:`STATEMENT SHELL(STRING command)`
-
-  **Description**
-    Executes a system shell / external program (availability/security can be restricted).
-
-BYE / GOODBYE (1.00)
-~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT BYE`
-  :PPL:`STATEMENT GOODBYE`
-
-  **Description**
-    Terminates user session gracefully (GOODBYE synonym). May trigger logoff scripts, accounting flush.
-
-HANGUP (1.00)
+    * :PPL:`DOINTR` – Generate interrupt
+    * :PPL:`VAROFF` – Get offset address
+    * :PPL:`VARSEG` – Get segment address
+    * :PPL:`MKADDR()` – Make address from segment:offset
+
+VAROFF (1.00)
 ~~~~~~~~~~~~~
-  :PPL:`STATEMENT HANGUP`
+  :PPL:`STATEMENT VAROFF(VAR src, VAR INTEGER dest)`
 
-  **Description**
-    Immediate disconnect / carrier drop (hard termination). Prefer BYE for clean logout.
-
-LOG (1.00)
-~~~~~~~~~~
-  :PPL:`STATEMENT LOG(STRING line)`
-
-  **Description**
-    Appends :PPL:`line` to the system activity / event log.
-
-DELAY (1.00)
-~~~~~~~~~~~~
-  :PPL:`STATEMENT DELAY(INTEGER ticks)`
+  Get the offset address of a variable.
 
   **Parameters**
-    * :PPL:`ticks` – ~18 per second
+    * :PPL:`src` – Variable to get the offset of
+    * :PPL:`dest` – Variable to store the offset
 
-  **Description**
-    Sleeps (non-busy) for specified ticks unless carrier loss or abort condition.
+  **Remarks**
+    Gets the offset portion of a variable's memory address. Used with VARSEG for 
+    interrupt programming when separate segment and offset values are needed.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Create subdirectory - DOS function 39h
+       INTEGER saddr, oaddr
+       STRING path
+       LET path = "C:\$TMPDIR$"
+       VARSEG path,saddr
+       VAROFF path,oaddr
+       DOINTR 0x21,0x39,0,0,oaddr,0,0,0,saddr,0
+       IF (REGCF() & (REGAX() = 3)) THEN
+           PRINTLN "Error: Path not found"
+       ELSEIF (REGCF() & (REGAX() = 5)) THEN
+           PRINTLN "Error: Access Denied"
+       ELSEIF (REGCF()) THEN
+           PRINTLN "Error: Unknown Error"
+       ELSE
+           PRINTLN "Directory successfully created..."
+       ENDIF
+
+  **See Also**
+    * :PPL:`DOINTR` – Generate interrupt
+    * :PPL:`VARADDR` – Get complete address
+    * :PPL:`VARSEG` – Get segment address
+
+VARSEG (1.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT VARSEG(VAR src, VAR INTEGER dest)`
+
+  Get the segment address of a variable.
+
+  **Parameters**
+    * :PPL:`src` – Variable to get the segment of
+    * :PPL:`dest` – Variable to store the segment
+
+  **Remarks**
+    Gets the segment portion of a variable's memory address. Used with VAROFF for 
+    interrupt programming when separate segment and offset values are needed.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Create subdirectory - DOS function 39h
+       INTEGER saddr, oaddr
+       STRING path
+       LET path = "C:\$TMPDIR$"
+       VARSEG path,saddr
+       VAROFF path,oaddr
+       DOINTR 0x21,0x39,0,0,oaddr,0,0,0,saddr,0
+       IF (REGCF() & (REGAX() = 3)) THEN
+           PRINTLN "Error: Path not found"
+       ELSEIF (REGCF() & (REGAX() = 5)) THEN
+           PRINTLN "Error: Access Denied"
+       ELSEIF (REGCF()) THEN
+           PRINTLN "Error: Unknown Error"
+       ELSE
+           PRINTLN "Directory successfully created..."
+       ENDIF
+
+  **See Also**
+    * :PPL:`DOINTR` – Generate interrupt
+    * :PPL:`VARADDR` – Get complete address
+    * :PPL:`VAROFF` – Get offset address
 
 WAIT (1.00)
 ~~~~~~~~~~~
-  :PPL:`STATEMENT WAIT(INTEGER ticks)`
+  :PPL:`STATEMENT WAIT`
 
-  **Description**
-    Similar to DELAY but may flush output first or enforce a minimum pacing (legacy pacing semantics).
+  Wait for user to press ENTER.
 
-BEEP (1.00)
-~~~~~~~~~~~
-  :PPL:`STATEMENT BEEP`
-
-  **Description**
-    Emits an audible terminal bell (Ctrl-G) if user’s terminal supports it.
-
-KBDSTUFF (1.00)
-~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT KBDSTUFF(STRING text)`
-
-  **Description**
-    Queues keystrokes into the input buffer as if typed by the caller.
-
-KBDFLUSH / KBDCHKON / KBDCHKOFF (1.00)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT KBDFLUSH`
-  :PPL:`STATEMENT KBDCHKON`
-  :PPL:`STATEMENT KBDCHKOFF`
-
-  **Description**
-    Manage keyboard buffering and carrier/abort key checks.
-
-SENDMODEM (1.00)
-~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT SENDMODEM(STRING raw)`
-
-  **Description**
-    Sends raw bytes (unfiltered) to remote terminal/modem (legacy; may be sanitized in modern environments).
-
-PAGEON / PAGEOFF (1.00)
-~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT PAGEON`
-  :PPL:`STATEMENT PAGEOFF`
-
-  **Description**
-    Enable/disable user “page” requests (sysop chat paging).
-
-CHAT (1.00)
-~~~~~~~~~~~
-  :PPL:`STATEMENT CHAT`
-
-  **Description**
-    Enters sysop chat mode if available (toggles live keyboard sharing).
-
-FLAG (1.00)
-~~~~~~~~~~~
-  :PPL:`STATEMENT FLAG(INTEGER flagId)`
-
-  **Description**
-    Sets a transient per-session flag bit (implementation-defined). Often used with prompt display logic.
-
-ALIAS (1.00)
-~~~~~~~~~~~~
-  :PPL:`STATEMENT ALIAS(STRING newName)`
-
-  **Description**
-    Temporarily changes display name (legacy; may not persist).
-
-GETUSER / PUTUSER (1.00)
-~~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT GETUSER(INTEGER record)`
-  :PPL:`STATEMENT PUTUSER`
-
-  **Parameters (GETUSER)**
-    * :PPL:`record` – User record number
-
-  **Description**
-    Loads user record into current context / writes modified current user back to storage.
-
-GETALTUSER / FREALTUSER / PUTALTUSER (1.00 / 3.20+ semantics)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT GETALTUSER(INTEGER record)`
-  :PPL:`STATEMENT FREALTUSER`
-  (Persist changes with :PPL:`PUTALTUSER` (if provided) or :PPL:`PUTUSER` after adjusting context.)
-
-  **Description**
-    Loads an alternate user profile (for inspection/modification) while preserving original active user data.
-
-ADJTIME (1.00)
-~~~~~~~~~~~~~~
-  :PPL:`STATEMENT ADJTIME(INTEGER deltaMinutes)`
-
-  **Description**
-    Adjusts remaining time this call by :PPL:`deltaMinutes` (negative to subtract).
-
-ADJBYTES / ADJTBYTES / ADJDBYTES / ADJTFILES (1.00+)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT ADJBYTES(INTEGER delta)`
-  :PPL:`STATEMENT ADJTBYTES(INTEGER delta)` (uploads)
-  :PPL:`STATEMENT ADJDBYTES(INTEGER delta)` (downloads)
-  :PPL:`STATEMENT ADJTFILES(INTEGER delta)` (upload file count)
-
-  **Description**
-    Adjust quota/accounting counters. Prefer the more explicit *T*/*D* forms when available.  
-    (You already documented :PPL:`ADJTUBYTES`—the upload bytes variant in expanded semantics.)
-
-DELETE / RENAME (1.00)
-~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT DELETE(STRING file)`
-  :PPL:`STATEMENT RENAME(STRING old, STRING new)`
-
-  **Description**
-    Remove or rename a filesystem entry (basic DOS semantics; silent failure if missing or permission denied).
-
-FCREATE / FOPEN / FAPPEND (1.00)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT FCREATE(INTEGER ch, STRING file, INTEGER access, INTEGER share)`
-  :PPL:`STATEMENT FOPEN(INTEGER ch, STRING file, INTEGER access, INTEGER share)`
-  :PPL:`STATEMENT FAPPEND(INTEGER ch, STRING file, INTEGER access, INTEGER share)`
-
-  **Parameters**
-    * :PPL:`ch` – Channel number (1–8)
-    * :PPL:`file` – Path
-    * :PPL:`access` – One of :PPL:`O_RD`, :PPL:`O_WR`, :PPL:`O_RW`
-    * :PPL:`share` – One of :PPL:`S_DN`, :PPL:`S_DR`, :PPL:`S_DW`, :PPL:`S_DB`
-
-  **Description**
-    Opens a file for subsequent buffered I/O. Create always truncates/creates; Append opens write and seeks end.
+  **Remarks**
+    Pauses execution and waits for user to press ENTER. Displays prompt 418 from 
+    PCBTEXT file in current language to indicate what's expected.
 
   **Example**
+
     .. code-block:: PPL
 
-       FCREATE 1,"log.txt",O_WR,S_DN
-       FPUTLN 1,"Session start"
-       FCLOSE 1
+       PRINTLN "Your account has expired!"
+       PRINTLN "You are about to be logged off"
+       WAIT
 
-FPUT / FPUTLN / FPUTPAD (1.00)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT FPUT(INTEGER ch, STRING data)`
-  :PPL:`STATEMENT FPUTLN(INTEGER ch, STRING data)`
-  :PPL:`STATEMENT FPUTPAD(INTEGER ch, STRING data, INTEGER width)`
+  **See Also**
+    * :PPL:`DISPTEXT` – Display PCBTEXT prompt
+    * :PPL:`INKEY()` – Get single keypress
+    * :PPL:`MORE` – Pause with options
+    * :PPL:`PROMPTSTR` – Prompt for input
 
-  **Description**
-    Write text (optionally newline or right-pad to width).
+WAITFOR (1.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT WAITFOR(STRING str, VAR BOOLEAN flag, INTEGER sec)`
 
-FGET (1.00)
-~~~~~~~~~~~
-  :PPL:`STATEMENT FGET(INTEGER ch, <VAR> target, INTEGER length)`
-
-  **Description**
-    Reads up to :PPL:`length` bytes (or line depending on legacy mode) into :PPL:`target`.
-
-FSEEK (1.00)
-~~~~~~~~~~~~
-  :PPL:`STATEMENT FSEEK(INTEGER ch, INTEGER offset, INTEGER whence)`
+  Wait for specific text from modem.
 
   **Parameters**
-    * :PPL:`whence` – :PPL:`SEEK_SET`, :PPL:`SEEK_CUR`, :PPL:`SEEK_END`
+    * :PPL:`str` – Text to wait for (case-insensitive)
+    * :PPL:`flag` – Returns TRUE if found, FALSE if timeout
+    * :PPL:`sec` – Maximum seconds to wait
 
-FFLUSH (1.00)
+  **Remarks**
+    Waits for specific text from modem (e.g., modem responses, terminal replies). 
+    Returns FALSE immediately if local caller. Case-insensitive matching: "connect" 
+    matches "CONNECT". Sets flag to FALSE if timeout or no remote caller.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       BOOLEAN flag
+       KBDCHKOFF
+       CDCHKOFF
+       DTROFF
+       DELAY 18
+       DTRON
+       SENDMODEM "ATDT5551212"
+       SENDMODEM CHR(13)
+       WAITFOR "CONNECT",flag,60
+       IF (!flag) SPRINTLN "No connect found in 60 seconds"
+       CDCHKON
+       KBDCHKON
+
+  **See Also**
+    * :PPL:`DELAY` – Pause execution
+    * :PPL:`MGETBYTE()` – Get byte from modem
+    * :PPL:`SENDMODEM` – Send to modem
+
+WRUNET (1.00)
 ~~~~~~~~~~~~~
-  :PPL:`STATEMENT FFLUSH(INTEGER ch)`
+  :PPL:`STATEMENT WRUNET(INTEGER node, STRING stat, STRING name, STRING city, STRING oper, STRING br)`
 
-  **Description**
-    Forces buffered channel output to disk.
+  Write information to USERNET file for a node.
 
-FCLOSE / FCLOSEALL (1.00)
-~~~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT FCLOSE(INTEGER ch)`
-  :PPL:`STATEMENT FCLOSEALL`
+  **Parameters**
+    * :PPL:`node` – Node number to update
+    * :PPL:`stat` – Node status
+    * :PPL:`name` – User name on node
+    * :PPL:`city` – User city
+    * :PPL:`oper` – Operation text
+    * :PPL:`br` – Broadcast message text
 
-  **Description**
-    Close one or all open channels (releases locks).
+  **Remarks**
+    Updates USERNET.XXX file entry for specified node. Used for internode communication, 
+    updating operation text during PPE execution, or broadcasting messages to other nodes.
 
-FREAD / FWRITE (1.00)
-~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT FREAD(INTEGER ch, <VAR> bigstrTarget, INTEGER bytes)`
-  :PPL:`STATEMENT FWRITE(INTEGER ch, BIGSTR buffer, INTEGER bytes)`
+  **Example**
 
-  **Description**
-    Raw byte read/write (binary).
+    .. code-block:: PPL
 
-FREWIND (1.00)
-~~~~~~~~~~~~~~
-  :PPL:`STATEMENT FREWIND(INTEGER ch)`
+       RDUNET PCBNODE()
+       WRUNET PCBNODE(),UN_STAT(),UN_NAME(),UN_CITY(),"Running "+PPENAME(),""
+       
+       ; Send message to node 1
+       RDUNET 1
+       WRUNET 1,UN_STAT(),UN_NAME(),UN_CITY(),UN_OPER(),"Hello there node 1"
 
-  **Description**
-    Equivalent to :PPL:`FSEEK ch,0,SEEK_SET`.
+  **See Also**
+    * :PPL:`BROADCAST` – Broadcast to nodes
+    * :PPL:`RDUNET` – Read USERNET record
+    * :PPL:`UN_...()` – USERNET field functions
 
-DISPFILE / DISPTEXT / DISPSTR (1.00)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT DISPFILE(STRING file, INTEGER flags)`
-  :PPL:`STATEMENT DISPTEXT(STRING text, INTEGER flags)`
-  :PPL:`STATEMENT DISPSTR(STRING text)`
-
-  **Description**
-    Display PCBoard @-code aware content (file or inline). Flags may control paging, security, or language substitution.
-
-RESETDISP / STARTDISP (1.00)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT RESETDISP`
-  :PPL:`STATEMENT STARTDISP(INTEGER flags)`
-
-  **Description**
-    Manage internal buffered display/paging state.
-
-JOIN (1.00)
-~~~~~~~~~~~
-  :PPL:`STATEMENT JOIN(INTEGER confnum)`
-
-  **Description**
-    Switches current conference (permission verified).
-
-CONFFLAG / CONFUNFLAG (1.00)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT CONFFLAG(INTEGER confnum, INTEGER flagMask)`
-  :PPL:`STATEMENT CONFUNFLAG(INTEGER confnum, INTEGER flagMask)`
-
-  **Description**
-    Set / clear specific conference attribute bits (F_MW, F_SYS, etc.).
-
-BITSET / BITCLEAR (1.00)
-~~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT BITSET(<VAR> var, INTEGER bit)`
-  :PPL:`STATEMENT BITCLEAR(<VAR> var, INTEGER bit)`
-
-  **Description**
-    Sets or clears (0-based) bit in integer variable.
-
-INC / DEC (1.00)
-~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT INC(<VAR> var)`
-  :PPL:`STATEMENT DEC(<VAR> var)`
-
-  **Description**
-    var = var ± 1 (legacy bytecode convenience).
-
-ALIAS (already documented above, retained for clarity)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-SAVESCRN / RESTSCRN (1.00)
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT SAVESCRN`
-  :PPL:`STATEMENT RESTSCRN`
-
-  **Description**
-    Save/restore current screen buffer (local + remote if supported).
-
-ANSIPOS (1.00)
-~~~~~~~~~~~~~~
-  :PPL:`STATEMENT ANSIPOS(INTEGER col, INTEGER row)`
-
-  **Description**
-    Directly positions cursor (1-based coordinates).
-
-KBDSTRING (1.00)
-~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT KBDSTRING(STRING str)`
-
-  **Description**
-    Inject entire string into keyboard buffer (contrast :PPL:`KBDSTUFF` which may differ historically).
-
-SETENV (1.00)
+WRUSYS (1.00)
 ~~~~~~~~~~~~~
-  :PPL:`STATEMENT SETENV(STRING name, STRING value)`
+  :PPL:`STATEMENT WRUSYS`
 
-  **Description**
-    Sets (or overrides) an environment variable for subsequent processes / shell calls.
+  Write USERS.SYS file to disk.
 
-CHDIR (3.20)
-~~~~~~~~~~~~
-  :PPL:`STATEMENT CHDIR(STRING path)`
+  **Remarks**
+    Creates USERS.SYS file for DOOR applications. Use before SHELL statement to run 
+    doors. If door modifies USERS.SYS, use RDUSYS after SHELL to read changes. 
+    Cannot create TPA record with this statement.
 
-  **Description**
-    Changes the current working directory.
+  **Example**
 
-RENAME (already included above)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    .. code-block:: PPL
 
-SHORTDESC (3.20)
-~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT SHORTDESC(STRING text)`
+       INTEGER ret
+       WRUSYS
+       SHELL FALSE,ret,"MYAPP.EXE",""
+       RDUSYS
 
-  **Description**
-    Sets a short descriptive string for the PPE (shown in sysop listings / logs).
+  **See Also**
+    * :PPL:`RDUSYS` – Read USERS.SYS
+    * :PPL:`SHELL` – Execute external program
 
-MOVEmsg (3.20)
-~~~~~~~~~~~~~~
-  :PPL:`STATEMENT MOVEMSG(INTEGER fromConf, INTEGER msgNum, INTEGER toConf)`
-
-  **Description**
-    Moves a message between conferences (permissions & existence required).
-
-SETBANKBAL (3.20)
-~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT SETBANKBAL(INTEGER userRec, MONEY amount)`
-
-  **Description**
-    Adjusts stored “bank” balance (economy/game feature – semantics engine-defined).
 
 WEBREQUEST (400 tentative)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1301,7 +1301,7 @@ LEFT (1.00)
 
   **Returns**
     Leftmost characters. If count > length, result is padded with spaces. 
-    If count ≤ 0, returns empty string.
+    If count <= 0, returns empty string.
 
   **Remarks**
     Extracts substring from the beginning. Useful for fixed-width field processing 
@@ -1369,6 +1369,7 @@ LOGGEDON (1.00)
     * :PPL:`CALLNUM()` – Get caller number
     * :PPL:`ONLOCAL()` – Check if local session
     * :PPL:`U_LOGONS()` – Get logon count
+
 LOWER (1.00)
 ~~~~~~~~~~~~
   :PPL:`FUNCTION BIGSTR LOWER(BIGSTR str)`
@@ -1427,9 +1428,9 @@ LTRIM (1.00)
     * :PPL:`RTRIM()` – Trim from right
     * :PPL:`TRIM()` – Trim from both ends
 
-MASK_... (1.00)
+MASK_XXX (1.00)
 ~~~~~~~~~~~~~~~
-  :PPL:`FUNCTION STRING MASK_...()`
+  :PPL:`FUNCTION STRING MASK_XXX()`
 
   Return a string for use as a valid character mask.
 
@@ -1531,7 +1532,7 @@ MID (1.00)
 
   **Returns**
     Substring from position. Pads with spaces if pos/count exceed bounds.
-    Empty if count ≤ 0.
+    Empty if count <= 0.
 
   **Remarks**
     Extracts characters from any position. Position < 1 or > length adds padding spaces.
@@ -2289,7 +2290,7 @@ RIGHT (1.00)
     * :PPL:`chars` – Number of characters to extract from the right end
 
   **Returns**
-    String with the rightmost chars characters of str. If chars ≤ 0, returns 
+    String with the rightmost chars characters of str. If chars <= 0, returns 
     empty string. If chars exceeds string length, spaces are added to pad the result.
 
   **Remarks**
@@ -2865,8 +2866,8 @@ TOBIGSTR (2.00)
     :PPL:`value` coerced to BIGSTR.
 
 
-UN_...() Functions (1.00)
--------------------------
+UN_XXX() Functions (1.00)
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Returns information about a node from the USERNET file.
 
@@ -2990,7 +2991,7 @@ U_BDL (1.00)
 
   **Remarks**
     Returns information useful for modifying BBS's built-in ratio management system 
-    and the view user information command. Unlike the predefined U_... user variables, 
+    and the view user information command. Unlike the predefined U_XXX user variables, 
     this function does not require GETUSER to return valid information.
 
   **Example**
@@ -3016,7 +3017,7 @@ U_BDLDAY (1.00)
 
   **Remarks**
     Returns information useful for modifying BBS's built-in ratio management system 
-    and the view user information command. Unlike the predefined U_... user variables, 
+    and the view user information command. Unlike the predefined U_XXX user variables, 
     this function does not require GETUSER to return valid information.
 
   **Example**
@@ -3042,7 +3043,7 @@ U_BUL (1.00)
 
   **Remarks**
     Returns information useful for modifying BBS's built-in ratio management system 
-    and the view user information command. Unlike the predefined U_... user variables, 
+    and the view user information command. Unlike the predefined U_XXX user variables, 
     this function does not require GETUSER to return valid information.
 
   **Example**
@@ -3068,7 +3069,7 @@ U_FDL (1.00)
 
   **Remarks**
     Returns information useful for modifying BBS's built-in ratio management system 
-    and the view user information command. Unlike the predefined U_... user variables, 
+    and the view user information command. Unlike the predefined U_XXX user variables, 
     this function does not require GETUSER to return valid information.
 
   **Example**
@@ -3094,7 +3095,7 @@ U_FUL (1.00)
 
   **Remarks**
     Returns information useful for modifying BBS's built-in ratio management system 
-    and the view user information command. Unlike the predefined U_... user variables, 
+    and the view user information command. Unlike the predefined U_XXX user variables, 
     this function does not require GETUSER to return valid information.
 
   **Example**
@@ -3156,7 +3157,7 @@ U_LDATE (1.00)
 
   **Remarks**
     The BBS tracks the last log on date for each user. This function returns that date 
-    for the user currently online. Unlike the predefined U_... user variables, this 
+    for the user currently online. Unlike the predefined U_XXX user variables, this 
     function does not require GETUSER to return valid information.
 
   **Example**
@@ -3181,7 +3182,7 @@ U_LDIR (1.00)
 
   **Remarks**
     The BBS tracks the latest file found by each user. This function returns that date 
-    for the user currently online. Unlike the predefined U_... user variables, this 
+    for the user currently online. Unlike the predefined U_XXX user variables, this 
     function does not require GETUSER to return valid information.
 
   **Example**
@@ -3205,7 +3206,7 @@ U_LOGONS (1.00)
 
   **Remarks**
     The BBS tracks the total number of logons for each user. This function returns that 
-    number for the user currently online. Unlike the predefined U_... user variables, 
+    number for the user currently online. Unlike the predefined U_XXX user variables, 
     this function does not require GETUSER to return valid information.
 
   **Example**
@@ -3230,7 +3231,7 @@ U_LTIME (1.00)
 
   **Remarks**
     The BBS tracks the last time of day of the last log on for each user. This function 
-    returns that time for the user currently online. Unlike the predefined U_... user 
+    returns that time for the user currently online. Unlike the predefined U_XXX user 
     variables, this function does not require GETUSER to return valid information.
 
   **Example**
@@ -3255,7 +3256,7 @@ U_MSGRD (1.00)
   **Remarks**
     The BBS tracks the total number of messages read by each user. This function returns 
     that number for the user currently online. One quick idea for use: a message/file 
-    ratio enforcement door. Unlike the predefined U_... user variables, this function 
+    ratio enforcement door. Unlike the predefined U_XXX user variables, this function 
     does not require GETUSER to return valid information.
 
   **Example**
@@ -3282,7 +3283,7 @@ U_MSGWR (1.00)
   **Remarks**
     The BBS tracks the total number of messages written by each user. This function 
     returns that number for the user currently online. One quick idea for use: a 
-    message/file ratio enforcement door. Unlike the predefined U_... user variables, 
+    message/file ratio enforcement door. Unlike the predefined U_XXX user variables, 
     this function does not require GETUSER to return valid information.
 
   **Example**
@@ -3310,7 +3311,7 @@ U_NAME (1.00)
     Perhaps the most important piece of information about a caller is their name. The 
     user name differentiates a user from every other user on the BBS and can be used 
     to track PPE user information that must be kept separate from all other users' 
-    information. Unlike the predefined U_... user variables, this function does not 
+    information. Unlike the predefined U_XXX user variables, this function does not 
     require GETUSER to return valid information.
 
   **Example**
@@ -3380,7 +3381,7 @@ U_PWDHIST (1.00)
   **Remarks**
     The BBS has the ability to track the last three passwords used by each user. This 
     function returns one of those passwords from the history for the user currently 
-    online. Unlike the predefined U_... user variables, this function does not require 
+    online. Unlike the predefined U_XXX user variables, this function does not require 
     GETUSER to return valid information. However, it does require that the password 
     PSA has been installed to return meaningful information. Check with PSA(4).
 
@@ -3415,7 +3416,7 @@ U_PWDLC (1.00)
   **Remarks**
     The BBS has the ability to track the last date of a password change for each user. 
     This function returns that date for the user currently online. Unlike the predefined 
-    U_... user variables, this function does not require GETUSER to return valid 
+    U_XXX user variables, this function does not require GETUSER to return valid 
     information. However, it does require that the password PSA has been installed 
     to return meaningful information. Check with PSA(4).
 
@@ -3445,7 +3446,7 @@ U_PWDTC (1.00)
   **Remarks**
     The BBS has the ability to track the total number of times each user changes their 
     password. This function returns that count for the user currently online. Unlike 
-    the predefined U_... user variables, this function does not require GETUSER to 
+    the predefined U_XXX user variables, this function does not require GETUSER to 
     return valid information. However, it does require that the password PSA has been 
     installed to return meaningful information. Check with PSA(4).
 
@@ -3519,8 +3520,8 @@ U_STAT (1.00)
       * 5: Number of 300 bps connects by the user
       * 6: Number of 1200 bps connects by the user
       * 7: Number of 2400 bps connects by the user
-      * 8: Number of connects 2400 < speed ≤ 9600 bps
-      * 9: Number of connects 9600 < speed ≤ 14400 bps
+      * 8: Number of connects 2400 < speed <= 9600 bps
+      * 9: Number of connects 9600 < speed <= 14400 bps
       * 10: Number of security violations by the user
       * 11: Number of "not registered in conference" warnings
       * 12: Number of times download limit has been reached
@@ -3531,7 +3532,7 @@ U_STAT (1.00)
   **Remarks**
     The BBS has the ability to track a number of statistics about the user. This 
     function returns the desired statistic for the user currently online. Unlike the 
-    predefined U_... user variables, this function does not require GETUSER to return 
+    predefined U_XXX user variables, this function does not require GETUSER to return 
     valid information. However, it does require that the statistics PSA has been 
     installed to return meaningful information. Check with PSA(5).
 
@@ -3562,7 +3563,7 @@ U_TIMEON (1.00)
 
   **Remarks**
     The BBS tracks the user's time online each day. This function returns the elapsed 
-    time for the user currently online. Unlike the predefined U_... user variables, 
+    time for the user currently online. Unlike the predefined U_XXX user variables, 
     this function does not require GETUSER to return valid information.
 
   **Example**
@@ -3692,7 +3693,7 @@ VER (1.00)
     As time passes, new features will be added to BBS and PPL. This function returns 
     the version of BBS (and PPL). For BBS version 15.0 this value is 1500. 
     The major version is accessible via VER()/100, and the minor version via VER()%100. 
-    Everything documented herein is available for versions ≥ 1500.
+    Everything documented herein is available for versions >= 1500.
 
   **Example**
 
