@@ -1141,29 +1141,9 @@ pub async fn grafmode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 // 9 - Personal Info Support (PCBPERSONAL)
 // 10 - Time/Byte Bank Support (PCBBANK)
 //
-// IcyBoard supports most of these, however I pretend it's not if the feature isn't used.
 pub async fn psa(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let var = vm.eval_expr(&args[0]).await?.as_int();
-    let res = match var {
-        1 => vm.icy_board_state.session.use_alias,
-        2 => vm.icy_board_state.board.lock().await.config.new_user_settings.ask_verification,
-        3 => vm.icy_board_state.board.lock().await.config.new_user_settings.ask_address,
-        4 => {
-            // Password support
-            true
-        }
-        5 => {
-            // Statistics support
-            true
-        }
-        6 => {
-            // Notes support
-            vm.icy_board_state.board.lock().await.config.new_user_settings.ask_comment
-        }
-        _ => false,
-    };
-
-    Ok(VariableValue::new_bool(res))
+    // OFC all are supported rigt now
+    Ok(VariableValue::new_bool(true))
 }
 
 #[allow(clippy::unnecessary_wraps)]
