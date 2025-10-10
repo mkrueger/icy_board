@@ -4,7 +4,7 @@ use crate::Res;
 use async_trait::async_trait;
 use icy_board_engine::icy_board::{IcyBoard, bbs::BBS, login_server::SSH};
 use icy_net::{Connection, ConnectionType};
-use russh_keys::{Certificate, ssh_key};
+use internal_russh_forked_ssh_key::{Certificate, PublicKey, rand_core::OsRng};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::Mutex,
@@ -23,7 +23,7 @@ pub async fn await_ssh_connections(ssh: SSH, board: Arc<tokio::sync::Mutex<IcyBo
         inactivity_timeout: Some(std::time::Duration::from_secs(3600)),
         auth_rejection_time: std::time::Duration::from_secs(3),
         auth_rejection_time_initial: Some(std::time::Duration::from_secs(0)),
-        keys: vec![russh::keys::PrivateKey::random(&mut ssh_key::rand_core::OsRng, russh::keys::Algorithm::Ed25519).unwrap()],
+        keys: vec![russh::keys::PrivateKey::random(&mut OsRng, russh::keys::Algorithm::Ed25519).unwrap()],
         preferred: Preferred {
             kex: Cow::Owned(kex::ALL_KEX_ALGORITHMS.iter().map(|k| **k).collect()),
             cipher: Cow::Owned(cipher::ALL_CIPHERS.iter().map(|k| **k).collect()),
@@ -116,7 +116,7 @@ impl server::Handler for SshSession {
         Ok(server::Auth::Accept)
     }
 
-    async fn auth_publickey(&mut self, _: &str, _key: &ssh_key::PublicKey) -> Result<server::Auth, Self::Error> {
+    async fn auth_publickey(&mut self, _: &str, _key: &PublicKey) -> Result<server::Auth, Self::Error> {
         Ok(server::Auth::Accept)
     }
 

@@ -32,8 +32,8 @@ jamjam = { workspace = true }
 bstr = { workspace = true }
 
 strum = { workspace = true }
-strum_macros = "0.26.2"
-serde-inline-default = "0.2.3"
+strum_macros = "0.27.2"
+serde-inline-default = "1.0.0"
 
 async-recursion = "1.1.1"
 radix_fmt = "1"
@@ -44,12 +44,12 @@ async-trait = "0.1.83"
 logos = "0.15.0"
 humanize-bytes = "1.0.5"
 reqwest = { version = "0.12", features = ["json", "blocking"] }
-md5 = "0.7.0"
+md5 = "0.8.0"
 temp-file = "0.1.9"
 glob = "0.3.2"
 chumsky = "0.9.3"
 creditcard = "0.1.0"
-zip = "2.2.3"
+zip = "6.0.0"
 argon2 = "0.5.3"
 bcrypt = "0.17.1"
 

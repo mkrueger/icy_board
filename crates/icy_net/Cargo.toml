@@ -23,11 +23,11 @@ bytes = "1"
 serial2-tokio = "0.1.10"
 
 # SSH
-russh = "0.50.2"
-russh-keys = "0.50.0-beta.7"
+russh = "0.54.5"
+internal-russh-forked-ssh-key = "0.6.7-internal.6"
 
 # WEBSOCKETS
-tokio-tungstenite = { version = "0.26.1", features = [
+tokio-tungstenite = { version = "0.28.0", features = [
     "rustls-tls-webpki-roots", # webpki root CAs
     "__rustls-tls",            # use Rustls
 ]}
@@ -39,7 +39,7 @@ rustls = { version = "0.23.0", features = [
  #   "dangerous_configuration"  # Allow invalid certs/etc.
 ]}
 rustls-pemfile = "2"
-webpki-roots = "0.26.1"
+webpki-roots = "1.0.3"
 futures-util = { version = "0.3.30", default-features = false, features = ["sink", "std"] }
 
 [dev-dependencies]

@@ -2,8 +2,6 @@ use std::{
     env,
     fs::{self, File},
     io::Write,
-    thread,
-    time::Duration,
 };
 
 use crate::{

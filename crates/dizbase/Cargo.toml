@@ -18,7 +18,7 @@ serde = { workspace = true }
 toml = { workspace = true }
 regex = { workspace = true }
 
-zip = "2.2.0"
+zip = "6.0.0"
 delharc = "0.6.0"
 unrar = "0.5.7"
 unarc-rs = "0.4.3"
