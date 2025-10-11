@@ -6,7 +6,7 @@ PPL Reference
    :caption: PPL Reference
 
    introduction
-   developing
+   data_types
    constants
    functions
    statements
