@@ -3,25 +3,7 @@
  * Licensed under the MIT License. See License.txt in the project root for license information.
  * ------------------------------------------------------------------------------------------ */
 
-import {
-  languages,
-  workspace,
-  EventEmitter,
-  ExtensionContext,
-  window,
-  InlayHintsProvider,
-  TextDocument,
-  CancellationToken,
-  Range,
-  InlayHint,
-  TextDocumentChangeEvent,
-  ProviderResult,
-  commands,
-  WorkspaceEdit,
-  TextEdit,
-  Selection,
-  Uri,
-} from "vscode";
+import * as vscode from "vscode";
 
 import {
   Disposable,
@@ -34,9 +16,9 @@ import {
 let client: LanguageClient;
 // type a = Parameters<>;
 
-export async function activate(context: ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
 
-  const traceOutputChannel = window.createOutputChannel("PPL Language Server trace");
+  const traceOutputChannel = vscode.window.createOutputChannel("PPL Language Server trace");
   const command = process.env.SERVER_PATH || "ppl-language-server";
   const run: Executable = {
     command,
@@ -60,7 +42,7 @@ export async function activate(context: ExtensionContext) {
     documentSelector: [{ scheme: "file", language: "ppl" }],
     synchronize: {
       // Notify the server about file changes to '.clientrc files contained in the workspace
-      fileEvents: workspace.createFileSystemWatcher("**/.clientrc"),
+      fileEvents: vscode.workspace.createFileSystemWatcher("**/.clientrc"),
     },
     traceOutputChannel,
   };
@@ -77,10 +59,10 @@ export function deactivate(): Thenable<void> | undefined {
   return client.stop();
 }
 
-export function activateInlayHints(ctx: ExtensionContext) {
+export function activateInlayHints(ctx: vscode.ExtensionContext) {
   const maybeUpdater = {
     hintsProvider: null as Disposable | null,
-    updateHintsEventEmitter: new EventEmitter<void>(),
+    updateHintsEventEmitter: new vscode.EventEmitter<void>(),
 
     async onConfigChange() {
       this.dispose();
@@ -137,7 +119,7 @@ export function activateInlayHints(ctx: ExtensionContext) {
       // );
     },
 
-    onDidChangeTextDocument({ contentChanges, document }: TextDocumentChangeEvent) {
+    onDidChangeTextDocument({ contentChanges, document }: vscode.TextDocumentChangeEvent) {
       // debugger
       // this.updateHintsEventEmitter.fire();
     },
@@ -149,9 +131,9 @@ export function activateInlayHints(ctx: ExtensionContext) {
     },
   };
 
-  workspace.onDidChangeConfiguration(maybeUpdater.onConfigChange, maybeUpdater, ctx.subscriptions);
-  workspace.onDidChangeTextDocument(maybeUpdater.onDidChangeTextDocument, maybeUpdater, ctx.subscriptions);
-  workspace.onDidCloseTextDocument(maybeUpdater.onConfigChange, maybeUpdater, ctx.subscriptions);
+  vscode.workspace.onDidChangeConfiguration(maybeUpdater.onConfigChange, maybeUpdater, ctx.subscriptions);
+  vscode.workspace.onDidChangeTextDocument(maybeUpdater.onDidChangeTextDocument, maybeUpdater, ctx.subscriptions);
+  vscode.workspace.onDidCloseTextDocument(maybeUpdater.onConfigChange, maybeUpdater, ctx.subscriptions);
 
   maybeUpdater.onConfigChange().catch(console.error);
 }

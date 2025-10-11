@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::{mem, process};
+use std::{env, mem, process};
 
 use dashmap::DashMap;
 use icy_board_engine::ast::{
@@ -421,10 +421,11 @@ impl LanguageServer for Backend {
                     let out_file: String = self.workspace.lock().unwrap().package.name().to_string();
                     let target_file = self.workspace.lock().unwrap().target_path(LAST_PPLC).join(out_file).with_extension("ppe");
                     self.client.log_message(MessageType::INFO, format!("Execute:{}", target_file.display())).await;
-
-                    if let Ok(process) = process::Command::new("sh")
+                    
+                    let shell = env::var("SHELL").unwrap_or("sh".to_string());
+                    if let Ok(process) = process::Command::new(shell)
                         .arg("-c")
-                        .arg(format!("gnome-terminal -- icboard --ppe {}", target_file.display()))
+                        .arg(format!("\"icboard --ppe {}\"", target_file.display()))
                         .spawn()
                     {
                         let mut state: std::sync::MutexGuard<'_, Option<process::Child>> = self.cur_process.lock().unwrap();
