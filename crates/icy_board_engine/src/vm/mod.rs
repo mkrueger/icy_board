@@ -176,7 +176,6 @@ impl<'a> VirtualMachine<'a> {
             log::warn!("Tried to set user variables, but no user variables defined.");
             return Ok(());
         }
-        log::info!("Setting user variables for user ({})", self.user.name);
         let cur_user = &self.user;
         self.variable_table.set_value(U_EXPERT, VariableValue::new_bool(cur_user.flags.expert_mode));
         match cur_user.flags.fse_mode {
@@ -808,7 +807,6 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
         Ok(script) => {
             let mut label_table = HashMap::new();
             for (i, stmt) in script.statements.iter().enumerate() {
-                log::info!("Label {:X} at {}", stmt.span.start * 2, i);
                 label_table.insert(stmt.span.start * 2, i);
             }
             let user = if let Some(user) = &icy_board_state.session.current_user {
