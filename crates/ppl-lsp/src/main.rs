@@ -421,7 +421,7 @@ impl LanguageServer for Backend {
                     let out_file: String = self.workspace.lock().unwrap().package.name().to_string();
                     let target_file = self.workspace.lock().unwrap().target_path(LAST_PPLC).join(out_file).with_extension("ppe");
                     self.client.log_message(MessageType::INFO, format!("Execute:{}", target_file.display())).await;
-                    
+
                     let shell = env::var("SHELL").unwrap_or("sh".to_string());
                     if let Ok(process) = process::Command::new(shell)
                         .arg("-c")

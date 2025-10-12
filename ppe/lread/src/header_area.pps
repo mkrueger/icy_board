@@ -1,6 +1,10 @@
 
 PROCEDURE DrawHeaderArea()
     INTEGER Offset
+    
+    IF !MessageIndexBuilt THEN
+        BuildMessageIndex()
+    ENDIF
 
     IF LastFirstMsg != FirstMsg THEN
         LastFirstMsg = FirstMsg
@@ -28,8 +32,9 @@ PROCEDURE DrawHeaderArea()
 ;$ENDIF
     FOR I = 0 TO Lines
         INTEGER O = FirstMsg + I
-        IF O > HIGH - LOW THEN
+        IF O >= ValidMessageCount THEN
             DefColor
+            AnsiPos AreaX, AreaY + I
             ClrEOL
             CONTINUE
         ENDIF
@@ -45,11 +50,19 @@ PROCEDURE DrawHeaderArea()
             Print MSG_HDR_ATTRIBUTE
         ENDIF 
         
-        INTEGER MSG_NUM = LOW + O
+        INTEGER MSG_NUM = GetActualMessageNumber(O)
+        
+        IF MSG_NUM == -1 THEN
+            DefColor
+            ClrEOL
+            CONTINUE
+        ENDIF
+        
+        INTEGER IDX_POS = MSG_NUM - LOW
 
         IF FROM[O] == "" THEN 
 ;$IF RUNTIME < 400
-            FSeek 2, O * 64, SEEK_SET
+            FSeek 2, IDX_POS * 64, SEEK_SET
             FRead 2, Offset, 4
             FRead 2, J, 4
             FRead 2, LINE, 25
@@ -79,4 +92,3 @@ PROCEDURE DrawHeaderArea()
     OldCursor = Cursor
     DefColor
 ENDPROC
- 

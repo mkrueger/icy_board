@@ -88,6 +88,9 @@ pub enum CompilationErrorType {
 
     #[error("Procedure expected")]
     ProcedureExpected,
+
+    #[error("Function used as variable ({0})")]
+    FunctionUsedAsVariable(String),
 }
 
 #[derive(Error, Debug)]

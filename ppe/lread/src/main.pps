@@ -6,10 +6,16 @@ DECLARE PROCEDURE ShowHelp()
 DECLARE PROCEDURE ReadMsg()
 DECLARE PROCEDURE ReadMsgConfig()
 
+DECLARE PROCEDURE BuildMessageIndex()
+DECLARE FUNCTION GetActualMessageNumber(INTEGER DisplayIndex) INTEGER
+
 INTEGER CONF = CurConf()
 INTEGER LOW = LOMSGNUM()
 INTEGER HIGH = HiMsgNum()
-STRING FROM(10), SUBJ(10), TO(10), DATETXT(10)
+STRING FROM(10), SUBJ(10), TO(10), DATETXT(10), ValidMessageIndex(10)
+INTEGER ValidMessageCount = 0
+BOOLEAN MessageIndexBuilt
+
 INTEGER FirstMsg = 0
 INTEGER Cursor = 0
 INTEGER FirstTxtLine = 0
@@ -51,6 +57,7 @@ ReDim FROM, MAX_MSGS
 ReDim SUBJ, MAX_MSGS
 ReDim TO, MAX_MSGS
 ReDim DATETXT, MAX_MSGS
+ReDim ValidMessageIndex, MAX_MSGS
 
 :Redisplay
 Cls
@@ -119,3 +126,54 @@ LOOP
         DrawMsgText()
     ENDSELECT
 ENDLOOP
+
+PROCEDURE BuildMessageIndex()
+    ValidMessageCount = 0
+    MessageIndexBuilt = FALSE
+    
+    INTEGER MSG_NUM
+    FOR MSG_NUM = LOW TO HIGH
+        BOOLEAN IsValid = FALSE
+        
+;$IF RUNTIME >= 400
+        STRING TestTo = GetMsgHdr(CONF, MSG_NUM, HDR_TO)
+        IF (TestTo = "ALL" | TestTo = U_NAME()) THEN
+            IsValid = TRUE
+        ENDIF
+;$ELSE
+        STRING MSGS_FILE = ConfInfo(CONF, 12)
+        IF Exist(MSGS_FILE + ".IDX") THEN
+            FOPEN 4, MSGS_FILE + ".IDX", O_RD, S_DW
+            IF !FErr(4) THEN
+                INTEGER IndexPos = (MSG_NUM - LOW) * 64
+                FSEEK 4, IndexPos, SEEK_SET
+                INTEGER TestOffset
+                FREAD 4, TestOffset, 4
+                IF TestOffset > 0 THEN
+                    IsValid = TRUE
+                ENDIF
+                FCLOSE 4
+            ENDIF
+        ENDIF
+;$ENDIF
+        
+        IF IsValid THEN
+            ValidMessageIndex(ValidMessageCount) = MSG_NUM
+            ValidMessageCount = ValidMessageCount + 1
+        ENDIF
+    NEXT
+    
+    MessageIndexBuilt = TRUE
+ENDPROC
+
+FUNCTION GetActualMessageNumber(INTEGER DisplayIndex) INTEGER
+    IF !MessageIndexBuilt THEN
+        BuildMessageIndex()
+    ENDIF
+    
+    IF DisplayIndex >= 0 && DisplayIndex < ValidMessageCount THEN
+        RETURN ValidMessageIndex(DisplayIndex)
+    ENDIF
+    
+    RETURN -1
+ENDFUNC

@@ -1043,13 +1043,19 @@ impl SemanticVisitor {
 
         // search if any user variables are used.
         if !self.require_user_variables {
-            for (i, user_var) in USER_VARIABLES.iter().enumerate() {
-                if user_var.runtime_version <= self.lang_version && !self.references[i].1.usages.is_empty() {
-                    self.require_user_variables = true;
-                    break;
+            for (_i, user_var) in USER_VARIABLES.iter().enumerate() {
+                if user_var.runtime_version > self.lang_version {
+                    continue;
+                }
+                for (_rype, r) in &self.references {
+                    if !r.usages.is_empty() && r.usages[0].1.token == user_var.name {
+                        self.require_user_variables = true;
+                        break;
+                    }
                 }
             }
         }
+        println!("Require user variables: {}", self.require_user_variables);
     }
 
     fn check_arg_types(&mut self, call_parameters: &[ParameterSpecifier], arguments: &[Expression]) {
@@ -1129,6 +1135,11 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             let def = &FUNCTION_DEFINITIONS[predef[0]];
             if self.cur_func_call > 0 {
                 self.function_type_lookup.insert(self.cur_func_call, SemanticInfo::PredefFunctionGroup(predef));
+            } else {
+                self.errors.lock().unwrap().report_error(
+                    identifier.get_identifier_token().span.clone(),
+                    CompilationErrorType::FunctionUsedAsVariable(identifier.get_identifier().to_string()),
+                );
             }
             return def.return_type;
         } else if let Some(idx) = self.lookup_variable(identifier.get_identifier()) {
@@ -1139,6 +1150,17 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     self.function_type_lookup.insert(self.cur_func_call, SemanticInfo::FunctionReference(*func_idx));
                 } else if let ReferenceType::Variable(func_idx) = rt {
                     self.function_type_lookup.insert(self.cur_func_call, SemanticInfo::VariableReference(*func_idx));
+                }
+            } else {
+                match rt {
+                    ReferenceType::Function(_) | ReferenceType::Procedure(_) => {
+                        self.errors.lock().unwrap().report_error(
+                            identifier.span.clone(),
+                            CompilationErrorType::FunctionUsedAsVariable(identifier.token.to_string()),
+                        );
+                        return VariableType::None;
+                    }
+                    _ => {}
                 }
             }
             r.usages.push((

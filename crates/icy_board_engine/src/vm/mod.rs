@@ -47,7 +47,7 @@ pub enum VMError {
     #[error("Internal VM error")]
     InternalVMError,
 
-    #[error("Label not found (0x{0})")]
+    #[error("Label not found (0x{0:X})")]
     LabelNotFound(usize),
 
     #[error("Tried to pop from empty value stack.")]
@@ -808,6 +808,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
         Ok(script) => {
             let mut label_table = HashMap::new();
             for (i, stmt) in script.statements.iter().enumerate() {
+                log::info!("Label {:X} at {}", stmt.span.start * 2, i);
                 label_table.insert(stmt.span.start * 2, i);
             }
             let user = if let Some(user) = &icy_board_state.session.current_user {
