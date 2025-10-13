@@ -15,7 +15,7 @@ use crate::icy_board::security_expr::SecurityExpression;
 use crate::icy_board::state::GraphicsMode;
 use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_NUM, MASK_PATH, MASK_PWD};
 use crate::icy_board::user_base::Password;
-use crate::icy_board::user_inf::BankUserInf;
+use crate::icy_board::user_inf::{BankUserInf, QwkConfigUserInf};
 use crate::parser::CONFERENCE_ID;
 use crate::vm::{TerminalTarget, VirtualMachine};
 use chrono::{DateTime, Utc};
@@ -1795,9 +1795,55 @@ pub async fn pcbaccstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
 pub async fn derrmsg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     unimplemented_function!("DERRMSG");
 }
+
 pub async fn account(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("ACCOUNT");
+    let field = vm.eval_expr(&args[0]).await?.as_int();
+
+    // Get or initialize user accounting data
+    if vm.user.account.is_none() {
+        vm.user.account = Some(crate::icy_board::user_inf::AccountUserInf::default());
+    }
+
+    let Some(accounting) = &vm.user.account else {
+        return Ok(VariableValue::new_double(0.0));
+    };
+
+    let value = match field {
+        0 => accounting.starting_balance,        // START_BAL - User's starting balance
+        1 => accounting.starting_balance,        // TODO: START_SESSION - Starting balance for this session
+        2 => accounting.debit_call,              // DEB_CALL - Debit for this call
+        3 => accounting.debit_time,              // DEB_TIME - Debit for time online
+        4 => accounting.debit_msg_read,          // DEB_MSGREAD - Debit for reading messages
+        5 => accounting.debit_msg_read_capture,  // DEB_MSGCAP - Debit for capturing messages
+        6 => accounting.debit_msg_write,         // DEB_MSGWRITE - Debit for writing messages
+        7 => accounting.debit_msg_write_echoed,  // DEB_MSGECHOED - Debit for echoed messages
+        8 => accounting.debit_msg_write_private, // DEB_MSGPRIVATE - Debit for private messages
+        9 => accounting.debit_download_file,     // DEB_DOWNFILE - Debit for downloading files
+        10 => accounting.debit_download_bytes,   // DEB_DOWNBYTES - Debit for downloading bytes
+        11 => accounting.debit_group_chat,       // DEB_CHAT - Debit for chat time
+        12 => accounting.debit_tpu,              // DEB_TPU - Debit for TPU
+        13 => accounting.debit_special,          // DEB_SPECIAL - Special debit
+        14 => accounting.credit_upload_file,     // CRED_UPFILE - Credit for uploading files
+        15 => accounting.credit_upload_bytes,    // CRED_UPBYTES - Credit for uploading bytes
+        16 => accounting.credit_special,         // CRED_SPECIAL - Special credit
+        17 => {
+            // SEC_DROP - Security level to drop to at 0 credits
+            let level = if let Some(config) = &vm.icy_board_state.get_board().await.config.accounting.accounting_config {
+                accounting.drop_sec_level as i32
+            } else {
+                0
+            };
+            return Ok(VariableValue::new_int(level));
+        }
+        _ => {
+            log::error!("ACCOUNT: Invalid field number: {field}");
+            0.0
+        }
+    };
+
+    Ok(VariableValue::new_double(value))
 }
+
 pub async fn scanmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     unimplemented_function!("SCANMSGHDR");
 }
@@ -1812,7 +1858,29 @@ pub async fn ripver(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 }
 
 pub async fn qwklimits(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("QWKLIMITS");
+    let field = vm.eval_expr(&args[0]).await?.as_int();
+
+    // Check if QWK limits are initialized for the user
+    if vm.user.qwk_config.is_none() {
+        vm.user.qwk_config = Some(QwkConfigUserInf::default());
+    }
+
+    let Some(qwk_config) = &vm.user.qwk_config else {
+        return Ok(VariableValue::new_int(0));
+    };
+
+    let value = match field {
+        0 => qwk_config.max_msgs as i32,              // MAXMSGS - Max messages per QWK packet
+        1 => qwk_config.max_msgs_per_conf as i32,     // CMAXMSGS - Max messages per conference
+        2 => qwk_config.personal_attach_limit as i32, // ATTACH_LIM_U - Personal attachment size limit (bytes)
+        3 => qwk_config.public_attach_limit as i32,   // ATTACH_LIM_P - Public attachment size limit (bytes)
+        _ => {
+            log::error!("QWKLIMITS: Invalid field number: {field}");
+            0
+        }
+    };
+
+    Ok(VariableValue::new_int(value))
 }
 
 pub async fn findfirst(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

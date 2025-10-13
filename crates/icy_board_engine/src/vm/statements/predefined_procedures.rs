@@ -14,7 +14,7 @@ use crate::{
             GraphicsMode, NodeState, NodeStatus,
             functions::{MASK_ALNUM, display_flags},
         },
-        user_inf::BankUserInf,
+        user_inf::{BankUserInf, QwkConfigUserInf},
     },
 };
 use bstr::BString;
@@ -712,7 +712,56 @@ pub async fn broadcast(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
 }
 
 pub async fn waitfor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("WAITFOR");
+    use std::time::{Duration, Instant};
+
+    // WAITFOR(STRING str, VAR BOOLEAN flag, INTEGER sec)
+    let search_str = vm.eval_expr(&args[0]).await?.as_string();
+    let timeout_secs = vm.eval_expr(&args[2]).await?.as_int();
+
+    // Default result is FALSE
+    let mut result = false;
+
+    // Only wait if we have a non-empty string and remote connection
+    if !search_str.is_empty() && !vm.icy_board_state.session.is_local {
+        let search_str_lower = search_str.to_lowercase();
+        let search_len = search_str_lower.len();
+        let mut buffer = String::new();
+
+        // Set up timer
+        let start = Instant::now();
+        let timeout = Duration::from_secs(timeout_secs.max(0) as u64);
+
+        // Wait for the string or timeout
+        while start.elapsed() < timeout {
+            // Try to get a character from the modem/remote
+            if let Some(key_char) = vm.icy_board_state.get_char(TerminalTarget::User).await? {
+                // Add character to buffer
+                buffer.push(key_char.ch);
+
+                // Keep buffer size manageable (only keep last search_len chars)
+                if buffer.len() > search_len {
+                    buffer = buffer.chars().skip(1).collect();
+                }
+
+                // Check if buffer matches (case-insensitive)
+                if buffer.len() >= search_len {
+                    let buffer_lower = buffer.to_lowercase();
+                    if buffer_lower == search_str_lower || buffer_lower.ends_with(&search_str_lower) {
+                        result = true;
+                        break;
+                    }
+                }
+            } else {
+                // No character available, yield to prevent tight loop
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        }
+    }
+
+    // Set the flag variable
+    vm.set_variable(&args[1], VariableValue::new_bool(result)).await?;
+
+    Ok(())
 }
 
 pub async fn kbdchkon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -1628,11 +1677,165 @@ pub async fn dfcopy(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn account(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("ACCOUNT");
+    use crate::icy_board::pcb::user_inf::AccountUserInf;
+
+    // ACCOUNT(INTEGER field, INTEGER value)
+    let field = vm.eval_expr(&args[0]).await?.as_int();
+    let value = vm.eval_expr(&args[1]).await?.as_double();
+
+    // Initialize accounting if not present
+    if vm.user.account.is_none() {
+        vm.user.account = Some(AccountUserInf::default());
+    }
+
+    let Some(account) = &mut vm.user.account else {
+        return Ok(());
+    };
+
+    // Update the specified accounting field
+    match field {
+        0 => account.starting_balance += value,        // START_BAL
+        1 => account.start_this_session += value,      // START_SESSION
+        2 => account.debit_call += value,              // DEB_CALL
+        3 => account.debit_time += value,              // DEB_TIME
+        4 => account.debit_msg_read += value,          // DEB_MSGREAD
+        5 => account.debit_msg_read_capture += value,  // DEB_MSGCAP
+        6 => account.debit_msg_write += value,         // DEB_MSGWRITE
+        7 => account.debit_msg_write_echoed += value,  // DEB_MSGECHOED
+        8 => account.debit_msg_write_private += value, // DEB_MSGPRIVATE
+        9 => account.debit_download_file += value,     // DEB_DOWNFILE
+        10 => account.debit_download_bytes += value,   // DEB_DOWNBYTES
+        11 => account.debit_group_chat += value,       // DEB_CHAT
+        12 => account.debit_tpu += value,              // DEB_TPU
+        13 => account.debit_special += value,          // DEB_SPECIAL
+        14 => account.credit_upload_file += value,     // CRED_UPFILE
+        15 => account.credit_upload_bytes += value,    // CRED_UPBYTES
+        16 => account.credit_special += value,         // CRED_SPECIAL
+        17 => {
+            // SEC_DROP - Security level to drop to (stored as u8)
+            account.drop_sec_level = value.max(0.0).min(255.0) as u8;
+        }
+        _ => {
+            log::error!("ACCOUNT statement: Invalid field number: {}", field);
+        }
+    }
+
+    // Update session user if this is the current user
+    if let Some(session_user) = &mut vm.icy_board_state.session.current_user {
+        if session_user.get_name() == vm.user.get_name() {
+            session_user.account = vm.user.account.clone();
+        }
+    }
+
+    Ok(())
 }
 
 pub async fn recordusage(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("RECORDUSAGE");
+    use crate::icy_board::pcb::user_inf::AccountUserInf;
+    use chrono::Utc;
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    // RECORDUSAGE(INTEGER field, STRING desc1, STRING desc2, DWORD unitcost, INTEGER value)
+    let field = vm.eval_expr(&args[0]).await?.as_int();
+    let desc1 = vm.eval_expr(&args[1]).await?.as_string();
+    let desc2 = vm.eval_expr(&args[2]).await?.as_string();
+    let unitcost = vm.eval_expr(&args[3]).await?.as_double();
+    let value = vm.eval_expr(&args[4]).await?.as_int();
+
+    // Validate field is in debit/credit range (2-16)
+    if field < 2 || field > 16 {
+        log::error!("RECORDUSAGE: Invalid field number: {} (must be 2-16)", field);
+        return Ok(());
+    }
+
+    // Calculate total charge
+    let total_charge = unitcost * value as f64;
+
+    // Initialize accounting if not present
+    if vm.user.account.is_none() {
+        vm.user.account = Some(AccountUserInf::default());
+    }
+
+    let Some(account) = &mut vm.user.account else {
+        return Ok(());
+    };
+
+    // Update the accounting field (same as ACCOUNT statement)
+    match field {
+        2 => account.debit_call += total_charge,              // DEB_CALL
+        3 => account.debit_time += total_charge,              // DEB_TIME
+        4 => account.debit_msg_read += total_charge,          // DEB_MSGREAD
+        5 => account.debit_msg_read_capture += total_charge,  // DEB_MSGCAP
+        6 => account.debit_msg_write += total_charge,         // DEB_MSGWRITE
+        7 => account.debit_msg_write_echoed += total_charge,  // DEB_MSGECHOED
+        8 => account.debit_msg_write_private += total_charge, // DEB_MSGPRIVATE
+        9 => account.debit_download_file += total_charge,     // DEB_DOWNFILE
+        10 => account.debit_download_bytes += total_charge,   // DEB_DOWNBYTES
+        11 => account.debit_group_chat += total_charge,       // DEB_CHAT
+        12 => account.debit_tpu += total_charge,              // DEB_TPU
+        13 => account.debit_special += total_charge,          // DEB_SPECIAL
+        14 => account.credit_upload_file += total_charge,     // CRED_UPFILE
+        15 => account.credit_upload_bytes += total_charge,    // CRED_UPBYTES
+        16 => account.credit_special += total_charge,         // CRED_SPECIAL
+        _ => {
+            log::error!("RECORDUSAGE: Invalid field number: {}", field);
+            return Ok(());
+        }
+    }
+
+    // Update session user if this is the current user
+    if let Some(session_user) = &mut vm.icy_board_state.session.current_user {
+        if session_user.get_name() == vm.user.get_name() {
+            session_user.account = vm.user.account.clone();
+        }
+    }
+
+    // Write to accounting tracking file if configured
+    let board = vm.icy_board_state.get_board().await;
+    if board.config.accounting.enabled && !board.config.accounting.tracking_file.as_os_str().is_empty() {
+        let tracking_file = board.resolve_file(&board.config.accounting.tracking_file);
+        drop(board); // Release lock before file I/O
+
+        // Format: timestamp, username, field, desc1, desc2, unitcost, quantity, total
+        let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let username = vm.user.get_name();
+
+        let field_name = match field {
+            2 => "DEB_CALL",
+            3 => "DEB_TIME",
+            4 => "DEB_MSGREAD",
+            5 => "DEB_MSGCAP",
+            6 => "DEB_MSGWRITE",
+            7 => "DEB_MSGECHOED",
+            8 => "DEB_MSGPRIVATE",
+            9 => "DEB_DOWNFILE",
+            10 => "DEB_DOWNBYTES",
+            11 => "DEB_CHAT",
+            12 => "DEB_TPU",
+            13 => "DEB_SPECIAL",
+            14 => "CRED_UPFILE",
+            15 => "CRED_UPBYTES",
+            16 => "CRED_SPECIAL",
+            _ => "UNKNOWN",
+        };
+
+        let log_line = format!(
+            "{}\t{}\t{}\t{}\t{}\t{:.2}\t{}\t{:.2}\n",
+            timestamp, username, field_name, desc1, desc2, unitcost, value, total_charge
+        );
+
+        // Append to tracking file
+        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(tracking_file) {
+            if let Err(e) = file.write_all(log_line.as_bytes()) {
+                log::error!("RECORDUSAGE: Failed to write to tracking file: {}", e);
+            }
+        } else {
+            log::error!("RECORDUSAGE: Failed to open tracking file");
+        }
+    }
+
+    Ok(())
 }
 
 pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -1706,9 +1909,47 @@ pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
         }
     }
 }
+
 pub async fn qwklimits(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("QWKLIMITS");
+    let field = vm.eval_expr(&args[0]).await?.as_int();
+    let limit = vm.eval_expr(&args[1]).await?.as_int();
+
+    // Ensure QWK config exists for the user
+    if vm.user.qwk_config.is_none() {
+        vm.user.qwk_config = Some(QwkConfigUserInf::default());
+    }
+
+    let Some(qwk_config) = &mut vm.user.qwk_config else {
+        log::error!("QWKLIMITS: Failed to initialize QWK configuration");
+        return Ok(());
+    };
+
+    // Get board-wide QWK limits for validation
+    let board = vm.icy_board_state.get_board().await;
+
+    let settings: &crate::icy_board::icb_config::QwkSettings = &board.config.qwk_settings;
+    match field {
+        0 => {
+            qwk_config.max_msgs = limit as u16;
+        }
+        1 => {
+            qwk_config.max_msgs_per_conf = limit as u16;
+        }
+        2 => {
+            // ATTACH_LIM_U - Personal attachment size limit (bytes)
+            qwk_config.personal_attach_limit = limit as i32;
+        }
+        3 => {
+            // ATTACH_LIM_P - Public attachment size limit (bytes)
+            qwk_config.public_attach_limit = limit as i32;
+        }
+        _ => {
+            log::error!("QWKLIMITS: Invalid field number: {field}");
+        }
+    }
+    Ok(())
 }
+
 pub async fn command(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let via_cmd_list = vm.eval_expr(&args[0]).await?.as_bool();
     let command_line = vm.eval_expr(&args[1]).await?.as_string();
@@ -1771,11 +2012,83 @@ pub async fn grafmode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 }
 
 pub async fn adduser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("ADDUSER");
+    use crate::icy_board::pcb::user_inf::AccountUserInf;
+    use crate::icy_board::user_base::User;
+    use chrono::Utc;
+
+    // ADDUSER(STRING username, BOOLEAN keepAltVars)
+    let username = vm.eval_expr(&args[0]).await?.as_string();
+    let keep_alt_vars = vm.eval_expr(&args[1]).await?.as_bool();
+
+    let trimmed = username.trim();
+    if trimmed.is_empty() {
+        log::warn!("ADDUSER: empty username ignored");
+        return Ok(());
+    }
+
+    // Save current user context before we potentially switch
+    let original_user = if !keep_alt_vars { Some(vm.user.clone()) } else { None };
+
+    // Acquire board lock to check for duplicates and add user
+    let mut board_guard = vm.icy_board_state.board.lock().await;
+
+    // Validate for duplicates (case-insensitive name/alias check)
+    let duplicate = board_guard
+        .users
+        .iter()
+        .any(|u| u.get_name().eq_ignore_ascii_case(trimmed) || (!u.alias.is_empty() && u.alias.eq_ignore_ascii_case(trimmed)));
+
+    if duplicate {
+        log::warn!("ADDUSER: duplicate username '{}', no user created", trimmed);
+        return Ok(());
+    }
+
+    // Create new user with system defaults
+    let mut new_user = User::default();
+    new_user.set_name(trimmed.to_string());
+    new_user.stats.first_date_on = Utc::now();
+    new_user.stats.last_on = Utc::now();
+    new_user.security_level = board_guard.config.new_user_settings.sec_level;
+
+    // Initialize accounting if enabled
+    if board_guard.config.accounting.enabled {
+        if let Some(acc_cfg) = &board_guard.config.accounting.accounting_config {
+            new_user.account = Some(AccountUserInf {
+                starting_balance: acc_cfg.new_user_balance,
+                start_this_session: acc_cfg.new_user_balance,
+                ..Default::default()
+            });
+        }
+    }
+
+    // Add user to user base
+    let record_index = board_guard.users.new_user(new_user.clone());
+    log::info!("ADDUSER: created user '{}' as record #{}", trimmed, record_index + 1);
+
+    // Release board lock before modifying VM state
+    drop(board_guard);
+
+    // Handle variable context switching
+    if keep_alt_vars {
+        // Like GETALTUSER: switch context to new user
+        vm.user = new_user;
+        vm.set_user_variables()?;
+        log::info!("ADDUSER: context switched to new user '{}'", trimmed);
+    } else {
+        // Restore original user context
+        if let Some(original) = original_user {
+            vm.user = original;
+            vm.set_user_variables()?;
+        }
+    }
+
+    Ok(())
 }
+
 pub async fn killmsg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     unimplemented_stmt!("KILLMSG");
 }
+
 pub async fn chdir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let dir = vm.eval_expr(&args[0]).await?.as_string();
     let path = vm.resolve_file(&dir).await;

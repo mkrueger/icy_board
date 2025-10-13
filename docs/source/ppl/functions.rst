@@ -61,6 +61,101 @@ ABS (1.00)
 
       DIFF = ABS(A - B)
 
+ACCOUNT (3.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER ACCOUNT(INTEGER field)`
+
+  Retrieve accounting information for the current user.
+
+  **Parameters**
+    * :PPL:`field` – Field number (0-17) or DEB_/CRED_ constant
+
+  **Returns**
+    Amount of credits for the specified accounting field.
+
+  **Field Constants**
+    ================  ===  ============================================
+    Constant          Val  Description
+    ================  ===  ============================================
+    START_BAL         0    User's starting balance
+    START_SESSION     1    Starting balance for this session
+    DEB_CALL          2    Debit for this call
+    DEB_TIME          3    Debit for time online
+    DEB_MSGREAD       4    Debit for reading messages
+    DEB_MSGCAP        5    Debit for capturing messages
+    DEB_MSGWRITE      6    Debit for writing messages
+    DEB_MSGECHOED     7    Debit for echoed messages
+    DEB_MSGPRIVATE    8    Debit for private messages
+    DEB_DOWNFILE      9    Debit for downloading files
+    DEB_DOWNBYTES     10   Debit for downloading bytes
+    DEB_CHAT          11   Debit for chat time
+    DEB_TPU           12   Debit for TPU
+    DEB_SPECIAL       13   Special debit
+    CRED_UPFILE       14   Credit for uploading files
+    CRED_UPBYTES      15   Credit for uploading bytes
+    CRED_SPECIAL      16   Special credit
+    SEC_DROP          17   Security level to drop to at 0 credits
+    ================  ===  ============================================
+
+  **Remarks**
+    Retrieves credit/debit accounting information from PCBoard's accounting system. 
+    Use the predefined constants for clarity and maintainability. The function returns 
+    the current value for the specified field without modifying it.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER chatCharges, balance
+       
+       chatCharges = ACCOUNT(DEB_CHAT)
+       PRINTLN "You have been charged ", chatCharges, " credits for chat"
+       
+       balance = ACCOUNT(START_BAL)
+       PRINTLN "Your starting balance was: ", balance
+       
+       IF (ACCOUNT(START_SESSION) < 100) THEN
+           PRINTLN "Warning: Low credit balance!"
+       ENDIF
+
+  **See Also**
+    * :PPL:`ACCOUNT` statement – Modify accounting fields
+    * :PPL:`RECORDUSAGE` – Record usage with logging
+
+ACTMSGNUM (3.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER ACTMSGNUM()`
+
+  Returns the number of active messages in the current conference.
+
+  **Returns**
+    Number of active (non-deleted) messages in the current conference.
+
+  **Remarks**
+    Returns the count of active messages in the currently joined conference. This 
+    excludes deleted messages but includes both public and private messages. Useful 
+    for displaying conference statistics or determining if a conference has activity.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER msgCount
+       msgCount = ACTMSGNUM()
+       PRINTLN "There are ", msgCount, " messages in conference ", CURCONF()
+       
+       ; Check if conference is empty
+       IF (ACTMSGNUM() = 0) THEN
+           PRINTLN "This conference has no messages."
+       ENDIF
+
+  **See Also**
+    * :PPL:`CURCONF()` – Get current conference number
+    * :PPL:`HIMSGNUM()` – Get highest message number
+    * :PPL:`LOWMSGNUM()` – Get lowest message number
+    * :PPL:`HICONFNUM()` – Get highest conference number
+    * :PPL:`JOIN` – Join conference
+
 AND (1.00)
 ~~~~~~~~~~
   :PPL:`FUNCTION INTEGER AND(INTEGER value1, INTEGER value2)`
@@ -469,6 +564,50 @@ CONFINFO (Delete Queue Record) (3.20)
 
        CONFINFO(6)  ; delete queue record #6
 
+CRC32 (3.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION DWORD CRC32(INTEGER mode, STRING target)`
+
+  Calculates the CRC32 checksum of a file or string.
+
+  **Parameters**
+    * :PPL:`mode` – Processing mode: CRC_FILE (TRUE) for file, CRC_STR (FALSE) for string
+    * :PPL:`target` – File path when mode is CRC_FILE, or string content when mode is CRC_STR
+
+  **Returns**
+    32-bit unsigned CRC32 checksum value.
+
+  **Remarks**
+    Computes a CRC32 checksum for data verification and integrity checking. The mode 
+    parameter determines whether target is treated as a file path or literal string. 
+    CRC_FILE and CRC_STR constants are provided for clarity but are equivalent to TRUE 
+    and FALSE respectively. Be careful not to confuse modes - CRC32(CRC_STR, "C:\AUTOEXEC.BAT") 
+    returns the CRC of the literal string "C:\AUTOEXEC.BAT", not the file contents.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       DWORD fileCRC, stringCRC
+       
+       ; Calculate CRC of a file
+       fileCRC = CRC32(CRC_FILE, "C:\AUTOEXEC.BAT")
+       PRINTLN "CRC of AUTOEXEC.BAT file: ", fileCRC
+       
+       ; Calculate CRC of a string
+       stringCRC = CRC32(CRC_STR, "Stan is super cool")
+       PRINTLN "CRC of string: ", stringCRC
+       
+       ; Verify file integrity
+       DWORD originalCRC = 0x12345678
+       IF (CRC32(CRC_FILE, "DATA.DAT") <> originalCRC) THEN
+           PRINTLN "File has been modified!"
+       ENDIF
+
+  **See Also**
+    * :PPL:`FILEINF()` – Get file information
+    * :PPL:`EXIST()` – Check file existence
+
 CURCOLOR (1.00)
 ~~~~~~~~~~~~~~~
   :PPL:`FUNCTION INTEGER CURCOLOR()`
@@ -704,6 +843,39 @@ DOW (1.00)
     * :PPL:`MONTH()` – Extract month
     * :PPL:`YEAR()` – Extract year
 
+DRIVESPACE (3.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER DRIVESPACE(STRING drivespec)`
+
+  Returns the amount of free space available on a specified drive.
+
+  **Parameters**
+    * :PPL:`drivespec` – Drive specification string. Must include at least a drive letter 
+      and colon (e.g., "C:", "C:\", "C:\PCB")
+
+  **Returns**
+    Amount of free space in bytes on the specified drive.
+
+  **Remarks**
+    The drivespec parameter must include at least a drive letter followed by a colon. 
+    The backslash and directory path are optional. Valid specifications include "C:", 
+    "C:\", and "C:\PCB" - all will return the free space on drive C. On LANtastic 
+    network drives, this function returns the free space of the current physical drive 
+    even if it is mapped as a directory.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER left
+       left = DRIVESPACE("C:\")
+       PRINTLN "There are ", STRING(left), " bytes on drive C."
+
+  **See Also**
+    * :PPL:`EXIST()` – Check file existence
+    * :PPL:`FILEINF()` – Get file information
+    * :PPL:`GETDRIVE()` – Get current drive
+
 EXIST (1.00)
 ~~~~~~~~~~~~
   :PPL:`FUNCTION BOOLEAN EXIST(STRING file)`
@@ -897,6 +1069,52 @@ FMTCC (1.00)
     * :PPL:`CCTYPE()` – Identify card type
     * :PPL:`VALCC()` – Validate credit card
 
+FNEXT (3.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER FNEXT()`
+
+  Returns the next available file channel number.
+
+  **Returns**
+    Next available file channel number (0-7), or -1 if all channels are in use.
+
+  **Remarks**
+    Designed to support code libraries made possible by functions and procedures, allowing 
+    file channel numbers to be determined at runtime. FNEXT returns the lowest available 
+    channel number but does NOT reserve it - you must open a file on that channel before 
+    calling FNEXT again, otherwise it will return the same value. Never call FNEXT directly 
+    in an FOPEN statement as there's no way to determine which channel was used.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER chan1, chan2
+       
+       ; CORRECT usage - store channel, then use it
+       chan1 = FNEXT()
+       IF (chan1 <> -1) THEN
+           FOPEN chan1, "FILE1.DAT", O_RD, S_DW
+       ENDIF
+       
+       chan2 = FNEXT()
+       IF (chan2 <> -1) THEN
+           FOPEN chan2, "FILE2.DAT", O_RD, S_DW
+       ENDIF
+       
+       ; WRONG - FNEXT returns same value if no file opened
+       ; chan1 = FNEXT()
+       ; chan2 = FNEXT()  ; ERROR: chan1 equals chan2!
+       
+       ; WRONG - No way to know which channel was used
+       ; FOPEN FNEXT(), "FILE.DAT", O_RD, S_DW
+
+  **See Also**
+    * :PPL:`FOPEN` – Open file
+    * :PPL:`FCLOSE` – Close file
+    * :PPL:`FCREATE` – Create file
+    * :PPL:`FAPPEND` – Append to file
+
 FTELL (3.20)
 ~~~~~~~~~~~~
 
@@ -1079,6 +1297,44 @@ HELPPATH (1.00)
     * :PPL:`SLPATH()` – Get security levels path  
     * :PPL:`TEMPPATH()` – Get temporary files path
 
+HICONFNUM (3.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER HICONFNUM()`
+
+  Returns the highest conference number available on the board.
+
+  **Returns**
+    Highest conference number configured on the system.
+
+  **Remarks**
+    Returns the highest conference number available, regardless of whether the conference 
+    is actively being used or has any messages. If a conference is installed in the 
+    system configuration, it will be counted. Useful for iterating through all possible 
+    conferences or setting up new user configurations.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER conf
+       PRINTLN "The highest conference available is ", HICONFNUM()
+       
+       ; Set all LMRs for a new user
+       IF (newuser = TRUE) THEN
+           FOR conf = 1 TO HICONFNUM()
+               JOIN conf
+               SETLMR conf, HIMSGNUM()-10
+           NEXT
+       ENDIF
+
+  **See Also**
+    * :PPL:`CURCONF()` – Get current conference number
+    * :PPL:`HIMSGNUM()` – Get highest message number
+    * :PPL:`JOIN` – Join conference
+    * :PPL:`LOWMSGNUM()` – Get lowest message number
+    * :PPL:`NUMACTMSG()` – Get number of active messages
+    * :PPL:`SETLMR` – Set last message read pointer
+
 HOUR (1.00)
 ~~~~~~~~~~~
   :PPL:`FUNCTION INTEGER HOUR(TIME t)`
@@ -1104,6 +1360,40 @@ HOUR (1.00)
     * :PPL:`MIN()` – Extract minutes
     * :PPL:`SEC()` – Extract seconds
     * :PPL:`TIME()` – Get current time
+
+INBYTES (3.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER INBYTES()`
+
+  Returns the number of bytes waiting in the modem's input buffer.
+
+  **Returns**
+    Number of bytes available in the modem input buffer, or 0 in local mode.
+
+  **Remarks**
+    Returns the count of bytes received from the remote user that are waiting to be 
+    processed. This function is not available in local mode and will return 0. Useful 
+    for determining if data is available from the remote user without blocking, 
+    particularly when implementing custom input routines or monitoring connection activity.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER bytes
+       bytes = INBYTES()
+       PRINTLN "Bytes in modem input buffer = ", bytes
+       
+       ; Check if user is typing
+       IF (INBYTES() > 0) THEN
+           PRINTLN "User is sending data..."
+       ENDIF
+
+  **See Also**
+    * :PPL:`OUTBYTES()` – Check output buffer
+    * :PPL:`MGETBYTE()` – Get byte from modem
+    * :PPL:`MINKEY()` – Get key from modem
+    * :PPL:`ONLOCAL()` – Check if local session
 
 I2S (1.00)
 ~~~~~~~~~~
@@ -1721,6 +2011,59 @@ MONTH (1.00)
   **Returns**
     Month (1–12).
 
+MSGTOFILE (3.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT MSGTOFILE(INTEGER conf, INTEGER msg_no, STRING filename)`
+
+  Export a message to a text file with formatted headers.
+
+  **Parameters**
+    * :PPL:`conf` – Conference number containing the message (0 = main board)
+    * :PPL:`msg_no` – Message number to export
+    * :PPL:`filename` – Path and filename for the output file
+
+  **Remarks**
+    Exports the specified message to a text file with structured header information. 
+    The output file format is:
+    
+    * Lines 1-15: Standard header fields (one per line)
+    * Line 16: Count of extended headers
+    * Following lines: Extended headers (one per line) if present
+    * Separator line: "Message body:"
+    * Remaining lines: Message text content
+    
+    Headers are formatted for easy parsing. This is useful for archiving messages, 
+    creating reports, or interfacing with external programs that need to process 
+    message content.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Export message #200 from main board
+       MSGTOFILE 0, 200, "D:\MSG1.TXT"
+       DISPFILE "D:\MSG1.TXT", DEFS
+       
+       ; Search for a message and export it
+       INTEGER msgNum
+       msgNum = SCANMSGHDR(0, 1, HDR_FROM, "John Doe")
+       IF (msgNum > 0) THEN
+           MSGTOFILE 0, msgNum, "FOUND.TXT"
+           PRINTLN "Message exported to FOUND.TXT"
+       ENDIF
+       
+       ; Archive all messages in a range
+       INTEGER i
+       FOR i = 100 TO 150
+           MSGTOFILE 0, i, "ARCHIVE\" + STRING(i) + ".TXT"
+       NEXT
+
+  **See Also**
+    * :PPL:`SCANMSGHDR()` – Search message headers
+    * :PPL:`MESSAGE` – Send message
+    * :PPL:`DISPFILE` – Display file
+    * :PPL:`HDR_` constants – Header field identifiers
+
 NOCHAR (1.00)
 ~~~~~~~~~~~~~
   :PPL:`FUNCTION STRING NOCHAR()`
@@ -1873,6 +2216,40 @@ OS (3.20)
                 PRINTLN "Running OS/2 version of Icy Board"
         END SELECT
 
+OUTBYTES (3.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER OUTBYTES()`
+
+  Returns the number of bytes waiting in the modem's output buffer.
+
+  **Returns**
+    Number of bytes pending in the modem output buffer, or 0 in local mode.
+
+  **Remarks**
+    Returns the count of bytes queued for transmission to the remote user's modem. 
+    This function is not available in local mode and will return 0. Useful for flow 
+    control and determining when data has been sent to the remote user, particularly 
+    during file transfers or when sending large amounts of data.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER bytes
+       bytes = OUTBYTES()
+       PRINTLN "Bytes waiting in the modem output buffer: ", bytes
+       
+       ; Wait for output buffer to clear before continuing
+       WHILE (OUTBYTES() > 0) DO
+           DELAY 1
+       ENDWHILE
+
+  **See Also**
+    * :PPL:`CARRIER()` – Check connection speed
+    * :PPL:`CDON()` – Check carrier detect
+    * :PPL:`MGETBYTE()` – Get byte from modem
+    * :PPL:`ONLOCAL()` – Check if local session
+
 PAGESTAT (1.00)
 ~~~~~~~~~~~~~~~
   :PPL:`FUNCTION BOOLEAN PAGESTAT()`
@@ -1903,6 +2280,133 @@ PAGESTAT (1.00)
     * :PPL:`PAGEOFF` – Disable page
     * :PPL:`PAGEON` – Enable page
 
+PCBACCOUNT (3.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION DOUBLE PCBACCOUNT(INTEGER field)`
+
+  Returns the configured charge/credit rates for various BBS activities.
+
+  **Parameters**
+    * :PPL:`field` – Field number (0-13) or charge/payment constant
+
+  **Returns**
+    Credit charge or payment rate for the specified activity.
+
+  **Field Constants**
+    =================  ===  =================================================
+    Constant           Val  Description
+    =================  ===  =================================================
+    NEWBALANCE         0    Credits given to new user accounts
+    CHRG_CALL          1    Credits charged per call
+    CHRG_TIME          2    Credits charged per minute of time used
+    CHRG_PEAKTIME      3    Credits charged for peak time usage
+    CHRG_CHAT          4    Credits charged for chat sessions
+    CHRG_MSGREAD       5    Credits charged for reading messages
+    CHRG_MSGCAP        6    Credits charged for capturing messages
+    CHRG_MSGWRITE      7    Credits charged for writing messages
+    CHRG_MSGECHOED     8    Credits charged for writing echoed messages
+    CHRG_MSGPRIVATE    9    Credits charged for writing private messages
+    CHRG_DOWNFILE      10   Credits charged for downloading files
+    CHRG_DOWNBYTES     11   Credits charged per byte downloaded
+    PAY_UPFILE         12   Credits given for uploading files
+    PAY_UPBYTES        13   Credits given per byte uploaded
+    =================  ===  =================================================
+
+  **Remarks**
+    Returns the accounting rates configured by the SysOp in PCBSetup. These values 
+    determine what users will be charged or credited for various system activities 
+    when accounting is enabled. Use the predefined constants for clarity and 
+    maintainability. These fields are read-only and can only be modified through 
+    PCBSetup, not within PPL.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       DOUBLE chatRate, downloadRate
+       
+       chatRate = PCBACCOUNT(CHRG_CHAT)
+       PRINTLN "You will be charged ", chatRate, " credits per minute for chat"
+       
+       downloadRate = PCBACCOUNT(CHRG_DOWNFILE)
+       PRINTLN "File downloads cost ", downloadRate, " credits each"
+       
+       IF (PCBACCOUNT(NEWBALANCE) > 0) THEN
+           PRINTLN "New users receive ", PCBACCOUNT(NEWBALANCE), " credits"
+       ENDIF
+
+  **See Also**
+    * :PPL:`ACCOUNT()` – Get user accounting values
+    * :PPL:`ACCOUNT` statement – Modify user accounting
+    * :PPL:`RECORDUSAGE` – Record usage with logging
+    * :PPL:`PCBACCSTAT()` – Check accounting status
+
+PCBACCSTAT (3.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION DOUBLE PCBACCSTAT(INTEGER field)`
+
+  Returns accounting status and conference-specific charge adjustments.
+
+  **Parameters**
+    * :PPL:`field` – Field number (0-4) or ACC_ constant
+
+  **Returns**
+    Value of the specified accounting status field.
+
+  **Field Constants**
+    ==============  ===  ===================================================
+    Constant        Val  Description
+    ==============  ===  ===================================================
+    ACC_STAT        0    Accounting system status: 0=Disabled, 1=Tracking, 
+                         2=Enabled
+    ACC_TIME        1    Additional units charged per minute in current 
+                         conference
+    ACC_MSGR        2    Additional charge for each message read in current 
+                         conference  
+    ACC_MSGW        3    Additional charge for each message written in 
+                         current conference
+    ACC_CUR_BAL     4    Current up-to-the-minute user balance
+    ==============  ===  ===================================================
+
+  **Remarks**
+    Provides access to the accounting system status and conference-specific charge 
+    adjustments. The ACC_STAT field indicates whether accounting is disabled (0), 
+    in tracking mode (1), or fully enabled (2). Fields 1-3 return additional charges 
+    applied in the current conference beyond the base rates. Field 4 provides the 
+    user's current balance calculated in real-time. Use the predefined constants for 
+    clarity and maintainability.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       DOUBLE balance, extraCharge
+       
+       ; Check if accounting is enabled
+       IF (PCBACCSTAT(ACC_STAT) = 2) THEN
+           PRINTLN "Accounting is fully enabled"
+           
+           ; Show current balance
+           balance = PCBACCSTAT(ACC_CUR_BAL)
+           PRINTLN "Your current balance: ", balance, " credits"
+           
+           ; Check conference-specific charges
+           extraCharge = PCBACCSTAT(ACC_TIME)
+           IF (extraCharge > 0) THEN
+               PRINTLN "Additional charge: ", extraCharge, " per minute in this conference"
+           ENDIF
+       ELSEIF (PCBACCSTAT(ACC_STAT) = 1) THEN
+           PRINTLN "Accounting is in tracking mode"
+       ELSE
+           PRINTLN "Accounting is disabled"
+       ENDIF
+
+  **See Also**
+    * :PPL:`ACCOUNT()` – Get user accounting values
+    * :PPL:`ACCOUNT` statement – Modify user accounting
+    * :PPL:`PCBACCOUNT()` – Get accounting charge rates
+    * :PPL:`RECORDUSAGE` – Record usage with logging
+
 PCBDAT (1.00)
 ~~~~~~~~~~~~~
   :PPL:`FUNCTION STRING PCBDAT()`
@@ -1927,6 +2431,49 @@ PCBDAT (1.00)
   **See Also**
     * :PPL:`GETENV()` – Get environment variable
     * :PPL:`READLINE()` – Read file line
+
+PCBMAC (3.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR PCBMAC(STRING macro)`
+
+  Expands a PCBoard macro and returns its text value.
+
+  **Parameters**
+    * :PPL:`macro` – PCBoard macro string including @ symbols (e.g., "@TIMELIMIT@")
+
+  **Returns**
+    Expanded text value of the macro as a BIGSTR.
+
+  **Remarks**
+    Processes PCBoard display macros and returns their expanded text values. Useful for 
+    accessing system information that would normally be displayed to users. The macro 
+    parameter must include the surrounding @ symbols. Not all PCBoard macros are supported - 
+    action macros like @BEEP@, @CLS@, @MORE@, @PAUSE@, @WAIT@, @WHO@ and positioning 
+    macros like @POS@, @X@ return empty strings rather than performing their actions.
+
+  **Unsupported Macros**
+    @AUTOMORE@, @BEEP@, @CLREOL@, @CLS@, @DELAY@, @MORE@, @PAUSE@, @POFF@, @PON@, 
+    @POS@, @QOFF@, @QON@, @WAIT@, @WHO@, @X@
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER timeLimit, timeUsed, timeLeft
+       timeLimit = INTEGER(PCBMAC("@TIMELIMIT@"))
+       timeUsed = INTEGER(PCBMAC("@TIMEUSED@"))
+       timeLeft = timeLimit - timeUsed
+       PRINTLN "You have ", timeLeft, " minutes left"
+       
+       ; Get user information
+       STRING userName
+       userName = PCBMAC("@USER@")
+       PRINTLN "Welcome, ", userName
+
+  **See Also**
+    * :PPL:`GETENV()` – Get environment variable
+    * :PPL:`PCBDAT()` – Get PCBoard data file
+    * :PPL:`U_NAME()` – Get user name directly
 
 PCBNODE (1.00)
 ~~~~~~~~~~~~~~
@@ -2110,6 +2657,44 @@ PSA (1.00)
 
   **See Also**
     * :PPL:`VER()` – Get version
+
+QWKLIMITS (3.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER QWKLIMITS(INTEGER field)`
+
+  Retrieve QWK packet limits for the current user.
+
+  **Parameters**
+    * :PPL:`field` – Field to retrieve (0-3, use constants below)
+
+  **Returns**
+    Current limit value for the specified field.
+
+  **Field Constants**
+    =================  =====  ================================================
+    Constant           Value  Description
+    =================  =====  ================================================
+    MAXMSGS            0      Maximum messages per QWK packet
+    CMAXMSGS           1      Maximum messages per conference in packet
+    ATTACH_LIM_U       2      Personal attachment size limit (bytes)
+    ATTACH_LIM_P       3      Public attachment size limit (bytes)
+    =================  =====  ================================================
+
+  **Remarks**
+    Returns the current QWK configuration values for the user. These limits control how 
+    many messages can be downloaded in QWK packets and the maximum size of file attachments. 
+    The actual values used may be lower than configured if PCBSetup has more restrictive 
+    system-wide limits. Must call GETUSER before using this function to load the user's 
+    configuration into memory.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       GETUSER
+       
+       ; Display current QWK limits
+       PRINTLN "Maximum messages per packet: ", QWKLIMITS(MAXMSGS)
 
 RANDOM (1.00)
 ~~~~~~~~~~~~~
@@ -2374,6 +2959,84 @@ S2I (1.00)
   **See Also**
     * :PPL:`I2S()` – Convert integer to string in base
 
+SCANMSGHDR (3.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER SCANMSGHDR(INTEGER conf, INTEGER start_msg, INTEGER field, STRING test)`
+
+  Scans message headers for matching criteria.
+
+  **Parameters**
+    * :PPL:`conf` – Conference number to scan (0 = main board)
+    * :PPL:`start_msg` – Starting message number for the scan
+    * :PPL:`field` – Header field to search (1-15, use HDR_ constants)
+    * :PPL:`test` – Search string to match
+
+  **Returns**
+    First message number matching the search criteria, or 0 if none found.
+
+  **Field Constants**
+    ===============  =====  ===  ==========================================
+    Constant         Hex    Dec  Description
+    ===============  =====  ===  ==========================================
+    HDR_STATUS       0x01   1    Message status
+    HDR_MSGNUM       0x02   2    Message number
+    HDR_MSGREF       0x03   3    Reference message number
+    HDR_BLOCKS       0x04   4    Number of 128-byte blocks in message
+    HDR_DATE         0x05   5    Date message was written
+    HDR_TIME         0x06   6    Time message was written
+    HDR_TO           0x07   7    Who the message is to
+    HDR_RPLYDATE     0x08   8    Reply message date
+    HDR_RPLYTIME     0x09   9    Reply message time
+    HDR_REPLY        0x0A   10   Message reply flag
+    HDR_FROM         0x0B   11   Who the message is from
+    HDR_SUBJ         0x0C   12   Message subject
+    HDR_PWD          0x0D   13   Message password
+    HDR_ACTIVE       0x0E   14   Message active flag
+    HDR_ECHO         0x0F   15   Echoed message flag
+    ===============  =====  ===  ==========================================
+
+  **Remarks**
+    Scans PCBoard message bases for specific information in message headers. All fields 
+    in the standard message header can be searched. The function starts at the specified 
+    message number and returns the first message that matches the search criteria. Useful 
+    for finding messages from specific users, with particular subjects, or matching other 
+    header criteria.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER msgno
+       
+       ; Find first message to "Stan" starting at message 1
+       msgno = SCANMSGHDR(0, 1, HDR_TO, "Stan")
+       IF (msgno > 0) THEN
+           PRINTLN "Found message #", msgno, " addressed to Stan"
+       ENDIF
+       
+       ; Search for messages with "PPL" in subject, conference 0, starting at msg 100
+       INTEGER num
+       num = SCANMSGHDR(0, 100, HDR_SUBJ, "PPL")
+       IF (num > 0) THEN
+           PRINTLN "Found message about PPL: #", num
+       ENDIF
+       
+       ; Find all messages from a user
+       INTEGER msg, conf
+       conf = CURCONF()
+       msg = 1
+       WHILE (TRUE) DO
+           msg = SCANMSGHDR(conf, msg, HDR_FROM, "John Doe")
+           IF (msg = 0) BREAK
+           PRINTLN "Message #", msg, " is from John Doe"
+           INC msg
+       ENDWHILE
+
+  **See Also**
+    * :PPL:`MSGTOFILE` – Export message to file
+    * :PPL:`MESSAGE` – Send message
+    * :PPL:`CURCONF()` – Get current conference
+
 SCRTEXT (1.00)
 ~~~~~~~~~~~~~~
   :PPL:`FUNCTION STRING SCRTEXT(INTEGER x, INTEGER y, INTEGER len, BOOLEAN color)`
@@ -2528,6 +3191,101 @@ SPACE (1.00)
     * :PPL:`INSTR()` – Find substring
     * :PPL:`LEN()` – Get string length
     * :PPL:`STRING()` – Convert to string
+
+STACKERR (3.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN STACKERR()`
+
+  Returns whether a stack error has occurred.
+
+  **Returns**
+    TRUE if a stack error has occurred, FALSE otherwise.
+
+  **Remarks**
+    Due to limited stack space for recursive and nested function calls, this function 
+    allows you to detect if a stack overflow has occurred during PPE execution. This is 
+    in addition to any error message displayed when the error occurs. Only useful if 
+    STACKABORT has been set to FALSE to prevent automatic abortion on stack errors. 
+    PPL will not allow system memory corruption when stack space is exhausted; it will 
+    prevent further function calls when no stack space remains. Note that nested/recursive 
+    procedure calls are limited by heap space, not stack space.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STACKABORT FALSE  ; Continue on stack errors
+       
+       ; Recursive function with error checking
+       FUNCTION deepRecursion(INTEGER level)
+           IF (STACKERR()) THEN
+               PRINTLN "Stack error occurred at level ", level
+               RETURN
+           ENDIF
+           
+           IF (level < 100) THEN
+               deepRecursion(level + 1)
+           ENDIF
+       ENDFUNC
+
+  **See Also**
+    * :PPL:`STACKABORT` – Control stack error behavior
+    * :PPL:`STACKLEFT()` – Check remaining stack space
+    * :PPL:`STK_LIMIT` – Stack limit constant
+
+STACKLEFT (3.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER STACKLEFT()`
+
+  Returns the number of bytes remaining on the system stack.
+
+  **Returns**
+    Number of bytes available on the system stack.
+
+  **Remarks**
+    Essential for managing recursive and deeply nested function calls. Since function 
+    calls consume significant stack space (approximately 26 nested calls can exhaust 
+    the stack), use this function to check available space before making recursive 
+    calls. This prevents runtime stack overflow errors. Both recursive functions and 
+    deeply nested function calls should check this value when more than a few levels 
+    of calls are expected.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       PRINTLN "There are ", STACKLEFT(), " bytes left on the stack"
+       
+       ; Recursive function with stack safety check
+       CONST STK_LIMIT = 1000
+       
+       FUNCTION factorial(INTEGER n) INTEGER
+           ; Check stack before recursing
+           IF (STACKLEFT() < STK_LIMIT) THEN
+               PRINTLN "Stack limit reached!"
+               RETURN 1
+           ENDIF
+           
+           IF (n <= 1) THEN
+               RETURN 1
+           ELSE
+               RETURN n * factorial(n - 1)
+           ENDIF
+       ENDFUNC
+       
+       ; Safe recursive directory traversal
+       FUNCTION processDir(STRING path)
+           IF (STACKLEFT() > STK_LIMIT) THEN
+               ; Process subdirectories recursively
+               processDir(path + "\subdir")
+           ELSE
+               PRINTLN "Maximum recursion depth reached"
+           ENDIF
+       ENDFUNC
+
+  **See Also**
+    * :PPL:`FUNCTION` – Define function
+    * :PPL:`PROCEDURE` – Define procedure
 
 STRING (1.00)
 ~~~~~~~~~~~~~
@@ -2766,8 +3524,6 @@ TIMEAP (1.00)
   **See Also**
     * :PPL:`TIME()` – Get current time
 
-// ...existing code...
-
 TOKCOUNT (1.00)
 ~~~~~~~~~~~~~~~
   :PPL:`FUNCTION INTEGER TOKCOUNT()`
@@ -2865,6 +3621,46 @@ TOBIGSTR (2.00)
   **Returns**
     :PPL:`value` coerced to BIGSTR.
 
+TODDATE (3.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION DDATE TODDATE(ANY value)`
+
+  Converts any PPL type to DDATE type.
+
+  **Parameters**
+    * :PPL:`value` – Any PPL expression to convert
+
+  **Returns**
+    DDATE representation of the input value.
+
+  **Remarks**
+    Provides explicit type conversion to DDATE format (julian date for dBase compatibility). 
+    While PPL supports implicit type conversion between compatible types, this function 
+    ensures proper conversion to DDATE format which stores dates as signed long integers 
+    and formats as "CCYYMMDD" when converted to string.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       DATE d1
+       DDATE d2
+       
+       d1 = DATE()  ; Get current date
+       d2 = TODDATE(d1)  ; Convert to DDATE format
+       
+       ; Also works with strings
+       DDATE birthDate
+       birthDate = TODDATE("19940527")
+       
+       ; Implicit conversion also valid
+       DDATE today
+       today = DATE()  ; Automatic conversion
+
+  **See Also**
+    * :PPL:`DATE()` – Get current date
+    * :PPL:`DDATE` – dBase date type
+    * :PPL:`STRING()` – Convert to string
 
 UN_XXX() Functions (1.00)
 ~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -5,6 +5,68 @@
 Statements
 ----------
 
+ACCOUNT (3.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT ACCOUNT(INTEGER field, INTEGER value)`
+
+  Update user accounting debit/credit values.
+
+  **Parameters**
+    * :PPL:`field` – Accounting field (0-17, use constants START_BAL through SEC_DROP)
+    * :PPL:`value` – Amount of credits to add to the field
+
+  **Field Constants**
+    ================  ===  ============================================
+    Constant          Val  Description
+    ================  ===  ============================================
+    START_BAL         0    User's starting balance
+    START_SESSION     1    Starting balance for this session
+    DEB_CALL          2    Debit for this call
+    DEB_TIME          3    Debit for time online
+    DEB_MSGREAD       4    Debit for reading messages
+    DEB_MSGCAP        5    Debit for capturing messages
+    DEB_MSGWRITE      6    Debit for writing messages
+    DEB_MSGECHOED     7    Debit for echoed messages
+    DEB_MSGPRIVATE    8    Debit for private messages
+    DEB_DOWNFILE      9    Debit for downloading files
+    DEB_DOWNBYTES     10   Debit for downloading bytes
+    DEB_CHAT          11   Debit for chat time
+    DEB_TPU           12   Debit for TPU
+    DEB_SPECIAL       13   Special debit
+    CRED_UPFILE       14   Credit for uploading files
+    CRED_UPBYTES      15   Credit for uploading bytes
+    CRED_SPECIAL      16   Special credit
+    SEC_DROP          17   Security level to drop to at 0 credits
+    ================  ===  ============================================
+
+  **Remarks**
+    Updates accounting values in memory only. This statement modifies debit/credit fields 
+    directly without creating audit trail records. For full transaction logging with 
+    descriptions and unit costs, use RECORDUSAGE instead.
+
+    The value parameter is added to the current field value (use negative values to subtract).
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Record 10 credits used for chatting
+       ACCOUNT DEB_CHAT, 10
+       
+       ; Add download byte charges
+       INTEGER fileSize
+       fileSize = FILEINF("MYFILE.ZIP", 2)
+       ACCOUNT DEB_DOWNBYTES, fileSize
+       
+       ; Give upload credit (add to credits)
+       ACCOUNT CRED_UPFILE, 1
+
+  **See Also**
+    * :PPL:`ACCOUNT()` function – Retrieve accounting values
+    * :PPL:`RECORDUSAGE` – Update accounting with detailed logging
+    * :PPL:`PCBACCOUNT()` – Get charge rates
+    * :PPL:`PCBACCSTAT()` – Check accounting status
+
 ADDUSER (3.20)
 ~~~~~~~~~~~~~~
 
@@ -1059,6 +1121,37 @@ FCLOSE (1.00)
     * :PPL:`FCREATE` – Create file
     * :PPL:`FOPEN` – Open file
 
+FCLOSEALL (3.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FCLOSEALL`
+
+  Close all open file channels.
+
+  **Remarks**
+    Closes all file channels (0-7) that are currently open. Useful for cleanup when working 
+    with multiple files or ensuring all files are closed before program termination. The 
+    statement automatically checks which channels are open and closes only those. While PPL 
+    automatically closes all open files at program end, explicit closing with FCLOSEALL is 
+    recommended for proper resource management.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FOPEN 1, "AUTOEXEC.BAT", O_RD, S_DW
+       FOPEN 2, "CONFIG.SYS", O_RD, S_DW
+       FCREATE 3, "OUTPUT.TXT", O_WR, S_DN
+       
+       ; Process files...
+       
+       FCLOSEALL  ; Close all three files at once
+
+  **See Also**
+    * :PPL:`FCLOSE` – Close specific file channel
+    * :PPL:`FOPEN` – Open existing file
+    * :PPL:`FCREATE` – Create new file
+    * :PPL:`FAPPEND` – Open file for append
+
 FCREATE (1.00)
 ~~~~~~~~~~~~~~
   :PPL:`STATEMENT FCREATE(INTEGER chan, STRING file, INTEGER am, INTEGER sm)`
@@ -1374,6 +1467,40 @@ FPUTPAD (1.00)
     * :PPL:`FGET` – Read from file
     * :PPL:`FPUT` – Write without newline
     * :PPL:`FPUTLN` – Write with newline
+
+FREALTUSER (3.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FREALTUSER`
+
+  Free the alternate user record loaded by GETALTUSER.
+
+  **Remarks**
+    Since only one GETALTUSER can be active at a time, FREALTUSER releases the 
+    alternate user record, allowing other processes that need GETALTUSER (such as 
+    the MESSAGE command) to function properly. Always call FREALTUSER after you're 
+    done with the alternate user data to avoid blocking other operations.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING name
+       
+       ; Load alternate user record
+       GETALTUSER 20
+       name = U_NAME()
+       
+       ; Free the record before MESSAGE command
+       FREALTUSER
+       
+       ; Now MESSAGE can use GETALTUSER internally
+       MESSAGE 1, name, "Subject", "R", 0, FALSE, FALSE, "message.txt"
+
+  **See Also**
+    * :PPL:`GETALTUSER` – Load alternate user record
+    * :PPL:`MESSAGE` – Send message
+    * :PPL:`GETUSER` – Load current user record
+    * :PPL:`PUTUSER` – Save user record
 
 FRESHLINE (1.00)
 ~~~~~~~~~~~~~~~~
@@ -2738,6 +2865,61 @@ QUEST (1.00)
     * :PPL:`DIR` – File directory
     * :PPL:`JOIN` – Join conference
 
+QWKLIMITS (3.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT QWKLIMITS(INTEGER field, INTEGER limit)`
+
+  Modify QWK packet limits for the current user.
+
+  **Parameters**
+    * :PPL:`field` – Field to modify (0-3, use constants below)
+    * :PPL:`limit` – New limit value
+
+  **Field Constants**
+    =================  =====  ================================================
+    Constant           Value  Description
+    =================  =====  ================================================
+    MAXMSGS            0      Maximum messages per QWK packet
+    CMAXMSGS           1      Maximum messages per conference in packet
+    ATTACH_LIM_U       2      Personal attachment size limit (bytes)
+    ATTACH_LIM_P       3      Public attachment size limit (bytes)
+    =================  =====  ================================================
+
+  **Remarks**
+    Modifies QWK packet download limits for the current user. Changes are only saved 
+    after calling PUTUSER. For MAXMSGS and CMAXMSGS, if you specify a value higher 
+    than configured in PCBSetup, the PCBSetup values will be used instead. The 
+    attachment limits control the maximum total size of file attachments the user 
+    can include in their QWK packets.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       GETUSER
+       
+       ; Set maximum messages per packet to 500
+       QWKLIMITS MAXMSGS, 500
+       
+       ; Limit messages per conference to 100
+       QWKLIMITS CMAXMSGS, 100
+       
+       ; Set attachment limits based on security level
+       IF (CURSEC() >= 50) THEN
+           QWKLIMITS ATTACH_LIM_U, 1048576  ; 1MB personal attachments
+           QWKLIMITS ATTACH_LIM_P, 2097152  ; 2MB public attachments
+       ELSE
+           QWKLIMITS ATTACH_LIM_U, 102400   ; 100KB personal attachments
+           QWKLIMITS ATTACH_LIM_P, 512000   ; 500KB public attachments
+       ENDIF
+       
+       PUTUSER
+
+  **See Also**
+    * :PPL:`GETUSER` – Load user record
+    * :PPL:`PUTUSER` – Save user record
+    * :PPL:`MESSAGE` – Send message
+
 RDUNET (1.00)
 ~~~~~~~~~~~~~
   :PPL:`STATEMENT RDUNET(INTEGER node)`
@@ -2788,6 +2970,69 @@ RDUSYS (1.00)
   **See Also**
     * :PPL:`SHELL` – Execute external program
     * :PPL:`WRUSYS` – Write USERS.SYS file
+
+RECORDUSAGE (3.00)
+~~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT RECORDUSAGE(INTEGER field, STRING desc1, STRING desc2, DWORD unitcost, INTEGER value)`
+
+  Update user accounting and log transaction details.
+
+  **Parameters**
+    * :PPL:`field` – Accounting field (2-16, use DEB_/CRED_ constants)
+    * :PPL:`desc1` – Primary description of the charge
+    * :PPL:`desc2` – Secondary description or details
+    * :PPL:`unitcost` – Cost per unit
+    * :PPL:`value` – Number of units
+
+  **Field Constants**
+    ================  ===  ============================================
+    Constant          Val  Description
+    ================  ===  ============================================
+    DEB_CALL          2    Debit for this call
+    DEB_TIME          3    Debit for time online
+    DEB_MSGREAD       4    Debit for reading messages
+    DEB_MSGCAP        5    Debit for capturing messages
+    DEB_MSGWRITE      6    Debit for writing messages
+    DEB_MSGECHOED     7    Debit for echoed messages
+    DEB_MSGPRIVATE    8    Debit for private messages
+    DEB_DOWNFILE      9    Debit for downloading files
+    DEB_DOWNBYTES     10   Debit for downloading bytes
+    DEB_CHAT          11   Debit for chat time
+    DEB_TPU           12   Debit for TPU
+    DEB_SPECIAL       13   Special debit
+    CRED_UPFILE       14   Credit for uploading files
+    CRED_UPBYTES      15   Credit for uploading bytes
+    CRED_SPECIAL      16   Special credit
+    ================  ===  ============================================
+
+  **Remarks**
+    Updates accounting debit/credit values and writes detailed transaction records to the 
+    accounting log file. Unlike the ACCOUNT statement which only updates in-memory values, 
+    RECORDUSAGE also creates an audit trail with descriptions, unit costs, and quantities 
+    for billing and reporting purposes. The total charge (unitcost * value) is added to 
+    the specified field.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Record chat charges with details
+       RECORDUSAGE DEB_CHAT, "Debit for chat", "Using PPE", 10, 10
+       ; This charges 100 credits (10 units * 10 per unit)
+       
+       ; Record file download with details
+       INTEGER fileSize
+       fileSize = FILEINF("MYFILE.ZIP", 2) / 1024  ; Size in KB
+       RECORDUSAGE DEB_DOWNBYTES, "Downloaded MYFILE.ZIP", "From Area 5", 1, fileSize
+       
+       ; Give upload credit
+       RECORDUSAGE CRED_UPFILE, "Upload credit", "NEWFILE.ZIP", 25, 1
+
+  **See Also**
+    * :PPL:`ACCOUNT` statement – Update accounting without logging
+    * :PPL:`ACCOUNT()` function – Retrieve accounting values
+    * :PPL:`PCBACCOUNT()` – Get charge rates
+    * :PPL:`PCBACCSTAT()` – Check accounting status
 
 RENAME (3.20)
 ~~~~~~~~~~~~~
@@ -3007,6 +3252,80 @@ SETBANKBAL (3.20)
 
   Adjusts stored “bank” balance (economy/game feature – semantics engine-defined).
 
+SETENV (3.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT SETENV(STRING envvar)`
+
+  Set a DOS environment variable.
+
+  **Parameters**
+    * :PPL:`envvar` – Environment variable assignment in format "NAME=VALUE"
+
+  **Remarks**
+    Sets a DOS environment variable for inter-PPE communication. The variable assignment must 
+    be in the format "NAME=VALUE". Environment variables set within PPL are NOT available to 
+    DOOR applications and will be cleared when PCBoard recycles through DOS. PPL programmers 
+    should clear environment variables when no longer needed to avoid memory waste. This 
+    provides a simple method for different PPE files to share data during a session.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING s
+       LET s = "STAN=Stan"
+       SETENV s
+       
+       ; Later in this or another PPE...
+       IF (GETENV("STAN") = "Stan") THEN
+           PRINTLN "Environment variable STAN = Stan"
+       ENDIF
+       
+       ; Clear when done
+       SETENV "STAN="
+
+  **See Also**
+    * :PPL:`GETENV()` – Get environment variable value
+    * :PPL:`CALL` – Execute another PPE
+    * :PPL:`SHELL` – Execute external program
+
+SETLMR (3.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT SETLMR(INTEGER conf, INTEGER msg)`
+
+  Set the Last Message Read pointer for a conference.
+
+  **Parameters**
+    * :PPL:`conf` – Conference number to set LMR for
+    * :PPL:`msg` – Message number to set as last read
+
+  **Remarks**
+    Sets the user's Last Message Read (LMR) pointer for the specified conference. Useful for 
+    new user setup to prevent them from seeing or replying to very old messages. If the 
+    conference number exceeds the highest available conference, it defaults to the highest 
+    conference. If the message number exceeds the highest message in that conference, it 
+    defaults to the highest message number.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER conf, msg
+       IF (newuser = TRUE) THEN           ; If new user
+           WHILE (conf <= HICONFNUM()) DO ; Set all LMRs to
+               JOIN conf                   ; HI_MSG - 10
+               SETLMR conf, HIMSGNUM()-10
+               INC conf
+           ENDWHILE
+       ENDIF
+
+  **See Also**
+    * :PPL:`HICONFNUM()` – Get highest conference number
+    * :PPL:`HIMSGNUM()` – Get highest message number
+    * :PPL:`LOWMSGNUM()` – Get lowest message number  
+    * :PPL:`NUMACTMSG()` – Get number of active messages
+    * :PPL:`JOIN` – Join conference
+
 SHELL (1.00)
 ~~~~~~~~~~~~
   :PPL:`STATEMENT SHELL(BOOLEAN viacc, VAR INTEGER retcode, STRING prog, STRING cmds)`
@@ -3222,6 +3541,49 @@ SPRINTLN (1.00)
     * :PPL:`SPRINT` – Print local without newline
     * :PPL:`PRINTLN` – Print to both with newline
     * :PPL:`MPRINTLN` – Print to modem with newline
+
+STACKABORT (3.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT STACKABORT(BOOLEAN abort)`
+
+  Control whether to abort execution on stack errors.
+
+  **Parameters**
+    * :PPL:`abort` – TRUE to abort on stack error (default), FALSE to continue
+
+  **Remarks**
+    Allows the programmer to control PPE behavior when a stack error occurs. When set 
+    to TRUE (default), the PPE will terminate execution after a stack error. When set 
+    to FALSE, the PPE will attempt to continue running. CAUTION: If execution continues 
+    after a stack error, program behavior becomes unpredictable. PPL will prevent system 
+    memory corruption but cannot guarantee correct program operation. Use STACKERR() to 
+    check for errors and STACKLEFT() to prevent them.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STACKABORT FALSE  ; Try to continue on stack errors
+       
+       ; Risky recursive operation
+       PROCEDURE riskyRecursion(INTEGER depth)
+           IF (STACKERR()) THEN
+               PRINTLN "Stack error detected, stopping recursion"
+               RETURN
+           ENDIF
+           
+           IF (STACKLEFT() < STK_LIMIT) THEN
+               PRINTLN "Stack space low, stopping at depth ", depth
+               RETURN
+           ENDIF
+           
+           riskyRecursion(depth + 1)
+       ENDPROC
+
+  **See Also**
+    * :PPL:`STACKERR()` – Check for stack errors
+    * :PPL:`STACKLEFT()` – Check remaining stack space
+    * :PPL:`STK_LIMIT` – Stack limit constant
 
 STARTDISP (1.00)
 ~~~~~~~~~~~~~~~~
