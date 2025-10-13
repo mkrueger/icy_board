@@ -68,7 +68,7 @@ ACCOUNT (3.00)
   Retrieve accounting information for the current user.
 
   **Parameters**
-    * :PPL:`field` – Field number (0-17) or DEB_/CRED_ constant
+    * :PPL:`field` – Field number (0-17) or DEB_XXX/CRED_XXX constant
 
   **Returns**
     Amount of credits for the specified accounting field.
@@ -2348,7 +2348,7 @@ PCBACCSTAT (3.00)
   Returns accounting status and conference-specific charge adjustments.
 
   **Parameters**
-    * :PPL:`field` – Field number (0-4) or ACC_ constant
+    * :PPL:`field` – Field number (0-4) or ACC_XXX constant
 
   **Returns**
     Value of the specified accounting status field.
@@ -2968,7 +2968,7 @@ SCANMSGHDR (3.00)
   **Parameters**
     * :PPL:`conf` – Conference number to scan (0 = main board)
     * :PPL:`start_msg` – Starting message number for the scan
-    * :PPL:`field` – Header field to search (1-15, use HDR_ constants)
+    * :PPL:`field` – Header field to search (1-15, use HDR_XXX constants)
     * :PPL:`test` – Search string to match
 
   **Returns**

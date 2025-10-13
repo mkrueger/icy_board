@@ -1,3 +1,6 @@
+.. role:: PPL(code)
+   :language: PPL
+
 DBase III+ API
 ==============
 
