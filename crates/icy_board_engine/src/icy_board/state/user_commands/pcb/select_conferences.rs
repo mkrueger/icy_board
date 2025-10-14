@@ -138,7 +138,7 @@ impl IcyBoardState {
             if let Some(flags) = user.conference_flags.get(&num) {
                 match select_mode {
                     SelectMode::SelectCmd => {
-                        if flags.contains(ConferenceFlags::UserSelected) {
+                        if flags.contains(ConferenceFlags::Selected) {
                             flag_str.push('X');
                         }
                     }
@@ -151,14 +151,14 @@ impl IcyBoardState {
                         } else if flags.contains(ConferenceFlags::Expired) {
                             flag_str.push('L');
                         }
-                        if flags.contains(ConferenceFlags::UserSelected) {
+                        if flags.contains(ConferenceFlags::Selected) {
                             flag_str.push('S');
                         }
 
-                        if flags.contains(ConferenceFlags::CON) {
+                        if flags.contains(ConferenceFlags::Sysop) {
                             flag_str.push('S');
                         }
-                        if flags.contains(ConferenceFlags::NET) {
+                        if flags.contains(ConferenceFlags::NetStatus) {
                             flag_str.push('N');
                         }
                     }
@@ -177,9 +177,9 @@ impl IcyBoardState {
             for i in from..=to {
                 let value = *user.conference_flags.get(&i).unwrap_or(&ConferenceFlags::empty());
                 let value = match set_selection_to {
-                    Some(true) => value | ConferenceFlags::UserSelected,
-                    Some(false) => value & !ConferenceFlags::UserSelected,
-                    None => value ^ ConferenceFlags::UserSelected,
+                    Some(true) => value | ConferenceFlags::Selected,
+                    Some(false) => value & !ConferenceFlags::Selected,
+                    None => value ^ ConferenceFlags::Selected,
                 };
                 if value.is_empty() {
                     user.conference_flags.remove(&i);

@@ -1267,7 +1267,7 @@ impl IcyBoardState {
 
         if let Some(user) = &self.session.current_user {
             if let Some(flags) = user.conference_flags.get(&(conf_number as usize)) {
-                if flags.contains(ConferenceFlags::UserSelected) {
+                if flags.contains(ConferenceFlags::Selected) {
                     return true;
                 }
             }

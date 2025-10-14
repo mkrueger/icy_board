@@ -149,7 +149,7 @@ fn create_test_user(name: &str, idx: u8) -> User {
             flags |= ConferenceFlags::Registered;
         }
         if conf % 3 == 0 {
-            flags |= ConferenceFlags::UserSelected;
+            flags |= ConferenceFlags::Selected;
         }
         user.conference_flags.insert(conf as usize, flags);
     }
@@ -284,8 +284,8 @@ fn test_export_import_multiple_users() {
                     i
                 );
                 assert_eq!(
-                    imported_flags.contains(ConferenceFlags::UserSelected),
-                    flags.contains(ConferenceFlags::UserSelected),
+                    imported_flags.contains(ConferenceFlags::Selected),
+                    flags.contains(ConferenceFlags::Selected),
                     "Conference {} UserSelected flag mismatch for user {}",
                     conf,
                     i
@@ -306,10 +306,10 @@ fn test_conference_flags_roundtrip() {
 
     // Set specific conference flags
     user.conference_flags.clear();
-    user.conference_flags.insert(0, ConferenceFlags::Registered | ConferenceFlags::UserSelected);
+    user.conference_flags.insert(0, ConferenceFlags::Registered | ConferenceFlags::Selected);
     user.conference_flags.insert(7, ConferenceFlags::Expired);
     user.conference_flags.insert(8, ConferenceFlags::Registered);
-    user.conference_flags.insert(15, ConferenceFlags::UserSelected);
+    user.conference_flags.insert(15, ConferenceFlags::Selected);
     user.conference_flags.insert(31, ConferenceFlags::Registered | ConferenceFlags::Expired);
     user.conference_flags.insert(39, ConferenceFlags::all());
 
@@ -333,7 +333,7 @@ fn test_conference_flags_roundtrip() {
         let imported_flags = imported.conference_flags.get(conf).copied().unwrap_or(ConferenceFlags::None);
 
         // Only compare the PCBoard-stored flags
-        let mask = ConferenceFlags::Registered | ConferenceFlags::Expired | ConferenceFlags::UserSelected;
+        let mask = ConferenceFlags::Registered | ConferenceFlags::Expired | ConferenceFlags::Selected;
         assert_eq!(original_flags & mask, imported_flags & mask, "Conference {} flags mismatch", conf);
     }
 }

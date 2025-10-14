@@ -14,7 +14,7 @@ use crate::icy_board::read_with_encoding_detection;
 use crate::icy_board::security_expr::SecurityExpression;
 use crate::icy_board::state::GraphicsMode;
 use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_NUM, MASK_PATH, MASK_PWD};
-use crate::icy_board::user_base::Password;
+use crate::icy_board::user_base::{ConferenceFlags, Password};
 use crate::icy_board::user_inf::{BankUserInf, QwkConfigUserInf};
 use crate::parser::CONFERENCE_ID;
 use crate::vm::{TerminalTarget, VirtualMachine};
@@ -1387,25 +1387,61 @@ pub async fn alias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 pub async fn confreg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
 
-    // TODO: What is that ?
-    // vm.icy_board_state.get_board().await.conferences[conf_num].
-    Ok(VariableValue::new_bool(true))
+    if let Some(session_user) = &vm.icy_board_state.session.current_user {
+        if let Some(flags) = session_user.conference_flags.get(&conf_num) {
+            return Ok(VariableValue::new_bool(flags.contains(ConferenceFlags::Registered)));
+        }
+    }
+
+    Ok(VariableValue::new_bool(false))
 }
 
 pub async fn confexp(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("CONFEXP");
+    let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
+
+    if let Some(session_user) = &vm.icy_board_state.session.current_user {
+        if let Some(flags) = session_user.conference_flags.get(&conf_num) {
+            return Ok(VariableValue::new_bool(flags.contains(ConferenceFlags::Expired)));
+        }
+    }
+
+    Ok(VariableValue::new_bool(false))
 }
 
 pub async fn confsel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("CONFSEL");
+    let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
+
+    if let Some(session_user) = &vm.icy_board_state.session.current_user {
+        if let Some(flags) = session_user.conference_flags.get(&conf_num) {
+            return Ok(VariableValue::new_bool(flags.contains(ConferenceFlags::Selected)));
+        }
+    }
+
+    Ok(VariableValue::new_bool(false))
 }
 
 pub async fn confsys(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("CONFSYS");
+    let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
+
+    if let Some(session_user) = &vm.icy_board_state.session.current_user {
+        if let Some(flags) = session_user.conference_flags.get(&conf_num) {
+            return Ok(VariableValue::new_bool(flags.contains(ConferenceFlags::Sysop)));
+        }
+    }
+
+    Ok(VariableValue::new_bool(false))
 }
 
 pub async fn confmw(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("CONFMQ");
+    let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
+
+    if let Some(session_user) = &vm.icy_board_state.session.current_user {
+        if let Some(flags) = session_user.conference_flags.get(&conf_num) {
+            return Ok(VariableValue::new_bool(flags.contains(ConferenceFlags::MailWaiting)));
+        }
+    }
+
+    Ok(VariableValue::new_bool(false))
 }
 
 pub async fn lprinted(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

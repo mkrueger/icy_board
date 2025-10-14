@@ -519,14 +519,13 @@ pub struct User {
 #[bitflag(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum ConferenceFlags {
-    None = 0b0000_0000,
-    UserSelected = 0b0000_0001,
-    Registered = 0b0000_0010,
-    Expired = 0b0000_0100,
-
-    CON = 0b0000_1000,
-    MFL = 0b0001_0000,
-    NET = 0b0010_0000,
+    None = 0x00,
+    Registered = 0x01,
+    Expired = 0x02,
+    Selected = 0x04,
+    Sysop = 0x08,
+    MailWaiting = 0x10,
+    NetStatus = 0x20,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
@@ -623,7 +622,7 @@ mod conference_flags_format {
                 continue;
             }
             // Only these flags get stored in PCBoard - rest is for use at runtime.
-            let v = *v & (ConferenceFlags::UserSelected | ConferenceFlags::Registered | ConferenceFlags::Expired);
+            let v = *v & (ConferenceFlags::Selected | ConferenceFlags::Registered | ConferenceFlags::Expired);
             s.push_str(&format!("{}:{};", k, v.bits()));
         }
         serializer.serialize_str(&s)
@@ -781,7 +780,7 @@ impl User {
                     flag |= ConferenceFlags::Registered;
                 }
                 if usr {
-                    flag |= ConferenceFlags::UserSelected;
+                    flag |= ConferenceFlags::Selected;
                 }
 
                 if !flag.is_empty() {
@@ -989,7 +988,7 @@ impl User {
             if flags.contains(ConferenceFlags::Expired) {
                 rec.conf_exp_flags[byte] |= 1 << bit;
             }
-            if flags.contains(ConferenceFlags::UserSelected) {
+            if flags.contains(ConferenceFlags::Selected) {
                 rec.conf_usr_flags[byte] |= 1 << bit;
             }
         }

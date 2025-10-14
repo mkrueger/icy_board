@@ -18,8 +18,12 @@ use std::fs::*;
 use std::io::*;
 use std::path::Path;
 
+use crate::compat_check::check_compatibility;
+
 #[cfg(test)]
 pub mod tests;
+
+pub mod compat_check;
 
 #[derive(FromArgs)]
 /// PCBoard Programming Language Decompiler
@@ -35,6 +39,10 @@ struct Cli {
     /// output to console instead of writing to file
     #[argh(switch, short = 'o')]
     output: bool,
+
+    /// checks a .ppe file for compatibility with the current runtime
+    #[argh(switch)]
+    check: bool,
 
     #[argh(option)]
     /// keyword casing style, valid values are u=upper (default), l=lower, c=camel
@@ -71,6 +79,35 @@ fn main() {
     let out_file_name = Path::new(&file_name).with_extension("ppd");
     match Executable::read_file(&file_name, !arguments.output) {
         Ok(mut executable) => {
+            if arguments.check {
+                execute!(
+                    stdout(),
+                    SetAttribute(Attribute::Bold),
+                    Print(format!("\nChecking compatibility for: {}\n", file_name)),
+                    SetAttribute(Attribute::Reset),
+                    Print(format!("PPE Version: {}\n\n", executable.runtime))
+                )
+                .unwrap();
+
+                match check_compatibility(&executable) {
+                    Ok(()) => {
+                        std::process::exit(0);
+                    }
+                    Err(err) => {
+                        execute!(
+                            stdout(),
+                            SetAttribute(Attribute::Bold),
+                            SetForegroundColor(Color::Red),
+                            Print("ERROR during compatibility check: ".to_string()),
+                            SetAttribute(Attribute::Reset),
+                            Print(format!("{}\n", err))
+                        )
+                        .unwrap();
+                        std::process::exit(1);
+                    }
+                }
+            }
+
             if arguments.disassemble {
                 executable.print_script_buffer_dump();
                 println!();

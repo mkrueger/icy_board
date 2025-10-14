@@ -45,10 +45,10 @@ impl OutputVisitor {
     }
 
     fn indent(&mut self) {
-        let one_indent = if self.options.insert_spaces {
-            " ".repeat(self.options.tab_size)
-        } else {
+        let one_indent = if self.options.use_tabs {
             "\t".to_string()
+        } else {
+            " ".repeat(self.options.indent_size)
         };
         for _ in 0..self.indent {
             self.output.push_str(one_indent.as_str());

@@ -212,6 +212,63 @@ ANSION (1.00)
     * :PPL:`ANSIPOS` – Position cursor using ANSI codes
     * :PPL:`GRAFMODE` – Get current graphics mode
 
+AREAID (4.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION MESSAGEAREAID AREAID(INTEGER conf, INTEGER area)`
+
+  Creates a combined conference/message area identifier for IcyBoard compatibility.
+
+  **Parameters**
+    * :PPL:`conf` – Conference number (0 = main board)
+    * :PPL:`area` – Message area number within the conference
+
+  **Returns**
+    Combined MessageAreaID value for use with message-related functions.
+
+  **Remarks**
+    IcyBoard extends the traditional PCBoard conference model with multiple message areas 
+    per conference. This function creates a combined identifier that allows message functions 
+    to target specific areas while maintaining backward compatibility. Legacy PPEs that don't 
+    use message areas continue to work unmodified - they simply operate on the default area 
+    (area 0) of each conference.
+    
+    The returned MessageAreaID encodes both conference and area information in a single value 
+    that can be passed to functions like HIMSGNUM(), LOWMSGNUM(), ACTMSGNUM(), and others 
+    that previously only accepted conference numbers. This enables precise targeting of 
+    message operations across the expanded IcyBoard message structure.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       MESSAGEAREAID mainBoard, techSupport
+       
+       ; Target main board's default area (backward compatible)
+       mainBoard = AREAID(0, 0)
+       PRINTLN "Messages in main: ", ACTMSGNUM(mainBoard)
+       
+       ; Target conference 5, area 3 (IcyBoard extended)
+       techSupport = AREAID(5, 3)
+       PRINTLN "Tech support messages: ", ACTMSGNUM(techSupport)
+       
+       ; Scan across multiple areas
+       INTEGER conf, area, msgCount
+       FOR conf = 0 TO HICONFNUM()
+           FOR area = 0 TO 9  ; Check first 10 areas
+               msgCount = ACTMSGNUM(AREAID(conf, area))
+               IF (msgCount > 0) THEN
+                   PRINTLN "Conf ", conf, " Area ", area, ": ", msgCount, " messages"
+               ENDIF
+           NEXT
+       NEXT
+
+  **See Also**
+    * :PPL:`ACTMSGNUM()` – Count active messages
+    * :PPL:`HIMSGNUM()` – Get highest message number
+    * :PPL:`LOWMSGNUM()` – Get lowest message number
+    * :PPL:`SCANMSGHDR()` – Search message headers
+    * :PPL:`JOIN` – Join conference
+
 ASC (1.00)
 ~~~~~~~~~~
   :PPL:`FUNCTION INTEGER ASC(STRING ch)`
@@ -607,6 +664,139 @@ CRC32 (3.00)
   **See Also**
     * :PPL:`FILEINF()` – Get file information
     * :PPL:`EXIST()` – Check file existence
+
+CONFREG (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN CONFREG(INTEGER conf)`
+
+  Check if user is registered in a conference.
+
+  **Parameters**
+    * :PPL:`conf` – Conference number to check
+
+  **Returns**
+    TRUE if registered, FALSE otherwise.
+
+  **Remarks**
+    Combined with CONFEXP() determines access:
+    * CONFREG=FALSE, CONFEXP=FALSE: Not registered
+    * CONFREG=FALSE, CONFEXP=TRUE: Locked out
+    * CONFREG=TRUE, CONFEXP=FALSE: Active access
+    * CONFREG=TRUE, CONFEXP=TRUE: Expired registration
+
+  **Example**
+
+    .. code-block:: PPL
+
+       IF (CONFREG(5) & !CONFEXP(5)) THEN
+           PRINTLN "You have access to conference 5"
+       ENDIF
+
+  **See Also**
+    * :PPL:`CONFEXP()` – Check expiration
+    * :PPL:`CONFFLAG` – Set conference flags
+
+CONFEXP (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN CONFEXP(INTEGER conf)`
+
+  Check if user's conference registration expired.
+
+  **Parameters**
+    * :PPL:`conf` – Conference number to check
+
+  **Returns**
+    TRUE if expired, FALSE otherwise.
+
+  **Remarks**
+    When TRUE with CONFREG()=FALSE means locked out. When TRUE with CONFREG()=TRUE means expired access.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FOR conf = 0 TO HICONFNUM()
+           IF (CONFREG(conf) & CONFEXP(conf)) THEN
+               PRINTLN "Conference ", conf, ": Registration expired"
+           ENDIF
+       NEXT
+
+  **See Also**
+    * :PPL:`CONFREG()` – Check registration
+    * :PPL:`CONFUNFLAG` – Clear conference flags
+
+CONFSEL (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN CONFSEL(INTEGER conf)`
+
+  Check if conference selected for scanning.
+
+  **Parameters**
+    * :PPL:`conf` – Conference number to check
+
+  **Returns**
+    TRUE if selected, FALSE otherwise.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER selected = 0
+       FOR conf = 0 TO HICONFNUM()
+           IF (CONFSEL(conf)) INC selected
+       NEXT
+       PRINTLN "You have ", selected, " conferences selected"
+
+  **See Also**
+    * :PPL:`CONFFLAG` – Set selection flag (bit 4)
+
+CONFSYS (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN CONFSYS(INTEGER conf)`
+
+  Check conference sysop privileges.
+
+  **Parameters**
+    * :PPL:`conf` – Conference number to check
+
+  **Returns**
+    TRUE if user has conference sysop access, FALSE otherwise.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       IF (CONFSYS(CURCONF())) THEN
+           PRINTLN "You can delete any message in this conference"
+       ENDIF
+
+  **See Also**
+    * :PPL:`SYSOPSEC()` – System sysop level
+
+CONFMW (2.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN CONFMW(INTEGER conf)`
+
+  Check for mail waiting in conference.
+
+  **Parameters**
+    * :PPL:`conf` – Conference number to check
+
+  **Returns**
+    TRUE if mail waiting, FALSE otherwise.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FOR conf = 0 TO HICONFNUM()
+           IF (CONFMW(conf)) THEN
+               PRINTLN "Mail waiting in conference ", conf
+           ENDIF
+       NEXT
+
+  **See Also**
+    * :PPL:`MESSAGE` – Send message
 
 CURCOLOR (1.00)
 ~~~~~~~~~~~~~~~
@@ -1114,6 +1304,46 @@ FNEXT (3.00)
     * :PPL:`FCLOSE` – Close file
     * :PPL:`FCREATE` – Create file
     * :PPL:`FAPPEND` – Append to file
+
+FMTREAL (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING FMTREAL(REAL realExp, INTEGER fieldWidth, INTEGER decimalPlaces)`
+
+  Format floating-point number for display.
+
+  **Parameters**
+    * :PPL:`realExp` – REAL or DREAL expression to format
+    * :PPL:`fieldWidth` – Minimum characters to display
+    * :PPL:`decimalPlaces` – Digits after decimal point
+
+  **Returns**
+    Formatted string representation of the number.
+
+  **Remarks**
+    Formats floating-point numbers with control over field width and decimal precision. 
+    If the formatted number is shorter than fieldWidth, it's right-justified with leading 
+    spaces. Useful for aligning numeric columns in reports.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       REAL price = 19.95
+       REAL tax = 1.646
+       REAL total = price + tax
+       
+       PRINTLN "Price: ", FMTREAL(price, 10, 2)
+       PRINTLN "Tax:   ", FMTREAL(tax, 10, 2)
+       PRINTLN "Total: ", FMTREAL(total, 10, 2)
+       
+       ; Outputs:
+       ; Price:      19.95
+       ; Tax:         1.65
+       ; Total:      21.60
+
+  **See Also**
+    * :PPL:`STRING()` – Convert to string
+    * :PPL:`I2S()` – Format integer
 
 FTELL (3.20)
 ~~~~~~~~~~~~
@@ -1635,6 +1865,63 @@ LEN (1.00)
   **See Also**
     * :PPL:`INSTR()` – Find substring position
     * :PPL:`SPACE()` – Create string of spaces
+
+LEN (4.00 Array Overload)
+~~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER LEN(ARRAY arr, INTEGER dim)`
+
+  Returns the length of a specific array dimension.
+
+  **Parameters**
+    * :PPL:`arr` – Array variable to measure
+    * :PPL:`dim` – Dimension index (0-based) to query
+
+  **Returns**
+    Number of elements in the specified dimension.
+
+  **Remarks**
+    This overload extends the LEN() function to work with multi-dimensional arrays, 
+    returning the size of a specific dimension. When dim is 0 or omitted, it returns 
+    the length of the first dimension, making LEN(arr) equivalent to LEN(arr, 0) for 
+    backward compatibility.
+    
+    For multi-dimensional arrays, each dimension can be queried independently. This is 
+    particularly useful for dynamic array processing where dimensions may vary or when 
+    iterating through complex data structures.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING names(10, 5)     ; 10 rows, 5 columns
+       INTEGER matrix(3, 4, 2) ; 3x4x2 3D array
+       
+       ; Query array dimensions
+       PRINTLN "Names array:"
+       PRINTLN "  Rows: ", LEN(names, 0)     ; Returns 10
+       PRINTLN "  Cols: ", LEN(names, 1)     ; Returns 5
+       
+       PRINTLN "Matrix dimensions:"
+       PRINTLN "  X: ", LEN(matrix, 0)       ; Returns 3
+       PRINTLN "  Y: ", LEN(matrix, 1)       ; Returns 4
+       PRINTLN "  Z: ", LEN(matrix, 2)       ; Returns 2
+       
+       ; Iterate safely through unknown array size
+       INTEGER i, j
+       FOR i = 0 TO LEN(names, 0) - 1
+           FOR j = 0 TO LEN(names, 1) - 1
+               names(i, j) = "Cell " + STRING(i) + "," + STRING(j)
+           NEXT
+       NEXT
+       
+       ; Backward compatible - works like original LEN()
+       STRING items(25)
+       PRINTLN "Items: ", LEN(items)         ; Returns 25
+
+  **See Also**
+    * :PPL:`LEN()` – Original string/array length function
+    * :PPL:`DIM` – Declare arrays
+
 
 LOGGEDON (1.00)
 ~~~~~~~~~~~~~~~
@@ -4503,6 +4790,73 @@ VER (1.00)
   **See Also**
     * :PPL:`PSA()` – Check PSA availability
 
+WEBREQUEST (4.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING WEBREQUEST(STRING url)`
+
+  Retrieves data from a web server via HTTP/HTTPS.
+
+  **Parameters**
+    * :PPL:`url` – Complete URL to request (including protocol)
+
+  **Returns**
+    Response body as a string, or empty string on failure.
+
+  **Remarks**
+    Performs a synchronous HTTP GET request to the specified URL and returns the response 
+    body as a string. Supports both HTTP and HTTPS protocols. The function handles common 
+    web server responses including redirects (30x), but returns empty string for client 
+    errors (4xx) or server errors (5xx).
+    
+    This function is limited by PPL's maximum string size. For large responses or binary 
+    data, use the WEBREQUEST statement to save directly to a file. The function includes 
+    a reasonable timeout to prevent hanging on unresponsive servers.
+    
+    Network operations require appropriate system permissions and firewall configuration. 
+    Some installations may restrict or disable web requests for security reasons.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING response, weather, quote
+       
+       ; Get plain text data
+       response = WEBREQUEST("http://api.example.com/status")
+       IF (response <> "") THEN
+           PRINTLN "Server status: ", response
+       ELSE
+           PRINTLN "Failed to contact server"
+       ENDIF
+       
+       ; Fetch weather data (JSON response)
+       weather = WEBREQUEST("https://api.weather.com/current?city=NewYork")
+       IF (INSTR(weather, "temperature") > 0) THEN
+           ; Parse JSON response (simplified example)
+           PRINTLN "Weather data received"
+       ENDIF
+       
+       ; Get quote of the day
+       quote = WEBREQUEST("https://quotes.example.com/qod.txt")
+       IF (LEN(quote) > 0) THEN
+           PRINTLN "Quote: ", quote
+       ENDIF
+       
+       ; Check BBS news feed
+       STRING news
+       news = WEBREQUEST("https://mybbs.com/news/latest.txt")
+       IF (news <> "") THEN
+           TOKENIZE news
+           WHILE (TOKCOUNT() > 0) DO
+               PRINTLN "  * ", GETTOKEN()
+           ENDWHILE
+       ENDIF
+
+  **See Also**
+    * :PPL:`WEBREQUEST` statement – Save response to file
+    * :PPL:`TOKENIZE` – Parse response data
+    * :PPL:`INSTR()` – Search response content
+
 XOR (1.00)
 ~~~~~~~~~~
   :PPL:`FUNCTION INTEGER XOR(INTEGER iexp1, INTEGER iexp2)`
@@ -4590,3 +4944,736 @@ YESCHAR (1.00)
   **See Also**
     * :PPL:`NOCHAR()` – Get no character
     * :PPL:`YESNO` – Yes/no input flag constant
+
+
+CCTYPE (1.00, updated 2.00)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING CCTYPE(STRING ccnum)`
+
+  Identify credit card type from number.
+
+  **Parameters**
+    * :PPL:`ccnum` – Credit card number to analyze
+
+  **Returns**
+    Card type string: "VISA", "MC", "AMEX", "DISC", "DC", "JCB", or "UNKNOWN"
+
+  **Remarks**
+    Updated in 2.00 to recognize JCB cards and additional Diners Club card ranges. 
+    Identifies card type based on prefix patterns and length.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING cardNum, cardType
+       INPUT "Card number", cardNum
+       cardType = CCTYPE(cardNum)
+       IF (cardType = "UNKNOWN") THEN
+           PRINTLN "Card type not recognized"
+       ELSE
+           PRINTLN "Card type: ", cardType
+       ENDIF
+
+  **See Also**
+    * :PPL:`VALCC()` – Validate card checksum
+
+VALCC (1.00, updated 2.00)
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN VALCC(STRING ccnum)`
+
+  Validate credit card number checksum.
+
+  **Parameters**
+    * :PPL:`ccnum` – Credit card number to validate
+
+  **Returns**
+    TRUE if valid checksum, FALSE otherwise.
+
+  **Remarks**
+    Updated in 2.00 to automatically strip spaces, dashes, and other invalid characters 
+    before validation. Uses Luhn algorithm to verify card number checksum.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING card
+       INPUT "Card number", card
+       IF (!VALCC(card)) THEN
+           PRINTLN "Invalid card number!"
+       ENDIF
+
+  **See Also**
+    * :PPL:`CCTYPE()` – Identify card type
+
+ERRCORRECT (2.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN ERRCORRECT()`
+
+  Check if connection is error-corrected.
+
+  **Returns**
+    TRUE if error-corrected session, FALSE otherwise.
+
+  **Remarks**
+    Determines if the current modem connection has error correction active (MNP, V.42, etc.). 
+    Useful for deciding whether to enable certain features that require reliable connections.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       IF (ERRCORRECT()) THEN
+           PRINTLN "Error-corrected connection detected"
+           ; Enable features requiring reliable link
+       ELSE
+           PRINTLN "Non-error-corrected connection"
+           ; Use simpler protocols
+       ENDIF
+
+  **See Also**
+    * :PPL:`CARRIER()` – Check carrier speed
+
+MIXED (2.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING MIXED(STRING str)`
+
+  Convert string to mixed case (proper name format).
+
+  **Parameters**
+    * :PPL:`str` – String to convert
+
+  **Returns**
+    String with first letter of each word capitalized.
+
+  **Remarks**
+    Converts string to proper name case - first letter uppercase, rest lowercase for each word. 
+    Useful for formatting user names and addresses.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING name
+       name = "JOHN DOE"
+       PRINTLN MIXED(name)  ; Displays "John Doe"
+       
+       name = "mary smith-jones"
+       PRINTLN MIXED(name)  ; Displays "Mary Smith-Jones"
+
+  **See Also**
+    * :PPL:`UPPER()` – Convert to uppercase
+    * :PPL:`LOWER()` – Convert to lowercase
+
+LPRINTED (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER LPRINTED()`
+
+  Get number of lines printed on display.
+
+  **Returns**
+    Count of lines printed since last reset.
+
+  **Remarks**
+    Returns the number of lines output to the display. Counter resets with STARTDISP or 
+    when MORE prompt is displayed. Useful for pagination control.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STARTDISP FCL
+       WHILE (!ABORT() & !EOF(1)) DO
+           FGET 1, line
+           PRINTLN line
+           IF (LPRINTED() >= 20) THEN
+               MORE
+               STARTDISP NC
+           ENDIF
+       ENDWHILE
+
+  **See Also**
+    * :PPL:`STARTDISP` – Start display mode
+    * :PPL:`MORE` – Display more prompt
+    * :PPL:`ISNONSTOP()` – Check non-stop mode
+
+ISNONSTOP (2.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN ISNONSTOP()`
+
+  Check if display is in non-stop mode.
+
+  **Returns**
+    TRUE if non-stop mode active, FALSE otherwise.
+
+  **Remarks**
+    Determines if user typed NS (non-stop) as part of their command, causing continuous 
+    display without pausing. Useful for adjusting output formatting.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       IF (ISNONSTOP()) THEN
+           ; Skip decorative pauses
+           DISPFILE "REPORT.TXT", DEFS
+       ELSE
+           ; Include pauses for readability
+           DISPFILE "REPORT.TXT", DEFS
+           WAIT
+       ENDIF
+
+  **See Also**
+    * :PPL:`STARTDISP` – Control display mode
+    * :PPL:`LPRINTED()` – Lines printed count
+
+REPLACESTR (2.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR REPLACESTR(STRING str, STRING search, STRING replace)`
+
+  Replace all occurrences of substring.
+
+  **Parameters**
+    * :PPL:`str` – String to process
+    * :PPL:`search` – Substring to find
+    * :PPL:`replace` – Replacement substring
+
+  **Returns**
+    String with all occurrences replaced.
+
+  **Remarks**
+    Unlike REPLACE which works character by character, REPLACESTR replaces complete 
+    substrings. Returns BIGSTR to handle expansion.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING text
+       text = "Hello World. World is great!"
+       text = REPLACESTR(text, "World", "Universe")
+       PRINTLN text  ; "Hello Universe. Universe is great!"
+       
+       ; Remove HTML tags
+       text = REPLACESTR(text, "<BR>", CHR(13)+CHR(10))
+       text = REPLACESTR(text, "&nbsp;", " ")
+
+  **See Also**
+    * :PPL:`REPLACE()` – Replace characters
+    * :PPL:`STRIPSTR()` – Remove substring
+
+STRIPSTR (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BIGSTR STRIPSTR(STRING str, STRING search)`
+
+  Remove all occurrences of substring.
+
+  **Parameters**
+    * :PPL:`str` – String to process
+    * :PPL:`search` – Substring to remove
+
+  **Returns**
+    String with all occurrences removed.
+
+  **Remarks**
+    Unlike STRIP which removes individual characters, STRIPSTR removes complete substrings. 
+    Returns BIGSTR to handle string operations.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING text
+       text = "Error: File not found. Error: Access denied."
+       text = STRIPSTR(text, "Error: ")
+       PRINTLN text  ; "File not found. Access denied."
+       
+       ; Clean up formatting
+       text = STRIPSTR(text, "  ")  ; Remove double spaces
+
+  **See Also**
+    * :PPL:`STRIP()` – Remove characters
+    * :PPL:`REPLACESTR()` – Replace substring
+ISBITSET (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN ISBITSET(ANY var, INTEGER bit)`
+
+  Check if a specific bit is set.
+
+  **Parameters**
+    * :PPL:`var` – Variable or expression to check
+    * :PPL:`bit` – Bit number to test (0-based)
+
+  **Returns**
+    TRUE if bit is set, FALSE if clear or invalid bit number.
+
+  **Remarks**
+    Primarily for BIGSTR variables but works with any data type. Returns FALSE for 
+    invalid bit numbers.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       BIGSTR flags
+       BITSET flags, 5
+       
+       IF (ISBITSET(flags, 5)) THEN
+           PRINTLN "Bit 5 is set"
+       ENDIF
+       
+       ; Check multiple flags
+       INTEGER i
+       FOR i = 0 TO 100
+           IF (ISBITSET(flags, i)) THEN
+               PRINTLN "Flag ", i, " enabled"
+           ENDIF
+       NEXT
+
+  **See Also**
+    * :PPL:`BITSET` – Set a bit
+    * :PPL:`BITCLEAR` – Clear a bit
+
+MEGANUM (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING MEGANUM(INTEGER num)`
+
+  Convert decimal to hexa-tri-decimal (meganum).
+
+  **Parameters**
+    * :PPL:`num` – Decimal number (0-1295)
+
+  **Returns**
+    Two-character meganum string.
+
+  **Remarks**
+    Converts decimal numbers to RIP meganum format (base-36 encoding). Used for RIP 
+    graphics coordinates and parameters. Valid range 0-1295.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Convert coordinates to meganum
+       INTEGER x = 100
+       INTEGER y = 200
+       
+       STRING megaX = MEGANUM(x)
+       STRING megaY = MEGANUM(y)
+       
+       MPRINT "!|1K" + megaX + megaY  ; RIP command
+
+  **See Also**
+    * :PPL:`MOUSEREG` – Define mouse region
+
+EVTTIMEADJ (2.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN EVTTIMEADJ()`
+
+  Check if user's time was adjusted for event.
+
+  **Returns**
+    TRUE if time adjusted for upcoming event, FALSE otherwise.
+
+  **Remarks**
+    Detects if user's remaining time was reduced for a scheduled event. When TRUE, 
+    ADJTIME cannot add time (only subtract). Prevents conflicts with event scheduler.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       IF (!EVTTIMEADJ()) THEN
+           ; Safe to add bonus time
+           PRINTLN "You won 10 extra minutes!"
+           ADJTIME 10
+       ELSE
+           PRINTLN "Cannot add time - event scheduled"
+       ENDIF
+
+  **See Also**
+    * :PPL:`ADJTIME` – Adjust user time
+    * :PPL:`MINLEFT()` – Minutes remaining
+
+U_LMR (2.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER U_LMR(INTEGER conf)`
+
+  Get last message read for specified conference.
+
+  **Parameters**
+    * :PPL:`conf` – Conference number
+
+  **Returns**
+    Last message read number for the conference.
+
+  **Remarks**
+    Returns the user's last message read pointer for any conference without joining it. 
+    Useful for checking multiple conferences or setting read pointers.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER conf
+       FOR conf = 0 TO HICONFNUM()
+           PRINTLN "Conf ", conf, " LMR: ", U_LMR(conf)
+       NEXT
+
+  **See Also**
+    * :PPL:`SETLMR` – Set last message read
+
+KBDBUFSIZE (2.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER KBDBUFSIZE()`
+
+  Get pending keystrokes in KBDSTRING buffer.
+
+  **Returns**
+    Number of characters waiting in KBDSTRING buffer.
+
+  **Remarks**
+    Returns count of characters stuffed via KBDSTRING that haven't been processed yet. 
+    Useful for managing automated input sequences.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       KBDSTRING "DIR N;S"
+       PRINTLN "Stuffed ", KBDBUFSIZE(), " characters"
+
+  **See Also**
+    * :PPL:`KBDSTRING` – Stuff with echo
+    * :PPL:`PPLBUFSIZE()` – KBDSTUFF buffer size
+
+PPLBUFSIZE (2.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER PPLBUFSIZE()`
+
+  Get pending keystrokes in KBDSTUFF buffer.
+
+  **Returns**
+    Number of characters waiting in KBDSTUFF buffer.
+
+  **Remarks**
+    Returns count of characters stuffed via KBDSTUFF that haven't been processed yet. 
+    Different from KBDBUFSIZE which tracks KBDSTRING buffer.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       KBDSTUFF "D" + CHR(13)
+       PRINTLN "Stuffed ", PPLBUFSIZE(), " characters"
+
+  **See Also**
+    * :PPL:`KBDSTUFF` – Stuff without echo
+    * :PPL:`KBDBUFSIZE()` – KBDSTRING buffer size
+
+KBDFILUSED (2.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN KBDFILUSED()`
+
+  Check if KBDFILE is active.
+
+  **Returns**
+    TRUE if keystrokes being stuffed from KBDFILE, FALSE otherwise.
+
+  **Remarks**
+    Determines if automated input is coming from a KBDFILE script rather than 
+    KBDSTUFF/KBDSTRING. Useful for managing different input sources.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       IF (KBDFILUSED()) THEN
+           PRINTLN "Running from script file"
+       ENDIF
+
+  **See Also**
+    * :PPL:`KBDFILE` – Execute keyboard script
+
+LOMSGNUM (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER LOMSGNUM([INTEGER conf])`
+
+  Get lowest message number in conference.
+
+  **Parameters**
+    * :PPL:`conf` – Conference number (optional, defaults to current)
+
+  **Returns**
+    Lowest active message number.
+
+  **Remarks**
+    Returns the lowest message number in the specified or current conference. 
+    May also be called as LOWMSGNUM().
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER first, last
+       first = LOMSGNUM()
+       last = HIMSGNUM()
+       PRINTLN "Messages range from ", first, " to ", last
+
+  **See Also**
+    * :PPL:`HIMSGNUM()` – Highest message number
+    * :PPL:`ACTMSGNUM()` – Active message count
+
+HIMSGNUM (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER HIMSGNUM([INTEGER conf])`
+
+  Get highest message number in conference.
+
+  **Parameters**
+    * :PPL:`conf` – Conference number (optional, defaults to current)
+
+  **Returns**
+    Highest message number.
+
+  **Remarks**
+    Returns the highest message number in the specified or current conference. 
+    Includes deleted messages in numbering.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Set LMR to last 10 messages
+       INTEGER high = HIMSGNUM()
+       SETLMR CURCONF(), high - 10
+
+  **See Also**
+    * :PPL:`LOMSGNUM()` – Lowest message number
+    * :PPL:`ACTMSGNUM()` – Active message count
+
+CHATSTAT (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN CHATSTAT()`
+
+  Get user's chat availability status.
+
+  **Returns**
+    TRUE if available for chat, FALSE if unavailable.
+
+  **Remarks**
+    Returns the current user's chat availability setting. Users can toggle this 
+    to indicate whether they want to receive chat requests.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       IF (!CHATSTAT()) THEN
+           PRINTLN "Your chat is OFF - you won't receive pages"
+       ENDIF
+
+  **See Also**
+    * :PPL:`CHAT` – Enter chat mode
+    * :PPL:`PAGESTAT()` – Check if paged
+
+DEFANS (2.00)
+~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING DEFANS()`
+
+  Get last default answer from INPUT statement.
+
+  **Returns**
+    Last default answer string passed to INPUT.
+
+  **Remarks**
+    Returns the default answer that was passed to the most recent INPUT statement. 
+    Useful in PPEs that replace PCBTEXT prompts to determine what the original 
+    default would have been.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; In a PCBTEXT replacement PPE
+       STRING originalDefault = DEFANS()
+       PRINTLN "Original default was: ", originalDefault
+       
+       STRING answer = originalDefault
+       INPUT "Your choice", answer
+
+  **See Also**
+    * :PPL:`LASTANS()` – Last accepted answer
+    * :PPL:`INPUT` – Get user input
+
+LASTANS (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION STRING LASTANS()`
+
+  Get last answer accepted by INPUT.
+
+  **Returns**
+    Last answer accepted by an INPUT statement.
+
+  **Remarks**
+    Returns the actual answer that was accepted by the most recent INPUT statement, 
+    regardless of what the default was. Useful for tracking user responses.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INPUT "Enter name", name
+       
+       STRING prev = LASTANS()
+       PRINTLN "You entered: ", prev
+       
+       ; Use previous answer as new default
+       INPUT "Confirm name", prev
+
+  **See Also**
+    * :PPL:`DEFANS()` – Last default answer
+    * :PPL:`INPUT` – Get user input
+
+
+FLAGCNT (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER FLAGCNT()`
+
+  Get number of files flagged for download.
+
+  **Returns**
+    Count of files currently flagged.
+
+  **Remarks**
+    Returns the number of files the user has flagged for batch download. 
+    Useful for checking if downloads are pending before logout.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       IF (FLAGCNT() > 0) THEN
+           PRINTLN "You have ", FLAGCNT(), " files flagged"
+           INPUTYN "Download now", "Y", @X0E
+           IF (YESCHAR() = LASTANS()) DOWNLOAD "D;Y"
+       ENDIF
+
+  **See Also**
+    * :PPL:`FLAG` – Flag file for download
+    * :PPL:`DOWNLOAD` – Download files
+
+ALIAS (2.00)
+~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN ALIAS()`
+
+  Get user's current alias status.
+
+  **Returns**
+    TRUE if using alias, FALSE if using real name.
+
+  **Remarks**
+    Returns whether the user is currently using their alias or real name. 
+    Only meaningful if both user and conference support aliases.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       IF (ALIAS()) THEN
+           PRINTLN "You are posting as: ", U_ALIAS
+       ELSE
+           PRINTLN "You are posting as: ", U_NAME()
+       ENDIF
+
+  **See Also**
+    * :PPL:`ALIAS` statement – Set alias usage
+    * :PPL:`CONFALIAS()` – Conference allows aliases
+    * :PPL:`USERALIAS()` – User can use alias
+
+CONFALIAS (2.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN CONFALIAS()`
+
+  Check if conference allows aliases.
+
+  **Returns**
+    TRUE if current conference allows aliases, FALSE otherwise.
+
+  **Remarks**
+    Determines if the current conference is configured to allow alias usage. 
+    Both this and USERALIAS() must be TRUE for aliases to work.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       IF (CONFALIAS() & USERALIAS()) THEN
+           PRINTLN "You may use an alias here"
+           ALIAS TRUE
+       ENDIF
+
+  **See Also**
+    * :PPL:`ALIAS()` – Get alias status
+    * :PPL:`USERALIAS()` – User alias permission
+
+USERALIAS (2.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`FUNCTION BOOLEAN USERALIAS()`
+
+  Check if user is allowed to use aliases.
+
+  **Returns**
+    TRUE if user has alias permission, FALSE otherwise.
+
+  **Remarks**
+    Determines if the current user has permission to use an alias. 
+    Both this and CONFALIAS() must be TRUE for aliases to work.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       IF (!USERALIAS()) THEN
+           PRINTLN "You are not authorized for alias use"
+       ELSEIF (!CONFALIAS()) THEN
+           PRINTLN "This conference doesn't allow aliases"
+       ELSE
+           PRINTLN "Alias use is available"
+       ENDIF
+
+  **See Also**
+    * :PPL:`ALIAS()` – Get alias status
+    * :PPL:`CONFALIAS()` – Conference alias support
+
+CURUSER (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`FUNCTION INTEGER CURUSER()`
+
+  Determine which user's data is loaded.
+
+  **Returns**
+    NO_USER (-1) if undefined, CUR_USER (0) for current user, or alternate user record number.
+
+  **Remarks**
+    Indicates which user's information is currently accessible via U_xxx variables. 
+    Changes when GETALTUSER is used to load a different user's data.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER userContext = CURUSER()
+       
+       IF (userContext = NO_USER) THEN
+           PRINTLN "No user data loaded"
+       ELSEIF (userContext = CUR_USER) THEN
+           PRINTLN "Current user data active"
+       ELSE
+           PRINTLN "Viewing user #", userContext
+       ENDIF
+
+  **See Also**
+    * :PPL:`GETALTUSER` – Load alternate user
+    * :PPL:`FREALTUSER` – Release alternate user    

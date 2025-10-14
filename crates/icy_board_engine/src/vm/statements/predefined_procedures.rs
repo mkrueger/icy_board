@@ -14,6 +14,7 @@ use crate::{
             GraphicsMode, NodeState, NodeStatus,
             functions::{MASK_ALNUM, display_flags},
         },
+        user_base::ConferenceFlags,
         user_inf::{BankUserInf, QwkConfigUserInf},
     },
 };
@@ -92,10 +93,46 @@ pub async fn confflag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     //16 = mail waiting
     //32 = net status
 
-    unimplemented_stmt!("CONFFLAG");
+    if let Some(session_user) = &mut vm.icy_board_state.session.current_user {
+        let mut value = session_user.conference_flags.get(&(conf as usize)).cloned().unwrap_or(ConferenceFlags::None);
+        value |= ConferenceFlags::from_bits(flags as u8).unwrap_or(ConferenceFlags::None);
+        session_user.conference_flags.insert(conf as usize, value);
+    }
+
+    Ok(())
 }
+
 pub async fn confunflag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("CONFUNFLAG");
+    let conf = vm.eval_expr(&args[0]).await?.as_int() as u16;
+    let flags = vm.eval_expr(&args[1]).await?.as_int();
+
+    // Flag values to clear:
+    // 1 = registered
+    // 2 = expired
+    // 4 = selected
+    // 8 = conference sysop
+    // 16 = mail waiting
+    // 32 = net status
+
+    if let Some(session_user) = &mut vm.icy_board_state.session.current_user {
+        // Get existing flags or None if conference has no flags set
+        let mut value = session_user.conference_flags.get(&(conf as usize)).cloned().unwrap_or(ConferenceFlags::None);
+
+        // Clear the specified flags using bitwise operations
+        let flags_to_clear = ConferenceFlags::from_bits(flags as u8).unwrap_or(ConferenceFlags::None);
+        value &= !flags_to_clear; // Remove the specified flags
+
+        // Update the conference flags
+        if value == ConferenceFlags::None {
+            // If no flags remain, remove the entry from the map
+            session_user.conference_flags.remove(&(conf as usize));
+        } else {
+            // Otherwise update with the new value
+            session_user.conference_flags.insert(conf as usize, value);
+        }
+    }
+
+    Ok(())
 }
 
 /// # Errors
@@ -250,8 +287,10 @@ pub async fn delete(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn deluser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DELUSER");
+    vm.user.flags.delete_flag = true;
+    Ok(())
 }
+
 pub async fn adjtime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let min = vm.eval_expr(&args[0]).await?.as_int();
     vm.icy_board_state.session.time_limit += min;

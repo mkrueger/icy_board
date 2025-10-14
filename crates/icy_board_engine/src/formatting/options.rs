@@ -13,11 +13,11 @@ pub struct FormattingOptions {
     pub space_around_binop: bool,
 
     //pub binop_separator: BinopSeparator,
-    #[serde_inline_default(true)]
-    pub insert_spaces: bool,
+    #[serde_inline_default(false)]
+    pub use_tabs: bool,
 
     #[serde_inline_default(4)]
-    pub tab_size: usize,
+    pub indent_size: usize,
 }
 
 impl Default for FormattingOptions {
@@ -29,8 +29,8 @@ impl Default for FormattingOptions {
 impl FormattingOptions {
     pub const DEFAULT: Self = Self {
         space_around_binop: true,
-        insert_spaces: true,
-        tab_size: 4,
+        use_tabs: false,
+        indent_size: 4,
     };
 
     pub fn new() -> Self {

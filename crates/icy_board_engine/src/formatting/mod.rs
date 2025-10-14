@@ -62,10 +62,10 @@ impl<'a> FormattingVisitor<'a> {
 
     fn update_indent_str(&mut self) {
         if self.indent_str.is_none() {
-            let one_indent = if self.options.insert_spaces {
-                " ".repeat(self.options.tab_size)
-            } else {
+            let one_indent = if self.options.use_tabs {
                 "\t".to_string()
+            } else {
+                " ".repeat(self.options.indent_size)
             };
             self.indent_str = Some(one_indent.repeat(self.indent));
         }

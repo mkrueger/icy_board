@@ -1182,6 +1182,348 @@ FCREATE (1.00)
     * :PPL:`FCLOSE` – Close file
     * :PPL:`FOPEN` – Open file
 
+FDEFIN (2.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT FDEFIN(INTEGER chan)`
+
+  Set default input file channel.
+
+  **Parameters**
+    * :PPL:`chan` – Channel to use as default for FD* input statements (0-7)
+
+  **Remarks**
+    Specifies which file channel to use for FDGET and FDREAD statements. Eliminates need 
+    to specify channel in every read operation, improving performance and code clarity 
+    when reading from a single file. Channel must be open before being set as default.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING line
+       
+       FOPEN 1, "INPUT.DAT", O_RD, S_DW
+       FDEFIN 1  ; Set channel 1 as default input
+       
+       ; Now can use FDGET without channel parameter
+       FDGET line
+       WHILE (!FERR(1)) DO
+           PRINTLN line
+           FDGET line
+       ENDWHILE
+       
+       FCLOSE 1
+
+  **See Also**
+    * :PPL:`FDEFOUT` – Set default output channel
+    * :PPL:`FDGET` – Get line using default channel
+    * :PPL:`FDREAD` – Read binary using default channel
+
+FDEFOUT (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FDEFOUT(INTEGER chan)`
+
+  Set default output file channel.
+
+  **Parameters**
+    * :PPL:`chan` – Channel to use as default for FD* output statements (0-7)
+
+  **Remarks**
+    Specifies which file channel to use for FDPUT, FDPUTLN, and FDPUTPAD statements. 
+    Eliminates need to specify channel in every write operation, improving performance 
+    and code clarity when writing to a single file. Channel must be open with write 
+    access before being set as default.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FOPEN 2, "OUTPUT.DAT", O_WR, S_DN
+       FDEFOUT 2  ; Set channel 2 as default output
+       
+       ; Now can use FD* output without channel parameter
+       FDPUTLN "Header Line"
+       FDPUTLN "Data Line 1"
+       FDPUTPAD "Padded", 20
+       
+       FCLOSE 2
+
+  **See Also**
+    * :PPL:`FDEFIN` – Set default input channel
+    * :PPL:`FDPUT` – Put using default channel (if implemented)
+    * :PPL:`FDPUTLN` – Put line using default channel (if implemented)
+    * :PPL:`FDPUTPAD` – Put padded using default channel
+
+FDGET (2.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT FDGET(VAR var)`
+
+  Read line from default input channel.
+
+  **Parameters**
+    * :PPL:`var` – Variable to receive the line
+
+  **Remarks**
+    Reads a text line from the file channel set by FDEFIN. Functionally identical to 
+    FGET but uses the default channel instead of requiring a channel parameter. Improves 
+    performance when reading multiple lines from the same file.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING data
+       INTEGER count
+       
+       FOPEN 1, "DATA.TXT", O_RD, S_DW
+       FDEFIN 1
+       
+       count = 0
+       FDGET data  ; Read from default channel 1
+       WHILE (!FERR(1)) DO
+           INC count
+           PRINTLN "Line ", count, ": ", data
+           FDGET data
+       ENDWHILE
+       
+       FCLOSE 1
+
+  **See Also**
+    * :PPL:`FDEFIN` – Set default input channel
+    * :PPL:`FGET` – Read with explicit channel
+    * :PPL:`FDREAD` – Binary read from default channel
+
+FDREAD (2.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT FDREAD(VAR var, INTEGER size)`
+
+  Read binary data from default input channel.
+
+  **Parameters**
+    * :PPL:`var` – Variable to receive data
+    * :PPL:`size` – Number of bytes to read (0-2048)
+
+  **Remarks**
+    Reads binary data from the file channel set by FDEFIN. Functionally identical to 
+    FREAD but uses the default channel. Improves performance for multiple binary reads 
+    from the same file.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING header
+       INTEGER value
+       
+       FOPEN 1, "BINARY.DAT", O_RD, S_DW
+       FDEFIN 1
+       
+       ; Read using default channel
+       FDREAD header, 10    ; 10-byte header
+       FDREAD value, 2      ; 2-byte integer
+       
+       PRINTLN "Header: ", header
+       PRINTLN "Value: ", value
+       
+       FCLOSE 1
+
+  **See Also**
+    * :PPL:`FDEFIN` – Set default input channel
+    * :PPL:`FREAD` – Read with explicit channel
+    * :PPL:`FDGET` – Text read from default channel
+
+FDPUTPAD (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FDPUTPAD(ANY exp, INTEGER width)`
+
+  Write padded line to default output channel.
+
+  **Parameters**
+    * :PPL:`exp` – Expression to write
+    * :PPL:`width` – Field width for padding (-256 to 256)
+
+  **Remarks**
+    Writes expression padded to specified width using the channel set by FDEFOUT. 
+    Positive width right-justifies (left-pads), negative width left-justifies (right-pads). 
+    Functionally identical to FPUTPAD but uses default channel.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FOPEN 2, "REPORT.TXT", O_WR, S_DN
+       FDEFOUT 2
+       
+       ; Write formatted report using default channel
+       FDPUTPAD "Name", -20
+       FDPUTPAD "Score", 10
+       FDPUTPAD "Grade", 8
+       
+       FDPUTPAD U_NAME(), -20
+       FDPUTPAD CURSEC(), 10
+       FDPUTPAD "A", 8
+       
+       FCLOSE 2
+
+  **See Also**
+    * :PPL:`FDEFOUT` – Set default output channel
+    * :PPL:`FPUTPAD` – Write padded with explicit channel
+    * :PPL:`FDPUTLN` – Write line to default channel (if implemented)
+FDPUT (2.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT FDPUT(ANY exp [, ANY exp...])`
+
+  Write expression(s) to default output channel without newline.
+
+  **Parameters**
+    * :PPL:`exp` – Expression(s) to write (at least one required)
+
+  **Remarks**
+    Writes expressions to the file channel set by FDEFOUT. Functionally identical to 
+    FPUT but uses the default channel instead of requiring a channel parameter. Does 
+    not append carriage return/line feed. Improves code clarity when writing multiple 
+    items to the same file.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FOPEN 2, "DATA.TXT", O_WR, S_DN
+       FDEFOUT 2
+       
+       ; Write using default channel
+       FDPUT U_NAME(), " "
+       FDPUT DATE(), " " 
+       FDPUT TIME()
+       ; Results in single line: "John Doe 01-15-24 14:30:00"
+       
+       FCLOSE 2
+
+  **See Also**
+    * :PPL:`FDEFOUT` – Set default output channel
+    * :PPL:`FPUT` – Write with explicit channel
+    * :PPL:`FDPUTLN` – Write line to default channel
+
+FDPUTLN (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FDPUTLN([ANY exp...])`
+
+  Write expression(s) to default output channel with newline.
+
+  **Parameters**
+    * :PPL:`exp` – Expression(s) to write (optional)
+
+  **Remarks**
+    Writes expressions to the file channel set by FDEFOUT with carriage return/line feed 
+    appended. Functionally identical to FPUTLN but uses the default channel. Can be called 
+    without arguments to write a blank line. Simplifies code when writing multiple lines 
+    to the same file.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FOPEN 2, "LOG.TXT", O_WR, S_DN
+       FDEFOUT 2
+       
+       ; Write log entries using default channel
+       FDPUTLN "Session started at ", TIME()
+       FDPUTLN "User: ", U_NAME()
+       FDPUTLN  ; Blank line
+       FDPUTLN "Actions:"
+       
+       FCLOSE 2
+
+  **See Also**
+    * :PPL:`FDEFOUT` – Set default output channel
+    * :PPL:`FPUTLN` – Write line with explicit channel
+    * :PPL:`FDPUT` – Write without newline
+
+FDPUTPAD (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FDPUTPAD(ANY exp, INTEGER width)`
+
+  Write padded line to default output channel.
+
+  **Parameters**
+    * :PPL:`exp` – Expression to write
+    * :PPL:`width` – Field width for padding (-256 to 256)
+
+  **Remarks**
+    Writes expression padded to specified width using the channel set by FDEFOUT. 
+    Positive width right-justifies (left-pads), negative width left-justifies (right-pads). 
+    Functionally identical to FPUTPAD but uses default channel. Appends newline after 
+    padded text.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FOPEN 2, "REPORT.TXT", O_WR, S_DN
+       FDEFOUT 2
+       
+       ; Write formatted report using default channel
+       FDPUTPAD "Name", -20
+       FDPUTPAD "Score", 10
+       FDPUTPAD "Grade", 8
+       
+       FDPUTPAD U_NAME(), -20
+       FDPUTPAD CURSEC(), 10
+       FDPUTPAD "A", 8
+       
+       FCLOSE 2
+
+  **See Also**
+    * :PPL:`FDEFOUT` – Set default output channel
+    * :PPL:`FPUTPAD` – Write padded with explicit channel
+    * :PPL:`FDPUTLN` – Write line to default channel
+
+FDWRITE (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FDWRITE(ANY exp, INTEGER size)`
+
+  Write binary data to default output channel.
+
+  **Parameters**
+    * :PPL:`exp` – Expression to write
+    * :PPL:`size` – Number of bytes to write
+
+  **Remarks**
+    Writes binary data to the file channel set by FDEFOUT. Functionally identical to 
+    FWRITE but uses the default channel. Expression is evaluated and written as binary 
+    bytes, not text. Essential for binary file operations when working with a single 
+    output file. File pointer advances by number of bytes written.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER recordNum
+       STRING header
+       
+       FOPEN 2, "BINARY.DAT", O_WR, S_DN
+       FDEFOUT 2
+       
+       ; Write binary data using default channel
+       header = "DATAFILE01"
+       FDWRITE header, 10      ; Fixed 10-byte header
+       
+       recordNum = 100
+       FDWRITE recordNum, 2    ; 2-byte integer
+       
+       ; Write multiple records
+       FOR i = 1 TO recordNum
+           FDWRITE i, 2
+           FDWRITE "REC", 3
+       NEXT
+       
+       FCLOSE 2
+
+  **See Also**
+    * :PPL:`FDEFOUT` – Set default output channel
+    * :PPL:`FWRITE` – Write binary with explicit channel
+    * :PPL:`FDREAD` – Read binary from default input
+    * :PPL:`FSEEK` – Position file pointer
 
 FDOQADD (3.20)
 ~~~~~~~~~~~~~~
@@ -1269,6 +1611,36 @@ FDOQMOD (3.20)
   **See Also**
     * :PPL:`FDOQADD()`
     * :PPL:`FDOQDEL()`
+
+FFLUSH (2.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT FFLUSH(INTEGER chan)`
+
+  Flush file buffer to disk immediately.
+
+  **Parameters**
+    * :PPL:`chan` – Open file channel to flush (0-7)
+
+  **Remarks**
+    Forces all buffered data for the specified channel to be written to disk immediately. 
+    Useful for ensuring critical data is saved before continuing, especially in multi-user 
+    environments or when sharing files between processes. Without FFLUSH, data may remain 
+    in memory buffers until the file is closed or the buffer fills.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FAPPEND 1, "ACTIVITY.LOG", O_RW, S_DB
+       FPUTLN 1, "Critical event at ", TIME()
+       FFLUSH 1  ; Ensure log entry is written immediately
+       ; Continue processing...
+       FCLOSE 1
+
+  **See Also**
+    * :PPL:`FCLOSE` – Close file (automatically flushes)
+    * :PPL:`FOPEN` – Open file
+    * :PPL:`FPUT` / :PPL:`FPUTLN` – Write to file
 
 FGET (1.00)
 ~~~~~~~~~~~
@@ -1378,6 +1750,88 @@ FORWARD (1.00)
     * :PPL:`BACKUP` – Move backward
     * :PPL:`GETX()` – Get cursor column
     * :PPL:`GETY()` – Get cursor row
+
+FREAD (2.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT FREAD(INTEGER chan, VAR var, INTEGER size)`
+
+  Read binary data from file.
+
+  **Parameters**
+    * :PPL:`chan` – Open file channel (0-7)
+    * :PPL:`var` – Variable to receive data
+    * :PPL:`size` – Number of bytes to read (0-2048)
+
+  **Remarks**
+    Reads raw binary data from current file position. Unlike FGET which reads text lines, 
+    FREAD reads exact byte counts regardless of content. Useful for binary formats, fixed-
+    length records, or data structures. File pointer advances by number of bytes read.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING header
+       INTEGER recordSize
+       
+       FOPEN 1, "BINARY.DAT", O_RD, S_DW
+       
+       ; Read 10-byte header
+       FREAD 1, header, 10
+       
+       ; Read 2-byte integer (size field)
+       FREAD 1, recordSize, 2
+       
+       FCLOSE 1
+
+  **See Also**
+    * :PPL:`FWRITE` – Write binary data
+    * :PPL:`FSEEK` – Position file pointer
+    * :PPL:`FDREAD` – Read with default channel
+
+FSEEK (2.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT FSEEK(INTEGER chan, INTEGER bytes, INTEGER position)`
+
+  Move file pointer to specific position.
+
+  **Parameters**
+    * :PPL:`chan` – Open file channel (0-7)
+    * :PPL:`bytes` – Number of bytes to move (positive or negative)
+    * :PPL:`position` – Base position: SEEK_SET (0), SEEK_CUR (1), or SEEK_END (2)
+
+  **Position Constants**
+    * :PPL:`SEEK_SET` (0) – Beginning of file
+    * :PPL:`SEEK_CUR` (1) – Current file position
+    * :PPL:`SEEK_END` (2) – End of file
+
+  **Remarks**
+    Positions the file pointer for random access operations. Allows moving forward or 
+    backward from the specified base position. Essential for binary file operations and 
+    updating specific records in data files.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FOPEN 1, "DATA.DAT", O_RW, S_DN
+       
+       ; Move to byte 100 from start
+       FSEEK 1, 100, SEEK_SET
+       
+       ; Move back 50 bytes from current position
+       FSEEK 1, -50, SEEK_CUR
+       
+       ; Position 10 bytes before end of file
+       FSEEK 1, -10, SEEK_END
+       
+       FCLOSE 1
+
+  **See Also**
+    * :PPL:`FREAD` – Read binary data
+    * :PPL:`FWRITE` – Write binary data
+    * :PPL:`FREWIND` – Return to beginning
+
 
 FPUT (1.00)
 ~~~~~~~~~~~
@@ -1561,6 +2015,46 @@ FREWIND (1.00)
     * :PPL:`FCLOSE` – Close file
     * :PPL:`FCREATE` – Create file
     * :PPL:`FOPEN` – Open file
+
+FWRITE (2.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT FWRITE(INTEGER chan, ANY exp, INTEGER size)`
+
+  Write binary data to file.
+
+  **Parameters**
+    * :PPL:`chan` – Open file channel (0-7)
+    * :PPL:`exp` – Expression to write
+    * :PPL:`size` – Number of bytes to write
+
+  **Remarks**
+    Writes raw binary data to current file position. Expression is evaluated and written 
+    as binary bytes, not text. Essential for creating binary files, fixed-length records, 
+    or structured data files. File pointer advances by number of bytes written.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER recordNum
+       STRING data
+       
+       FOPEN 1, "BINARY.DAT", O_WR, S_DN
+       
+       ; Write fixed-size header
+       data = "DATAFILE01"
+       FWRITE 1, data, 10
+       
+       ; Write record count as 2-byte integer
+       recordNum = 100
+       FWRITE 1, recordNum, 2
+       
+       FCLOSE 1
+
+  **See Also**
+    * :PPL:`FREAD` – Read binary data
+    * :PPL:`FSEEK` – Position file pointer
+    * :PPL:`FDWRITE` – Write with default channel (if implemented)
 
 GETTOKEN (1.00)
 ~~~~~~~~~~~~~~~
@@ -3902,6 +4396,84 @@ WAITFOR (1.00)
     * :PPL:`MGETBYTE()` – Get byte from modem
     * :PPL:`SENDMODEM` – Send to modem
 
+WEBREQUEST (4.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT WEBREQUEST(STRING url, STRING filename)`
+
+  Downloads data from a web server and saves it to a file.
+
+  **Parameters**
+    * :PPL:`url` – Complete URL to download (including protocol)
+    * :PPL:`filename` – Local file path to save the downloaded data
+
+  **Remarks**
+    Performs an HTTP GET request and saves the response directly to a file. This statement 
+    is ideal for downloading large files, binary data, or any content that exceeds PPL's 
+    string limitations. Supports both HTTP and HTTPS protocols with automatic handling of 
+    common redirects.
+    
+    The download is synchronous - the PPE will wait until the download completes or times 
+    out before continuing. For large files, consider informing users of the download progress 
+    or expected wait time. The function overwrites existing files without warning.
+    
+    Network operations require appropriate system permissions. The download directory must 
+    be writable by the BBS process. Some installations may restrict web requests or limit 
+    accessible URLs for security reasons.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING tempFile, updateFile
+       BOOLEAN success
+       
+       ; Download a text file
+       tempFile = TEMPPATH() + "news_" + STRING(PCBNODE()) + ".txt"
+       WEBREQUEST "https://example.com/bbsnews.txt", tempFile
+       IF (EXIST(tempFile)) THEN
+           DISPFILE tempFile, DEFS
+           DELETE tempFile
+       ENDIF
+       
+       ; Download binary file (ZIP archive)
+       updateFile = TEMPPATH() + "update.zip"
+       PRINTLN "Downloading update package..."
+       WEBREQUEST "https://updates.bbs.com/latest.zip", updateFile
+       IF (EXIST(updateFile)) THEN
+           INTEGER size
+           size = FILEINF(updateFile, 4)
+           PRINTLN "Downloaded ", size, " bytes"
+           ; Process the downloaded file
+           SHELL TRUE, rc, "unzip -o " + updateFile
+       ELSE
+           PRINTLN "Download failed!"
+       ENDIF
+       
+       ; Fetch and save JSON data
+       STRING dataFile
+       dataFile = PPEPATH() + "userdata.json"
+       WEBREQUEST "https://api.service.com/users/current", dataFile
+       IF (EXIST(dataFile) & FILEINF(dataFile, 4) > 0) THEN
+           ; Process JSON file
+           PRINTLN "User data updated"
+       ENDIF
+       
+       ; Download with error checking
+       STRING url, dest
+       url = "https://mirror.bbs.com/files/welcome.ans"
+       dest = HELPPATH() + "welcome.ans"
+       WEBREQUEST url, dest
+       IF (!EXIST(dest) | FILEINF(dest, 4) = 0) THEN
+           LOG "Failed to download: " + url, FALSE
+       ENDIF
+
+  **See Also**
+    * :PPL:`WEBREQUEST()` function – Get response as string
+    * :PPL:`EXIST()` – Check if download succeeded
+    * :PPL:`FILEINF()` – Get file information
+    * :PPL:`TEMPPATH()` – Get temporary directory
+    * :PPL:`DELETE` – Clean up downloaded files
+
 WRUNET (1.00)
 ~~~~~~~~~~~~~
   :PPL:`STATEMENT WRUNET(INTEGER node, STRING stat, STRING name, STRING city, STRING oper, STRING br)`
@@ -3983,3 +4555,1029 @@ D* Database / Table Primitives (Overview)
   * NewName variants (DN*) manage named index or alt dataset.
 
   Add a request if you want these expanded in the same detailed template.
+
+REDIM (2.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT REDIM(VAR array, INTEGER dim1 [, INTEGER dim2, INTEGER dim3])`
+
+  Dynamically resize an array at runtime.
+
+  **Parameters**
+    * :PPL:`array` – Previously declared array to resize
+    * :PPL:`dim1,dim2,dim3` – New dimensions (must match original dimension count)
+
+  **Remarks**
+    Array must be declared with the desired number of dimensions before using REDIM. 
+    Cannot change the number of dimensions, only their sizes. Existing data may be lost 
+    when resizing.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING s(1,1,1)
+       REDIM s,5,5,5
+       LET s(4,4,4) = "Hello, World!"
+       PRINTLN s(4,4,4)
+
+  **See Also**
+    * Array declarations
+
+APPEND (2.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT APPEND(STRING srcfile, STRING dstfile)`
+
+  Append one file's contents to another.
+
+  **Parameters**
+    * :PPL:`srcfile` – Source file to read from
+    * :PPL:`dstfile` – Destination file to append to
+
+  **Remarks**
+    Appends the entire contents of srcfile to the end of dstfile. Creates dstfile if it 
+    doesn't exist. Leaves srcfile unchanged.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       APPEND "TODAY.LOG", "MASTER.LOG"
+       DELETE "TODAY.LOG"
+
+  **See Also**
+    * :PPL:`COPY` – Copy file
+    * :PPL:`FAPPEND` – Open file for append
+
+COPY (2.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT COPY(STRING srcfile, STRING dstfile)`
+
+  Copy a file to a new location.
+
+  **Parameters**
+    * :PPL:`srcfile` – Source file to copy
+    * :PPL:`dstfile` – Destination file (overwrites if exists)
+
+  **Remarks**
+    Creates or overwrites dstfile with the contents of srcfile. Source file remains unchanged.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       COPY "CONFIG.DAT", "CONFIG.BAK"
+
+  **See Also**
+    * :PPL:`APPEND` – Append files
+    * :PPL:`RENAME` – Rename/move file
+    * :PPL:`DELETE` – Delete file
+
+LASTIN (2.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT LASTIN(INTEGER conf)`
+
+  Set user's last conference visited.
+
+  **Parameters**
+    * :PPL:`conf` – Conference number
+
+  **Remarks**
+    Forces the user's "last in" conference value. Useful in logon scripts to start users 
+    in a specific conference regardless of where they were when they logged off.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Force new users to main conference
+       IF (U_EXPERT = "N") THEN
+           LASTIN 0
+       ENDIF
+
+  **See Also**
+    * :PPL:`JOIN` – Join conference
+    * :PPL:`CURCONF()` – Current conference
+
+FLAG (2.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT FLAG(STRING filename)`
+
+  Flag a file for download.
+
+  **Parameters**
+    * :PPL:`filename` – Full path and filename to flag
+
+  **Remarks**
+    Directly flags any file for download, bypassing FSEC and DLPATH.LST restrictions. 
+    Allows flagging files not normally accessible through standard download areas.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       FLAG "C:\PRIVATE\REPORT.ZIP"
+       PRINTLN "File flagged. Use D command to download."
+
+  **See Also**
+    * :PPL:`DOWNLOAD` – Download files
+    * :PPL:`FLAGCNT()` – Count flagged files
+
+DOWNLOAD (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT DOWNLOAD(STRING cmds)`
+
+  Initiate file download with commands.
+
+  **Parameters**
+    * :PPL:`cmds` – Download commands (same format as D or DB command)
+
+  **Remarks**
+    Processes download commands as if typed by user. Files must be accessible per FSEC 
+    and DLPATH.LST unless previously flagged with FLAG statement.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Download flagged files
+       IF (FLAGCNT() > 0) THEN
+           DOWNLOAD "D;Y"
+       ENDIF
+
+  **See Also**
+    * :PPL:`FLAG` – Flag files
+    * :PPL:`FLAGCNT()` – Count flagged files
+
+WRUSYSDOOR (2.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT WRUSYSDOOR(STRING doorname)`
+
+  Write USERS.SYS with TPA record for doors.
+
+  **Parameters**
+    * :PPL:`doorname` – Name of door application
+
+  **Remarks**
+    Creates USERS.SYS file with TPA (Third Party Application) record for enhanced door 
+    compatibility. Some doors require TPA information for advanced features.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER ret
+       WRUSYSDOOR "TRADEWARS"
+       SHELL FALSE,ret,"TW2002.EXE",""
+       RDUSYS
+
+  **See Also**
+    * :PPL:`WRUSYS` – Standard USERS.SYS
+    * :PPL:`RDUSYS` – Read USERS.SYS
+
+KBDSTRING (2.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT KBDSTRING(STRING str)`
+
+  Stuff string to keyboard with echo.
+
+  **Parameters**
+    * :PPL:`str` – String to stuff (max 256 chars)
+
+  **Remarks**
+    Like KBDSTUFF but echoes characters to display as if typed. Useful when you want 
+    the user to see what's being automated.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       KBDSTRING "DIR N;S"
+       ; User sees: DIR N;S
+
+  **See Also**
+    * :PPL:`KBDSTUFF` – Stuff without echo
+    * :PPL:`KBDFLUSH` – Clear keyboard buffer
+
+KBDFLUSH (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT KBDFLUSH`
+
+  Clear local keyboard and stuffed keystroke buffers.
+
+  **Remarks**
+    Clears both the local keyboard buffer and any keystrokes stuffed with KBDSTUFF or 
+    KBDSTRING. Does not affect modem input.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       KBDFLUSH  ; Clear any pending input
+       INPUT "Enter choice", choice
+
+  **See Also**
+    * :PPL:`MDMFLUSH` – Clear modem buffer
+    * :PPL:`KEYFLUSH` – Clear all buffers
+
+MDMFLUSH (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT MDMFLUSH`
+
+  Clear incoming modem buffer.
+
+  **Remarks**
+    Flushes all pending input from the modem. Does not affect local keyboard or stuffed 
+    keystrokes.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       MDMFLUSH  ; Ignore any typed-ahead input
+       INPUT "Fresh prompt", answer
+
+  **See Also**
+    * :PPL:`KBDFLUSH` – Clear keyboard buffer
+    * :PPL:`KEYFLUSH` – Clear all buffers
+
+KEYFLUSH (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT KEYFLUSH`
+
+  Clear all input buffers.
+
+  **Remarks**
+    Flushes local keyboard buffer, stuffed keystrokes, and incoming modem buffer. 
+    Ensures no pending input affects the next prompt.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       KEYFLUSH  ; Start fresh
+       INPUTYN "Continue (Y/N)", yn, @X0E
+
+  **See Also**
+    * :PPL:`KBDFLUSH` – Clear keyboard only
+    * :PPL:`MDMFLUSH` – Clear modem only
+
+ALIAS (2.00)
+~~~~~~~~~~~~
+  :PPL:`STATEMENT ALIAS(BOOLEAN enable)`
+
+  Control alias usage for current user.
+
+  **Parameters**
+    * :PPL:`enable` – TRUE to enable alias, FALSE to use real name
+
+  **Remarks**
+    Toggles between alias and real name if user and conference support aliases. Has no 
+    effect if aliases not allowed.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       IF (CONFALIAS() & USERALIAS()) THEN
+           ALIAS TRUE  ; Use alias
+           PRINTLN "Now using alias: ", U_ALIAS
+       ENDIF
+
+  **See Also**
+    * :PPL:`ALIAS()` – Get alias status
+    * :PPL:`CONFALIAS()` – Check conference setting
+    * :PPL:`USERALIAS()` – Check user permission
+
+LANG (2.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT LANG(INTEGER langnum)`
+
+  Change user's language.
+
+  **Parameters**
+    * :PPL:`langnum` – Language number to activate
+
+  **Remarks**
+    Changes the active language for prompts and displays. Language must be configured 
+    in PCBML.DAT.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       LANG 2  ; Switch to language 2
+       DISPTEXT 149, LFAFTER+NEWLINE
+
+  **See Also**
+    * :PPL:`LANGEXT()` – Get language extension
+
+ADJBYTES (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT ADJBYTES(INTEGER bytes)`
+
+  Adjust user's total and daily download bytes.
+
+  **Parameters**
+    * :PPL:`bytes` – Bytes to add (positive) or subtract (negative)
+
+  **Remarks**
+    Modifies both total and daily download byte counters. Use negative values to give 
+    back credit, positive to charge.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Give back 1MB credit
+       ADJBYTES -1048576
+
+  **See Also**
+    * :PPL:`ADJDBYTES` – Adjust daily only
+    * :PPL:`ADJTBYTES` – Adjust total only
+
+ADJDBYTES (2.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT ADJDBYTES(INTEGER bytes)`
+
+  Adjust user's daily download bytes only.
+
+  **Parameters**
+    * :PPL:`bytes` – Bytes to add (positive) or subtract (negative)
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ADJDBYTES -524288  ; Credit 512KB today only
+
+  **See Also**
+    * :PPL:`ADJBYTES` – Adjust both counters
+
+ADJTBYTES (2.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT ADJTBYTES(INTEGER bytes)`
+
+  Adjust user's total download bytes only.
+
+  **Parameters**
+    * :PPL:`bytes` – Bytes to add (positive) or subtract (negative)
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ADJTBYTES 1048576  ; Charge 1MB total
+
+  **See Also**
+    * :PPL:`ADJBYTES` – Adjust both counters
+
+ADJTFILES (2.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT ADJTFILES(INTEGER files)`
+
+  Adjust user's total download file count.
+
+  **Parameters**
+    * :PPL:`files` – Files to add (positive) or subtract (negative)
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ADJTFILES -5  ; Credit 5 files
+
+PUTALTUSER (2.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT PUTALTUSER`
+
+  Save alternate user record.
+
+  **Remarks**
+    Alias for PUTUSER when working with alternate user loaded via GETALTUSER. Makes code 
+    clearer when updating alternate users.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       GETALTUSER 50
+       LET U_SEC = 20
+       PUTALTUSER  ; Save changes to user 50
+
+  **See Also**
+    * :PPL:`GETALTUSER` – Load alternate user
+    * :PPL:`PUTUSER` – Save user record
+
+GETALTUSER (2.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT GETALTUSER(INTEGER recnum)`
+
+  Load alternate user record.
+
+  **Parameters**
+    * :PPL:`recnum` – User record number to load
+
+  **Remarks**
+    Loads specified user's data into U_XXX variables. User statements/functions redirect 
+    to this user until FREALTUSER called or another GETALTUSER issued. Invalid record 
+    numbers revert to current user. Changes to online users take effect after logoff. 
+    ADJTIME always affects current user only.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       GETALTUSER 100
+       PRINTLN "User 100 is: ", U_NAME()
+       LET U_SEC = 30
+       PUTALTUSER
+       FREALTUSER
+
+  **See Also**
+    * :PPL:`FREALTUSER` – Release alternate user
+    * :PPL:`CURUSER()` – Check active user
+
+FREALTUSER (2.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FREALTUSER`
+
+  Release alternate user and restore current user.
+
+  **Remarks**
+    Frees memory used by GETALTUSER and reverts to current caller's data. Required before 
+    MESSAGE statement if GETALTUSER was used, as MESSAGE needs alternate user access internally.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       GETALTUSER 20
+       STRING name = U_NAME()
+       FREALTUSER  ; Must free before MESSAGE
+       MESSAGE 1, name, "Subject", "R", 0, FALSE, FALSE, "msg.txt"
+
+  **See Also**
+    * :PPL:`GETALTUSER` – Load alternate user
+
+BITCLEAR (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT BITCLEAR(VAR var, INTEGER bit)`
+
+  Clear a specific bit in a variable.
+
+  **Parameters**
+    * :PPL:`var` – Variable containing the bit to clear
+    * :PPL:`bit` – Bit number to clear (0-based)
+
+  **Remarks**
+    Primarily designed for BIGSTR variables (up to 2048 bytes = 16384 bits). Works with 
+    other data types but use caution when bit-twiddling non-string variables as it may 
+    corrupt their values. If bit number is invalid (negative or beyond variable size), 
+    no operation occurs.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       BIGSTR flags
+       flags = CHR(255) + CHR(255)  ; All bits set
+       
+       ; Clear specific bits
+       BITCLEAR flags, 0   ; Clear bit 0
+       BITCLEAR flags, 8   ; Clear bit 8
+       
+       ; Use as flags array
+       INTEGER i
+       FOR i = 0 TO 100
+           IF (ISBITSET(flags, i)) THEN
+               PRINTLN "Flag ", i, " is ON"
+           ENDIF
+       NEXT
+
+  **See Also**
+    * :PPL:`BITSET` – Set a bit
+    * :PPL:`ISBITSET()` – Check bit status
+
+BITSET (2.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT BITSET(VAR var, INTEGER bit)`
+
+  Set a specific bit in a variable.
+
+  **Parameters**
+    * :PPL:`var` – Variable containing the bit to set
+    * :PPL:`bit` – Bit number to set (0-based)
+
+  **Remarks**
+    Primarily designed for BIGSTR variables (up to 2048 bytes = 16384 bits). Works with 
+    other data types but use caution when bit-twiddling non-string variables as it may 
+    corrupt their values. If bit number is invalid (negative or beyond variable size), 
+    no operation occurs.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       BIGSTR userFlags
+       
+       ; Track user preferences as bits
+       BITSET userFlags, 0   ; Email notifications
+       BITSET userFlags, 1   ; Auto-signature
+       BITSET userFlags, 2   ; Expert mode
+       
+       ; Store up to 16384 boolean flags in one BIGSTR
+
+  **See Also**
+    * :PPL:`BITCLEAR` – Clear a bit
+    * :PPL:`ISBITSET()` – Check bit status
+
+MOUSEREG (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT MOUSEREG(INTEGER num, INTEGER x1, INTEGER y1, INTEGER x2, INTEGER y2, INTEGER fontX, INTEGER fontY, BOOLEAN invert, BOOLEAN clear, STRING text)`
+
+  Define a RIP mouse-clickable region.
+
+  **Parameters**
+    * :PPL:`num` – RIP region number
+    * :PPL:`x1,y1` – Upper-left coordinates
+    * :PPL:`x2,y2` – Lower-right coordinates  
+    * :PPL:`fontX` – Character width in pixels
+    * :PPL:`fontY` – Character height in pixels
+    * :PPL:`invert` – TRUE to invert region when clicked
+    * :PPL:`clear` – TRUE to clear and fullscreen text window
+    * :PPL:`text` – Text to transmit when region clicked
+
+  **Remarks**
+    Creates clickable regions for RIP graphics terminals. When user clicks the defined 
+    region, the terminal sends the specified text as if typed. Only works with RIP-enabled 
+    terminals.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Create clickable menu buttons
+       MOUSEREG 1, 10, 10, 100, 30, 8, 14, TRUE, FALSE, "1"
+       MOUSEREG 2, 10, 40, 100, 60, 8, 14, TRUE, FALSE, "2"
+       MOUSEREG 3, 10, 70, 100, 90, 8, 14, TRUE, FALSE, "Q"
+
+  **See Also**
+    * :PPL:`RIPDETECT()` – Check RIP support
+
+SCRFILE (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT SCRFILE(VAR INTEGER line, VAR STRING filename)`
+
+  Find a filename on the current screen display.
+
+  **Parameters**
+    * :PPL:`line` – On entry: starting line (1=top); On exit: line where found or 0
+    * :PPL:`filename` – On exit: filename if found, empty otherwise
+
+  **Remarks**
+    Searches the visible screen for filenames starting at the specified line. Useful for 
+    file listing screens where users can select files by pointing. Sets line to 0 and 
+    filename to empty if no filename found.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER lineNum
+       STRING fname
+       
+       DIR "N;NS"  ; Display new files
+       lineNum = 1
+       SCRFILE lineNum, fname
+       
+       IF (lineNum > 0) THEN
+           PRINTLN "Found file: ", fname, " on line ", lineNum
+           FLAG fname
+       ENDIF
+
+  **See Also**
+    * :PPL:`DIR` – Display file directory
+    * :PPL:`FLAG` – Flag file for download
+
+SORT (2.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT SORT(ARRAY sortArray, VAR INTEGER pointerArray)`
+
+  Sort array contents using pointer array.
+
+  **Parameters**
+    * :PPL:`sortArray` – One-dimensional array to sort (any type)
+    * :PPL:`pointerArray` – Integer array to hold sorted indices
+
+  **Remarks**
+    Creates a pointer array containing indices to access sortArray in sorted order. 
+    Original array remains unchanged. Both arrays must be one-dimensional and 
+    pointerArray must be INTEGER type.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING s(99)    ; 100 elements (0-99)
+       INTEGER p(99)   ; Pointer array
+       INTEGER i
+       
+       ; Fill array with data
+       FOR i = 0 TO 99
+           FGET 1, s(i)
+       NEXT
+       
+       SORT s, p
+       
+       ; Display in sorted order
+       PRINTLN "Sorted list:"
+       FOR i = 0 TO 99
+           PRINTLN s(p(i))  ; Access via pointer
+       NEXT
+
+  **See Also**
+    * Array declarations
+
+SEARCHINIT (2.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT SEARCHINIT(STRING criteria, BOOLEAN caseSensitive)`
+
+  Initialize Boyer-Moore search parameters.
+
+  **Parameters**
+    * :PPL:`criteria` – Search criteria in PCBoard format ("THIS & THAT | BOB")
+    * :PPL:`caseSensitive` – TRUE for case-sensitive, FALSE otherwise
+
+  **Remarks**
+    Prepares optimized Boyer-Moore search algorithm for fast text searching. Supports 
+    PCBoard search syntax with & (AND), | (OR) operators. Must call before SEARCHFIND.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       ; Search for messages containing both words
+       SEARCHINIT "PPL & SCRIPT", FALSE
+       
+       STRING msgText
+       BOOLEAN found
+       FGET 1, msgText
+       SEARCHFIND msgText, found
+       
+       IF (found) THEN
+           PRFOUNDLN msgText  ; Highlight found words
+       ENDIF
+       
+       SEARCHSTOP
+
+  **See Also**
+    * :PPL:`SEARCHFIND` – Perform search
+    * :PPL:`SEARCHSTOP` – Clear search
+    * :PPL:`PRFOUND` – Print with highlighting
+
+SEARCHFIND (2.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT SEARCHFIND(STRING buffer, VAR BOOLEAN found)`
+
+  Search text using Boyer-Moore algorithm.
+
+  **Parameters**
+    * :PPL:`buffer` – Text to search
+    * :PPL:`found` – Returns TRUE if criteria found, FALSE otherwise
+
+  **Remarks**
+    Performs fast Boyer-Moore search using criteria from SEARCHINIT. More efficient than 
+    simple string searching for large texts or multiple searches.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       SEARCHINIT "SYSOP | ADMIN", FALSE
+       
+       STRING line
+       BOOLEAN hasAuth
+       
+       WHILE (!FERR(1)) DO
+           FGET 1, line
+           SEARCHFIND line, hasAuth
+           IF (hasAuth) THEN
+               PRFOUNDLN line  ; Print with highlighting
+           ENDIF
+       ENDWHILE
+
+  **See Also**
+    * :PPL:`SEARCHINIT` – Initialize search
+    * :PPL:`SEARCHSTOP` – Clear search
+    * :PPL:`PRFOUND` – Print with highlighting
+
+SEARCHSTOP (2.00)
+~~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT SEARCHSTOP`
+
+  Clear search criteria and free resources.
+
+  **Remarks**
+    Clears Boyer-Moore search criteria set by SEARCHINIT. Call when done searching to 
+    free allocated memory. Automatically called at program end.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       SEARCHINIT "ERROR | WARNING", TRUE
+       ; ... perform searches ...
+       SEARCHSTOP  ; Clean up
+
+  **See Also**
+    * :PPL:`SEARCHINIT` – Initialize search
+    * :PPL:`SEARCHFIND` – Perform search
+
+PRFOUND (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT PRFOUND(ANY exp [, ANY exp...])`
+
+  Print with search term highlighting.
+
+  **Parameters**
+    * :PPL:`exp` – Expression(s) to print
+
+  **Remarks**
+    Like PRINT but automatically highlights words found by the last SEARCHFIND. Only 
+    highlights if last search was successful. No highlighting if search failed.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       SEARCHINIT "PPL | SCRIPT", FALSE
+       STRING text = "Learning PPL script programming"
+       BOOLEAN found
+       
+       SEARCHFIND text, found
+       IF (found) THEN
+           PRFOUND text  ; "PPL" and "script" highlighted
+       ENDIF
+
+  **See Also**
+    * :PPL:`PRFOUNDLN` – Print line with highlighting
+    * :PPL:`SEARCHFIND` – Perform search
+    * :PPL:`PRINT` – Normal print
+
+PRFOUNDLN (2.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT PRFOUNDLN([ANY exp...])`
+
+  Print line with search term highlighting.
+
+  **Parameters**
+    * :PPL:`exp` – Expression(s) to print (optional)
+
+  **Remarks**
+    Like PRINTLN but automatically highlights words found by the last SEARCHFIND. Only 
+    highlights if last search was successful. Appends newline after output.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       SEARCHINIT "ERROR | FAIL", TRUE
+       
+       STRING logLine
+       BOOLEAN hasError
+       
+       FOPEN 1, "SYSTEM.LOG", O_RD, S_DW
+       WHILE (!FERR(1)) DO
+           FGET 1, logLine
+           SEARCHFIND logLine, hasError
+           IF (hasError) THEN
+               PRFOUNDLN logLine  ; Highlight ERROR/FAIL
+           ELSE
+               PRINTLN logLine    ; Normal display
+           ENDIF
+       ENDWHILE
+
+  **See Also**
+    * :PPL:`PRFOUND` – Print without newline
+    * :PPL:`SEARCHFIND` – Perform search
+    * :PPL:`PRINTLN` – Normal print line    
+
+TPAGET (2.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT TPAGET(STRING keyword, VAR STRING infoVar)`
+
+  Get static string information from a named TPA.
+
+  **Parameters**
+    * :PPL:`keyword` – TPA keyword identifier
+    * :PPL:`infoVar` – Variable to receive the information
+
+  **Remarks**
+    Retrieves string data from a Third Party Application's static storage area. TPAs 
+    can store persistent data between calls. The keyword identifies which TPA's data 
+    to access.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING doorData
+       TPAGET "TRADEWARS", doorData
+       PRINTLN "TW2002 data: ", doorData
+
+  **See Also**
+    * :PPL:`TPAPUT` – Store TPA string data
+    * :PPL:`TPAREAD` – Read TPA binary data
+    * :PPL:`TPACGET` – Get conference TPA data
+
+TPAPUT (2.00)
+~~~~~~~~~~~~~
+  :PPL:`STATEMENT TPAPUT(STRING keyword, ANY infoExpr)`
+
+  Put static string information to a named TPA.
+
+  **Parameters**
+    * :PPL:`keyword` – TPA keyword identifier
+    * :PPL:`infoExpr` – Expression to store
+
+  **Remarks**
+    Stores string data to a Third Party Application's static storage area. Data 
+    persists between TPA calls and user sessions.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       TPAPUT "TRADEWARS", "PLAYER:" + U_NAME() + ";CREDITS:1000"
+
+  **See Also**
+    * :PPL:`TPAGET` – Retrieve TPA string data
+    * :PPL:`TPAWRITE` – Write TPA binary data
+
+TPACGET (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT TPACGET(STRING keyword, VAR STRING infoVar, INTEGER confNum)`
+
+  Get conference-specific string data from a TPA.
+
+  **Parameters**
+    * :PPL:`keyword` – TPA keyword identifier
+    * :PPL:`infoVar` – Variable to receive the information
+    * :PPL:`confNum` – Conference number
+
+  **Remarks**
+    Retrieves string data from a TPA's conference-specific storage. Allows TPAs to 
+    maintain separate data for each conference.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       STRING gameData
+       INTEGER conf = CURCONF()
+       TPACGET "RPGDOOR", gameData, conf
+       PRINTLN "RPG data for conference ", conf, ": ", gameData
+
+  **See Also**
+    * :PPL:`TPACPUT` – Store conference TPA data
+    * :PPL:`TPACREAD` – Read conference binary data
+
+TPACPUT (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT TPACPUT(STRING keyword, ANY infoExpr, INTEGER confNum)`
+
+  Put conference-specific string data to a TPA.
+
+  **Parameters**
+    * :PPL:`keyword` – TPA keyword identifier
+    * :PPL:`infoExpr` – Expression to store
+    * :PPL:`confNum` – Conference number
+
+  **Remarks**
+    Stores string data to a TPA's conference-specific storage area. Each conference 
+    maintains separate TPA data.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER conf = CURCONF()
+       TPACPUT "RPGDOOR", "LEVEL:5;HP:100", conf
+
+  **See Also**
+    * :PPL:`TPACGET` – Retrieve conference TPA data
+    * :PPL:`TPACWRITE` – Write conference binary data
+
+TPAREAD (2.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT TPAREAD(STRING keyword, VAR infoVar)`
+
+  Read static binary information from a TPA.
+
+  **Parameters**
+    * :PPL:`keyword` – TPA keyword identifier
+    * :PPL:`infoVar` – Variable to receive data (any type)
+
+  **Remarks**
+    Reads binary data from a TPA's static storage. Unlike TPAGET which handles strings, 
+    TPAREAD preserves binary data types.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER score
+       REAL multiplier
+       TPAREAD "GAME", score
+       TPAREAD "GAMEMULT", multiplier
+       PRINTLN "Score: ", score * multiplier
+
+  **See Also**
+    * :PPL:`TPAWRITE` – Write TPA binary data
+    * :PPL:`TPAGET` – Get TPA string data
+
+TPAWRITE (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT TPAWRITE(STRING keyword, ANY infoExpr)`
+
+  Write static binary information to a TPA.
+
+  **Parameters**
+    * :PPL:`keyword` – TPA keyword identifier
+    * :PPL:`infoExpr` – Expression to store (any type)
+
+  **Remarks**
+    Writes binary data to a TPA's static storage. Preserves data types for numeric 
+    and other non-string values.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER highScore = 50000
+       TPAWRITE "HIGHSCORE", highScore
+       
+       REAL ratio = 1.5
+       TPAWRITE "BONUSRATIO", ratio
+
+  **See Also**
+    * :PPL:`TPAREAD` – Read TPA binary data
+    * :PPL:`TPAPUT` – Put TPA string data
+
+TPACREAD (2.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT TPACREAD(STRING keyword, VAR infoVar, INTEGER confNum)`
+
+  Read conference-specific binary data from a TPA.
+
+  **Parameters**
+    * :PPL:`keyword` – TPA keyword identifier
+    * :PPL:`infoVar` – Variable to receive data (any type)
+    * :PPL:`confNum` – Conference number
+
+  **Remarks**
+    Reads binary data from a TPA's conference-specific storage. Maintains separate 
+    data for each conference with type preservation.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER level, conf
+       conf = CURCONF()
+       TPACREAD "USERLEVEL", level, conf
+       PRINTLN "User level in conf ", conf, ": ", level
+
+  **See Also**
+    * :PPL:`TPACWRITE` – Write conference binary data
+    * :PPL:`TPACGET` – Get conference string data
+
+TPACWRITE (2.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT TPACWRITE(STRING keyword, ANY infoExpr, INTEGER confNum)`
+
+  Write conference-specific binary data to a TPA.
+
+  **Parameters**
+    * :PPL:`keyword` – TPA keyword identifier
+    * :PPL:`infoExpr` – Expression to store (any type)
+    * :PPL:`confNum` – Conference number
+
+  **Remarks**
+    Writes binary data to a TPA's conference-specific storage. Each conference 
+    maintains separate TPA data with preserved types.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       INTEGER points = 100
+       REAL bonus = 2.5
+       INTEGER conf = CURCONF()
+       
+       TPACWRITE "POINTS", points, conf
+       TPACWRITE "BONUS", bonus, conf
+
+  **See Also**
+    * :PPL:`TPACREAD` – Read conference binary data
+    * :PPL:`TPACPUT` – Put conference string data
