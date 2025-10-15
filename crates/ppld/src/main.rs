@@ -80,29 +80,27 @@ fn main() {
     match Executable::read_file(&file_name, !arguments.output) {
         Ok(mut executable) => {
             if arguments.check {
-                execute!(
+                let _ = execute!(
                     stdout(),
                     SetAttribute(Attribute::Bold),
                     Print(format!("\nChecking compatibility for: {}\n", file_name)),
                     SetAttribute(Attribute::Reset),
                     Print(format!("PPE Version: {}\n\n", executable.runtime))
-                )
-                .unwrap();
+                );
 
                 match check_compatibility(&executable) {
                     Ok(()) => {
                         std::process::exit(0);
                     }
                     Err(err) => {
-                        execute!(
+                        let _ = execute!(
                             stdout(),
                             SetAttribute(Attribute::Bold),
                             SetForegroundColor(Color::Red),
                             Print("ERROR during compatibility check: ".to_string()),
                             SetAttribute(Attribute::Reset),
                             Print(format!("{}\n", err))
-                        )
-                        .unwrap();
+                        );
                         std::process::exit(1);
                     }
                 }
@@ -145,7 +143,7 @@ fn main() {
                                 .unwrap();
                             std::process::exit(1);
                         }
-                        execute!(
+                        let _ = execute!(
                             stdout(),
                             Print("\nSource decompilation complete: ".to_string()),
                             SetAttribute(Attribute::Bold),
@@ -155,15 +153,14 @@ fn main() {
                             SetAttribute(Attribute::Bold),
                             Print(format!("{out_file_name:?}\n")),
                             SetAttribute(Attribute::Reset),
-                        )
-                        .unwrap();
+                        );
                     }
 
                     if !issues.is_empty() {
                         println!();
                     }
                     for issue in &issues {
-                        execute!(
+                        let _ = execute!(
                             stdout(),
                             SetAttribute(Attribute::Bold),
                             SetForegroundColor(Color::Yellow),
@@ -174,8 +171,7 @@ fn main() {
                             SetAttribute(Attribute::Reset),
                             Print(format!("{}", issue.bug)),
                             SetAttribute(Attribute::Reset),
-                        )
-                        .unwrap();
+                        );
                         println!();
                     }
                     if !issues.is_empty() {
@@ -184,7 +180,7 @@ fn main() {
                     std::process::exit(0);
                 }
                 Err(err) => {
-                    execute!(
+                    let _ = execute!(
                         stdout(),
                         SetAttribute(Attribute::Bold),
                         SetForegroundColor(Color::Red),
@@ -193,15 +189,14 @@ fn main() {
                         SetAttribute(Attribute::Bold),
                         Print(format!("{}", err)),
                         SetAttribute(Attribute::Reset),
-                    )
-                    .unwrap();
+                    );
                     println!();
                     std::process::exit(1);
                 }
             }
         }
         Err(err) => {
-            execute!(
+            let _ = execute!(
                 stdout(),
                 SetAttribute(Attribute::Bold),
                 SetForegroundColor(Color::Red),
@@ -210,8 +205,7 @@ fn main() {
                 SetAttribute(Attribute::Bold),
                 Print(format!("{}", err)),
                 SetAttribute(Attribute::Reset),
-            )
-            .unwrap();
+            );
             println!();
             println!();
             std::process::exit(1);

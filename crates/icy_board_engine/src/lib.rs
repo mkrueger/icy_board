@@ -49,7 +49,6 @@ pub fn lookup_icyboard_file(file: &Option<PathBuf>) -> Option<PathBuf> {
     if file.exists() {
         return Some(file);
     }
-    println!("Looking for icyboard file in env var ICB_PATH {:?}", env::var("ICB_PATH"));
     if let Ok(var) = env::var("ICB_PATH") {
         let mut path = PathBuf::from(var);
         if path.is_dir() {

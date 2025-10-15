@@ -11,3 +11,4 @@ PPL Reference
    functions
    statements
    dbase
+   integration

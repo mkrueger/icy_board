@@ -22,7 +22,7 @@ impl<'a> DisassembleVisitor<'a> {
     }
 
     fn output_op_code(end: OpCode) {
-        execute!(
+        let _ = execute!(
             stdout(),
             SetForegroundColor(Color::White),
             Print(format!("{:02X} ", end as i16)),
@@ -30,14 +30,13 @@ impl<'a> DisassembleVisitor<'a> {
             SetForegroundColor(Color::Yellow),
             Print(format!("{:<10} ", end.to_string())),
             SetAttribute(Attribute::Reset),
-        )
-        .unwrap();
+        );
     }
 
     fn print_arguments(&mut self, args: &[PPEExpr]) {
         for (i, d) in args.iter().enumerate() {
             if i > 0 {
-                print!(", ");
+                let _ = execute!(stdout(), Print(", "));
             }
             d.visit(self);
         }
@@ -45,28 +44,26 @@ impl<'a> DisassembleVisitor<'a> {
 
     fn dump_script_data(ppe_file: &super::Executable, range: Range<usize>) {
         let offset = range.start;
-        execute!(
+        let _ = execute!(
             stdout(),
             SetForegroundColor(Color::Cyan),
             Print(format!("{:05X}: ", offset * 2)),
             SetForegroundColor(Color::White),
-        )
-        .unwrap();
+        );
 
         for (i, x) in ppe_file.script_buffer[range].iter().enumerate() {
             if i > 0 && (i % 16) == 0 {
-                println!();
-                execute!(
+                let _ = execute!(
                     stdout(),
+                    Print("\n"),
                     SetForegroundColor(Color::Cyan),
                     Print(format!("{:05X}: ", (offset + i) * 2)),
                     SetForegroundColor(Color::White),
-                )
-                .unwrap();
+                );
             }
-            print!("{:04X} ", *x);
+            let _ = execute!(stdout(), Print(format!("{:04X} ", *x)));
         }
-        execute!(stdout(), SetForegroundColor(Color::Reset),).unwrap();
+        let _ = execute!(stdout(), SetForegroundColor(Color::Reset),);
     }
 
     pub fn print_disassembler(&mut self) {
@@ -77,9 +74,9 @@ impl<'a> DisassembleVisitor<'a> {
                     self.print_statement(&stmt);
                 }
                 CommandOrError::Error(e) => {
-                    println!();
-                    execute!(
+                    let _ = execute!(
                         stdout(),
+                        Print("\n"),
                         SetAttribute(Attribute::Bold),
                         SetForegroundColor(Color::Red),
                         Print("ERROR: ".to_string()),
@@ -87,25 +84,23 @@ impl<'a> DisassembleVisitor<'a> {
                         SetAttribute(Attribute::Bold),
                         Print(format!("{}", e.error_type)),
                         SetAttribute(Attribute::Reset),
-                    )
-                    .unwrap();
-                    println!();
+                        Print("\n"),
+                    );
                     Self::dump_script_data(self.ppe_file, e.span);
-                    println!();
+                    let _ = execute!(stdout(), Print("\n"));
                 }
             }
         }
     }
 
     pub fn print_script_buffer_dump(ppe_file: &super::Executable) {
-        execute!(
+        let _ = execute!(
             stdout(),
             Print("Real uncompressed script buffer size: ".to_string()),
             SetAttribute(Attribute::Bold),
             Print(format!("{} bytes\n\n", ppe_file.script_buffer.len() * 2)),
             SetAttribute(Attribute::Reset)
-        )
-        .unwrap();
+        );
         Self::dump_script_data(ppe_file, 0..ppe_file.script_buffer.len());
     }
 
@@ -117,30 +112,30 @@ impl<'a> DisassembleVisitor<'a> {
         } else {
             &self.ppe_file.script_buffer[stmt.span.clone()]
         };
-        print!("       [");
+        let _ = execute!(stdout(), Print("       ["));
         for (i, x) in data.iter().enumerate() {
             if i > 0 && (i % 16) == 0 {
-                println!();
+                let _ = execute!(stdout(), Print("\n"));
             }
-            print!("{:04X} ", *x);
+            let _ = execute!(stdout(), Print(format!("{:04X} ", *x)));
         }
-        println!("]");
 
-        execute!(
+        let _ = execute!(
             stdout(),
+            Print("]\n"),
             SetForegroundColor(Color::Cyan),
             Print(format!("{:05X}: ", stmt.span.start * 2)),
             SetForegroundColor(Color::Reset),
-        )
-        .unwrap();
+        );
         stmt.command.visit(self);
-        println!();
+
+        let _ = execute!(stdout(), Print("\n"));
     }
 }
 
 impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
     fn visit_value(&mut self, id: usize) {
-        execute!(
+        let _ = execute!(
             stdout(),
             Print("["),
             SetForegroundColor(Color::Magenta),
@@ -156,24 +151,22 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
             Print(format!("{id:04X}")),
             SetAttribute(Attribute::Reset),
             Print("]"),
-        )
-        .unwrap();
+        );
     }
 
     fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> () {
         expr.visit(self);
-        execute!(
+        let _ = execute!(
             stdout(),
             SetForegroundColor(Color::Blue),
             Print(format!(".[{:03X}]", id)),
             SetAttribute(Attribute::Reset),
-        )
-        .unwrap();
+        );
     }
 
     fn visit_proc_call(&mut self, id: usize, args: &[PPEExpr]) {
         Self::output_op_code(OpCode::PCALL);
-        execute!(
+        let _ = execute!(
             stdout(),
             SetForegroundColor(Color::Magenta),
             Print(format!(" {}", self.ppe_file.variable_table.get_var_entry(id).name)),
@@ -183,15 +176,14 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
             Print(format!("{id:04X}")),
             SetAttribute(Attribute::Reset),
             Print("] ("),
-        )
-        .unwrap();
+        );
 
         self.print_arguments(args);
-        print!(")");
+        let _ = execute!(stdout(), Print(")"));
     }
 
     fn visit_function_call(&mut self, id: usize, arguments: &[PPEExpr]) {
-        execute!(
+        let _ = execute!(
             stdout(),
             SetForegroundColor(Color::Magenta),
             Print(format!(" {}", self.ppe_file.variable_table.get_var_entry(id).name)),
@@ -201,14 +193,13 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
             Print(format!("{id:04X}")),
             SetAttribute(Attribute::Reset),
             Print("] ("),
-        )
-        .unwrap();
+        );
 
         self.print_arguments(arguments);
-        print!(")");
+        let _ = execute!(stdout(), Print(")"));
     }
     fn visit_member_function_call(&mut self, expr: &PPEExpr, arguments: &[PPEExpr], id: usize) {
-        execute!(
+        let _ = execute!(
             stdout(),
             SetForegroundColor(Color::Magenta),
             Print(format!("Member:#{:02X}", id)),
@@ -218,39 +209,37 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
             Print(format!("{:?}", expr)),
             SetAttribute(Attribute::Reset),
             Print("] ("),
-        )
-        .unwrap();
+        );
         self.print_arguments(arguments);
-        print!(")");
+        let _ = execute!(stdout(), Print(")"));
     }
 
     fn visit_unary_expression(&mut self, op: crate::ast::UnaryOp, expr: &PPEExpr) {
-        execute!(
+        let _ = execute!(
             stdout(),
             SetForegroundColor(Color::Yellow),
             Print(format!("{op}")),
             SetAttribute(Attribute::Reset),
-        )
-        .unwrap();
-        print!("(");
+        );
+        let _ = execute!(stdout(), Print("("));
+
         expr.visit(self);
-        print!(")");
+        let _ = execute!(stdout(), Print(")"));
     }
 
     fn visit_binary_expression(&mut self, op: crate::ast::BinOp, left: &PPEExpr, right: &PPEExpr) {
         left.visit(self);
-        execute!(
+        let _ = execute!(
             stdout(),
             SetForegroundColor(Color::Yellow),
             Print(format!(" {op} ")),
             SetAttribute(Attribute::Reset),
-        )
-        .unwrap();
+        );
         right.visit(self);
     }
 
     fn visit_dim_expression(&mut self, id: usize, dim: &[PPEExpr]) {
-        execute!(
+        let _ = execute!(
             stdout(),
             Print("["),
             SetForegroundColor(Color::Yellow),
@@ -258,16 +247,16 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
             SetForegroundColor(Color::Green),
             Print(format!("{id:04X}")),
             SetAttribute(Attribute::Reset),
-        )
-        .unwrap();
-        print!(", ");
+        );
+        let _ = execute!(stdout(), Print(", "));
         self.print_arguments(dim);
-        print!("]");
+        let _ = execute!(stdout(), Print("]"));
     }
 
     fn visit_predefined_function_call(&mut self, def: &FunctionDefinition, arguments: &[PPEExpr]) {
-        print!("(");
-        execute!(
+        let _ = execute!(stdout(), Print("("));
+
+        let _ = execute!(
             stdout(),
             SetForegroundColor(Color::White),
             Print(format!("{:02X}", def.opcode as i16)),
@@ -275,13 +264,12 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
             SetForegroundColor(Color::DarkYellow),
             Print(format!("'{}'", def.name)),
             SetAttribute(Attribute::Reset),
-        )
-        .unwrap();
+        );
         if !arguments.is_empty() {
-            print!(" ");
+            let _ = execute!(stdout(), Print(" "));
             self.print_arguments(arguments);
         }
-        print!(")");
+        let _ = execute!(stdout(), Print(")"));
     }
 
     fn visit_end(&mut self) {
@@ -294,24 +282,22 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
 
     fn visit_if(&mut self, cond: &PPEExpr, label: &usize) {
         Self::output_op_code(OpCode::IFNOT);
-        print!(" (");
+        let _ = execute!(stdout(), Print(" ("));
         cond.visit(self);
-        print!(")");
+        let _ = execute!(stdout(), Print(")"));
 
-        execute!(stdout(), SetForegroundColor(Color::Yellow), Print(" GOTO "), SetAttribute(Attribute::Reset),).unwrap();
-
-        execute!(
+        let _ = execute!(stdout(), SetForegroundColor(Color::Yellow), Print(" GOTO "), SetAttribute(Attribute::Reset),);
+        let _ = execute!(
             stdout(),
             SetForegroundColor(Color::Cyan),
             Print(format!("{{{label:04X}}}")),
             SetAttribute(Attribute::Reset),
-        )
-        .unwrap();
+        );
     }
 
     fn visit_predefined_call(&mut self, def: &StatementDefinition, args: &[PPEExpr]) {
         let name = format!("'{}'", def.name);
-        execute!(
+        let _ = execute!(
             stdout(),
             SetForegroundColor(Color::White),
             Print(format!("{:02X} ", def.opcode as i16)),
@@ -319,32 +305,29 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
             SetForegroundColor(Color::DarkYellow),
             Print(format!("{name:<12}")),
             SetAttribute(Attribute::Reset),
-        )
-        .unwrap();
+        );
 
         self.print_arguments(args);
     }
 
     fn visit_goto(&mut self, label: &usize) {
         Self::output_op_code(OpCode::GOTO);
-        execute!(
+        let _ = execute!(
             stdout(),
             SetForegroundColor(Color::Cyan),
             Print(format!(" {{{label:04X}}}")),
             SetAttribute(Attribute::Reset),
-        )
-        .unwrap();
+        );
     }
 
     fn visit_gosub(&mut self, label: &usize) {
         Self::output_op_code(OpCode::GOSUB);
-        execute!(
+        let _ = execute!(
             stdout(),
             SetForegroundColor(Color::Cyan),
             Print(format!(" {{{label:04X}}}")),
             SetAttribute(Attribute::Reset),
-        )
-        .unwrap();
+        );
     }
 
     fn visit_end_func(&mut self) {
@@ -361,9 +344,9 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
 
     fn visit_let(&mut self, target: &PPEExpr, value: &PPEExpr) {
         Self::output_op_code(OpCode::LET);
-        print!(" ");
+        let _ = execute!(stdout(), Print(" "));
         target.visit(self);
-        execute!(stdout(), SetForegroundColor(Color::Yellow), Print(" <- "), SetAttribute(Attribute::Reset),).unwrap();
+        let _ = execute!(stdout(), SetForegroundColor(Color::Yellow), Print(" <- "), SetAttribute(Attribute::Reset),);
         value.visit(self);
     }
 
@@ -372,12 +355,12 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
         for stmt in &script.statements {
             self.print_statement(stmt);
         }
-        println!();
+        let _ = execute!(stdout(), Print("\n"));
     }
 }
 
 fn print_disassemble_header() {
-    println!();
+    let _ = execute!(stdout(), Print("\n"));
     println!("Offset  # OpCode      Parameters");
     println!("---------------------------------------------------------------------------------------");
 }

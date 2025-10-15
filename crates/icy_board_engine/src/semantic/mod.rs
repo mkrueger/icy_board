@@ -1055,7 +1055,6 @@ impl SemanticVisitor {
                 }
             }
         }
-        println!("Require user variables: {}", self.require_user_variables);
     }
 
     fn check_arg_types(&mut self, call_parameters: &[ParameterSpecifier], arguments: &[Expression]) {

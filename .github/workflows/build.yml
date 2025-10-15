@@ -196,3 +196,52 @@ jobs:
      with:
        name: ppl-language-server-${{ env.VERSION }}.vsix
        path: crates/ppl-lsp/ppl-language-server-${{ env.VERSION }}.vsix
+
+  build_docs_pdf:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Get version
+      run: |
+        export version=$(python3 tools/prep_diz.py "file_id.diz")
+        echo "VERSION=$version" >> $GITHUB_ENV
+        echo "Version: $version"
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          latexmk \
+          texlive-latex-recommended \
+          texlive-latex-extra \
+          texlive-fonts-recommended \
+          texlive-fonts-extra \
+          texlive-xetex \
+          xindy
+        pip install --upgrade pip
+        pip install sphinx sphinx_rtd_theme
+        # Install any other Sphinx extensions if needed
+        # pip install sphinx-autodoc-typehints sphinxcontrib-bibtex etc.
+    
+    - name: Build PDF documentation
+      run: |
+        cd docs
+        # Build the latex files first
+        make latex
+        # Build the PDF from latex
+        cd build/latex
+        make
+        # Copy PDF to a better location
+        cp *.pdf ../../../icy_board_documentation_${{ env.VERSION }}.pdf
+    
+    - name: Upload PDF documentation
+      uses: actions/upload-artifact@v4
+      with:
+        name: icy_board_documentation_${{ env.VERSION }}
+        path: icy_board_documentation_${{ env.VERSION }}.pdf
