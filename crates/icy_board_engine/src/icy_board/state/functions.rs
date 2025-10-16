@@ -298,7 +298,11 @@ impl IcyBoardState {
                     }
                     result.push(key.ch);
                 }
-                self.session.push_tokens(&result);
+                if result.is_empty() {
+                    return Ok(String::new());
+                } else {
+                    self.session.push_tokens(&result);
+                }
             }
         }
         if let Some(token) = self.session.tokens.pop_front() {

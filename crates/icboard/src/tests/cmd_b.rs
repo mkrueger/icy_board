@@ -76,7 +76,6 @@ fn test_blt_a_subcommand() {
     );
 }
 
-
 #[test]
 fn test_blt_exit() {
     let output = test_output("B\n\n".to_string(), |_| {});

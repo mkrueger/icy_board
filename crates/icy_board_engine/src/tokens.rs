@@ -2,7 +2,6 @@ pub fn tokenize(str: &str) -> Vec<String> {
     let mut result = Vec::new();
     let mut cur = String::new();
     if str.len() == 0 {
-        result.push("".to_string());
         return result;
     }
 

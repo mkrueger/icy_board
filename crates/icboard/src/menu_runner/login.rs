@@ -124,7 +124,13 @@ impl PcbBoardCommand {
                         .await?;
                     continue;
                 }
-                self.state.session.user_name = format!("{} {}", first_name, last_name.trim()).trim().to_string();
+                self.state.session.user_name = if last_name.is_empty() {
+                    first_name
+                } else {
+                    format!("{} {}", first_name, last_name.trim())
+                }
+                .trim()
+                .to_string();
                 for (i, user) in self.state.get_board().await.users.iter().enumerate() {
                     if user.is_valid_loginname(&self.state.session.user_name) {
                         found_user = Some(i);
