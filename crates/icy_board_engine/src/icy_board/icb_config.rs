@@ -515,6 +515,14 @@ pub struct ConfigSwitches {
     /// DisplayNewsBehavior
     pub display_news_behavior: DisplayNewsBehavior,
 
+    /// TRUE to disable automatic filtering of the data typed in logon prompts
+    #[serde(default)]
+    pub disable_registration_edits: bool,
+
+    /// TRUE to help avoid line noise while logged in.
+    #[serde(default)]
+    pub disable_high_ascii_filter: bool,
+
     #[serde(default)]
     pub display_userinfo_at_login: bool,
 
@@ -924,6 +932,8 @@ impl IcbConfig {
                 display_userinfo_at_login: false,
                 exclude_local_calls_stats: true,
                 non_graphics: false,
+                disable_registration_edits: false,
+                disable_high_ascii_filter: false,
                 default_graphics_at_login: true,
                 force_intro_on_join: false,
                 scan_new_blt: true,

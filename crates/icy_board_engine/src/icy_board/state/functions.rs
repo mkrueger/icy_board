@@ -49,7 +49,7 @@ lazy_static::lazy_static! {
     pub static ref MASK_PWD: String = (' '..='~').collect::<String>();
     pub static ref MASK_ALPHA: String = ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str();
     pub static ref MASK_NUM: String = ('0'..='9').collect::<String>();
-    pub static ref MASK_ALNUM: String = ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + ('0'..='9').collect::<String>().as_str();
+    pub static ref MASK_ALNUM: String = (' '..='~').collect::<String>();
     pub static ref MASK_FILE: String =  ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + ('0'..='9').collect::<String>().as_str() + "!#$%&'()-.:[\\]^_`~";
     pub static ref MASK_PATH: String =  ('A'..='Z').collect::<String>()
     + ('a'..='z').collect::<String>().as_str()
@@ -59,6 +59,10 @@ lazy_static::lazy_static! {
     pub static ref MASK_WEB: String = ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + ('0'..='9').collect::<String>().as_str() + "@.:!#$%&'*+-/=?^_`{|}~";
 
     pub static ref MASK_PHONE: String = ('0'..='9').collect::<String>() + "/()-+ ";
+
+    pub static ref MASK_NAME: String = ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + " .,-'";
+
+    pub static ref MASK_DATE: String = ('0'..='9').collect::<String>() + "./";
 
 }
 

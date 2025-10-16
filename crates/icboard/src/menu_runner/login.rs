@@ -11,7 +11,7 @@ use icy_board_engine::{
         security_expr::SecurityExpression,
         state::{
             NodeStatus,
-            functions::{MASK_ALNUM, MASK_PHONE, MASK_WEB, display_flags, pwd_flags},
+            functions::{MASK_ALNUM, MASK_DATE, MASK_NAME, MASK_PHONE, MASK_WEB, display_flags, pwd_flags},
         },
         surveys::Survey,
         user_base::User,
@@ -271,21 +271,36 @@ impl PcbBoardCommand {
 
         if !self.newask_exists().await || self.state.get_board().await.config.new_user_settings.use_newask_and_builtin {
             if settings.ask_city_or_state && self.state.display_text.has_text(IceText::CityState) {
-                let Some(city_or_state) = self.input_required(IceText::CityState, &MASK_ALNUM, 24, 0).await? else {
+                let mask: &str = if self.state.get_board().await.config.switches.disable_registration_edits {
+                    &MASK_ALNUM
+                } else {
+                    &MASK_NAME
+                };
+                let Some(city_or_state) = self.input_required(IceText::CityState, mask, 24, 0).await? else {
                     return Ok(false);
                 };
                 new_user.city_or_state = city_or_state;
             }
 
             if settings.ask_business_phone && self.state.display_text.has_text(IceText::BusDataPhone) {
-                let Some(bus_data_phone) = self.input_required(IceText::BusDataPhone, &MASK_PHONE, 13, 0).await? else {
+                let mask: &str = if self.state.get_board().await.config.switches.disable_registration_edits {
+                    &MASK_ALNUM
+                } else {
+                    &MASK_PHONE
+                };
+                let Some(bus_data_phone) = self.input_required(IceText::BusDataPhone, mask, 13, 0).await? else {
                     return Ok(false);
                 };
                 new_user.bus_data_phone = bus_data_phone;
             }
 
             if settings.ask_home_phone && self.state.display_text.has_text(IceText::HomeVoicePhone) {
-                let Some(home_voice_phone) = self.input_required(IceText::HomeVoicePhone, &MASK_PHONE, 13, 0).await? else {
+                let mask: &str = if self.state.get_board().await.config.switches.disable_registration_edits {
+                    &MASK_ALNUM
+                } else {
+                    &MASK_PHONE
+                };
+                let Some(home_voice_phone) = self.input_required(IceText::HomeVoicePhone, mask, 13, 0).await? else {
                     return Ok(false);
                 };
                 new_user.home_voice_phone = home_voice_phone;
@@ -338,12 +353,17 @@ impl PcbBoardCommand {
             }
 
             if settings.ask_alias && self.state.display_text.has_text(IceText::GetAliasName) {
+                let mask: &str = if self.state.get_board().await.config.switches.disable_registration_edits {
+                    &MASK_ALNUM
+                } else {
+                    &MASK_NAME
+                };
                 new_user.alias = self
                     .state
                     .input_field(
                         IceText::GetAliasName,
                         30,
-                        &MASK_ALNUM,
+                        mask,
                         "",
                         None,
                         display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -352,6 +372,11 @@ impl PcbBoardCommand {
             }
 
             if settings.ask_address && self.state.display_text.has_text(IceText::EnterAddress) {
+                let mask: &str = if self.state.get_board().await.config.switches.disable_registration_edits {
+                    &MASK_ALNUM
+                } else {
+                    &MASK_NAME
+                };
                 self.state
                     .display_text(IceText::EnterAddress, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
@@ -362,7 +387,7 @@ impl PcbBoardCommand {
                         .input_field(
                             IceText::Street1,
                             50,
-                            &MASK_ALNUM,
+                            mask,
                             "",
                             None,
                             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -375,7 +400,7 @@ impl PcbBoardCommand {
                         .input_field(
                             IceText::Street2,
                             50,
-                            &MASK_ALNUM,
+                            mask,
                             "",
                             None,
                             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -388,7 +413,7 @@ impl PcbBoardCommand {
                         .input_field(
                             IceText::City,
                             25,
-                            &MASK_ALNUM,
+                            mask,
                             "",
                             None,
                             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -401,7 +426,7 @@ impl PcbBoardCommand {
                         .input_field(
                             IceText::State,
                             15,
-                            &MASK_ALNUM,
+                            mask,
                             "",
                             None,
                             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -414,7 +439,7 @@ impl PcbBoardCommand {
                         .input_field(
                             IceText::Zip,
                             10,
-                            &MASK_ALNUM,
+                            mask,
                             "",
                             None,
                             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -427,7 +452,7 @@ impl PcbBoardCommand {
                         .input_field(
                             IceText::Country,
                             15,
-                            &MASK_ALNUM,
+                            mask,
                             "",
                             None,
                             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -463,7 +488,7 @@ impl PcbBoardCommand {
                     .input_field(
                         IceText::EnterBirthdate,
                         8,
-                        &MASK_ALNUM,
+                        &MASK_DATE,
                         "",
                         None,
                         display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,

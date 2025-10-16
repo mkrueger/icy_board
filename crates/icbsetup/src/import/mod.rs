@@ -464,6 +464,8 @@ impl PCBoardImporter {
                 exclude_local_calls_stats: self.data.exclude_locals,
                 display_userinfo_at_login: self.data.display_userinfo_at_login,
                 non_graphics: self.data.non_graphics,
+                disable_registration_edits: self.data.disable_edits,
+                disable_high_ascii_filter: self.data.disable_filter,
                 default_graphics_at_login: self.data.default_graphics,
                 force_intro_on_join: self.data.force_intro,
                 scan_new_blt: self.data.scan_blts,

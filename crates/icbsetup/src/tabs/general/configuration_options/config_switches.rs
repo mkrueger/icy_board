@@ -20,6 +20,8 @@ impl ConfigSwitches {
             let label_width = 34;
             let entry = vec![
                 ConfigEntry::Separator,
+                cfg_entry_bool!("disable_registration_edits", label_width, switches, disable_registration_edits, lock),
+                cfg_entry_bool!("disable_high_ascii_filter", label_width, switches, disable_high_ascii_filter, lock),
                 cfg_entry_bool!("default_graphics_at_login", label_width, switches, default_graphics_at_login, lock),
                 cfg_entry_bool!("non_graphics", label_width, switches, non_graphics, lock),
                 cfg_entry_bool!("exclude_local_calls_stats", label_width, switches, exclude_local_calls_stats, lock),

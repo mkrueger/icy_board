@@ -845,6 +845,14 @@ stop_uploads_free_space=Stop Uploads when Free Space is less than
 stop_uploads_free_space-status=Minimum kb left on drive to allow uploads.
 stop_uploads_free_space-help=TODO
 
+disable_registration_edits=Disable Registration Edits
+disable_registration_edits-status=Disable logon prompt filtering
+disable_registration_edits-help=TODO
+
+disable_high_ascii_filter=Disable High-ASCII Filter
+disable_high_ascii_filter-status=Disable filtering of high ASCII chars.
+disable_high_ascii_filter-help=TODO
+
 default_graphics_at_login=Default to Graphics At Login
 default_graphics_at_login-status=Set default answer to 'Do you want graphics?' question
 default_graphics_at_login-help=TODO
