@@ -462,16 +462,6 @@ impl UserEditor {
                         }),
                 ),
                 ConfigEntry::Item(
-                    ListItem::new(get_text("user_editor_gender"), ListValue::Text(25, TextFlags::None, user.gender.clone()))
-                        .with_status(get_text("user_editor_gender-status"))
-                        .with_help(get_text("user_editor_gender-help"))
-                        .with_label_width(label_width)
-                        .with_update_text_value(&|board: &Arc<Mutex<User>>, value: String| {
-                            let mut user = board.lock().unwrap();
-                            user.gender = value;
-                        }),
-                ),
-                ConfigEntry::Item(
                     ListItem::new(
                         get_text("user_editor_birthdate"),
                         ListValue::Date(user.exp_date.clone(), user.exp_date.to_string()),
