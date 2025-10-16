@@ -394,6 +394,9 @@ pub enum MacroCommand {
 
     /// New in ICB : Current Message Area number,
     SysopName,
+
+    /// New in ICB : IcyBoard version number
+    Version,
 }
 
 #[derive(Debug, PartialEq)]
@@ -511,6 +514,7 @@ pub enum PcbToken {
     #[token("UPBYTES", |_| MacroCommand::UpBytes, ignore(ascii_case))]
     #[token("UPFILES", |_| MacroCommand::UpFiles, ignore(ascii_case))]
     #[token("USER", |_| MacroCommand::User, ignore(ascii_case))]
+    #[token("VERSION", |_| MacroCommand::Version, ignore(ascii_case))]
     #[token("WAIT", |_| MacroCommand::Wait, ignore(ascii_case))]
     #[token("WHO", |_| MacroCommand::Who, ignore(ascii_case))]
     #[token("XOFF", |_| MacroCommand::XOff, ignore(ascii_case))]

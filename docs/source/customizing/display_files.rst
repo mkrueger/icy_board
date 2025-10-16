@@ -358,6 +358,8 @@ Alphabetical List of @ Macros
      - Total files uploaded by caller
    * - ``@USER@``
      - Full username in uppercase (e.g., ``EDWARD B. SMITH``)
+   * - ``@VERSION@``
+     - **[IcyBoard]** IcyBoard version number
    * - ``@WAIT@``
      - Display "Press (Enter) to continue?" prompt
    * - ``@WHO@``

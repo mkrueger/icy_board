@@ -9,3 +9,5 @@ IcyBoard adds following new macros.
 | @AREANAME@ | Name of current message area |
 | @AREANUM@ | Number of current message area |
 | @SYSOPNAME@ | Name of the sysop (usually 'SYSOP') as configured in setup or sysop real name, if configured |
+| @VERSION@ | Icy Board version number |
+

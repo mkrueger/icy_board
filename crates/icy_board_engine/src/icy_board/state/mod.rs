@@ -1926,6 +1926,9 @@ impl IcyBoardState {
                     result = "0".to_string();
                 }
             }
+            MacroCommand::Version => {
+                result = env!("CARGO_PKG_VERSION").to_string();
+            }
             MacroCommand::Wait => {
                 let _ = self.press_enter().await;
                 return None;
