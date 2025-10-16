@@ -131,7 +131,7 @@ pub fn test_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
                     };
 
                     if let Err(err) = internal_handle_client(state, Some(options), &cmd).await {
-                        log::error!("Error running backround client: {}", err);
+                        log::error!("Error running background client: {}", err);
                     }
                 });
             })

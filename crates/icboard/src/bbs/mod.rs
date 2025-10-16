@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc, thread, time::Duration};
+use std::{sync::Arc, thread, time::Duration};
 
 use crate::Res;
 use async_recursion::async_recursion;
@@ -9,7 +9,7 @@ use icy_board_engine::{
         icb_text::IceText,
         login_server::{SecureWebsocket, Telnet, Websocket},
         state::{
-            IcyBoardState, NodeState, NodeStatus,
+            IcyBoardState, NodeState, NodeStatus, PPEExecute,
             functions::{MASK_COMMAND, display_flags},
         },
     },
@@ -55,7 +55,7 @@ pub async fn await_telnet_connections(con: Telnet, board: Arc<tokio::sync::Mutex
                         Ok(connection) => {
                             // connection succeeded
                             if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
-                                log::error!("Error running backround client: {}", err);
+                                log::error!("Error running background client: {}", err);
                             }
                         }
                         Err(e) => {
@@ -63,6 +63,7 @@ pub async fn await_telnet_connections(con: Telnet, board: Arc<tokio::sync::Mutex
                         }
                     }
                 });
+                Ok(())
             })
             .unwrap();
         bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
@@ -97,7 +98,7 @@ pub async fn await_websocket_connections(con: Websocket, board: Arc<tokio::sync:
                         Ok(connection) => {
                             // connection succeeded
                             if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
-                                log::error!("Error running backround client: {}", err);
+                                log::error!("Error running background client: {}", err);
                             }
                         }
                         Err(e) => {
@@ -105,6 +106,7 @@ pub async fn await_websocket_connections(con: Websocket, board: Arc<tokio::sync:
                         }
                     }
                 });
+                Ok(())
             })
             .unwrap();
         bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
@@ -139,7 +141,7 @@ pub async fn await_securewebsocket_connections(con: SecureWebsocket, board: Arc<
                         Ok(connection) => {
                             // connection succeeded
                             if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
-                                log::error!("Error running backround client: {}", err);
+                                log::error!("Error running background client: {}", err);
                             }
                         }
                         Err(e) => {
@@ -147,6 +149,7 @@ pub async fn await_securewebsocket_connections(con: SecureWebsocket, board: Arc<
                         }
                     }
                 });
+                Ok(())
             })
             .unwrap();
         bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
@@ -182,6 +185,34 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
             state.session.is_sysop = true;
             state.set_current_user(0).await.unwrap();
         }
+
+        if let Some(ppe) = &login_options.ppe {
+            logged_in = true;
+
+            if let (Some(user_name), Some(password)) = (&ppe.user_name, &ppe.password) {
+                // Try to find and authenticate the user
+                let user_opt = state.board.lock().await.users.find_by_name(user_name);
+                if let Some(user_record) = user_opt {
+                    // Verify password
+                    if state.board.lock().await.users[user_record].password.password.is_valid(password) {
+                        // Set the authenticated user
+                        state.set_current_user(user_record).await?;
+                        logged_in = true;
+                        state.session.is_sysop = false;
+                    } else {
+                        return Err("Error in Password".into());
+                    }
+                } else {
+                    return Err("User Name not found".into());
+                }
+            } else {
+                state.join_conference(0, false, false).await?;
+            }
+            for arg in &ppe.args {
+                state.session.push_tokens(arg);
+            }
+        }
+
         local = login_options.local;
     }
 
@@ -196,7 +227,7 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
 
     if let Some(login_options) = &login_options {
         if let Some(ppe) = &login_options.ppe {
-            if let Err(err) = cmd.state.run_ppe(&ppe, None).await {
+            if let Err(err) = cmd.state.run_ppe(&ppe.ppe, None).await {
                 log::error!("error running PPE: {}", err);
             };
             let _ = cmd.state.press_enter().await;
@@ -318,6 +349,6 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
 
 pub struct LoginOptions {
     pub login_sysop: bool,
-    pub ppe: Option<PathBuf>,
+    pub ppe: Option<PPEExecute>,
     pub local: bool,
 }

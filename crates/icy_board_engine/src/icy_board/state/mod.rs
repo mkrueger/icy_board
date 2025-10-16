@@ -86,6 +86,13 @@ pub struct DisplayOptions {
     pub num_lines_printed: usize,
 }
 
+pub struct PPEExecute {
+    pub ppe: PathBuf,
+    pub user_name: Option<String>,
+    pub password: Option<String>,
+    pub args: Vec<String>,
+}
+
 impl DisplayOptions {
     pub fn force_count_lines(&mut self) {
         self.count_lines = true;
@@ -450,7 +457,7 @@ pub struct NodeState {
     pub node_number: usize,
     pub connection_type: ConnectionType,
     pub logon_time: DateTime<Utc>,
-    pub handle: Option<thread::JoinHandle<()>>,
+    pub handle: Option<thread::JoinHandle<Res<()>>>,
 }
 
 unsafe impl Send for NodeState {}
@@ -932,8 +939,6 @@ impl IcyBoardState {
     }
 
     pub async fn set_current_user(&mut self, user_number: usize) -> Res<()> {
-        let old_language = self.session.language.clone();
-
         self.session.cur_user_id = user_number as i32;
         if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
             state.cur_user = user_number as i32;
@@ -944,6 +949,8 @@ impl IcyBoardState {
             return Err(IcyBoardError::UserNumberInvalid(user_number).into());
         }
         let mut user = self.get_board().await.users[user_number].clone();
+
+        let old_language = self.session.language.clone();
         user.stats.num_times_on += 1;
         let last_conference: u16 = user.last_conference;
         self.get_board().await.statistics.add_caller(user.get_name().clone());

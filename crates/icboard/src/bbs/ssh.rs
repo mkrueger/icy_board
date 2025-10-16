@@ -103,9 +103,10 @@ impl server::Handler for SshSession {
             .spawn(move || {
                 tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
                     if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
-                        log::error!("Error running backround client: {}", err);
+                        log::error!("Error running background client: {}", err);
                     }
                 });
+                Ok(())
             })
             .unwrap();
         self.bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);

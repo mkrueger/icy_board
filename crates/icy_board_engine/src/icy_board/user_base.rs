@@ -1115,6 +1115,15 @@ pub struct UserBase {
 }
 
 impl UserBase {
+    pub fn find_by_name(&self, name: &str) -> Option<usize> {
+        let lookup = name.trim();
+        if lookup.is_empty() {
+            return None;
+        }
+
+        self.users.iter().position(|u| u.is_valid_loginname(lookup))
+    }
+
     pub fn len(&self) -> usize {
         self.users.len()
     }

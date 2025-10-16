@@ -32,7 +32,6 @@ pub enum CallWaitMessage {
     User(bool),
     Sysop(bool),
     Exit(bool),
-    RunPPE(PathBuf),
     Monitor,
 
     ToggleCallLog,
@@ -44,6 +43,7 @@ pub enum CallWaitMessage {
     IcbText,
     ToggleStatistics,
     ShowStatistics,
+    RunPPE(PathBuf, Option<String>, Option<String>, Option<Vec<String>>),
 }
 
 struct Button {

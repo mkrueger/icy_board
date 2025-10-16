@@ -17,7 +17,7 @@ use crossterm::{
 };
 use icy_board_engine::{
     Res,
-    icy_board::{IcyBoard, bbs::BBS},
+    icy_board::{IcyBoard, bbs::BBS, state::PPEExecute},
 };
 
 use node_monitoring_screen::NodeMonitoringScreenMessage;
@@ -60,6 +60,10 @@ struct Cli {
     ppe: Option<PathBuf>,
 
     #[argh(option)]
+    /// run PPE with user login: "first;last;PWRD:password;PPE:file.ppe;param1;param2;..."
+    runppe: Option<String>,
+
+    #[argh(option)]
     /// stuffed key chars
     key: Option<String>,
 
@@ -80,6 +84,7 @@ async fn main() -> Res<()> {
         print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
         exit(1);
     };
+
     start_icy_board(&arguments, file).await?;
     Ok(())
 }
@@ -116,7 +121,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
             if arguments.localon || arguments.ppe.is_some() {
                 let mut terminal = init_terminal()?;
                 let cmd = if let Some(ppe) = &arguments.ppe {
-                    CallWaitMessage::RunPPE(ppe.clone())
+                    CallWaitMessage::RunPPE(ppe.clone(), None, None, None)
                 } else {
                     CallWaitMessage::User(false)
                 };
@@ -124,6 +129,23 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                 restore_terminal()?;
                 return Ok(());
             }
+
+            // Handle /runppe parameter
+            if let Some(runppe_params) = &arguments.runppe {
+                match handle_runppe(runppe_params).await {
+                    Ok(cmd) => {
+                        let mut terminal = init_terminal()?;
+                        run_message(cmd, &mut terminal, &board, &mut bbs, arguments.full_screen, stuffed).await?;
+                        restore_terminal()?;
+                    }
+                    Err(err) => {
+                        print_error(err.to_string());
+                        exit(99);
+                    }
+                }
+                exit(0);
+            }
+
             let mut connection_token = CancellationToken::new();
             start_connections(&bbs, &board, connection_token.clone()).await;
             let mut app = CallWaitScreen::new(&board).await?;
@@ -242,32 +264,72 @@ async fn run_message(
     match msg {
         CallWaitMessage::User(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
-            let mut tui = Tui::local_mode(board, bbs, false, None, stuffed_chars).await;
-            if let Err(err) = tui.run(bbs, &board).await {
-                restore_terminal()?;
-                log::error!("while running board in local mode: {}", err.to_string());
-                println!("Error: {}", err);
-                process::exit(1);
+            match Tui::local_mode(board, bbs, false, None, stuffed_chars).await {
+                Ok(mut tui) => {
+                    if let Err(err) = tui.run(bbs, &board).await {
+                        restore_terminal()?;
+                        log::error!("while running board in local mode: {}", err.to_string());
+                        println!("Error: {}", err);
+                        process::exit(1);
+                    }
+                }
+                Err(err) => {
+                    restore_terminal()?;
+                    log::error!("while initializing board in local mode: {}", err.to_string());
+                    println!("Error: {}", err);
+                    process::exit(1);
+                }
             }
         }
-        CallWaitMessage::RunPPE(ppe) => {
+        CallWaitMessage::RunPPE(ppe, name_opt, pw_opt, params_opt) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
-            let mut tui = Tui::local_mode(board, bbs, true, Some(ppe), stuffed_chars).await;
-            if let Err(err) = tui.run(bbs, &board).await {
-                restore_terminal()?;
-                log::error!("while running board in local mode: {}", err.to_string());
-                println!("Error: {}", err);
-                process::exit(1);
+            match Tui::local_mode(
+                board,
+                bbs,
+                false,
+                Some(PPEExecute {
+                    ppe,
+                    user_name: name_opt,
+                    password: pw_opt,
+                    args: params_opt.unwrap_or_default(),
+                }),
+                stuffed_chars,
+            )
+            .await
+            {
+                Ok(mut tui) => {
+                    if let Err(err) = tui.run(bbs, &board).await {
+                        restore_terminal()?;
+                        log::error!("while running board in local mode: {}", err.to_string());
+                        println!("Error: {}", err);
+                        process::exit(1);
+                    }
+                }
+                Err(err) => {
+                    restore_terminal()?;
+                    log::error!("while initializing board in local mode: {}", err.to_string());
+                    println!("Error: {}", err);
+                    process::exit(1);
+                }
             }
         }
         CallWaitMessage::Sysop(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
-            let mut tui: Tui = Tui::local_mode(board, bbs, true, None, stuffed_chars).await;
-            if let Err(err) = tui.run(bbs, &board).await {
-                restore_terminal()?;
-                log::error!("while running board in local mode: {}", err.to_string());
-                println!("Error: {}", err);
-                process::exit(1);
+            match Tui::local_mode(board, bbs, true, None, stuffed_chars).await {
+                Ok(mut tui) => {
+                    if let Err(err) = tui.run(bbs, &board).await {
+                        restore_terminal()?;
+                        log::error!("while running board in local mode: {}", err.to_string());
+                        println!("Error: {}", err);
+                        process::exit(1);
+                    }
+                }
+                Err(err) => {
+                    restore_terminal()?;
+                    log::error!("while initializing board in local mode: {}", err.to_string());
+                    println!("Error: {}", err);
+                    process::exit(1);
+                }
             }
         }
         CallWaitMessage::Exit(_busy) => {
@@ -390,4 +452,67 @@ pub fn print_error<A: Display>(error: A) {
         SetAttribute(Attribute::Reset)
     )
     .unwrap();
+}
+
+async fn handle_runppe(params: &str) -> Res<CallWaitMessage> {
+    // Parse semicolon-separated parameters
+    let parts: Vec<&str> = params.split(';').collect();
+
+    if parts.len() < 4 {
+        return Err("Insufficient parameters. Format: first;last;PWRD:password;PPE:file.ppe".into());
+    }
+
+    let mut first_name = String::new();
+    let mut last_name = String::new();
+    let password;
+    let ppe_file;
+    let mut ppe_params = Vec::new();
+    let mut idx = 0;
+
+    // Parse user name (might be 2 or 3 parts for Jr./Sr./III etc.)
+    while idx < parts.len() && !parts[idx].to_uppercase().starts_with("PWRD:") {
+        if first_name.is_empty() {
+            first_name = parts[idx].to_string();
+        } else if last_name.is_empty() {
+            last_name = parts[idx].to_string();
+        } else {
+            // Handle suffixes like Jr., Sr., III
+            last_name.push(' ');
+            last_name.push_str(parts[idx]);
+        }
+        idx += 1;
+    }
+
+    // Parse password
+    if idx >= parts.len() || !parts[idx].to_uppercase().starts_with("PWRD:") {
+        return Err("Error in Password - missing PWRD: prefix".into());
+    }
+    password = parts[idx][5..].to_string();
+    idx += 1;
+
+    // Parse PPE file
+    if idx >= parts.len() || !parts[idx].to_uppercase().starts_with("PPE:") {
+        return Err("PPE Name is missing - missing PPE: prefix".into());
+    }
+    ppe_file = PathBuf::from(&parts[idx][4..]);
+    idx += 1;
+
+    // Remaining parts are PPE parameters
+    while idx < parts.len() {
+        ppe_params.push(parts[idx].to_string());
+        idx += 1;
+    }
+
+    // Validate PPE file exists
+    if !ppe_file.exists() {
+        return Err(format!("PPE Name is missing - file not found: {}", ppe_file.display()).into());
+    }
+
+    let name = if last_name.is_empty() {
+        first_name
+    } else {
+        format!("{} {}", first_name, last_name)
+    };
+
+    Ok(CallWaitMessage::RunPPE(ppe_file, Some(name), Some(password), Some(ppe_params)))
 }

@@ -1547,7 +1547,7 @@ pub async fn kbdfilusued(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<V
 
 pub async fn lomsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let area = 0;
-    let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].path.clone();
+    let msg_base: PathBuf = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].path.clone();
     match JamMessageBase::open(msg_base) {
         Ok(base) => Ok(VariableValue::new_int(base.base_messagenumber() as i32)),
         Err(err) => {

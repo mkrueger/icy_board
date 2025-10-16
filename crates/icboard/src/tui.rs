@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     io::{self, Stdout, stdout},
-    path::PathBuf,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -21,7 +20,7 @@ use crossterm::{
 use icy_board_engine::icy_board::{
     IcyBoard, IcyBoardError,
     bbs::{BBS, BBSMessage},
-    state::{GraphicsMode, NodeState},
+    state::{GraphicsMode, NodeState, PPEExecute},
 };
 use icy_board_tui::{
     get_text_args,
@@ -49,9 +48,9 @@ impl Tui {
         board: &Arc<tokio::sync::Mutex<IcyBoard>>,
         bbs: &Arc<Mutex<BBS>>,
         login_sysop: bool,
-        ppe: Option<PathBuf>,
+        ppe: Option<PPEExecute>,
         stuffed_chars: String,
-    ) -> Self {
+    ) -> Res<Self> {
         let board = board.clone();
         let bbs2 = bbs.clone();
 
@@ -66,11 +65,12 @@ impl Tui {
         let handle = std::thread::Builder::new()
             .name("Local mode handle".to_string())
             .spawn(move || {
-                tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                    if let Err(err) = handle_client(bbs2, board, node_state2, node, Box::new(connection), Some(options), &stuffed_chars).await {
-                        log::error!("Error running backround client: {}", err);
-                    }
-                });
+                let foo = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(async { handle_client(bbs2, board, node_state2, node, Box::new(connection), Some(options), &stuffed_chars).await });
+                foo
             })
             .unwrap();
         bbs.lock().await.get_open_connections().await.as_ref().lock().await[node]
@@ -79,7 +79,7 @@ impl Tui {
             .handle = Some(handle);
         let (_handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone());
 
-        Self {
+        Ok(Self {
             sysop_mode: false,
             screen,
             tx,
@@ -87,7 +87,7 @@ impl Tui {
             node,
             node_state,
             handle: bbs.lock().await.get_open_connections().await.clone(),
-        }
+        })
     }
 
     async fn logoff_sysop(&self, bbs: &mut Arc<Mutex<BBS>>) -> Res<()> {
@@ -134,10 +134,12 @@ impl Tui {
                 if let Some(handle) = node_state.handle.as_ref() {
                     if handle.is_finished() {
                         let handle = node_state.handle.take().unwrap();
-                        if let Err(_err) = handle.join() {
-                            return Err(Box::new(IcyBoardError::ThreadCrashed));
+                        match handle.join() {
+                            Ok(res) => {
+                                return res;
+                            }
+                            Err(_err) => return Err(Box::new(IcyBoardError::ThreadCrashed)),
                         }
-                        return Ok(());
                     }
                 } else {
                     // thread has gone
