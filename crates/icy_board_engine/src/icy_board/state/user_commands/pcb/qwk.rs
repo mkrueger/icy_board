@@ -94,7 +94,9 @@ impl IcyBoardState {
                         display_flags::UPCASE | display_flags::STACKED | display_flags::NEWLINE | display_flags::LFBEFORE,
                     )
                     .await?;
-                log::info!("QWK command input: '{}'", input);
+                if input.is_empty() {
+                    break;
+                }
                 self.session.push_tokens(&input);
             };
 
@@ -204,6 +206,9 @@ impl IcyBoardState {
                         display_flags::ERASELINE | display_flags::STACKED | display_flags::UPCASE,
                     )
                     .await?;
+                if text.is_empty() {
+                    break;
+                }
                 self.session.push_tokens(&text);
             } else {
                 done = true;

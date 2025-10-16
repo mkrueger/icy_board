@@ -37,11 +37,12 @@ impl IcyBoardState {
                         display_flags::UPCASE | display_flags::STACKED | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,
                     )
                     .await?;
+                if str.is_empty() {
+                    break;
+                }
                 self.session.push_tokens(&str);
             }
-            if self.session.tokens.is_empty() {
-                break;
-            }
+
             let mut search_text = String::new();
             let mut last_token = String::new();
             let mut name = String::new();

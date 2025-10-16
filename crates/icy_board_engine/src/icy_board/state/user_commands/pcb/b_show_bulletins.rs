@@ -47,11 +47,12 @@ impl IcyBoardState {
                         display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE | display_flags::STACKED,
                     )
                     .await?;
+
+                if input.is_empty() {
+                    break;
+                }
                 self.session.push_tokens(&input);
             };
-            if self.session.tokens.is_empty() {
-                break;
-            }
             let mut files = Vec::new();
             let mut download_blt = false;
             let mut search_blt = false;

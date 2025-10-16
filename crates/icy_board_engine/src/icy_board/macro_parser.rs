@@ -393,7 +393,7 @@ pub enum MacroCommand {
     AreaNum,
 
     /// New in ICB : Current Message Area number,
-    SysopName
+    SysopName,
 }
 
 #[derive(Debug, PartialEq)]
