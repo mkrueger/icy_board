@@ -391,6 +391,9 @@ pub enum MacroCommand {
 
     /// New in ICB : Current Message Area number,
     AreaNum,
+
+    /// New in ICB : Current Message Area number,
+    SysopName
 }
 
 #[derive(Debug, PartialEq)]
@@ -499,6 +502,7 @@ pub enum PcbToken {
     #[token("SYSDATE", |_| MacroCommand::SysDate, ignore(ascii_case))]
     #[token("SYSOPIN", |_| MacroCommand::SysopIn, ignore(ascii_case))]
     #[token("SYSOPOUT", |_| MacroCommand::SysopOut, ignore(ascii_case))]
+    #[token("SYSOPNAME", |_| MacroCommand::SysopName, ignore(ascii_case))]
     #[token("SYSTIME", |_| MacroCommand::SysTime, ignore(ascii_case))]
     #[token("TIMELIMIT", |_| MacroCommand::TimeLimit, ignore(ascii_case))]
     #[token("TIMELEFT", |_| MacroCommand::TimeLeft, ignore(ascii_case))]

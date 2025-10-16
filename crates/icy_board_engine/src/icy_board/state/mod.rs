@@ -1873,6 +1873,13 @@ impl IcyBoardState {
             }
             MacroCommand::SysopIn => result = self.get_board().await.config.limits.sysop_start.to_string(),
             MacroCommand::SysopOut => result = self.get_board().await.config.limits.sysop_stop.to_string(),
+            MacroCommand::SysopName => {
+                if self.get_board().await.config.sysop.use_real_name {
+                    result = self.get_board().await.users[0].name.to_string();
+                } else {
+                    result = self.get_board().await.config.sysop.name.to_string();
+                }
+            }
             MacroCommand::SysTime => {
                 result = self.format_time(Utc::now());
             }

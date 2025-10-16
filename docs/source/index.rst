@@ -8,5 +8,6 @@ Icy Board BBS
    introduction
    installation
    icy_board
+   customizing/index
    ppl/ppl
 
