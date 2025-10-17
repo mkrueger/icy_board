@@ -6,6 +6,7 @@ use icy_board_engine::{
     Res,
     icy_board::{
         IcyBoardSerializer,
+        accounting_cfg::AccountingConfig,
         bulletins::{Bullettin, BullettinList},
         commands::CommandList,
         conferences::{Conference, ConferenceBase},
@@ -251,6 +252,24 @@ impl IcyBoardCreator {
         let mut user_base = UserBase::default();
         user_base.new_user(user);
         user_base.save(&self.destination.join(&config.paths.user_file))?;
+
+        // Accounting
+        config.accounting.cfg_file = PathBuf::from("main/accounting.toml");
+        config.accounting.peak_holiday_list_file = PathBuf::from("main/holidays.toml");
+        config.accounting.tracking_file = PathBuf::from("main/tracking.txt");
+        config.accounting.info_file = PathBuf::from("art/actinfo");
+        config.accounting.warning_file = PathBuf::from("art/actwarn");
+        config.accounting.logoff_file = PathBuf::from("art/actbye");
+
+        AccountingConfig::default().save(&self.destination.join(&config.accounting.cfg_file))?;
+
+        fs::write(&self.destination.join(&config.accounting.peak_holiday_list_file), [])?;
+
+        fs::write(&self.destination.join(&config.accounting.tracking_file), [])?;
+
+        fs::write(&self.destination.join(&config.accounting.info_file).with_extension("pcb"), [])?;
+        fs::write(&self.destination.join(&config.accounting.warning_file).with_extension("pcb"), [])?;
+        fs::write(&self.destination.join(&config.accounting.logoff_file).with_extension("pcb"), [])?;
 
         config.save(&self.destination.join(icy_board_engine::DEFAULT_ICYBOARD_FILE))?;
 

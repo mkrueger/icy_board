@@ -323,7 +323,9 @@ impl IcyBoard {
                 config.accounting.accounting_config = Some(acc);
             }
             Err(e) => {
-                log::error!("Error loading accounting: {} from {}", e, load_path.display());
+                if config.accounting.enabled {
+                    log::error!("Error loading accounting: {} from {}", e, load_path.display());
+                }
             }
         }
 
