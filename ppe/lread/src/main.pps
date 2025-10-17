@@ -8,6 +8,9 @@ DECLARE PROCEDURE ReadMsgConfig()
 
 DECLARE PROCEDURE BuildMessageIndex()
 DECLARE FUNCTION GetActualMessageNumber(INTEGER DisplayIndex) INTEGER
+DECLARE FUNCTION WriteMsgFile() STRING
+DECLARE FUNCTION PageUp() BOOLEAN
+DECLARE FUNCTION PageDown() BOOLEAN
 
 INTEGER CONF = CurConf()
 INTEGER LOW = LOMSGNUM()
@@ -86,37 +89,40 @@ LOOP
         DrawHeaderArea()
         DrawMsgText()
     CASE "END"
-        Cursor = HIGH - LOW
-        FirstMsg = Cursor - Lines
-        IF FirstMsg < 0 THEN
+        IF ValidMessageCount > 0 THEN
+            Cursor = ValidMessageCount - 1
+            FirstMsg = Cursor - Lines
+            IF FirstMsg < 0 THEN FirstMsg = 0 ENDIF
+        ELSE
+            Cursor = 0
             FirstMsg = 0
         ENDIF
+
         FirstTxtLine = 0
         DrawHeaderArea()
         DrawMsgText()
     CASE "UP"
         IF Cursor > 0 THEN
-            Cursor -= 1
-            IF Cursor < FirstMsg THEN
-                FirstMsg = Cursor - Lines
-                IF FirstMsg < 0 THEN
-                    FirstMsg = 0
-                ENDIF
-            ENDIF
-            FirstTxtLine = 0
+            Up()
             DrawHeaderArea()
             DrawMsgText()
         ENDIF
     CASE "DOWN"
-        IF Cursor < HIGH - LOW THEN
-            Cursor += 1
-            IF Cursor > FirstMsg + Lines THEN
-                FirstMsg += Lines + 1
-            ENDIF
-            FirstTxtLine = 0
+        IF Cursor < ValidMessageCount - 1 THEN
+            Down()
             DrawHeaderArea()
             DrawMsgText()
         ENDIF
+    CASE "LEFT"
+        IF PageUp() THEN
+            DrawHeaderArea()
+            DrawMsgText()
+        ENDIF
+    CASE "RIGHT"
+        IF PageDown() THEN
+            DrawHeaderArea()
+            DrawMsgText()
+        ENDIF        
     CASE "PGUP"
         FirstTxtLine -= MsgHdrY2 - MsgHdrY1;
         IF FirstTxtLine < 0 FirstTxtLine = 0
@@ -176,4 +182,60 @@ FUNCTION GetActualMessageNumber(INTEGER DisplayIndex) INTEGER
     ENDIF
     
     RETURN -1
+ENDFUNC
+
+
+FUNCTION Up() BOOLEAN
+    IF Cursor > 0 THEN
+        Cursor -= 1
+        IF Cursor < FirstMsg THEN
+            FirstMsg = Cursor
+            IF FirstMsg < 0 THEN FirstMsg = 0 ENDIF
+        ENDIF
+        FirstTxtLine = 0
+        RETURN TRUE
+    ENDIF
+    RETURN FALSE
+ENDFUNC
+
+FUNCTION Down() BOOLEAN
+    IF Cursor < ValidMessageCount - 1 THEN
+        Cursor += 1
+        IF Cursor > FirstMsg + Lines THEN
+            FirstMsg = Cursor - Lines
+            IF FirstMsg < 0 THEN FirstMsg = 0 ENDIF
+        ENDIF
+        FirstTxtLine = 0
+        RETURN TRUE
+    ENDIF
+    RETURN FALSE
+ENDFUNC
+
+
+FUNCTION PageUp() BOOLEAN
+    IF ValidMessageCount <= 0 RETURN FALSE
+    INTEGER PageSize = Lines + 1
+    INTEGER NewCursor = Cursor - PageSize
+    IF NewCursor < 0 THEN NewCursor = 0 ENDIF
+    IF NewCursor == Cursor RETURN FALSE
+    Cursor = NewCursor
+    FirstMsg = Cursor
+    IF FirstMsg < 0 THEN FirstMsg = 0 ENDIF
+    FirstTxtLine = 0
+    RETURN TRUE
+ENDFUNC
+
+FUNCTION PageDown() BOOLEAN
+    IF ValidMessageCount <= 0 RETURN FALSE
+    INTEGER PageSize = Lines + 1
+    INTEGER NewCursor = Cursor + PageSize
+    IF NewCursor > ValidMessageCount - 1 THEN
+        NewCursor = ValidMessageCount - 1
+    ENDIF
+    IF NewCursor == Cursor RETURN FALSE
+    Cursor = NewCursor
+    FirstMsg = Cursor - Lines
+    IF FirstMsg < 0 THEN FirstMsg = 0 ENDIF
+    FirstTxtLine = 0
+    RETURN TRUE
 ENDFUNC

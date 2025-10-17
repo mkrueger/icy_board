@@ -1,0 +1,3 @@
+[2025-10-16 22:45:45 ERROR icy_board_engine::icy_board] Error loading accounting: accounting file not found () from 
+[2025-10-16 22:45:45 INFO i18n_embed::requester] Current Locale: [LanguageIdentifier { language: Language(Some("de")), script: None, region: Some(Region("DE")), variants: None }]
+[2025-10-16 22:45:45 INFO i18n_embed] Selecting translations for domain "icy_board_tui"

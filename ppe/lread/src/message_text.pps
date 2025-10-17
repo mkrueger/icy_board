@@ -1,12 +1,51 @@
+
 INTEGER CurMsgTxt
+
+FUNCTION WriteMsgFile() STRING
+    STRING MsgFile = PPEPath() + "msgtxt." + STRING(PCBNode())
+
+    INTEGER ActualMsgNum = GetActualMessageNumber(Cursor)
+    IF ActualMsgNum == -1 THEN
+        IF Exist(MsgFile) THEN
+            Delete MsgFile
+        ENDIF
+        CurMsgTxt = -1
+        ClrHdrArea()
+        AnsiPos MsgHdrX1, MsgHdrY1
+        COLOR 11
+        PRINT "No valid message"
+        RETURN
+    ENDIF
+
+    IF CurMsgTxt != ActualMsgNum THEN
+        CurMsgTxt = ActualMsgNum
+        Delete MsgFile
+        MsgToFile CONF, ActualMsgNum, MsgFile
+    ENDIF
+    RETURN MsgFile
+ENDFUNC
 
 PROCEDURE DrawMsgText()
     STRING line
-    STRING MsgFile = PPEPath() + "msgtxt." + STRING(PCBNode())
-    if CurMsgTxt != LOW + Cursor THEN
-        CurMsgTxt = LOW + Cursor
+    STRING MsgFile = WriteMsgFile()
+
+    INTEGER ActualMsgNum = GetActualMessageNumber(Cursor)
+    IF ActualMsgNum == -1 THEN
+        IF Exist(MsgFile) THEN
+            Delete MsgFile
+        ENDIF
+        CurMsgTxt = -1
+        ClrHdrArea()
+        AnsiPos MsgHdrX1, MsgHdrY1
+        COLOR 11
+        PRINT "No valid message"
+        RETURN
+    ENDIF
+
+    IF CurMsgTxt != ActualMsgNum THEN
+        CurMsgTxt = ActualMsgNum
         Delete MsgFile
-        MsgToFile CONF, LOW + Cursor, MsgFile
+        MsgToFile CONF, ActualMsgNum, MsgFile
     ENDIF
  
     IF !Exist(MsgFile) THEN
@@ -38,7 +77,7 @@ PROCEDURE DrawMsgText()
         FGet 1, line
         IF FErr(1) THEN 
             FirstTxtLine = I - (MsgHdrY2 - MsgHdrY1)
-            if FirstTxtLine <  FirstTxtLine THEN
+            IF FirstTxtLine < 0 THEN
                 FirstTxtLine = 0
             ENDIF
             FClose 1
@@ -48,9 +87,8 @@ PROCEDURE DrawMsgText()
 
     INTEGER msg_line = 0
     Color 7
-    While MsgHdrY1 + msg_line <= MsgHdrY2 DO
+    WHILE MsgHdrY1 + msg_line <= MsgHdrY2 DO
         FGet 1, line
-
         IF FErr(1) || msg_line + MsgHdrY1 > 23 BREAK
         AnsiPos MsgHdrX1, MsgHdrY1 + msg_line
         PRINT Left(line, MsgHdrX2 - MsgHdrX1)
@@ -58,7 +96,7 @@ PROCEDURE DrawMsgText()
     ENDWHILE
     FClose 1
     
-    While MsgHdrY1 + msg_line <= MsgHdrY2 DO
+    WHILE MsgHdrY1 + msg_line <= MsgHdrY2 DO
         AnsiPos MsgHdrX1, MsgHdrY1 + msg_line
         Print Space(MsgHdrX2 - MsgHdrX1)
         msg_line += 1
