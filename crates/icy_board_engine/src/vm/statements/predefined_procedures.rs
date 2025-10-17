@@ -576,7 +576,7 @@ pub async fn newlines(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 /// # Errors
 /// Errors if the variable is not found.
 pub async fn tokenize(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let str = vm.eval_expr(&args[0]).await?.to_string();
+    let str: String = vm.eval_expr(&args[0]).await?.to_string();
     vm.icy_board_state.session.push_tokens(&str);
     Ok(())
 }

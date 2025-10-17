@@ -378,9 +378,11 @@ pub struct User {
     pub path: Option<PathBuf>,
 
     pub name: String,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub alias: String,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub verify_answer: String,

@@ -14,11 +14,24 @@ impl IcyBoardState {
         self.display_text(IceText::UserNetHeader, display_flags::NEWLINE).await?;
         self.display_text(IceText::UsernetUnderline, display_flags::NEWLINE).await?;
         let mut lines = Vec::new();
+
+        let include_city = self.board.lock().await.config.board.who_include_city;
+        let show_alias = self.board.lock().await.config.board.who_show_alias;
+
         for (i, connection) in self.node_state.lock().await.iter().enumerate() {
             if let Some(connection) = connection {
-                if let Some(name) = self.get_board().await.users.get(connection.cur_user as usize) {
-                    let name = name.get_name().to_string();
-                    lines.push(format!("{:>4}   {:23} {}", i + 1, connection.operation, name));
+                if let Some(user) = self.get_board().await.users.get(connection.cur_user as usize) {
+                    let name = if show_alias {
+                        if user.alias.is_empty() { user.get_name().clone() } else { user.alias.clone() }
+                    } else {
+                        user.get_name().clone()
+                    };
+                    let txt = if include_city {
+                        format!("{:>4}   {:23} {} ({})", i + 1, connection.operation, name, user.city_or_state)
+                    } else {
+                        format!("{:>4}   {:23} {}", i + 1, connection.operation, name)
+                    };
+                    lines.push(txt);
                 }
             }
         }
