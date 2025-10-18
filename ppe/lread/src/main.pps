@@ -136,39 +136,51 @@ ENDLOOP
 PROCEDURE BuildMessageIndex()
     ValidMessageCount = 0
     MessageIndexBuilt = FALSE
-    
+;$IF RUNTIME < 400
+    STRING MSGS_FILE = ConfInfo(CONF, 12)
+    BOOLEAN MSGIDXVALID = FALSE
+    IF Exist(MSGS_FILE + ".IDX") THEN
+        FOPEN 4, MSGS_FILE + ".IDX", O_RD, S_DW
+        MSGIDXVALID = TRUE
+    ENDIF
+;$ENDIF
     INTEGER MSG_NUM
     FOR MSG_NUM = LOW TO HIGH
         BOOLEAN IsValid = FALSE
         
 ;$IF RUNTIME >= 400
-        STRING TestTo = GetMsgHdr(CONF, MSG_NUM, HDR_TO)
-        IF (TestTo = "ALL" | TestTo = U_NAME()) THEN
-            IsValid = TRUE
+        INTEGER IsActive = GetMsgHdr(CONF, MSG_NUM, HDR_ACTIVE)
+        IF IsActive == 225 THEN 
+            INTEGER TestTo = GetMsgHdr(CONF, MSG_NUM, HDR_TO)
+            IF (TestTo = "ALL" | TestTo = U_NAME()) THEN
+                IsValid = TRUE
+            ENDIF
         ENDIF
 ;$ELSE
-        STRING MSGS_FILE = ConfInfo(CONF, 12)
-        IF Exist(MSGS_FILE + ".IDX") THEN
-            FOPEN 4, MSGS_FILE + ".IDX", O_RD, S_DW
+        IF MSGIDXVALID THEN
             IF !FErr(4) THEN
                 INTEGER IndexPos = (MSG_NUM - LOW) * 64
                 FSEEK 4, IndexPos, SEEK_SET
                 INTEGER TestOffset
                 FREAD 4, TestOffset, 4
-                IF TestOffset > 0 THEN
+                IF (TestOffset > 0) THEN
                     IsValid = TRUE
                 ENDIF
-                FCLOSE 4
             ENDIF
         ENDIF
 ;$ENDIF
-        
+
         IF IsValid THEN
             ValidMessageIndex(ValidMessageCount) = MSG_NUM
             ValidMessageCount = ValidMessageCount + 1
         ENDIF
     NEXT
-    
+;$IF RUNTIME < 400
+    IF MSGIDXVALID THEN 
+        FCLOSE 4
+    ENDIF
+;$ENDIF
+
     MessageIndexBuilt = TRUE
 ENDPROC
 

@@ -1,4 +1,6 @@
+use core::panic;
 use std::{
+    backtrace::Backtrace,
     collections::{HashMap, HashSet},
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -599,7 +601,15 @@ impl SemanticVisitor {
         }
     }
 
-    fn add_declaration(&mut self, reftype: ReferenceType, variable_type: VariableType, identifier_token: &Spanned<parser::lexer::Token>) {
+    fn add_declaration(&mut self, variable_type: VariableType, identifier_token: &Spanned<parser::lexer::Token>) -> usize {
+        let id = self.references.len();
+
+        let reftype = match variable_type {
+            VariableType::Function => ReferenceType::Function(self.function_containers.len()),
+            VariableType::Procedure => ReferenceType::Procedure(self.function_containers.len()),
+            _ => ReferenceType::Variable(id),
+        };
+
         self.references.push((
             reftype,
             References {
@@ -615,6 +625,7 @@ impl SemanticVisitor {
                 usages: vec![],
             },
         ));
+        return id;
     }
 
     fn add_reference(&mut self, reftype: ReferenceType, variable_type: VariableType, identifier_token: &Spanned<parser::lexer::Token>) {
@@ -776,8 +787,7 @@ impl SemanticVisitor {
         matrix_size: usize,
         cube_size: usize,
     ) {
-        let id = self.references.len();
-        self.add_declaration(ReferenceType::Variable(id), variable_type, identifier);
+        let id = self.add_declaration(variable_type, identifier);
 
         let header = VarHeader {
             id,
@@ -826,12 +836,7 @@ impl SemanticVisitor {
         for (i, param) in parameters.iter().enumerate() {
             match param {
                 ParameterSpecifier::Variable(param) => {
-                    let id = self.references.len();
-                    self.add_declaration(
-                        ReferenceType::Variable(id),
-                        param.get_variable_type(),
-                        param.get_variable().as_ref().unwrap().get_identifier_token(),
-                    );
+                    let id = self.add_declaration(param.get_variable_type(), param.get_variable().as_ref().unwrap().get_identifier_token());
                     self.references[id].1.header = Some(VarHeader {
                         id,
                         variable_type: param.get_variable_type(),
@@ -849,12 +854,7 @@ impl SemanticVisitor {
                         .insert(unicase::Ascii::new(param.get_variable().as_ref().unwrap().get_identifier().to_string()), id);
                 }
                 ParameterSpecifier::Function(func) => {
-                    let id = self.references.len();
-                    self.add_declaration(
-                        ReferenceType::Function(self.function_containers.len()),
-                        VariableType::Function,
-                        func.get_identifier_token(),
-                    );
+                    let id = self.add_declaration(VariableType::Function, func.get_identifier_token());
                     self.references[id].1.header = Some(VarHeader {
                         id,
                         variable_type: VariableType::Function,
@@ -892,12 +892,7 @@ impl SemanticVisitor {
                     });
                 }
                 ParameterSpecifier::Procedure(func) => {
-                    let id = self.references.len();
-                    self.add_declaration(
-                        ReferenceType::Function(self.function_containers.len()),
-                        VariableType::Function,
-                        func.get_identifier_token(),
-                    );
+                    let id = self.add_declaration(VariableType::Function, func.get_identifier_token());
                     self.references[id].1.header = Some(VarHeader {
                         id,
                         variable_type: VariableType::Procedure,
@@ -1433,13 +1428,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         CompilationErrorType::FunctionNotFound(call.get_expression().to_string()),
                     );
                 } else if let Expression::Identifier(ident) = call.get_expression() {
-                    let id: usize = self.references.len();
+                    let id = self.add_declaration(VariableType::Function, ident.get_identifier_token());
                     self.global_lookup.variable_lookup.insert(ident.get_identifier().clone(), id);
-                    self.add_declaration(
-                        ReferenceType::Function(self.function_containers.len()),
-                        VariableType::Function,
-                        ident.get_identifier_token(),
-                    );
                     self.function_containers.push(FunctionContainer {
                         name: ident.get_identifier().clone(),
                         parameter_index: None,
@@ -1651,13 +1641,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     CompilationErrorType::ProcedureNotFound(call.get_identifier().to_string()),
                 );
             } else {
-                let id = self.references.len();
+                let id = self.add_declaration(VariableType::Procedure, call.get_identifier_token());
                 self.global_lookup.variable_lookup.insert(call.get_identifier().clone(), id);
-                self.add_declaration(
-                    ReferenceType::Procedure(self.function_containers.len()),
-                    VariableType::Procedure,
-                    call.get_identifier_token(),
-                );
                 self.function_containers.push(FunctionContainer {
                     name: call.get_identifier().clone(),
                     parameter_index: None,
@@ -1689,13 +1674,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             );
             return VariableType::None;
         }
-        let id = self.references.len();
+        let id = self.add_declaration(VariableType::Function, func_decl.get_identifier_token());
         self.global_lookup.variable_lookup.insert(func_decl.get_identifier().clone(), id);
-        self.add_declaration(
-            ReferenceType::Function(self.function_containers.len()),
-            VariableType::Function,
-            func_decl.get_identifier_token(),
-        );
         self.function_containers.push(FunctionContainer {
             name: func_decl.get_identifier().clone(),
             parameter_index: None,
@@ -1741,14 +1721,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     CompilationErrorType::FunctionNotFound(function.get_identifier().to_string()),
                 );
             } else {
-                let id = self.references.len();
+                let id = self.add_declaration(VariableType::Function, function.get_identifier_token());
                 self.cur_func_impl = id;
                 self.global_lookup.variable_lookup.insert(function.get_identifier().clone(), id);
-                self.add_declaration(
-                    ReferenceType::Function(self.function_containers.len()),
-                    VariableType::Function,
-                    function.get_identifier_token(),
-                );
+
                 self.function_containers.push(FunctionContainer {
                     name: function.get_identifier().clone(),
                     parameter_index: None,
@@ -1809,13 +1785,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             );
             return VariableType::None;
         }
-        let id = self.references.len();
+        let id = self.add_declaration(VariableType::Procedure, proc_decl.get_identifier_token());
         self.global_lookup.variable_lookup.insert(proc_decl.get_identifier().clone(), id);
-        self.add_declaration(
-            ReferenceType::Procedure(self.function_containers.len()),
-            VariableType::Procedure,
-            proc_decl.get_identifier_token(),
-        );
 
         self.function_containers.push(FunctionContainer {
             name: proc_decl.get_identifier().clone(),
@@ -1860,13 +1831,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     CompilationErrorType::ProcedureNotFound(procedure.get_identifier().to_string()),
                 );
             } else {
-                let id = self.references.len();
+                let id = self.add_declaration(VariableType::Procedure, procedure.get_identifier_token());
                 self.global_lookup.variable_lookup.insert(procedure.get_identifier().clone(), id);
-                self.add_declaration(
-                    ReferenceType::Procedure(self.function_containers.len()),
-                    VariableType::Procedure,
-                    procedure.get_identifier_token(),
-                );
                 self.references[id].1.implementation = Some((
                     self.errors.lock().unwrap().file_name().to_path_buf(),
                     Spanned::new(

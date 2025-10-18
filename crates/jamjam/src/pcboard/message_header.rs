@@ -54,7 +54,7 @@ pub struct PCBoardMessageHeader {
     /// Reply Time (HH:MM)
     pub reply_time: String,
 
-    /// 'R' == repliey, ' ' == no reply
+    /// 'R' == reply, ' ' == no reply
     pub reply_status: u8,
 
     /// 25 character "From" field

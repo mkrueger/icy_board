@@ -9,11 +9,18 @@ use crate::pcboard::FROM_TO_LEN;
 
 #[derive(Clone, Debug)]
 pub struct PCBoardMessageIndex {
-    pub offset: u32,
+    ///  Offset (0 if none, >0 if active, <0 if deleted)
+    pub offset: i32,
+
+    /// Message Number
     pub num: u32,
     pub to: BString,
     pub from: BString,
+
+    /// Status Char (same as in msg header)
     pub status: u8,
+
+    /// Julian date format
     pub date: u16,
     pub reserved: [u8; 3],
 }
@@ -35,7 +42,7 @@ impl PCBoardMessageIndex {
         let reserved = [data[0], data[1], data[2]];
 
         Ok(Self {
-            offset,
+            offset: offset as i32,
             num,
             to,
             from,

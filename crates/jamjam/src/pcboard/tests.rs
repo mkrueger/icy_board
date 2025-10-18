@@ -27,7 +27,7 @@ fn test_index() {
     let new_idx = base.read_index().unwrap();
     assert_eq!(old_idx.len(), new_idx.len());
     for i in 0..old_idx.len() {
-        assert_eq!(old_idx[i], new_idx[i].offset);
+        assert_eq!(old_idx[i], new_idx[i].offset as u32);
     }
 }
 

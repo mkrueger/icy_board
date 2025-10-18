@@ -135,6 +135,7 @@ PROCEDURE ReadMsg()
 
     LOOP
         STRING CH = InKey()
+        
         SELECT CASE CH
         CASE Chr(27)
             BREAK
@@ -160,6 +161,17 @@ PROCEDURE ReadMsg()
                     goto RedrawMsg
                 ENDIF
             ENDIF
+        CASE "HOME"
+            first_line = 0
+            GOTO RedrawMsg
+        CASE "END"
+            IF MSG_LEN > (MsgY2 - MsgY1) THEN
+                first_line = MSG_LEN - (MsgY2 - MsgY1)
+                IF first_line < 0 THEN first_line = 0 ENDIF
+            ELSE
+                first_line = 0
+            ENDIF
+            GOTO RedrawMsg            
         CASE "H", "h"
             Cls
             StartDisp FNS

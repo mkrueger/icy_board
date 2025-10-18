@@ -1,6 +1,5 @@
 
 PROCEDURE DrawHeaderArea()
-    INTEGER Offset
     
     IF !MessageIndexBuilt THEN
         BuildMessageIndex()
@@ -13,6 +12,7 @@ PROCEDURE DrawHeaderArea()
         Redraw = FALSE
     ENDIF
 ;$IF RUNTIME < 400
+    INTEGER Offset
     STRING MSGS_FILE = ConfInfo(CONF, 12)
     IF !Exist(MSGS_FILE) THEN
         Cls
@@ -58,10 +58,10 @@ PROCEDURE DrawHeaderArea()
             CONTINUE
         ENDIF
         
-        INTEGER IDX_POS = MSG_NUM - LOW
 
         IF FROM[O] == "" THEN 
 ;$IF RUNTIME < 400
+            INTEGER IDX_POS = MSG_NUM - LOW
             FSeek 2, IDX_POS * 64, SEEK_SET
             FRead 2, Offset, 4
             FRead 2, J, 4
