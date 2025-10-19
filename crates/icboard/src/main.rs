@@ -117,7 +117,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
         Ok(mut icy_board) => {
             icy_board.resolve_paths();
             let mut bbs = Arc::new(Mutex::new(BBS::new(icy_board.config.board.num_nodes as usize)));
-            let mut board = Arc::new(tokio::sync::Mutex::new(icy_board));
+            let mut board: Arc<Mutex<IcyBoard>> = Arc::new(tokio::sync::Mutex::new(icy_board));
             if arguments.localon || arguments.ppe.is_some() {
                 let mut terminal = init_terminal()?;
                 let cmd = if let Some(ppe) = &arguments.ppe {

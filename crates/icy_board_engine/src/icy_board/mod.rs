@@ -137,27 +137,57 @@ impl IcyBoard {
     }
 
     pub fn resolve_paths(&mut self) {
+        // Core system paths
+        self.config.paths.help_path = get_path(&self.root_path, &self.config.paths.help_path);
+        self.config.paths.tmp_work_path = get_path(&self.root_path, &self.config.paths.tmp_work_path);
+        self.config.paths.icbtext = get_path(&self.root_path, &self.config.paths.icbtext);
+        self.config.paths.conferences = get_path(&self.root_path, &self.config.paths.conferences);
+        self.config.paths.security_file_path = get_path(&self.root_path, &self.config.paths.security_file_path);
+        self.config.paths.command_display_path = get_path(&self.root_path, &self.config.paths.command_display_path);
+        self.config.paths.email_msgbase = get_path(&self.root_path, &self.config.paths.email_msgbase);
+        self.config.paths.caller_log = get_path(&self.root_path, &self.config.paths.caller_log);
+
+        // User/group/command files
         self.config.paths.user_file = get_path(&self.root_path, &self.config.paths.user_file);
         self.config.paths.group_file = get_path(&self.root_path, &self.config.paths.group_file);
         self.config.paths.command_file = get_path(&self.root_path, &self.config.paths.command_file);
-        self.config.paths.language_file = get_path(&self.root_path, &self.config.paths.language_file);
+
+        // Display files
+        self.config.paths.welcome = get_path(&self.root_path, &self.config.paths.welcome);
+        self.config.paths.newuser = get_path(&self.root_path, &self.config.paths.newuser);
+        self.config.paths.closed = get_path(&self.root_path, &self.config.paths.closed);
+        self.config.paths.expire_warning = get_path(&self.root_path, &self.config.paths.expire_warning);
+        self.config.paths.expired = get_path(&self.root_path, &self.config.paths.expired);
+        self.config.paths.conf_join_menu = get_path(&self.root_path, &self.config.paths.conf_join_menu);
+        self.config.paths.no_ansi = get_path(&self.root_path, &self.config.paths.no_ansi);
+
+        // Chat files
         self.config.paths.chat_intro_file = get_path(&self.root_path, &self.config.paths.chat_intro_file);
+        self.config.paths.chat_menu = get_path(&self.root_path, &self.config.paths.chat_menu);
+        self.config.paths.chat_actions_menu = get_path(&self.root_path, &self.config.paths.chat_actions_menu);
+
+        // Config files
+        self.config.paths.language_file = get_path(&self.root_path, &self.config.paths.language_file);
         self.config.paths.protocol_data_file = get_path(&self.root_path, &self.config.paths.protocol_data_file);
         self.config.paths.pwrd_sec_level_file = get_path(&self.root_path, &self.config.paths.pwrd_sec_level_file);
+        self.config.paths.statistics_file = get_path(&self.root_path, &self.config.paths.statistics_file);
+
+        // Trashcan files
         self.config.paths.trashcan_upload_files = get_path(&self.root_path, &self.config.paths.trashcan_upload_files);
         self.config.paths.trashcan_email = get_path(&self.root_path, &self.config.paths.trashcan_email);
         self.config.paths.trashcan_passwords = get_path(&self.root_path, &self.config.paths.trashcan_passwords);
         self.config.paths.trashcan_user = get_path(&self.root_path, &self.config.paths.trashcan_user);
-        self.config.paths.statistics_file = get_path(&self.root_path, &self.config.paths.statistics_file);
+        self.config.paths.vip_users = get_path(&self.root_path, &self.config.paths.vip_users);
 
+        // Survey files
         self.config.paths.newask_answer = get_path(&self.root_path, &self.config.paths.newask_answer);
         self.config.paths.newask_survey = get_path(&self.root_path, &self.config.paths.newask_survey);
-
         self.config.paths.logon_answer = get_path(&self.root_path, &self.config.paths.logon_answer);
         self.config.paths.logon_survey = get_path(&self.root_path, &self.config.paths.logon_survey);
-
         self.config.paths.logoff_answer = get_path(&self.root_path, &self.config.paths.logoff_answer);
         self.config.paths.logoff_survey = get_path(&self.root_path, &self.config.paths.logoff_survey);
+
+        // Conference paths
         for c in self.conferences.iter_mut() {
             c.command_file = get_path(&self.root_path, &c.command_file);
             c.intro_file = get_path(&self.root_path, &c.intro_file);

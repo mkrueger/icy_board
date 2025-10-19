@@ -28,6 +28,8 @@ mod cmd_t;
 
 mod cmd_x;
 
+mod display_file;
+
 // !
 #[test]
 fn test_last_cmd() {

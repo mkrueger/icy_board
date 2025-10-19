@@ -228,7 +228,7 @@ impl IcyBoardState {
                 self.print(TerminalTarget::Both, &format!("\r\n({}) is missing!\r\n\r\n", file_name.as_ref().display()))
                     .await?;
             }
-            return Ok(true);
+            return Ok(false);
         };
         let converted_content = if content.starts_with(&UTF8_BOM) {
             String::from_utf8_lossy(&content[3..]).to_string()
