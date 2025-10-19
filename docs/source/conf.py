@@ -121,3 +121,27 @@ class PPLLexer(RegexLexer):
         ],
     }
 lexers['PPL'] = PPLLexer(startinline=True)
+
+import pathlib
+import re
+
+def load_workspace_version() -> str:
+    cargo = pathlib.Path(__file__).resolve().parents[2] / "Cargo.toml"
+    try:
+        txt = cargo.read_text(encoding="utf-8")
+        # Look for [workspace.package] version = "x.y.z"
+        m = re.search(r'^\s*version\s*=\s*"([^"]+)"\s*$', txt, re.MULTILINE)
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
+    return "unknown"
+
+release = load_workspace_version()      # full version string (e.g. 0.1.7)
+version = release                       # or split major/minor if you prefer: release.split('.')[:2]
+
+# Provide a substitution usable in RST as |icy_version|
+rst_epilog = f"""
+.. |icy_version| replace:: {release}
+.. |icy_version_short| replace:: {version}
+"""

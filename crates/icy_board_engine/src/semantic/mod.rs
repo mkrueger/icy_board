@@ -1,6 +1,5 @@
 use core::panic;
 use std::{
-    backtrace::Backtrace,
     collections::{HashMap, HashSet},
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -1690,6 +1689,34 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
     fn visit_function_implementation(&mut self, function: &FunctionImplementation) -> VariableType {
         if let Some(idx) = self.lookup_variable(function.get_identifier()) {
+            // Procedure call may've added a function wrongly as a procedure, fix that here.
+            {
+                let (ref_kind, refs) = &mut self.references[idx];
+                match ref_kind.clone() {
+                    ReferenceType::Procedure(container_idx) => {
+                        // Switch the reference kind.
+                        *ref_kind = ReferenceType::Function(container_idx);
+                        // Update semantic type.
+                        refs.variable_type = VariableType::Function;
+                        if let Some(h) = refs.header.as_mut() {
+                            h.variable_type = VariableType::Function;
+                        }
+                    }
+                    ReferenceType::Function(_) => {
+                        // All good.
+                    }
+                    _ => {
+                        self.errors.lock().unwrap().report_error(
+                            function.get_identifier_token().span.clone(),
+                            CompilationErrorType::InternalError(format!(
+                                "Internal error: Found function implementation for non-procedure: {}",
+                                function.get_identifier()
+                            )),
+                        );
+                    }
+                }
+            }
+
             let identifier = function.get_identifier_token();
             self.cur_func_impl = idx;
             self.references[idx].1.implementation = Some((
@@ -1699,6 +1726,13 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             for cont in &mut self.function_containers {
                 if cont.id == idx {
                     if let FunctionDeclaration::Function(func) = &cont.functions {
+                        if func.get_parameters().len() != function.get_parameters().len() {
+                            self.errors.lock().unwrap().report_error(
+                                function.get_identifier_token().span.clone(),
+                                CompilationErrorType::ParameterMismatch(function.get_identifier().to_string()),
+                            );
+                        } // may've been wrongly added as procedure before - get's corrected.
+                    } else if let FunctionDeclaration::Procedure(func) = &cont.functions {
                         if func.get_parameters().len() != function.get_parameters().len() {
                             self.errors.lock().unwrap().report_error(
                                 function.get_identifier_token().span.clone(),
@@ -1785,6 +1819,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             );
             return VariableType::None;
         }
+
         let id = self.add_declaration(VariableType::Procedure, proc_decl.get_identifier_token());
         self.global_lookup.variable_lookup.insert(proc_decl.get_identifier().clone(), id);
 
@@ -1802,6 +1837,31 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
     fn visit_procedure_implementation(&mut self, procedure: &ProcedureImplementation) -> VariableType {
         if let Some(idx) = self.lookup_variable(procedure.get_identifier()) {
+            // Procedure call may've added a function wrongly as a procedure, fix that here.
+            {
+                let (ref_kind, _refs) = &mut self.references[idx];
+                match ref_kind.clone() {
+                    ReferenceType::Procedure(_container_idx) => {
+                        // All good.
+                    }
+                    ReferenceType::Function(_) => {
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(procedure.get_identifier_token().span.clone(), CompilationErrorType::ProcedureUsedAsFunction);
+                    }
+                    _ => {
+                        self.errors.lock().unwrap().report_error(
+                            procedure.get_identifier_token().span.clone(),
+                            CompilationErrorType::InternalError(format!(
+                                "Internal error: Found function implementation for non-procedure: {}",
+                                procedure.get_identifier()
+                            )),
+                        );
+                    }
+                }
+            }
+
             let identifier = procedure.get_identifier_token();
             self.references[idx].1.implementation = Some((
                 self.errors.lock().unwrap().file_name().to_path_buf(),

@@ -91,6 +91,12 @@ pub enum CompilationErrorType {
 
     #[error("Function used as variable ({0})")]
     FunctionUsedAsVariable(String),
+
+    #[error("Internal error ({0})")]
+    InternalError(String),
+
+    #[error("Undeclared procedure was used as function.")]
+    ProcedureUsedAsFunction,
 }
 
 #[derive(Error, Debug)]

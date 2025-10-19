@@ -1,5 +1,6 @@
-Icy Board BBS
+Icy Board BBS 
 =============
+Version |icy_version|
 
 .. toctree::
    :maxdepth: 2

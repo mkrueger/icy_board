@@ -1369,6 +1369,7 @@ FDPUTPAD (2.00)
     * :PPL:`FDEFOUT` – Set default output channel
     * :PPL:`FPUTPAD` – Write padded with explicit channel
     * :PPL:`FDPUTLN` – Write line to default channel (if implemented)
+
 FDPUT (2.00)
 ~~~~~~~~~~~~
   :PPL:`STATEMENT FDPUT(ANY exp [, ANY exp...])`
@@ -3472,7 +3473,7 @@ RECORDUSAGE (3.00)
   Update user accounting and log transaction details.
 
   **Parameters**
-    * :PPL:`field` – Accounting field (2-16, use DEB_/CRED_ constants)
+    * :PPL:`field` – Accounting field (2-16, use DEB_XXX/CRED_XXX constants)
     * :PPL:`desc1` – Primary description of the charge
     * :PPL:`desc2` – Secondary description or details
     * :PPL:`unitcost` – Cost per unit
