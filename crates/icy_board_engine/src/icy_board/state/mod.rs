@@ -930,10 +930,12 @@ impl IcyBoardState {
     }
 
     async fn shutdown_connections(&mut self) {
-        let _ = self.connection.shutdown();
+        self.session.request_logoff = true;
+        let _ = self.connection.shutdown().await;
+
         if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
             if let Some(sysop_connection) = &mut state.sysop_connection {
-                let _ = sysop_connection.shutdown();
+                let _ = sysop_connection.shutdown().await;
             }
         }
     }
@@ -1424,13 +1426,21 @@ impl IcyBoardState {
     async fn write_chars(&mut self, target: TerminalTarget, data: &[char]) -> Res<()> {
         let mut user_bytes = Vec::new();
         let mut sysop_bytes = Vec::new();
+        let user_is_utf8 = self.session.term_caps.is_utf8;
+        let mut buf = [0; 4];
+
         for c in data {
             if target != TerminalTarget::Sysop || self.session.is_sysop || self.session.current_user.is_none() {
                 let _ = self.user_screen.print_char(*c);
-                if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
-                    user_bytes.push(cp437);
+                if user_is_utf8 {
+                    let encoded = c.encode_utf8(&mut buf);
+                    user_bytes.extend_from_slice(encoded.as_bytes());
                 } else {
-                    user_bytes.push(b'.');
+                    if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
+                        user_bytes.push(cp437);
+                    } else {
+                        user_bytes.push(b'.');
+                    }
                 }
             }
             if target != TerminalTarget::User {

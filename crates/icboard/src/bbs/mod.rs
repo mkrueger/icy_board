@@ -241,8 +241,7 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
                 return Ok(());
             }
             Err(err) => {
-                log::error!("error during login process {}", err);
-                return Ok(());
+                return Err(err);
             }
         }
     }

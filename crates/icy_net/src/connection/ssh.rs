@@ -87,7 +87,9 @@ impl Connection for SSHConnection {
     }
 
     async fn shutdown(&mut self) -> crate::Result<()> {
-        self.client.session.disconnect(Disconnect::ByApplication, "bye", "en").await?;
+        self.channel.eof().await?;
+        self.channel.close().await?;
+
         Ok(())
     }
 }

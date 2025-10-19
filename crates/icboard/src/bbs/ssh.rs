@@ -83,6 +83,7 @@ impl server::Server for Server {
             bbs: self.bbs.clone(),
         }
     }
+
     fn handle_session_error(&mut self, _error: <Self::Handler as russh::server::Handler>::Error) {
         log::error!("SSH Session error: {:#?}", _error);
     }
@@ -91,12 +92,15 @@ impl server::Server for Server {
 impl server::Handler for SshSession {
     type Error = russh::Error;
 
-    async fn channel_open_session(&mut self, channel: Channel<Msg>, _session: &mut Session) -> Result<bool, Self::Error> {
+    async fn channel_open_session(&mut self, channel: Channel<Msg>, session: &mut Session) -> Result<bool, Self::Error> {
         let bbs2 = self.bbs.clone();
         let node = self.bbs.lock().await.create_new_node(ConnectionType::SSH).await;
         let node_list = self.bbs.lock().await.get_open_connections().await.clone();
         let board = self.board.clone();
-        let connection = SSHConnection::new(channel);
+
+        let channel_id = channel.id();
+        let session_handle = session.handle();
+        let connection = SSHConnection::new(channel, channel_id, session_handle);
 
         let handle = std::thread::Builder::new()
             .name("SSH handle".to_string())
@@ -105,11 +109,14 @@ impl server::Handler for SshSession {
                     if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
                         log::error!("Error running background client: {}", err);
                     }
+                    log::info!("SSH session for node {} ended.", node);
                 });
                 Ok(())
             })
             .unwrap();
+
         self.bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
+
         Ok(true)
     }
 
@@ -138,34 +145,44 @@ impl server::Handler for SshSession {
     }
 }
 
-impl Drop for Server {
-    fn drop(&mut self) {
-        /*let id = self.id;
-        let clients = self.clients.clone();
-        tokio::spawn(async move {
-            let mut clients = clients.lock().await;
-            clients.remove(&id);
-        });*/
-    }
-}
-
 pub struct SSHConnection {
     channel: ChannelStream<Msg>,
+    channel_id: russh::ChannelId,
+    handle: russh::server::Handle,
+    closed: bool,
 }
+
 unsafe impl Send for SSHConnection {}
 unsafe impl Sync for SSHConnection {}
 
 impl SSHConnection {
-    pub fn new(channel: Channel<Msg>) -> Self {
-        let channel = channel.into_stream();
-        Self { channel }
+    pub fn new(channel: Channel<Msg>, channel_id: russh::ChannelId, handle: russh::server::Handle) -> Self {
+        Self {
+            channel: channel.into_stream(),
+            channel_id,
+            handle,
+            closed: false,
+        }
+    }
+
+    async fn do_close(&mut self) {
+        if self.closed {
+            return;
+        }
+
+        // Explicit channel close
+        if let Err(e) = self.handle.close(self.channel_id).await {
+            log::debug!("SSH channel close failed: {e:?}");
+        }
+
+        self.closed = true;
     }
 }
 
 #[async_trait]
 impl Connection for SSHConnection {
     fn get_connection_type(&self) -> ConnectionType {
-        ConnectionType::Channel
+        ConnectionType::SSH
     }
 
     async fn read(&mut self, buf: &mut [u8]) -> icy_net::Result<usize> {
@@ -212,6 +229,8 @@ impl Connection for SSHConnection {
     }
 
     async fn shutdown(&mut self) -> icy_net::Result<()> {
+        self.channel.shutdown().await?;
+        self.do_close().await;
         Ok(())
     }
 }
