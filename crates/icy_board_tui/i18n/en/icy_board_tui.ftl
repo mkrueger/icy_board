@@ -265,43 +265,82 @@ board_config_title=Board Configuration
 
 board_name=Board Name
 board_name-status=Board name is shown on login to the caller
-board_name-help=TODO
+board_name-help=
+    # Board Name
+
+    Enter here the name of your bulletin board system. This name is displayed
+    at connect to the caller.
 
 allow_iemsi=Allow IEMSI
 allow_iemsi-status=Allow IEMSI login
-allow_iemsi-help=TODO
+allow_iemsi-help=
+    # Allow IEMSI
+
+    IEMSI is an automatic login/capability exchange used by advanced BBS clients. 
+    The caller sends name, terminal features (ANSI/color, size), 
+    and preferred protocols so IcyBoard can skip most prompts and tailor output immediately. 
+
+    If no IEMSI data arrives, normal interactive login is used. 
+    Because classic IEMSI isn’t encrypted, prefer it on trusted or secured connections.
 
 board_iemsi_location=Location
 board_iemsi_location-status=Board location used in IEMSI
-board_iemsi_location-help=TODO
+board_iemsi_location-help=
+    # Location
+
+    Human-readable board location (city/region) advertised in the IEMSI handshake.
 
 board_iemsi_operator=Operator
 board_iemsi_operator-status=Board operator used in IEMSI
-board_iemsi_operator-help=TODO
+board_iemsi_operator-help=
+    # Operator
+
+    Name or handle of the board operator/sysop sent to the client.
 
 board_iemsi_notice=Notice
 board_iemsi_notice-status=Board notice used in IEMSI
-board_iemsi_notice-help=TODO
+board_iemsi_notice-help=
+    # Notice
+
+    Short welcome / status blurb shown by capable IEMSI clients after login.
 
 board_iemsi_caps=Capabilities
 board_iemsi_caps-status=Board capabilities used in IEMSI
-board_iemsi_caps-help=TODO
+board_iemsi_caps-help=
+    # Capabilities
+
+    Capability flags string (e.g. ANSI,COLOR,RIP,DOORS,MAIL) describing supported features.
+    Used in IEMSI handshake.
 
 board_node_num=# Nodes
 board_node_num-status=Number of maximum active nodes
-board_node_num-help=TODO
+board_node_num-help=
+    # Nodes
+
+    Maximum number of nodes allowed. Prevents DDoS attacks.
 
 who_include_city=Include City Field in WHO Display
 who_include_city-status=Include City Field in WHO Display
-who_include_city-help=TODO
+who_include_city-help=
+    # Include City Field in WHO Display
+
+    When a user types WHO at the command prompt in IcyBoard, this 
+    setting will determine if the city field of each user online is
+    included in the list.
 
 who_show_alias=Show ALIAS Name in WHO Display
 who_show_alias-status=Show ALIAS Name in WHO Display
-who_show_alias-help=TODO
+who_show_alias-help=
+    # Show ALIAS Name in WHO Display
+
+    Switch to display ALIAS instead of names in the WHO display.
 
 date_format=Date Format
 date_format-status=Date format used in the system
-date_format-help=TODO
+date_format-help=
+    # Date Format
+
+    The default Date Format used by IcyBoard.
 
 new_user_options_title=New User Options
 

@@ -56,9 +56,7 @@ impl HelpViewState {
             quote_default: get_tui_theme().help_box.fg.unwrap(),
         };
 
-        unsafe {
-            md_tui::util::colors::COLOR_CONFIG = cfg;
-        }
+        md_tui::util::colors::set_color_config(cfg);
 
         HelpViewState {
             markdown: None,
