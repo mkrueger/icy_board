@@ -183,7 +183,7 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
         if login_options.login_sysop {
             logged_in = true;
             state.session.is_sysop = true;
-            state.set_current_user(0).await.unwrap();
+            state.set_current_user(0, true).await.unwrap();
         }
 
         if let Some(ppe) = &login_options.ppe {
@@ -196,7 +196,7 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
                     // Verify password
                     if state.board.lock().await.users[user_record].password.password.is_valid(password) {
                         // Set the authenticated user
-                        state.set_current_user(user_record).await?;
+                        state.set_current_user(user_record, true).await?;
                         logged_in = true;
                         state.session.is_sysop = false;
                     } else {

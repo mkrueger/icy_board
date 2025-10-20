@@ -141,7 +141,7 @@ impl PcbBoardCommand {
                 self.state.session.user_name = first_name.to_string();
             }
             if let Some(user) = found_user {
-                self.state.set_current_user(user).await?;
+                self.state.set_current_user(user, false).await?;
                 return self.login_user().await;
             } else {
                 self.state.session.op_text = self.state.session.user_name.clone();
@@ -537,7 +537,7 @@ impl PcbBoardCommand {
 
         let id = self.state.get_board().await.users.new_user(new_user);
         self.state.get_board().await.save_userbase()?;
-        self.state.set_current_user(id).await?;
+        self.state.set_current_user(id, true).await?;
 
         log::info!("NEW USER: '{}'", self.state.session.user_name);
 
@@ -662,6 +662,13 @@ impl PcbBoardCommand {
         }
 
         log::warn!("Login from {} at {}", self.state.session.user_name, Local::now().to_rfc2822());
+        let last_conference = if let Some(user) = &self.state.session.current_user {
+            user.last_conference
+        } else {
+            0
+        };
+        self.state.join_conference(last_conference, false, false).await?;
+
         self.logon_questions().await?;
         return Ok(true);
     }

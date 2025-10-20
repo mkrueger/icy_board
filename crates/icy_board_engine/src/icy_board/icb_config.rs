@@ -653,7 +653,7 @@ pub struct AccountingOptions {
     pub accounting_config: Option<AccountingConfig>,
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq)]
 
 pub enum DisplayNewsBehavior {
     /// Display news on login
@@ -666,6 +666,7 @@ pub enum DisplayNewsBehavior {
     #[serde(rename = "A")]
     Always,
 }
+
 impl DisplayNewsBehavior {
     pub fn to_pcb_char(&self) -> char {
         match self {

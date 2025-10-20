@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     fs,
     path::{Path, PathBuf},
     str::FromStr,
@@ -250,6 +250,7 @@ pub struct Session {
     pub last_answer: Option<String>,
 
     pub memorized_msg: Option<(usize, u32)>,
+    pub joined_conferences: HashSet<u16>,
 }
 
 impl Session {
@@ -311,6 +312,8 @@ impl Session {
             default_answer: None,
             last_answer: None,
             memorized_msg: None,
+
+            joined_conferences: HashSet::new(),
         }
     }
 
@@ -674,25 +677,54 @@ impl IcyBoardState {
 
     pub async fn join_conference(&mut self, conference: u16, _quick_join: bool, show_intro: bool) -> Res<()> {
         // todo: display news on join.
-        if (conference as usize) < self.get_board().await.conferences.len() {
-            self.session.current_conference_number = conference;
-            let c = self.get_board().await.conferences[conference as usize].clone();
-            self.session.current_conference = c;
-            self.session.current_message_area = 0;
-            if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
-                state.cur_conference = self.session.current_conference_number;
-            }
-            if let Some(user) = &mut self.session.current_user {
-                user.last_conference = conference;
-            }
+        if (conference as usize) >= self.get_board().await.conferences.len() {
+            return Ok(());
+        }
 
-            if self.get_board().await.config.switches.force_intro_on_join || show_intro {
-                if self.session.current_conference.intro_file.is_file() {
-                    let f = self.session.current_conference.intro_file.clone();
-                    self.display_file(&f).await?;
-                }
+        let news_behavior = self.board.lock().await.config.switches.display_news_behavior;
+        let scan_new_blt = self.board.lock().await.config.switches.scan_new_blt;
+        let display_userinfo_at_login = self.board.lock().await.config.switches.display_userinfo_at_login;
+
+        let show_news = if news_behavior == crate::icy_board::icb_config::DisplayNewsBehavior::Always {
+            true
+        } else {
+            self.session.joined_conferences.get(&conference).is_none()
+        };
+
+        self.session.current_conference_number = conference;
+        let c = self.get_board().await.conferences[conference as usize].clone();
+        self.session.current_conference = c;
+        self.session.current_message_area = 0;
+        if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+            state.cur_conference = self.session.current_conference_number;
+        }
+        if let Some(user) = &mut self.session.current_user {
+            user.last_conference = conference;
+        }
+
+        if show_news {
+            self.display_news().await?;
+        }
+
+        if scan_new_blt {
+            self.scan_new_bulletins().await?;
+        }
+
+        if self.get_board().await.config.switches.force_intro_on_join || show_intro {
+            if self.session.current_conference.intro_file.is_file() {
+                let f = self.session.current_conference.intro_file.clone();
+                self.display_file(&f).await?;
             }
         }
+        self.session.joined_conferences.insert(conference);
+
+        if display_userinfo_at_login {
+            let sec: SecurityExpression = self.session.user_command_level.cmd_v.clone();
+            if !sec.session_can_access(&self.session) {
+                self.view_settings().await?;
+            }
+        }
+
         Ok(())
     }
 
@@ -940,7 +972,7 @@ impl IcyBoardState {
         }
     }
 
-    pub async fn set_current_user(&mut self, user_number: usize) -> Res<()> {
+    pub async fn set_current_user(&mut self, user_number: usize, join_conference: bool) -> Res<()> {
         self.session.cur_user_id = user_number as i32;
         if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
             state.cur_user = user_number as i32;
@@ -971,7 +1003,9 @@ impl IcyBoardState {
         if self.session.language != old_language {
             self.update_language().await;
         }
-        self.join_conference(last_conference, false, false).await?;
+        if join_conference {
+            self.join_conference(last_conference, false, false).await?;
+        }
         return Ok(());
     }
 
@@ -1310,6 +1344,92 @@ impl IcyBoardState {
             super::icb_config::PasswordStorageMethod::BCrypt => Password::new_bcrypt(pw1),
             super::icb_config::PasswordStorageMethod::PlainText => Password::PlainText(pw1),
         }
+    }
+
+    async fn scan_new_bulletins(&mut self) -> Res<()> {
+        let sec = self.session.user_command_level.cmd_b.clone();
+        if !sec.session_can_access(&self.session) {
+            return Ok(());
+        }
+
+        self.reset_color(TerminalTarget::Both).await?;
+        self.display_text(IceText::ScanningBulletins, display_flags::LFBEFORE).await?;
+
+        let prev_login = if let Some(user) = &self.session.current_user {
+            user.stats.last_on
+        } else {
+            // If no user context, use a very old date so nothing is considered new
+            Utc::now() - chrono::Duration::days(365 * 50)
+        };
+        let Some(bulletins) = self.session.current_conference.bulletins.clone() else {
+            return Ok(());
+        };
+
+        for (i, b) in bulletins.iter().enumerate() {
+            // Skip if bulletin requires higher security
+            if !b.required_security.session_can_access(&self.session) {
+                continue;
+            }
+
+            let path = self.resolve_path(&b.path);
+
+            // If the file doesn’t exist, silently skip
+            let Ok(meta) = std::fs::metadata(&path) else {
+                continue;
+            };
+
+            let Ok(modified_sys) = meta.modified() else {
+                continue;
+            };
+
+            // Convert SystemTime → DateTime<Utc>
+            let modified: chrono::DateTime<Utc> = modified_sys.into();
+
+            // Only list bulletins modified after the previous login
+            if modified > prev_login {
+                /*
+                                let name = path
+                                    .file_name()
+                                    .map(|s| s.to_string_lossy().to_string())
+                                    .unwrap_or_else(|| path.to_string_lossy().to_string());
+                */
+
+                self.backupcleareol(TerminalTarget::Both, self.user_screen.caret.get_position().x as usize)
+                    .await?;
+                self.new_line().await?;
+                self.set_color(TerminalTarget::Both, IcbColor::dos_light_red()).await?;
+                self.display_text(IceText::BulletinsUpdated, display_flags::NEWLINE).await?;
+                self.display_text(IceText::NewBulletins, display_flags::DEFAULT).await?;
+                self.println(TerminalTarget::Both, &format!("{}", i + 1)).await?;
+            }
+            if self.session.disp_options.abort_printout {
+                break;
+            }
+            self.new_line().await?;
+        }
+        self.session.disp_options.check_display_status();
+        Ok(())
+    }
+
+    async fn backupcleareol(&mut self, target: TerminalTarget, num_cols: usize) -> Res<()> {
+        // If we don't need to move, just clear EOL.
+        if num_cols == 0 {
+            return self.clear_eol(target).await;
+        }
+
+        // ANSI / graphics-capable terminals
+        if self.use_ansi() {
+            // Move left num_cols then clear to end of line.
+            // Example: ESC[{n}D moves cursor left n cols, ESC[K clears to end of line.
+            let seq = format!("\x1B[{}D\x1B[K", num_cols);
+            self.write_raw(target, seq.chars().collect::<Vec<char>>().as_slice()).await?;
+            return Ok(());
+        }
+
+        for _ in 0..num_cols {
+            self.print(target, "\x08 \x08").await?;
+        }
+        Ok(())
     }
 }
 
