@@ -194,8 +194,10 @@ impl<'a> VirtualMachine<'a> {
         }
         self.variable_table.set_value(U_CLS, VariableValue::new_bool(cur_user.flags.msg_clear));
 
-        self.variable_table
-            .set_value(U_EXPDATE, VariableValue::new_date(cur_user.exp_date.to_pcboard_date()));
+        self.variable_table.set_value(
+            U_EXPDATE,
+            VariableValue::new_date(IcbDate::from_utc(&cur_user.expiration_date).to_pcboard_date()),
+        );
 
         self.variable_table.set_value(U_SEC, VariableValue::new_int(cur_user.security_level as i32));
         self.variable_table.set_value(U_PAGELEN, VariableValue::new_int(cur_user.page_len as i32));
@@ -288,7 +290,7 @@ impl<'a> VirtualMachine<'a> {
 
         self.variable_table.set_value(
             U_PWDEXP,
-            VariableValue::new_date(IcbDate::from_utc(cur_user.password.expire_date).to_pcboard_date()),
+            VariableValue::new_date(IcbDate::from_utc(&cur_user.password.expire_date).to_pcboard_date()),
         );
         if self.variable_table.get_version() >= 300 {
             // PCBoard seems not to set this variable ever.
@@ -299,11 +301,8 @@ impl<'a> VirtualMachine<'a> {
             self.variable_table
                 .set_value(U_SHORTDESC, VariableValue::new_bool(cur_user.flags.use_short_filedescr));
             self.variable_table.set_value(U_GENDER, VariableValue::new_string(cur_user.gender.clone()));
-            if let Some(day) = &cur_user.birth_day {
-                self.variable_table.set_value(U_BIRTHDATE, VariableValue::new_string(day.to_string()));
-            } else {
-                self.variable_table.set_value(U_BIRTHDATE, VariableValue::new_string("0".to_string()));
-            }
+            let day = &cur_user.birth_date;
+            self.variable_table.set_value(U_BIRTHDATE, VariableValue::new_string(day.to_string()));
             self.variable_table.set_value(U_EMAIL, VariableValue::new_string(cur_user.email.clone()));
             self.variable_table.set_value(U_WEB, VariableValue::new_string(cur_user.web.clone()));
         }
@@ -321,7 +320,7 @@ impl<'a> VirtualMachine<'a> {
         }
         cur_user.flags.msg_clear = self.variable_table.get_value(U_CLS).as_bool();
 
-        cur_user.exp_date = IcbDate::from_pcboard(self.variable_table.get_value(U_EXPDATE).as_int() as u32);
+        cur_user.expiration_date = IcbDate::from_pcboard(self.variable_table.get_value(U_EXPDATE).as_int() as u32).to_utc_date_time();
         cur_user.security_level = self.variable_table.get_value(U_SEC).as_int() as u8;
         cur_user.page_len = self.variable_table.get_value(U_PAGELEN).as_int() as u16;
         cur_user.exp_security_level = self.variable_table.get_value(U_EXPSEC).as_int() as u8;
@@ -377,7 +376,7 @@ impl<'a> VirtualMachine<'a> {
             cur_user.flags.use_short_filedescr = self.variable_table.get_value(U_SHORTDESC).as_bool();
 
             cur_user.gender = self.variable_table.get_value(U_GENDER).as_string();
-            cur_user.birth_day = Some(IcbDate::parse(&self.variable_table.get_value(U_BIRTHDATE).as_string()));
+            cur_user.birth_date = IcbDate::parse(&self.variable_table.get_value(U_BIRTHDATE).as_string()).to_utc_date_time();
             cur_user.email = self.variable_table.get_value(U_EMAIL).as_string();
             cur_user.web = self.variable_table.get_value(U_WEB).as_string();
         }

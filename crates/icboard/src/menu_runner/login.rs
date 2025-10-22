@@ -494,7 +494,7 @@ impl PcbBoardCommand {
                         display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
                     )
                     .await?;
-                new_user.birth_day = Some(IcbDate::parse(&date));
+                new_user.birth_date = IcbDate::parse(&date).to_utc_date_time();
             }
 
             if settings.ask_email && self.state.display_text.has_text(IceText::EnterEmail) {
@@ -621,15 +621,15 @@ impl PcbBoardCommand {
 
         if self.state.get_board().await.config.subscription_info.is_enabled {
             if let Some(user) = &self.state.session.current_user {
-                if user.exp_date.to_utc_date_time() < Utc::now() {
+                if user.expiration_date < Utc::now() {
                     log::warn!("Login from expired user {} at {}", self.state.session.user_name, Local::now().to_rfc2822());
-                    let exp_file = self.state.get_board().await.config.paths.expired.clone();
+                    let exp_file: std::path::PathBuf = self.state.get_board().await.config.paths.expired.clone();
                     self.state.display_file(&self.state.resolve_path(&exp_file)).await?;
                     self.state.hangup().await?;
                     return Ok(false);
                 }
                 let warn_days = self.state.get_board().await.config.subscription_info.warning_days as i64;
-                if user.exp_date.to_utc_date_time() + chrono::Duration::days(warn_days) < Utc::now() {
+                if user.expiration_date + chrono::Duration::days(warn_days) < Utc::now() {
                     let exp_file = self.state.get_board().await.config.paths.expire_warning.clone();
                     self.state.display_file(&self.state.resolve_path(&exp_file)).await?;
                     self.state.press_enter().await?;

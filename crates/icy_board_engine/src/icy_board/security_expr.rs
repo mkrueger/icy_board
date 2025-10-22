@@ -193,9 +193,7 @@ impl SecData for Session {
 
     fn birth_day(&self) -> Option<DateTime<Utc>> {
         if let Some(user) = &self.current_user {
-            if let Some(day) = &user.birth_day {
-                return Some(day.to_utc_date_time());
-            }
+            return Some(user.birth_date.clone());
         }
         None
     }
@@ -215,10 +213,7 @@ impl SecData for User {
     }
 
     fn birth_day(&self) -> Option<DateTime<Utc>> {
-        if let Some(day) = &self.birth_day {
-            return Some(day.to_utc_date_time());
-        }
-        None
+        Some(self.birth_date.clone())
     }
 
     fn is_in_goup(&self, _group: &str) -> bool {

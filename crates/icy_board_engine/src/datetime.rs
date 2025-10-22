@@ -160,7 +160,28 @@ impl IcbDate {
         Self::new(month as u8, day as u8, year as u16)
     }
 
-    pub(crate) fn to_pcb_str(&self) -> String {
+    pub fn try_parse(str: &str) -> Option<Self> {
+        let parts = str
+            .split(|c| c == '-' || c == '/' || c == '.' || c == ' ')
+            .map(|c| c.parse::<i32>().unwrap_or_default())
+            .collect::<Vec<i32>>();
+        if parts.len() != 3 || parts[0] == 0 || parts[1] == 0 {
+            return None;
+        }
+        let month = parts[0];
+        let day = parts[1];
+        let mut year = parts[2];
+        if year < 100 {
+            if year < 79 {
+                year += 2000;
+            } else {
+                year += 1900;
+            }
+        }
+        Some(Self::new(month as u8, day as u8, year as u16))
+    }
+
+    pub fn to_pcb_str(&self) -> String {
         // PCBoard uses MM-DD-YY format (6 characters)
         // Year is stored as 2 digits:
         // 00-78 = 2000-2078
@@ -235,7 +256,7 @@ impl IcbDate {
             .unwrap()
     }
 
-    pub fn from_utc(date_time: chrono::prelude::DateTime<chrono::prelude::Utc>) -> Self {
+    pub fn from_utc(date_time: &chrono::prelude::DateTime<chrono::prelude::Utc>) -> Self {
         Self {
             month: date_time.month() as u8,
             day: date_time.day() as u8,
@@ -533,7 +554,7 @@ mod test {
         let date = super::IcbDate::parse("12-30-1976");
         let utc = date.to_utc_date_time();
 
-        let date = super::IcbDate::from_utc(utc);
+        let date = super::IcbDate::from_utc(&utc);
         assert_eq!(utc, date.to_utc_date_time());
     }
 }

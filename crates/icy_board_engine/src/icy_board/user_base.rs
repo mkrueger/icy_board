@@ -439,7 +439,8 @@ pub struct User {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub home_voice_phone: String,
 
-    pub birth_day: Option<IcbDate>,
+    #[serde(default)]
+    pub birth_date: DateTime<Utc>,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -474,7 +475,7 @@ pub struct User {
     pub security_level: u8,
 
     #[serde(default)]
-    pub exp_date: IcbDate,
+    pub expiration_date: DateTime<Utc>,
 
     /// Expired security level
     pub exp_security_level: u8,
@@ -683,12 +684,12 @@ impl User {
         let (gender, birth_date, email, web) = if let Some(personal) = &u.inf.personal {
             (
                 personal.gender.clone(),
-                personal.birth_date.clone(),
+                personal.birth_date.to_utc_date_time(),
                 personal.email.clone(),
                 personal.web.clone(),
             )
         } else {
-            (String::new(), IcbDate::new(0, 0, 0), String::new(), String::new())
+            (String::new(), IcbDate::new(0, 0, 0).to_utc_date_time(), String::new(), String::new())
         };
 
         let (street1, street2, city, state, zip, country) = if let Some(address) = &u.inf.address {
@@ -817,7 +818,7 @@ impl User {
 
             date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
             gender,
-            birth_day: Some(birth_date),
+            birth_date,
             email,
             web,
 
@@ -851,7 +852,7 @@ impl User {
             user_comment: u.user.user_comment.clone(),
             sysop_comment: u.user.sysop_comment.clone(),
             security_level: u.user.security_level as u8,
-            exp_date: u.user.exp_date.clone(),
+            expiration_date: u.user.exp_date.to_utc_date_time(),
             exp_security_level: u.user.exp_security_level as u8,
             flags: UserFlags {
                 expert_mode: u.user.expert_mode,
@@ -946,7 +947,7 @@ impl User {
             user_comment: self.user_comment.clone(),
             sysop_comment: self.sysop_comment.clone(),
             security_level: self.security_level as u8,
-            exp_date: self.exp_date.clone(),
+            exp_date: IcbDate::from_utc(&self.expiration_date),
             exp_security_level: self.exp_security_level as u8,
             expert_mode: self.flags.expert_mode,
             is_dirty: self.flags.is_dirty,
@@ -963,9 +964,9 @@ impl User {
             page_len: self.page_len as u8,
             last_conference: self.last_conference,
             elapsed_time_on: self.elapsed_time_on,
-            date_last_dir_read: IcbDate::from_utc(self.date_last_dir_read),
+            date_last_dir_read: IcbDate::from_utc(&self.date_last_dir_read),
             is_chat_available: matches!(self.chat_status, ChatStatus::Available),
-            last_date_on: IcbDate::from_utc(self.stats.last_on),
+            last_date_on: IcbDate::from_utc(&self.stats.last_on),
             num_times_on: self.stats.num_times_on as usize,
             num_uploads: self.stats.num_uploads as i32,
             num_downloads: self.stats.num_downloads as i32,
@@ -1031,10 +1032,12 @@ impl User {
                 country: self.country.clone(),
             });
         }
-        if !(self.gender.is_empty() && self.birth_day.is_none() && self.email.is_empty() && self.web.is_empty()) {
+        if !(self.gender.is_empty() && self.email.is_empty() && self.web.is_empty()) {
+            let birth_date = IcbDate::from_utc(&self.birth_date);
+
             inf.personal = Some(PersonalUserInf {
                 gender: self.gender.clone(),
-                birth_date: self.birth_day.clone().unwrap_or_else(|| IcbDate::new(0, 0, 0)),
+                birth_date,
                 email: self.email.clone(),
                 web: self.web.clone(),
             });
@@ -1051,9 +1054,9 @@ impl User {
             }
             inf.password = Some(PasswordUserInf {
                 prev_pwd: prev.try_into().expect("prev should have exactly 3 elements"),
-                last_change: IcbDate::from_utc(self.password.last_change),
+                last_change: IcbDate::from_utc(&self.password.last_change),
                 times_changed: self.password.times_changed as usize,
-                expire_date: IcbDate::from_utc(self.password.expire_date),
+                expire_date: IcbDate::from_utc(&self.password.expire_date),
             });
         }
 
@@ -1071,7 +1074,7 @@ impl User {
 
         if any_stats {
             inf.call_stats = Some(CallStatsUserInf {
-                first_date_on: IcbDate::from_utc(self.stats.first_date_on),
+                first_date_on: IcbDate::from_utc(&self.stats.first_date_on),
                 num_sysop_pages: self.stats.num_sysop_pages as usize,
                 num_group_chats: self.stats.num_group_chats as usize,
                 num_comments: self.stats.num_comments as usize,

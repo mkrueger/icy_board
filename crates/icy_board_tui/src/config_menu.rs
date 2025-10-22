@@ -1,5 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
+use chrono::{DateTime, Datelike, Utc};
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
     datetime::{IcbDate, IcbDoW, IcbTime},
@@ -144,7 +145,7 @@ pub enum ListValue {
     U32(u32, u32, u32),
     /// float, cur_edit_string
     Float(f64, String),
-    Date(IcbDate, String),
+    Date(DateTime<Utc>, DateEditState),
     Time(IcbTime, String),
     DoW(IcbDoW, String),
     Bool(bool),
@@ -152,6 +153,80 @@ pub enum ListValue {
     ValueList(String, Vec<Value>),
     Security(SecurityExpression, String),
     Position(Box<dyn Fn(&mut Frame, &Position)>, Box<dyn Fn(KeyEvent, &Position) -> Position>, Position),
+}
+
+#[derive(Clone, Debug)]
+pub struct DateEditState {
+    pub text_buffer: String,
+    pub cursor_field: DateField, // Month, Day, Year
+    pub editing_mode: DateEditMode,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum DateField {
+    Month,
+    Day,
+    Year,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum DateEditMode {
+    Text,   // Current text entry mode
+    Picker, // Interactive picker mode
+}
+
+impl DateEditState {
+    pub fn from_date(dt: &DateTime<Utc>) -> Self {
+        Self {
+            text_buffer: IcbDate::from_utc(dt).to_pcb_str(),
+            cursor_field: DateField::Month,
+            editing_mode: DateEditMode::Picker,
+        }
+    }
+
+    pub fn increment_field(&mut self, dt: &mut DateTime<Utc>) {
+        let date = dt.date_naive();
+        *dt = match self.cursor_field {
+            DateField::Month => {
+                if date.month() == 12 {
+                    date.with_month(1).unwrap_or(date)
+                } else {
+                    date.with_month(date.month() + 1).unwrap_or(date)
+                }
+            }
+            DateField::Day => (*dt + chrono::Duration::days(1)).date_naive(),
+            DateField::Year => date.with_year(date.year() + 1).unwrap_or(date),
+        }
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
+        .and_utc();
+        self.text_buffer = IcbDate::from_utc(dt).to_pcb_str();
+    }
+
+    pub fn decrement_field(&mut self, dt: &mut DateTime<Utc>) {
+        let date = dt.date_naive();
+        *dt = match self.cursor_field {
+            DateField::Month => {
+                if date.month() == 1 {
+                    date.with_month(12).unwrap_or(date)
+                } else {
+                    date.with_month(date.month() - 1).unwrap_or(date)
+                }
+            }
+            DateField::Day => (*dt - chrono::Duration::days(1)).date_naive(),
+            DateField::Year => date.with_year(date.year() - 1).unwrap_or(date),
+        }
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
+        .and_utc();
+        self.text_buffer = IcbDate::from_utc(dt).to_pcb_str();
+    }
+}
+
+impl ListValue {
+    pub fn date(date: DateTime<Utc>) -> Self {
+        ListValue::Date(date, DateEditState::from_date(&date))
+    }
 }
 
 pub struct ListItem<T> {
@@ -310,7 +385,7 @@ impl<T> ListItem<T> {
         self
     }
 
-    pub fn with_update_date_value(mut self, update_value: &'static dyn Fn(&T, IcbDate) -> ()) -> Self {
+    pub fn with_update_date_value(mut self, update_value: &'static dyn Fn(&T, DateTime<Utc>) -> ()) -> Self {
         let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
             let ListValue::Date(b, _) = value else {
                 return;
@@ -428,14 +503,16 @@ impl<T> ListItem<T> {
                 };
                 Text::from(str.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
             }
-            ListValue::Date(_val, str) => {
+            ListValue::Date(_val, state) => {
                 let area = Rect {
                     x: area.x,
                     y: area.y,
                     width: 8,
                     height: 1,
                 };
-                Text::from(str.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
+                Text::from(state.text_buffer.clone())
+                    .style(get_tui_theme().value)
+                    .render(area, frame.buffer_mut());
             }
 
             ListValue::DoW(_val, str) => {
@@ -533,16 +610,65 @@ impl<T> ListItem<T> {
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
                 self.text_field_state.set_cursor_position(frame);
             }
-            ListValue::Date(_val, str) => {
+            ListValue::Date(val, state) => {
                 let area = Rect {
                     x: area.x,
                     y: area.y,
-                    width: 8,
+                    width: 10, // MM-DD-YY
                     height: 1,
                 };
-                let field = TextField::new().with_max_len(8).with_value(str.clone());
-                frame.render_stateful_widget(field, area, &mut self.text_field_state);
-                self.text_field_state.set_cursor_position(frame);
+
+                if state.editing_mode == DateEditMode::Picker {
+                    // Render with field highlighting
+                    let date_str = &state.text_buffer;
+                    let parts: Vec<&str> = date_str.split('-').collect();
+
+                    let mut x = area.x;
+                    for (i, (part, is_selected)) in [
+                        (parts.get(0).unwrap_or(&"??"), state.cursor_field == DateField::Month),
+                        (parts.get(1).unwrap_or(&"??"), state.cursor_field == DateField::Day),
+                        (parts.get(2).unwrap_or(&"??"), state.cursor_field == DateField::Year),
+                    ]
+                    .iter()
+                    .enumerate()
+                    {
+                        let style = if *is_selected {
+                            get_tui_theme().edit_value.reversed() // Highlight current field
+                        } else {
+                            get_tui_theme().edit_value
+                        };
+
+                        Text::from(part.to_string()).style(style).render(
+                            Rect {
+                                x,
+                                y: area.y,
+                                width: part.len() as u16,
+                                height: 1,
+                            },
+                            frame.buffer_mut(),
+                        );
+
+                        x += part.len() as u16;
+                        if i < 2 {
+                            Text::from("-").style(get_tui_theme().edit_value).render(
+                                Rect {
+                                    x,
+                                    y: area.y,
+                                    width: 1,
+                                    height: 1,
+                                },
+                                frame.buffer_mut(),
+                            );
+                            x += 1;
+                        }
+                    }
+                    frame.set_cursor_position((area.x, area.y));
+                } else {
+                    // Fallback to text mode
+                    let field = TextField::new().with_max_len(8).with_value(state.text_buffer.clone());
+                    frame.render_stateful_widget(field, area, &mut self.text_field_state);
+                    self.text_field_state.set_cursor_position(frame);
+                }
             }
             ListValue::DoW(_val, str) => {
                 let area = Rect {
@@ -702,9 +828,64 @@ impl<T> ListItem<T> {
                 self.need_update |= self.text_field_state.handle_input(key, str);
                 *val = IcbTime::parse(str);
             }
-            ListValue::Date(val, str) => {
-                self.need_update |= self.text_field_state.handle_input(key, str);
-                *val = IcbDate::parse(str);
+            ListValue::Date(val, state) => {
+                match state.editing_mode {
+                    DateEditMode::Picker => {
+                        match key.code {
+                            KeyCode::Left => {
+                                state.cursor_field = match state.cursor_field {
+                                    DateField::Month => DateField::Year,
+                                    DateField::Day => DateField::Month,
+                                    DateField::Year => DateField::Day,
+                                };
+                            }
+                            KeyCode::Right | KeyCode::Tab => {
+                                state.cursor_field = match state.cursor_field {
+                                    DateField::Month => DateField::Day,
+                                    DateField::Day => DateField::Year,
+                                    DateField::Year => DateField::Month,
+                                };
+                            }
+                            KeyCode::Char('+') | KeyCode::PageUp => {
+                                state.increment_field(val);
+                                self.need_update = true;
+                            }
+                            KeyCode::Char('-') | KeyCode::PageDown => {
+                                state.decrement_field(val);
+                                self.need_update = true;
+                            }
+                            KeyCode::Char('t') | KeyCode::Char('T') => {
+                                // Set to today
+                                *val = Utc::now();
+                                state.text_buffer = IcbDate::from_utc(val).to_pcb_str();
+                                self.need_update = true;
+                            }
+                            KeyCode::Char(' ') => {
+                                // Toggle to text mode
+                                state.editing_mode = DateEditMode::Text;
+                            }
+                            KeyCode::Char(c) if c.is_ascii_digit() => {
+                                // Start typing - switch to text mode
+                                state.editing_mode = DateEditMode::Text;
+                                state.text_buffer = c.to_string();
+                                // self.text_field_state.cursor_position = 1;
+                            }
+                            _ => {}
+                        }
+                    }
+                    DateEditMode::Text => {
+                        if key.code == KeyCode::Esc {
+                            // Return to picker mode
+                            state.editing_mode = DateEditMode::Picker;
+                            state.text_buffer = IcbDate::from_utc(val).to_pcb_str();
+                        } else {
+                            self.need_update |= self.text_field_state.handle_input(key, &mut state.text_buffer);
+                            if let Some(parsed) = IcbDate::try_parse(&state.text_buffer) {
+                                *val = parsed.to_utc_date_time();
+                            }
+                        }
+                    }
+                }
             }
             ListValue::DoW(val, str) => {
                 self.need_update |= self.text_field_state.handle_input(key, str);

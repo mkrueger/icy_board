@@ -10,7 +10,7 @@ use std::{
 
 use crate::{Res, executable::Executable, search_patterns::PatternExpr, vm::expressions::fix_casing};
 use async_recursion::async_recursion;
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Datelike, Local, Utc};
 use codepages::tables::UNICODE_TO_CP437;
 use dizbase::file_base::FileBase;
 use icy_engine::{OutputFormat, SaveOptions, ScreenPreperation, ansi};
@@ -1776,7 +1776,7 @@ impl IcyBoardState {
             }
             MacroCommand::ExpDate => {
                 if let Some(user) = &self.session.current_user {
-                    result = self.format_date(user.exp_date.to_utc_date_time());
+                    result = self.format_date(user.expiration_date.clone());
                 } else {
                     result = "NEVER".to_string();
                 }
@@ -1784,7 +1784,7 @@ impl IcyBoardState {
             MacroCommand::ExpDays => {
                 if self.get_board().await.config.subscription_info.is_enabled {
                     if let Some(user) = &self.session.current_user {
-                        if user.exp_date.year() != 0 {
+                        if user.expiration_date.year() != 0 {
                             result  =
                                 0.to_string() // TODO
                                                /*

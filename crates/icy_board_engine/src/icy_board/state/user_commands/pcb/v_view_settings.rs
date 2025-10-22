@@ -1,3 +1,5 @@
+use chrono::Datelike;
+
 use crate::{Res, icy_board::state::IcyBoardState};
 
 use crate::{
@@ -25,9 +27,9 @@ impl IcyBoardState {
         self.println(TerminalTarget::Both, &self.format_date(user.stats.last_on)).await?;
         self.reset_color(TerminalTarget::Both).await?;
 
-        if user.exp_date.year() > 0 {
+        if user.expiration_date.year() > 0 {
             self.display_text(IceText::ViewSettingsExpireDate, display_flags::DEFAULT).await?;
-            self.println(TerminalTarget::Both, &self.format_date(user.exp_date.to_utc_date_time())).await?;
+            self.println(TerminalTarget::Both, &self.format_date(user.expiration_date.clone())).await?;
             self.reset_color(TerminalTarget::Both).await?;
         }
         self.display_text(IceText::ViewSettingsNumberTimesOn, display_flags::DEFAULT).await?;

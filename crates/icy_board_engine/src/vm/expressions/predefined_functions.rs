@@ -488,7 +488,7 @@ pub async fn u_name(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 pub async fn u_ldate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new(
         VariableType::Date,
-        VariableData::from_int(IcbDate::from_utc(vm.user.stats.last_on).to_pcboard_date()),
+        VariableData::from_int(IcbDate::from_utc(&vm.user.stats.last_on).to_pcboard_date()),
     ))
 }
 
@@ -1010,7 +1010,7 @@ pub async fn u_pwdhist(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
 pub async fn u_pwdlc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new(
         VariableType::Date,
-        VariableData::from_int(IcbDate::from_utc(vm.user.password.last_change).to_pcboard_date()),
+        VariableData::from_int(IcbDate::from_utc(&vm.user.password.last_change).to_pcboard_date()),
     ))
 }
 
@@ -1028,7 +1028,7 @@ pub async fn u_stat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
             //  first date the user called the system
             Ok(VariableValue::new(
                 VariableType::Date,
-                VariableData::from_int(IcbDate::from_utc(vm.user.stats.first_date_on).to_pcboard_date()),
+                VariableData::from_int(IcbDate::from_utc(&vm.user.stats.first_date_on).to_pcboard_date()),
             ))
         }
         2 => {
@@ -2279,7 +2279,7 @@ fn get_field(field_num: i32, header: &JamMessageHeader) -> Res<VariableValue> {
         HDR_BLOCKS => Ok(VariableValue::new_int((header.txt_len / 128) as i32)),
         HDR_DATE => {
             let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
-            let date = IcbDate::from_utc(date_time);
+            let date = IcbDate::from_utc(&date_time);
             Ok(VariableValue::new_date(date.to_pcboard_date()))
         }
         HDR_ECHO => {

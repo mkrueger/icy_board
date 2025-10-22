@@ -99,7 +99,7 @@ impl IcyBoardState {
                     Local::now().format("(%H:%M)")
                 ),
                 self.session.cur_security,
-                user.exp_date
+                user.expiration_date
             ));
         } else {
             output.push(format!(

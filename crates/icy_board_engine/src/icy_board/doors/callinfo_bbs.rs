@@ -1,5 +1,6 @@
 use crate::{
     Res,
+    datetime::IcbDate,
     icy_board::{
         doors::{DOOR_BPS_RATE, DOOR_COM_PORT},
         state::{GraphicsMode, IcyBoardState},
@@ -52,11 +53,8 @@ pub async fn create_callinfo_bbs(state: &IcyBoardState, path: &std::path::Path, 
         contents.push_str("REMOTE\r\n"); // LOCAL or REMOTE
     }
     contents.push_str(&format!("COM{}\r\n", DOOR_COM_PORT)); // COM Port
-    if let Some(day) = &state.session.current_user.as_ref().unwrap().birth_day {
-        contents.push_str(&format!("{}\r\n", day.to_country_date())); // Birth Date
-    } else {
-        contents.push_str(&"\r\n"); // Birth Date
-    }
+    let day = &state.session.current_user.as_ref().unwrap().birth_date;
+    contents.push_str(&format!("{}\r\n", IcbDate::from_utc(day).to_country_date())); // Birth Date
     contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE)); // Com Port Speed
     contents.push_str("TRUE\r\n"); // Already Connected
     contents.push_str("Normal Connection \r\n"); // MNP/ARQ or Normal Connection

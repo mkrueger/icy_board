@@ -261,7 +261,7 @@ impl IcyBoardState {
                 )
                 .await?;
             if !date.is_empty() {
-                new_user.birth_day = Some(IcbDate::parse(&date));
+                new_user.birth_date = IcbDate::parse(&date).to_utc_date_time();
             }
         }
 

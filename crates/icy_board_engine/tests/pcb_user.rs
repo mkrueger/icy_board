@@ -26,7 +26,7 @@ fn create_test_user(name: &str, idx: u8) -> User {
         language: "EN".to_string(),
         bus_data_phone: format!("555-{:04}", (idx as u32) * 100),
         home_voice_phone: format!("555-{:04}", (idx as u32) * 101),
-        birth_day: Some(IcbDate::new(idx, idx % 12 + 1, 1980 + idx as u16)),
+        birth_date: IcbDate::new(idx, idx % 12 + 1, 1980 + idx as u16).to_utc_date_time(),
         user_comment: format!("User comment {}", idx),
         sysop_comment: format!("Sysop comment {}", idx),
         custom_comment1: format!("Custom 1-{}", idx),
@@ -45,7 +45,7 @@ fn create_test_user(name: &str, idx: u8) -> User {
             expire_date: DateTime::from_timestamp(2000000 + idx as i64 * 1000, 0).unwrap(),
         },
         security_level: 10 + idx,
-        exp_date: IcbDate::new(12, 31, 2025),
+        expiration_date: IcbDate::new(12, 31, 2025).to_utc_date_time(),
         exp_security_level: 5 + idx,
         flags: UserFlags {
             expert_mode: idx % 2 == 0,

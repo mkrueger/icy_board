@@ -6,7 +6,7 @@ use crate::{
     },
     tables::export_cp437_string,
 };
-use chrono::Local;
+use chrono::{Datelike, Local};
 use icy_engine::TextPane;
 use icy_net::crc::get_crc32;
 use std::fs;
@@ -93,11 +93,12 @@ pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) 
         contents.extend(u16::to_le_bytes(0));
     }
     contents.extend(user.stats.first_date_on.format("%m-%d-%y").to_string().as_bytes());
-    if let Some(day) = &user.birth_day {
-        contents.extend(format!("{:02}-{:02}-{:02}", day.day(), day.month(), day.year() % 100).to_string().as_bytes());
-    } else {
-        contents.extend(b"00-00-00");
-    }
+    let birth_day = &user.birth_date;
+    contents.extend(
+        format!("{:02}-{:02}-{:02}", birth_day.day(), birth_day.month(), birth_day.year() % 100)
+            .to_string()
+            .as_bytes(),
+    );
 
     contents.extend(user.stats.first_date_on.format("%m-%d-%y").to_string().as_bytes()); // SubDate?
     contents.push(state.display_screen().buffer.get_width() as u8);
@@ -115,11 +116,8 @@ pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) 
 
     contents.extend(user.stats.last_on.format("%C").to_string().as_bytes());
     contents.extend(user.stats.first_date_on.format("%C").to_string().as_bytes());
-    if let Some(day) = &user.birth_day {
-        contents.extend(format!("{:02}", (day.year() / 100)).as_bytes());
-    } else {
-        contents.extend(b"00");
-    }
+    let day = &user.birth_date;
+    contents.extend(format!("{:02}", (day.year() / 100)).as_bytes());
     contents.extend(user.stats.first_date_on.format("%C").to_string().as_bytes()); // SubDate ?
 
     // free space

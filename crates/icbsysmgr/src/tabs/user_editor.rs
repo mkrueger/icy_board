@@ -1,11 +1,9 @@
+use chrono::{DateTime, Utc};
 use crossterm::event::KeyEvent;
-use icy_board_engine::{
-    datetime::IcbDate,
-    icy_board::{
-        IcyBoard,
-        icb_config::PasswordStorageMethod,
-        user_base::{ChatStatus, FSEMode, Password, User},
-    },
+use icy_board_engine::icy_board::{
+    IcyBoard,
+    icb_config::PasswordStorageMethod,
+    user_base::{ChatStatus, FSEMode, Password, User},
 };
 use icy_board_tui::{
     BORDER_SET,
@@ -161,17 +159,14 @@ impl UserEditor {
                         }),
                 ),
                 ConfigEntry::Item(
-                    ListItem::new(
-                        get_text("user_editor_reg_ex_date"),
-                        ListValue::Date(user.exp_date.clone(), user.exp_date.to_string()),
-                    )
-                    .with_status(get_text("user_editor_reg_ex_date-status"))
-                    .with_help(get_text("user_editor_reg_ex_date-help"))
-                    .with_label_width(label_width)
-                    .with_update_date_value(&|board: &Arc<Mutex<User>>, value: IcbDate| {
-                        let mut user = board.lock().unwrap();
-                        user.exp_date = value;
-                    }),
+                    ListItem::new(get_text("user_editor_reg_ex_date"), ListValue::date(user.expiration_date.clone()))
+                        .with_status(get_text("user_editor_reg_ex_date-status"))
+                        .with_help(get_text("user_editor_reg_ex_date-help"))
+                        .with_label_width(label_width)
+                        .with_update_date_value(&|board: &Arc<Mutex<User>>, value: DateTime<Utc>| {
+                            let mut user = board.lock().unwrap();
+                            user.expiration_date = value;
+                        }),
                 ),
                 ConfigEntry::Item(
                     ListItem::new(get_text("user_editor_exp_sec"), ListValue::U32(user.exp_security_level as u32, 0, 255))
@@ -462,17 +457,14 @@ impl UserEditor {
                         }),
                 ),
                 ConfigEntry::Item(
-                    ListItem::new(
-                        get_text("user_editor_birthdate"),
-                        ListValue::Date(user.exp_date.clone(), user.exp_date.to_string()),
-                    )
-                    .with_label_width(label_width)
-                    .with_status(get_text("user_editor_birthdate-status"))
-                    .with_help(get_text("user_editor_birthdate-help"))
-                    .with_update_date_value(&|board: &Arc<Mutex<User>>, value: IcbDate| {
-                        let mut user = board.lock().unwrap();
-                        user.exp_date = value;
-                    }),
+                    ListItem::new(get_text("user_editor_birthdate"), ListValue::date(user.birth_date.clone()))
+                        .with_label_width(label_width)
+                        .with_status(get_text("user_editor_birthdate-status"))
+                        .with_help(get_text("user_editor_birthdate-help"))
+                        .with_update_date_value(&|board: &Arc<Mutex<User>>, value: DateTime<Utc>| {
+                            let mut user = board.lock().unwrap();
+                            user.expiration_date = value;
+                        }),
                 ),
                 ConfigEntry::Item(
                     ListItem::new(get_text("user_editor_email"), ListValue::Text(60, TextFlags::None, user.email.clone()))

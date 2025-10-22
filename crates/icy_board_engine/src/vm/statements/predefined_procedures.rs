@@ -1898,7 +1898,7 @@ pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
                             msg.push_str(&format!("Number of blocks: {}\n", msg.len() / 128));
 
                             let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
-                            let date = IcbDate::from_utc(date_time);
+                            let date = IcbDate::from_utc(&date_time);
                             let time = IcbTime::from_naive(date_time.naive_local());
                             msg.push_str(&format!("            Date: {}\n", date));
                             msg.push_str(&format!("            Time: {}\n", time));
