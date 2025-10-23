@@ -6,7 +6,7 @@ use std::{
     time::SystemTime,
 };
 
-use crate::{Res, icy_board::read_data_with_encoding_detection};
+use crate::{Res, executable::PPEExpr, icy_board::read_data_with_encoding_detection, vm::VirtualMachine};
 
 use crate::vm::VMError;
 
@@ -14,6 +14,7 @@ const O_RD: i32 = 0;
 const O_RW: i32 = 2;
 const O_WR: i32 = 1;
 const O_APPEND: i32 = 4;
+pub const MAX_FILE_CHANNELS: i32 = 8;
 
 pub trait PCBoardIO: Send {
     /// Open a file for append access
@@ -21,14 +22,14 @@ pub trait PCBoardIO: Send {
     /// file - file name to open
     /// am - desired access mode for the file
     /// sm - desired share mode for the file
-    fn fappend(&mut self, channel: usize, file: &str);
+    fn fappend(&mut self, channel: i32, file: &str);
 
     /// Creates a new file
     /// channel - integer expression with the channel to use for the file
     /// file - file name to open
     /// am - desired access mode for the file
     /// sm - desired share mode for the file
-    fn fcreate(&mut self, channel: usize, file: &str, am: i32, sm: i32);
+    fn fcreate(&mut self, channel: i32, file: &str, am: i32, sm: i32);
 
     /// Opens a new file
     /// channel - integer expression with the channel to use for the file
@@ -36,15 +37,15 @@ pub trait PCBoardIO: Send {
     /// am - desired access mode for the file
     /// sm - desired share mode for the file
     /// # Errors
-    fn fopen(&mut self, channel: usize, file: &str, am: i32, sm: i32) -> Res<()>;
+    fn fopen(&mut self, channel: i32, file: &str, am: i32, sm: i32) -> Res<()>;
 
     /// Dermine if a file error has occured on a channel since last check
     /// channel - integer expression with the channel to use for the file
     /// Returns
     /// True, if an error occured on the specified channel, False otherwise
-    fn ferr(&self, channel: usize) -> bool;
+    fn ferr(&self, channel: i32) -> bool;
 
-    fn fput(&mut self, channel: usize, text: String) -> Res<()>;
+    fn fput(&mut self, channel: i32, text: String) -> Res<()>;
 
     /// Read a line from an open file
     /// channel - integer expression with the channel to use for the file
@@ -67,14 +68,14 @@ pub trait PCBoardIO: Send {
     ///   FGET 1, s
     /// ENDWHILE
     /// FCLOSE 1
-    fn fget(&mut self, channel: usize) -> Res<String>;
+    fn fget(&mut self, channel: i32) -> Res<String>;
 
-    fn fread(&mut self, channel: usize, size: usize) -> Res<Vec<u8>>;
-    fn fwrite(&mut self, channel: usize, data: &[u8]) -> Res<()>;
+    fn fread(&mut self, channel: i32, size: usize) -> Res<Vec<u8>>;
+    fn fwrite(&mut self, channel: i32, data: &[u8]) -> Res<()>;
 
-    fn fseek(&mut self, channel: usize, pos: i32, seek_pos: i32) -> Res<()>;
+    fn fseek(&mut self, channel: i32, pos: i32, seek_pos: i32) -> Res<()>;
 
-    fn ftell(&mut self, channel: usize) -> Res<u64>;
+    fn ftell(&mut self, channel: i32) -> Res<u64>;
 
     /// channel - integer expression with the channel to use for the file
     /// #Example
@@ -87,9 +88,9 @@ pub trait PCBoardIO: Send {
     /// PRINTLN s
     /// ENDWHILE
     /// FCLOSE 1
-    fn frewind(&mut self, channel: usize) -> Res<()>;
+    fn frewind(&mut self, channel: i32) -> Res<()>;
 
-    fn fclose(&mut self, channel: usize) -> Res<()>;
+    fn fclose(&mut self, channel: i32) -> Res<()>;
 
     /// .
     ///
@@ -125,6 +126,8 @@ pub trait PCBoardIO: Send {
     /// This function will return an error if .
     fn get_file_date(&self, file: &str) -> Result<SystemTime>;
     fn get_file_size(&self, file: &str) -> u64;
+
+    fn is_open(&self, channel: i32) -> bool;
 }
 
 struct FileChannel {
@@ -147,7 +150,7 @@ impl FileChannel {
 
 pub struct DiskIO {
     _path: String, // use that as
-    channels: HashMap<usize, FileChannel>,
+    channels: HashMap<i32, FileChannel>,
 }
 
 impl DiskIO {
@@ -169,13 +172,13 @@ impl DiskIO {
 }
 
 impl PCBoardIO for DiskIO {
-    fn fappend(&mut self, channel: usize, file_name: &str) {
+    fn fappend(&mut self, channel: i32, file_name: &str) {
         if let Err(err) = self.fopen(channel, file_name, O_APPEND, 0) {
             log::error!("error appending file: {}", err);
         }
     }
 
-    fn fcreate(&mut self, channel: usize, file_name: &str, _am: i32, sm: i32) {
+    fn fcreate(&mut self, channel: i32, file_name: &str, _am: i32, sm: i32) {
         if let Err(err) = self.fopen(channel, file_name, O_WR, sm) {
             log::error!("error creating file: {}", err);
         }
@@ -193,7 +196,11 @@ impl PCBoardIO for DiskIO {
         Ok(())
     }
 
-    fn fopen(&mut self, channel: usize, file_name: &str, mode: i32, _sm: i32) -> Res<()> {
+    fn is_open(&self, channel: i32) -> bool {
+        self.channels.contains_key(&channel)
+    }
+
+    fn fopen(&mut self, channel: i32, file_name: &str, mode: i32, _sm: i32) -> Res<()> {
         let file = match mode {
             O_RD => File::open(file_name),
             O_WR => File::create(file_name),
@@ -222,11 +229,11 @@ impl PCBoardIO for DiskIO {
         Ok(())
     }
 
-    fn ferr(&self, channel: usize) -> bool {
+    fn ferr(&self, channel: i32) -> bool {
         if let Some(channel) = self.channels.get(&channel) { channel.err } else { true }
     }
 
-    fn fput(&mut self, channel: usize, text: String) -> Res<()> {
+    fn fput(&mut self, channel: i32, text: String) -> Res<()> {
         let Some(chan) = self.channels.get_mut(&channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
         };
@@ -247,7 +254,7 @@ impl PCBoardIO for DiskIO {
         Ok(())
     }
 
-    fn fget(&mut self, channel: usize) -> Res<String> {
+    fn fget(&mut self, channel: i32) -> Res<String> {
         let Some(chan) = self.channels.get_mut(&channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
         };
@@ -279,7 +286,7 @@ impl PCBoardIO for DiskIO {
         }
     }
 
-    fn fread(&mut self, channel: usize, size: usize) -> Res<Vec<u8>> {
+    fn fread(&mut self, channel: i32, size: usize) -> Res<Vec<u8>> {
         let Some(chan) = self.channels.get_mut(&channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
         };
@@ -297,7 +304,7 @@ impl PCBoardIO for DiskIO {
             Ok(Vec::new())
         }
     }
-    fn fwrite(&mut self, channel: usize, data: &[u8]) -> Res<()> {
+    fn fwrite(&mut self, channel: i32, data: &[u8]) -> Res<()> {
         let Some(chan) = self.channels.get_mut(&channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
         };
@@ -311,7 +318,7 @@ impl PCBoardIO for DiskIO {
         }
         Ok(())
     }
-    fn ftell(&mut self, channel: usize) -> Res<u64> {
+    fn ftell(&mut self, channel: i32) -> Res<u64> {
         let Some(chan) = self.channels.get_mut(&channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
         };
@@ -328,7 +335,7 @@ impl PCBoardIO for DiskIO {
         }
     }
 
-    fn fseek(&mut self, channel: usize, pos: i32, seek_pos: i32) -> Res<()> {
+    fn fseek(&mut self, channel: i32, pos: i32, seek_pos: i32) -> Res<()> {
         let Some(chan) = self.channels.get_mut(&channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
         };
@@ -369,7 +376,7 @@ impl PCBoardIO for DiskIO {
         Ok(())
     }
 
-    fn frewind(&mut self, channel: usize) -> Res<()> {
+    fn frewind(&mut self, channel: i32) -> Res<()> {
         let Some(chan) = self.channels.get_mut(&channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
         };
@@ -386,7 +393,7 @@ impl PCBoardIO for DiskIO {
         Ok(())
     }
 
-    fn fclose(&mut self, channel: usize) -> Res<()> {
+    fn fclose(&mut self, channel: i32) -> Res<()> {
         self.channels.remove(&channel);
 
         Ok(())
@@ -400,4 +407,9 @@ impl PCBoardIO for DiskIO {
     fn get_file_size(&self, file: &str) -> u64 {
         if let Ok(metadata) = fs::metadata(file) { metadata.len() } else { 0 }
     }
+}
+
+pub async fn get_file_channel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<i32> {
+    let channel = vm.eval_expr(&args[0]).await?.as_int();
+    Ok(channel % MAX_FILE_CHANNELS)
 }

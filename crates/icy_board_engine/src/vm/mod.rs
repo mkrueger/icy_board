@@ -66,7 +66,7 @@ pub enum VMError {
     InvalidSeekPosition(i32),
 
     #[error("File channel not open ({0})")]
-    FileChannelNotOpen(usize),
+    FileChannelNotOpen(i32),
 
     #[error("Pass value stack empty")]
     PassValueStackEmpty,
@@ -162,8 +162,8 @@ pub struct VirtualMachine<'a> {
 
     stored_screen: Option<Buffer>,
 
-    pub fd_default_in: usize,
-    pub fd_default_out: usize,
+    pub fd_default_in: i32,
+    pub fd_default_out: i32,
 
     pub file_list: VecDeque<String>,
     pub user: User,

@@ -46,7 +46,7 @@ pub struct ChatParticipant {
     pub handle: String,
     pub is_owner: bool,
 }
-
+/*
 #[derive(Clone, Debug, Default)]
 struct ChatRoom {
     topic: Option<String>,
@@ -54,8 +54,9 @@ struct ChatRoom {
     owner: Option<usize>,
     participants: HashSet<usize>,
 }
+*/
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct GroupChatPreferences {
     pub current_room: Option<u8>,
     pub echo: bool,
@@ -159,10 +160,7 @@ impl IcyBoardState {
                     }
                     _ => {
                         if let Some(number) = cmd.parse::<u8>().ok() {
-                            if number >= 0 && number <= 255 {
-                                return self.group_chat(number).await;
-                            }
-                            break;
+                            return self.group_chat(number).await;
                         }
                         self.display_text(IceText::InvalidEntry, display_flags::LFBEFORE | display_flags::NEWLINE)
                             .await?;
@@ -174,7 +172,7 @@ impl IcyBoardState {
         return Ok(());
     }
 
-    pub async fn group_chat(&mut self, room: u8) -> Res<()> {
+    pub async fn group_chat(&mut self, _room: u8) -> Res<()> {
         let manager = {
             let bbs = self.bbs.lock().await;
             bbs.group_chat.clone()
@@ -533,12 +531,12 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub async fn dispatch_group_chat_events(&mut self, events: Vec<GroupChatEvent>) -> Res<()> {
+    pub async fn dispatch_group_chat_events(&mut self, _events: Vec<GroupChatEvent>) -> Res<()> {
         /* same body as in state/mod.rs, but kept here for cohesion */
         Ok(())
     }
 
-    pub async fn handle_group_chat_event(&mut self, event: GroupChatEvent) -> Res<()> {
+    pub async fn handle_group_chat_event(&mut self, _event: GroupChatEvent) -> Res<()> {
         /* render logic described above */
         Ok(())
     }

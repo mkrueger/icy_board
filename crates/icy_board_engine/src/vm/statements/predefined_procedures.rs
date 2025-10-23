@@ -17,6 +17,7 @@ use crate::{
         user_base::ConferenceFlags,
         user_inf::{BankUserInf, QwkConfigUserInf},
     },
+    vm::{MAX_FILE_CHANNELS, get_file_channel},
 };
 use bstr::BString;
 use chrono::{DateTime, Utc};
@@ -145,7 +146,7 @@ pub async fn dispfile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 }
 
 pub async fn fcreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let channel = get_file_channel(vm, args).await?;
     let file = vm.eval_expr(&args[1]).await?.as_string();
     let am = vm.eval_expr(&args[2]).await?.as_int();
     let sm = vm.eval_expr(&args[3]).await?.as_int();
@@ -155,7 +156,7 @@ pub async fn fcreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn fopen(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let channel = get_file_channel(vm, args).await?;
     let file = vm.eval_expr(&args[1]).await?.as_string();
     let am = vm.eval_expr(&args[2]).await?.as_int();
     let sm = vm.eval_expr(&args[3]).await?.as_int();
@@ -165,7 +166,7 @@ pub async fn fopen(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn fappend(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let channel = get_file_channel(vm, args).await?;
     let file = vm.eval_expr(&args[1]).await?.as_string();
     let am = vm.eval_expr(&args[2]).await?.as_int();
     let sm = vm.eval_expr(&args[3]).await?.as_int();
@@ -175,24 +176,24 @@ pub async fn fappend(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn fclose(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int();
+    let channel = get_file_channel(vm, args).await?;
     if channel == -1 {
         // READLINE uses -1 as a special value
         return Ok(());
     }
-    vm.io.fclose(channel as usize)?;
+    vm.io.fclose(channel)?;
     Ok(())
 }
 
 pub async fn fget(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let channel = get_file_channel(vm, args).await?;
     let value = VariableValue::new_string(vm.io.fget(channel)?);
     vm.set_variable(&args[1], value).await?;
     Ok(())
 }
 
 pub async fn fput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let channel = get_file_channel(vm, args).await?;
 
     for value in &args[1..] {
         let text = vm.eval_expr(value).await?.as_string();
@@ -202,7 +203,7 @@ pub async fn fput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn fputln(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let channel = get_file_channel(vm, args).await?;
 
     for value in &args[1..] {
         let text = vm.eval_expr(value).await?.as_string();
@@ -1080,7 +1081,7 @@ pub async fn rename(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 pub async fn frewind(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let channel = get_file_channel(vm, args).await?;
     vm.io.frewind(channel)?;
     Ok(())
 }
@@ -1111,7 +1112,7 @@ pub async fn pageoff(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn fseek(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let channel = get_file_channel(vm, args).await?;
     let pos = vm.eval_expr(&args[1]).await?.as_int();
     let position = vm.eval_expr(&args[2]).await?.as_int();
     vm.io.fseek(channel, pos, position)?;
@@ -1122,18 +1123,15 @@ pub async fn fflush(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     unimplemented_stmt!("FFLUSH");
 }
 pub async fn fread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let channel = get_file_channel(vm, args).await?;
     let size = vm.eval_expr(&args[2]).await?.as_int() as usize;
     internal_fread(vm, channel, size, &args[1]).await
 }
 
-async fn internal_fread(vm: &mut VirtualMachine<'_>, channel: usize, size: usize, arg: &PPEExpr) -> Res<()> {
+async fn internal_fread(vm: &mut VirtualMachine<'_>, channel: i32, size: usize, arg: &PPEExpr) -> Res<()> {
     let val = vm.eval_expr(&arg).await?;
 
-    let result = vm.io.fread(channel, size).map_err(|e| {
-        log::error!("fread error: {} ({})", e, channel);
-        e
-    })?;
+    let result = vm.io.fread(channel, size)?;
 
     match val.get_type() {
         VariableType::String | VariableType::BigStr => {
@@ -1191,13 +1189,13 @@ async fn internal_fread(vm: &mut VirtualMachine<'_>, channel: usize, size: usize
 }
 
 pub async fn fwrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let channel = get_file_channel(vm, args).await?;
     let val = vm.eval_expr(&args[1]).await?;
     let size = vm.eval_expr(&args[2]).await?.as_int() as usize;
     internal_fwrite(vm, channel, val, size).await
 }
 
-async fn internal_fwrite(vm: &mut VirtualMachine<'_>, channel: usize, val: VariableValue, size: usize) -> Res<()> {
+async fn internal_fwrite(vm: &mut VirtualMachine<'_>, channel: i32, val: VariableValue, size: usize) -> Res<()> {
     let mut v = match val.get_type() {
         VariableType::String | VariableType::BigStr => val.as_string().as_bytes().to_vec(),
         VariableType::Boolean => {
@@ -1224,12 +1222,12 @@ async fn internal_fwrite(vm: &mut VirtualMachine<'_>, channel: usize, val: Varia
 }
 
 pub async fn fdefin(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let channel = get_file_channel(vm, args).await?;
     vm.fd_default_in = channel;
     Ok(())
 }
 pub async fn fdefout(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let channel = get_file_channel(vm, args).await?;
     vm.fd_default_out = channel;
     Ok(())
 }
@@ -1301,7 +1299,7 @@ pub async fn redim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 pub async fn append(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let channel = get_file_channel(vm, args).await?;
     let file = vm.eval_expr(&args[1]).await?.as_string();
     let file = vm.resolve_file(&file).await.to_string_lossy().to_string();
     vm.io.fappend(channel, &file);
@@ -1616,7 +1614,7 @@ pub async fn setenv(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn fcloseall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    for i in 0..8 {
+    for i in 0..MAX_FILE_CHANNELS {
         let _ = vm.io.fclose(i);
     }
     Ok(())

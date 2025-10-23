@@ -24,7 +24,7 @@ pub struct GroupChatState {
     user_handles: HashMap<usize, String>,
     monitors: HashMap<usize, HashSet<u8>>,
 }
-
+/*
 #[derive(Clone, Debug)]
 pub struct GroupChatPreferences {
     pub current_room: Option<u8>,
@@ -34,7 +34,7 @@ pub struct GroupChatPreferences {
     pub handle: String,
     pub ignore_handles: HashSet<String>,
     pub monitor_rooms: HashSet<u8>,
-}
+}*/
 
 const MAX_CHAT_ROOMS: usize = 256;
 

@@ -17,7 +17,7 @@ use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MAS
 use crate::icy_board::user_base::{ConferenceFlags, Password};
 use crate::icy_board::user_inf::{BankUserInf, QwkConfigUserInf};
 use crate::parser::CONFERENCE_ID;
-use crate::vm::{TerminalTarget, VirtualMachine};
+use crate::vm::{MAX_FILE_CHANNELS, TerminalTarget, VirtualMachine, get_file_channel};
 use chrono::{DateTime, Utc};
 use icy_engine::{Position, TextPane, update_crc32};
 use jamjam::jam::JamMessageBase;
@@ -253,8 +253,8 @@ pub async fn space(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 }
 
 pub async fn ferr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int();
-    Ok(VariableValue::new_bool(vm.io.ferr(channel as usize)))
+    let channel = get_file_channel(vm, args).await?;
+    Ok(VariableValue::new_bool(vm.io.ferr(channel)))
 }
 
 pub async fn chr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1679,8 +1679,14 @@ pub async fn dtype(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     unimplemented_function!("DTYPE");
 }
 pub async fn fnext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("FNEXT");
+    for i in 1..MAX_FILE_CHANNELS {
+        if !vm.io.is_open(i) {
+            return Ok(VariableValue::new_int(i as i32));
+        }
+    }
+    Ok(VariableValue::new_int(-1))
 }
+
 pub async fn dnext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     unimplemented_function!("DNEXT");
 }
@@ -2175,7 +2181,7 @@ pub async fn i2bd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variable
 }
 
 pub async fn ftell(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let channel = get_file_channel(vm, args).await?;
     Ok(VariableValue::new_int(vm.io.ftell(channel)? as i32))
 }
 

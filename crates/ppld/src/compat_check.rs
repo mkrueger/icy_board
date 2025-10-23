@@ -145,7 +145,6 @@ const UNIMPLEMENTED_FUNCTIONS: &[&str] = &[
     "DRECCOUNT",
     "DRECNO",
     "DTYPE",
-    "FNEXT",
     "DNEXT",
     "TODDATE",
     "DCLOSEALL",
