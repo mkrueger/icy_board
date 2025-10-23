@@ -401,7 +401,7 @@ impl IcyBoardState {
             }
             CommandType::DisplayNews => {
                 // NEWS
-                self.display_news().await?;
+                self.display_news(false).await?;
             }
             CommandType::UserList => {
                 let sec = self.session.user_command_level.cmd_show_user_list.clone();

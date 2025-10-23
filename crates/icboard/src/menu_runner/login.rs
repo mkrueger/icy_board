@@ -541,7 +541,7 @@ impl PcbBoardCommand {
 
         log::info!("NEW USER: '{}'", self.state.session.user_name);
 
-        self.state.display_news().await?;
+        self.state.display_news(false).await?;
         self.logon_questions().await?;
 
         return Ok(true);

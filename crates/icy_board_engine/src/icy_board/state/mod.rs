@@ -688,10 +688,10 @@ impl IcyBoardState {
         let scan_new_blt = self.board.lock().await.config.switches.scan_new_blt;
         let display_userinfo_at_login = self.board.lock().await.config.switches.display_userinfo_at_login;
 
-        let show_news = if news_behavior == crate::icy_board::icb_config::DisplayNewsBehavior::Always {
-            true
-        } else {
-            self.session.joined_conferences.get(&conference).is_none()
+        let (show_news, only_new) = match news_behavior {
+            super::icb_config::DisplayNewsBehavior::OnlyNewer | super::icb_config::DisplayNewsBehavior::OncePerDay => (true, true),
+
+            super::icb_config::DisplayNewsBehavior::Always => (true, false),
         };
 
         self.session.current_conference_number = conference;
@@ -706,7 +706,7 @@ impl IcyBoardState {
         }
 
         if show_news {
-            self.display_news().await?;
+            self.display_news(only_new).await?;
         }
 
         if scan_new_blt {
