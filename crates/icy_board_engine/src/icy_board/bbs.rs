@@ -2,6 +2,8 @@ use icy_net::ConnectionType;
 use std::sync::Arc;
 use tokio::sync::{Mutex, mpsc};
 
+use crate::icy_board::state::user_commands::groupchat::{GroupChatEvent, GroupChatState};
+
 use super::state::NodeState;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -9,11 +11,13 @@ pub enum BBSMessage {
     SysopLogin,
     SysopLogout,
     Broadcast(String),
+    GroupChat(GroupChatEvent),
 }
 
 pub struct BBS {
     pub open_connections: Arc<Mutex<Vec<Option<NodeState>>>>,
     pub bbs_channels: Vec<Option<tokio::sync::mpsc::Sender<BBSMessage>>>,
+    pub group_chat: Arc<Mutex<GroupChatState>>,
 }
 
 impl BBS {
@@ -60,6 +64,7 @@ impl BBS {
         BBS {
             open_connections: Arc::new(Mutex::new(vec)),
             bbs_channels: vec2,
+            group_chat: Arc::new(Mutex::new(GroupChatState::default())),
         }
     }
 }

@@ -610,7 +610,7 @@ impl<T> ListItem<T> {
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
                 self.text_field_state.set_cursor_position(frame);
             }
-            ListValue::Date(val, state) => {
+            ListValue::Date(_val, state) => {
                 let area = Rect {
                     x: area.x,
                     y: area.y,

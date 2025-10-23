@@ -214,6 +214,15 @@ impl IcyBoardCreator {
             include_bytes!("../../../../ppe/cnfn.ppe"),
         )?;
 
+        config.paths.chat_intro_file = PathBuf::from("art/group");
+        convert_to_pcb(
+            &self.destination.join(&config.paths.chat_intro_file),
+            include_bytes!("../../data/new_bbs/group.icy"),
+        )?;
+
+        config.paths.chat_menu = PathBuf::from("art/chtm");
+        convert_to_pcb(&self.destination.join(&config.paths.chat_menu), include_bytes!("../../data/new_bbs/chtm.icy"))?;
+
         self.logger.start_action("Write default statistics file".to_string());
         config.paths.statistics_file = PathBuf::from("main/statistics.toml");
         Statistics::default().save(&self.destination.join(&config.paths.statistics_file))?;

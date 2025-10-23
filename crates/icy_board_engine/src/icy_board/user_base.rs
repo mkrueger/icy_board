@@ -295,7 +295,7 @@ impl FSEMode {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub enum ChatStatus {
     #[default]
     Available,

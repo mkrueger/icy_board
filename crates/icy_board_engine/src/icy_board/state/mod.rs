@@ -8,7 +8,9 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{Res, executable::Executable, search_patterns::PatternExpr, vm::expressions::fix_casing};
+use crate::{
+    Res, executable::Executable, icy_board::state::user_commands::groupchat::GroupChatPreferences, search_patterns::PatternExpr, vm::expressions::fix_casing,
+};
 use async_recursion::async_recursion;
 use chrono::{DateTime, Datelike, Local, Utc};
 use codepages::tables::UNICODE_TO_CP437;
@@ -250,6 +252,7 @@ pub struct Session {
     pub last_answer: Option<String>,
 
     pub memorized_msg: Option<(usize, u32)>,
+    pub group_chat: GroupChatPreferences,
     pub joined_conferences: HashSet<u16>,
 }
 
@@ -312,7 +315,7 @@ impl Session {
             default_answer: None,
             last_answer: None,
             memorized_msg: None,
-
+            group_chat: GroupChatPreferences::default(),
             joined_conferences: HashSet::new(),
         }
     }
@@ -1431,6 +1434,71 @@ impl IcyBoardState {
         }
         Ok(())
     }
+
+    async fn list_channels(&mut self) -> Res<()> {
+        // Get the group chat state
+        let chat_state = self.bbs.lock().await.group_chat.clone();
+        let chat_guard = chat_state.lock().await;
+
+        // List all channels (1-255)
+        let mut channels_shown = 0;
+        for channel_num in 1..=255u8 {
+            // Get channel info from the state
+            let participants = match chat_guard.list_participants(channel_num) {
+                Ok(p) => p,
+                Err(_) => continue, // Skip invalid channels
+            };
+
+            let room_idx = channel_num as usize;
+            if room_idx >= chat_guard.rooms.len() {
+                continue;
+            }
+
+            let room = &chat_guard.rooms[room_idx];
+            let user_count = participants.len();
+
+            // Skip empty channels unless they have a topic
+            if user_count == 0 && room.topic.is_none() {
+                continue;
+            }
+
+            // Channel number
+
+            self.session.op_text = format!("{}", channel_num);
+            self.display_text(IceText::ChannelText, display_flags::LFBEFORE).await?;
+            if let Some(topic) = &room.topic {
+                let max_topic_len = 40;
+                let display_topic = if topic.len() > max_topic_len {
+                    format!("{}...", &topic[..max_topic_len - 3])
+                } else {
+                    topic.clone()
+                };
+                self.print(TerminalTarget::Both, &display_topic).await?;
+            }
+
+            self.new_line().await?;
+            channels_shown += 1;
+
+            // Check for abort or page break
+            if self.session.disp_options.abort_printout {
+                break;
+            }
+        }
+
+        // Footer
+        if channels_shown == 0 {
+            self.display_text(IceText::NoChannelsInUse, display_flags::LFBEFORE).await?;
+            return Ok(());
+        }
+
+        let len = self.user_screen.caret.get_position().x;
+        self.new_line().await?;
+
+        self.print(TerminalTarget::Both, &"=".repeat(len as usize)).await?;
+        self.new_line().await?;
+
+        Ok(())
+    }
 }
 
 #[derive(PartialEq)]
@@ -2163,6 +2231,9 @@ impl IcyBoardState {
                         Some(BBSMessage::Broadcast(msg)) => {
                             self.show_broadcast(msg).await?;
                         }
+                        Some(BBSMessage::GroupChat(event)) => {
+                            self.handle_group_chat_event(event).await?;
+                        }
                         _ => {}
                     }
                     return Ok(None);
@@ -2222,6 +2293,9 @@ impl IcyBoardState {
                         }
                         Some(BBSMessage::Broadcast(msg)) => {
                             self.show_broadcast(msg).await?;
+                        }
+                        Some(BBSMessage::GroupChat(event)) => {
+                            self.handle_group_chat_event(event).await?;
                         }
                         _ => {}
                     }
