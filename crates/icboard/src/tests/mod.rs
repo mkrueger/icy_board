@@ -6,6 +6,7 @@ use icy_board_engine::icy_board::{
     bulletins::{Bullettin, BullettinList},
     commands::CommandList,
     conferences::Conference,
+    icb_config::DisplayNewsBehavior,
     read_data_with_encoding_detection,
     state::IcyBoardState,
     user_base::User,
@@ -79,7 +80,8 @@ pub fn test_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
     let result = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
         let bbs: Arc<tokio::sync::Mutex<BBS>> = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
         let mut icy_board = icy_board_engine::icy_board::IcyBoard::new();
-
+        icy_board.config.switches.display_news_behavior = DisplayNewsBehavior::Never;
+        icy_board.config.switches.scan_new_blt = false;
         icy_board.commands = CommandList::new();
         icy_board.protocols = SupportedProtocols::generate_pcboard_defaults();
         icy_board.default_display_text = icy_board_engine::icy_board::icb_text::DEFAULT_DISPLAY_TEXT.clone();
