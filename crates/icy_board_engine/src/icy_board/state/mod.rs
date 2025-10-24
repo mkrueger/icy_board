@@ -1500,6 +1500,16 @@ impl IcyBoardState {
 
         Ok(())
     }
+
+    pub async fn get_raw_byte(&mut self) -> Res<Option<u8>> {
+        // Try to read a single byte from the connection
+        let mut buf = [0u8; 1];
+        match self.connection.read(&mut buf).await {
+            Ok(1) => Ok(Some(buf[0])),
+            Ok(0) => Ok(None), // No data available
+            _ => Ok(None),     // Shouldn't happen with 1-byte buffer
+        }
+    }
 }
 
 #[derive(PartialEq)]
@@ -2427,6 +2437,11 @@ impl IcyBoardState {
 
     pub fn inbytes(&mut self) -> i32 {
         self.char_buffer.len() as i32
+    }
+
+    /// Like 'inbytes' but does not count stuffed hidden characters
+    pub fn kbdbufsize(&mut self) -> i32 {
+        self.char_buffer.iter().filter(|c| c.source != KeySource::StuffedHidden).count() as i32
     }
 
     pub fn cur_color(&self) -> IcbColor {

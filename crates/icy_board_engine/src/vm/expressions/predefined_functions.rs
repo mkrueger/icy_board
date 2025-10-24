@@ -1232,18 +1232,30 @@ pub async fn temppath(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
         vm.icy_board_state.get_board().await.config.paths.tmp_work_path.to_string_lossy().to_string(),
     ))
 }
+
 pub async fn modem(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("MODEM");
+    Ok(VariableValue::new_string("CONNECT 9600/ARQ/V32".to_string()))
 }
+
 pub async fn loggedon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_bool(!vm.icy_board_state.session.user_name.is_empty()))
 }
+
 pub async fn callnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("CALLNUM");
+    let board = vm.icy_board_state.get_board().await;
+    Ok(VariableValue::new_int(board.statistics.cur_caller_number() as i32))
 }
+
 pub async fn mgetbyte(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("MGETBYTE");
+    // Check if there's any raw input available from the user connection
+    if let Ok(Some(byte)) = vm.icy_board_state.get_raw_byte().await {
+        Ok(VariableValue::new_int(byte as i32))
+    } else {
+        // Return -1 if buffer is empty
+        Ok(VariableValue::new_int(-1))
+    }
 }
+
 pub async fn tokcount(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.icy_board_state.session.tokens.len() as i32))
 }
@@ -1547,7 +1559,7 @@ pub async fn flagcnt(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn kbdbufsize(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("KBDBUFSIZE");
+    Ok(VariableValue::new_int(vm.icy_board_state.kbdbufsize()))
 }
 
 pub async fn pplbufsize(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -2161,11 +2173,12 @@ pub async fn fdoqrd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 }
 
 pub async fn getdrive(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("GETDRIVE");
+    Ok(VariableValue::new_int(0))
 }
 
 pub async fn setdrive(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("SETDRIVE");
+    let drive = vm.eval_expr(&args[0]).await?.as_int();
+    Ok(VariableValue::new_int(drive))
 }
 
 pub async fn bs2i(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

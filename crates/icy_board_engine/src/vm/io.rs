@@ -77,6 +77,8 @@ pub trait PCBoardIO: Send {
 
     fn ftell(&mut self, channel: i32) -> Res<u64>;
 
+    fn fflush(&mut self, channel: i32) -> Res<()>;
+
     /// channel - integer expression with the channel to use for the file
     /// #Example
     /// STRING s
@@ -318,6 +320,7 @@ impl PCBoardIO for DiskIO {
         }
         Ok(())
     }
+
     fn ftell(&mut self, channel: i32) -> Res<u64> {
         let Some(chan) = self.channels.get_mut(&channel) else {
             return Err(Box::new(VMError::FileChannelNotOpen(channel)));
@@ -385,6 +388,22 @@ impl PCBoardIO for DiskIO {
             Some(f) => {
                 f.seek(SeekFrom::Start(0)).expect("seek error");
                 chan.err = false;
+            }
+            _ => {
+                chan.err = true;
+            }
+        }
+        Ok(())
+    }
+
+    fn fflush(&mut self, channel: i32) -> Res<()> {
+        let Some(chan) = self.channels.get_mut(&channel) else {
+            return Err(Box::new(VMError::FileChannelNotOpen(channel)));
+        };
+
+        match &mut chan.file {
+            Some(f) => {
+                f.flush()?;
             }
             _ => {
                 chan.err = true;

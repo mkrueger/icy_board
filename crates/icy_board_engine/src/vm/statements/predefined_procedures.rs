@@ -239,7 +239,35 @@ pub async fn startdisp(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
 /// # Errors
 /// Errors if the variable is not found.
 pub async fn fputpad(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("FPUTPAD");
+    let channel = get_file_channel(vm, args).await?;
+    let text = vm.eval_expr(&args[1]).await?.as_string();
+    let width = vm.eval_expr(&args[2]).await?.as_int();
+    fputpad_internal(vm, channel, text, width)
+}
+
+fn fputpad_internal(vm: &mut VirtualMachine<'_>, channel: i32, text: String, width: i32) -> Res<()> {
+    let abs_width = width.abs() as usize;
+    let padded = if width > 0 {
+        // Positive width: right-justify (left-pad with spaces)
+        if text.len() >= abs_width {
+            text
+        } else {
+            format!("{:>width$}", text, width = abs_width)
+        }
+    } else if width < 0 {
+        // Negative width: left-justify (right-pad with spaces)
+        if text.len() >= abs_width {
+            text
+        } else {
+            format!("{:<width$}", text, width = abs_width)
+        }
+    } else {
+        // Width of 0: just the text as-is
+        text
+    };
+    vm.io.fput(channel, padded)?;
+    vm.io.fput(channel, "\n".to_string())?;
+    Ok(())
 }
 
 /// # Errors
@@ -710,7 +738,7 @@ pub async fn kbdstuff(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 pub async fn kbdstring(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let value = vm.eval_expr(&args[0]).await?.as_string();
     vm.icy_board_state.print(TerminalTarget::Both, &value).await?;
-    vm.icy_board_state.stuff_keyboard_buffer(&value, false)?;
+    vm.icy_board_state.stuff_keyboard_buffer(&value, true)?;
     Ok(())
 }
 pub async fn kbdfile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -1120,7 +1148,9 @@ pub async fn fseek(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn fflush(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("FFLUSH");
+    let channel = get_file_channel(vm, args).await?;
+    vm.io.fflush(channel)?;
+    Ok(())
 }
 pub async fn fread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let channel = get_file_channel(vm, args).await?;
@@ -1252,9 +1282,13 @@ pub async fn fdputln(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     vm.io.fput(vm.fd_default_out, "\n".to_string())?;
     Ok(())
 }
+
 pub async fn fdputpad(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("FDPUTPAD");
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let width = vm.eval_expr(&args[1]).await?.as_int();
+    fputpad_internal(vm, vm.fd_default_out, text, width)
 }
+
 pub async fn fdread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let size = vm.eval_expr(&args[1]).await?.as_int() as usize;
     internal_fread(vm, vm.fd_default_in, size, &args[0]).await

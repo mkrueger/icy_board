@@ -30,7 +30,6 @@ const UNSUPPORTED_STATEMENTS: &[&str] = &[
 ];
 
 pub const UNIMPLEMENTED_STATEMENTS: &[&str] = &[
-    "FPUTPAD",
     "DOINTR",
     "VARSEG",
     "VAROFF",
@@ -43,8 +42,6 @@ pub const UNIMPLEMENTED_STATEMENTS: &[&str] = &[
     "OPENCAP",
     "CLOSECAP",
     "POKEDW",
-    "FFLUSH",
-    "FDPUTPAD",
     "TPAGET",
     "TPAPUT",
     "TPACGEA",
@@ -101,6 +98,7 @@ const PARTIAL_STATEMENTS: &[&str] = &[
 
 const UNSUPPORTED_FUNCTIONS: &[&str] = &[
     // (If any functions only warn)
+    "GETDRIVE", "SETDRIVE", "MODEM",
 ];
 
 const UNIMPLEMENTED_FUNCTIONS: &[&str] = &[
@@ -124,11 +122,7 @@ const UNIMPLEMENTED_FUNCTIONS: &[&str] = &[
     "REGES",
     "PEEKB",
     "PEEKW",
-    "MODEM",
-    "CALLNUM",
-    "MGETBYTE",
     "EVTTIMEADJ",
-    "KBDBUFSIZE",
     "KBDFILUSUED",
     "DRIVESPACE",
     "DGETALIAS",
@@ -182,8 +176,6 @@ const UNIMPLEMENTED_FUNCTIONS: &[&str] = &[
     "FDORDORG",
     "FDORDAREA",
     "FDOQRD",
-    "GETDRIVE",
-    "SETDRIVE",
     "SETMSGHDR",
 ];
 
