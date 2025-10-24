@@ -128,7 +128,6 @@ const UNIMPLEMENTED_FUNCTIONS: &[&str] = &[
     "CALLNUM",
     "MGETBYTE",
     "EVTTIMEADJ",
-    "FMTREAL",
     "KBDBUFSIZE",
     "KBDFILUSUED",
     "DRIVESPACE",

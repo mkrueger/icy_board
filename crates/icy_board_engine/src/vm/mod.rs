@@ -134,7 +134,7 @@ impl ReturnAddress {
 }
 
 pub struct VirtualMachine<'a> {
-    io: &'a mut dyn PCBoardIO,
+    pub io: &'a mut dyn PCBoardIO,
     pub type_registry: &'a UserTypeRegistry,
     pub file_name: PathBuf,
     pub variable_table: VariableTable,
@@ -154,13 +154,13 @@ pub struct VirtualMachine<'a> {
     pub user_data: Vec<Box<dyn UserDataValue>>,
 
     pub return_addresses: Vec<ReturnAddress>,
-    call_local_value_stack: Vec<VariableValue>,
-    write_back_stack: Vec<PPEExpr>,
+    pub call_local_value_stack: Vec<VariableValue>,
+    pub write_back_stack: Vec<PPEExpr>,
 
     pub label_table: HashMap<usize, usize>,
     pub push_pop_stack: Vec<VariableValue>,
 
-    stored_screen: Option<Buffer>,
+    pub stored_screen: Option<Buffer>,
 
     pub fd_default_in: i32,
     pub fd_default_out: i32,
@@ -814,7 +814,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
                 User::default()
             };
             let file_name = file_name.as_ref().to_path_buf();
-            let reg = UserTypeRegistry::icy_board_registry();
+            let reg: UserTypeRegistry = UserTypeRegistry::icy_board_registry();
             log::info!("Run PPE {}", file_name.display());
 
             let mut vm = VirtualMachine {

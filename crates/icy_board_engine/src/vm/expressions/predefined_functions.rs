@@ -1525,7 +1525,21 @@ pub async fn isbitset(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn fmtreal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("FMTREAL");
+    let value = vm.eval_expr(&args[0]).await?.as_double();
+    let field_width = vm.eval_expr(&args[1]).await?.as_int() as usize;
+    let decimal_places = vm.eval_expr(&args[2]).await?.as_int() as usize;
+
+    // Format the number with the specified decimal places
+    let formatted = format!("{:.prec$}", value, prec = decimal_places);
+
+    // Right-justify with spaces if needed
+    let result = if formatted.len() < field_width {
+        format!("{:>width$}", formatted, width = field_width)
+    } else {
+        formatted
+    };
+
+    Ok(VariableValue::new_string(result))
 }
 
 pub async fn flagcnt(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

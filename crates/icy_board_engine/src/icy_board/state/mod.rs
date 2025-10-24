@@ -775,7 +775,7 @@ impl IcyBoardState {
 
         let canonicalized_path = PathBuf::from(adjust_canonicalization(canonicalized_path));
         let parent = canonicalized_path.parent().unwrap().to_str().unwrap().to_string();
-        let mut io = DiskIO::new(&parent, answer_file);
+        let mut io: DiskIO = DiskIO::new(&parent, answer_file);
         Ok(if let Err(err) = run(&canonicalized_path, &executable, &mut io, self).await {
             log::error!("Error executing PPE {}: {}", canonicalized_path.display(), err);
             self.session.op_text = format!("{}", err);
