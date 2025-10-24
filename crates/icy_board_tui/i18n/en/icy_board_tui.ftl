@@ -905,7 +905,7 @@ exclude_local_calls_stats-status=Disables counting local logins from stats
 exclude_local_calls_stats-help=TODO
 
 display_news_behavior=Display NEWS Only if Changed
-display_news_behavior-status=Y (Always New), N (Once per Day), A (Always)
+display_news_behavior-status=Y (Always New), N (Once per Day), A (Always), X (Never)
 display_news_behavior-help=TODO
 
 

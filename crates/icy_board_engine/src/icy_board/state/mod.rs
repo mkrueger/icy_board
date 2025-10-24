@@ -692,6 +692,7 @@ impl IcyBoardState {
             super::icb_config::DisplayNewsBehavior::OnlyNewer | super::icb_config::DisplayNewsBehavior::OncePerDay => (true, true),
 
             super::icb_config::DisplayNewsBehavior::Always => (true, false),
+            super::icb_config::DisplayNewsBehavior::Never => (false, false),
         };
 
         self.session.current_conference_number = conference;

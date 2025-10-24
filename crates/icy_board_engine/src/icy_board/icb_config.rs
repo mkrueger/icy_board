@@ -665,6 +665,9 @@ pub enum DisplayNewsBehavior {
     /// Display news on command if news is available
     #[serde(rename = "A")]
     Always,
+    /// Never Display News on Login
+    #[serde(rename = "X")]
+    Never,
 }
 
 impl DisplayNewsBehavior {
@@ -673,6 +676,7 @@ impl DisplayNewsBehavior {
             DisplayNewsBehavior::OnlyNewer => 'Y',
             DisplayNewsBehavior::OncePerDay => 'N',
             DisplayNewsBehavior::Always => 'A',
+            DisplayNewsBehavior::Never => 'X',
         }
     }
 
@@ -681,6 +685,7 @@ impl DisplayNewsBehavior {
             'Y' => DisplayNewsBehavior::OnlyNewer,
             'N' => DisplayNewsBehavior::OncePerDay,
             'A' => DisplayNewsBehavior::Always,
+            'X' => DisplayNewsBehavior::Never,
             _ => {
                 log::warn!("Invalid DisplayNewsBehavior char: {}", c);
                 DisplayNewsBehavior::OnlyNewer
