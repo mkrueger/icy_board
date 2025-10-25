@@ -7,12 +7,13 @@ pub mod ssh;
 pub mod telnet;
 pub mod websocket;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 
 pub struct ConnectionData {
     pub address: String,
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConnectionType {
     Channel,
     Raw,

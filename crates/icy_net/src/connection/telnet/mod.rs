@@ -33,7 +33,7 @@ mod terminal_type {
     // pub const MAXLN: usize = 40;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum TerminalEmulation {
     #[default]
     Ansi,
