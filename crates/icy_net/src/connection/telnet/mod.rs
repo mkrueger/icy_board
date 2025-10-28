@@ -2,6 +2,7 @@
 
 use std::{
     io::{self, ErrorKind},
+    primitive,
     time::Duration,
 };
 
@@ -61,6 +62,7 @@ pub struct TelnetConnection {
     tcp_stream: TcpStream,
     caps: TermCaps,
     state: ParserState,
+    read_buffer: Vec<u8>,
 }
 
 impl TelnetConnection {
@@ -76,6 +78,7 @@ impl TelnetConnection {
                     tcp_stream,
                     caps,
                     state: ParserState::Data,
+                    read_buffer: Vec::new(),
                 }),
                 Err(err) => Err(Box::new(err)),
             },
@@ -91,6 +94,7 @@ impl TelnetConnection {
                 terminal: TerminalEmulation::Ansi,
             },
             state: ParserState::Data,
+            read_buffer: Vec::new(),
         })
     }
 
@@ -257,6 +261,15 @@ impl Connection for TelnetConnection {
     }
 
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        // First, check if we have buffered data from a previous poll
+        if !self.read_buffer.is_empty() {
+            let to_read = buf.len().min(self.read_buffer.len());
+            buf[..to_read].copy_from_slice(&self.read_buffer[..to_read]);
+            self.read_buffer.drain(..to_read);
+            return Ok(to_read);
+        }
+
+        // No buffered data, read from the stream
         match self.tcp_stream.read(buf).await {
             Ok(size) => {
                 let result = self.parse(&mut buf[0..size]).await?;
@@ -277,17 +290,24 @@ impl Connection for TelnetConnection {
     }
 
     async fn poll(&mut self) -> crate::Result<ConnectionState> {
-        // Try to read 0 bytes to check if the connection is still alive
-        // This is a common technique to detect if the peer has closed the connection
-        let mut buf = [0u8; 0];
+        // Try to read data to check connection status
+        let mut buf = [0u8; 256]; // Use a reasonable buffer size
         match self.tcp_stream.try_read(&mut buf) {
-            Ok(_) => {
+            Ok(0) => {
                 // A successful read of 0 bytes means the connection was closed cleanly
+                Ok(ConnectionState::Disconnected)
+            }
+            Ok(n) => {
+                // We got data - parse it and store the result in our buffer
+                let parsed_len = self.parse(&mut buf[..n]).await?;
+                if parsed_len > 0 {
+                    // Store the parsed data in our internal buffer for later reading
+                    self.read_buffer.extend_from_slice(&buf[..parsed_len]);
+                }
                 Ok(ConnectionState::Connected)
             }
             Err(e) if e.kind() == ErrorKind::WouldBlock => {
                 // No data available, but connection is still open
-                // This is the normal case for an active connection with no pending data
                 Ok(ConnectionState::Connected)
             }
             Err(e)
@@ -296,13 +316,28 @@ impl Connection for TelnetConnection {
                     ErrorKind::ConnectionAborted | ErrorKind::ConnectionReset | ErrorKind::NotConnected | ErrorKind::BrokenPipe | ErrorKind::UnexpectedEof
                 ) =>
             {
+                // These errors indicate the connection is definitely closed
+                log::debug!("Telnet connection closed: {:?}", e);
                 Ok(ConnectionState::Disconnected)
             }
-            Err(e) => Err(Box::new(e)),
+            Err(e) => {
+                // Other errors might be temporary, log them but assume connection is still valid
+                log::warn!("Telnet poll error: {:?}", e);
+                Err(Box::new(e))
+            }
         }
     }
 
     async fn try_read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        // First, check if we have buffered data from a previous poll
+        if !self.read_buffer.is_empty() {
+            let to_read = buf.len().min(self.read_buffer.len());
+            buf[..to_read].copy_from_slice(&self.read_buffer[..to_read]);
+            self.read_buffer.drain(..to_read);
+            return Ok(to_read);
+        }
+
+        // No buffered data, try to read from the stream
         match self.tcp_stream.try_read(buf) {
             Ok(size) => {
                 let result = self.parse(&mut buf[0..size]).await?;
