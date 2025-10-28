@@ -121,7 +121,7 @@ impl Default for ICITerminalSettings {
 impl ICITerminalSettings {
     pub fn get_crtdef_string(&self) -> String {
         let term = match self.term_caps.terminal {
-            TerminalEmulation::Ansi => "ANSI",
+            TerminalEmulation::Ansi | TerminalEmulation::Utf8Ansi => "ANSI",
             TerminalEmulation::Avatar => "AVT0",
             _ => "TTY",
         };

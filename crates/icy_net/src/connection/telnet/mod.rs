@@ -41,6 +41,7 @@ mod terminal_type {
 pub enum TerminalEmulation {
     #[default]
     Ansi,
+    Utf8Ansi,
     Avatar,
     Ascii,
     PETscii,
@@ -126,6 +127,7 @@ impl TelnetConnection {
                                 match self.caps.terminal {
                                     //  :TODO: Let's extend this to allow for some of the semi-standard BBS IDs, e.g. "xterm" (ANSI), "ansi-256-color", etc.
                                     TerminalEmulation::Ansi => buf.extend_from_slice(b"ANSI"),
+                                    TerminalEmulation::Utf8Ansi => buf.extend_from_slice(b"UTF8ANSI"),
                                     TerminalEmulation::PETscii => buf.extend_from_slice(b"PETSCII"),
                                     TerminalEmulation::ATAscii => buf.extend_from_slice(b"ATASCII"),
                                     TerminalEmulation::ViewData => buf.extend_from_slice(b"VIEWDATA"),
