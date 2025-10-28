@@ -1,11 +1,12 @@
 #![allow(dead_code)]
 
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use serial2_tokio::{SerialPort, Settings};
 
 use crate::{Connection, ConnectionState, ConnectionType};
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CharSize {
     #[default]
     Bits8,
@@ -14,14 +15,14 @@ pub enum CharSize {
     Bits5,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StopBits {
     #[default]
     One,
     Two,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Parity {
     #[default]
     None,
@@ -29,7 +30,7 @@ pub enum Parity {
     Even,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlowControl {
     #[default]
     None,

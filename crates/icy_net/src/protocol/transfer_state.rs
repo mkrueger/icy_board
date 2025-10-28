@@ -23,10 +23,10 @@ pub struct TransferInformation {
     pub check_size: String,
 
     pub bps: u64,
-    bytes_transferred_timed: u64,
-    bps_time: Instant,
+    pub bytes_transferred_timed: u64,
+    pub bps_time: Instant,
 
-    output_log: Vec<OutputLogMessage>,
+    pub output_log: Vec<OutputLogMessage>,
 
     pub finished_files: Vec<(String, PathBuf)>,
 }
