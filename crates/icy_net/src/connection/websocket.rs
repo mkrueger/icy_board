@@ -1,4 +1,4 @@
-use crate::{Connection, ConnectionType};
+use crate::{Connection, ConnectionState, ConnectionType};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
@@ -121,6 +121,74 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection for WebSocketConnectio
                 _ => Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into()),
             },
             None => Err(std::io::Error::new(ErrorKind::ConnectionAborted, "Connection aborted").into()),
+        }
+    }
+
+    async fn poll(&mut self) -> crate::Result<ConnectionState> {
+        use std::task::Poll;
+
+        // First check if we have buffered data - if we do, connection is still active
+        if !self.data.is_empty() {
+            return Ok(ConnectionState::Connected);
+        }
+
+        // Try to poll the stream without consuming messages
+        // We need to check if the stream is ready without actually reading
+        let waker = futures_util::task::noop_waker();
+        let mut cx = std::task::Context::from_waker(&waker);
+
+        match self.socket.poll_next_unpin(&mut cx) {
+            Poll::Ready(Some(Ok(msg))) => {
+                match msg {
+                    Message::Close(_) => {
+                        log::debug!("WebSocket received close frame");
+                        Ok(ConnectionState::Disconnected)
+                    }
+                    Message::Binary(data) => {
+                        // We got data, store it in our buffer for the next read
+                        self.data = Bytes::from(data);
+                        Ok(ConnectionState::Connected)
+                    }
+                    Message::Text(_) => Ok(ConnectionState::Connected),
+                    Message::Ping(_) | Message::Pong(_) => {
+                        // Control frames indicate the connection is still alive
+                        Ok(ConnectionState::Connected)
+                    }
+                    Message::Frame(_) => {
+                        // Raw frame, connection is still active
+                        Ok(ConnectionState::Connected)
+                    }
+                }
+            }
+            Poll::Ready(Some(Err(e))) => match e {
+                tokio_tungstenite::tungstenite::Error::ConnectionClosed | tokio_tungstenite::tungstenite::Error::AlreadyClosed => {
+                    log::debug!("WebSocket connection closed");
+                    Ok(ConnectionState::Disconnected)
+                }
+                tokio_tungstenite::tungstenite::Error::Io(ref io_err) => match io_err.kind() {
+                    ErrorKind::UnexpectedEof | ErrorKind::ConnectionAborted | ErrorKind::ConnectionReset | ErrorKind::BrokenPipe => {
+                        log::debug!("WebSocket IO error indicates disconnection: {:?}", io_err);
+                        Ok(ConnectionState::Disconnected)
+                    }
+                    _ => {
+                        log::warn!("WebSocket poll error: {:?}", e);
+                        Err(Box::new(e))
+                    }
+                },
+                _ => {
+                    log::warn!("WebSocket error during poll: {:?}", e);
+                    Err(Box::new(e))
+                }
+            },
+            Poll::Ready(None) => {
+                // Stream has ended
+                log::debug!("WebSocket stream ended");
+                Ok(ConnectionState::Disconnected)
+            }
+            Poll::Pending => {
+                // No data available right now, but connection is still open
+                Ok(ConnectionState::Connected)
+            }
         }
     }
 

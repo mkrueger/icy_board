@@ -26,6 +26,13 @@ pub enum ConnectionType {
     SecureWebsocket,
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ConnectionState {
+    #[default]
+    Disconnected,
+    Connected,
+}
+
 #[async_trait]
 pub trait Connection: Send + Unpin {
     fn get_connection_type(&self) -> ConnectionType;
@@ -34,6 +41,10 @@ pub trait Connection: Send + Unpin {
     async fn try_read(&mut self, buf: &mut [u8]) -> crate::Result<usize>;
 
     async fn send(&mut self, buf: &[u8]) -> crate::Result<()>;
+
+    async fn poll(&mut self) -> crate::Result<ConnectionState> {
+        Ok(ConnectionState::Connected)
+    }
 
     async fn read_exact(&mut self, buf: &mut [u8]) -> crate::Result<()> {
         let mut offset = 0;

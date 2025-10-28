@@ -4,6 +4,7 @@ use russh::keys::ssh_key;
 use russh::{client::Msg, *};
 use std::{borrow::Cow, collections::HashMap, io::ErrorKind, sync::Arc, time::Duration};
 
+use crate::ConnectionState;
 use crate::{Connection, ConnectionType, telnet::TermCaps};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -62,6 +63,14 @@ impl Connection for SSHConnection {
                     Ok(0)
                 }
             },
+        }
+    }
+
+    async fn poll(&mut self) -> crate::Result<ConnectionState> {
+        if !self.client.session.is_closed() {
+            Ok(ConnectionState::Connected)
+        } else {
+            Ok(ConnectionState::Disconnected)
         }
     }
 

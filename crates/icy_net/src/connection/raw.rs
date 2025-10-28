@@ -8,6 +8,8 @@ use tokio::{
     net::{TcpStream, ToSocketAddrs},
 };
 
+use crate::ConnectionState;
+
 use super::{Connection, ConnectionType};
 
 pub struct RawConnection {
@@ -59,6 +61,32 @@ impl Connection for RawConnection {
                     Ok(0)
                 }
             },
+        }
+    }
+
+    async fn poll(&mut self) -> crate::Result<ConnectionState> {
+        // Try to read 0 bytes to check if the connection is still alive
+        // This is a common technique to detect if the peer has closed the connection
+        let mut buf = [0u8; 0];
+        match self.tcp_stream.try_read(&mut buf) {
+            Ok(_) => {
+                // A successful read of 0 bytes means the connection was closed cleanly
+                Ok(ConnectionState::Connected)
+            }
+            Err(e) if e.kind() == ErrorKind::WouldBlock => {
+                // No data available, but connection is still open
+                // This is the normal case for an active connection with no pending data
+                Ok(ConnectionState::Connected)
+            }
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    ErrorKind::ConnectionAborted | ErrorKind::ConnectionReset | ErrorKind::NotConnected | ErrorKind::BrokenPipe | ErrorKind::UnexpectedEof
+                ) =>
+            {
+                Ok(ConnectionState::Disconnected)
+            }
+            Err(e) => Err(Box::new(e)),
         }
     }
 
