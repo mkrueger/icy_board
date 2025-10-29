@@ -2,7 +2,6 @@
 
 use std::{
     io::{self, ErrorKind},
-    primitive,
     time::Duration,
 };
 

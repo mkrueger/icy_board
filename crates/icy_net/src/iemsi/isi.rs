@@ -3,7 +3,7 @@ use super::{encode_emsi, get_crc32string, get_length_string};
 /// The ISI packet is used by the Server to transmit its configuration
 /// and Client-related information to the Client. It contains Server data
 /// and capabilities.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EmsiISI {
     /// The name, version number, and optionally the serial number of the
     /// Server software. Eg. {RemoteAccess,1.10/b5,CS000001}.
