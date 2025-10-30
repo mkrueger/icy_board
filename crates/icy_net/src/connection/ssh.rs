@@ -2,12 +2,12 @@
 use async_trait::async_trait;
 use russh::keys::ssh_key;
 use russh::{client::Msg, *};
-use std::{borrow::Cow, collections::HashMap, io::ErrorKind, sync::Arc, time::Duration};
+use std::{borrow::Cow, collections::HashMap, sync::Arc, time::Duration};
 
 use crate::ConnectionState;
 use crate::{Connection, ConnectionType, telnet::TermCaps};
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::AsyncWriteExt,
     net::TcpStream,
     sync::Mutex,
 };
@@ -15,6 +15,7 @@ use tokio::{
 pub struct SSHConnection {
     client: SshClient,
     channel: Channel<Msg>,
+    read_buffer: Vec<u8>,  // Add internal buffer for non-blocking reads
 }
 
 pub struct Credentials {
@@ -36,11 +37,53 @@ impl SSHConnection {
             .request_pty(false, &terminal_type, caps.window_size.0 as u32, caps.window_size.1 as u32, 1, 1, &[])
             .await?;
         channel.request_shell(false).await?;
-        return Ok(Self { client: ssh, channel });
+        return Ok(Self { 
+            client: ssh, 
+            channel,
+            read_buffer: Vec::new(),  // Initialize empty buffer
+        });
     }
 
     fn default_port() -> u16 {
         22
+    }
+
+    // Helper method to fill buffer from channel messages without blocking
+    async fn fill_buffer_nonblocking(&mut self) -> crate::Result<()> {
+        // Use a very short timeout to make this non-blocking
+        let timeout = Duration::from_millis(1);
+        
+        loop {
+            match tokio::time::timeout(timeout, self.channel.wait()).await {
+                Ok(Some(msg)) => {
+                    match msg {
+                        ChannelMsg::Data { data } => {
+                            // Add data to our buffer
+                            self.read_buffer.extend_from_slice(&data);
+                        }
+                        ChannelMsg::Eof => {
+                            // Channel received EOF, connection is ending
+                            return Ok(());
+                        }
+                        ChannelMsg::Close => {
+                            // Channel is closing
+                            return Ok(());
+                        }
+                        _ => {
+                            // Other messages, continue
+                        }
+                    }
+                }
+                Ok(None) => {
+                    // Channel closed
+                    return Ok(());
+                }
+                Err(_) => {
+                    // Timeout - no more messages available right now
+                    return Ok(());
+                }
+            }
+        }
     }
 }
 
@@ -51,42 +94,104 @@ impl Connection for SSHConnection {
     }
 
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
-        match self.channel.make_reader().read(buf).await {
-            Ok(size) => Ok(size),
-            Err(e) => match e.kind() {
-                ErrorKind::ConnectionAborted | ErrorKind::NotConnected => {
-                    return Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into());
+        // First check if we have buffered data
+        if !self.read_buffer.is_empty() {
+            let to_read = buf.len().min(self.read_buffer.len());
+            buf[..to_read].copy_from_slice(&self.read_buffer[..to_read]);
+            self.read_buffer.drain(..to_read);
+            return Ok(to_read);
+        }
+
+        // No buffered data, wait for new data from the channel
+        loop {
+            let Some(msg) = self.channel.wait().await else {
+                // Channel closed
+                return Ok(0);
+            };
+            
+            match msg {
+                ChannelMsg::Data { data } => {
+                    // We got data, copy what we can to the buffer
+                    let to_read = buf.len().min(data.len());
+                    buf[..to_read].copy_from_slice(&data[..to_read]);
+                    
+                    // If there's leftover data, store it in our buffer
+                    if data.len() > to_read {
+                        self.read_buffer.extend_from_slice(&data[to_read..]);
+                    }
+                    
+                    return Ok(to_read);
                 }
-                ErrorKind::WouldBlock => Ok(0),
+                ChannelMsg::Eof | ChannelMsg::Close => {
+                    // Connection is closing
+                    return Ok(0);
+                }
                 _ => {
-                    log::error!("Error {:?} reading from SSH connection: {:?}", e.kind(), e);
-                    Ok(0)
+                    // Other messages, continue waiting
+                    continue;
                 }
-            },
+            }
         }
     }
 
     async fn poll(&mut self) -> crate::Result<ConnectionState> {
-        if !self.client.session.is_closed() {
-            Ok(ConnectionState::Connected)
-        } else {
-            Ok(ConnectionState::Disconnected)
+        // Check if the session is closed
+        if self.client.session.is_closed() {
+            return Ok(ConnectionState::Disconnected);
+        }
+
+        // Try to fill buffer without blocking
+        self.fill_buffer_nonblocking().await?;
+
+        // Use timeout to check if channel is still responsive
+        let timeout = Duration::from_millis(1);
+        match tokio::time::timeout(timeout, self.channel.wait()).await {
+            Ok(Some(msg)) => {
+                match msg {
+                    ChannelMsg::Data { data } => {
+                        // We got data during poll, buffer it
+                        self.read_buffer.extend_from_slice(&data);
+                        Ok(ConnectionState::Connected)
+                    }
+                    ChannelMsg::Eof | ChannelMsg::Close => {
+                        log::debug!("SSH channel received EOF/Close");
+                        Ok(ConnectionState::Disconnected)
+                    }
+                    _ => Ok(ConnectionState::Connected)
+                }
+            }
+            Ok(None) => {
+                // Channel is closed
+                Ok(ConnectionState::Disconnected)
+            }
+            Err(_) => {
+                // Timeout - no messages pending, connection is still active
+                Ok(ConnectionState::Connected)
+            }
         }
     }
 
     async fn try_read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
-        match self.channel.make_reader().read(buf).await {
-            Ok(size) => Ok(size),
-            Err(e) => match e.kind() {
-                ErrorKind::ConnectionAborted | ErrorKind::NotConnected => {
-                    return Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into());
-                }
-                ErrorKind::WouldBlock => Ok(0),
-                _ => {
-                    log::error!("Error {:?} reading from SSH connection: {:?}", e.kind(), e);
-                    Ok(0)
-                }
-            },
+        // First check if we have buffered data
+        if !self.read_buffer.is_empty() {
+            let to_read = buf.len().min(self.read_buffer.len());
+            buf[..to_read].copy_from_slice(&self.read_buffer[..to_read]);
+            self.read_buffer.drain(..to_read);
+            return Ok(to_read);
+        }
+
+        // Try to fill buffer without blocking
+        self.fill_buffer_nonblocking().await?;
+
+        // Check buffer again after attempting to fill
+        if !self.read_buffer.is_empty() {
+            let to_read = buf.len().min(self.read_buffer.len());
+            buf[..to_read].copy_from_slice(&self.read_buffer[..to_read]);
+            self.read_buffer.drain(..to_read);
+            Ok(to_read)
+        } else {
+            // No data available
+            Ok(0)
         }
     }
 
