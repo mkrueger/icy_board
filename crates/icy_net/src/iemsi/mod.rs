@@ -158,7 +158,7 @@ pub struct IEmsi {
     pub user_settings: ICIUserSettings,
     pub terminal_settings: ICITerminalSettings,
     pub aborted: bool,
-    logged_in: bool,
+    pub logged_in: bool,
 }
 
 // **EMSI_ISI<len><data><crc32><CR>
