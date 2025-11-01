@@ -22,4 +22,7 @@ pub enum XYModemError {
 
     #[error("no file open")]
     NoFileOpen,
+
+    #[error("invalid response received: {0}")]
+    InvalidResponse(u8),
 }

@@ -6,16 +6,12 @@ use std::{borrow::Cow, collections::HashMap, sync::Arc, time::Duration};
 
 use crate::ConnectionState;
 use crate::{Connection, ConnectionType, telnet::TermCaps};
-use tokio::{
-    io::AsyncWriteExt,
-    net::TcpStream,
-    sync::Mutex,
-};
+use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
 
 pub struct SSHConnection {
     client: SshClient,
     channel: Channel<Msg>,
-    read_buffer: Vec<u8>,  // Add internal buffer for non-blocking reads
+    read_buffer: Vec<u8>, // Add internal buffer for non-blocking reads
 }
 
 pub struct Credentials {
@@ -37,10 +33,10 @@ impl SSHConnection {
             .request_pty(false, &terminal_type, caps.window_size.0 as u32, caps.window_size.1 as u32, 1, 1, &[])
             .await?;
         channel.request_shell(false).await?;
-        return Ok(Self { 
-            client: ssh, 
+        return Ok(Self {
+            client: ssh,
             channel,
-            read_buffer: Vec::new(),  // Initialize empty buffer
+            read_buffer: Vec::new(), // Initialize empty buffer
         });
     }
 
@@ -52,7 +48,7 @@ impl SSHConnection {
     async fn fill_buffer_nonblocking(&mut self) -> crate::Result<()> {
         // Use a very short timeout to make this non-blocking
         let timeout = Duration::from_millis(1);
-        
+
         loop {
             match tokio::time::timeout(timeout, self.channel.wait()).await {
                 Ok(Some(msg)) => {
@@ -108,18 +104,18 @@ impl Connection for SSHConnection {
                 // Channel closed
                 return Ok(0);
             };
-            
+
             match msg {
                 ChannelMsg::Data { data } => {
                     // We got data, copy what we can to the buffer
                     let to_read = buf.len().min(data.len());
                     buf[..to_read].copy_from_slice(&data[..to_read]);
-                    
+
                     // If there's leftover data, store it in our buffer
                     if data.len() > to_read {
                         self.read_buffer.extend_from_slice(&data[to_read..]);
                     }
-                    
+
                     return Ok(to_read);
                 }
                 ChannelMsg::Eof | ChannelMsg::Close => {
@@ -157,7 +153,7 @@ impl Connection for SSHConnection {
                         log::debug!("SSH channel received EOF/Close");
                         Ok(ConnectionState::Disconnected)
                     }
-                    _ => Ok(ConnectionState::Connected)
+                    _ => Ok(ConnectionState::Connected),
                 }
             }
             Ok(None) => {
