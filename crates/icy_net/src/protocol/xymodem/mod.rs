@@ -26,7 +26,7 @@ pub enum Checksum {
     CRC16,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum XYModemVariant {
     /// 128 byte blocks, SOH header.
     XModem,

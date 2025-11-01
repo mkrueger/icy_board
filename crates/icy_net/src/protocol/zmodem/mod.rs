@@ -110,6 +110,15 @@ pub async fn read_zdle_bytes(com: &mut dyn Connection, length: usize) -> crate::
     Ok(data)
 }
 
+pub async fn read_bytes(com: &mut dyn Connection, length: usize) -> crate::Result<Vec<u8>> {
+    let mut data = Vec::new();
+    for _ in 0..length {
+        let c = com.read_u8().await?;
+        data.push(c);
+    }
+    Ok(data)
+}
+
 fn get_hex(n: u8) -> u8 {
     if n < 10 { b'0' + n } else { b'a' + (n - 10) }
 }

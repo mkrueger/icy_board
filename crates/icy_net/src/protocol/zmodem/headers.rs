@@ -66,6 +66,7 @@ pub enum ZFrameType {
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Header {
+    pub header_type: HeaderType,
     pub frame_type: ZFrameType,
     pub data: [u8; 4],
 }
@@ -93,6 +94,7 @@ impl Display for Header {
 impl Header {
     pub fn empty(frame_type: ZFrameType) -> Self {
         Self {
+            header_type: HeaderType::Hex,
             frame_type,
             data: [0, 0, 0, 0],
         }
@@ -100,6 +102,7 @@ impl Header {
 
     pub fn from_flags(frame_type: ZFrameType, f3: u8, f2: u8, f1: u8, f0: u8) -> Self {
         Self {
+            header_type: HeaderType::Hex,
             frame_type,
             data: [f3, f2, f1, f0],
         }
@@ -107,6 +110,7 @@ impl Header {
 
     pub fn from_number(frame_type: ZFrameType, number: u32) -> Self {
         Self {
+            header_type: HeaderType::Hex,
             frame_type,
             data: u32::to_le_bytes(number),
         }
@@ -150,15 +154,23 @@ impl Header {
         match header_type {
             HeaderType::Bin => {
                 res.extend_from_slice(&[ZPAD, ZDLE, ZBIN, self.frame_type as u8]);
+                let mut raw = Vec::with_capacity(1 + self.data.len());
+                raw.push(self.frame_type as u8);
+                raw.extend_from_slice(&self.data);
+                // Append escaped data bytes
                 append_zdle_encoded(&mut res, &self.data, escape_ctrl_chars);
-                let crc16 = get_crc16_buggy(&res[3..]);
+                // Compute CRC16 on raw body
+                let crc16 = get_crc16_buggy(&raw);
                 append_zdle_encoded(&mut res, &u16::to_le_bytes(crc16), escape_ctrl_chars);
             }
 
             HeaderType::Bin32 => {
                 res.extend_from_slice(&[ZPAD, ZDLE, ZBIN32, self.frame_type as u8]);
+                let mut raw = Vec::with_capacity(1 + self.data.len());
+                raw.push(self.frame_type as u8);
+                raw.extend_from_slice(&self.data);
                 append_zdle_encoded(&mut res, &self.data, escape_ctrl_chars);
-                let crc32 = get_crc32(&res[3..]);
+                let crc32 = get_crc32(&raw);
                 append_zdle_encoded(&mut res, &u32::to_le_bytes(crc32), escape_ctrl_chars);
             }
 
@@ -261,6 +273,7 @@ impl Header {
                     return Err(ZModemError::CRC16Mismatch(crc16, check_crc16).into());
                 }
                 Ok(Some(Header {
+                    header_type: HeaderType::Bin,
                     frame_type: Header::get_frame_type(header_data[0])?,
                     data: header_data[1..5].try_into().unwrap(),
                 }))
@@ -273,6 +286,7 @@ impl Header {
                     return Err(ZModemError::CRC32Mismatch(crc32, check_crc32).into());
                 }
                 Ok(Some(Header {
+                    header_type: HeaderType::Bin32,
                     frame_type: Header::get_frame_type(header_data[0])?,
                     data: header_data[1..5].try_into().unwrap(),
                 }))
@@ -306,6 +320,7 @@ impl Header {
                 }
 
                 Ok(Some(Header {
+                    header_type: HeaderType::Hex,
                     frame_type: Header::get_frame_type(data[0])?,
                     data: data[1..5].try_into().unwrap(),
                 }))

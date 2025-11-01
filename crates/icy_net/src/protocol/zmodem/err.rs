@@ -29,4 +29,7 @@ pub enum ZModemError {
     SubpacketCrcError(String),
     #[error("no file open")]
     NoFileOpen,
+
+    #[error("subpacket overflow: length {0} exceeds max {1}")]
+    SubpacketOverflow(usize, usize),
 }

@@ -30,6 +30,7 @@ pub enum SendState {
     SendData(usize),
     AckSendData(usize),
     YModemEndHeader(u8),
+    YModemWaitNextRequest,
 }
 
 pub struct Sy {
@@ -73,7 +74,6 @@ impl Sy {
             transfer_info.check_size = self.configuration.get_check_and_size();
             transfer_info.update_bps();
         }
-
         match self.send_state {
             SendState::None => {}
             SendState::InitiateSend => {
@@ -200,7 +200,8 @@ impl Sy {
                     }
                     Ok(false) => {
                         transfer_state.send_state.log_info("End of file reached");
-                        self.send_state = SendState::None;
+                        // check_eof will perform EOT sequence and transition
+                        self.check_eof(com, transfer_state).await?;
                     }
                     Err(e) => {
                         transfer_state.send_state.log_error(&format!("Error sending data block: {}", e));
@@ -212,10 +213,9 @@ impl Sy {
             SendState::AckSendData(retries) => {
                 let ack = self.read_command(com).await?;
                 if ack == CAN {
-                    // need 2 CAN
                     let can2 = self.read_command(com).await?;
                     if can2 == CAN {
-                        transfer_state.send_state.log_warning("Transfer cancelled by receiver (received double CAN)");
+                        transfer_state.send_state.log_warning("Transfer cancelled by receiver (double CAN)");
                         self.send_state = SendState::None;
                         return Err(XYModemError::Cancel.into());
                     }
@@ -229,7 +229,6 @@ impl Sy {
                         transfer_state.send_state.errors
                     ));
 
-                    // fall back to short block length after too many errors
                     if retries > 3 && self.configuration.block_length == EXT_BLOCK_LENGTH {
                         transfer_state.send_state.log_error("Falling back to 128-byte blocks due to errors");
                         self.configuration.block_length = DEFAULT_BLOCK_LENGTH;
@@ -238,16 +237,64 @@ impl Sy {
                     }
 
                     if retries > 5 {
-                        transfer_state.send_state.log_error("Maximum retries exceeded for data block, sending EOT");
-                        self.eot(com).await?;
+                        transfer_state.send_state.log_error("Max retries for data block; aborting with cancel");
+                        self.cancel(com).await?;
                         return Err(XYModemError::TooManyRetriesSendingHeader.into());
                     }
                     self.send_state = SendState::SendData(retries + 1);
                     return Ok(());
                 }
-                // ACK received
+
+                // ACK ok
                 self.send_state = SendState::SendData(0);
                 self.check_eof(com, transfer_state).await?;
+            }
+
+            SendState::YModemWaitNextRequest => {
+                transfer_state.current_state = "Await next file request";
+                let cmd = self.read_command(com).await?;
+                if cmd == CAN {
+                    if self.read_command(com).await? == CAN {
+                        transfer_state.send_state.log_warning("Batch cancelled (double CAN)");
+                        self.send_state = SendState::None;
+                        return Err(XYModemError::Cancel.into());
+                    }
+                }
+
+                let streaming = self.configuration.variant == XYModemVariant::YModemG;
+                let expected = if streaming { b'G' } else { b'C' };
+
+                match cmd {
+                    c if c == expected => {
+                        if !self.file_queue.is_empty() {
+                            transfer_state
+                                .send_state
+                                .log_info(&format!("Receiver ready for next file ({} remaining)", self.file_queue.len()));
+                            self.send_state = SendState::SendYModemHeader(0);
+                        } else {
+                            transfer_state.send_state.log_info("Receiver requested terminal header; sending empty block");
+                            self.send_state = SendState::SendYModemHeader(0);
+                        }
+                    }
+                    ACK => {
+                        // Stray ACK – wait again
+                        transfer_state.send_state.log_info("Stray ACK while waiting for 'C'/'G'; ignoring");
+                        self.send_state = SendState::YModemWaitNextRequest;
+                    }
+                    NAK => {
+                        // Some quirky receivers re-send NAK; re-EOT then wait again
+                        transfer_state.send_state.log_warning("Got NAK during next-file wait; re-sending EOT handshake");
+                        self.eot(com).await?;
+                        self.send_state = SendState::YModemWaitNextRequest;
+                    }
+                    other => {
+                        transfer_state
+                            .send_state
+                            .log_error(&format!("Unexpected command 0x{:02X} awaiting next file", other));
+                        self.cancel(com).await?;
+                        return Err(XYModemError::InvalidResponse(other).into());
+                    }
+                }
             }
 
             SendState::YModemEndHeader(step) => match step {
@@ -282,9 +329,14 @@ impl Sy {
                 2 => {
                     if self.read_command(com).await? == b'C' {
                         if !self.file_queue.is_empty() {
-                            transfer_state.send_state.log_info("Receiver ready for next file in batch");
+                            transfer_state
+                                .send_state
+                                .log_info(&format!("Receiver ready for next file in batch ({} files remaining)", self.file_queue.len()));
+                            self.send_state = SendState::SendYModemHeader(0);
+                        } else {
+                            transfer_state.send_state.log_info("No more files in batch, sending end-of-batch header");
+                            self.send_state = SendState::SendYModemHeader(0);
                         }
-                        self.send_state = SendState::SendYModemHeader(0);
                         return Ok(());
                     }
                     transfer_state
@@ -303,19 +355,20 @@ impl Sy {
     async fn check_eof(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
         if transfer_state.send_state.cur_bytes_transfered >= transfer_state.send_state.file_size {
             transfer_state.send_state.log_info(&format!(
-                "File '{}' transfer complete ({} bytes)",
+                "File '{}' complete ({} bytes)",
                 transfer_state.send_state.file_name, transfer_state.send_state.cur_bytes_transfered
             ));
             transfer_state.send_state.finish_file(self.cur_file.clone());
 
             self.eot(com).await?;
+
             if self.configuration.is_ymodem() {
                 if !self.file_queue.is_empty() {
-                    transfer_state
-                        .send_state
-                        .log_info(&format!("{} file(s) remaining in batch", self.file_queue.len()));
+                    transfer_state.send_state.log_info(&format!("{} file(s) remaining", self.file_queue.len()));
+                } else {
+                    transfer_state.send_state.log_info("All files sent; terminal header pending");
                 }
-                self.send_state = SendState::YModemEndHeader(0);
+                self.send_state = SendState::YModemWaitNextRequest;
             } else {
                 transfer_state.send_state.log_info("XModem transfer complete");
                 self.send_state = SendState::None;
@@ -342,16 +395,36 @@ impl Sy {
     }
 
     #[allow(clippy::unused_self)]
-    async fn eot(&self, com: &mut dyn Connection) -> crate::Result<usize> {
-        // println!("[EOT]");
+    async fn eot(&self, com: &mut dyn Connection) -> crate::Result<()> {
+        // First EOT
         com.send(&[EOT]).await?;
-        let ack = self.read_command(com).await?;
-        // Should verify it's actually an ACK
-        if ack != ACK && ack != b'C' {
-            // Receiver might send 'C' for next file in YModem
-            return Err(XYModemError::InvalidResponse(ack).into());
+        let first = self.read_command(com).await?;
+
+        // Streaming YModemG: expect ACK only, no double handshake
+        if self.configuration.variant == XYModemVariant::YModemG {
+            if first != ACK {
+                return Err(XYModemError::InvalidResponse(first).into());
+            }
+            return Ok(());
         }
-        Ok(1)
+
+        // Classic YModem: prefer NAK then EOT then ACK
+        match first {
+            NAK => {
+                // Resend EOT
+                com.send(&[EOT]).await?;
+                let second = self.read_command(com).await?;
+                if second != ACK {
+                    return Err(XYModemError::InvalidResponse(second).into());
+                }
+                Ok(())
+            }
+            ACK => {
+                // Lenient receivers ACK immediately – accept
+                Ok(())
+            }
+            other => Err(XYModemError::InvalidResponse(other).into()),
+        }
     }
 
     pub async fn get_mode(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
@@ -404,11 +477,13 @@ impl Sy {
     }
 
     async fn send_ymodem_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
+        // Always reset block number for any header (file or terminal)
+        self.block_number = 0;
+
         if let Some(next_file) = self.file_queue.pop_front() {
-            // restart from 0
             let mut block = Vec::new();
-            let name = next_file.file_name().unwrap().as_encoded_bytes();
-            block.extend_from_slice(name);
+            let name_bytes = next_file.file_name().unwrap().as_encoded_bytes();
+            block.extend_from_slice(name_bytes);
             block.push(0);
             let size = next_file.metadata()?.len();
             block.extend_from_slice(format!("{}", size).as_bytes());
@@ -416,18 +491,19 @@ impl Sy {
             let file_name = next_file.file_name().unwrap().to_string_lossy().to_string();
             transfer_state
                 .send_state
-                .log_info(&format!("Sending YModem header for '{}' ({} bytes)", file_name, size));
+                .log_info(&format!("Sending header for '{}' ({} bytes)", file_name, size));
 
             transfer_state.send_state.file_name = file_name;
             transfer_state.send_state.file_size = size;
             transfer_state.send_state.cur_bytes_transfered = 0;
+
             self.cur_file = next_file.clone();
-            let reader = BufReader::new(File::open(next_file)?);
-            self.cur_buf = Some(reader);
+            self.cur_buf = Some(BufReader::new(File::open(next_file)?));
+
             self.send_block(com, &block, 0).await?;
             Ok(())
         } else {
-            transfer_state.send_state.log_info("No more files to send, sending end-of-batch header");
+            transfer_state.send_state.log_info("Sending terminal empty header (batch end)");
             self.end_ymodem(com).await?;
             Ok(())
         }
