@@ -237,8 +237,8 @@ impl SshClient {
         let config = client::Config {
             inactivity_timeout: None,
             preferred,
-            keepalive_interval: Some(Duration::from_secs(30)),
-            keepalive_max: 3,
+            // keepalive_interval: Some(Duration::from_secs(30)),
+            // keepalive_max: 3,
             ..<_>::default()
         };
         let config = Arc::new(config);
