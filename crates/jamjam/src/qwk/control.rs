@@ -2,6 +2,7 @@ use bstr::{BString, ByteSlice};
 
 use super::QwkError;
 
+#[derive(Debug, Clone)]
 pub struct Conference {
     /// Conference number
     /// Note: Qwk limits conferences to u16
@@ -10,6 +11,7 @@ pub struct Conference {
     pub name: bstr::BString,
 }
 
+#[derive(Debug, Clone)]
 pub struct ControlDat {
     /// BBS name
     pub bbs_name: bstr::BString,

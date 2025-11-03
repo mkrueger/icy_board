@@ -122,7 +122,7 @@ impl QWKMessage {
 
         let mut text = vec![0; 128 * ((num_blocks as usize).saturating_sub(1))];
         file.read_exact(&mut text)?;
-        let mut text = crate::pcboard::convert_msg(&text);
+        let mut text: BString = crate::pcboard::convert_msg(&text);
         let mut to_field = to_field;
         let mut from_field = from_field;
         let mut subj_field = subj_field;
