@@ -46,10 +46,10 @@ impl TestConnection {
         }
         n
     }
-
+    /*
     pub async fn write_u8(&mut self, byte: u8) -> icy_net::Result<()> {
         self.send(&[byte]).await
-    }
+    }*/
 }
 
 #[async_trait]

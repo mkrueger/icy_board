@@ -86,6 +86,11 @@ impl Rz {
         transfer_info.check_size = if self.use_crc32 { "CRC32" } else { "CRC16" }.to_string();
         transfer_info.update_bps();
 
+        println!(
+            "update transfer: RZ State: {:?}, Received: {} / {} bytes ({} bps)",
+            self.state, transfer_info.cur_bytes_transfered, transfer_info.file_size, transfer_info.bps
+        );
+
         match self.state {
             RecvState::SendZRINIT => {
                 if self.read_header(com, transfer_state).await? {
@@ -161,245 +166,256 @@ impl Rz {
     }
 
     async fn read_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<bool> {
-        let result = Header::read(com, &mut self.can_count).await;
-        if result.is_err() {
-            if self.can_count >= 5 {
-                transfer_state.recieve_state.log_error("Received 5+ CAN bytes, cancelling session".to_string());
-                self.cancel(com).await?;
-                self.cancel(com).await?;
-                self.cancel(com).await?;
-                self.state = RecvState::Idle;
+        match Header::read(com, &mut self.can_count).await {
+            Ok(Some(header)) => {
+                self.can_count = 0;
+                return self.handle_header(com, transfer_state, header).await;
+            }
+
+            Ok(None) => {
                 return Ok(false);
             }
-            transfer_state.recieve_state.errors += 1;
-            transfer_state
-                .recieve_state
-                .log_warning(format!("Header read error #{}: {:?}", transfer_state.recieve_state.errors, result.err()));
-            return Ok(false);
+
+            Err(err) => {
+                if self.can_count >= 5 {
+                    transfer_state.recieve_state.log_error("Received 5+ CAN bytes, cancelling session".to_string());
+                    self.cancel(com).await?;
+                    self.cancel(com).await?;
+                    self.cancel(com).await?;
+                    self.state = RecvState::Idle;
+                    return Ok(false);
+                }
+                transfer_state.recieve_state.errors += 1;
+                transfer_state
+                    .recieve_state
+                    .log_warning(format!("Header read error #{}: {:?}", transfer_state.recieve_state.errors, err));
+                return Ok(false);
+            }
         }
-        self.can_count = 0;
-        let header_opt = result?;
-        if let Some(header) = header_opt {
-            self.use_crc32 = matches!(header.header_type, HeaderType::Bin32 | HeaderType::Hex);
+    }
 
-            match header.frame_type {
-                ZFrameType::Sinit => {
-                    transfer_state.recieve_state.log_info("ZSINIT received, reading attention sequence".to_string());
-                    let pck = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control).await;
-                    match pck {
-                        Ok(attn_seq) => {
-                            self.attn_seq = attn_seq.0;
-                            self.sender_flags = header.f0();
+    async fn handle_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState, header: Header) -> crate::Result<bool> {
+        self.use_crc32 = matches!(header.header_type, HeaderType::Bin32 | HeaderType::Hex);
+        match header.frame_type {
+            ZFrameType::Sinit => {
+                transfer_state.recieve_state.log_info("ZSINIT received, reading attention sequence".to_string());
+                let pck = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control).await;
+                match pck {
+                    Ok(attn_seq) => {
+                        self.attn_seq = attn_seq.0;
+                        self.sender_flags = header.f0();
 
-                            // Log sender flags
-                            let mut flags = Vec::new();
-                            if self.sender_flags & super::zsinit_flag::TESCCTL != 0 {
-                                flags.push("ESCCTL");
-                            }
-                            if self.sender_flags & super::zsinit_flag::TESC8 != 0 {
-                                flags.push("ESC8");
-                            }
-
-                            transfer_state.recieve_state.log_info(format!(
-                                "ZSINIT accepted - Sender flags: [{}], Attn seq length: {} bytes",
-                                flags.join(", "),
-                                self.attn_seq.len()
-                            ));
-
-                            Header::empty(ZFrameType::Ack).write(com, HeaderType::Hex, self.can_esc_control).await?;
-                            return Ok(true);
+                        // Log sender flags
+                        let mut flags = Vec::new();
+                        if self.sender_flags & super::zsinit_flag::TESCCTL != 0 {
+                            flags.push("ESCCTL");
                         }
-                        Err(err) => {
-                            log::error!("{err}");
-                            transfer_state.recieve_state.log_error(format!("Failed to read ZSINIT data: {}", err));
-                            Header::empty(ZFrameType::Nak).write(com, HeaderType::Hex, self.can_esc_control).await?;
-                            return Ok(false);
-                        }
-                    }
-                }
-
-                ZFrameType::RQInit => {
-                    transfer_state.recieve_state.log_info("ZRQINIT received, will send ZRINIT".to_string());
-                    self.state = RecvState::SendZRINIT;
-                    return Ok(true);
-                }
-                ZFrameType::File => {
-                    transfer_state.recieve_state.log_info("ZFILE header received, reading file info".to_string());
-                    let pck = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control).await;
-
-                    match pck {
-                        Ok((block, _, _)) => {
-                            let file_name = str_from_null_terminated_utf8_unchecked(&block).to_string();
-                            let mut file_size = 0;
-                            for b in &block[(file_name.len() + 1)..] {
-                                if *b < b'0' || *b > b'9' {
-                                    break;
-                                }
-                                file_size = file_size * 10 + (*b - b'0') as usize;
-                            }
-
-                            transfer_state
-                                .recieve_state
-                                .log_info(format!("Starting file transfer: '{}' ({} bytes)", file_name, file_size));
-
-                            transfer_state.recieve_state.file_name = file_name;
-                            self.cur_out_file = Some(NamedTempFile::new()?);
-                            transfer_state.recieve_state.file_size = file_size as u64;
-                            transfer_state.recieve_state.cur_bytes_transfered = 0;
-
-                            self.state = RecvState::AwaitZDATA;
-
-                            transfer_state
-                                .recieve_state
-                                .log_info(format!("Requesting start position: {}", transfer_state.recieve_state.cur_bytes_transfered));
-
-                            self.request_zpos(com, transfer_state.recieve_state.cur_bytes_transfered as u32).await?;
-                            return Ok(true);
-                        }
-                        Err(err) => {
-                            log::error!("{err}");
-                            transfer_state.recieve_state.errors += 1;
-                            transfer_state
-                                .recieve_state
-                                .log_error(format!("Failed to read file info: {}, sending attention sequence", err));
-                            com.send(&self.attn_seq).await?;
-                            Header::from_number(ZFrameType::RPos, transfer_state.recieve_state.cur_bytes_transfered as u32)
-                                .write(com, HeaderType::Hex, self.can_esc_control)
-                                .await?;
-                            return Ok(false);
-                        }
-                    }
-                }
-                ZFrameType::Data => {
-                    let offset = header.number();
-                    transfer_state.recieve_state.log_info(format!("ZDATA received at offset {}", offset));
-
-                    if self.cur_out_file.is_none() {
-                        transfer_state.recieve_state.log_error("ZDATA received before ZFILE".to_string());
-                        self.cancel(com).await?;
-                        return Err(ZModemError::ZDataBeforeZFILE.into());
-                    }
-                    let len = transfer_state.recieve_state.cur_bytes_transfered as usize;
-                    match len.cmp(&(offset as usize)) {
-                        Ordering::Greater => {
-                            transfer_state
-                                .recieve_state
-                                .log_warning(format!("Sender offset {} is behind our position {}, truncating file", offset, len));
-                            if let Some(named_file) = self.cur_out_file.take() {
-                                named_file.as_file().set_len(offset as u64)?;
-                                transfer_state.recieve_state.cur_bytes_transfered = offset as u64;
-                                self.cur_out_file = Some(named_file);
-                            } else {
-                                return Err(ZModemError::NoFileOpen.into());
-                            }
+                        if self.sender_flags & super::zsinit_flag::TESC8 != 0 {
+                            flags.push("ESC8");
                         }
 
-                        Ordering::Less => {
-                            transfer_state
-                                .recieve_state
-                                .log_warning(format!("Sender offset {} ahead of our position {}, requesting resync", offset, len));
-                            Header::from_number(ZFrameType::RPos, len as u32)
-                                .write(com, HeaderType::Hex, self.can_esc_control)
-                                .await?;
-                            return Ok(false);
-                        }
-                        Ordering::Equal => {
-                            transfer_state.recieve_state.log_info("Data offset matches, ready to receive".to_string());
-                        }
-                    }
-                    self.state = RecvState::AwaitFileData;
-                    return Ok(true);
-                }
-                ZFrameType::Eof => {
-                    let expected_size = header.number() as u64;
-                    transfer_state.recieve_state.log_info(format!(
-                        "ZEOF received, file size: {} (received: {})",
-                        expected_size, transfer_state.recieve_state.cur_bytes_transfered
-                    ));
-
-                    if transfer_state.recieve_state.cur_bytes_transfered != expected_size {
-                        transfer_state.recieve_state.log_warning(format!(
-                            "File size mismatch! Expected {}, got {}. Requesting missing data.",
-                            expected_size, transfer_state.recieve_state.cur_bytes_transfered
+                        transfer_state.recieve_state.log_info(format!(
+                            "ZSINIT accepted - Sender flags: [{}], Attn seq length: {} bytes",
+                            flags.join(", "),
+                            self.attn_seq.len()
                         ));
+
+                        Header::empty(ZFrameType::Ack).write(com, HeaderType::Hex, self.can_esc_control).await?;
+                        return Ok(true);
+                    }
+                    Err(err) => {
+                        log::error!("{err}");
+                        transfer_state.recieve_state.log_error(format!("Failed to read ZSINIT data: {}", err));
+                        Header::empty(ZFrameType::Nak).write(com, HeaderType::Hex, self.can_esc_control).await?;
+                        return Ok(false);
+                    }
+                }
+            }
+
+            ZFrameType::RQInit => {
+                transfer_state.recieve_state.log_info("ZRQINIT received, will send ZRINIT".to_string());
+                self.state = RecvState::SendZRINIT;
+                return Ok(true);
+            }
+            ZFrameType::File => {
+                transfer_state.recieve_state.log_info("ZFILE header received, reading file info".to_string());
+                let pck = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control).await;
+
+                match pck {
+                    Ok((block, _, _)) => {
+                        let file_name = str_from_null_terminated_utf8_unchecked(&block).to_string();
+                        let mut file_size = 0;
+                        for b in &block[(file_name.len() + 1)..] {
+                            if *b < b'0' || *b > b'9' {
+                                break;
+                            }
+                            file_size = file_size * 10 + (*b - b'0') as usize;
+                        }
+
+                        transfer_state
+                            .recieve_state
+                            .log_info(format!("Starting file transfer: '{}' ({} bytes)", file_name, file_size));
+
+                        transfer_state.recieve_state.file_name = file_name;
+                        self.cur_out_file = Some(NamedTempFile::new()?);
+                        transfer_state.recieve_state.file_size = file_size as u64;
+                        transfer_state.recieve_state.cur_bytes_transfered = 0;
+
+                        self.state = RecvState::AwaitZDATA;
+
+                        transfer_state
+                            .recieve_state
+                            .log_info(format!("Requesting start position: {}", transfer_state.recieve_state.cur_bytes_transfered));
+
+                        self.request_zpos(com, transfer_state.recieve_state.cur_bytes_transfered as u32).await?;
+                        return Ok(true);
+                    }
+                    Err(err) => {
+                        log::error!("{err}");
+                        transfer_state.recieve_state.errors += 1;
+                        transfer_state
+                            .recieve_state
+                            .log_error(format!("Failed to read file info: {}, sending attention sequence", err));
+                        com.send(&self.attn_seq).await?;
                         Header::from_number(ZFrameType::RPos, transfer_state.recieve_state.cur_bytes_transfered as u32)
                             .write(com, HeaderType::Hex, self.can_esc_control)
                             .await?;
                         return Ok(false);
                     }
-
-                    self.send_zrinit(com).await?;
-                    transfer_state.recieve_state.log_info(format!(
-                        "File '{}' successfully received ({} bytes)",
-                        transfer_state.recieve_state.file_name, transfer_state.recieve_state.cur_bytes_transfered
-                    ));
-
-                    if let Some(named_file) = self.cur_out_file.take() {
-                        let path = &named_file.keep()?.1;
-                        transfer_state.recieve_state.finish_file(path.clone());
-                    } else {
-                        return Err(ZModemError::NoFileOpen.into());
-                    }
-                    self.state = RecvState::SendZRINIT;
-                    return Ok(true);
-                }
-                ZFrameType::Fin => {
-                    transfer_state.recieve_state.log_info("ZFIN received, session ending".to_string());
-                    Header::empty(ZFrameType::Fin).write(com, HeaderType::Hex, self.can_esc_control).await?;
-                    self.state = RecvState::Idle;
-                    return Ok(true);
-                }
-                ZFrameType::Challenge => {
-                    transfer_state
-                        .recieve_state
-                        .log_info(format!("Challenge received: 0x{:08x}, sending response", header.number()));
-                    Header::from_number(ZFrameType::Ack, header.number())
-                        .write(com, HeaderType::Hex, self.can_esc_control)
-                        .await?;
-                }
-                ZFrameType::FreeCnt => {
-                    transfer_state
-                        .recieve_state
-                        .log_info("Free space request received, reporting unlimited".to_string());
-                    // 0 means unlimited space but sending free hd space to an unknown source is a security issue
-                    Header::from_number(ZFrameType::Ack, 0)
-                        .write(com, HeaderType::Hex, self.can_esc_control)
-                        .await?;
-                }
-                ZFrameType::Command => {
-                    // just protocol it.
-                    let package = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control).await;
-                    match &package {
-                        Ok((block, _, _)) => {
-                            let cmd = str_from_null_terminated_utf8_unchecked(block);
-                            transfer_state
-                                .recieve_state
-                                .log_error(format!("SECURITY: Remote attempted to execute command: '{}' (REJECTED)", cmd));
-                            log::error!("Remote wanted to execute {cmd} on the system. (did not execute)");
-                        }
-                        Err(err) => {
-                            transfer_state.recieve_state.log_error(format!("Failed to read command packet: {}", err));
-                            log::error!("{err}");
-                        }
-                    }
-                    Header::from_number(ZFrameType::Compl, 0)
-                        .write(com, HeaderType::Hex, self.can_esc_control)
-                        .await?;
-                }
-                ZFrameType::Abort | ZFrameType::FErr | ZFrameType::Can => {
-                    transfer_state
-                        .recieve_state
-                        .log_error(format!("Abort signal received: {:?}", header.frame_type));
-                    Header::empty(ZFrameType::Fin).write(com, HeaderType::Hex, self.can_esc_control).await?;
-                    self.state = RecvState::Idle;
-                }
-                unk_frame => {
-                    transfer_state.recieve_state.log_error(format!("Unsupported frame type: {:?}", unk_frame));
-                    return Err(ZModemError::UnsupportedFrame(unk_frame).into());
                 }
             }
+            ZFrameType::Data => {
+                let offset = header.number();
+                transfer_state.recieve_state.log_info(format!("ZDATA received at offset {}", offset));
+
+                if self.cur_out_file.is_none() {
+                    transfer_state.recieve_state.log_error("ZDATA received before ZFILE".to_string());
+                    self.cancel(com).await?;
+                    return Err(ZModemError::ZDataBeforeZFILE.into());
+                }
+                let len = transfer_state.recieve_state.cur_bytes_transfered as usize;
+                match len.cmp(&(offset as usize)) {
+                    Ordering::Greater => {
+                        transfer_state
+                            .recieve_state
+                            .log_warning(format!("Sender offset {} is behind our position {}, truncating file", offset, len));
+                        if let Some(named_file) = self.cur_out_file.take() {
+                            named_file.as_file().set_len(offset as u64)?;
+                            transfer_state.recieve_state.cur_bytes_transfered = offset as u64;
+                            self.cur_out_file = Some(named_file);
+                        } else {
+                            return Err(ZModemError::NoFileOpen.into());
+                        }
+                    }
+
+                    Ordering::Less => {
+                        transfer_state
+                            .recieve_state
+                            .log_warning(format!("Sender offset {} ahead of our position {}, requesting resync", offset, len));
+                        Header::from_number(ZFrameType::RPos, len as u32)
+                            .write(com, HeaderType::Hex, self.can_esc_control)
+                            .await?;
+                        return Ok(false);
+                    }
+                    Ordering::Equal => {
+                        transfer_state.recieve_state.log_info("Data offset matches, ready to receive".to_string());
+                    }
+                }
+                self.state = RecvState::AwaitFileData;
+                return Ok(true);
+            }
+            ZFrameType::Eof => {
+                let expected_size = header.number() as u64;
+                transfer_state.recieve_state.log_info(format!(
+                    "ZEOF received, file size: {} (received: {})",
+                    expected_size, transfer_state.recieve_state.cur_bytes_transfered
+                ));
+
+                if transfer_state.recieve_state.cur_bytes_transfered != expected_size {
+                    transfer_state.recieve_state.log_warning(format!(
+                        "File size mismatch! Expected {}, got {}. Requesting missing data.",
+                        expected_size, transfer_state.recieve_state.cur_bytes_transfered
+                    ));
+                    Header::from_number(ZFrameType::RPos, transfer_state.recieve_state.cur_bytes_transfered as u32)
+                        .write(com, HeaderType::Hex, self.can_esc_control)
+                        .await?;
+                    return Ok(false);
+                }
+
+                self.send_zrinit(com).await?;
+                transfer_state.recieve_state.log_info(format!(
+                    "File '{}' successfully received ({} bytes)",
+                    transfer_state.recieve_state.file_name, transfer_state.recieve_state.cur_bytes_transfered
+                ));
+
+                if let Some(named_file) = self.cur_out_file.take() {
+                    let path = &named_file.keep()?.1;
+                    transfer_state.recieve_state.finish_file(path.clone());
+                } else {
+                    return Err(ZModemError::NoFileOpen.into());
+                }
+                self.state = RecvState::SendZRINIT;
+                return Ok(true);
+            }
+            ZFrameType::Fin => {
+                transfer_state.recieve_state.log_info("ZFIN received, session ending".to_string());
+                Header::empty(ZFrameType::Fin).write(com, HeaderType::Hex, self.can_esc_control).await?;
+                self.state = RecvState::Idle;
+                return Ok(true);
+            }
+            ZFrameType::Challenge => {
+                transfer_state
+                    .recieve_state
+                    .log_info(format!("Challenge received: 0x{:08x}, sending response", header.number()));
+                Header::from_number(ZFrameType::Ack, header.number())
+                    .write(com, HeaderType::Hex, self.can_esc_control)
+                    .await?;
+                return Ok(true);
+            }
+            ZFrameType::FreeCnt => {
+                transfer_state
+                    .recieve_state
+                    .log_info("Free space request received, reporting unlimited".to_string());
+                // 0 means unlimited space but sending free hd space to an unknown source is a security issue
+                Header::from_number(ZFrameType::Ack, 0)
+                    .write(com, HeaderType::Hex, self.can_esc_control)
+                    .await?;
+                return Ok(true);
+            }
+            ZFrameType::Command => {
+                // just protocol it.
+                let package = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control).await;
+                match &package {
+                    Ok((block, _, _)) => {
+                        let cmd = str_from_null_terminated_utf8_unchecked(block);
+                        transfer_state
+                            .recieve_state
+                            .log_error(format!("SECURITY: Remote attempted to execute command: '{}' (REJECTED)", cmd));
+                        log::error!("Remote wanted to execute {cmd} on the system. (did not execute)");
+                    }
+                    Err(err) => {
+                        transfer_state.recieve_state.log_error(format!("Failed to read command packet: {}", err));
+                        log::error!("{err}");
+                    }
+                }
+                Header::from_number(ZFrameType::Compl, 0)
+                    .write(com, HeaderType::Hex, self.can_esc_control)
+                    .await?;
+                return Ok(true);
+            }
+            ZFrameType::Abort | ZFrameType::FErr | ZFrameType::Can => {
+                transfer_state
+                    .recieve_state
+                    .log_error(format!("Abort signal received: {:?}", header.frame_type));
+                Header::empty(ZFrameType::Fin).write(com, HeaderType::Hex, self.can_esc_control).await?;
+                self.state = RecvState::Idle;
+                return Ok(false);
+            }
+            unk_frame => {
+                transfer_state.recieve_state.log_error(format!("Unsupported frame type: {:?}", unk_frame));
+                return Err(ZModemError::UnsupportedFrame(unk_frame).into());
+            }
         }
-        Ok(false)
     }
 
     pub async fn recv(&mut self, com: &mut dyn Connection) -> crate::Result<()> {

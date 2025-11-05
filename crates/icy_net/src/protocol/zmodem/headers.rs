@@ -330,6 +330,109 @@ impl Header {
             }
         }
     }
+
+    pub async fn try_read(com: &mut dyn Connection, can_count: &mut usize) -> crate::Result<Option<Header>> {
+        let buf = &mut [0u8; 1];
+        let bytes_read = com.try_read(buf).await?;
+        if bytes_read == 0 {
+            return Ok(None);
+        }
+        let zpad = buf[0];
+        if zpad == 0x18 {
+            // CAN
+            *can_count += 1;
+        }
+        if zpad != ZPAD {
+            return Err(ZModemError::ZPADExected(zpad).into());
+        }
+        *can_count = 0;
+        let mut next = com.read_u8().await?;
+
+        if next == ZPAD {
+            next = com.read_u8().await?;
+        }
+        if next != ZDLE {
+            return Err(ZModemError::ZLDEExected(next).into());
+        }
+
+        let header_type = com.read_u8().await?;
+
+        let header_data_size = match header_type {
+            ZBIN => 7,
+            ZBIN32 => 9,
+            ZHEX => 14,
+            _ => {
+                return Err(ZModemError::UnknownHeaderType(header_type).into());
+            }
+        };
+
+        let header_data = read_zdle_bytes(com, header_data_size).await?;
+
+        match header_type {
+            ZBIN => {
+                let crc16 = get_crc16_buggy(&header_data[0..5]);
+                let check_crc16 = u16::from_le_bytes(header_data[5..7].try_into().unwrap());
+                if crc16 != check_crc16 {
+                    return Err(ZModemError::CRC16Mismatch(crc16, check_crc16).into());
+                }
+                Ok(Some(Header {
+                    header_type: HeaderType::Bin,
+                    frame_type: Header::get_frame_type(header_data[0])?,
+                    data: header_data[1..5].try_into().unwrap(),
+                }))
+            }
+            ZBIN32 => {
+                let data = &header_data[0..5];
+                let crc32 = get_crc32(data);
+                let check_crc32 = u32::from_le_bytes(header_data[5..9].try_into().unwrap());
+                if crc32 != check_crc32 {
+                    return Err(ZModemError::CRC32Mismatch(crc32, check_crc32).into());
+                }
+                Ok(Some(Header {
+                    header_type: HeaderType::Bin32,
+                    frame_type: Header::get_frame_type(header_data[0])?,
+                    data: header_data[1..5].try_into().unwrap(),
+                }))
+            }
+            ZHEX => {
+                let data = [
+                    from_hex(header_data[0])? << 4 | from_hex(header_data[1])?,
+                    from_hex(header_data[2])? << 4 | from_hex(header_data[3])?,
+                    from_hex(header_data[4])? << 4 | from_hex(header_data[5])?,
+                    from_hex(header_data[6])? << 4 | from_hex(header_data[7])?,
+                    from_hex(header_data[8])? << 4 | from_hex(header_data[9])?,
+                ];
+
+                let crc16 = get_crc16_buggy(&data);
+
+                let mut check_crc16 = 0;
+                for b in &header_data[10..14] {
+                    check_crc16 = check_crc16 << 4 | u16::from(from_hex(*b)?);
+                }
+                if crc16 != check_crc16 {
+                    return Err(ZModemError::CRC16Mismatch(crc16, check_crc16).into());
+                }
+                // read rest;
+                let eol = com.read_u8().await?;
+                // don't check the next bytes. Errors there don't impact much
+                if eol == b'\r' {
+                    com.read_u8().await?; // \n windows eol
+                }
+                if data[0] != ZACK && data[0] != frame_types::ZFIN {
+                    com.read_u8().await?; // read XON
+                }
+
+                Ok(Some(Header {
+                    header_type: HeaderType::Hex,
+                    frame_type: Header::get_frame_type(data[0])?,
+                    data: data[1..5].try_into().unwrap(),
+                }))
+            }
+            _ => {
+                panic!("should never happen");
+            }
+        }
+    }
 }
 
 /*

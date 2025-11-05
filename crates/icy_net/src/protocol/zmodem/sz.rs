@@ -129,6 +129,12 @@ impl Sz {
         transfer_info.errors = self.errors;
         transfer_info.check_size = format!("Crc32/{}", self.package_len);
         transfer_info.update_bps();
+
+        if let Some(header) = Header::try_read(com, &mut self.can_count).await? {
+            println!("found out of order header: {:?}", header);
+            return self.handle_header(com, transfer_state, header).await;
+        }
+
         match self.state {
             SendState::Await => {
                 self.read_next_header(com, transfer_state).await?;
@@ -179,13 +185,11 @@ impl Sz {
                 let is_last_block = remaining as usize <= self.package_len;
 
                 // Fixed CRC byte selection according to spec
-                let crc_byte = if is_last_block {
+                let crc_byte = if remaining == 0 {
+                    ZCRCW // No more data to send, ACK expected
+                } else if is_last_block {
                     // Last data subpacket of file
-                    if self.nonstop {
-                        ZCRCE // End of frame, no ACK expected
-                    } else {
-                        ZCRCW // End of frame, ACK expected
-                    }
+                    ZCRCE // End of frame, no ACK expected
                 } else {
                     // More data to follow
                     if self.nonstop {
@@ -212,8 +216,7 @@ impl Sz {
                         if self.nonstop { "streaming mode" } else { "waiting for ACK" }
                     ));
 
-                    // First, wait for ACK if we sent ZCRCW
-                    if !self.nonstop && crc_byte == ZCRCW {
+                    if crc_byte == ZCRCW {
                         let ack = Header::read(com, &mut self.can_count).await?;
                         if let Some(header) = ack {
                             match header.frame_type {
@@ -244,18 +247,16 @@ impl Sz {
                             }
                         }
                     }
-
                     // Now send ZEOF
                     Header::from_number(ZFrameType::Eof, transfer_state.send_state.file_size as u32)
                         .write(com, self.get_header_type(), self.can_esc_control())
                         .await?;
-
                     transfer_state.send_state.log_info("ZEOF sent, waiting for ZRINIT".to_string());
-
-                    // Don't call finish_file here - wait for ZRINIT response
-                    self.cur_buf = None; // Close the current file
                     self.state = SendState::Await;
-                } else if !self.nonstop {
+                    return Ok(());
+                }
+
+                if !self.nonstop {
                     // Handle ACK for mid-file packets
                     let ack = Header::read(com, &mut self.can_count).await?;
                     if let Some(header) = ack {
@@ -299,7 +300,7 @@ impl Sz {
         Ok(())
     }
 
-    async fn read_next_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
+    pub async fn read_next_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
         let err = Header::read(com, &mut self.can_count).await;
         if self.can_count >= 5 {
             transfer_state.send_state.log_error("Received 5+ CAN bytes, cancelling".to_string());
@@ -307,122 +308,134 @@ impl Sz {
             transfer_state.is_finished = true;
             return Ok(());
         }
-        if let Err(err) = err {
-            self.errors += 1;
-            transfer_state
-                .send_state
-                .log_error(format!("Error reading header (error #{}/3): {:?}", self.errors, err));
-            if self.errors > 3 {
-                transfer_state.send_state.log_error("Too many header errors, aborting".to_string());
-                Zmodem::cancel(com).await?;
-                transfer_state.is_finished = true;
-                return Err(err);
+        match err {
+            Err(err) => {
+                self.errors += 1;
+                transfer_state
+                    .send_state
+                    .log_error(format!("Error reading header (error #{}/3): {:?}", self.errors, err));
+                if self.errors > 3 {
+                    transfer_state.send_state.log_error("Too many header errors, aborting".to_string());
+                    Zmodem::cancel(com).await?;
+                    transfer_state.is_finished = true;
+                    return Err(err);
+                }
+                return Ok(());
             }
-            return Ok(());
+            Ok(Some(res)) => {
+                return self.handle_header(com, transfer_state, res).await;
+            }
+
+            Ok(None) => {
+                transfer_state.send_state.log_warning("No header received".to_string());
+            }
         }
+        Ok(())
+    }
+
+    async fn handle_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState, res: Header) -> crate::Result<()> {
         self.errors = 0;
-        let res = err.unwrap();
-        if let Some(res) = res {
-            match res.frame_type {
-                ZFrameType::RIinit => {
-                    // Check if we just finished a file (got ZRINIT after ZEOF)
-                    if self.transfered_file && self.cur_buf.is_none() {
-                        // File transfer completed successfully
-                        transfer_state
-                            .send_state
-                            .log_info(format!("File transfer confirmed: {}", self.cur_file.display()));
-                        transfer_state.send_state.finish_file(self.cur_file.clone());
-                    }
-
-                    // Log receiver capabilities
-                    let mut capabilities = Vec::new();
-                    if self.can_fdx() {
-                        capabilities.push("FDX");
-                    }
-                    if self.can_receive_data_during_io() {
-                        capabilities.push("OVIO");
-                    }
-                    if self.can_use_crc32() {
-                        capabilities.push("CRC32");
-                    }
-                    if self.can_esc_control() {
-                        capabilities.push("ESCCTL");
-                    }
-
-                    transfer_state.send_state.cur_bytes_transfered = 0;
-                    self.receiver_capabilities = res.f0();
-                    let block_size = res.p0() as usize + ((res.p1() as usize) << 8);
-                    self.nonstop = block_size == 0;
-
-                    transfer_state.send_state.log_info(format!(
-                        "ZRINIT received - Capabilities: [{}], Block size: {}, Mode: {}",
-                        capabilities.join(", "),
-                        if block_size == 0 { "unlimited".to_string() } else { block_size.to_string() },
-                        if self.nonstop { "streaming" } else { "segmented" }
-                    ));
-
-                    if block_size != 0 {
-                        self.package_len = block_size;
-                    }
+        Ok(match res.frame_type {
+            ZFrameType::RIinit => {
+                if self.cur_buf.is_some() {
+                    // File transfer completed successfully
+                    transfer_state
+                        .send_state
+                        .log_info(format!("File transfer confirmed: {}", self.cur_file.display()));
+                    transfer_state.send_state.finish_file(self.cur_file.clone());
+                    self.transfered_file = true;
+                    self.cur_buf = None;
                     self.state = SendState::SendNextFile;
                     return Ok(());
                 }
 
-                ZFrameType::Nak => {
-                    transfer_state.send_state.log_warning("NAK received, will resend file header".to_string());
+                // Log receiver capabilities
+                let mut capabilities = Vec::new();
+                if self.can_fdx() {
+                    capabilities.push("FDX");
+                }
+                if self.can_receive_data_during_io() {
+                    capabilities.push("OVIO");
+                }
+                if self.can_use_crc32() {
+                    capabilities.push("CRC32");
+                }
+                if self.can_esc_control() {
+                    capabilities.push("ESCCTL");
                 }
 
-                ZFrameType::RPos => {
-                    let new_pos = res.number() as u64;
-                    transfer_state
-                        .send_state
-                        .log_info(format!("RPOS received, repositioning to offset {}", new_pos));
-                    transfer_state.send_state.cur_bytes_transfered = new_pos;
-                    if let Some(cur) = &mut self.cur_buf {
-                        cur.seek(std::io::SeekFrom::Start(transfer_state.send_state.cur_bytes_transfered))?;
+                transfer_state.send_state.cur_bytes_transfered = 0;
+                self.receiver_capabilities = res.f0();
+                let block_size = res.p0() as usize + ((res.p1() as usize) << 8);
+                self.nonstop = block_size == 0;
+
+                transfer_state.send_state.log_info(format!(
+                    "ZRINIT received - Capabilities: [{}], Block size: {}, Mode: {}",
+                    capabilities.join(", "),
+                    if block_size == 0 { "unlimited".to_string() } else { block_size.to_string() },
+                    if self.nonstop { "streaming" } else { "segmented" }
+                ));
+
+                if block_size != 0 {
+                    self.package_len = block_size;
+                }
+                self.state = SendState::SendNextFile;
+                return Ok(());
+            }
+
+            ZFrameType::Nak => {
+                transfer_state.send_state.log_warning("NAK received, will resend file header".to_string());
+            }
+
+            ZFrameType::RPos => {
+                let new_pos = res.number() as u64;
+                transfer_state
+                    .send_state
+                    .log_info(format!("RPOS received, repositioning to offset {}", new_pos));
+                transfer_state.send_state.cur_bytes_transfered = new_pos;
+                if let Some(cur) = &mut self.cur_buf {
+                    cur.seek(std::io::SeekFrom::Start(transfer_state.send_state.cur_bytes_transfered))?;
+                }
+
+                self.state = SendState::SendZDATA;
+
+                if let SendState::SendDataPackages = self.state {
+                    if self.package_len > 512 {
+                        transfer_state
+                            .send_state
+                            .log_info(format!("Reducing packet size from {} to {}", self.package_len, self.package_len / 2));
+                        //reinit transfer.
+                        self.package_len /= 2;
+                        self.state = SendState::SendZRQInit;
+                        return Ok(());
                     }
-
-                    self.state = SendState::SendZDATA;
-
-                    if let SendState::SendDataPackages = self.state {
-                        if self.package_len > 512 {
-                            transfer_state
-                                .send_state
-                                .log_info(format!("Reducing packet size from {} to {}", self.package_len, self.package_len / 2));
-                            //reinit transfer.
-                            self.package_len /= 2;
-                            self.state = SendState::SendZRQInit;
-                            return Ok(());
-                        }
-                    }
-                }
-
-                ZFrameType::Fin => {
-                    transfer_state.send_state.log_info("ZFIN received, ending session".to_string());
-                    transfer_state.is_finished = true;
-                    com.send(b"OO").await?;
-                    return Ok(());
-                }
-                ZFrameType::Challenge => {
-                    transfer_state.send_state.log_info(format!("Challenge received: 0x{:08x}", res.number()));
-                    Header::from_number(ZFrameType::Ack, res.number())
-                        .write(com, self.get_header_type(), self.can_esc_control())
-                        .await?;
-                }
-                ZFrameType::Abort | ZFrameType::FErr | ZFrameType::Can => {
-                    transfer_state.send_state.log_error(format!("Session abort requested: {:?}", res.frame_type));
-                    Header::empty(ZFrameType::Fin)
-                        .write(com, self.get_header_type(), self.can_esc_control())
-                        .await?;
-                    transfer_state.is_finished = true;
-                }
-                unk_frame => {
-                    transfer_state.send_state.log_error(format!("Unsupported frame type: {:?}", unk_frame));
-                    return Err(ZModemError::UnsupportedFrame(unk_frame).into());
                 }
             }
-        }
-        Ok(())
+
+            ZFrameType::Fin => {
+                transfer_state.send_state.log_info("ZFIN received, ending session".to_string());
+                transfer_state.is_finished = true;
+                com.send(b"OO").await?;
+                return Ok(());
+            }
+            ZFrameType::Challenge => {
+                transfer_state.send_state.log_info(format!("Challenge received: 0x{:08x}", res.number()));
+                Header::from_number(ZFrameType::Ack, res.number())
+                    .write(com, self.get_header_type(), self.can_esc_control())
+                    .await?;
+            }
+            ZFrameType::Abort | ZFrameType::FErr | ZFrameType::Can => {
+                transfer_state.send_state.log_error(format!("Session abort requested: {:?}", res.frame_type));
+                Header::empty(ZFrameType::Fin)
+                    .write(com, self.get_header_type(), self.can_esc_control())
+                    .await?;
+                transfer_state.is_finished = true;
+            }
+            unk_frame => {
+                transfer_state.send_state.log_error(format!("Unsupported frame type: {:?}", unk_frame));
+                return Err(ZModemError::UnsupportedFrame(unk_frame).into());
+            }
+        })
     }
 
     async fn send_zfile(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState, mut tries: i32) -> crate::Result<()> {
@@ -440,15 +453,13 @@ impl Sz {
                 tries + 1
             ));
 
-            let mut b = Vec::new();
-            b.extend_from_slice(
-                &Header::from_flags(ZFrameType::File, 0, 0, zfile_flag::ZMNEW, zfile_flag::ZCRESUM).build(self.get_header_type(), self.can_esc_control()),
-            );
+            let mut b =
+                Header::from_flags(ZFrameType::File, 0, 0, zfile_flag::ZMNEW, zfile_flag::ZCRESUM).build(self.get_header_type(), self.can_esc_control());
+
             let data = { format!("{}\0{}\0", transfer_state.send_state.file_name, transfer_state.send_state.file_size).into_bytes() };
 
             b.extend_from_slice(&self.encode_subpacket(ZCRCW, &data));
             com.send(&b).await?;
-
             let ack = Header::read(com, &mut self.can_count).await?;
             if let Some(header) = ack {
                 match header.frame_type {
@@ -503,8 +514,17 @@ impl Sz {
                     }
                 }
             } else {
-                transfer_state.send_state.log_warning("No response to ZFILE".to_string());
-                break; // Exit if no header received
+                tries += 1;
+                if tries > 5 {
+                    transfer_state
+                        .send_state
+                        .log_error("No response to ZFILE after 5 attempts, aborting".to_string());
+                    Zmodem::cancel(com).await?;
+                    transfer_state.is_finished = true;
+                    break;
+                }
+                transfer_state.send_state.log_warning(format!("No response to ZFILE, retry {}/5", tries));
+                continue;
             }
         }
 

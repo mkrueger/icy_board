@@ -46,8 +46,8 @@ enum Begin {
 async fn begin_zconnect(connection: &mut dyn Connection) -> Begin {
     let mut buf = [0; 1024];
     let mut zconnect_pattern = PatternRecognizer::from(b"begin", true);
-    let mut zmodem_send_pattern = PatternRecognizer::from(b"B0100000023be50", false);
-    let mut zmodem_recv_pattern = PatternRecognizer::from(b"B00000000000000", false);
+    let mut zmodem_send_pattern = PatternRecognizer::from(b"B01", false); // ZRINIT for send starts with B01
+    let mut zmodem_recv_pattern = PatternRecognizer::from(b"B00", false); // ZRQINIT starts with B00
 
     let mut instant = Instant::now();
     println!("Waiting for ZConnect or ZModem");

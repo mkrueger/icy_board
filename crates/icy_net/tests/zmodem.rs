@@ -1,11 +1,7 @@
 use icy_net::Connection;
 use icy_net::crc::update_crc32;
 use icy_net::protocol::zmodem::rz::read_subpacket;
-use icy_net::protocol::{Header, HeaderType, Protocol, ZFrameType, str_from_null_terminated_utf8_unchecked};
 use icy_net::protocol::{ZCRCE, Zmodem};
-
-use std::io::Write;
-use tempfile::NamedTempFile;
 
 mod test_connection;
 use test_connection::TestConnection;
