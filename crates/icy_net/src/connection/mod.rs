@@ -2,6 +2,7 @@ use crate::NetError;
 pub mod channel;
 pub mod modem;
 pub mod raw;
+pub mod rlogin;
 pub mod serial;
 pub mod ssh;
 pub mod telnet;
@@ -24,6 +25,8 @@ pub enum ConnectionType {
     Serial,
     Websocket,
     SecureWebsocket,
+    Rlogin,
+    RloginSwapped,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

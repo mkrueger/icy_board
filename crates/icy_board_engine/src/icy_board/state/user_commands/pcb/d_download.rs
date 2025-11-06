@@ -136,7 +136,6 @@ impl IcyBoardState {
                         self.display_text(IceText::BatchTransferEnded, display_flags::LFBEFORE).await?;
                         self.transfer_statistics.downloaded_bytes = state.send_state.total_bytes_transfered as usize;
                         self.transfer_statistics.downloaded_files = state.send_state.finished_files.len();
-                        self.transfer_statistics.downloaded_cps = state.send_state.get_bps() as usize;
                         self.display_text(IceText::BatchSend, display_flags::LFBEFORE).await?;
 
                         self.board.lock().await.statistics.add_download(&state);

@@ -47,12 +47,10 @@ impl Ry {
     }
 
     pub async fn update_transfer(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
-        transfer_state.update_time();
         {
             let transfer_info = &mut transfer_state.recieve_state;
             transfer_info.errors = self.errors;
             transfer_info.check_size = self.configuration.get_check_and_size();
-            transfer_info.update_bps();
         }
 
         match self.recv_state {

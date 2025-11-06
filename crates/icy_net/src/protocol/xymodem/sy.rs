@@ -68,11 +68,9 @@ impl Sy {
     }
 
     pub async fn update_transfer(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
-        transfer_state.update_time();
         {
             let transfer_info = &mut transfer_state.send_state;
             transfer_info.check_size = self.configuration.get_check_and_size();
-            transfer_info.update_bps();
         }
         match self.send_state {
             SendState::None => {}
@@ -496,6 +494,7 @@ impl Sy {
             transfer_state.send_state.file_name = file_name;
             transfer_state.send_state.file_size = size;
             transfer_state.send_state.cur_bytes_transfered = 0;
+            transfer_state.start_time = std::time::Instant::now();
 
             self.cur_file = next_file.clone();
             self.cur_buf = Some(BufReader::new(File::open(next_file)?));

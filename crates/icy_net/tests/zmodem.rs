@@ -125,6 +125,35 @@ async fn test_zmodem_simple_send() {
                         injected_handshake = true;
                     }
                 }
+                ZFrameType::SInit => {
+                    println!("Got ZSINIT, reading attention string and sending ZACK");
+                    // Read the attention string subpacket (usually empty or minimal)
+                    let (attn_data, last, _) = read_subpacket(&mut b, 1024, true, false).await.expect("read ZSINIT subpacket");
+                    assert!(last, "ZSINIT subpacket should be last");
+                    println!("ZSINIT attention string: {:?}", attn_data);
+
+                    // Send ZACK to acknowledge ZSINIT
+                    Header::from_number(ZFrameType::Ack, 0)
+                        .write(&mut b, HeaderType::Hex, false)
+                        .await
+                        .expect("write ZACK after ZSINIT");
+                }
+                ZFrameType::File => {
+                    println!("Got ZFILE, reading subpacket and sending ZRPOS");
+                    // Read the file info subpacket
+                    let (block, last, _) = read_subpacket(&mut b, 1024, true, false).await.expect("read file subpacket");
+                    assert!(last, "File header subpacket should be last in frame");
+                    let name = str_from_null_terminated_utf8_unchecked(&block);
+                    let expected_name = f.path().file_name().unwrap().to_string_lossy();
+                    assert!(name.contains(expected_name.as_ref()));
+                    saw_file = true;
+
+                    // Send ZRPOS (offset 0). (Alternative: send Ack.)
+                    Header::from_number(ZFrameType::RPos, 0)
+                        .write(&mut b, HeaderType::Hex, false)
+                        .await
+                        .expect("write ZRPOS");
+                }
                 ZFrameType::File => {
                     println!("Got ZFILE, reading subpacket and sending ZRPOS");
                     // Read the file info subpacket

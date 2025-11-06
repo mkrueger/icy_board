@@ -27,7 +27,7 @@ pub enum ZFrameType {
     /// Receive init (r->s)
     RIinit = 1,
     // Send init sequence (optional) (s->r)
-    Sinit = 2,
+    SInit = 2,
     // ACK to RQInit, RInit or SInit (s<->r)
     Ack = 3,
     /// File name from sender (s->r)
@@ -203,6 +203,7 @@ impl Header {
     }
 
     pub async fn write(&self, com: &mut dyn Connection, header_type: HeaderType, escape_ctrl_chars: bool) -> crate::Result<usize> {
+        println!("Sending header: {}", self);
         com.send(&self.build(header_type, escape_ctrl_chars)).await?;
         Ok(12)
     }
@@ -211,7 +212,7 @@ impl Header {
         match ftype {
             frame_types::ZRQINIT => Ok(ZFrameType::RQInit),
             frame_types::ZRINIT => Ok(ZFrameType::RIinit),
-            frame_types::ZSINIT => Ok(ZFrameType::Sinit),
+            frame_types::ZSINIT => Ok(ZFrameType::SInit),
             frame_types::ZACK => Ok(ZFrameType::Ack),
             frame_types::ZFILE => Ok(ZFrameType::File),
             frame_types::ZSKIP => Ok(ZFrameType::Skip),

@@ -81,15 +81,8 @@ impl Rz {
             self.cancel(com).await?;
             return Ok(());
         }
-        transfer_state.update_time();
         let transfer_info = &mut transfer_state.recieve_state;
         transfer_info.check_size = if self.use_crc32 { "CRC32" } else { "CRC16" }.to_string();
-        transfer_info.update_bps();
-
-        println!(
-            "update transfer: RZ State: {:?}, Received: {} / {} bytes ({} bps)",
-            self.state, transfer_info.cur_bytes_transfered, transfer_info.file_size, transfer_info.bps
-        );
 
         match self.state {
             RecvState::SendZRINIT => {
@@ -197,7 +190,7 @@ impl Rz {
     async fn handle_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState, header: Header) -> crate::Result<bool> {
         self.use_crc32 = matches!(header.header_type, HeaderType::Bin32 | HeaderType::Hex);
         match header.frame_type {
-            ZFrameType::Sinit => {
+            ZFrameType::SInit => {
                 transfer_state.recieve_state.log_info("ZSINIT received, reading attention sequence".to_string());
                 let pck = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control).await;
                 match pck {

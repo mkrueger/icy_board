@@ -1,8 +1,4 @@
-use std::{
-    mem,
-    path::PathBuf,
-    time::{Duration, Instant},
-};
+use std::{mem, path::PathBuf, time::Instant};
 
 #[derive(Debug, Clone)]
 pub enum OutputLogMessage {
@@ -22,9 +18,7 @@ pub struct TransferInformation {
     pub warnings: usize,
     pub check_size: String,
 
-    pub bps: u64,
     pub bytes_transferred_timed: u64,
-    pub bps_time: Instant,
 
     pub output_log: Vec<OutputLogMessage>,
 
@@ -38,30 +32,6 @@ impl TransferInformation {
         self.finished_files.push((file_name, file));
         self.file_size = 0;
         self.cur_bytes_transfered = 0;
-    }
-
-    pub fn update_bps(&mut self) {
-        let bytes = self.total_bytes_transfered.saturating_sub(self.bytes_transferred_timed);
-        let length = Instant::now().duration_since(self.bps_time);
-
-        if length > Duration::from_secs(10) {
-            self.bytes_transferred_timed = self.total_bytes_transfered;
-        }
-
-        let length = length.as_secs();
-        if length > 0 {
-            self.bps = self.bps / 2 + bytes as u64 / length;
-        }
-
-        let length = Instant::now().duration_since(self.bps_time);
-        if length > Duration::from_secs(5) {
-            self.bytes_transferred_timed = self.total_bytes_transfered;
-            self.bps_time = Instant::now();
-        }
-    }
-
-    pub fn get_bps(&self) -> u64 {
-        self.bps
     }
 
     pub fn has_log_entries(&self) -> bool {
@@ -118,10 +88,8 @@ impl Default for TransferInformation {
             warnings: 0,
             finished_files: Vec::new(),
             check_size: String::new(),
-            bps_time: Instant::now(),
             output_log: Vec::new(),
             bytes_transferred_timed: 0,
-            bps: 0,
         }
     }
 }
@@ -134,7 +102,6 @@ pub struct TransferState {
     pub protocol_name: String,
 
     pub start_time: Instant,
-    pub end_time: Instant,
 
     pub send_state: TransferInformation,
 
@@ -150,14 +117,24 @@ impl TransferState {
             protocol_name,
             is_finished: false,
             start_time: Instant::now(),
-            end_time: Instant::now(),
             send_state: TransferInformation::default(),
             recieve_state: TransferInformation::default(),
             request_cancel: false,
         }
     }
 
-    pub fn update_time(&mut self) {
-        self.end_time = Instant::now();
+    pub fn get_bps(&self, download: bool) -> usize {
+        let elapsed = self.start_time.elapsed().as_secs_f64();
+        if elapsed < 0.001 {
+            return 0; // Avoid division by zero
+        }
+
+        let bytes_transferred = if download {
+            self.recieve_state.cur_bytes_transfered
+        } else {
+            self.send_state.cur_bytes_transfered
+        };
+
+        (bytes_transferred as f64 / elapsed) as usize
     }
 }
