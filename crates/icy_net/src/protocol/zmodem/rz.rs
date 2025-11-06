@@ -252,7 +252,7 @@ impl Rz {
                         transfer_state.recieve_state.file_name = file_name;
                         self.cur_out_file = Some(NamedTempFile::new()?);
                         transfer_state.recieve_state.file_size = file_size as u64;
-                        transfer_state.recieve_state.cur_bytes_transfered = 0;
+                        transfer_state.recieve_state.reset_cur_transfer();
 
                         self.state = RecvState::AwaitZDATA;
 

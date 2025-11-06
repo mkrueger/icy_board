@@ -494,7 +494,6 @@ impl Sy {
             transfer_state.send_state.file_name = file_name;
             transfer_state.send_state.file_size = size;
             transfer_state.send_state.cur_bytes_transfered = 0;
-            transfer_state.start_time = std::time::Instant::now();
 
             self.cur_file = next_file.clone();
             self.cur_buf = Some(BufReader::new(File::open(next_file)?));

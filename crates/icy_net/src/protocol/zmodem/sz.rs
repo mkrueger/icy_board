@@ -140,7 +140,7 @@ impl Sz {
                 if !self.next_file(transfer_state)? {
                     transfer_state.send_state.log_info("All files sent, sending ZFIN".to_string());
                     self.send_zfin(com, transfer_state.send_state.cur_bytes_transfered as u32).await?;
-                    transfer_state.send_state.cur_bytes_transfered = 0;
+                    transfer_state.send_state.reset_cur_transfer();
                     return Ok(());
                 }
                 self.send_zfile(com, transfer_state, 0).await?;
@@ -351,7 +351,7 @@ impl Sz {
                     capabilities.push("ESCCTL");
                 }
 
-                transfer_state.send_state.cur_bytes_transfered = 0;
+                transfer_state.send_state.reset_cur_transfer();
                 self.receiver_capabilities = res.f0();
                 let block_size = res.p0() as usize + ((res.p1() as usize) << 8);
                 self.nonstop = block_size == 0;
@@ -533,7 +533,7 @@ impl Sz {
             }
         }
 
-        transfer_state.send_state.cur_bytes_transfered = 0;
+        transfer_state.send_state.reset_cur_transfer();
         Ok(())
     }
 
