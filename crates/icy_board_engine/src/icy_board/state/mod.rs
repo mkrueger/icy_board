@@ -664,7 +664,7 @@ impl IcyBoardState {
     pub async fn clear_eol(&mut self, target: TerminalTarget) -> Res<()> {
         match self.session.disp_options.grapics_mode {
             GraphicsMode::Ctty => {
-                let x = self.user_screen.buffer.get_width() - self.user_screen.caret.get_position().x;
+                let x = self.user_screen.buffer.get_width() - self.user_screen.buffer.caret.x;
                 for _ in 0..x {
                     self.print(target, " ").await?;
                 }
@@ -1398,8 +1398,7 @@ impl IcyBoardState {
                                     .unwrap_or_else(|| path.to_string_lossy().to_string());
                 */
 
-                self.backupcleareol(TerminalTarget::Both, self.user_screen.caret.get_position().x as usize)
-                    .await?;
+                self.backupcleareol(TerminalTarget::Both, self.user_screen.buffer.caret.x as usize).await?;
                 self.new_line().await?;
                 self.set_color(TerminalTarget::Both, IcbColor::dos_light_red()).await?;
                 self.display_text(IceText::BulletinsUpdated, display_flags::NEWLINE).await?;
@@ -1492,7 +1491,7 @@ impl IcyBoardState {
             return Ok(());
         }
 
-        let len = self.user_screen.caret.get_position().x;
+        let len = self.user_screen.buffer.caret.x;
         self.new_line().await?;
 
         self.print(TerminalTarget::Both, &"=".repeat(len as usize)).await?;
@@ -1600,7 +1599,7 @@ impl IcyBoardState {
         if let Some(regex) = &self.session.search_pattern.clone() {
             if let Some(find) = regex.find(str) {
                 self.write_raw(target, &chars[..find.start()]).await?;
-                let old_color = self.user_screen.caret.get_attribute();
+                let old_color = self.user_screen.buffer.caret.attribute;
                 if old_color.get_background() == 0 {
                     self.set_color(target, IcbColor::Dos(0x70)).await?;
                 } else {
@@ -1687,12 +1686,12 @@ impl IcyBoardState {
         match target {
             TerminalTarget::Both | TerminalTarget::User => {
                 if !user_bytes.is_empty() {
-                    self.session.cursor_pos = self.user_screen.caret.get_position();
+                    self.session.cursor_pos = self.user_screen.buffer.caret.position();
                 }
             }
             TerminalTarget::Sysop => {
                 if !sysop_bytes.is_empty() {
-                    self.session.cursor_pos = self.sysop_screen.caret.get_position();
+                    self.session.cursor_pos = self.sysop_screen.buffer.caret.position();
                 }
             }
         }
@@ -2033,7 +2032,7 @@ impl IcyBoardState {
                 return None;
             }
             MacroCommand::POS(value) => {
-                let x = self.user_screen.caret.get_position().x as usize;
+                let x = self.user_screen.buffer.caret.x as usize;
                 while result.len() + x + 1 < *value as usize {
                     result.push(' ');
                 }
@@ -2400,8 +2399,8 @@ impl IcyBoardState {
     }
 
     async fn show_broadcast(&mut self, msg: String) -> Res<()> {
-        let mut buf = self.user_screen.buffer.flat_clone(false);
-        let pos = self.user_screen.caret.get_position();
+        let mut buf = self.user_screen.buffer.buffer.flat_clone(false);
+        let pos = self.user_screen.buffer.caret.position();
         self.set_activity(NodeStatus::NodeMessage).await;
         self.new_line().await?;
         self.set_color(TerminalTarget::Both, IcbColor::dos_white()).await?;
@@ -2427,10 +2426,10 @@ impl IcyBoardState {
         options.screen_preparation = icy_engine::ScreenPreperation::ClearScreen;
         options.save_sauce = false;
         options.modern_terminal_output = true;
-        let res = icy_engine::formats::PCBoard::default().to_bytes(&mut self.user_screen.buffer, &options)?;
+        let res = icy_engine::formats::PCBoard::default().to_bytes(&mut self.user_screen.buffer.buffer, &options)?;
         let res = unsafe { String::from_utf8_unchecked(res) };
         self.print(TerminalTarget::Sysop, &res).await?;
-        let p = self.user_screen.caret.get_position();
+        let p = self.user_screen.buffer.caret.position();
         self.gotoxy(TerminalTarget::Sysop, p.x + 1, p.y + 1).await?;
         Ok(())
     }
@@ -2445,7 +2444,7 @@ impl IcyBoardState {
     }
 
     pub fn cur_color(&self) -> IcbColor {
-        let attr = self.user_screen.caret.get_attribute().as_u8(icy_engine::IceMode::Blink);
+        let attr = self.user_screen.buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink);
         IcbColor::Dos(attr)
     }
 
@@ -2464,7 +2463,7 @@ impl IcyBoardState {
                 return Ok(());
             }
             IcbColor::Dos(color) => {
-                if screen.caret.get_attribute().as_u8(icy_engine::IceMode::Blink) == color {
+                if screen.buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink) == color {
                     return Ok(());
                 }
 
@@ -2483,10 +2482,10 @@ impl IcyBoardState {
         }
 
         let mut color_change = "\x1B[".to_string();
-        let was_bold = screen.caret.get_attribute().is_bold();
+        let was_bold = screen.buffer.caret.attribute.is_bold();
         let new_bold = new_color.is_bold() || new_color.get_foreground() > 7;
-        let mut bg = screen.caret.get_attribute().get_background();
-        let mut fg = screen.caret.get_attribute().get_foreground();
+        let mut bg = screen.buffer.caret.attribute.get_background();
+        let mut fg = screen.buffer.caret.attribute.get_foreground();
         if was_bold != new_bold {
             if new_bold {
                 color_change += "1;";
@@ -2497,7 +2496,7 @@ impl IcyBoardState {
             }
         }
 
-        if !screen.caret.get_attribute().is_blinking() && new_color.is_blinking() {
+        if !screen.buffer.caret.attribute.is_blinking() && new_color.is_blinking() {
             color_change += "5;";
         }
 
@@ -2603,7 +2602,7 @@ impl IcyBoardState {
     }
 
     pub async fn fresh_line(&mut self) -> Res<()> {
-        if self.user_screen.caret.get_position().x > 0 {
+        if self.user_screen.buffer.caret.x > 0 {
             self.new_line().await?;
         }
         Ok(())

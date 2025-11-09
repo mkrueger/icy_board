@@ -128,7 +128,7 @@ impl IcyBoardState {
     pub async fn display_text(&mut self, message_number: IceText, display_flags: i32) -> Res<()> {
         let txt_entry = self.display_text.get_display_text(message_number)?;
         let color = if txt_entry.style == IcbTextStyle::Plain {
-            self.user_screen.caret.get_attribute().as_u8(IceMode::Blink).into()
+            self.user_screen.buffer.caret.attribute.as_u8(IceMode::Blink).into()
         } else {
             txt_entry.style.to_color()
         };

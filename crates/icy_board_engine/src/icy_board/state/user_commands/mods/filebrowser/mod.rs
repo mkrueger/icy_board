@@ -1,6 +1,6 @@
 pub mod file_list;
 pub use file_list::*;
-use icy_engine::TextPane;
+use icy_engine::{Screen, TextPane};
 use regex::Regex;
 
 use crate::icy_board::state::IcyBoardState;
@@ -21,7 +21,7 @@ impl IcyBoardState {
         while y < height {
             let mut str = String::new();
             for x in 0..width {
-                let ch = self.user_screen.buffer.get_char((x, top + y));
+                let ch: icy_engine::AttributedChar = self.user_screen.buffer.get_char((x, top + y).into());
                 str.push(ch.ch);
             }
 

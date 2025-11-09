@@ -1197,7 +1197,7 @@ pub async fn mkdate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 }
 
 pub async fn curcolor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let attr = vm.icy_board_state.display_screen().caret.get_attribute().as_u8(icy_engine::IceMode::Blink);
+    let attr = vm.icy_board_state.display_screen().buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink);
     Ok(VariableValue::new_int(attr as i32))
 }
 

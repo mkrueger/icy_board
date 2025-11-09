@@ -78,7 +78,7 @@ impl IcyBoardState {
             let mut x = current_item + 1;
             self.move_lightbar(mnu, &mut x, current_item).await?;
 
-            self.session.last_new_line_y = self.display_screen().caret.get_position().y;
+            self.session.last_new_line_y = self.display_screen().buffer.caret.y;
             self.session.disp_options.no_change();
             let pos = self.get_caret_position();
             for (i, command) in mnu.commands.iter().enumerate() {
@@ -96,7 +96,7 @@ impl IcyBoardState {
             }
             if command.is_empty() {
                 if !mnu.commands[current_item].lighbar_display.is_empty() {
-                    self.session.last_new_line_y = self.display_screen().caret.get_position().y;
+                    self.session.last_new_line_y = self.display_screen().buffer.caret.y;
                     self.session.disp_options.no_change();
                     self.dispatch_command(&command, &mnu.commands[current_item]).await?;
                     continue;
@@ -106,7 +106,7 @@ impl IcyBoardState {
             if let Some(command_str) = self.session.tokens.pop_front() {
                 let cmd = mnu.commands.iter().find(|cmd| cmd.keyword.eq_ignore_ascii_case(&command_str));
                 if let Some(cmd) = cmd {
-                    self.session.last_new_line_y = self.display_screen().caret.get_position().y;
+                    self.session.last_new_line_y = self.display_screen().buffer.caret.y;
                     self.session.disp_options.no_change();
                     self.dispatch_command(&command_str, &cmd).await?;
                     self.session.tokens.clear();
@@ -114,7 +114,7 @@ impl IcyBoardState {
                 }
 
                 if let Some(command) = self.try_find_command(&command_str, true).await {
-                    self.session.last_new_line_y = self.display_screen().caret.get_position().y;
+                    self.session.last_new_line_y = self.display_screen().buffer.caret.y;
                     self.session.disp_options.no_change();
                     self.dispatch_command(&command_str, &command).await?;
                     self.session.tokens.clear();

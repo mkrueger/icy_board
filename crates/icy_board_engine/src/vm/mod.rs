@@ -16,7 +16,7 @@ use crate::icy_board::state::NodeState;
 use crate::icy_board::user_base::FSEMode;
 use crate::parser::UserTypeRegistry;
 use async_recursion::async_recursion;
-use icy_engine::Buffer;
+use icy_engine::TextBuffer;
 use icy_engine::rip::to_base_36;
 use jamjam::jam::msg_header::JamMessageHeader;
 use std::collections::HashMap;
@@ -160,7 +160,7 @@ pub struct VirtualMachine<'a> {
     pub label_table: HashMap<usize, usize>,
     pub push_pop_stack: Vec<VariableValue>,
 
-    pub stored_screen: Option<Buffer>,
+    pub stored_screen: Option<TextBuffer>,
 
     pub fd_default_in: i32,
     pub fd_default_out: i32,

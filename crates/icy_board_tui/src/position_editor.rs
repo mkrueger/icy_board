@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::icy_board::commands::Position;
-use icy_engine::{Buffer, TextPane};
+use icy_engine::{TextBuffer, TextPane};
 use ratatui::{
     Frame,
     layout::Rect,
@@ -10,7 +10,7 @@ use ratatui::{
 };
 
 pub struct PositionEditor {
-    pub buffer: Buffer,
+    pub buffer: TextBuffer,
 }
 
 impl PositionEditor {
@@ -19,7 +19,7 @@ impl PositionEditor {
         Clear.render(area, frame.buffer_mut());
         for y in 0..area.height as i32 {
             for x in 0..area.width as i32 {
-                let c = buffer.get_char((x, y + buffer.get_first_visible_line()));
+                let c = buffer.get_char((x, y + buffer.get_first_visible_line()).into());
                 let mut fg = c.attribute.get_foreground();
                 if c.attribute.is_bold() {
                     fg += 8;

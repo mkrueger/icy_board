@@ -1,12 +1,12 @@
 use std::{
     ffi::OsStr,
     fs,
-    io::{BufReader, Read, Seek, SeekFrom},
+    io::{BufReader, Read},
     path::Path,
 };
 
 use codepages::{normalize_file, tables::get_utf8};
-use icy_sauce::SauceInformation;
+use icy_sauce::SauceRecord;
 use unarc_rs::{
     arc::arc_archive::ArcArchieve, arj::arj_archive::ArjArchieve, hyp::hyp_archive::HypArchieve, sq::sq_archive::SqArchieve, zoo::zoo_archive::ZooArchieve,
 };
@@ -65,14 +65,8 @@ fn is_short_desc(name: &std::ffi::OsStr) -> Option<i32> {
 }
 
 fn scan_sauce(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<MetadataHeader>> {
-    let file = fs::File::open(path)?;
-    let mut reader = BufReader::new(file);
-    if reader.seek(SeekFrom::End(-128)).is_ok() {
-        let mut sauce = [0u8; 128];
-        reader.read_exact(&mut sauce)?;
-        if let Ok(Some(_)) = SauceInformation::read(&sauce[..]) {
-            info.push(MetadataHeader::new(MetadataType::Sauce, sauce.to_vec()));
-        }
+    if let Ok(Some(sauce)) = SauceRecord::from_path(path) {
+        info.push(MetadataHeader::new(MetadataType::Sauce, sauce.to_bytes_without_eof()));
     }
     Ok(info)
 }

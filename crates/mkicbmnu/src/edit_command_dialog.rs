@@ -54,9 +54,9 @@ impl<'a> EditCommandDialog<'a> {
         let file = icy_board.lock().unwrap().resolve_file(&disp_file);
 
         let buffer = if file.exists() {
-            icy_engine::Buffer::load_buffer(&file, true, None).unwrap()
+            icy_engine::TextBuffer::load_buffer(&file, true, None).unwrap()
         } else {
-            icy_engine::Buffer::new((80, 25))
+            icy_engine::TextBuffer::new((80, 25))
         };
 
         let position_editor = Arc::new(Mutex::new(PositionEditor { buffer }));

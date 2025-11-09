@@ -24,7 +24,7 @@ use icy_board_engine::{
         xfer_protocols::SupportedProtocols,
     },
 };
-use icy_engine::{Buffer, SaveOptions, ScreenPreperation};
+use icy_engine::{SaveOptions, ScreenPreperation, TextBuffer};
 use jamjam::{jam::JamMessageBase, util::echmoail::EchomailAddress};
 
 use crate::import::{OutputLogger, console_logger::ConsoleLogger};
@@ -512,7 +512,7 @@ pub fn convert_to_pcb(path: &PathBuf, data: &[u8]) -> Res<()> {
 }
 
 pub fn convert_to_pcb_opt(path: &PathBuf, data: &[u8], opt: &SaveOptions) -> Res<()> {
-    let mut buffer = Buffer::from_bytes(&PathBuf::from("a.icy"), true, data, None, None).unwrap();
+    let mut buffer = TextBuffer::from_bytes(&PathBuf::from("a.icy"), true, data, None, None).unwrap();
     let bytes: Vec<u8> = buffer.to_bytes("pcb", opt).unwrap();
     fs::write(path.with_extension("pcb"), &bytes)?;
     Ok(())

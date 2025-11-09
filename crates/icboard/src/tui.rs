@@ -26,16 +26,14 @@ use icy_board_tui::{
     get_text_args,
     theme::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GRAY, DOS_LIGHT_GREEN, DOS_RED, DOS_WHITE, DOS_YELLOW},
 };
-use icy_engine::TextPane;
+use icy_engine::{Screen, TextPane, TextScreen};
 use icy_net::{ConnectionType, channel::ChannelConnection};
 use ratatui::{prelude::*, widgets::Paragraph};
 use tokio::sync::{Mutex, mpsc};
 
-use crate::icy_engine_output::Screen;
-
 pub struct Tui {
     sysop_mode: bool,
-    screen: Arc<std::sync::Mutex<Screen>>,
+    screen: Arc<std::sync::Mutex<TextScreen>>,
     tx: mpsc::Sender<SendData>,
     status_bar: usize,
     handle: Arc<Mutex<Vec<Option<NodeState>>>>,
@@ -57,7 +55,7 @@ impl Tui {
         let ui_node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
         let node_state = bbs.lock().await.open_connections.clone();
         let node = ui_node.clone();
-        let screen = Arc::new(std::sync::Mutex::new(Screen::new()));
+        let screen = Arc::new(std::sync::Mutex::new(TextScreen::new((80, 25))));
         let (ui_connection, connection) = ChannelConnection::create_pair();
         let node_state2 = node_state.clone();
 
@@ -108,7 +106,7 @@ impl Tui {
         }
         bbs.bbs_channels[node].as_ref().unwrap().send(BBSMessage::SysopLogin).await?;
 
-        let screen = Arc::new(std::sync::Mutex::new(Screen::new()));
+        let screen = Arc::new(std::sync::Mutex::new(TextScreen::new((80, 25))));
         log::info!("Run terminal thread");
         let (_handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone());
 
@@ -224,16 +222,15 @@ impl Tui {
         let mut area = Rect::new((frame.area().width - width) / 2, (frame.area().height - height) / 2, width, height);
 
         let screen = &self.screen.lock().unwrap();
-        let buffer = &screen.buffer;
         for y in 0..area.height as i32 {
             for x in 0..area.width as i32 {
-                let c = buffer.get_char((x, y + buffer.get_first_visible_line()));
+                let c = screen.get_char((x, y + screen.get_first_visible_line()).into());
                 let mut fg = c.attribute.get_foreground();
                 if c.attribute.is_bold() {
                     fg += 8;
                 }
-                let fg = buffer.palette.get_color(fg).get_rgb();
-                let bg = buffer.palette.get_color(c.attribute.get_background()).get_rgb();
+                let fg = screen.palette().get_color(fg).get_rgb();
+                let bg = screen.palette().get_color(c.attribute.get_background()).get_rgb();
                 let mut s: Style = Style::new().bg(Color::Rgb(bg.0, bg.1, bg.2)).fg(Color::Rgb(fg.0, fg.1, fg.2));
                 if c.attribute.is_blinking() {
                     s = s.slow_blink();
@@ -248,8 +245,8 @@ impl Tui {
         if area.y + area.height < frame.area().height {
             self.draw_statusbar(frame, area, status_bar_info);
         }
-        let pos: icy_engine::Position = screen.caret.get_position();
-        frame.set_cursor_position((area.x + pos.x as u16, y + pos.y as u16 - buffer.get_first_visible_line() as u16));
+        let pos: icy_engine::Position = screen.caret.position();
+        frame.set_cursor_position((area.x + pos.x as u16, y + pos.y as u16 - screen.get_first_visible_line() as u16));
     }
 
     fn draw_statusbar(&self, frame: &mut Frame, area: Rect, status_bar_info: StatusBarInfo) {

@@ -1017,7 +1017,7 @@ pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn savescrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let mut buf = vm.icy_board_state.display_screen().buffer.flat_clone(false);
+    let mut buf = vm.icy_board_state.display_screen().buffer.buffer.flat_clone(false);
     buf.buffer_type = BufferType::Unicode;
     vm.stored_screen = Some(buf);
     Ok(())
