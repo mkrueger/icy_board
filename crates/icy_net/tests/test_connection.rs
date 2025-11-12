@@ -84,7 +84,7 @@ impl Connection for TestConnection {
                 }
                 Ok(take)
             }
-            None => {
+            _ => {
                 self.closed = true;
                 Ok(0)
             }
@@ -147,6 +147,7 @@ impl Connection for TestConnection {
     }
 }
 
+#[allow(unused)]
 pub async fn test_sender(con: &mut TestConnection, proto: &mut dyn Protocol, files: &[std::path::PathBuf]) -> TransferState {
     let mut state = proto.initiate_send(con, files).await.expect("init send failed");
     while !state.is_finished {
@@ -155,6 +156,7 @@ pub async fn test_sender(con: &mut TestConnection, proto: &mut dyn Protocol, fil
     state
 }
 
+#[allow(unused)]
 pub async fn test_receiver(con: &mut TestConnection, proto: &mut dyn Protocol) -> TransferState {
     let mut state = proto.initiate_recv(con).await.expect("init recv failed");
     while !state.is_finished {

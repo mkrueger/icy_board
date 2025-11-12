@@ -8,7 +8,9 @@ use pretty_assertions::assert_eq;
 use tempfile::NamedTempFile;
 
 mod test_connection;
-use test_connection::{TestConnection, test_receiver, test_sender};
+use test_connection::TestConnection;
+
+use crate::test_connection::{test_receiver, test_sender};
 
 const SOH: u8 = 0x01;
 const EOT: u8 = 0x04;

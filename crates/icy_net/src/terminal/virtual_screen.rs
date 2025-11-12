@@ -9,7 +9,6 @@ impl VirtualScreen {
     pub fn new<T: BufferParser + 'static>(parser: T) -> Self {
         let mut buffer = TextScreen::new((80, 25));
         buffer.buffer.terminal_state.is_terminal_buffer = true;
-        buffer.buffer.terminal_state.fixed_size = true;
         buffer.buffer.buffer_type = icy_engine::BufferType::Unicode;
         Self {
             parser: Box::new(parser),

@@ -98,22 +98,17 @@ async fn test_zmodem_simple_send() {
             let header = match maybe_header {
                 Ok(Some(h)) => h,
                 Ok(None) => {
-                    println!("No header available, continuing...");
                     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
                     continue;
                 }
-                Err(e) => {
-                    println!("Header read error: {:?}", e);
+                Err(_) => {
                     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
                     continue;
                 }
             };
 
-            println!("Received header: {:?}", header.frame_type);
-
             match header.frame_type {
                 ZFrameType::RQInit => {
-                    println!("Got ZRQINIT, sending ZRINIT");
                     if !injected_handshake {
                         // Advertise CANFC32 (CRC32) and ESCCTL so sender uses 32-bit CRC & escapes
                         let caps = icy_net::protocol::zmodem::constants::zrinit_flag::CANFC32 | icy_net::protocol::zmodem::constants::zrinit_flag::ESCCTL;
@@ -126,11 +121,9 @@ async fn test_zmodem_simple_send() {
                     }
                 }
                 ZFrameType::SInit => {
-                    println!("Got ZSINIT, reading attention string and sending ZACK");
                     // Read the attention string subpacket (usually empty or minimal)
-                    let (attn_data, last, _) = read_subpacket(&mut b, 1024, true, false).await.expect("read ZSINIT subpacket");
+                    let (_attn_data, last, _) = read_subpacket(&mut b, 1024, true, false).await.expect("read ZSINIT subpacket");
                     assert!(last, "ZSINIT subpacket should be last");
-                    println!("ZSINIT attention string: {:?}", attn_data);
 
                     // Send ZACK to acknowledge ZSINIT
                     Header::from_number(ZFrameType::Ack, 0)
@@ -139,7 +132,6 @@ async fn test_zmodem_simple_send() {
                         .expect("write ZACK after ZSINIT");
                 }
                 ZFrameType::File => {
-                    println!("Got ZFILE, reading subpacket and sending ZRPOS");
                     // Read the file info subpacket
                     let (block, last, _) = read_subpacket(&mut b, 1024, true, false).await.expect("read file subpacket");
                     assert!(last, "File header subpacket should be last in frame");
@@ -155,17 +147,14 @@ async fn test_zmodem_simple_send() {
                         .expect("write ZRPOS");
                 }
                 ZFrameType::Data => {
-                    println!("Got ZDATA, reading subpacket");
                     // Read the data subpacket
                     let (payload, last, zack) = read_subpacket(&mut b, 1024, true, false).await.expect("read data subpacket");
-                    println!("Data subpacket: last={}, zack={}, len={}", last, zack, payload.len());
                     assert!(last, "Expect single subpacket for tiny test data");
                     assert_eq!(payload, data);
                     saw_data = true;
 
                     // Only send ACK if the subpacket explicitly requested it (ZCRCQ or ZCRCW).
                     if zack {
-                        println!("Sending ACK as requested");
                         Header::empty(ZFrameType::Ack)
                             .write(&mut b, HeaderType::Hex, false)
                             .await
@@ -173,7 +162,6 @@ async fn test_zmodem_simple_send() {
                     }
                 }
                 ZFrameType::Eof => {
-                    println!("Got ZEOF, sending ZRINIT");
                     saw_eof = true;
                     // Send ZRINIT to acknowledge EOF
                     Header::empty(ZFrameType::RIinit)
@@ -182,7 +170,6 @@ async fn test_zmodem_simple_send() {
                         .expect("write ZRINIT after EOF");
                 }
                 ZFrameType::Fin => {
-                    println!("Got ZFIN, echoing and sending OO");
                     saw_fin = true;
                     // Echo ZFIN to complete session
                     Header::empty(ZFrameType::Fin).write(&mut b, HeaderType::Hex, false).await.expect("echo ZFIN");
@@ -192,7 +179,7 @@ async fn test_zmodem_simple_send() {
                     break;
                 }
                 other => {
-                    println!("Unexpected header type: {:?}", other);
+                    log::error!("Unexpected header type: {:?}", other);
                 }
             }
         }

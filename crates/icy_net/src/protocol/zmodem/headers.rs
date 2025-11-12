@@ -203,7 +203,6 @@ impl Header {
     }
 
     pub async fn write(&self, com: &mut dyn Connection, header_type: HeaderType, escape_ctrl_chars: bool) -> crate::Result<usize> {
-        println!("Sending header: {}", self);
         com.send(&self.build(header_type, escape_ctrl_chars)).await?;
         Ok(12)
     }
@@ -331,7 +330,6 @@ impl Header {
             }
         }
     }
-
     pub async fn try_read(com: &mut dyn Connection, can_count: &mut usize) -> crate::Result<Option<Header>> {
         let buf = &mut [0u8; 1];
         let bytes_read = com.try_read(buf).await?;

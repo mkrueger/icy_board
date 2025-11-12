@@ -4,11 +4,11 @@ use tempfile::NamedTempFile;
 
 use crate::{
     Connection,
-    crc::{get_crc16_buggy_zlde, get_crc32, update_crc32},
+    crc::{get_crc16_buggy, get_crc16_buggy_zlde, get_crc32, update_crc32},
     protocol::{Header, HeaderType, TransferState, ZCRCE, ZCRCG, ZCRCW, ZFrameType, Zmodem, str_from_null_terminated_utf8_unchecked},
 };
 
-use super::{constants::*, err::ZModemError, read_zdle_bytes, zrinit_flag::CANFDX};
+use super::{ZBIN, ZBIN32, ZDLE, ZHEX, ZPAD, constants::*, err::ZModemError, frame_types, from_hex, read_zdle_bytes, zrinit_flag::CANFDX};
 
 #[derive(Debug)]
 pub enum RecvState {
@@ -23,6 +23,7 @@ pub enum RecvState {
 pub struct Rz {
     state: RecvState,
     retries: usize,
+    errors: usize,
     can_count: usize,
     block_length: usize,
     sender_flags: u8,
@@ -46,6 +47,7 @@ impl Rz {
             state: RecvState::Idle,
             block_length,
             retries: 0,
+            errors: 0,
             can_count: 0,
             sender_flags: 0,
             use_crc32: true,
@@ -100,48 +102,85 @@ impl Rz {
                 self.read_header(com, storage_handler, transfer_state)?;
             }*/
             RecvState::AwaitFileData => {
-                let pck = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control).await;
-                match pck {
-                    Ok((block, is_last, expect_ack)) => {
-                        // Write data first, then send ACK
-                        if let Some(named_file) = &mut self.cur_out_file {
-                            named_file.as_file_mut().write_all(&block)?;
-                            transfer_state.recieve_state.total_bytes_transfered += block.len() as u64;
-                            transfer_state.recieve_state.cur_bytes_transfered += block.len() as u64;
-                        } else {
-                            transfer_state.recieve_state.log_error("No file open for writing data".to_string());
-                            return Err(ZModemError::NoFileOpen.into());
-                        }
+                let result = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control).await;
 
-                        if expect_ack {
-                            // Send ACK with correct offset (not block length)
+                match result {
+                    Ok((data, is_last, zack)) => {
+                        // Reset error count on successful read
+                        self.errors = 0;
+
+                        if let Some(out) = &mut self.cur_out_file {
+                            out.as_file_mut().write_all(&data)?;
+                        }
+                        transfer_state.recieve_state.cur_bytes_transfered += data.len() as u64;
+                        transfer_state.recieve_state.total_bytes_transfered += data.len() as u64;
+
+                        if zack {
+                            // Send ZACK if requested
                             Header::from_number(ZFrameType::Ack, transfer_state.recieve_state.cur_bytes_transfered as u32)
                                 .write(com, HeaderType::Hex, self.can_esc_control)
                                 .await?;
-
-                            transfer_state
-                                .recieve_state
-                                .log_info(format!("Sent ACK for offset {}", transfer_state.recieve_state.cur_bytes_transfered));
                         }
 
                         if is_last {
-                            transfer_state.recieve_state.log_info("Last data subpacket received, awaiting ZEOF".to_string());
                             self.state = RecvState::AwaitEOF;
                         }
                     }
-                    Err(err) => {
-                        transfer_state.recieve_state.errors += 1;
-                        log::error!("{err}");
-                        transfer_state.recieve_state.log_error(format!(
-                            "Subpacket error #{}: {}, requesting retransmission from offset {}",
-                            transfer_state.recieve_state.errors, err, transfer_state.recieve_state.cur_bytes_transfered
-                        ));
+                    Err(e) => {
+                        // Classify recoverable errors (CRC mismatch or invalid subpacket byte)
+                        let (recoverable, kind) = if let Some(zmodem_err) = e.downcast_ref::<ZModemError>() {
+                            match zmodem_err {
+                                ZModemError::SubpacketCrcError(_) => (true, "crc"),
+                                ZModemError::InvalidSubpacket(_) => (true, "decode"),
+                                _ => (false, "fatal"),
+                            }
+                        } else {
+                            (false, "other")
+                        };
 
-                        Header::from_number(ZFrameType::RPos, transfer_state.recieve_state.cur_bytes_transfered as u32)
-                            .write(com, HeaderType::Hex, self.can_esc_control)
-                            .await?;
-                        self.state = RecvState::AwaitZDATA;
-                        return Ok(());
+                        if recoverable {
+                            match kind {
+                                "crc" => transfer_state.recieve_state.log_warning(format!(
+                                    "Subpacket CRC error at offset {}, requesting retransmission",
+                                    transfer_state.recieve_state.cur_bytes_transfered
+                                )),
+                                "decode" => transfer_state.recieve_state.log_warning(format!(
+                                    "Invalid byte in subpacket at offset {}, requesting retransmission",
+                                    transfer_state.recieve_state.cur_bytes_transfered
+                                )),
+                                _ => {}
+                            }
+
+                            self.errors += 1;
+
+                            // Optionally send attention sequence for decode errors
+                            if kind == "decode" && !self.attn_seq.is_empty() {
+                                let _ = com.send(&self.attn_seq).await; // ignore failure, we still try ZRPOS
+                            }
+
+                            // Purge any stray bytes from a partially consumed frame
+                            let _ = self.purge(com).await;
+
+                            // Request retransmission from last good position
+                            Header::from_number(ZFrameType::RPos, transfer_state.recieve_state.cur_bytes_transfered as u32)
+                                .write(com, HeaderType::Hex, self.can_esc_control)
+                                .await?;
+
+                            // Switch to waiting for a new ZDATA header
+                            self.state = RecvState::AwaitZDATA;
+
+                            if self.errors > 10 {
+                                transfer_state
+                                    .recieve_state
+                                    .log_error("Too many recoverable subpacket errors, aborting transfer".to_string());
+                                Zmodem::cancel(com).await?;
+                                return Err(e);
+                            }
+                        } else {
+                            // Non-recoverable error
+                            transfer_state.recieve_state.log_error(format!("Fatal subpacket error: {:?}", e));
+                            return Err(e);
+                        }
                     }
                 }
             }
@@ -158,13 +197,44 @@ impl Rz {
             .await
     }
 
+    /// Purge any residual incoming bytes after an error before waiting for the next header.
+    /// Uses `try_read` so it doesn't block. Caps the total purged bytes to avoid livelock.
+    async fn purge(&mut self, com: &mut dyn Connection) -> crate::Result<usize> {
+        let mut total = 0usize;
+        let mut buf = [0u8; 256];
+        // Read until no more data or cap reached
+        loop {
+            let read = com.try_read(&mut buf).await?;
+            if read == 0 {
+                break;
+            }
+            total += read;
+            if total > 4096 {
+                break;
+            }
+        }
+        Ok(total)
+    }
+
     async fn read_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<bool> {
-        match Header::read(com, &mut self.can_count).await {
+        // In AwaitZDATA state after error recovery, we need to scan for header
+        // because sender may have data packets in flight that arrive before ZRPOS is processed
+        let use_scan = matches!(self.state, RecvState::AwaitZDATA) && self.errors > 0;
+
+        let result = if use_scan {
+            self.scan_for_header(com).await
+        } else {
+            Header::read(com, &mut self.can_count).await
+        };
+
+        match result {
             Ok(Some(header)) => {
                 self.can_count = 0;
+
                 return self.handle_header(com, transfer_state, header).await;
             }
 
+            #[allow(non_snake_case)]
             Ok(None) => {
                 return Ok(false);
             }
@@ -184,6 +254,112 @@ impl Rz {
                     .log_warning(format!("Header read error #{}: {:?}", transfer_state.recieve_state.errors, err));
                 return Ok(false);
             }
+        }
+    }
+
+    /// Scan for a valid header by skipping garbage bytes.
+    /// Used after error recovery when sender may have packets in flight.
+    async fn scan_for_header(&mut self, com: &mut dyn Connection) -> crate::Result<Option<Header>> {
+        let mut scanned = 0;
+        const MAX_SCAN: usize = 8192; // Limit scan to avoid infinite loop
+
+        loop {
+            let b = com.read_u8().await?;
+            scanned += 1;
+
+            // Don't track CAN during data scanning - CAN bytes are valid in binary data!
+            // Only the strict header parser should track sequential CANs at frame boundaries.
+
+            if b != ZPAD {
+                if scanned > MAX_SCAN {
+                    return Err(ZModemError::ZPADExected(b).into());
+                }
+                continue; // Keep scanning
+            }
+
+            // Found ZPAD, try to parse header
+            let mut next = com.read_u8().await?;
+            if next == ZPAD {
+                next = com.read_u8().await?;
+            }
+            if next != ZDLE {
+                continue; // False alarm, keep scanning
+            }
+
+            let header_type = com.read_u8().await?;
+            let header_data_size = match header_type {
+                ZBIN => 7,
+                ZBIN32 => 9,
+                ZHEX => 14,
+                _ => continue, // Unknown type, keep scanning
+            };
+
+            let header_data = read_zdle_bytes(com, header_data_size).await?;
+
+            // Parse header based on type
+            let header = match header_type {
+                ZBIN => {
+                    let crc16 = get_crc16_buggy(&header_data[0..5]);
+                    let check_crc16 = u16::from_le_bytes(header_data[5..7].try_into().unwrap());
+                    if crc16 != check_crc16 {
+                        continue; // CRC mismatch, keep scanning
+                    }
+                    Header {
+                        header_type: HeaderType::Bin,
+                        frame_type: Header::get_frame_type(header_data[0])?,
+                        data: header_data[1..5].try_into().unwrap(),
+                    }
+                }
+                ZBIN32 => {
+                    let data = &header_data[0..5];
+                    let crc32 = get_crc32(data);
+                    let check_crc32 = u32::from_le_bytes(header_data[5..9].try_into().unwrap());
+                    if crc32 != check_crc32 {
+                        continue; // CRC mismatch, keep scanning
+                    }
+                    Header {
+                        header_type: HeaderType::Bin32,
+                        frame_type: Header::get_frame_type(header_data[0])?,
+                        data: header_data[1..5].try_into().unwrap(),
+                    }
+                }
+                ZHEX => {
+                    let data = [
+                        from_hex(header_data[0])? << 4 | from_hex(header_data[1])?,
+                        from_hex(header_data[2])? << 4 | from_hex(header_data[3])?,
+                        from_hex(header_data[4])? << 4 | from_hex(header_data[5])?,
+                        from_hex(header_data[6])? << 4 | from_hex(header_data[7])?,
+                        from_hex(header_data[8])? << 4 | from_hex(header_data[9])?,
+                    ];
+
+                    let crc16 = get_crc16_buggy(&data);
+                    let mut check_crc16 = 0;
+                    for b in &header_data[10..14] {
+                        check_crc16 = check_crc16 << 4 | u16::from(from_hex(*b)?);
+                    }
+                    if crc16 != check_crc16 {
+                        continue; // CRC mismatch, keep scanning
+                    }
+
+                    // Read EOL/XON
+                    let eol = com.read_u8().await?;
+                    if eol == b'\r' {
+                        com.read_u8().await?;
+                    }
+                    if data[0] != frame_types::ZACK && data[0] != frame_types::ZFIN {
+                        com.read_u8().await?;
+                    }
+
+                    Header {
+                        header_type: HeaderType::Hex,
+                        frame_type: Header::get_frame_type(data[0])?,
+                        data: data[1..5].try_into().unwrap(),
+                    }
+                }
+                _ => unreachable!(),
+            };
+
+            return Ok(Some(header));
         }
     }
 
@@ -232,10 +408,16 @@ impl Rz {
             }
             ZFrameType::File => {
                 transfer_state.recieve_state.log_info("ZFILE header received, reading file info".to_string());
+
+                // Reset error count for new file
+                self.errors = 0;
+
                 let pck = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control).await;
 
                 match pck {
                     Ok((block, _, _)) => {
+                        // Successful file header subpacket: reset per-file retry counters
+                        self.errors = 0;
                         let file_name = str_from_null_terminated_utf8_unchecked(&block).to_string();
                         let mut file_size = 0;
                         for b in &block[(file_name.len() + 1)..] {
@@ -264,16 +446,51 @@ impl Rz {
                         return Ok(true);
                     }
                     Err(err) => {
-                        log::error!("{err}");
-                        transfer_state.recieve_state.errors += 1;
-                        transfer_state
-                            .recieve_state
-                            .log_error(format!("Failed to read file info: {}, sending attention sequence", err));
-                        com.send(&self.attn_seq).await?;
-                        Header::from_number(ZFrameType::RPos, transfer_state.recieve_state.cur_bytes_transfered as u32)
-                            .write(com, HeaderType::Hex, self.can_esc_control)
-                            .await?;
-                        return Ok(false);
+                        // Classify recoverable vs fatal for ZFILE subpacket (same criteria as data packets)
+                        let (recoverable, kind) = if let Some(zerr) = err.downcast_ref::<ZModemError>() {
+                            match zerr {
+                                ZModemError::SubpacketCrcError(_) => (true, "crc"),
+                                ZModemError::InvalidSubpacket(_) => (true, "decode"),
+                                _ => (false, "fatal"),
+                            }
+                        } else {
+                            (false, "other")
+                        };
+
+                        if recoverable {
+                            match kind {
+                                "crc" => transfer_state
+                                    .recieve_state
+                                    .log_warning("CRC error in ZFILE info block, requesting retransmission".to_string()),
+                                "decode" => transfer_state
+                                    .recieve_state
+                                    .log_warning("Decode error in ZFILE info block, requesting retransmission".to_string()),
+                                _ => {}
+                            }
+                            self.errors += 1;
+                            // Optionally send attention before RPOS
+                            if kind == "decode" && !self.attn_seq.is_empty() {
+                                let _ = com.send(&self.attn_seq).await;
+                            }
+                            // Purge stray bytes before requesting file header again
+                            let _ = self.purge(com).await;
+                            Header::from_number(ZFrameType::RPos, transfer_state.recieve_state.cur_bytes_transfered as u32)
+                                .write(com, HeaderType::Hex, self.can_esc_control)
+                                .await?;
+                            // If we exceed threshold, abort
+                            if self.errors > 10 {
+                                transfer_state
+                                    .recieve_state
+                                    .log_error("Too many errors reading ZFILE info, aborting".to_string());
+                                Zmodem::cancel(com).await?;
+                                return Err(err);
+                            }
+                            return Ok(false);
+                        } else {
+                            log::error!("{err}");
+                            transfer_state.recieve_state.log_error(format!("Failed to read file info: {}", err));
+                            return Err(err);
+                        }
                     }
                 }
             }
@@ -519,8 +736,10 @@ pub async fn read_zdle_byte(com: &mut dyn Connection, escape_ctrl_chars: bool) -
                             if c & 0x60 == 0x40 {
                                 return Ok(ZModemResult::Ok(c ^ 0x40));
                             }
-
-                            return Err(ZModemError::InvalidSubpacket(c).into());
+                            // Reference implementation only logs and discards illegal ZDLE sequences.
+                            // Treat as recoverable: drop byte and keep reading instead of bailing out.
+                            log::warn!("Illegal ZDLE sequence byte 0x{:02X}, dropping", c);
+                            continue; // keep consuming until we see a valid terminator or data byte
                         }
                     }
                 }

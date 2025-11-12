@@ -457,7 +457,6 @@ impl<'a> EditCommandDialog<'a> {
             //     let area =  footer.inner(&Margin { vertical: 15, horizontal: 5 });
             block.render(area, frame.buffer_mut());
             edit_config.render(area.inner(Margin { vertical: 1, horizontal: 1 }), frame, &mut self.edit_config_state);
-
             edit_config
                 .get_item(self.edit_config_state.selected)
                 .unwrap()
