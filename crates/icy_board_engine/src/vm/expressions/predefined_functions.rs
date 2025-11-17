@@ -19,7 +19,8 @@ use crate::icy_board::user_inf::{BankUserInf, QwkConfigUserInf};
 use crate::parser::CONFERENCE_ID;
 use crate::vm::{MAX_FILE_CHANNELS, TerminalTarget, VirtualMachine, get_file_channel};
 use chrono::{DateTime, Utc};
-use icy_engine::{Position, TextPane, update_crc32};
+use icy_engine::{Position, TextPane};
+use icy_net::crc::update_crc32;
 use jamjam::jam::JamMessageBase;
 use jamjam::jam::msg_header::JamMessageHeader;
 use jamjam::util::basic_real::{BasicDouble, BasicReal};
@@ -1506,13 +1507,10 @@ pub async fn lastans(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     }
 }
 
-pub fn to_base_36(number: i32) -> String {
-    if number <= 0 {
-        return "0".into();
-    }
+pub fn to_base_36(min_len: usize, number: i32) -> String {
     let mut n = number;
     let mut out = Vec::new();
-    while n > 0 {
+    while n > 0 && min_len < out.len() {
         let d = (n % 36) as u8;
         out.push(if d < 10 { (b'0' + d) as char } else { (b'A' + d - 10) as char });
         n /= 36;
@@ -1522,7 +1520,7 @@ pub fn to_base_36(number: i32) -> String {
 
 pub async fn meganum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let var = vm.eval_expr(&args[0]).await?.as_int();
-    Ok(VariableValue::new_string(to_base_36(var)))
+    Ok(VariableValue::new_string(to_base_36(0, var)))
 }
 
 pub async fn evttimeadj(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

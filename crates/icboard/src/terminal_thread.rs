@@ -1,7 +1,7 @@
-use codepages::tables::CP437_TO_UNICODE;
 use icy_board_engine::Res;
-use icy_engine::{BufferParser, Caret, TextScreen, ansi};
+use icy_engine::{Caret, TextScreen};
 use icy_net::Connection;
+use icy_parser_core::{AnsiParser, CommandParser};
 use std::{
     mem,
     sync::{Arc, Mutex},
@@ -24,8 +24,8 @@ pub fn start_update_thread(com: Box<dyn Connection>, screen: Arc<Mutex<TextScree
             .name("Terminal update".to_string())
             .spawn(move || {
                 tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                    let mut buffer_parser = ansi::Parser::default();
-                    buffer_parser.bs_is_ctrl_char = true;
+                    let mut buffer_parser = AnsiParser::default();
+                    // buffer_parser.bs_is_ctrl_char = true;
                     let mut connection = ConnectionThreadData {
                         _is_connected: false,
                         com,
@@ -68,9 +68,8 @@ pub fn start_update_thread(com: Box<dyn Connection>, screen: Arc<Mutex<TextScree
                                                                     let mut s = screen.lock().unwrap();
                                                                     let mut caret = Caret::default();
                                                                     mem::swap(&mut caret, &mut s.caret);
-                                                                    for ch in &data[0..size] {
-                                                                        let _ = buffer_parser.print_char( &mut *s, CP437_TO_UNICODE[*ch as usize]);
-                                                                    }
+                                                                    let mut sink = icy_engine::ScreenSink::new(&mut *s);
+                                                                    buffer_parser.parse(&data[0..size], &mut sink);
                                                                     mem::swap(&mut s.caret, &mut caret);
                                                                 } else {
                                                                     std::thread::sleep(std::time::Duration::from_millis(20));

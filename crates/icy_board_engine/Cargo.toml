@@ -9,6 +9,7 @@ edition.workspace = true
 [dependencies]
 icy_engine = { workspace = true }
 icy_net = { workspace = true }
+icy_parser_core =  { workspace = true }
 codepages = { workspace = true }
 
 lazy_static = { workspace = true }
@@ -35,12 +36,12 @@ strum = { workspace = true }
 strum_macros = "0.27.2"
 serde-inline-default = "1.0.0"
 
-async-recursion = "1.1.1"
+async-recursion =  { workspace = true }
 radix_fmt = "1"
 qfile = { path = "../qfile" }
 byteorder = "1.5.0"
 toml = { workspace = true }
-async-trait = "0.1.83"
+async-trait =  { workspace = true }
 logos = "0.15.0"
 humanize-bytes = "1.0.5"
 reqwest = { version = "0.12", features = ["json", "blocking"] }

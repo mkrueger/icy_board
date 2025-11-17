@@ -8,6 +8,7 @@ edition = "2024"
 [dependencies]
 icy_board_engine = { workspace = true}
 icy_board_tui = { workspace = true}
+icy_parser_core = { workspace = true}
 jamjam = { workspace = true}
 codepages = { workspace = true}
 dizbase = { workspace = true}
@@ -42,8 +43,8 @@ tokio-util = "0.7.13"
 http = "1.1.0"
 
 # for file view kb/mb
-async-recursion = "1.1.1"
+async-recursion = { workspace = true }
 
 russh = "0.54.5"
 internal-russh-forked-ssh-key = "0.6.7-internal.6"
-async-trait = "0.1.83"
+async-trait =  { workspace = true }

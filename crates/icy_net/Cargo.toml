@@ -12,20 +12,21 @@ thiserror = { workspace = true }
 tempfile = { workspace = true }
 serde = { workspace = true }
 icy_engine = { workspace = true }
+icy_parser_core = { workspace = true }
 tokio = { workspace = true }
 lazy_static = { workspace = true }
 semver = { workspace = true }
 tokio-util = { version = "0.7.10", features = ["codec"] }
 regex = { workspace = true }
-async-trait = "0.1.83"
-async-recursion = "1.1.1"
+async-trait =  { workspace = true }
+async-recursion =  { workspace = true }
 
 bytes = "1"
 # MODEM
-serial2-tokio = "0.1.10"
+serial2-tokio = "0.1.19"
 
 # SSH
-russh = "0.54.5"
+russh = "0.54.6"
 internal-russh-forked-ssh-key = "0.6.7-internal.6"
 
 # WEBSOCKETS

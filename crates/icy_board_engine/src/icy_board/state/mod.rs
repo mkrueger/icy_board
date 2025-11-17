@@ -15,10 +15,11 @@ use async_recursion::async_recursion;
 use chrono::{DateTime, Datelike, Local, Utc};
 use codepages::tables::UNICODE_TO_CP437;
 use dizbase::file_base::FileBase;
-use icy_engine::{OutputFormat, SaveOptions, ScreenPreperation, ansi};
-use icy_engine::{Position, ansi::constants::COLOR_OFFSETS};
+use icy_engine::Position;
+use icy_engine::{OutputFormat, SaveOptions, ScreenPreperation};
 use icy_engine::{TextAttribute, TextPane};
 use icy_net::{Connection, ConnectionType, channel::ChannelConnection, iemsi::EmsiICI, termcap_detect::TerminalCaps, terminal::virtual_screen::VirtualScreen};
+use icy_parser_core::ANSI_COLOR_OFFSETS;
 use regex::Regex;
 use tokio::{sync::Mutex, time::sleep};
 
@@ -561,11 +562,10 @@ impl IcyBoardState {
         session.date_format = board.lock().await.config.board.date_format.clone();
         let display_text: IcbTextFile = board.lock().await.default_display_text.clone();
         let root_path = board.lock().await.root_path.clone();
-        let mut p1 = ansi::Parser::default();
-        p1.bs_is_ctrl_char = true;
-        let mut p2 = ansi::Parser::default();
-        p2.bs_is_ctrl_char = true;
-
+        let p1 = icy_parser_core::AnsiParser::default();
+        //p1.bs_is_ctrl_char = true;
+        let p2 = icy_parser_core::AnsiParser::default();
+        //p2.bs_is_ctrl_char = true;
         Self {
             root_path,
             bbs,
@@ -2501,11 +2501,11 @@ impl IcyBoardState {
         }
 
         if fg != new_color.get_foreground() {
-            color_change += format!("{};", COLOR_OFFSETS[new_color.get_foreground() as usize % 8] + 30).as_str();
+            color_change += format!("{};", ANSI_COLOR_OFFSETS[new_color.get_foreground() as usize % 8] + 30).as_str();
         }
 
         if bg != new_color.get_background() {
-            color_change += format!("{};", COLOR_OFFSETS[new_color.get_background() as usize % 8] + 40).as_str();
+            color_change += format!("{};", ANSI_COLOR_OFFSETS[new_color.get_background() as usize % 8] + 40).as_str();
         }
 
         color_change.pop();

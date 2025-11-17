@@ -33,6 +33,7 @@ icy_board_tui = { path = "crates/icy_board_tui" }
 icy_net = { path = "crates/icy_net" }
 icy_board_engine = { path = "crates/icy_board_engine" }
 icy_engine = { git ="https://github.com/mkrueger/icy_tools" }
+icy_parser_core = { git ="https://github.com/mkrueger/icy_tools" }
  
 lazy_static = "1.5.0"
 semver = { version ="1.0.23", features = ["serde"] }
@@ -48,6 +49,8 @@ tokio = { version = "1.43.0", features = ["full"] }
 rayon = "1.10.0"
 regex = "1.11.3"
 bitflag = "0.10.1"
+async-trait = "0.1.89"
+async-recursion = "1.1.1"
 
 walkdir = "2.5.0"
 i18n-embed = { version = "0.16.0", features = ["fluent-system", "desktop-requester"]} 
