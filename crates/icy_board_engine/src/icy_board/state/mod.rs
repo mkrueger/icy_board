@@ -9,7 +9,11 @@ use std::{
 };
 
 use crate::{
-    Res, executable::Executable, icy_board::state::user_commands::groupchat::GroupChatPreferences, search_patterns::PatternExpr, vm::expressions::fix_casing,
+    Res,
+    executable::Executable,
+    icy_board::state::{user_commands::groupchat::GroupChatPreferences, virtual_screen::VirtualScreen},
+    search_patterns::PatternExpr,
+    vm::expressions::fix_casing,
 };
 use async_recursion::async_recursion;
 use chrono::{DateTime, Datelike, Local, Utc};
@@ -18,7 +22,7 @@ use dizbase::file_base::FileBase;
 use icy_engine::Position;
 use icy_engine::{OutputFormat, SaveOptions, ScreenPreperation};
 use icy_engine::{TextAttribute, TextPane};
-use icy_net::{Connection, ConnectionType, channel::ChannelConnection, iemsi::EmsiICI, termcap_detect::TerminalCaps, terminal::virtual_screen::VirtualScreen};
+use icy_net::{Connection, ConnectionType, channel::ChannelConnection, iemsi::EmsiICI, termcap_detect::TerminalCaps};
 use icy_parser_core::ANSI_COLOR_OFFSETS;
 use regex::Regex;
 use tokio::{sync::Mutex, time::sleep};
@@ -30,6 +34,7 @@ use crate::{
 pub mod functions;
 pub mod menu_runner;
 pub mod user_commands;
+pub mod virtual_screen;
 use self::functions::display_flags;
 
 use super::{

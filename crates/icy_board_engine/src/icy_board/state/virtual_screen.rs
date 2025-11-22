@@ -1,5 +1,7 @@
 use icy_engine::TextScreen;
 
+use crate::Res;
+
 pub struct VirtualScreen {
     parser: Box<dyn icy_parser_core::CommandParser>,
     pub buffer: TextScreen,
@@ -20,7 +22,7 @@ impl VirtualScreen {
         self.parser = Box::new(parser);
     }
 
-    pub fn print_char(&mut self, c: char) -> crate::Result<()> {
+    pub fn print_char(&mut self, c: char) -> Res<()> {
         let mut sink = icy_engine::ScreenSink::new(&mut self.buffer);
         self.parser.parse(&[c as u8], &mut sink);
         Ok(())
