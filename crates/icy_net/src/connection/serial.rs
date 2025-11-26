@@ -38,7 +38,7 @@ pub enum FlowControl {
     RtsCts,
 }
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
 pub struct Serial {
     pub device: String,
     pub baud_rate: u32,
