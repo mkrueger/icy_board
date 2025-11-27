@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::collections::HashMap;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -107,16 +108,9 @@ impl ModemCommand {
     }
 }
 
-/// Modem response codes for parsing modem output
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ModemResponse {
-    /// The response string to match (e.g., "CONNECT", "NO CARRIER")
-    pub pattern: String,
-    /// The type of response this represents
-    pub response_type: ModemResponseType,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+/// Modem response types
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ModemResponseType {
     /// Connection established (e.g., "CONNECT", "CONNECT 9600")
     Connect,
@@ -136,26 +130,17 @@ pub enum ModemResponseType {
     NoAnswer,
 }
 
-impl ModemResponse {
-    pub fn new(pattern: impl Into<String>, response_type: ModemResponseType) -> Self {
-        Self {
-            pattern: pattern.into(),
-            response_type,
-        }
-    }
-}
-
-fn default_modem_responses() -> Vec<ModemResponse> {
-    vec![
-        ModemResponse::new("CONNECT", ModemResponseType::Connect),
-        ModemResponse::new("OK", ModemResponseType::Ok),
-        ModemResponse::new("RING", ModemResponseType::Ring),
-        ModemResponse::new("NO CARRIER", ModemResponseType::NoCarrier),
-        ModemResponse::new("ERROR", ModemResponseType::Error),
-        ModemResponse::new("NO DIAL TONE", ModemResponseType::NoDialtone),
-        ModemResponse::new("BUSY", ModemResponseType::Busy),
-        ModemResponse::new("NO ANSWER", ModemResponseType::NoAnswer),
-    ]
+fn default_modem_responses() -> HashMap<ModemResponseType, String> {
+    HashMap::from([
+        (ModemResponseType::Connect, "CONNECT".to_string()),
+        (ModemResponseType::Ok, "OK".to_string()),
+        (ModemResponseType::Ring, "RING".to_string()),
+        (ModemResponseType::NoCarrier, "NO CARRIER".to_string()),
+        (ModemResponseType::Error, "ERROR".to_string()),
+        (ModemResponseType::NoDialtone, "NO DIAL TONE".to_string()),
+        (ModemResponseType::Busy, "BUSY".to_string()),
+        (ModemResponseType::NoAnswer, "NO ANSWER".to_string()),
+    ])
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -176,14 +161,14 @@ pub struct ModemConfiguration {
     #[serde(default = "default_dial_prefix")]
     pub dial_prefix: String,
 
-    #[serde(default = "default_dial_postfix")]
-    pub dial_postfix: String,
+    #[serde(default = "default_dial_suffix")]
+    pub dial_suffix: String,
 
     #[serde(default = "default_hangup_command")]
     pub hangup_command: String,
 
     #[serde(default = "default_modem_responses")]
-    pub modem_responses: Vec<ModemResponse>,
+    pub modem_responses: HashMap<ModemResponseType, String>,
 }
 
 fn default_init_command() -> String {
@@ -194,7 +179,7 @@ fn default_dial_prefix() -> String {
     "ATDT".to_string()
 }
 
-fn default_dial_postfix() -> String {
+fn default_dial_suffix() -> String {
     "^M".to_string()
 }
 
@@ -216,7 +201,7 @@ impl Default for ModemConfiguration {
             flow_control: Default::default(),
             init_command: default_init_command(),
             dial_prefix: default_dial_prefix(),
-            dial_postfix: default_dial_postfix(),
+            dial_suffix: default_dial_suffix(),
             hangup_command: default_hangup_command(),
             modem_responses: default_modem_responses(),
         }
@@ -226,9 +211,12 @@ impl Default for ModemConfiguration {
 impl ModemConfiguration {
     /// Parse a modem response from the given text
     /// Returns the first matching response type, if any
-    pub fn parse_response(&self, text: &str) -> Option<&ModemResponse> {
+    pub fn parse_response(&self, text: &str) -> Option<ModemResponseType> {
         let text_upper = text.to_uppercase();
-        self.modem_responses.iter().find(|r| text_upper.contains(&r.pattern.to_uppercase()))
+        self.modem_responses
+            .iter()
+            .find(|(_, pattern)| text_upper.contains(&pattern.to_uppercase()))
+            .map(|(response_type, _)| response_type.clone())
     }
 }
 
