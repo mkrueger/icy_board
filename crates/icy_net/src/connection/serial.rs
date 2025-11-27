@@ -165,7 +165,9 @@ impl Serialize for Format {
 pub struct Serial {
     pub device: String,
     pub baud_rate: u32,
+    #[serde(default)]
     pub format: Format,
+    #[serde(default)]
     pub flow_control: FlowControl,
 }
 

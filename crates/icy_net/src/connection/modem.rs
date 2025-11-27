@@ -31,6 +31,24 @@ pub struct ModemConfiguration {
     pub dial_string: String,
 }
 
+impl Default for ModemConfiguration {
+    fn default() -> Self {
+        Self {
+            name: "Modem".to_string(),
+            device: if cfg!(target_os = "windows") {
+                "COM1:".to_string()
+            } else {
+                "/dev/ttyUSB0".to_string()
+            },
+            baud_rate: 57600,
+            format: Default::default(),
+            flow_control: Default::default(),
+            init_string: "ATZ\r".to_string(),
+            dial_string: "ATDT".to_string(),
+        }
+    }
+}
+
 impl ModemConfiguration {}
 
 pub struct ModemConnection {
