@@ -161,12 +161,27 @@ impl Serialize for Format {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Serial {
     pub device: String,
     pub baud_rate: u32,
     pub format: Format,
     pub flow_control: FlowControl,
+}
+
+impl Default for Serial {
+    fn default() -> Self {
+        Self {
+            device: if cfg!(target_os = "windows") {
+                "COM1:".to_string()
+            } else {
+                "/dev/ttyUSB0".to_string()
+            },
+            baud_rate: 57600,
+            format: Default::default(),
+            flow_control: Default::default(),
+        }
+    }
 }
 
 impl Serial {
