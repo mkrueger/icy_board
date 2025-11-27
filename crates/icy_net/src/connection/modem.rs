@@ -1,15 +1,37 @@
 #![allow(dead_code)]
 
+use std::time::Duration;
+
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use serial2_tokio::SerialPort;
+use tokio::{io::AsyncWriteExt, time::timeout};
 
-use crate::{Connection, ConnectionState, ConnectionType, serial::Serial};
+use crate::{
+    Connection, ConnectionState, ConnectionType,
+    serial::{FlowControl, Format, Serial},
+};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ModemConfiguration {
+    pub name: String,
+    pub device: String,
+    pub baud_rate: u32,
+
+    #[serde(default)]
+    pub format: Format,
+
+    #[serde(default)]
+    pub flow_control: FlowControl,
+
+    #[serde(default)]
     pub init_string: String,
+
+    #[serde(default)]
     pub dial_string: String,
 }
+
+impl ModemConfiguration {}
 
 pub struct ModemConnection {
     modem: ModemConfiguration,
@@ -17,7 +39,8 @@ pub struct ModemConnection {
 }
 
 impl ModemConnection {
-    pub async fn open(serial: Serial, modem: ModemConfiguration, call_number: String) -> crate::Result<Self> {
+    pub async fn open(modem: ModemConfiguration, call_number: String) -> crate::Result<Self> {
+        let serial: Serial = modem.clone().into();
         let port = serial.open()?;
         port.write_all(modem.init_string.as_bytes()).await?;
         port.write_all(b"\n").await?;
@@ -41,12 +64,12 @@ impl Connection for ModemConnection {
     }
 
     async fn try_read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
-        if !self.port.read_dsr().unwrap_or_default() {
-            return Ok(0);
+        // Non-blocking: return immediately if no data available
+        match timeout(Duration::from_millis(1), self.port.read(buf)).await {
+            Ok(Ok(n)) => Ok(n),
+            Ok(Err(e)) => Err(e.into()),
+            Err(_) => Ok(0), // Timeout = no data available
         }
-        let res = self.port.read(buf).await?;
-        //  println!("Read {:?} bytes", &buf[..res]);
-        Ok(res)
     }
 
     async fn poll(&mut self) -> crate::Result<ConnectionState> {
@@ -80,7 +103,7 @@ impl Connection for ModemConnection {
     }
 
     async fn shutdown(&mut self) -> crate::Result<()> {
-        self.port.set_dtr(false)?;
+        self.port.shutdown().await?;
         Ok(())
     }
 }

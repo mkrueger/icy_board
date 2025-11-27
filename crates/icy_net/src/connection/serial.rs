@@ -201,6 +201,17 @@ impl Serial {
     }
 }
 
+impl From<super::modem::ModemConfiguration> for Serial {
+    fn from(modem: super::modem::ModemConfiguration) -> Self {
+        Serial {
+            device: modem.device,
+            baud_rate: modem.baud_rate,
+            format: modem.format,
+            flow_control: modem.flow_control,
+        }
+    }
+}
+
 pub struct SerialConnection {
     port: Box<SerialPort>,
 }
