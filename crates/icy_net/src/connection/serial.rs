@@ -9,7 +9,7 @@ use tokio::{io::AsyncWriteExt, time::timeout};
 
 use crate::{Connection, ConnectionState, ConnectionType};
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum CharSize {
     #[default]
     Bits8,
@@ -18,19 +18,88 @@ pub enum CharSize {
     Bits5,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+impl From<CharSize> for char {
+    fn from(cs: CharSize) -> char {
+        match cs {
+            CharSize::Bits5 => '5',
+            CharSize::Bits6 => '6',
+            CharSize::Bits7 => '7',
+            CharSize::Bits8 => '8',
+        }
+    }
+}
+
+impl TryFrom<char> for CharSize {
+    type Error = String;
+
+    fn try_from(c: char) -> Result<Self, Self::Error> {
+        match c {
+            '5' => Ok(CharSize::Bits5),
+            '6' => Ok(CharSize::Bits6),
+            '7' => Ok(CharSize::Bits7),
+            '8' => Ok(CharSize::Bits8),
+            _ => Err(format!("Invalid char size '{}': expected 5-8", c)),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum StopBits {
     #[default]
     One,
     Two,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+impl From<StopBits> for char {
+    fn from(sb: StopBits) -> char {
+        match sb {
+            StopBits::One => '1',
+            StopBits::Two => '2',
+        }
+    }
+}
+
+impl TryFrom<char> for StopBits {
+    type Error = String;
+
+    fn try_from(c: char) -> Result<Self, Self::Error> {
+        match c {
+            '1' => Ok(StopBits::One),
+            '2' => Ok(StopBits::Two),
+            _ => Err(format!("Invalid stop bits '{}': expected 1/2", c)),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Parity {
     #[default]
     None,
     Odd,
     Even,
+}
+
+impl From<Parity> for char {
+    fn from(p: Parity) -> char {
+        match p {
+            Parity::None => 'N',
+            Parity::Odd => 'O',
+            Parity::Even => 'E',
+        }
+    }
+}
+
+impl TryFrom<char> for Parity {
+    type Error = String;
+
+    fn try_from(c: char) -> Result<Self, Self::Error> {
+        match c.to_ascii_uppercase() {
+            'N' => Ok(Parity::None),
+            'O' => Ok(Parity::Odd),
+            'E' => Ok(Parity::Even),
+            _ => Err(format!("Invalid parity '{}': expected N/O/E", c)),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -41,14 +110,62 @@ pub enum FlowControl {
     RtsCts,
 }
 
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct Format {
+    pub char_size: CharSize,
+    pub stop_bits: StopBits,
+    pub parity: Parity,
+}
+
+impl std::fmt::Display for Format {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}{}", char::from(self.char_size), char::from(self.parity), char::from(self.stop_bits))
+    }
+}
+
+impl std::str::FromStr for Format {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.trim();
+        if s.len() != 3 {
+            return Err(format!("Invalid format string '{}': expected 3 characters (e.g., 8N1)", s));
+        }
+
+        let chars: Vec<char> = s.chars().collect();
+
+        let char_size = CharSize::try_from(chars[0])?;
+        let parity = Parity::try_from(chars[1])?;
+        let stop_bits = StopBits::try_from(chars[2])?;
+
+        Ok(Format { char_size, stop_bits, parity })
+    }
+}
+
+impl<'de> Deserialize<'de> for Format {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        s.parse().map_err(serde::de::Error::custom)
+    }
+}
+
+impl Serialize for Format {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
 pub struct Serial {
     pub device: String,
     pub baud_rate: u32,
-
-    pub char_size: CharSize,
-    pub stop_bits: StopBits,
-    pub parity: Parity,
+    pub format: Format,
     pub flow_control: FlowControl,
 }
 
@@ -57,17 +174,17 @@ impl Serial {
         let port = SerialPort::open(&self.device, move |mut settings: Settings| {
             settings.set_raw();
             settings.set_baud_rate(self.baud_rate)?;
-            match self.char_size {
+            match self.format.char_size {
                 CharSize::Bits5 => settings.set_char_size(serial2_tokio::CharSize::Bits5),
                 CharSize::Bits6 => settings.set_char_size(serial2_tokio::CharSize::Bits6),
                 CharSize::Bits7 => settings.set_char_size(serial2_tokio::CharSize::Bits7),
                 CharSize::Bits8 => settings.set_char_size(serial2_tokio::CharSize::Bits8),
             }
-            match self.stop_bits {
+            match self.format.stop_bits {
                 StopBits::One => settings.set_stop_bits(serial2_tokio::StopBits::One),
                 StopBits::Two => settings.set_stop_bits(serial2_tokio::StopBits::Two),
             }
-            match self.parity {
+            match self.format.parity {
                 Parity::None => settings.set_parity(serial2_tokio::Parity::None),
                 Parity::Odd => settings.set_parity(serial2_tokio::Parity::Odd),
                 Parity::Even => settings.set_parity(serial2_tokio::Parity::Even),
