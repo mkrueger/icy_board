@@ -212,8 +212,40 @@ impl Serial {
                 FlowControl::XonXoff => settings.set_flow_control(serial2_tokio::FlowControl::XonXoff),
                 FlowControl::RtsCts => settings.set_flow_control(serial2_tokio::FlowControl::RtsCts),
             }
+            /*
+            // Set CLOCAL (ignore modem control lines) - essential for local serial communication
+            // Without this, reads may block waiting for carrier detect
+            #[cfg(unix)]
+            {
+                let termios = settings.as_termios_mut();
+                termios.c_cflag |= libc_unix::CLOCAL; // Ignore modem control lines
+                termios.c_cflag |= libc_unix::CREAD;  // Enable receiver
+                termios.c_cflag &= !libc_unix::HUPCL; // Don't hang up on close
+
+                // VMIN=1, VTIME=0: blocking read, return when at least 1 byte available
+                termios.c_cc[libc_unix::VMIN as usize] = 1;
+                termios.c_cc[libc_unix::VTIME as usize] = 0;
+            }*/
+
             Ok(settings)
         })?;
+
+        // Set DTR (Data Terminal Ready) - tells the modem we're ready
+        // This is essential for hardware modems to respond
+        if let Err(e) = port.set_dtr(true) {
+            log::warn!("Failed to set DTR: {}", e);
+        }
+
+        // Set RTS (Request To Send) - enables communication
+        // Only set if not using hardware flow control (RTS/CTS)
+        if self.flow_control != FlowControl::RtsCts {
+            if let Err(e) = port.set_rts(true) {
+                log::warn!("Failed to set RTS: {}", e);
+            }
+        }
+
+        // Discard any garbage in the buffers
+        let _ = port.discard_buffers();
         Ok(port)
     }
 }
@@ -253,8 +285,9 @@ impl Connection for SerialConnection {
     }
 
     async fn try_read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
-        // Non-blocking: return immediately if no data available
-        match timeout(Duration::from_millis(1), self.port.read(buf)).await {
+        // Use a reasonable timeout for serial communication
+        // 50ms gives the hardware time to buffer data
+        match timeout(Duration::from_millis(50), self.port.read(buf)).await {
             Ok(Ok(n)) => Ok(n),
             Ok(Err(e)) => Err(e.into()),
             Err(_) => Ok(0), // Timeout = no data available
