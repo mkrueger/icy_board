@@ -1,6 +1,6 @@
 pub mod file_list;
 pub use file_list::*;
-use icy_engine::{Screen, TextPane};
+use icy_engine::{EditableScreen, TextPane};
 use regex::Regex;
 
 use crate::icy_board::state::IcyBoardState;

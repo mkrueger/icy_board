@@ -26,7 +26,7 @@ use icy_board_tui::{
     get_text_args,
     theme::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GRAY, DOS_LIGHT_GREEN, DOS_RED, DOS_WHITE, DOS_YELLOW},
 };
-use icy_engine::{Screen, TextPane, TextScreen};
+use icy_engine::{EditableScreen, Screen, TextPane, TextScreen};
 use icy_net::{ConnectionType, channel::ChannelConnection};
 use ratatui::{prelude::*, widgets::Paragraph};
 use tokio::sync::{Mutex, mpsc};
