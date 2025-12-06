@@ -2417,7 +2417,6 @@ impl IcyBoardState {
 
         let mut options = SaveOptions::default();
         options.screen_preparation = ScreenPreperation::ClearScreen;
-        options.save_sauce = false;
         options.modern_terminal_output = true;
         let res = icy_engine::formats::PCBoard::default().to_bytes(&mut buf, &options)?;
         let res = unsafe { String::from_utf8_unchecked(res) };
@@ -2429,7 +2428,6 @@ impl IcyBoardState {
     async fn print_sysop_screen(&mut self) -> Res<()> {
         let mut options = icy_engine::SaveOptions::default();
         options.screen_preparation = icy_engine::ScreenPreperation::ClearScreen;
-        options.save_sauce = false;
         options.modern_terminal_output = true;
         let res = icy_engine::formats::PCBoard::default().to_bytes(&mut self.user_screen.buffer.buffer, &options)?;
         let res = unsafe { String::from_utf8_unchecked(res) };

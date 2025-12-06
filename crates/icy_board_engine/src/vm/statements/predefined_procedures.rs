@@ -1027,7 +1027,6 @@ pub async fn restscrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     if let Some(screen) = &mut vm.stored_screen {
         let mut options = SaveOptions::default();
         options.screen_preparation = ScreenPreperation::ClearScreen;
-        options.save_sauce = false;
         options.modern_terminal_output = true;
         let res = icy_engine::formats::PCBoard::default().to_bytes(screen, &options)?;
         let res = unsafe { String::from_utf8_unchecked(res) };
