@@ -585,14 +585,10 @@ pub struct ModemConnection {
 }
 
 impl ModemConnection {
-    pub async fn open(modem: ModemConfiguration, call_number: String) -> crate::Result<Self> {
+    pub async fn open(modem: ModemConfiguration) -> crate::Result<Self> {
         let serial: Serial = modem.clone().into();
         let port: SerialPort = serial.open()?;
-
-        let mut conn = Self { modem, port: Box::new(port) };
-        conn.init().await?;
-        conn.dial(&call_number).await?;
-        Ok(conn)
+        Ok(Self { modem, port: Box::new(port) })
     }
 
     /// Initialize the modem by sending the init command
