@@ -1,6 +1,8 @@
 use std::io::Write;
+use std::time::Duration;
 
 use tempfile::NamedTempFile;
+use tokio::time::timeout;
 
 use super::{Checksum, XYModemConfiguration, constants::DEFAULT_BLOCK_LENGTH, err::XYModemError, get_checksum, remove_cpm_eof};
 use crate::{
@@ -11,6 +13,12 @@ use crate::{
         xymodem::constants::{ACK, EOT, EXT_BLOCK_LENGTH, NAK, SOH, STX},
     },
 };
+
+/// Timeout for waiting for a byte from the sender (3 seconds)
+const READ_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Maximum number of retries before giving up
+const MAX_RETRIES: usize = 5;
 
 #[derive(Debug)]
 pub enum RecvState {
@@ -69,7 +77,34 @@ impl Ry {
                         .log_info(&format!("Starting {} receive with {} verification", variant_str, mode_str));
                 }
 
-                let start = com.read_u8().await?;
+                let start = match timeout(READ_TIMEOUT, com.read_u8()).await {
+                    Ok(Ok(byte)) => byte,
+                    Ok(Err(e)) => {
+                        return Err(e);
+                    }
+                    Err(_) => {
+                        transfer_state
+                            .recieve_state
+                            .log_warning(&format!("Timeout waiting for start byte (retry {})", retries));
+                        if retries >= MAX_RETRIES {
+                            transfer_state.recieve_state.log_error("Too many timeouts waiting for start");
+                            self.cancel(com).await?;
+                            return Err(XYModemError::Timeout.into());
+                        }
+                        // Fallback chain: Streaming (G) -> CRC (C) -> Checksum (NAK)
+                        if retries == 1 && self.configuration.streaming_enabled {
+                            transfer_state.recieve_state.log_info("No streaming response, falling back to CRC mode");
+                            self.configuration.streaming_enabled = false;
+                        } else if retries == 2 && self.configuration.checksum_mode == Checksum::CRC16 {
+                            transfer_state.recieve_state.log_info("No CRC response, falling back to checksum mode");
+                            self.configuration.checksum_mode = Checksum::Default;
+                        }
+                        self.await_data(com).await?;
+                        self.recv_state = RecvState::StartReceive(retries + 1);
+                        return Ok(());
+                    }
+                };
+
                 if start == SOH {
                     transfer_state.recieve_state.log_info("Received SOH - 128 byte blocks");
                     if self.configuration.is_ymodem() {
@@ -170,7 +205,27 @@ impl Ry {
 
             RecvState::ReadBlockStart(step, retries) => {
                 if step == 0 {
-                    let start = com.read_u8().await?;
+                    let start = match timeout(READ_TIMEOUT, com.read_u8()).await {
+                        Ok(Ok(byte)) => byte,
+                        Ok(Err(e)) => {
+                            return Err(e);
+                        }
+                        Err(_) => {
+                            transfer_state
+                                .recieve_state
+                                .log_warning(&format!("Timeout waiting for block start (retry {})", retries));
+                            if retries >= MAX_RETRIES {
+                                transfer_state.recieve_state.log_error("Too many timeouts waiting for block");
+                                self.cancel(com).await?;
+                                return Err(XYModemError::Timeout.into());
+                            }
+                            com.send(&[NAK]).await?;
+                            self.errors += 1;
+                            self.recv_state = RecvState::ReadBlockStart(0, retries + 1);
+                            return Ok(());
+                        }
+                    };
+
                     if start == SOH {
                         self.recv_state = RecvState::ReadBlock(DEFAULT_BLOCK_LENGTH, 0);
                     } else if start == STX {
@@ -222,7 +277,20 @@ impl Ry {
                         self.recv_state = RecvState::ReadBlockStart(0, retries + 1);
                     }
                 } else if step == 1 {
-                    let eot = com.read_u8().await?;
+                    let eot = match timeout(READ_TIMEOUT, com.read_u8()).await {
+                        Ok(Ok(byte)) => byte,
+                        Ok(Err(e)) => {
+                            return Err(e);
+                        }
+                        Err(_) => {
+                            transfer_state
+                                .recieve_state
+                                .log_warning("Timeout waiting for second EOT, assuming transfer complete");
+                            self.recv_state = RecvState::None;
+                            transfer_state.is_finished = true;
+                            return Ok(());
+                        }
+                    };
                     if eot != EOT {
                         transfer_state
                             .recieve_state
@@ -265,7 +333,15 @@ impl Ry {
                     com.send(&[NAK]).await?;
                     self.errors += 1;
 
-                    let start = com.read_u8().await?;
+                    let start = match timeout(READ_TIMEOUT, com.read_u8()).await {
+                        Ok(Ok(byte)) => byte,
+                        Ok(Err(e)) => return Err(e),
+                        Err(_) => {
+                            transfer_state.recieve_state.log_error("Timeout waiting for retransmit");
+                            self.cancel(com).await?;
+                            return Err(XYModemError::Timeout.into());
+                        }
+                    };
                     if start == SOH {
                         self.recv_state = RecvState::ReadBlock(DEFAULT_BLOCK_LENGTH, retries + 1);
                     } else if start == STX {

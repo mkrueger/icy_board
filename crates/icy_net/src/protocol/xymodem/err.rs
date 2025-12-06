@@ -25,4 +25,7 @@ pub enum XYModemError {
 
     #[error("invalid response received: {0}")]
     InvalidResponse(u8),
+
+    #[error("timeout waiting for data")]
+    Timeout,
 }

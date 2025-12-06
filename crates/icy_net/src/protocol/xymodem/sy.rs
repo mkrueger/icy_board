@@ -3,7 +3,10 @@ use std::{
     fs::File,
     io::{BufReader, Read},
     path::PathBuf,
+    time::Duration,
 };
+
+use tokio::time::timeout;
 
 use super::{
     Checksum, XYModemConfiguration, XYModemVariant,
@@ -20,6 +23,9 @@ use crate::{
         xymodem::constants::{ACK, CPMEOF, EOT, EXT_BLOCK_LENGTH, NAK, SOH, STX},
     },
 };
+
+/// Timeout for waiting for a response from the receiver (3 seconds)
+const READ_TIMEOUT: Duration = Duration::from_secs(3);
 
 #[derive(Debug)]
 pub enum SendState {
@@ -377,7 +383,13 @@ impl Sy {
 
     #[allow(clippy::unused_self)]
     async fn read_command(&self, com: &mut dyn Connection) -> crate::Result<u8> {
-        let ch = com.read_u8().await?;
+        let ch = match timeout(READ_TIMEOUT, com.read_u8()).await {
+            Ok(Ok(byte)) => byte,
+            Ok(Err(e)) => return Err(e),
+            Err(_) => {
+                return Err(XYModemError::Timeout.into());
+            }
+        };
         /*
          let cmd = match ch {
             b'C' => "[C]",

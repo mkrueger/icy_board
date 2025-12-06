@@ -20,7 +20,7 @@ use self::{
 
 use super::TransferState;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Checksum {
     Default,
     CRC16,
@@ -138,17 +138,20 @@ pub struct XYModemConfiguration {
     pub variant: XYModemVariant,
     pub block_length: usize,
     pub checksum_mode: Checksum,
+    pub streaming_enabled: bool,
 }
 
 impl XYModemConfiguration {
     fn new(variant: XYModemVariant) -> Self {
         let block_length = variant.get_block_length();
         let checksum_mode = variant.get_checksum_mode();
+        let streaming_enabled = matches!(variant, XYModemVariant::XModem1kG | XYModemVariant::YModemG);
 
         Self {
             variant,
             block_length,
             checksum_mode,
+            streaming_enabled,
         }
     }
 
@@ -167,7 +170,7 @@ impl XYModemConfiguration {
     }
 
     fn is_streaming(&self) -> bool {
-        matches!(self.variant, XYModemVariant::XModem1kG | XYModemVariant::YModemG)
+        self.streaming_enabled
     }
 
     fn use_crc(&self) -> bool {
