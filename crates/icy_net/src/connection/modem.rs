@@ -317,14 +317,14 @@ impl ModemCommand {
         result
     }
 
-    /// Send the command to a writer, respecting pause tokens
-    pub async fn send<W: tokio::io::AsyncWriteExt + Unpin>(&self, writer: &mut W) -> std::io::Result<()> {
+    /// Send the command to a connection, respecting pause tokens
+    pub async fn send(&self, connection: &mut dyn Connection) -> crate::Result<()> {
         for token in &self.tokens {
             match token {
-                ModemCommandToken::Text(s) => writer.write_all(s.as_bytes()).await?,
+                ModemCommandToken::Text(s) => connection.send(s.as_bytes()).await?,
                 ModemCommandToken::Pause(d) => tokio::time::sleep(*d).await,
-                ModemCommandToken::Control(c) => writer.write_all(&[*c]).await?,
-                ModemCommandToken::Byte(b) => writer.write_all(&[*b]).await?,
+                ModemCommandToken::Control(c) => connection.send(&[*c]).await?,
+                ModemCommandToken::Byte(b) => connection.send(&[*b]).await?,
             }
         }
         Ok(())
@@ -590,28 +590,6 @@ impl ModemConnection {
         let port: SerialPort = serial.open()?;
         Ok(Self { modem, port: Box::new(port) })
     }
-
-    /// Initialize the modem by sending the init command
-    pub async fn init(&mut self) -> crate::Result<()> {
-        self.modem.init_command.send(&mut *self.port).await?;
-        Ok(())
-    }
-
-    /// Dial a phone number
-    /// Sends: dial_prefix + number + dial_suffix
-    pub async fn dial(&mut self, number: &str) -> crate::Result<()> {
-        self.modem.dial_prefix.send(&mut *self.port).await?;
-        self.port.write_all(number.as_bytes()).await?;
-        self.modem.dial_suffix.send(&mut *self.port).await?;
-        Ok(())
-    }
-
-    /// Hang up the modem connection
-    /// Sends the hangup command (typically ~~~+++~~~ATH0^M)
-    pub async fn hangup(&mut self) -> crate::Result<()> {
-        self.modem.hangup_command.send(&mut *self.port).await?;
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -670,7 +648,6 @@ impl Connection for ModemConnection {
     }
 
     async fn shutdown(&mut self) -> crate::Result<()> {
-        self.hangup().await?;
         self.port.shutdown().await?;
         Ok(())
     }
