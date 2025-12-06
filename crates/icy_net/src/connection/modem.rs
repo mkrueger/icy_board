@@ -482,16 +482,16 @@ pub enum ModemResponseType {
     NoAnswer,
 }
 
-fn default_modem_responses() -> HashMap<ModemResponseType, String> {
+fn default_modem_responses() -> HashMap<ModemResponseType, ModemCommand> {
     HashMap::from([
-        (ModemResponseType::Connect, "CONNECT".to_string()),
-        (ModemResponseType::Ok, "OK".to_string()),
-        (ModemResponseType::Ring, "RING".to_string()),
-        (ModemResponseType::NoCarrier, "NO CARRIER".to_string()),
-        (ModemResponseType::Error, "ERROR".to_string()),
-        (ModemResponseType::NoDialtone, "NO DIAL TONE".to_string()),
-        (ModemResponseType::Busy, "BUSY".to_string()),
-        (ModemResponseType::NoAnswer, "NO ANSWER".to_string()),
+        (ModemResponseType::Connect, ModemCommand::try_parse("CONNECT").unwrap()),
+        (ModemResponseType::Ok, ModemCommand::try_parse("OK").unwrap()),
+        (ModemResponseType::Ring, ModemCommand::try_parse("RING").unwrap()),
+        (ModemResponseType::NoCarrier, ModemCommand::try_parse("NO CARRIER").unwrap()),
+        (ModemResponseType::Error, ModemCommand::try_parse("ERROR").unwrap()),
+        (ModemResponseType::NoDialtone, ModemCommand::try_parse("NO DIAL TONE").unwrap()),
+        (ModemResponseType::Busy, ModemCommand::try_parse("BUSY").unwrap()),
+        (ModemResponseType::NoAnswer, ModemCommand::try_parse("NO ANSWER").unwrap()),
     ])
 }
 
@@ -536,7 +536,7 @@ pub struct ModemConfiguration {
     pub hangup_command: ModemCommand,
 
     #[serde(default = "default_modem_responses")]
-    pub modem_responses: HashMap<ModemResponseType, String>,
+    pub modem_responses: HashMap<ModemResponseType, ModemCommand>,
 }
 
 impl Default for ModemConfiguration {
@@ -565,9 +565,16 @@ impl ModemConfiguration {
     /// Returns the first matching response type, if any
     pub fn parse_response(&self, text: &str) -> Option<ModemResponseType> {
         let text_upper = text.to_uppercase();
+        let text_bytes = text_upper.as_bytes();
         self.modem_responses
             .iter()
-            .find(|(_, pattern)| text_upper.contains(&pattern.to_uppercase()))
+            .find(|(_, pattern)| {
+                let pattern_bytes = pattern.to_bytes();
+                // Convert pattern to uppercase for case-insensitive match
+                let pattern_upper: Vec<u8> = pattern_bytes.iter().map(|b| b.to_ascii_uppercase()).collect();
+                // Check if text contains pattern
+                text_bytes.windows(pattern_upper.len()).any(|window| window == pattern_upper.as_slice())
+            })
             .map(|(response_type, _)| response_type.clone())
     }
 }
