@@ -85,7 +85,6 @@ impl Rz {
         }
         let transfer_info = &mut transfer_state.recieve_state;
         transfer_info.check_size = if self.use_crc32 { "CRC32" } else { "CRC16" }.to_string();
-
         match self.state {
             RecvState::SendZRINIT => {
                 if self.read_header(com, transfer_state).await? {
@@ -402,7 +401,8 @@ impl Rz {
             }
 
             ZFrameType::RQInit => {
-                transfer_state.recieve_state.log_info("ZRQINIT received, will send ZRINIT".to_string());
+                transfer_state.recieve_state.log_info("ZRQINIT received, sending ZRINIT".to_string());
+                self.send_zrinit(com).await?;
                 self.state = RecvState::SendZRINIT;
                 return Ok(true);
             }

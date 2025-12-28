@@ -150,7 +150,6 @@ impl Header {
 
     pub fn build(&self, header_type: HeaderType, escape_ctrl_chars: bool) -> Vec<u8> {
         let mut res = Vec::new();
-
         match header_type {
             HeaderType::Bin => {
                 res.extend_from_slice(&[ZPAD, ZDLE, ZBIN, self.frame_type as u8]);
@@ -193,7 +192,7 @@ impl Header {
                 res.push(get_hex((crc16 >> 8) as u8 & 0xF));
                 res.push(get_hex((crc16 >> 4) as u8 & 0xF));
                 res.push(get_hex((crc16 & 0xF) as u8));
-                res.push(b'\n'); // only 1 is required, 2 if it starts with \r then windows EOL is expected
+                res.extend_from_slice(b"\r\n");
                 if self.frame_type != ZFrameType::Ack && self.frame_type != ZFrameType::Fin {
                     res.push(XON);
                 }

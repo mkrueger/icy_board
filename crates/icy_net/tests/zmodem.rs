@@ -260,3 +260,112 @@ async fn header_bin32_escctl_crc32_roundtrip() {
     assert_eq!(read.f1(), 0x13);
     assert_eq!(read.f0(), 0x40);
 }
+
+/// Regression test: Verify the complete ZRQINIT -> ZRINIT handshake works.
+/// This was a bug where the receiver would log "will send ZRINIT" but never actually send it,
+/// causing the transfer to hang in an infinite loop.
+#[tokio::test]
+async fn test_zrqinit_zrinit_handshake() {
+    use icy_net::protocol::{Header, HeaderType, Protocol, ZFrameType, Zmodem};
+    use test_connection::TestConnection;
+
+    let (mut sender_conn, mut receiver_conn) = TestConnection::create_pair();
+
+    // Create receiver protocol
+    let mut zmodem = Zmodem::new(1024);
+
+    // Initiate receive - this sends the initial ZRINIT
+    let mut state = zmodem.initiate_recv(&mut receiver_conn).await.expect("initiate_recv failed");
+
+    // Read the initial ZRINIT from receiver
+    let mut can_count = 0;
+    let initial_zrinit = Header::read(&mut sender_conn, &mut can_count).await.unwrap().unwrap();
+    assert_eq!(initial_zrinit.frame_type, ZFrameType::RIinit, "Expected initial ZRINIT from receiver");
+
+    // Spawn a task to send ZRQINIT and then read the response
+    let sender_handle = tokio::spawn(async move {
+        // Sender sends ZRQINIT
+        let zrqinit = Header::empty(ZFrameType::RQInit);
+        zrqinit.write(&mut sender_conn, HeaderType::Hex, false).await.unwrap();
+
+        // Wait for and read ZRINIT response
+        let mut can_count = 0;
+        let response = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            Header::read(&mut sender_conn, &mut can_count),
+        )
+        .await
+        .expect("Timeout waiting for ZRINIT response - receiver didn't send ZRINIT!")
+        .expect("Failed to read header")
+        .expect("No header received");
+
+        response
+    });
+
+    // Give sender time to send ZRQINIT
+    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+
+    // Receiver processes the ZRQINIT - this MUST trigger sending ZRINIT
+    zmodem.update_transfer(&mut receiver_conn, &mut state).await.expect("update_transfer failed");
+
+    // Verify sender received ZRINIT
+    let response = sender_handle.await.expect("Sender task failed");
+    assert_eq!(
+        response.frame_type,
+        ZFrameType::RIinit,
+        "Expected ZRINIT response after ZRQINIT, got {:?}",
+        response.frame_type
+    );
+}
+
+/// Test that Hex headers are built with CR LF line ending as per ZModem spec.
+/// This is important for compatibility with older BBS systems.
+#[test]
+fn test_hex_header_ends_with_crlf() {
+    use icy_net::protocol::{Header, HeaderType, ZFrameType};
+
+    // Test ZRINIT header (should have XON after CR LF)
+    let zrinit = Header::empty(ZFrameType::RIinit);
+    let built = zrinit.build(HeaderType::Hex, false);
+
+    // Find CR LF sequence - should be near the end
+    let crlf_pos = built.windows(2).position(|w| w == b"\r\n");
+    assert!(crlf_pos.is_some(), "Hex header should contain CR LF sequence");
+
+    let pos = crlf_pos.unwrap();
+    // After CR LF, there should be XON (0x11) for non-ACK/FIN frames
+    assert!(
+        pos + 2 < built.len() && built[pos + 2] == 0x11,
+        "ZRINIT header should have XON after CR LF"
+    );
+
+    // Test ZACK header (should NOT have XON after CR LF)
+    let zack = Header::empty(ZFrameType::Ack);
+    let built_ack = zack.build(HeaderType::Hex, false);
+
+    let crlf_pos_ack = built_ack.windows(2).position(|w| w == b"\r\n");
+    assert!(crlf_pos_ack.is_some(), "ZACK Hex header should contain CR LF sequence");
+
+    let pos_ack = crlf_pos_ack.unwrap();
+    // ZACK should end with CR LF (no XON)
+    assert_eq!(
+        pos_ack + 2,
+        built_ack.len(),
+        "ZACK header should end with CR LF without XON"
+    );
+
+    // Test ZFIN header (should NOT have XON after CR LF)
+    let zfin = Header::empty(ZFrameType::Fin);
+    let built_fin = zfin.build(HeaderType::Hex, false);
+
+    let crlf_pos_fin = built_fin.windows(2).position(|w| w == b"\r\n");
+    assert!(crlf_pos_fin.is_some(), "ZFIN Hex header should contain CR LF sequence");
+
+    let pos_fin = crlf_pos_fin.unwrap();
+    // ZFIN should end with CR LF (no XON)
+    assert_eq!(
+        pos_fin + 2,
+        built_fin.len(),
+        "ZFIN header should end with CR LF without XON"
+    );
+}

@@ -502,8 +502,8 @@ pub async fn u_ltime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 
 pub async fn u_ldir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new(
-        VariableType::Time,
-        VariableData::from_int(IcbTime::from_naive(vm.user.date_last_dir_read.naive_local()).to_pcboard_time()),
+        VariableType::Date,
+        VariableData::from_int(IcbDate::from_utc(&vm.user.date_last_dir_read).to_pcboard_date()),
     ))
 }
 pub async fn u_lmr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -525,28 +525,29 @@ pub async fn u_bdlday(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     ))
 }
 pub async fn u_timeon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let elapsed = (chrono::Utc::now() - vm.icy_board_state.session.login_date).num_seconds();
     Ok(VariableValue::new(
         VariableType::Integer,
-        VariableData::from_int(0), // TODO: ON TIME COUNTER
+        VariableData::from_int(elapsed as i32),
     ))
 }
 pub async fn u_bdl(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new(
-        VariableType::Integer,
-        VariableData::from_int(vm.user.stats.total_dnld_bytes as i32),
+        VariableType::Double,
+        VariableData::from_float(vm.user.stats.total_dnld_bytes as f64),
     ))
 }
 
 pub async fn u_bul(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new(
-        VariableType::Integer,
-        VariableData::from_int(vm.user.stats.total_upld_bytes as i32),
+        VariableType::Double,
+        VariableData::from_float(vm.user.stats.total_upld_bytes as f64),
     ))
 }
 
 pub async fn u_msgrd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new(
-        VariableType::Integer,
+        VariableType::Unsigned,
         VariableData::from_int(vm.user.stats.messages_read as i32),
     ))
 }
@@ -841,9 +842,9 @@ pub async fn reges(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 }
 
 pub async fn b2w(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let hi = vm.eval_expr(&args[0]).await?.as_int();
-    let low = vm.eval_expr(&args[1]).await?.as_int();
-    Ok(VariableValue::new_int((hi << 8) | (low & 0xFF)))
+    let low = vm.eval_expr(&args[0]).await?.as_int();
+    let hi = vm.eval_expr(&args[1]).await?.as_int();
+    Ok(VariableValue::new_int((low & 0xFF) | ((hi & 0xFF) << 8)))
 }
 
 pub async fn peekb(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1510,7 +1511,7 @@ pub async fn lastans(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 pub fn to_base_36(min_len: usize, number: i32) -> String {
     let mut n = number;
     let mut out = Vec::new();
-    while n > 0 && min_len < out.len() {
+    while out.len() < min_len || n > 0 {
         let d = (n % 36) as u8;
         out.push(if d < 10 { (b'0' + d) as char } else { (b'A' + d - 10) as char });
         n /= 36;
