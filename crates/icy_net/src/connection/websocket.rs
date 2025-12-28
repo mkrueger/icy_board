@@ -97,21 +97,28 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection for WebSocketConnectio
     }
 
     async fn try_read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        // First return any buffered data
         if self.data.len() > 0 {
             let len = buf.len().min(self.data.len());
             buf[..len].copy_from_slice(&self.data[..len]);
             self.data = self.data.slice(len..);
             return Ok(len);
         }
-        match self.socket.next().await {
-            Some(Ok(msg)) => {
+
+        // Non-blocking check for new messages using poll
+        use std::task::Poll;
+        let waker = futures_util::task::noop_waker();
+        let mut cx = std::task::Context::from_waker(&waker);
+
+        match self.socket.poll_next_unpin(&mut cx) {
+            Poll::Ready(Some(Ok(msg))) => {
                 let data = msg.into_data();
                 let len = buf.len().min(data.len());
                 buf[..len].copy_from_slice(&data[..len]);
                 self.data = data.slice(len..);
                 Ok(len)
             }
-            Some(Err(e)) => match e {
+            Poll::Ready(Some(Err(e))) => match e {
                 tokio_tungstenite::tungstenite::Error::Io(e) => {
                     if e.kind() == ErrorKind::UnexpectedEof {
                         return Ok(0);
@@ -120,7 +127,8 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection for WebSocketConnectio
                 }
                 _ => Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into()),
             },
-            None => Err(std::io::Error::new(ErrorKind::ConnectionAborted, "Connection aborted").into()),
+            Poll::Ready(None) => Ok(0), // Stream ended
+            Poll::Pending => Ok(0),     // No data available (non-blocking)
         }
     }
 
@@ -195,8 +203,11 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection for WebSocketConnectio
     async fn send(&mut self, buf: &[u8]) -> crate::Result<()> {
         let msg = Message::binary(Bytes::copy_from_slice(buf));
         if let Err(err) = self.socket.send(msg).await {
-            // write + flush
             return Err(io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {err}")).into());
+        }
+        // Explicit flush to ensure data is sent immediately
+        if let Err(err) = self.socket.flush().await {
+            return Err(io::Error::new(ErrorKind::ConnectionAborted, format!("Flush failed: {err}")).into());
         }
         Ok(())
     }

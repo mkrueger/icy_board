@@ -290,14 +290,11 @@ async fn test_zrqinit_zrinit_handshake() {
 
         // Wait for and read ZRINIT response
         let mut can_count = 0;
-        let response = tokio::time::timeout(
-            std::time::Duration::from_secs(2),
-            Header::read(&mut sender_conn, &mut can_count),
-        )
-        .await
-        .expect("Timeout waiting for ZRINIT response - receiver didn't send ZRINIT!")
-        .expect("Failed to read header")
-        .expect("No header received");
+        let response = tokio::time::timeout(std::time::Duration::from_secs(2), Header::read(&mut sender_conn, &mut can_count))
+            .await
+            .expect("Timeout waiting for ZRINIT response - receiver didn't send ZRINIT!")
+            .expect("Failed to read header")
+            .expect("No header received");
 
         response
     });
@@ -334,10 +331,7 @@ fn test_hex_header_ends_with_crlf() {
 
     let pos = crlf_pos.unwrap();
     // After CR LF, there should be XON (0x11) for non-ACK/FIN frames
-    assert!(
-        pos + 2 < built.len() && built[pos + 2] == 0x11,
-        "ZRINIT header should have XON after CR LF"
-    );
+    assert!(pos + 2 < built.len() && built[pos + 2] == 0x11, "ZRINIT header should have XON after CR LF");
 
     // Test ZACK header (should NOT have XON after CR LF)
     let zack = Header::empty(ZFrameType::Ack);
@@ -348,11 +342,7 @@ fn test_hex_header_ends_with_crlf() {
 
     let pos_ack = crlf_pos_ack.unwrap();
     // ZACK should end with CR LF (no XON)
-    assert_eq!(
-        pos_ack + 2,
-        built_ack.len(),
-        "ZACK header should end with CR LF without XON"
-    );
+    assert_eq!(pos_ack + 2, built_ack.len(), "ZACK header should end with CR LF without XON");
 
     // Test ZFIN header (should NOT have XON after CR LF)
     let zfin = Header::empty(ZFrameType::Fin);
@@ -363,9 +353,5 @@ fn test_hex_header_ends_with_crlf() {
 
     let pos_fin = crlf_pos_fin.unwrap();
     // ZFIN should end with CR LF (no XON)
-    assert_eq!(
-        pos_fin + 2,
-        built_fin.len(),
-        "ZFIN header should end with CR LF without XON"
-    );
+    assert_eq!(pos_fin + 2, built_fin.len(), "ZFIN header should end with CR LF without XON");
 }

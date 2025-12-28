@@ -526,10 +526,7 @@ pub async fn u_bdlday(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 pub async fn u_timeon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let elapsed = (chrono::Utc::now() - vm.icy_board_state.session.login_date).num_seconds();
-    Ok(VariableValue::new(
-        VariableType::Integer,
-        VariableData::from_int(elapsed as i32),
-    ))
+    Ok(VariableValue::new(VariableType::Integer, VariableData::from_int(elapsed as i32)))
 }
 pub async fn u_bdl(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new(

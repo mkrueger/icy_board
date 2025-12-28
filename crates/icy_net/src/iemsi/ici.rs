@@ -6,7 +6,7 @@ use crate::{
     telnet::{TermCaps, TerminalEmulation},
 };
 
-use super::{EMSI_2ACK, encode_emsi, get_crc32string, get_length_string};
+use super::{encode_emsi, get_crc32string, get_length_string};
 
 /// The ICI packet is used by the Client to transmit its configuration
 /// and Server-related information to the Server. It contains Server
@@ -276,7 +276,8 @@ impl FromStr for ICIRequests {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut requests = ICIRequests::default();
         for req in s.split(',') {
-            match req {
+            // FSC-0056: All string comparisons must be case-insensitive
+            match req.to_ascii_uppercase().as_str() {
                 "NEWS" => requests.news = true,
                 "MAIL" => requests.mail = true,
                 "FILE" => requests.file = true,
@@ -286,6 +287,7 @@ impl FromStr for ICIRequests {
                 "MORE" => requests.more = true,
                 "FSED" => requests.full_screen_editor = true,
                 "XPRS" => requests.xprs = true,
+                "" => {} // Empty string is valid (no requests)
                 _ => return Err(NetError::InvalidEmsiPacket),
             }
         }
@@ -330,8 +332,8 @@ pub fn encode_ici(user_settings: &ICIUserSettings, term_settings: &ICITerminalSe
 
     result.extend_from_slice(get_crc32string(&result[2..]).as_bytes());
     result.push(b'\r');
-    // need to send 2*ACK for the ici to be recognized - see the spec
-    result.extend_from_slice(EMSI_2ACK);
+    // NOTE: According to FSC-0056, the 2x ACK should be sent AFTER receiving ISI from server,
+    // NOT together with the ICI packet. The ACK is handled in advance_char() after ISI is parsed.
     Ok(result)
 }
 
@@ -375,7 +377,8 @@ pub fn decode_ici(ici: &[u8]) -> crate::Result<EmsiICI> {
                     }
                     8 => term_settings.protocols = str,
                     9 => {
-                        let caps = std::str::from_utf8(&emsi_body[start..i]).unwrap();
+                        // FSC-0056: All string comparisons must be case-insensitive
+                        let caps = std::str::from_utf8(&emsi_body[start..i]).unwrap().to_ascii_uppercase();
                         term_settings.can_chat = caps.contains("CHT");
                         term_settings.can_download_ascii = caps.contains("MNU");
                         term_settings.can_tab_char = caps.contains("TAB");
@@ -403,7 +406,8 @@ pub fn decode_ici(ici: &[u8]) -> crate::Result<EmsiICI> {
 
 fn parse_emsi_term_caps(str: &str) -> crate::Result<TermCaps> {
     let mut parts = str.split(',');
-    let term = match parts.next() {
+    // FSC-0056: All string comparisons must be case-insensitive
+    let term = match parts.next().map(|s| s.to_ascii_uppercase()).as_deref() {
         Some("ANSI") => TerminalEmulation::Ansi,
         Some("AVT0") => TerminalEmulation::Avatar,
         Some("VT52") => TerminalEmulation::Ansi,

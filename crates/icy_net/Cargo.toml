@@ -22,8 +22,8 @@ bytes = "1"
 serial2-tokio = { version = "0.1.19", features = ["unix"] }
 
 # SSH
-russh = "0.55.0"
-internal-russh-forked-ssh-key = "0.6.7-internal.6"
+russh = "0.56.0"
+internal-russh-forked-ssh-key = "0.6.16"
 
 # WEBSOCKETS
 tokio-tungstenite = { version = "0.28.0", features = [
