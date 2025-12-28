@@ -255,6 +255,12 @@ impl VariableData {
         res.unsigned_value = if b { 1 } else { 0 };
         res
     }
+
+    pub fn from_float(d: f64) -> VariableData {
+        let mut res = VariableData::default();
+        res.double_value = d;
+        res
+    }
 }
 
 impl Default for VariableData {

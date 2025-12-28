@@ -275,11 +275,9 @@ impl IsiParser {
                             self.isi_crc = self.isi_crc * 16 + get_value(ch);
                         } else if self.isi_seq >= self.isi_len + 12 + 8 {
                             // end - should be marked with b'\r'
-                            println!("\n[IEMSI Parser] ISI complete, checking CRC...");
                             if ch == b'\r' {
                                 if self.isi_crc == self.isi_check_crc as usize {
                                     let group = parse_emsi_blocks(&self.isi_data)?;
-                                    println!("[IEMSI Parser] ISI has {} blocks", group.len());
                                     if group.len() == 8 {
                                         // valid ISI !!!
                                         self.isi = Some(EmsiISI {
@@ -298,7 +296,6 @@ impl IsiParser {
                                     }
                                     self.got_invalid_isi = true;
                                 } else {
-                                    println!("[IEMSI Parser] CRC mismatch: expected {:08X}, got {:08X}", self.isi_crc, self.isi_check_crc);
                                     self.got_invalid_isi = true;
                                 }
                             }
@@ -323,19 +320,12 @@ impl IsiParser {
                 self.isi_len = 0;
                 got_seq = true;
             } else {
-                if self.isi_seq > 0 {
-                    println!(
-                        "\n[IEMSI Parser] ISI sequence broken at pos {}, got '{}' expected '{}'",
-                        self.isi_seq, ch_upper as char, ISI_START[self.isi_seq] as char
-                    );
-                }
                 self.isi_seq = 0;
             }
 
             if ch_upper == EMSI_NAK[2 + self.nak_seq] {
                 self.nak_seq += 1;
                 if self.nak_seq + 2 >= EMSI_NAK.len() {
-                    println!("\n[IEMSI Parser] NAK detected!");
                     self.nak_detected = true;
                     self.stars_read = 0;
                     self.reset_sequences();
@@ -349,7 +339,6 @@ impl IsiParser {
             if ch_upper == EMSI_ACK[2 + self.ack_seq] {
                 self.ack_seq += 1;
                 if self.ack_seq + 2 >= EMSI_ACK.len() {
-                    println!("\n[IEMSI Parser] ACK detected (ignoring, waiting for ISI)");
                     self.ack_detected = true;
                     self.stars_read = 0;
                     self.reset_sequences();
@@ -412,16 +401,8 @@ pub async fn complete_iemsi_handshake(
 ) -> crate::Result<Option<EmsiISI>> {
     const MAX_RETRIES: usize = 2;
     let mut retries = 0;
-
-    println!("[IEMSI Client] Starting client handshake");
-
     // Send initial ICI (NOT IIR - that means abort!)
     let ici_data = encode_ici(user_settings, terminal_settings, &ICIRequests::default())?;
-    println!(
-        "[IEMSI Client] >> Sending EMSI_ICI ({} bytes): {:?}",
-        ici_data.len(),
-        String::from_utf8_lossy(&ici_data)
-    );
     com.send(&ici_data).await?;
 
     let mut buf = [0u8; 1024];
@@ -435,21 +416,16 @@ pub async fn complete_iemsi_handshake(
             continue;
         }
 
-        println!("[IEMSI Client] << Received {} bytes: {:?}", size, String::from_utf8_lossy(&buf[..size.min(80)]));
-
         for &ch in &buf[..size] {
             parser.parse_byte(ch)?;
 
             // Check if server is sending garbage (ANSI login screen) instead of EMSI_ISI
             if parser.abort_detected {
-                println!("[IEMSI Client] Server doesn't support IEMSI, aborting handshake");
                 return Ok(None);
             }
 
             // Check if we got a valid ISI
             if let Some(isi) = parser.isi.take() {
-                println!("[IEMSI Client] << Received valid EMSI_ISI: name='{}' location='{}'", isi.name, isi.location);
-                println!("[IEMSI Client] >> Sending 2x EMSI_ACK");
                 com.send(EMSI_2ACK).await?;
                 return Ok(Some(isi));
             }
@@ -457,8 +433,6 @@ pub async fn complete_iemsi_handshake(
             // Check for invalid ISI (CRC error but still accept)
             if parser.got_invalid_isi {
                 parser.got_invalid_isi = false;
-                println!("[IEMSI Client] << Received invalid EMSI_ISI (CRC error)");
-                println!("[IEMSI Client] >> Sending 2x EMSI_ACK anyway");
                 com.send(EMSI_2ACK).await?;
                 // Return a default/empty ISI to indicate login was accepted
                 return Ok(Some(EmsiISI::default()));
@@ -467,15 +441,12 @@ pub async fn complete_iemsi_handshake(
             // Check for NAK - server wants us to resend ICI
             if parser.nak_detected {
                 parser.nak_detected = false;
-                println!("[IEMSI Client] << Received EMSI_NAK");
 
                 if retries < MAX_RETRIES {
                     retries += 1;
                     let ici_data = encode_ici(user_settings, terminal_settings, &ICIRequests::default())?;
-                    println!("[IEMSI Client] >> Resending EMSI_ICI (retry {}/{})", retries, MAX_RETRIES);
                     com.send(&ici_data).await?;
                 } else {
-                    println!("[IEMSI Client] >> Max retries reached, aborting");
                     com.send(EMSI_IIR).await?; // Send IIR to abort
                     return Ok(None);
                 }
@@ -483,7 +454,6 @@ pub async fn complete_iemsi_handshake(
         }
     }
 
-    println!("[IEMSI Client] Handshake timeout after {}ms", timeout_ms);
     Ok(None)
 }
 
@@ -525,8 +495,6 @@ pub async fn try_iemsi_client_login(
 
         for &ch in &buf[..size] {
             if scanner.scan_byte(ch) {
-                println!("[IEMSI Client] << Detected EMSI_IRQ");
-
                 // Phase 2: Complete handshake
                 let remaining_time = timeout_ms.saturating_sub(start.elapsed().as_millis() as u64);
                 if let Some(isi) = complete_iemsi_handshake(com, user_settings, terminal_settings, remaining_time).await? {
