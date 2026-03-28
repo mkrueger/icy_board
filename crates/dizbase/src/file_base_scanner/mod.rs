@@ -8,7 +8,7 @@ use std::{
 use codepages::{normalize_file, tables::get_utf8};
 use icy_sauce::SauceRecord;
 use unarc_rs::{
-    arc::arc_archive::ArcArchieve, arj::arj_archive::ArjArchieve, hyp::hyp_archive::HypArchieve, sq::sq_archive::SqArchieve, zoo::zoo_archive::ZooArchieve,
+    arc::arc_archive::ArcArchive, arj::arj_archive::ArjArchive, hyp::hyp_archive::HypArchive, sq::sq_archive::SqArchive, zoo::zoo_archive::ZooArchive,
 };
 use unrar::Archive;
 
@@ -183,7 +183,7 @@ fn scan_arj(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<Met
     let mut short_descr = Vec::new();
     let mut last_prio = -1;
 
-    let mut archieve = ArjArchieve::new(file)?;
+    let mut archieve = ArjArchive::new(file)?;
     while let Ok(Some(header)) = archieve.get_next_entry() {
         if let Some(prio) = is_short_desc(OsStr::new(&header.name)) {
             if prio <= last_prio {
@@ -206,7 +206,7 @@ fn scan_arc(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<Met
     let mut short_descr = Vec::new();
     let mut last_prio = -1;
 
-    let mut archieve = ArcArchieve::new(file)?;
+    let mut archieve = ArcArchive::new(file)?;
     while let Ok(Some(header)) = archieve.get_next_entry() {
         if let Some(prio) = is_short_desc(OsStr::new(&header.name)) {
             if prio <= last_prio {
@@ -229,7 +229,7 @@ fn scan_zoo(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<Met
     let mut short_descr = Vec::new();
     let mut last_prio = -1;
 
-    let mut archieve = ZooArchieve::new(file)?;
+    let mut archieve = ZooArchive::new(file)?;
     while let Ok(Some(header)) = archieve.get_next_entry() {
         if let Some(prio) = is_short_desc(OsStr::new(&header.name)) {
             if prio <= last_prio {
@@ -252,7 +252,7 @@ fn scan_sqz(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<Met
     let mut short_descr = Vec::new();
     let mut last_prio = -1;
 
-    let mut archieve = ZooArchieve::new(file)?;
+    let mut archieve = ZooArchive::new(file)?;
     while let Ok(Some(header)) = archieve.get_next_entry() {
         if let Some(prio) = is_short_desc(OsStr::new(&header.name)) {
             if prio <= last_prio {
@@ -275,7 +275,7 @@ fn scan_sq(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<Meta
     let mut short_descr = Vec::new();
     let mut last_prio = -1;
 
-    let mut archieve = SqArchieve::new(file)?;
+    let mut archieve = SqArchive::new(file)?;
     while let Ok(Some(header)) = archieve.get_next_entry() {
         if let Some(prio) = is_short_desc(OsStr::new(&header.name)) {
             if prio <= last_prio {
@@ -298,7 +298,7 @@ fn scan_hyp(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<Met
     let mut short_descr = Vec::new();
     let mut last_prio = -1;
 
-    let mut archieve = HypArchieve::new(file)?;
+    let mut archieve = HypArchive::new(file)?;
     while let Ok(Some(header)) = archieve.get_next_entry() {
         if let Some(prio) = is_short_desc(OsStr::new(&header.name)) {
             // only uncompressed files are supported, so it's likely to fail.

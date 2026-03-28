@@ -437,8 +437,8 @@ impl serde::Serialize for IcbTime {
             time: Some(toml::value::Time {
                 hour: self.hour,
                 minute: self.minute,
-                second: self.second,
-                nanosecond: 0,
+                second: Some(self.second),
+                nanosecond: Some(0),
             }),
             offset: None,
         }
@@ -451,7 +451,7 @@ impl From<Datetime> for IcbTime {
         Self {
             hour: datetime.time.unwrap().hour,
             minute: datetime.time.unwrap().minute,
-            second: datetime.time.unwrap().second,
+            second: datetime.time.unwrap().second.unwrap_or(0),
         }
     }
 }
@@ -463,8 +463,8 @@ impl From<IcbTime> for Datetime {
             time: Some(toml::value::Time {
                 hour: datetime.hour,
                 minute: datetime.minute,
-                second: datetime.second,
-                nanosecond: 0,
+                second: Some(datetime.second),
+                nanosecond: Some(0),
             }),
             offset: None,
         }

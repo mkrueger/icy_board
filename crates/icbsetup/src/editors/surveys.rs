@@ -25,7 +25,7 @@ use ratatui::{
     Frame,
     layout::{Alignment, Margin, Rect},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget, block::Title},
+    widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget},
 };
 
 pub struct SurveyEditor<'a> {
@@ -114,7 +114,7 @@ impl<'a> Page for SurveyEditor<'a> {
 
         let block = Block::new()
             .title_alignment(Alignment::Center)
-            .title(Title::from(Span::from(title).style(get_tui_theme().dialog_box_title)))
+            .title(Line::from(Span::from(title).style(get_tui_theme().dialog_box_title)))
             .style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
@@ -129,9 +129,7 @@ impl<'a> Page for SurveyEditor<'a> {
             Clear.render(area, frame.buffer_mut());
             let block = Block::new()
                 .title_alignment(Alignment::Center)
-                .title(Title::from(
-                    Span::from(get_text("survey_editor_editor")).style(get_tui_theme().dialog_box_title),
-                ))
+                .title(Line::from(Span::from(get_text("survey_editor_editor")).style(get_tui_theme().dialog_box_title)))
                 .style(get_tui_theme().dialog_box)
                 .padding(Padding::new(2, 2, 1, 1))
                 .borders(Borders::ALL)

@@ -224,13 +224,13 @@ impl Tui {
         let screen = &self.screen.lock().unwrap();
         for y in 0..area.height as i32 {
             for x in 0..area.width as i32 {
-                let c = screen.get_char((x, y + screen.get_first_visible_line()).into());
-                let mut fg = c.attribute.get_foreground();
+                let c = screen.char_at((x, y + screen.first_visible_line()).into());
+                let mut fg = c.attribute.foreground();
                 if c.attribute.is_bold() {
                     fg += 8;
                 }
-                let fg = screen.palette().get_color(fg).get_rgb();
-                let bg = screen.palette().get_color(c.attribute.get_background()).get_rgb();
+                let fg = screen.palette().rgb(fg);
+                let bg = screen.palette().rgb(c.attribute.background());
                 let mut s: Style = Style::new().bg(Color::Rgb(bg.0, bg.1, bg.2)).fg(Color::Rgb(fg.0, fg.1, fg.2));
                 if c.attribute.is_blinking() {
                     s = s.slow_blink();
@@ -246,7 +246,7 @@ impl Tui {
             self.draw_statusbar(frame, area, status_bar_info);
         }
         let pos: icy_engine::Position = screen.caret.position();
-        frame.set_cursor_position((area.x + pos.x as u16, y + pos.y as u16 - screen.get_first_visible_line() as u16));
+        frame.set_cursor_position((area.x + pos.x as u16, y + pos.y as u16 - screen.first_visible_line() as u16));
     }
 
     fn draw_statusbar(&self, frame: &mut Frame, area: Rect, status_bar_info: StatusBarInfo) {

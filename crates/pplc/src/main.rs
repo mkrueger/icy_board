@@ -20,7 +20,8 @@ use crossterm::{
     style::{Attribute, Color, Print, SetAttribute, SetForegroundColor},
 };
 
-use icy_engine::{SaveOptions, TextBuffer};
+use icy_engine::SaveOptions;
+use icy_engine::formats::{CharacterFormatOptions, FileFormat, FormatOptions};
 use semver::Version;
 use std::{
     fs::{self},
@@ -212,10 +213,13 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {
 
                 if src_file.extension().unwrap() == "icy" {
                     let data = fs::read(&src_file)?;
-                    let mut buffer = TextBuffer::from_bytes(&src_file, true, &data, None, None).unwrap();
-                    let mut options = SaveOptions::default();
-                    options.modern_terminal_output = workspace.runtime() > 340;
-                    let bytes = buffer.to_bytes("pcb", &options).unwrap();
+                    let format = FileFormat::from_extension("icy").unwrap();
+                    let loaded = format.from_bytes(&data, None).unwrap();
+                    let options = SaveOptions {
+                        format: FormatOptions::Character(CharacterFormatOptions::default()),
+                        ..Default::default()
+                    };
+                    let bytes = FileFormat::PCBoard.to_bytes(&loaded.screen.buffer, &options).unwrap();
                     let out_file: PathBuf = out_file.with_extension("pcb");
                     fs::write(out_file, bytes)?;
                     continue;

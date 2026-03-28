@@ -9,7 +9,6 @@ use icy_board_engine::{
 use ratatui::{
     Frame,
     layout::{Alignment, Rect},
-    style::Stylize,
     text::Text,
     widgets::{Block, BorderType, Borders, Clear, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget},
 };

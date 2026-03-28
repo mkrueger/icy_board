@@ -24,7 +24,7 @@ use ratatui::{
     Frame,
     layout::{Alignment, Margin, Rect},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget, block::Title},
+    widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget},
 };
 
 pub struct ProtocolEditor<'a> {
@@ -112,7 +112,7 @@ impl<'a> Page for ProtocolEditor<'a> {
 
         let block = Block::new()
             .title_alignment(Alignment::Center)
-            .title(Title::from(
+            .title(Line::from(
                 Span::from(get_text("protocol_editor_title")).style(get_tui_theme().dialog_box_title),
             ))
             .style(get_tui_theme().dialog_box)
@@ -129,7 +129,7 @@ impl<'a> Page for ProtocolEditor<'a> {
             Clear.render(area, frame.buffer_mut());
             let block = Block::new()
                 .title_alignment(Alignment::Center)
-                .title(Title::from(
+                .title(Line::from(
                     Span::from(get_text("protocol_editor_editor")).style(get_tui_theme().dialog_box_title),
                 ))
                 .style(get_tui_theme().dialog_box)

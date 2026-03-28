@@ -24,7 +24,7 @@ use icy_board_engine::{
         xfer_protocols::SupportedProtocols,
     },
 };
-use icy_engine::{SaveOptions, ScreenPreperation, TextBuffer};
+use icy_engine::{CharacterFormatOptions, FileFormat, FormatOptions, SaveOptions, ScreenPreperation};
 use jamjam::{jam::JamMessageBase, util::echmoail::EchomailAddress};
 
 use crate::import::{OutputLogger, console_logger::ConsoleLogger};
@@ -116,9 +116,13 @@ impl IcyBoardCreator {
         self.logger.start_action("Creating required paths.".to_string());
         fs::create_dir_all(&self.destination.join(&config.paths.help_path))?;
 
-        let mut options = SaveOptions::default();
-        options.screen_preparation = ScreenPreperation::ClearScreen;
-        options.modern_terminal_output = true;
+        let options = SaveOptions {
+            format: FormatOptions::Character(CharacterFormatOptions {
+                screen_prep: ScreenPreperation::ClearScreen,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
 
         for hlp in HELP_FILES.iter() {
             let path = self.destination.join(&config.paths.help_path).join(hlp.0);
@@ -173,9 +177,13 @@ impl IcyBoardCreator {
 
         self.logger.start_action("Write default art files".to_string());
 
-        let mut options = SaveOptions::default();
-        options.screen_preparation = ScreenPreperation::ClearScreen;
-        options.modern_terminal_output = true;
+        let options = SaveOptions {
+            format: FormatOptions::Character(CharacterFormatOptions {
+                screen_prep: ScreenPreperation::ClearScreen,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
         config.paths.welcome = PathBuf::from("art/welcome");
         convert_to_pcb_opt(
             &self.destination.join(&config.paths.welcome),
@@ -305,9 +313,13 @@ impl IcyBoardCreator {
 
         self.logger.start_action("Write user & sysop menus…".to_string());
         conf.users_menu = PathBuf::from("conferences/main/brdm");
-        let mut options = SaveOptions::default();
-        options.screen_preparation = ScreenPreperation::ClearScreen;
-        options.modern_terminal_output = true;
+        let options = SaveOptions {
+            format: FormatOptions::Character(CharacterFormatOptions {
+                screen_prep: ScreenPreperation::ClearScreen,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
         convert_to_pcb_opt(
             &self.destination.join(&conf.users_menu),
             include_bytes!("../../data/new_bbs/brdm.icy"),
@@ -506,14 +518,13 @@ fn generate_protocol_data(protocol_data_file: &PathBuf) -> Res<()> {
 }
 
 pub fn convert_to_pcb(path: &PathBuf, data: &[u8]) -> Res<()> {
-    let mut options = SaveOptions::default();
-    options.modern_terminal_output = true;
+    let options = SaveOptions::default();
     convert_to_pcb_opt(path, data, &options)
 }
 
 pub fn convert_to_pcb_opt(path: &PathBuf, data: &[u8], opt: &SaveOptions) -> Res<()> {
-    let mut buffer = TextBuffer::from_bytes(&PathBuf::from("a.icy"), true, data, None, None).unwrap();
-    let bytes: Vec<u8> = buffer.to_bytes("pcb", opt).unwrap();
+    let loaded = FileFormat::IcyDraw.from_bytes(data, None).unwrap();
+    let bytes: Vec<u8> = FileFormat::PCBoard.to_bytes(&loaded.screen.buffer, opt).unwrap();
     fs::write(path.with_extension("pcb"), &bytes)?;
     Ok(())
 }

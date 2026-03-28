@@ -20,7 +20,8 @@ use chrono::{DateTime, Datelike, Local, Utc};
 use codepages::tables::UNICODE_TO_CP437;
 use dizbase::file_base::FileBase;
 use icy_engine::Position;
-use icy_engine::{OutputFormat, SaveOptions, ScreenPreperation};
+use icy_engine::SaveOptions;
+use icy_engine::formats::{CharacterFormatOptions, FileFormat, FormatOptions, ScreenPreperation};
 use icy_engine::{TextAttribute, TextPane};
 use icy_net::{Connection, ConnectionType, channel::ChannelConnection, iemsi::EmsiICI, termcap_detect::TerminalCaps};
 use icy_parser_core::ANSI_COLOR_OFFSETS;
@@ -669,7 +670,7 @@ impl IcyBoardState {
     pub async fn clear_eol(&mut self, target: TerminalTarget) -> Res<()> {
         match self.session.disp_options.grapics_mode {
             GraphicsMode::Ctty => {
-                let x = self.user_screen.buffer.get_width() - self.user_screen.buffer.caret.x;
+                let x = self.user_screen.buffer.width() - self.user_screen.buffer.caret.x;
                 for _ in 0..x {
                     self.print(target, " ").await?;
                 }
@@ -1605,7 +1606,7 @@ impl IcyBoardState {
             if let Some(find) = regex.find(str) {
                 self.write_raw(target, &chars[..find.start()]).await?;
                 let old_color = self.user_screen.buffer.caret.attribute;
-                if old_color.get_background() == 0 {
+                if old_color.background() == 0 {
                     self.set_color(target, IcbColor::Dos(0x70)).await?;
                 } else {
                     self.set_color(target, IcbColor::Dos(0x07)).await?;
@@ -2404,7 +2405,7 @@ impl IcyBoardState {
     }
 
     async fn show_broadcast(&mut self, msg: String) -> Res<()> {
-        let mut buf = self.user_screen.buffer.buffer.flat_clone(false);
+        let buf = self.user_screen.buffer.buffer.clone();
         let pos = self.user_screen.buffer.caret.position();
         self.set_activity(NodeStatus::NodeMessage).await;
         self.new_line().await?;
@@ -2415,10 +2416,14 @@ impl IcyBoardState {
 
         self.press_enter().await?;
 
-        let mut options = SaveOptions::default();
-        options.screen_preparation = ScreenPreperation::ClearScreen;
-        options.modern_terminal_output = true;
-        let res = icy_engine::formats::PCBoard::default().to_bytes(&mut buf, &options)?;
+        let options = SaveOptions {
+            format: FormatOptions::Character(CharacterFormatOptions {
+                screen_prep: ScreenPreperation::ClearScreen,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let res = FileFormat::PCBoard.to_bytes(&buf, &options)?;
         let res = unsafe { String::from_utf8_unchecked(res) };
         self.print(TerminalTarget::Both, &res).await?;
         self.gotoxy(TerminalTarget::Both, pos.x, pos.y).await?;
@@ -2426,10 +2431,14 @@ impl IcyBoardState {
     }
 
     async fn print_sysop_screen(&mut self) -> Res<()> {
-        let mut options = icy_engine::SaveOptions::default();
-        options.screen_preparation = icy_engine::ScreenPreperation::ClearScreen;
-        options.modern_terminal_output = true;
-        let res = icy_engine::formats::PCBoard::default().to_bytes(&mut self.user_screen.buffer.buffer, &options)?;
+        let options = SaveOptions {
+            format: FormatOptions::Character(CharacterFormatOptions {
+                screen_prep: ScreenPreperation::ClearScreen,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let res = FileFormat::PCBoard.to_bytes(&self.user_screen.buffer.buffer, &options)?;
         let res = unsafe { String::from_utf8_unchecked(res) };
         self.print(TerminalTarget::Sysop, &res).await?;
         let p = self.user_screen.buffer.caret.position();
@@ -2486,9 +2495,9 @@ impl IcyBoardState {
 
         let mut color_change = "\x1B[".to_string();
         let was_bold = screen.buffer.caret.attribute.is_bold();
-        let new_bold = new_color.is_bold() || new_color.get_foreground() > 7;
-        let mut bg = screen.buffer.caret.attribute.get_background();
-        let mut fg = screen.buffer.caret.attribute.get_foreground();
+        let new_bold = new_color.is_bold() || new_color.foreground() > 7;
+        let mut bg = screen.buffer.caret.attribute.background();
+        let mut fg = screen.buffer.caret.attribute.foreground();
         if was_bold != new_bold {
             if new_bold {
                 color_change += "1;";
@@ -2503,12 +2512,12 @@ impl IcyBoardState {
             color_change += "5;";
         }
 
-        if fg != new_color.get_foreground() {
-            color_change += format!("{};", ANSI_COLOR_OFFSETS[new_color.get_foreground() as usize % 8] + 30).as_str();
+        if fg != new_color.foreground() {
+            color_change += format!("{};", ANSI_COLOR_OFFSETS[new_color.foreground() as usize % 8] + 30).as_str();
         }
 
-        if bg != new_color.get_background() {
-            color_change += format!("{};", ANSI_COLOR_OFFSETS[new_color.get_background() as usize % 8] + 40).as_str();
+        if bg != new_color.background() {
+            color_change += format!("{};", ANSI_COLOR_OFFSETS[new_color.background() as usize % 8] + 40).as_str();
         }
 
         color_change.pop();

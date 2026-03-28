@@ -1884,8 +1884,8 @@ impl TextEntry {
 
 fn load_ice_format(data: &[u8], file: String) -> Res<Vec<TextEntry>> {
     let text = get_utf8(data);
-    match text.parse::<Value>() {
-        Ok(Value::Table(entries)) => {
+    match toml::from_str::<toml::Table>(&text) {
+        Ok(entries) => {
             let mut res: Vec<Option<TextEntry>> = vec![None; LAST_ENTRY + 1];
             res[0] = Some(TextEntry::default());
             for (k, v) in entries {
@@ -1916,10 +1916,6 @@ fn load_ice_format(data: &[u8], file: String) -> Res<Vec<TextEntry>> {
                 }
             }
             Ok(res.into_iter().flatten().collect())
-        }
-        Ok(_) => {
-            log::error!("IcbText file doesn't contain a table ({})", file);
-            Err(Box::new(TextError::NoValidIceTextFile("no table".to_string())))
         }
         Err(err) => {
             log::error!("Error parsing icb text file ({}): {} ", file, err);

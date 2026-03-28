@@ -235,6 +235,8 @@ struct IsiParser {
     garbage_bytes: usize,
     /// Flag set when too much garbage is received (server doesn't support IEMSI)
     pub abort_detected: bool,
+    /// Flag indicating an EMSI sequence is being received (should extend timeout)
+    pub sequence_in_progress: bool,
 }
 
 // **EMSI_ISI<len><data><crc32><CR>
@@ -249,13 +251,6 @@ impl IsiParser {
     }
 
     fn parse_byte(&mut self, ch: u8) -> crate::Result<()> {
-        // Debug: print every byte
-        if ch.is_ascii_graphic() || ch == b' ' {
-            print!("{}", ch as char);
-        } else {
-            print!("[{:02X}]", ch);
-        }
-
         if self.stars_read >= 2 {
             if self.isi_seq > 7 {
                 match self.isi_seq {
@@ -319,6 +314,10 @@ impl IsiParser {
                 self.isi_seq += 1;
                 self.isi_len = 0;
                 got_seq = true;
+                // Mark that we're receiving an EMSI sequence
+                if self.isi_seq >= 4 {
+                    self.sequence_in_progress = true;
+                }
             } else {
                 self.isi_seq = 0;
             }
@@ -358,8 +357,23 @@ impl IsiParser {
         if ch == b'*' {
             self.stars_read += 1;
             self.garbage_bytes = 0; // Reset garbage counter on potential EMSI start
-            self.reset_sequences();
+            // Don't call reset_sequences() here - preserve sequence_in_progress
+            // when accumulating stars
+            self.isi_seq = 0;
+            self.nak_seq = 0;
+            self.ack_seq = 0;
+            self.isi_crc = 0;
+            self.isi_check_crc = 0xFFFF_FFFF;
+            self.isi_data.clear();
+            // Mark potential sequence when we see a star (possible EMSI packet start)
+            // This extends the timeout to allow the full sequence to arrive
+            self.sequence_in_progress = true;
             return Ok(());
+        }
+        // Non-star character without being in a sequence - reset everything
+        if self.stars_read > 0 && self.stars_read < 2 {
+            // Single star followed by non-star is not an EMSI sequence
+            self.sequence_in_progress = false;
         }
         self.stars_read = 0;
 
@@ -373,6 +387,7 @@ impl IsiParser {
         self.isi_crc = 0;
         self.isi_check_crc = 0xFFFF_FFFF;
         self.isi_data.clear();
+        self.sequence_in_progress = false;
     }
 }
 
@@ -400,6 +415,8 @@ pub async fn complete_iemsi_handshake(
     timeout_ms: u64,
 ) -> crate::Result<Option<EmsiISI>> {
     const MAX_RETRIES: usize = 2;
+    // Extra time to allow for completing a sequence that started near the timeout
+    const SEQUENCE_GRACE_PERIOD_MS: u64 = 2000;
     let mut retries = 0;
     // Send initial ICI (NOT IIR - that means abort!)
     let ici_data = encode_ici(user_settings, terminal_settings, &ICIRequests::default())?;
@@ -409,7 +426,19 @@ pub async fn complete_iemsi_handshake(
     let mut parser = IsiParser::new();
     let start = std::time::Instant::now();
 
-    while start.elapsed().as_millis() < timeout_ms as u128 {
+    loop {
+        let elapsed = start.elapsed().as_millis() as u64;
+        // Extend timeout if we're in the middle of receiving an EMSI sequence
+        let effective_timeout = if parser.sequence_in_progress {
+            timeout_ms + SEQUENCE_GRACE_PERIOD_MS
+        } else {
+            timeout_ms
+        };
+
+        if elapsed >= effective_timeout {
+            break;
+        }
+
         let size = com.try_read(&mut buf).await?;
         if size == 0 {
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;

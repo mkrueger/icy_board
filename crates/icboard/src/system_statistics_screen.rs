@@ -12,10 +12,7 @@ use icy_board_tui::{
     get_text,
     theme::{DOS_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_YELLOW},
 };
-use ratatui::{
-    prelude::*,
-    widgets::{block::Title, *},
-};
+use ratatui::{prelude::*, widgets::*};
 
 #[derive(PartialEq)]
 pub enum SystemStatisticsScreenMessage {
@@ -41,7 +38,10 @@ impl SystemStatisticsScreen {
         }
     }
 
-    pub async fn run(&mut self, terminal: &mut Terminal<impl Backend>, full_screen: bool) -> Res<SystemStatisticsScreenMessage> {
+    pub async fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>, full_screen: bool) -> Res<SystemStatisticsScreenMessage>
+    where
+        B::Error: Send + Sync + 'static,
+    {
         let last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
         loop {
@@ -110,15 +110,13 @@ impl SystemStatisticsScreen {
 
         let b = Block::default()
             .title_alignment(Alignment::Left)
-            .title(Title::from(Line::from(format!(" {} ", now.date_naive())).style(Style::new().white())))
+            .title(Line::from(format!(" {} ", now.date_naive())).style(Style::new().white()))
             .title_alignment(Alignment::Center)
-            .title(Title::from(
+            .title(Line::from(
                 Span::from(get_text("icb_system_statistics_title")).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED).bold()),
             ))
             .title_alignment(Alignment::Right)
-            .title(Title::from(
-                Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white()),
-            ))
+            .title(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white()))
             .title_alignment(Alignment::Center)
             .title_bottom(Line::from(Span::from(footer).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED))))
             .style(Style::new().bg(DOS_BLUE))

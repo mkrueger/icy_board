@@ -204,7 +204,10 @@ impl CallWaitScreen {
         };
     }
 
-    pub async fn run(&mut self, terminal: &mut Terminal<impl Backend>, board: &Arc<Mutex<IcyBoard>>, full_screen: bool) -> Res<CallWaitMessage> {
+    pub async fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>, board: &Arc<Mutex<IcyBoard>>, full_screen: bool) -> Res<CallWaitMessage>
+    where
+        B::Error: Send + Sync + 'static,
+    {
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
 

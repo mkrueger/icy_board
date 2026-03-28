@@ -200,7 +200,7 @@ impl IcyBoardState {
         map.insert("X-System", bbslink.system_code.parse()?);
         map.insert("X-Auth", format!("{:x}", md5::compute(bbslink.auth_code.clone() + token.as_str())).parse()?);
         map.insert("X-Code", format!("{:x}", md5::compute(bbslink.sheme_code.clone() + token.as_str())).parse()?);
-        map.insert("X-Rows", self.user_screen.buffer.get_height().into());
+        map.insert("X-Rows", self.user_screen.buffer.height().into());
         map.insert("X-Key", x_key.parse()?);
         map.insert("X-Door", door.path.parse()?);
         map.insert("X-Token", token.parse()?);
@@ -223,7 +223,7 @@ impl IcyBoardState {
             bbslink.system_code,
             format!("{:x}", md5::compute(bbslink.auth_code.clone() + token.as_str())),
             format!("{:x}", md5::compute(bbslink.sheme_code.clone() + token.as_str())),
-            self.display_screen().buffer.get_height(),
+            self.display_screen().buffer.height(),
             door.path,
             token,
             "icy_board",

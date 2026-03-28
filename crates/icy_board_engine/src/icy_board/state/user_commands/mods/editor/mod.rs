@@ -797,19 +797,21 @@ impl EditState {
                 break;
             }
         }
-        for i in paragraph_start..y {
+        let mut i = paragraph_start;
+        while i < y {
             if i >= self.msg.len() {
                 break;
             }
             while self.msg[i].contains("  ") {
                 self.msg[i] = self.msg[i].replace("  ", " ");
             }
-            let line_counft = self.msg.len();
+            let line_count = self.msg.len();
             self.msg[i].push(' ');
             self.merge_line(i as i32);
-            if line_counft < self.msg.len() {
+            if line_count < self.msg.len() {
                 y -= 1;
             }
+            i += 1;
         }
 
         EditUpdate::UpdateLinesFrom(paragraph_start)

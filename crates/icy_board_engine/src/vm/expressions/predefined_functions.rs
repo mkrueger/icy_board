@@ -1309,7 +1309,7 @@ pub async fn scrtext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 
     let mut cur_color = -1;
     for i in 0..len {
-        let ch = vm.icy_board_state.display_screen().buffer.get_char(Position::new(col + i, row));
+        let ch = vm.icy_board_state.display_screen().buffer.char_at(Position::new(col + i, row));
         if code {
             let col = ch.attribute.as_u8(icy_engine::IceMode::Blink) as i32;
             if cur_color != col && (!ch.is_transparent() || cur_color & 0b0111_0000 != col & 0b0111_0000) {

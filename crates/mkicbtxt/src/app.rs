@@ -12,10 +12,7 @@ use icy_board_tui::{
     theme::{DOS_DARK_GRAY, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE, get_tui_theme},
 };
 use itertools::Itertools;
-use ratatui::{
-    prelude::*,
-    widgets::{block::Title, *},
-};
+use ratatui::{prelude::*, widgets::*};
 use strum_macros::{Display, FromRepr};
 
 use crate::tabs::*;
@@ -325,13 +322,13 @@ impl<'a> App<'a> {
 
                 Block::new()
                     .borders(Borders::ALL)
-                    .title(Title::from(Span::from(format!(" {} ", edit_title)).style(get_tui_theme().dialog_box_title)))
-                    .title_position(block::Position::Bottom)
+                    .title(Line::from(Span::from(format!(" {} ", edit_title)).style(get_tui_theme().dialog_box_title)))
+                    .title_position(TitlePosition::Bottom)
                     .title_alignment(Alignment::Center)
-                    .title(Title::from(Span::from(format!(" {} ", record_length)).style(get_tui_theme().dialog_box_title)))
-                    .title_position(block::Position::Top)
+                    .title(Line::from(Span::from(format!(" {} ", record_length)).style(get_tui_theme().dialog_box_title)))
+                    .title_position(TitlePosition::Top)
                     .title_alignment(Alignment::Right)
-                    .title(Title::from(Span::from(format!(" {} ", justify_title)).style(get_tui_theme().dialog_box_title)))
+                    .title(Line::from(Span::from(format!(" {} ", justify_title)).style(get_tui_theme().dialog_box_title)))
                     .style(get_tui_theme().dialog_box)
                     .border_type(BorderType::Double)
                     .render(edit_area, frame.buffer_mut());
@@ -410,7 +407,7 @@ impl<'a> App<'a> {
 
                 Block::new()
                     .borders(Borders::ALL)
-                    .title(Title::from(
+                    .title(Line::from(
                         Span::from(format!(" {} ", get_text("icbtext_filter_title"))).style(get_tui_theme().dialog_box_title),
                     ))
                     .style(get_tui_theme().dialog_box)
@@ -430,7 +427,7 @@ impl<'a> App<'a> {
 
                 Block::new()
                     .borders(Borders::ALL)
-                    .title(Title::from(
+                    .title(Line::from(
                         Span::from(format!(" {} ", get_text("icbtext_jump_to_title"))).style(get_tui_theme().dialog_box_title),
                     ))
                     .style(get_tui_theme().dialog_box)

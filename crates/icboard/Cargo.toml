@@ -45,6 +45,6 @@ http = "1.1.0"
 # for file view kb/mb
 async-recursion = { workspace = true }
 
-russh = "0.56.0"
-internal-russh-forked-ssh-key = "0.6.16"
-async-trait =  { workspace = true }
+russh = { workspace = true }
+internal-russh-forked-ssh-key = { workspace = true }
+async-trait = { workspace = true }

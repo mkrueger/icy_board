@@ -22,7 +22,8 @@ use crate::{
 use bstr::BString;
 use chrono::{DateTime, Utc};
 use codepages::tables::{CP437_TO_UNICODE, write_utf8_with_bom};
-use icy_engine::{BufferType, OutputFormat, SaveOptions, ScreenPreperation};
+use icy_engine::formats::{CharacterFormatOptions, FileFormat, FormatOptions, ScreenPreperation};
+use icy_engine::{BufferType, SaveOptions};
 use jamjam::jam::{JamMessage, JamMessageBase};
 
 use crate::{
@@ -1017,7 +1018,7 @@ pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn savescrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let mut buf = vm.icy_board_state.display_screen().buffer.buffer.flat_clone(false);
+    let mut buf = vm.icy_board_state.display_screen().buffer.buffer.clone();
     buf.buffer_type = BufferType::Unicode;
     vm.stored_screen = Some(buf);
     Ok(())
@@ -1025,10 +1026,14 @@ pub async fn savescrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 
 pub async fn restscrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     if let Some(screen) = &mut vm.stored_screen {
-        let mut options = SaveOptions::default();
-        options.screen_preparation = ScreenPreperation::ClearScreen;
-        options.modern_terminal_output = true;
-        let res = icy_engine::formats::PCBoard::default().to_bytes(screen, &options)?;
+        let options = SaveOptions {
+            format: FormatOptions::Character(CharacterFormatOptions {
+                screen_prep: ScreenPreperation::ClearScreen,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let res = FileFormat::PCBoard.to_bytes(screen, &options)?;
         let res = unsafe { String::from_utf8_unchecked(res) };
         vm.icy_board_state.print(TerminalTarget::Both, &res).await?;
     }

@@ -21,7 +21,7 @@ use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Layout, Margin, Rect},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget, block::Title},
+    widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -54,7 +54,13 @@ impl<'a> EditCommandDialog<'a> {
         let file = icy_board.lock().unwrap().resolve_file(&disp_file);
 
         let buffer = if file.exists() {
-            icy_engine::TextBuffer::load_buffer(&file, true, None).unwrap()
+            let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("ans");
+            icy_engine::FileFormat::from_extension(ext)
+                .unwrap_or(icy_engine::FileFormat::Ansi)
+                .load(&file, None)
+                .unwrap()
+                .screen
+                .buffer
         } else {
             icy_engine::TextBuffer::new((80, 25))
         };
@@ -83,7 +89,7 @@ impl<'a> EditCommandDialog<'a> {
                     "Position".to_string(),
                     ListValue::Position(
                         Box::new(move |frame, pos| {
-                            let size = pos_ed.lock().unwrap().buffer.get_size();
+                            let size = pos_ed.lock().unwrap().buffer.size();
                             let area = Rect::new(
                                 (frame.area().width - size.width as u16) / 2,
                                 (frame.area().height - size.height as u16) / 2,
@@ -385,7 +391,7 @@ impl<'a> EditCommandDialog<'a> {
         Clear.render(area, frame.buffer_mut());
         let block = Block::new()
             .title_alignment(Alignment::Center)
-            .title(Title::from(
+            .title(Line::from(
                 Span::from(format!(" Command ID {} ", self.id)).style(get_tui_theme().dialog_box_title),
             ))
             .style(get_tui_theme().dialog_box)
@@ -449,7 +455,7 @@ impl<'a> EditCommandDialog<'a> {
             Clear.render(area, frame.buffer_mut());
             let block = Block::new()
                 .title_alignment(Alignment::Center)
-                .title(Title::from(Span::from(" Edit Action ").style(get_tui_theme().dialog_box_title)))
+                .title(Line::from(Span::from(" Edit Action ").style(get_tui_theme().dialog_box_title)))
                 .style(get_tui_theme().dialog_box)
                 .padding(Padding::new(2, 2, 1, 1))
                 .borders(Borders::ALL)

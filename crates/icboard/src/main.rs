@@ -252,14 +252,17 @@ async fn start_connections(bbs: &Arc<Mutex<BBS>>, board: &Arc<Mutex<IcyBoard>>, 
     }
 }
 
-async fn run_message(
+async fn run_message<B: Backend>(
     msg: CallWaitMessage,
-    terminal: &mut Terminal<impl Backend>,
+    terminal: &mut Terminal<B>,
     board: &Arc<tokio::sync::Mutex<IcyBoard>>,
     bbs: &mut Arc<Mutex<BBS>>,
     full_screen: bool,
     stuffed_chars: String,
-) -> Res<bool> {
+) -> Res<bool>
+where
+    B::Error: Send + Sync + 'static,
+{
     match msg {
         CallWaitMessage::User(_busy) => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
@@ -426,7 +429,7 @@ async fn run_message(
     Ok(false)
 }
 
-fn init_terminal() -> Res<Terminal<impl Backend>> {
+fn init_terminal() -> Res<ratatui::DefaultTerminal> {
     color_eyre::install()?;
     Ok(ratatui::init())
 }

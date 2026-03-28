@@ -205,10 +205,6 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection for WebSocketConnectio
         if let Err(err) = self.socket.send(msg).await {
             return Err(io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {err}")).into());
         }
-        // Explicit flush to ensure data is sent immediately
-        if let Err(err) = self.socket.flush().await {
-            return Err(io::Error::new(ErrorKind::ConnectionAborted, format!("Flush failed: {err}")).into());
-        }
         Ok(())
     }
 

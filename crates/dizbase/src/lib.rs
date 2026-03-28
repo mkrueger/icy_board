@@ -1,8 +1,8 @@
 use std::{fs, io::BufReader, path::Path};
 
 use unarc_rs::{
-    arc::arc_archive::ArcArchieve, arj::arj_archive::ArjArchieve, hyp::hyp_archive::HypArchieve, sq::sq_archive::SqArchieve, sqz::sqz_archive::SqzArchieve,
-    zoo::zoo_archive::ZooArchieve,
+    arc::arc_archive::ArcArchive, arj::arj_archive::ArjArchive, hyp::hyp_archive::HypArchive, sq::sq_archive::SqArchive, sqz::sqz_archive::SqzArchive,
+    zoo::zoo_archive::ZooArchive,
 };
 use unrar::Archive;
 use zip::DateTime;
@@ -48,7 +48,7 @@ pub fn scan_file_contents(path: &std::path::PathBuf) -> crate::Result<Vec<FileIn
 
 fn scan_arj(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
     let file = fs::File::open(path)?;
-    let mut archieve = ArjArchieve::new(file)?;
+    let mut archieve = ArjArchive::new(file)?;
     let mut info = Vec::new();
 
     while let Ok(Some(header)) = archieve.get_next_entry() {
@@ -66,7 +66,7 @@ fn scan_arj(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
 
 fn scan_arc(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
     let file = fs::File::open(path)?;
-    let mut archieve = ArcArchieve::new(file)?;
+    let mut archieve = ArcArchive::new(file)?;
     let mut info = Vec::new();
 
     while let Ok(Some(header)) = archieve.get_next_entry() {
@@ -84,7 +84,7 @@ fn scan_arc(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
 
 fn scan_zoo(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
     let file = fs::File::open(path)?;
-    let mut archieve = ZooArchieve::new(file)?;
+    let mut archieve = ZooArchive::new(file)?;
     let mut info = Vec::new();
 
     while let Ok(Some(header)) = archieve.get_next_entry() {
@@ -102,7 +102,7 @@ fn scan_zoo(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
 
 fn scan_sqz(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
     let file = fs::File::open(path)?;
-    let mut archieve = SqzArchieve::new(file)?;
+    let mut archieve = SqzArchive::new(file)?;
     let mut info = Vec::new();
 
     while let Ok(Some(header)) = archieve.get_next_entry() {
@@ -120,7 +120,7 @@ fn scan_sqz(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
 
 fn scan_sq(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
     let file = fs::File::open(path)?;
-    let mut archieve = SqArchieve::new(file)?;
+    let mut archieve = SqArchive::new(file)?;
     let mut info = Vec::new();
 
     while let Ok(Some(header)) = archieve.get_next_entry() {
@@ -137,7 +137,7 @@ fn scan_sq(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
 
 fn scan_hyp(path: &std::path::PathBuf) -> crate::Result<Vec<FileInfo>> {
     let file = fs::File::open(path)?;
-    let mut archieve = HypArchieve::new(file)?;
+    let mut archieve = HypArchive::new(file)?;
     let mut info = Vec::new();
 
     while let Ok(Some(header)) = archieve.get_next_entry() {

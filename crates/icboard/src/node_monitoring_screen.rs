@@ -13,10 +13,7 @@ use icy_board_tui::{
     theme::{DOS_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_YELLOW},
 };
 use icy_net::ConnectionType;
-use ratatui::{
-    prelude::*,
-    widgets::{block::Title, *},
-};
+use ratatui::{prelude::*, widgets::*};
 use tokio::sync::Mutex;
 
 pub enum NodeMonitoringScreenMessage {
@@ -67,13 +64,16 @@ impl NodeMonitoringScreen {
         }
     }
 
-    pub async fn run(
+    pub async fn run<B: Backend>(
         &mut self,
-        terminal: &mut Terminal<impl Backend>,
+        terminal: &mut Terminal<B>,
         board: &Arc<Mutex<IcyBoard>>,
         bbs: &mut Arc<Mutex<BBS>>,
         full_screen: bool,
-    ) -> Res<NodeMonitoringScreenMessage> {
+    ) -> Res<NodeMonitoringScreenMessage>
+    where
+        B::Error: Send + Sync + 'static,
+    {
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
         let mut node_info: Vec<Option<Info>> = Vec::new();
@@ -193,15 +193,13 @@ impl NodeMonitoringScreen {
 
         let b = Block::default()
             .title_alignment(Alignment::Left)
-            .title(Title::from(Line::from(format!(" {} ", now.date_naive())).style(Style::new().white())))
+            .title(Line::from(format!(" {} ", now.date_naive())).style(Style::new().white()))
             .title_alignment(Alignment::Center)
-            .title(Title::from(
+            .title(Line::from(
                 Span::from(get_text("icbmoni_title")).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED).bold()),
             ))
             .title_alignment(Alignment::Right)
-            .title(Title::from(
-                Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white()),
-            ))
+            .title(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white()))
             .title_alignment(Alignment::Center)
             .title_bottom(Line::from(Span::from(footer).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED))))
             .style(Style::new().bg(DOS_BLUE))

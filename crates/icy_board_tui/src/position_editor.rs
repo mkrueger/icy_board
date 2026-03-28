@@ -4,7 +4,7 @@ use icy_engine::{TextBuffer, TextPane};
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Color, Style, Stylize},
+    style::{Color, Style},
     text::Span,
     widgets::{Clear, Widget},
 };
@@ -19,13 +19,13 @@ impl PositionEditor {
         Clear.render(area, frame.buffer_mut());
         for y in 0..area.height as i32 {
             for x in 0..area.width as i32 {
-                let c = buffer.get_char((x, y + buffer.get_first_visible_line()).into());
-                let mut fg = c.attribute.get_foreground();
+                let c = buffer.char_at((x, y + buffer.first_visible_line()).into());
+                let mut fg = c.attribute.foreground();
                 if c.attribute.is_bold() {
                     fg += 8;
                 }
-                let fg = buffer.palette.get_color(fg).get_rgb();
-                let bg = buffer.palette.get_color(c.attribute.get_background()).get_rgb();
+                let fg = buffer.palette.rgb(fg);
+                let bg = buffer.palette.rgb(c.attribute.background());
                 let mut s: Style = Style::new().bg(Color::Rgb(bg.0, bg.1, bg.2)).fg(Color::Rgb(fg.0, fg.1, fg.2));
                 if c.attribute.is_blinking() {
                     s = s.slow_blink();
@@ -43,9 +43,9 @@ impl PositionEditor {
 
         match event.code {
             KeyCode::Char('h') | KeyCode::Left => res.x = res.x.saturating_sub(1),
-            KeyCode::Char('l') | KeyCode::Right => res.x = (res.x + 1).min(self.buffer.get_width() as u16 - 1),
+            KeyCode::Char('l') | KeyCode::Right => res.x = (res.x + 1).min(self.buffer.width() as u16 - 1),
             KeyCode::Char('k') | KeyCode::Up => res.y = res.y.saturating_sub(1),
-            KeyCode::Char('j') | KeyCode::Down => res.y = (res.y + 1).min(self.buffer.get_height() as u16 - 1),
+            KeyCode::Char('j') | KeyCode::Down => res.y = (res.y + 1).min(self.buffer.height() as u16 - 1),
             _ => {}
         }
         res
