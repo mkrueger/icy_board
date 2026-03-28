@@ -25,7 +25,6 @@ use jamjam::jam::JamMessageBase;
 use jamjam::jam::msg_header::JamMessageHeader;
 use jamjam::util::basic_real::{BasicDouble, BasicReal};
 use radix_fmt::radix;
-use rand::Rng; // 0.8.5
 
 const HDR_ACTIVE: i32 = 0x0E;
 const HDR_BLOCKS: i32 = 0x04;
@@ -470,8 +469,7 @@ pub async fn random(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
         return Ok(VariableValue::new_int(0));
     }
 
-    let mut rng = rand::rng();
-    Ok(VariableValue::new_int(rng.random_range(0..upper)))
+    Ok(VariableValue::new_int(fastrand::i32(0..upper)))
 }
 
 pub async fn date(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1292,8 +1290,7 @@ pub async fn u_inconf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 
 pub async fn peekdw(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     log::error!("simulating not implementable function 'peekdw' (random number)!");
-    let mut rng = rand::rng();
-    Ok(VariableValue::new_int(rng.random()))
+    Ok(VariableValue::new_int(fastrand::i32(..)))
 }
 
 pub async fn dbglevel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

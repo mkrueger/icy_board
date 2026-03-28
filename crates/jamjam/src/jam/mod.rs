@@ -7,7 +7,6 @@ use std::{fs::File, io::Read};
 
 use bstr::BString;
 use chrono::{DateTime, Utc};
-use rand::random;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use thiserror::Error;
 
@@ -525,7 +524,7 @@ impl JamMessage {
             0
         };
 
-        let rnd: u32 = random();
+        let rnd: u32 = fastrand::u32(..);
         let id = BString::from(format!("{} {:08x}", aka, rnd));
         let msgid_crc = JamMessageBase::get_crc(&id);
 

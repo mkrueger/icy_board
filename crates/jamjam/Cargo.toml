@@ -18,7 +18,7 @@ bstr = { workspace = true }
 codepages = { workspace = true }
 
 rayon = { workspace = true }
-rand = { workspace = true }
+fastrand = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"
