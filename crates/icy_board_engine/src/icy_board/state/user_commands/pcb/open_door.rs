@@ -190,10 +190,12 @@ impl IcyBoardState {
 
     pub async fn run_bbslink_door(&mut self, bbslink: &BBSLink, door: &Door) -> Res<()> {
         log::info!("Running door: {}, requesting token", door.path);
-        let x_key: String = (0..12).map(|_| {
-            const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-            CHARSET[fastrand::usize(..CHARSET.len())] as char
-        }).collect();
+        let x_key: String = (0..12)
+            .map(|_| {
+                const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+                CHARSET[fastrand::usize(..CHARSET.len())] as char
+            })
+            .collect();
         let token = reqwest::get(format!("https://games.bbslink.net/token.php?{x_key}")).await?.text().await?;
         log::info!("got token {}, sending credentials", token);
         /* Not sure why this doesn't work:

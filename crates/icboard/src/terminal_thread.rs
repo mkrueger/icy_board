@@ -1,9 +1,8 @@
 use icy_board_engine::Res;
-use icy_engine::{Caret, TextScreen};
+use icy_engine::TextScreen;
 use icy_net::Connection;
 use icy_parser_core::{AnsiParser, CommandParser};
 use std::{
-    mem,
     sync::{Arc, Mutex},
     thread,
 };
@@ -66,11 +65,8 @@ pub fn start_update_thread(com: Box<dyn Connection>, screen: Arc<Mutex<TextScree
                                                                     }
 
                                                                     let mut s = screen.lock().unwrap();
-                                                                    let mut caret = Caret::default();
-                                                                    mem::swap(&mut caret, &mut s.caret);
                                                                     let mut sink = icy_engine::ScreenSink::new(&mut *s);
                                                                     buffer_parser.parse(&data[0..size], &mut sink);
-                                                                    mem::swap(&mut s.caret, &mut caret);
                                                                 } else {
                                                                     std::thread::sleep(std::time::Duration::from_millis(20));
                                                                 }

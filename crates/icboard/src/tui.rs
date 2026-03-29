@@ -26,7 +26,7 @@ use icy_board_tui::{
     get_text_args,
     theme::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GRAY, DOS_LIGHT_GREEN, DOS_RED, DOS_WHITE, DOS_YELLOW},
 };
-use icy_engine::{EditableScreen, Screen, TextPane, TextScreen};
+use icy_engine::{BufferType, EditableScreen, Screen, TextPane, TextScreen};
 use icy_net::{ConnectionType, channel::ChannelConnection};
 use ratatui::{prelude::*, widgets::Paragraph};
 use tokio::sync::{Mutex, mpsc};
@@ -55,7 +55,9 @@ impl Tui {
         let ui_node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
         let node_state = bbs.lock().await.open_connections.clone();
         let node = ui_node.clone();
-        let screen = Arc::new(std::sync::Mutex::new(TextScreen::new((80, 25))));
+        let mut screen_buffer = TextScreen::new((80, 25));
+        screen_buffer.buffer.buffer_type = BufferType::Unicode;
+        let screen = Arc::new(std::sync::Mutex::new(screen_buffer));
         let (ui_connection, connection) = ChannelConnection::create_pair();
         let node_state2 = node_state.clone();
 
@@ -407,7 +409,8 @@ impl Tui {
     async fn add_input(&mut self, c_seq: std::str::Chars<'_>) -> Res<()> {
         let mut s = Vec::new();
         for c in c_seq {
-            s.push(c as u8);
+            let mut buf = [0; 4];
+            s.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
         }
         let _res = self.tx.send(SendData::Data(s)).await;
         Ok(())
@@ -415,7 +418,10 @@ impl Tui {
 }
 
 fn init_terminal() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
-    Ok(ratatui::init())
+    // Don't call ratatui::init() here - the main terminal is already initialized
+    // (raw mode enabled, alternate screen entered) by main.rs. We just need a
+    // Terminal struct for drawing.
+    Terminal::new(CrosstermBackend::new(stdout()))
 }
 
 pub fn print_exit_screen() {
@@ -467,12 +473,14 @@ pub struct StatusBarInfo {
 
 impl StatusBarInfo {
     pub async fn get_info(board: &Arc<tokio::sync::Mutex<IcyBoard>>, node_state: &Arc<Mutex<Vec<Option<NodeState>>>>, node: usize) -> Self {
-        let l = node_state.lock().await;
-        let node_state = l[node].as_ref().unwrap();
-        let current_conf = node_state.cur_conference;
-        let graphics_mode = node_state.graphics_mode;
-        let logon_time = node_state.logon_time;
-        let cur_user = node_state.cur_user as usize;
+        // Read node_state fields and drop the lock before acquiring the board lock,
+        // to avoid holding both locks simultaneously (which can deadlock with the
+        // BBS thread that acquires them in the opposite order).
+        let (current_conf, graphics_mode, logon_time, cur_user) = {
+            let l = node_state.lock().await;
+            let ns = l[node].as_ref().unwrap();
+            (ns.cur_conference, ns.graphics_mode, ns.logon_time, ns.cur_user as usize)
+        };
         let board = board.lock().await;
         if cur_user >= board.users.len() {
             return Default::default();

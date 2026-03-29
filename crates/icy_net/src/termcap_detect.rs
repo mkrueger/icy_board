@@ -25,7 +25,7 @@ impl TerminalCaps {
     pub const LOCAL: TerminalCaps = TerminalCaps {
         program: TerminalProgram::Unknown,
         term_size: (80, 25),
-        is_utf8: false,
+        is_utf8: true,
         rip_version: None,
     };
 
