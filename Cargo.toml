@@ -77,7 +77,7 @@ tui-markdown = "0.3"
 tui-input = "0.14.0"
 # tui-markdown = { git = "https://github.com/joshka/tui-markdown" }
 
-russh = "0.58.1"
+russh = "0.60.0"
 internal-russh-forked-ssh-key = "0.6"
 
 [profile.release]
