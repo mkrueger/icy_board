@@ -4,7 +4,8 @@ use crate::Res;
 use async_trait::async_trait;
 use icy_board_engine::icy_board::{IcyBoard, bbs::BBS, login_server::SSH};
 use icy_net::{Connection, ConnectionType};
-use internal_russh_forked_ssh_key::{Certificate, PublicKey, rand_core::OsRng};
+use internal_russh_forked_ssh_key::{Certificate, PublicKey};
+use rand::rngs::StdRng;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::Mutex,
@@ -19,11 +20,12 @@ use russh::{
 use super::handle_client;
 
 pub async fn await_ssh_connections(ssh: SSH, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+    let mut rng: StdRng = rand::make_rng();
     let config = russh::server::Config {
         inactivity_timeout: Some(std::time::Duration::from_secs(3600)),
         auth_rejection_time: std::time::Duration::from_secs(3),
         auth_rejection_time_initial: Some(std::time::Duration::from_secs(0)),
-        keys: vec![russh::keys::PrivateKey::random(&mut OsRng, russh::keys::Algorithm::Ed25519).unwrap()],
+        keys: vec![russh::keys::PrivateKey::random(&mut rng, russh::keys::Algorithm::Ed25519).unwrap()],
         preferred: Preferred {
             kex: Cow::Owned(kex::ALL_KEX_ALGORITHMS.iter().map(|k| **k).collect()),
             cipher: Cow::Owned(cipher::ALL_CIPHERS.iter().map(|k| **k).collect()),

@@ -296,6 +296,10 @@ impl FromStr for ICIRequests {
 }
 
 const MAX_SIZE: usize = 2048;
+const ICI_PREFIX_LEN: usize = 10;
+const ICI_LEN_FIELD_LEN: usize = 4;
+const ICI_CRC_LEN: usize = 8;
+const ICI_TRAILER_LEN: usize = 1;
 
 #[derive(Clone)]
 pub struct EmsiICI {
@@ -346,10 +350,29 @@ pub fn decode_ici(ici: &[u8]) -> crate::Result<EmsiICI> {
         return Err(NetError::InvalidEmsiPacket.into());
     }
 
-    let len = parse_hex(&ici[10..14]);
-    let emsi_body = &ici[2..len as usize + 14];
+    if ici.len() < ICI_PREFIX_LEN + ICI_LEN_FIELD_LEN + ICI_CRC_LEN + ICI_TRAILER_LEN {
+        return Err(NetError::InvalidEmsiPacket.into());
+    }
+
+    let len = parse_hex(&ici[ICI_PREFIX_LEN..ICI_PREFIX_LEN + ICI_LEN_FIELD_LEN]).ok_or(NetError::InvalidEmsiPacket)? as usize;
+    if len > MAX_SIZE {
+        return Err(NetError::MaximumEmsiICIExceeded(len).into());
+    }
+
+    let packet_len = ICI_PREFIX_LEN
+        .checked_add(ICI_LEN_FIELD_LEN)
+        .and_then(|value| value.checked_add(len))
+        .and_then(|value| value.checked_add(ICI_CRC_LEN))
+        .and_then(|value| value.checked_add(ICI_TRAILER_LEN))
+        .ok_or(NetError::InvalidEmsiPacket)?;
+
+    if ici.len() < packet_len || ici[packet_len - 1] != b'\r' {
+        return Err(NetError::InvalidEmsiPacket.into());
+    }
+
+    let emsi_body = &ici[2..len + 14];
     let calc_crc32 = !get_crc32(emsi_body);
-    let crc = parse_hex(&ici[len as usize + 14..len as usize + 14 + 8]);
+    let crc = parse_hex(&ici[len + 14..len + 14 + ICI_CRC_LEN]).ok_or(NetError::InvalidEmsiPacket)?;
     if crc != calc_crc32 {
         return Err(NetError::EmsiCRC32Error.into());
     }
@@ -363,7 +386,7 @@ pub fn decode_ici(ici: &[u8]) -> crate::Result<EmsiICI> {
                 start = i + 1;
             }
             b'}' => {
-                let str = std::str::from_utf8(&emsi_body[start..i]).unwrap().to_string();
+                let str = std::str::from_utf8(&emsi_body[start..i]).map_err(|_| NetError::NoUnicodeInEmsi)?.to_string();
                 match block {
                     0 => user_settings.name = str,
                     1 => user_settings.alias = str,
@@ -378,7 +401,9 @@ pub fn decode_ici(ici: &[u8]) -> crate::Result<EmsiICI> {
                     8 => term_settings.protocols = str,
                     9 => {
                         // FSC-0056: All string comparisons must be case-insensitive
-                        let caps = std::str::from_utf8(&emsi_body[start..i]).unwrap().to_ascii_uppercase();
+                        let caps = std::str::from_utf8(&emsi_body[start..i])
+                            .map_err(|_| NetError::NoUnicodeInEmsi)?
+                            .to_ascii_uppercase();
                         term_settings.can_chat = caps.contains("CHT");
                         term_settings.can_download_ascii = caps.contains("MNU");
                         term_settings.can_tab_char = caps.contains("TAB");
@@ -415,26 +440,36 @@ fn parse_emsi_term_caps(str: &str) -> crate::Result<TermCaps> {
         Some("TTY") => TerminalEmulation::Ansi,
         _ => return Err(NetError::InvalidEmsiPacket.into()),
     };
-    let rows = parts.next().unwrap().parse::<u16>().unwrap();
-    let cols = parts.next().unwrap().parse::<u16>().unwrap();
+    let rows = parts
+        .next()
+        .ok_or(NetError::InvalidEmsiPacket)?
+        .parse::<u16>()
+        .map_err(|_| NetError::InvalidEmsiPacket)?;
+    let cols = parts
+        .next()
+        .ok_or(NetError::InvalidEmsiPacket)?
+        .parse::<u16>()
+        .map_err(|_| NetError::InvalidEmsiPacket)?;
     Ok(TermCaps {
         terminal: term,
         window_size: (cols, rows),
     })
 }
 
-fn parse_hex(ici: &[u8]) -> u32 {
-    let mut result = 0;
-    for c in ici {
-        if (b'0'..=b'9').contains(c) {
-            result = result * 16 + (*c - b'0') as u64;
-        }
-        if (b'a'..=b'f').contains(c) {
-            result = result * 16 + 10 + (*c - b'a') as u64;
-        }
-        if (b'A'..=b'F').contains(c) {
-            result = result * 16 + 10 + (*c - b'A') as u64;
-        }
+fn parse_hex(ici: &[u8]) -> Option<u32> {
+    if ici.is_empty() {
+        return None;
     }
-    result as u32
+
+    let mut result: u64 = 0;
+    for c in ici {
+        let digit = match *c {
+            b'0'..=b'9' => u64::from(*c - b'0'),
+            b'a'..=b'f' => u64::from(*c - b'a') + 10,
+            b'A'..=b'F' => u64::from(*c - b'A') + 10,
+            _ => return None,
+        };
+        result = result.checked_mul(16)?.checked_add(digit)?;
+    }
+    Some(result as u32)
 }

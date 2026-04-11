@@ -1,20 +1,20 @@
 [workspace]
 resolver = "2"
 members = [
-	"crates/icy_board_engine", 
+	"crates/icy_board_engine",
 	"crates/jamjam",
 	"crates/dizbase",
 	"crates/codepages",
 	"crates/pplc",
 	"crates/ppld",
 	"crates/ppl-lsp",
-#	"crates/scandb",
-	"crates/codepages", 
+	#	"crates/scandb",
+	"crates/codepages",
 	"crates/icy_board_tui",
 	"crates/mkicbmnu",
 	"crates/icy_net",
-	"crates/mkicbtxt", 
-	"crates/icboard", 
+	"crates/mkicbtxt",
+	"crates/icboard",
 	"crates/icbsetup",
 	"crates/icbmailer",
 	"crates/icbsysmgr",
@@ -32,11 +32,11 @@ icy_board_tui = { path = "crates/icy_board_tui" }
 
 icy_net = { path = "crates/icy_net" }
 icy_board_engine = { path = "crates/icy_board_engine" }
-icy_engine = { git ="https://github.com/mkrueger/icy_tools" }
-icy_parser_core = { git ="https://github.com/mkrueger/icy_tools" }
- 
+icy_engine = { git = "https://github.com/mkrueger/icy_tools" }
+icy_parser_core = { git = "https://github.com/mkrueger/icy_tools" }
+
 lazy_static = "1.5.0"
-semver = { version ="1.0.23", features = ["serde"] }
+semver = { version = "1.0.23", features = ["serde"] }
 thiserror = "2.0.17"
 argh = "0.1.12"
 crossterm = "0.29.0"
@@ -51,10 +51,14 @@ regex = "1.11.3"
 bitflag = "0.10.1"
 async-trait = "0.1.89"
 async-recursion = "1.1.1"
+rand = "0.10.0"
 zip = "8.4.0"
 
 walkdir = "2.2.6"
-i18n-embed = { version = "0.16.0", features = ["fluent-system", "desktop-requester"]} 
+i18n-embed = { version = "0.16.0", features = [
+	"fluent-system",
+	"desktop-requester",
+] }
 i18n-embed-fl = "0.10.0"
 fluent-bundle = "0.16.0"
 rust-embed = "8.5.0"
@@ -71,8 +75,8 @@ itertools = "0.14.0"
 fern = "0.7.0"
 ariadne = "0.6.0"
 relative-path = "2.0.1"
-bitflags ="2.10.0"
-tui-textarea  = "0.7.0"
+bitflags = "2.10.0"
+tui-textarea = "0.7.0"
 tui-markdown = "0.3"
 tui-input = "0.14.0"
 # tui-markdown = { git = "https://github.com/joshka/tui-markdown" }
@@ -81,11 +85,11 @@ russh = "0.60.0"
 internal-russh-forked-ssh-key = "0.6"
 
 [profile.release]
-opt-level = 'z'     # Optimize for size
-lto = true          # Enable link-time optimization
-codegen-units = 1   # Reduce number of codegen units to increase optimizations
-panic = 'abort'     # Abort on panic
-strip = true        # Strip symbols from binary*
+opt-level = 'z'   # Optimize for size
+lto = true        # Enable link-time optimization
+codegen-units = 1 # Reduce number of codegen units to increase optimizations
+panic = 'abort'   # Abort on panic
+strip = true      # Strip symbols from binary*
 
 [profile.dev]
 opt-level = 3

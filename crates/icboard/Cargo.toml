@@ -6,12 +6,12 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-icy_board_engine = { workspace = true}
-icy_board_tui = { workspace = true}
-icy_parser_core = { workspace = true}
-jamjam = { workspace = true}
-codepages = { workspace = true}
-dizbase = { workspace = true}
+icy_board_engine = { workspace = true }
+icy_board_tui = { workspace = true }
+icy_parser_core = { workspace = true }
+jamjam = { workspace = true }
+codepages = { workspace = true }
+dizbase = { workspace = true }
 icy_engine = { workspace = true }
 icy_net = { workspace = true }
 
@@ -43,6 +43,7 @@ http = "1.1.0"
 
 # for file view kb/mb
 async-recursion = { workspace = true }
+rand = { workspace = true }
 
 russh = { workspace = true }
 internal-russh-forked-ssh-key = { workspace = true }
