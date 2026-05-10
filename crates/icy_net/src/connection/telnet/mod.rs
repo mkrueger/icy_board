@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::{
+    collections::HashMap,
     io::{self, ErrorKind},
     time::Duration,
 };
@@ -16,8 +17,11 @@ use crate::ConnectionState;
 
 use super::{Connection, ConnectionType};
 
+mod negotiation;
 mod telnet_cmd;
 mod telnet_option;
+
+use negotiation::Negotiation;
 
 #[derive(Debug)]
 enum ParserState {
@@ -63,6 +67,11 @@ pub struct TelnetConnection {
     caps: TermCaps,
     state: ParserState,
     read_buffer: Vec<u8>,
+    is_server: bool,
+    /// RFC 1143 negotiation state for the remote side (incoming WILL/WONT).
+    remote_neg: HashMap<u8, Negotiation>,
+    /// RFC 1143 negotiation state for the local side (incoming DO/DONT).
+    local_neg: HashMap<u8, Negotiation>,
 }
 
 impl TelnetConnection {
@@ -79,6 +88,9 @@ impl TelnetConnection {
                     caps,
                     state: ParserState::Data,
                     read_buffer: Vec::new(),
+                    is_server: false,
+                    remote_neg: HashMap::new(),
+                    local_neg: HashMap::new(),
                 }),
                 Err(err) => Err(Box::new(err)),
             },
@@ -95,7 +107,36 @@ impl TelnetConnection {
             },
             state: ParserState::Data,
             read_buffer: Vec::new(),
+            is_server: true,
+            remote_neg: HashMap::new(),
+            local_neg: HashMap::new(),
         })
+    }
+
+    fn agree_remote(opt: u8, is_server: bool) -> bool {
+        if is_server {
+            matches!(opt, telnet_option::TRANSMIT_BINARY | telnet_option::TERMINAL_TYPE | telnet_option::NEGOTIATE_ABOUT_WINDOW_SIZE)
+        } else {
+            matches!(opt, telnet_option::TRANSMIT_BINARY | telnet_option::ECHO | telnet_option::SUPPRESS_GO_AHEAD)
+        }
+    }
+
+    fn agree_local(opt: u8, is_server: bool) -> bool {
+        if is_server {
+            matches!(opt, telnet_option::TRANSMIT_BINARY | telnet_option::ECHO | telnet_option::SUPPRESS_GO_AHEAD)
+        } else {
+            matches!(opt, telnet_option::TRANSMIT_BINARY | telnet_option::TERMINAL_TYPE | telnet_option::NEGOTIATE_ABOUT_WINDOW_SIZE)
+        }
+    }
+
+    async fn send_negotiation_reply(&mut self, reply: negotiation::Reply, opt: u8) -> io::Result<()> {
+        use negotiation::Reply;
+        match reply {
+            Reply::Do => self.tcp_stream.write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::DO, opt)).await,
+            Reply::Dont => self.tcp_stream.write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::DONT, opt)).await,
+            Reply::Will => self.tcp_stream.write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::WILL, opt)).await,
+            Reply::Wont => self.tcp_stream.write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::WONT, opt)).await,
+        }
     }
 
     async fn parse(&mut self, data: &mut [u8]) -> io::Result<usize> {
@@ -187,71 +228,52 @@ impl TelnetConnection {
                 },
                 ParserState::Will => {
                     self.state = ParserState::Data;
-                    match b {
-                        telnet_option::TRANSMIT_BINARY => {
-                            self.tcp_stream
-                                .write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::DO, telnet_option::TRANSMIT_BINARY))
-                                .await?;
-                        }
-                        telnet_option::ECHO => {
-                            self.tcp_stream
-                                .write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::DO, telnet_option::ECHO))
-                                .await?;
-                        }
-                        telnet_option::SUPPRESS_GO_AHEAD => {
-                            self.tcp_stream
-                                .write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::DO, telnet_option::SUPPRESS_GO_AHEAD))
-                                .await?;
-                        }
-                        opt => {
-                            log::warn!("unsupported will option {}", telnet_option::to_string(opt));
-                            self.tcp_stream.write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::DONT, opt)).await?;
-                        }
+                    let agree = Self::agree_remote(b, self.is_server);
+                    let neg = self.remote_neg.get(&b).copied().unwrap_or_default();
+                    let (new_neg, reply) = neg.on_will(agree);
+                    self.remote_neg.insert(b, new_neg);
+                    if let Some(reply) = reply {
+                        self.send_negotiation_reply(reply, b).await?;
                     }
                 }
                 ParserState::Wont => {
-                    if !telnet_option::is_supported(b) {
-                        log::warn!("unsupported wont option {}", telnet_option::to_string(b));
+                    self.state = ParserState::Data;
+                    let neg = self.remote_neg.get(&b).copied().unwrap_or_default();
+                    let (new_neg, reply) = neg.on_wont();
+                    self.remote_neg.insert(b, new_neg);
+                    if let Some(reply) = reply {
+                        self.send_negotiation_reply(reply, b).await?;
                     }
                     log::info!("Wont {b:?}");
-                    self.state = ParserState::Data;
                 }
                 ParserState::Do => {
                     self.state = ParserState::Data;
-                    let opt = b;
-                    match opt {
-                        telnet_option::TRANSMIT_BINARY => {
-                            self.tcp_stream
-                                .write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::WILL, telnet_option::TRANSMIT_BINARY))
-                                .await?;
-                        }
-                        telnet_option::TERMINAL_TYPE => {
-                            self.tcp_stream
-                                .write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::WILL, telnet_option::TERMINAL_TYPE))
-                                .await?;
-                        }
-                        telnet_option::NEGOTIATE_ABOUT_WINDOW_SIZE => {
-                            // NAWS: send our current window size
-                            let mut buf: Vec<u8> = telnet_cmd::make_cmd_with_option(telnet_cmd::SB, telnet_option::NEGOTIATE_ABOUT_WINDOW_SIZE).to_vec();
-                            // Note: big endian bytes are correct.
-                            buf.extend(self.caps.window_size.0.to_be_bytes());
-                            buf.extend(self.caps.window_size.1.to_be_bytes());
-                            buf.push(telnet_cmd::IAC);
-                            buf.push(telnet_cmd::SE);
-                            self.tcp_stream.write_all(&buf).await?;
-                        }
-                        _ => {
-                            log::warn!("unsupported do option {}", telnet_option::to_string(opt));
-                            self.tcp_stream.write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::WONT, opt)).await?;
-                        }
+                    let agree = Self::agree_local(b, self.is_server);
+                    let neg = self.local_neg.get(&b).copied().unwrap_or_default();
+                    let (new_neg, reply) = neg.on_do(agree);
+                    self.local_neg.insert(b, new_neg);
+                    let has_reply = reply.is_some();
+                    if let Some(reply) = reply {
+                        self.send_negotiation_reply(reply, b).await?;
+                    }
+                    if b == telnet_option::NEGOTIATE_ABOUT_WINDOW_SIZE && has_reply {
+                        let mut buf: Vec<u8> = telnet_cmd::make_cmd_with_option(telnet_cmd::SB, telnet_option::NEGOTIATE_ABOUT_WINDOW_SIZE).to_vec();
+                        buf.extend(self.caps.window_size.0.to_be_bytes());
+                        buf.extend(self.caps.window_size.1.to_be_bytes());
+                        buf.push(telnet_cmd::IAC);
+                        buf.push(telnet_cmd::SE);
+                        self.tcp_stream.write_all(&buf).await?;
                     }
                 }
                 ParserState::Dont => {
-                    if !telnet_option::is_supported(b) {
-                        log::warn!("unsupported dont option {}", telnet_option::to_string(b));
+                    self.state = ParserState::Data;
+                    let neg = self.local_neg.get(&b).copied().unwrap_or_default();
+                    let (new_neg, reply) = neg.on_dont();
+                    self.local_neg.insert(b, new_neg);
+                    if let Some(reply) = reply {
+                        self.send_negotiation_reply(reply, b).await?;
                     }
                     log::info!("Dont {b:?}");
-                    self.state = ParserState::Data;
                 }
             }
         }
@@ -377,5 +399,60 @@ impl Connection for TelnetConnection {
     async fn shutdown(&mut self) -> crate::Result<()> {
         self.tcp_stream.shutdown().await?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn agree_remote(opt: u8, is_server: bool) -> bool {
+        if is_server {
+            matches!(opt, telnet_option::TRANSMIT_BINARY | telnet_option::TERMINAL_TYPE | telnet_option::NEGOTIATE_ABOUT_WINDOW_SIZE)
+        } else {
+            matches!(opt, telnet_option::TRANSMIT_BINARY | telnet_option::ECHO | telnet_option::SUPPRESS_GO_AHEAD)
+        }
+    }
+
+    fn agree_local(opt: u8, is_server: bool) -> bool {
+        if is_server {
+            matches!(opt, telnet_option::TRANSMIT_BINARY | telnet_option::ECHO | telnet_option::SUPPRESS_GO_AHEAD)
+        } else {
+            matches!(opt, telnet_option::TRANSMIT_BINARY | telnet_option::TERMINAL_TYPE | telnet_option::NEGOTIATE_ABOUT_WINDOW_SIZE)
+        }
+    }
+
+    #[test]
+    fn agree_remote_directionality() {
+        // Client: wants server to do BINARY, ECHO, SGA; refuses TTYPE, NAWS
+        assert!(agree_remote(telnet_option::TRANSMIT_BINARY, false));
+        assert!(agree_remote(telnet_option::ECHO, false));
+        assert!(agree_remote(telnet_option::SUPPRESS_GO_AHEAD, false));
+        assert!(!agree_remote(telnet_option::TERMINAL_TYPE, false));
+        assert!(!agree_remote(telnet_option::NEGOTIATE_ABOUT_WINDOW_SIZE, false));
+
+        // Server: wants client to do BINARY, TTYPE, NAWS; refuses ECHO, SGA
+        assert!(agree_remote(telnet_option::TRANSMIT_BINARY, true));
+        assert!(agree_remote(telnet_option::TERMINAL_TYPE, true));
+        assert!(agree_remote(telnet_option::NEGOTIATE_ABOUT_WINDOW_SIZE, true));
+        assert!(!agree_remote(telnet_option::ECHO, true));
+        assert!(!agree_remote(telnet_option::SUPPRESS_GO_AHEAD, true));
+    }
+
+    #[test]
+    fn agree_local_directionality() {
+        // Client: will do BINARY, TTYPE, NAWS; refuses ECHO, SGA
+        assert!(agree_local(telnet_option::TRANSMIT_BINARY, false));
+        assert!(agree_local(telnet_option::TERMINAL_TYPE, false));
+        assert!(agree_local(telnet_option::NEGOTIATE_ABOUT_WINDOW_SIZE, false));
+        assert!(!agree_local(telnet_option::ECHO, false));
+        assert!(!agree_local(telnet_option::SUPPRESS_GO_AHEAD, false));
+
+        // Server: will do BINARY, ECHO, SGA; refuses TTYPE, NAWS
+        assert!(agree_local(telnet_option::TRANSMIT_BINARY, true));
+        assert!(agree_local(telnet_option::ECHO, true));
+        assert!(agree_local(telnet_option::SUPPRESS_GO_AHEAD, true));
+        assert!(!agree_local(telnet_option::TERMINAL_TYPE, true));
+        assert!(!agree_local(telnet_option::NEGOTIATE_ABOUT_WINDOW_SIZE, true));
     }
 }
