@@ -1,5 +1,3 @@
-use std::io;
-
 /**
 <http://www.iana.org/assignments/telnet-options/telnet-options.xhtml>
 */
@@ -103,14 +101,8 @@ pub const TEL_OPT_PRAGMA_HEARTBEAT: u8 = 140;
 /// <https://www.rfc-editor.org/rfc/rfc861>
 pub const EXTENDED_OPTIONS_LIST: u8 = 0xFF;
 
-pub fn check(byte: u8) -> io::Result<u8> {
-    match byte {
-        0..=49 | 138..=140 | 255 => Ok(byte),
-        _ => Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("unknown option: {byte}/x{byte:02X}"),
-        )),
-    }
+pub fn is_supported(byte: u8) -> bool {
+    matches!(byte, 0..=49 | 138..=140 | 255)
 }
 
 pub fn to_string(byte: u8) -> &'static str {
@@ -164,5 +156,18 @@ pub fn to_string(byte: u8) -> &'static str {
         TEL_OPT_PRAGMA_HEARTBEAT => "TelOptPragmaHeartbeat",
         EXTENDED_OPTIONS_LIST => "ExtendedOptionsList",
         _ => "Unknown",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_supported_correct_for_all_bytes() {
+        for byte in 0..=255u8 {
+            let expected = matches!(byte, 0..=49 | 138..=140 | 255);
+            assert_eq!(is_supported(byte), expected);
+        }
     }
 }

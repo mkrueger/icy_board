@@ -187,7 +187,7 @@ impl TelnetConnection {
                 },
                 ParserState::Will => {
                     self.state = ParserState::Data;
-                    match telnet_option::check(b)? {
+                    match b {
                         telnet_option::TRANSMIT_BINARY => {
                             self.tcp_stream
                                 .write_all(&telnet_cmd::make_cmd_with_option(telnet_cmd::DO, telnet_option::TRANSMIT_BINARY))
@@ -210,13 +210,15 @@ impl TelnetConnection {
                     }
                 }
                 ParserState::Wont => {
-                    let opt = telnet_option::check(b)?;
-                    log::info!("Wont {opt:?}");
+                    if !telnet_option::is_supported(b) {
+                        log::warn!("unsupported wont option {}", telnet_option::to_string(b));
+                    }
+                    log::info!("Wont {b:?}");
                     self.state = ParserState::Data;
                 }
                 ParserState::Do => {
                     self.state = ParserState::Data;
-                    let opt = telnet_option::check(b)?;
+                    let opt = b;
                     match opt {
                         telnet_option::TRANSMIT_BINARY => {
                             self.tcp_stream
@@ -245,8 +247,10 @@ impl TelnetConnection {
                     }
                 }
                 ParserState::Dont => {
-                    let opt = telnet_option::check(b)?;
-                    log::info!("Dont {opt:?}");
+                    if !telnet_option::is_supported(b) {
+                        log::warn!("unsupported dont option {}", telnet_option::to_string(b));
+                    }
+                    log::info!("Dont {b:?}");
                     self.state = ParserState::Data;
                 }
             }
