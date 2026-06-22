@@ -19,8 +19,9 @@ use thiserror::Error;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::ConnectionState;
+use crate::connection::proxy::{ProxyConfig, connect_tcp};
 use crate::{Connection, ConnectionType, telnet::TermCaps};
-use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
+use tokio::{io::AsyncWriteExt, sync::Mutex};
 
 pub struct SSHConnection {
     client: SshClient,
@@ -163,6 +164,8 @@ pub struct SshConnectionOptions {
     pub host_key_policy: HostKeyPolicy,
     pub connect_timeout: Duration,
     pub authentication_timeout: Duration,
+    /// Optional proxy for the underlying TCP connection (e.g. SOCKS5 for Tor/I2P).
+    pub proxy: Option<ProxyConfig>,
 }
 
 impl SshConnectionOptions {
@@ -174,6 +177,7 @@ impl SshConnectionOptions {
             host_key_policy: HostKeyPolicy::InsecureAcceptAny,
             connect_timeout: Duration::from_secs(5),
             authentication_timeout: Duration::from_secs(30),
+            proxy: None,
         }
     }
 }
@@ -501,10 +505,9 @@ impl SshClient {
             port,
             host_key_policy: options.host_key_policy,
         };
-        let tcp_stream = tokio::time::timeout(options.connect_timeout, TcpStream::connect(connect_addr))
+        let tcp_stream = connect_tcp(&connect_addr, options.proxy.as_ref(), options.connect_timeout)
             .await
-            .map_err(transport)?
-            .map_err(transport)?;
+            .map_err(SshAuthenticationError::Transport)?;
         tcp_stream.set_nodelay(true).map_err(transport)?;
         let mut session: client::Handle<Client> = russh::client::connect_stream(config, tcp_stream, sh).await.map_err(map_transport_error)?;
 
@@ -1231,6 +1234,7 @@ mod tests {
                 },
                 connect_timeout: Duration::from_secs(2),
                 authentication_timeout: Duration::from_secs(2),
+                proxy: None,
             },
         )
         .await;
@@ -1260,6 +1264,7 @@ mod tests {
                 host_key_policy: HostKeyPolicy::Fingerprint(SshHostKeyFingerprint(unrelated.public_key().fingerprint(ssh_key::HashAlg::Sha256).to_string())),
                 connect_timeout: Duration::from_secs(2),
                 authentication_timeout: Duration::from_secs(2),
+                proxy: None,
             },
         )
         .await;
@@ -1305,6 +1310,7 @@ mod tests {
                 host_key_policy: HostKeyPolicy::InsecureAcceptAny,
                 connect_timeout: Duration::from_secs(2),
                 authentication_timeout: Duration::from_millis(20),
+                proxy: None,
             },
         )
         .await;

@@ -9,6 +9,7 @@ use tokio::{
 
 use crate::ConnectionState;
 
+use super::proxy::{ProxyConfig, connect_tcp};
 use super::{Connection, ConnectionType};
 
 pub struct RawConnection {
@@ -18,17 +19,22 @@ pub struct RawConnection {
 
 impl RawConnection {
     pub async fn open<A: ToSocketAddrs>(addr: &A, timeout: Duration) -> crate::Result<Self> {
-        let result = tokio::time::timeout(timeout, TcpStream::connect(addr)).await;
-        match result {
-            Ok(tcp_stream) => match tcp_stream {
-                Ok(stream) => Ok(Self {
-                    tcp_stream: stream,
-                    read_buffer: Vec::new(),
-                }),
-                Err(err) => Err(Box::new(err)),
-            },
-            Err(err) => Err(Box::new(err)),
-        }
+        let tcp_stream = tokio::time::timeout(timeout, TcpStream::connect(addr)).await??;
+        Ok(Self {
+            tcp_stream,
+            read_buffer: Vec::new(),
+        })
+    }
+
+    /// Like [`RawConnection::open`], but routes the TCP connection through an
+    /// optional proxy. The address must be given as `host:port` so that a SOCKS5
+    /// proxy can resolve the host remotely (`.onion` / `.i2p`).
+    pub async fn open_with_proxy(addr: &str, timeout: Duration, proxy: Option<&ProxyConfig>) -> crate::Result<Self> {
+        let tcp_stream = connect_tcp(addr, proxy, timeout).await?;
+        Ok(Self {
+            tcp_stream,
+            read_buffer: Vec::new(),
+        })
     }
 
     pub async fn accept(tcp_stream: TcpStream) -> crate::Result<Self> {

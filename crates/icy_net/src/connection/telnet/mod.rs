@@ -14,6 +14,7 @@ use tokio::{
 
 use crate::ConnectionState;
 
+use super::proxy::{ProxyConfig, connect_tcp};
 use super::{Connection, ConnectionType};
 
 mod negotiation;
@@ -116,18 +117,19 @@ pub struct TelnetConnection {
 
 impl TelnetConnection {
     pub async fn open(addr: impl Into<String>, caps: TermCaps, timeout: Duration) -> crate::Result<Self> {
+        Self::open_with_proxy(addr, caps, timeout, None).await
+    }
+
+    /// Like [`TelnetConnection::open`], but routes the TCP connection through an
+    /// optional proxy. With a SOCKS5 proxy the host name is resolved remotely, so
+    /// `.onion` and `.i2p` addresses work.
+    pub async fn open_with_proxy(addr: impl Into<String>, caps: TermCaps, timeout: Duration, proxy: Option<&ProxyConfig>) -> crate::Result<Self> {
         let mut addr: String = addr.into();
         if !addr.contains(':') {
             addr.push_str(":23");
         }
-        let result = tokio::time::timeout(timeout, TcpStream::connect(addr)).await;
-        match result {
-            Ok(tcp_stream) => match tcp_stream {
-                Ok(tcp_stream) => Ok(Self::new(tcp_stream, caps, false)),
-                Err(err) => Err(Box::new(err)),
-            },
-            Err(err) => Err(Box::new(err)),
-        }
+        let tcp_stream = connect_tcp(&addr, proxy, timeout).await?;
+        Ok(Self::new(tcp_stream, caps, false))
     }
 
     pub fn accept(tcp_stream: TcpStream) -> crate::Result<Self> {

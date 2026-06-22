@@ -18,6 +18,8 @@ regex = { workspace = true }
 async-trait =  { workspace = true }
 
 bytes = "1"
+# PROXY (SOCKS5 with remote DNS, for Tor/I2P)
+tokio-socks = "0.5"
 # MODEM
 serial2-tokio = { version = "0.1.25", features = ["unix"] }
 
