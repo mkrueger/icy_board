@@ -99,15 +99,18 @@ impl PPECall {
         let mut arg = String::new();
 
         for ch in iter {
-            if ch == ' ' || ch == '_' {
+            // A space separates arguments.
+            if ch == ' ' {
                 if !arg.is_empty() {
                     arguments.push(arg);
                     arg = String::new();
                 }
-                if ch == '_' {
-                    break;
-                }
                 continue;
+            }
+            // '_' acts as a terminator only at a token boundary (start of a token),
+            // so underscores inside a file name or path are kept as-is.
+            if ch == '_' && arg.is_empty() {
+                break;
             }
             arg.push(ch);
         }
@@ -564,4 +567,51 @@ pub mod pwd_flags {
     pub const SHOW_WRONG_PWD_MSG: u32 = 0x00001;
     /// Don't show any text
     pub const PLAIN: u32 = 0x00002;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PPECall, PPECallType};
+
+    #[test]
+    fn test_parse_simple_ppe_call() {
+        let call = PPECall::try_parse_line("!FOO.PPE").unwrap();
+        assert_eq!(call.call_type, PPECallType::PPE);
+        assert_eq!(call.file, "FOO.PPE");
+        assert!(call.arguments.is_empty());
+    }
+
+    #[test]
+    fn test_parse_arguments_separated_by_space() {
+        let call = PPECall::try_parse_line("!FOO.PPE arg1 arg2").unwrap();
+        assert_eq!(call.file, "FOO.PPE");
+        assert_eq!(call.arguments, vec!["arg1".to_string(), "arg2".to_string()]);
+    }
+
+    #[test]
+    fn test_underscore_in_file_name_is_kept() {
+        let call = PPECall::try_parse_line("!foo_bar.ppe arg1").unwrap();
+        assert_eq!(call.file, "foo_bar.ppe");
+        assert_eq!(call.arguments, vec!["arg1".to_string()]);
+    }
+
+    #[test]
+    fn test_underscore_in_absolute_path_is_kept() {
+        let call = PPECall::try_parse_line("!/home/my_user/my_ppe.ppe").unwrap();
+        assert_eq!(call.file, "/home/my_user/my_ppe.ppe");
+        assert!(call.arguments.is_empty());
+    }
+
+    #[test]
+    fn test_underscore_at_token_boundary_terminates() {
+        let call = PPECall::try_parse_line("!SUBSCR.PPE _some trailing prompt").unwrap();
+        assert_eq!(call.file, "SUBSCR.PPE");
+        assert!(call.arguments.is_empty());
+    }
+
+    #[test]
+    fn test_non_call_line_returns_none() {
+        assert!(PPECall::try_parse_line("just some text").is_none());
+        assert!(PPECall::try_parse_line("").is_none());
+    }
 }
