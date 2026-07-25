@@ -847,9 +847,20 @@ pub async fn optext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     vm.icy_board_state.session.op_text = vm.eval_expr(&args[0]).await?.as_string();
     Ok(())
 }
+
 pub async fn dispstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let value = vm.eval_expr(&args[0]).await?.as_string();
-    vm.icy_board_state.print(TerminalTarget::Both, &value).await
+
+    if let Some(file_name) = value.strip_prefix('%') {
+        let file_name = vm.resolve_file(&file_name).await;
+        vm.icy_board_state.display_file(&file_name).await?;
+    } else if let Some(file_name) = value.strip_prefix('!') {
+        vm.icy_board_state.run_ppe(&file_name, None).await?;
+    } else {
+        vm.icy_board_state.print(TerminalTarget::Both, &value).await?;
+    }
+
+    Ok(())
 }
 
 pub async fn rdunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
