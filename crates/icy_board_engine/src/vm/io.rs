@@ -205,8 +205,10 @@ impl PCBoardIO for DiskIO {
     fn fopen(&mut self, channel: i32, file_name: &str, mode: i32, _sm: i32) -> Res<()> {
         let file = match mode {
             O_RD => File::open(file_name),
+            // FOPEN should create the file if it does not exist for every mode
+            // other than O_RD, matching PCBoard PPL behavior.
             O_WR => File::create(file_name),
-            O_RW => OpenOptions::new().read(true).write(true).open(file_name),
+            O_RW => OpenOptions::new().read(true).write(true).create(true).open(file_name),
             O_APPEND => OpenOptions::new().append(true).create(true).open(file_name),
             _ => panic!("unsupported mode {mode}"),
         };
@@ -425,6 +427,67 @@ impl PCBoardIO for DiskIO {
 
     fn get_file_size(&self, file: &str) -> u64 {
         if let Ok(metadata) = fs::metadata(file) { metadata.len() } else { 0 }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+
+    use super::{DiskIO, PCBoardIO};
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_fopen_o_rd_missing_file_fails() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("missing.dat");
+        let mut io = DiskIO::new(tmp.path().to_str().unwrap(), None);
+        let result = io.fopen(1, path.to_str().unwrap(), 0, 0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_fopen_o_wr_creates_missing_file() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("new_wr.dat");
+        let mut io = DiskIO::new(tmp.path().to_str().unwrap(), None);
+        io.fopen(1, path.to_str().unwrap(), 1, 0).unwrap();
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn test_fopen_o_rw_creates_missing_file() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("new_rw.dat");
+        let mut io = DiskIO::new(tmp.path().to_str().unwrap(), None);
+        io.fopen(1, path.to_str().unwrap(), 2, 0).unwrap();
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn test_fopen_o_append_creates_missing_file() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("new_append.dat");
+        let mut io = DiskIO::new(tmp.path().to_str().unwrap(), None);
+        io.fopen(1, path.to_str().unwrap(), 4, 0).unwrap();
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn test_fopen_o_append_preserves_existing_content() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("existing.dat");
+        {
+            let mut f = std::fs::File::create(&path).unwrap();
+            f.write_all(b"hello").unwrap();
+        }
+        let mut io = DiskIO::new(tmp.path().to_str().unwrap(), None);
+        io.fopen(1, path.to_str().unwrap(), 4, 0).unwrap();
+        io.fput(1, " world".to_string()).unwrap();
+        io.fflush(1).unwrap();
+        io.fclose(1).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(content, "hello world");
     }
 }
 
