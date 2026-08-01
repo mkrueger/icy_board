@@ -378,7 +378,7 @@ impl FunctionDefinition {
     }
 }
 lazy_static::lazy_static! {
-    pub static ref FUNCTION_DEFINITIONS: [FunctionDefinition; 300] = [
+    pub static ref FUNCTION_DEFINITIONS: [FunctionDefinition; 309] = [
         FunctionDefinition {
             name: "END",
             version: 100,
@@ -3144,6 +3144,78 @@ lazy_static::lazy_static! {
             version: 100,
             opcode: FuncOpCode::TOUNSIGNED,
             return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "ToLong",
+            version: 100,
+            opcode: FuncOpCode::TOINTEGER,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "KbdFileUsed",
+            version: 100,
+            opcode: FuncOpCode::KBDFILUSED,
+            return_type: VariableType::Boolean,
+            args: None,
+            signature: FunctionSignature::FixedParameters(0),
+        },
+        FunctionDefinition {
+            name: "ToDouble",
+            version: 100,
+            opcode: FuncOpCode::TODREAL,
+            return_type: VariableType::Double,
+            args: None,
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "ToFloat",
+            version: 100,
+            opcode: FuncOpCode::TOREAL,
+            return_type: VariableType::Float,
+            args: None,
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "ToSDWord",
+            version: 100,
+            opcode: FuncOpCode::TOINTEGER,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "ToShort",
+            version: 100,
+            opcode: FuncOpCode::TOSWORD,
+            return_type: VariableType::SWord,
+            args: None,
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "ToUByte",
+            version: 100,
+            opcode: FuncOpCode::TOBYTE,
+            return_type: VariableType::Byte,
+            args: None,
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "ToUWord",
+            version: 100,
+            opcode: FuncOpCode::TOWORD,
+            return_type: VariableType::Word,
+            args: None,
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "ToUDWord",
+            version: 100,
+            opcode: FuncOpCode::TOUNSIGNED,
+            return_type: VariableType::Unsigned,
             args: None,
             signature: FunctionSignature::FixedParameters(1),
         },
