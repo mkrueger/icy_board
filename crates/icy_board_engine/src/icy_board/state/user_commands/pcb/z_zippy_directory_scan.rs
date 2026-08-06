@@ -5,7 +5,7 @@ use crate::{
     datetime::IcbDate,
     icy_board::{
         commands::CommandType,
-        state::{IcyBoardState, functions::MASK_COMMAND},
+        state::{IcyBoardState, functions::MASK_COMMAND, functions::MASK_NUM},
     },
     tables::import_cp437_string,
 };
@@ -32,6 +32,7 @@ impl IcyBoardState {
                 .await?;
             return Ok(());
         }
+        let scan_date = if self.tokens_request_new_scan() { self.ask_scan_date().await? } else { None };
         let search_pattern = if let Some(token) = self.session.tokens.pop_front() {
             token
         } else {
@@ -79,7 +80,10 @@ impl IcyBoardState {
                 self.show_dir_menu().await?;
             } else {
                 self.session.push_tokens(&search_area);
-                let dir_numbers = self.get_dir_numbers().await?;
+                let mut dir_numbers = self.get_dir_numbers().await?;
+                if scan_date.is_some() {
+                    dir_numbers.date_time = scan_date;
+                }
                 self.displaycmdfile("prefile").await?;
                 self.new_line().await?;
                 self.session.disp_options.no_change();
@@ -131,6 +135,57 @@ impl IcyBoardState {
         }
         self.stop_search();
         Ok(())
+    }
+
+    /// PCBoard treats a lone N or S on the command line as a new file scan and
+    /// then asks for a date before it asks for the search text. The tokens are
+    /// taken out of the queue so the later directory parse does not see them twice.
+    pub fn tokens_request_new_scan(&mut self) -> bool {
+        let mut found = false;
+        self.session.tokens.retain(|token| {
+            if token.eq_ignore_ascii_case("N") || token.eq_ignore_ascii_case("S") {
+                found = true;
+                false
+            } else {
+                true
+            }
+        });
+        found
+    }
+
+    /// An empty answer keeps the default, a
+    /// date of all zeroes turns the filter off and anything that is not six
+    /// digits is asked again.
+    pub async fn ask_scan_date(&mut self) -> Res<Option<chrono::prelude::DateTime<chrono::prelude::Local>>> {
+        let default = self.session.current_user.as_ref().map(|user| user.stats.last_on.format("%m%d%y").to_string());
+        loop {
+            let mut answer = self
+                .input_field(
+                    IceText::DateToSearch,
+                    6,
+                    &MASK_NUM,
+                    "",
+                    default.clone(),
+                    display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::GUIDE,
+                )
+                .await?;
+            if answer.is_empty() {
+                let Some(default) = &default else {
+                    return Ok(None);
+                };
+                answer = default.clone();
+            }
+            if answer == "000000" {
+                return Ok(None);
+            }
+            if answer.len() != 6 || !answer.chars().all(|c| c.is_ascii_digit()) {
+                continue;
+            }
+            let month = answer[0..2].parse::<u8>().unwrap_or(0);
+            let day = answer[2..4].parse::<u8>().unwrap_or(0);
+            let year = answer[4..6].parse::<u16>().unwrap_or(0);
+            return Ok(Some(IcbDate::new(month, day, year).to_local_date_time()));
+        }
     }
 
     pub async fn get_dir_numbers(&mut self) -> Res<DirNumbers> {

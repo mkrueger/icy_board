@@ -207,7 +207,7 @@ impl PCBoardIO for DiskIO {
             O_RD => File::open(file_name),
             O_WR => File::create(file_name),
             O_RW => OpenOptions::new().read(true).write(true).open(file_name),
-            O_APPEND => OpenOptions::new().append(true).open(file_name),
+            O_APPEND => OpenOptions::new().append(true).create(true).open(file_name),
             _ => panic!("unsupported mode {mode}"),
         };
         match file {

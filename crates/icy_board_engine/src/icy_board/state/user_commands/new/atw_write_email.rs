@@ -7,6 +7,7 @@ use crate::icy_board::{
         functions::{MASK_ASCII, display_flags},
     },
 };
+use jamjam::jam::attributes;
 
 impl IcyBoardState {
     pub async fn write_email(&mut self) -> Res<()> {
@@ -53,7 +54,8 @@ impl IcyBoardState {
             return Ok(());
         };
 
-        self.write_message(-1, -1, &to, &subject, false, IceText::SavingMessage).await?;
+        self.write_message(-1, -1, &to, &subject, attributes::MSG_PRIVATE, None, None, Vec::new(), IceText::SavingMessage)
+            .await?;
 
         Ok(())
     }

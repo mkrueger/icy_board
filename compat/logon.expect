@@ -1,0 +1,46 @@
+# Answers for the PCBoard oracle logon (new-user registration path).
+#
+# Format: REGEX=RESPONSE, first match against the tail of the last read wins,
+# so more specific patterns must come first. Rules are matched case-insensitively.
+#
+# The account is a throwaway fixture that exists only inside the local DOSBox
+# image; nothing here is a real credential.
+
+# --- MORE / continue prompts, matched first so they never fall through ---
+\(Enter\) to continue=
+- more \]-=
+More\? \[Y=
+
+# --- identification ---
+username:=ORACLE TESTER
+apply as a new user=Y
+
+# Once the account exists the board asks for the password directly, so the same
+# script drives both a fresh registration and a returning logon.
+password:=QX7742ZK
+
+# "Re-enter" must precede the generic password rule.
+Re-enter password=QX7742ZK
+Password \(one word=QX7742ZK
+
+# --- questionnaire ---
+City and State calling from=TESTCITY
+Business or data phone=555-0001
+Home or voice phone=555-0002
+Brand of CPU=PENTIUM
+Clear the screen between=N
+Default Protocol Desired=N
+# An alias collides with the real user base ("User already exists"), so keep none.
+Alias Name=
+Street \(1 of 2\)=1 TEST ST
+Street \(2 of 2\)=
+Zip Code=12345
+Country=TESTLAND
+maiden name=SMITH
+gender=M
+birthdate=01/01/70
+E-mail address=oracle@example.invalid
+WEB address=
+Set default file description=N
+City\?=TESTCITY
+State\?=TS

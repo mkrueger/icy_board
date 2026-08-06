@@ -7,7 +7,7 @@ use std::{
 use icy_board_engine::{
     compiler::{PPECompiler, workspace::Workspace},
     executable::Executable,
-    icy_board::{bbs::BBS, read_data_with_encoding_detection, state::IcyBoardState, user_base::User},
+    icy_board::{bbs::BBS, state::IcyBoardState, user_base::User},
     parser::{Encoding, ErrorReporter, UserTypeRegistry},
 };
 use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
@@ -95,7 +95,7 @@ fn run_test(file_name: &Path, input: &str, expected_output: &str) {
                 x
             });
 
-            let result = read_data_with_encoding_detection(&result).unwrap();
+            let result = String::from_utf8(result).expect("PPE output is not valid UTF-8");
             let result = result.replace("\r\n", "\n");
             if result != expected_output {
                 println!("Input: {}", input);

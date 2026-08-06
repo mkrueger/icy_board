@@ -23,6 +23,7 @@ impl IcyBoardState {
                 .await?;
             return Ok(());
         }
+        let scan_date = if self.tokens_request_new_scan() { self.ask_scan_date().await? } else { None };
         let search_pattern = if let Some(token) = self.session.tokens.pop_front() {
             token
         } else {
@@ -91,6 +92,11 @@ impl IcyBoardState {
                         &path,
                         &metadata,
                         Box::new(move |p, _| {
+                            if let Some(date) = scan_date {
+                                if p.date() < date {
+                                    return false;
+                                }
+                            }
                             if r.is_match(p.name()) {
                                 return true;
                             }

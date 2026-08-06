@@ -94,6 +94,48 @@ impl IcyBoardState {
             return Ok(());
         }
 
+        // The sysop walks past both of these gates.
+        if !self.session.is_sysop && !door.password.is_empty() {
+            let answer = self
+                .input_field(
+                    IceText::PasswordForDOOR,
+                    12,
+                    &MASK_ALNUM,
+                    "",
+                    None,
+                    display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::UPCASE | display_flags::ECHODOTS,
+                )
+                .await?;
+            if answer.is_empty() || !answer.eq_ignore_ascii_case(&door.password) {
+                self.display_text(IceText::BadPasswordForDOOR, display_flags::NEWLINE | display_flags::LOGIT)
+                    .await?;
+                return Ok(());
+            }
+        }
+
+        // Running a door drops the flag list, so give the user a way out.
+        if !self.session.flagged_files.is_empty() {
+            self.display_text(
+                IceText::FilesAreFlagged,
+                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL,
+            )
+            .await?;
+            self.session.op_text = door.name.clone();
+            let answer = self
+                .input_field(
+                    IceText::ContinueDOOR,
+                    1,
+                    "",
+                    "",
+                    Some(self.session.no_char.to_uppercase().to_string()),
+                    display_flags::YESNO | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE | display_flags::FIELDLEN,
+                )
+                .await?;
+            if answer != self.session.yes_char.to_uppercase().to_string() {
+                return Ok(());
+            }
+        }
+
         match door.door_type {
             DoorType::BBSlink => {
                 let DoorServerAccount::BBSLink(bbslink) = &door_list.accounts[0];

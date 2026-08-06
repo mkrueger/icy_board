@@ -5,6 +5,9 @@ pub use deserializer::*;
 pub mod commands;
 pub use commands::*;
 
+pub mod compat;
+pub use compat::*;
+
 pub mod smt_op_codes;
 pub use smt_op_codes::*;
 

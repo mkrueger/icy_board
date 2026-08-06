@@ -6,7 +6,7 @@ fn test_blt_empty() {
     let output = test_output("B\n".to_string(), |_| {});
     assert_eq!(
         output,
-        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mB\n\n.\u{1b}[1;31mSorry, Sysop, no Bulletins are presently available.\n\n\u{1b}[32mPress (Enter) to continue? \u{1b}[0m"
+        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mB\n\n\u{7}\u{1b}[1;31mSorry, Sysop, no Bulletins are presently available.\n\n\u{1b}[32mPress (Enter) to continue? \u{1b}[0m"
     );
 }
 
@@ -81,6 +81,6 @@ fn test_blt_exit() {
     let output = test_output("B\n\n".to_string(), |_| {});
     assert_eq!(
         output,
-        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mB\n\n.\u{1b}[1;31mSorry, Sysop, no Bulletins are presently available.\n\n\u{1b}[32mPress (Enter) to continue? \u{1b}[0m\r\u{1b}[K\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m"
+        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mB\n\n\u{7}\u{1b}[1;31mSorry, Sysop, no Bulletins are presently available.\n\n\u{1b}[32mPress (Enter) to continue? \u{1b}[0m\r\u{1b}[K\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m"
     );
 }

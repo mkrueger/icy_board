@@ -90,6 +90,7 @@ impl IcyBoardState {
             self.gotoxy(TerminalTarget::Both, pos.0, pos.1).await?;
             self.autorun_commands(mnu, AutoRun::After, 0).await?;
 
+            let typed_ahead = self.ppl_typeahead();
             let command = self.input_menu_prompt(mnu, &mut current_item, &menu_start_time).await?;
             if command.len() > 5 {
                 self.saved_cmd = command.clone();
@@ -113,7 +114,7 @@ impl IcyBoardState {
                     continue;
                 }
 
-                if let Some(command) = self.try_find_command(&command_str, true).await {
+                if let Some(command) = self.try_find_command(&command_str, !typed_ahead).await {
                     self.session.last_new_line_y = self.display_screen().buffer.caret.y;
                     self.session.disp_options.no_change();
                     self.dispatch_command(&command_str, &command).await?;
@@ -453,7 +454,7 @@ impl IcyBoardState {
             }
             CommandType::RestoreMessage => {
                 let sec = self.session.sysop_command_level.sec_4_recover_deleted_msg.clone();
-                if check_security && !self.check_sec("CHAT", &sec).await? {
+                if check_security && !self.check_sec("4", &sec).await? {
                     return Ok(());
                 }
                 // 4
@@ -496,7 +497,7 @@ impl IcyBoardState {
             }
             CommandType::Broadcast => {
                 let sec = self.session.sysop_command_level.use_broadcast_command.clone();
-                if check_security && !self.check_sec("PPE", &sec).await? {
+                if check_security && !self.check_sec("BR", &sec).await? {
                     return Ok(());
                 }
                 // BR
@@ -528,7 +529,7 @@ impl IcyBoardState {
             }
             CommandType::BatchDownload => {
                 let sec = self.session.user_command_level.batch_file_transfer.clone();
-                if check_security && !self.check_sec("DB", &sec).await? {
+                if check_security && !self.check_sec("BD", &sec).await? {
                     return Ok(());
                 }
                 // BD
@@ -536,7 +537,7 @@ impl IcyBoardState {
             }
             CommandType::BatchUpload => {
                 let sec = self.session.user_command_level.batch_file_transfer.clone();
-                if check_security && !self.check_sec("UB", &sec).await? {
+                if check_security && !self.check_sec("BU", &sec).await? {
                     return Ok(());
                 }
                 // BU
@@ -564,7 +565,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    async fn check_sec(&mut self, command: &str, required_sec: &SecurityExpression) -> Res<bool> {
+    pub(crate) async fn check_sec(&mut self, command: &str, required_sec: &SecurityExpression) -> Res<bool> {
         if required_sec.session_can_access(&self.session) {
             return Ok(true);
         }

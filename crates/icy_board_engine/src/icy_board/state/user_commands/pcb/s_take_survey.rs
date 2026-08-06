@@ -35,7 +35,11 @@ impl IcyBoardState {
             .await?;
             return Ok(());
         }
-        let mut display_current_menu = self.session.tokens.is_empty();
+        // PCBoard ignores any token here: S always shows the menu and
+        // always asks, so a PPE that stuffs the answer stays in step.
+        self.session.tokens.clear();
+
+        let mut display_current_menu = true;
         loop {
             if display_current_menu {
                 let file = self.session.current_conference.survey_menu.clone();
@@ -43,19 +47,23 @@ impl IcyBoardState {
                 self.display_file(&file).await?;
                 display_current_menu = false;
             }
-            let text = if let Some(token) = self.session.tokens.pop_front() {
-                token
+            let digits = if surveys.len() > 99 {
+                3
+            } else if surveys.len() > 9 {
+                2
             } else {
-                self.input_field(
+                1
+            };
+            let text = self
+                .input_field(
                     IceText::QuestionNumberToAnswer,
-                    12,
+                    digits,
                     MASK_BULLETINS,
                     CommandType::Survey.get_help(),
                     None,
                     display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
                 )
-                .await?
-            };
+                .await?;
             if text.is_empty() {
                 break;
             }

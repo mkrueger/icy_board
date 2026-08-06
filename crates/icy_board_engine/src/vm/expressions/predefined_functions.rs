@@ -184,20 +184,28 @@ pub async fn upper(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 pub async fn mid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let str = vm.eval_expr(&args[0]).await?.as_string();
     let mut pos = vm.eval_expr(&args[1]).await?.as_int() - 1; // 1 based
-    let mut chars = vm.eval_expr(&args[2]).await?.as_int();
+    let chars = vm.eval_expr(&args[2]).await?.as_int();
     if chars <= 0 {
         return Ok(VariableValue::new_string(String::new()));
     }
 
     let mut res = String::new();
-    while pos < 0 {
+    let mut remaining = chars;
+    while pos < 0 && remaining > 0 {
         res.push(' ');
         pos += 1;
-        chars -= 1;
+        remaining -= 1;
     }
 
-    if chars > 0 {
-        str.chars().skip(pos as usize).take(chars as usize).for_each(|c| res.push(c));
+    if remaining > 0 {
+        str.chars().skip(pos as usize).take(remaining as usize).for_each(|c| res.push(c));
+    }
+
+    // PCBoard always returns exactly `chars` characters, padding on the right when
+    // the requested span runs past the end of the string.
+    // Verified against PCBoard 15.4: MID("ABC",2,6) == "BC    ", MID("ABC",9,2) == "  ".
+    while res.chars().count() < chars as usize {
+        res.push(' ');
     }
     Ok(VariableValue::new_string(res))
 }

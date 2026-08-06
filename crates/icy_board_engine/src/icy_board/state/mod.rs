@@ -498,8 +498,16 @@ impl NodeState {
 #[derive(Clone, Debug, Copy, PartialEq)]
 pub enum KeySource {
     User,
+    /// KBDSTUFF: originates from a PPE but is echoed like typed input.
+    StuffedVisible,
     StuffedHidden,
     Sysop,
+}
+
+impl KeySource {
+    pub fn is_stuffed(self) -> bool {
+        matches!(self, KeySource::StuffedVisible | KeySource::StuffedHidden)
+    }
 }
 
 pub struct KeyChar {
@@ -684,8 +692,7 @@ impl IcyBoardState {
         }
     }
 
-    pub async fn join_conference(&mut self, conference: u16, _quick_join: bool, show_intro: bool) -> Res<()> {
-        // todo: display news on join.
+    pub async fn join_conference(&mut self, conference: u16, quick_join: bool, show_intro: bool) -> Res<()> {
         if (conference as usize) >= self.get_board().await.conferences.len() {
             return Ok(());
         }
@@ -700,6 +707,9 @@ impl IcyBoardState {
             super::icb_config::DisplayNewsBehavior::Always => (true, false),
             super::icb_config::DisplayNewsBehavior::Never => (false, false),
         };
+
+        // Everything below the intro only happens the first time round.
+        let first_join = !self.session.joined_conferences.contains(&conference);
 
         self.session.current_conference_number = conference;
         let c = self.get_board().await.conferences[conference as usize].clone();
@@ -716,15 +726,19 @@ impl IcyBoardState {
             self.display_news(only_new).await?;
         }
 
-        if scan_new_blt {
-            self.scan_new_bulletins().await?;
-        }
-
         if self.get_board().await.config.switches.force_intro_on_join || show_intro {
             if self.session.current_conference.intro_file.is_file() {
                 let f = self.session.current_conference.intro_file.clone();
                 self.display_file(&f).await?;
             }
+        }
+
+        if first_join {
+            self.ask_to_view_conference_members(quick_join).await?;
+            if scan_new_blt {
+                self.scan_new_bulletins().await?;
+            }
+            self.ask_to_scan_message_base().await?;
         }
         self.session.joined_conferences.insert(conference);
 
@@ -793,7 +807,7 @@ impl IcyBoardState {
     pub fn stuff_keyboard_buffer(&mut self, value: &str, is_visible: bool) -> Res<()> {
         let in_chars: Vec<char> = value.chars().collect();
 
-        let src = if is_visible { KeySource::User } else { KeySource::StuffedHidden };
+        let src = if is_visible { KeySource::StuffedVisible } else { KeySource::StuffedHidden };
         let mut i = 0;
         while i < in_chars.len() {
             let c = in_chars[i];
@@ -811,6 +825,13 @@ impl IcyBoardState {
         }
         // self.char_buffer.push_back(KeyChar::new(KeySource::StuffedHidden, '\n'));
         Ok(())
+    }
+
+    /// True when the next command will come out of a PPE's stuffed keyboard buffer.
+    /// PCBoard skips CMD.LST in that case so a PPE started from CMD.LST cannot
+    /// stuff its own keyword and re-trigger itself.
+    pub fn ppl_typeahead(&self) -> bool {
+        self.char_buffer.front().is_some_and(|c| c.source.is_stuffed())
     }
 
     pub async fn get_pcbdat(&self) -> Res<String> {
@@ -1210,7 +1231,9 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub async fn page_sysop(&mut self) -> Res<()> {
+    /// Rings the sysop. Returns true when the page was answered or given up on,
+    /// false when it rang out.
+    pub async fn page_sysop(&mut self) -> Res<bool> {
         self.session.paged_sysop = true;
         self.display_text(IceText::Paging, display_flags::LFBEFORE).await?;
 
@@ -1227,18 +1250,18 @@ impl IcyBoardState {
                 };
                 if ch.ch == '\x1b' || ch.ch as u32 == 11 {
                     self.new_line().await?;
-                    return Ok(());
+                    return Ok(true);
                 }
                 if ch.source == KeySource::Sysop {
                     self.chat().await?;
                     self.display_text(IceText::SysopChatEnded, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
-                    return Ok(());
+                    return Ok(true);
                 }
             }
         }
 
-        Ok(())
+        Ok(false)
     }
 
     async fn chat(&mut self) -> Res<()> {
@@ -2194,7 +2217,7 @@ impl IcyBoardState {
                     return Ok(Some(ch));
                 }
                 TerminalTarget::User => {
-                    if ch.source == KeySource::User {
+                    if ch.source == KeySource::User || ch.source.is_stuffed() {
                         return Ok(Some(ch));
                     } else {
                         self.char_buffer.push_back(ch);

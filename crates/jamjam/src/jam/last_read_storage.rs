@@ -32,8 +32,8 @@ impl JamLastReadStorage {
 
     pub fn write(&self, file: &mut File) -> crate::Result<()> {
         let mut record = Vec::new();
-        record.extend_from_slice(&self.user_id.to_le_bytes());
         record.extend_from_slice(&self.user_crc.to_le_bytes());
+        record.extend_from_slice(&self.user_id.to_le_bytes());
         record.extend_from_slice(&self.last_read_msg.to_le_bytes());
         record.extend_from_slice(&self.high_read_msg.to_le_bytes());
         file.write_all(&record)?;

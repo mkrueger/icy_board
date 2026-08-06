@@ -4,15 +4,7 @@ use crossterm::{
     execute,
     style::{Attribute, Color, Print, ResetColor, SetAttribute, SetForegroundColor},
 };
-use icy_board_engine::executable::{Executable, PPECommand, PPEExpr, PPEScript};
-
-/// Status categories for reporting.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum ImplStatus {
-    Unsupported,   // Present, but intentionally not supported (logs warn) e.g. SOUNDDELAY
-    Unimplemented, // Stubbed with unimplemented_stmt!/function!
-    Partial,       // Partially implemented (works but missing features)
-}
+use icy_board_engine::executable::{Executable, ImplStatus, PPECommand, PPEExpr, PPEScript, function_status, statement_status};
 
 struct UsageHit {
     span_start: usize,
@@ -21,198 +13,21 @@ struct UsageHit {
     is_function: bool,
 }
 
-// Curated lists:
-// NOTE: Keep names matching the canonical `StatementDefinition.name` or `FunctionDefinition.name` (case-insensitive compare).
-// Statement names (from STATEMENT_DEFINITIONS) often use mixed case (e.g. "SoundDelay"); functions use their defined names.
-const UNSUPPORTED_STATEMENTS: &[&str] = &[
-    "SOUND",
-    "SOUNDDELAY", // logs warn only
-];
-
-pub const UNIMPLEMENTED_STATEMENTS: &[&str] = &[
-    "DOINTR",
-    "VARSEG",
-    "VAROFF",
-    "POKEB",
-    "POKEW",
-    "VARADDR",
-    "WRUSYSDOOR",
-    "WRUSYS",
-    "RDUSYS",
-    "OPENCAP",
-    "CLOSECAP",
-    "POKEDW",
-    "TPAGET",
-    "TPAPUT",
-    "TPACGEA",
-    "TPACPUT",
-    "TPAREAD",
-    "TPAWRITE",
-    "TPACREAD",
-    "TPACWRITE",
-    "SETLMR",
-    "STACKABORT",
-    "DCREATE",
-    "DOPEN",
-    "DCLOSE",
-    "DSETALIAS",
-    "DPACK",
-    "DCLOSEALL",
-    "DLOCK",
-    "DLOCKR",
-    "DLOCKG",
-    "DUNLOCK",
-    "DNCREATE",
-    "DNOPEN",
-    "DNCLOSE",
-    "DNCLOSEALL",
-    "DNEW",
-    "DADD",
-    "DAPPEND",
-    "DTOP",
-    "DGO",
-    "DBOTTOM",
-    "DSKIP",
-    "DBLANK",
-    "DDELETE",
-    "DRECALL",
-    "DTAG",
-    "DSEEK",
-    "DFBLANK",
-    "DGET",
-    "DPUT",
-    "DFCOPY",
-    "KILLMSG",
-    "FDOWRAKA",
-    "FDOADDAKA",
-    "FDOWRORG",
-    "FDOADDOR",
-    "FDOQMOD",
-    "FDOQADD",
-    "FDOQDEL",
-    "MOVE_MSG",
-];
-const PARTIAL_STATEMENTS: &[&str] = &[
-    // Add statements that are implemented but missing edge cases
-];
-
-const UNSUPPORTED_FUNCTIONS: &[&str] = &[
-    // (If any functions only warn)
-    "GETDRIVE", "SETDRIVE", "MODEM",
-];
-
-const UNIMPLEMENTED_FUNCTIONS: &[&str] = &[
-    "REGAL",
-    "REGAH",
-    "REGBL",
-    "REGBH",
-    "REGCL",
-    "REGCH",
-    "REGDL",
-    "REGDH",
-    "REGAX",
-    "REGBX",
-    "REGCX",
-    "REGDX",
-    "REGSI",
-    "REGDI",
-    "REGF",
-    "REGCF",
-    "REGDS",
-    "REGES",
-    "PEEKB",
-    "PEEKW",
-    "EVTTIMEADJ",
-    "KBDFILUSUED",
-    "DRIVESPACE",
-    "DGETALIAS",
-    "DBOF",
-    "DCHANGED",
-    "DDECIMALS",
-    "DDELETED",
-    "DEOF",
-    "DERR",
-    "DFIELDS",
-    "DLENGTH",
-    "DNAME",
-    "DRECCOUNT",
-    "DRECNO",
-    "DTYPE",
-    "DNEXT",
-    "TODDATE",
-    "DCLOSEALL",
-    "DOPEN",
-    "DCLOSE",
-    "DSETALIAS",
-    "DPACK",
-    "DLOCKF",
-    "DLOCK",
-    "DLOCKR",
-    "DUNLOCK",
-    "DNOPEN",
-    "DNCLOSE",
-    "DNCLOSEALL",
-    "DNEW",
-    "DADD",
-    "DAPPEND",
-    "DTOP",
-    "DGO",
-    "DBOTTOM",
-    "DSKIP",
-    "DBLANK",
-    "DDELETE",
-    "DRECALL",
-    "DTAG",
-    "DSEEK",
-    "DFBLANK",
-    "DGET",
-    "DPUT",
-    "DFCOPY",
-    "DSELECT",
-    "DCHKSTAT",
-    "DERRMSG",
-    "SCANMSGHDR",
-    "FDORDAKA",
-    "FDORDORG",
-    "FDORDAREA",
-    "FDOQRD",
-    "SETMSGHDR",
-];
-
-const PARTIAL_FUNCTIONS: &[&str] = &[
-    // Add partially supported functions here
-];
-
-fn normalize(s: &str) -> String {
-    s.to_ascii_uppercase()
-}
+// The compatibility tables live in `icy_board_engine::executable::compat` and are
+// kept in sync with the VM by the `opcode_coverage` test in that crate.
 
 fn classify_statement(name: &str) -> Option<ImplStatus> {
-    let n = normalize(name);
-    if UNSUPPORTED_STATEMENTS.iter().any(|s| normalize(s) == n) {
-        return Some(ImplStatus::Unsupported);
+    match statement_status(name) {
+        ImplStatus::Implemented | ImplStatus::Invalid => None,
+        status => Some(status),
     }
-    if UNIMPLEMENTED_STATEMENTS.iter().any(|s| normalize(s) == n) {
-        return Some(ImplStatus::Unimplemented);
-    }
-    if PARTIAL_STATEMENTS.iter().any(|s| normalize(s) == n) {
-        return Some(ImplStatus::Partial);
-    }
-    None
 }
 
 fn classify_function(name: &str) -> Option<ImplStatus> {
-    let n = normalize(name);
-    if UNSUPPORTED_FUNCTIONS.iter().any(|s| normalize(s) == n) {
-        return Some(ImplStatus::Unsupported);
+    match function_status(name) {
+        ImplStatus::Implemented | ImplStatus::Invalid => None,
+        status => Some(status),
     }
-    if UNIMPLEMENTED_FUNCTIONS.iter().any(|s| normalize(s) == n) {
-        return Some(ImplStatus::Unimplemented);
-    }
-    if PARTIAL_FUNCTIONS.iter().any(|s| normalize(s) == n) {
-        return Some(ImplStatus::Partial);
-    }
-    None
 }
 
 /// Recursively walk expressions to find predefined function calls.
@@ -338,6 +153,8 @@ pub fn check_compatibility(executable: &Executable) -> Result<(), Box<dyn std::e
                 ImplStatus::Unimplemented => ("Unimplemented", Color::Red),
                 ImplStatus::Unsupported => ("Unsupported (stubbed)", Color::Magenta),
                 ImplStatus::Partial => ("Partially Implemented", Color::Yellow),
+                // `classify_*` never yields these, they are filtered out beforehand.
+                ImplStatus::Implemented | ImplStatus::Invalid => continue,
             };
             execute!(
                 stdout(),

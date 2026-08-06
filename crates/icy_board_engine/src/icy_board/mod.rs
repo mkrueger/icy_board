@@ -375,6 +375,23 @@ impl IcyBoard {
         };
 
         for conf in board.conferences.iter_mut() {
+            // A conference command list takes priority over the global one.
+            let command_file = if conf.command_file.is_absolute() {
+                conf.command_file.clone()
+            } else {
+                board.root_path.join(&conf.command_file)
+            };
+            if command_file.is_file() {
+                match CommandList::load(&command_file) {
+                    Ok(commands) => {
+                        conf.commands = commands.commands;
+                    }
+                    Err(err) => {
+                        log::error!("Error loading conference commands {}: {}", command_file.display(), err);
+                    }
+                }
+            }
+
             let area_file = if conf.area_file.is_absolute() {
                 conf.area_file.clone()
             } else {

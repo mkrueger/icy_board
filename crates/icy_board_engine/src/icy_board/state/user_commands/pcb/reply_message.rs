@@ -1,9 +1,9 @@
 use jamjam::jam::JamMessageBase;
+use jamjam::jam::attributes;
 
 use crate::icy_board::commands::CommandType;
 use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA};
 use crate::{Res, icy_board::state::IcyBoardState};
-
 use crate::icy_board::{
     icb_text::IceText,
     state::{
@@ -109,13 +109,17 @@ impl IcyBoardState {
                 new_subject = subject;
             };
             let ret_receipt = self.get_ret_receipt().await?;
+            let msg_attributes = if ret_receipt { attributes::MSG_RECEIPTREQ } else { 0 };
 
             self.write_message(
                 self.session.current_conference_number as i32,
                 self.session.current_message_area as i32,
                 &to,
                 &new_subject,
-                ret_receipt,
+                msg_attributes,
+                None,
+                None,
+                Vec::new(),
                 IceText::SavingMessage,
             )
             .await?;

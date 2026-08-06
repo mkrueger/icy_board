@@ -897,8 +897,8 @@ impl IcbConfig {
                 ask_birthdate: false,
                 ask_email: false,
                 ask_web_address: false,
-                ask_use_short_descr: false,
-                ask_fse: false,
+                ask_use_short_descr: true,
+                ask_fse: true,
             },
             message: MessageOptions {
                 max_msg_lines: 100,
@@ -1000,7 +1000,7 @@ impl Default for IcbConfig {
     }
 }
 
-#[derive(Default, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct QwkSettings {
     pub bbs_name: String,
     pub bbs_city_and_state: String,
@@ -1011,4 +1011,40 @@ pub struct QwkSettings {
     pub welcome_screen: PathBuf,
     pub goodbye_screen: PathBuf,
     pub news_sceen: PathBuf,
+
+    /// System wide ceiling for the per user message capture limit, PCBoard's
+    /// MaxTotalMsgs. Shown in the W command as "System Max=".
+    #[serde(default = "QwkSettings::default_max_msgs")]
+    pub max_msgs: u16,
+
+    /// The same ceiling per conference, PCBoard's MaxConfMsgs.
+    #[serde(default = "QwkSettings::default_max_msgs_per_conf")]
+    pub max_msgs_per_conf: u16,
+}
+
+impl QwkSettings {
+    fn default_max_msgs() -> u16 {
+        600
+    }
+
+    fn default_max_msgs_per_conf() -> u16 {
+        200
+    }
+}
+
+impl Default for QwkSettings {
+    fn default() -> Self {
+        Self {
+            bbs_name: String::new(),
+            bbs_city_and_state: String::new(),
+            bbs_phone_number: String::new(),
+            bbs_sysop_name: String::new(),
+            bbs_id: String::new(),
+            welcome_screen: PathBuf::new(),
+            goodbye_screen: PathBuf::new(),
+            news_sceen: PathBuf::new(),
+            max_msgs: Self::default_max_msgs(),
+            max_msgs_per_conf: Self::default_max_msgs_per_conf(),
+        }
+    }
 }

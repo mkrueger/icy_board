@@ -15,7 +15,39 @@ use dizbase::file_base_scanner::scan_file;
 use icy_net::protocol::{Protocol, TransferProtocolType, XYModemVariant, XYmodem, Zmodem};
 
 impl IcyBoardState {
+    /// An upload throws the flag list
+    /// away, so PCBoard asks first - and this is the very first prompt of the
+    /// U command, ahead of the file name.
+    pub async fn proceed_with_upload(&mut self) -> Res<bool> {
+        if self.session.flagged_files.is_empty() {
+            return Ok(true);
+        }
+        self.display_text(
+            IceText::FilesAreFlagged,
+            display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL,
+        )
+        .await?;
+        let answer = self
+            .input_field(
+                IceText::ContinueUpload,
+                1,
+                "",
+                "",
+                Some(self.session.no_char.to_uppercase().to_string()),
+                display_flags::YESNO | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE | display_flags::FIELDLEN,
+            )
+            .await?;
+        if answer != self.session.yes_char.to_uppercase().to_string() {
+            return Ok(false);
+        }
+        self.session.flagged_files.clear();
+        Ok(true)
+    }
+
     pub async fn upload_file(&mut self) -> Res<()> {
+        if !self.proceed_with_upload().await? {
+            return Ok(());
+        }
         self.set_activity(NodeStatus::Transfer).await;
         let upload_location = self.session.current_conference.pub_upload_location.clone();
         let upload_metadata = self.session.current_conference.pub_upload_metadata.clone();
@@ -28,8 +60,11 @@ impl IcyBoardState {
             return Ok(());
         }
 
-        let file_name = self
-            .input_field(
+        // A name stacked on the command line skips the prompt.
+        let file_name = if let Some(token) = self.session.tokens.pop_front() {
+            token
+        } else {
+            self.input_field(
                 IceText::FileNameToUpload,
                 60,
                 &MASK_ASCII,
@@ -37,7 +72,8 @@ impl IcyBoardState {
                 None,
                 display_flags::NEWLINE | display_flags::LFBEFORE,
             )
-            .await?;
+            .await?
+        };
 
         if file_name.is_empty() {
             return Ok(());

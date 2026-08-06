@@ -1,6 +1,6 @@
 use crate::Res;
 use crate::icy_board::commands::CommandType;
-use crate::icy_board::state::functions::MASK_COMMAND;
+use crate::icy_board::state::functions::{MASK_ALNUM, MASK_COMMAND, MASK_NUM};
 use crate::{
     icy_board::{
         icb_text::{IceText, TextEntry},
@@ -9,6 +9,32 @@ use crate::{
     vm::TerminalTarget,
 };
 use jamjam::jam::{JamMessageBase, msg_header::JamMessageHeader};
+
+pub mod message_filter;
+pub mod read_actions;
+pub mod read_command;
+
+use message_filter::MessageFilter;
+use read_actions::AfterAction;
+use read_command::{MsgFunc, ParseContext, ReadCommand, ReadLoop, user_search};
+
+/// The next message number in the direction the range runs, if the range has one.
+fn next_in_range(number: u32, first: u32, last: u32) -> Option<u32> {
+    if last < first {
+        if number <= last { None } else { Some(number - 1) }
+    } else if number >= last {
+        None
+    } else {
+        Some(number + 1)
+    }
+}
+
+/// What to do with the command line once its missing pieces have been asked for.
+enum Resolution {
+    Run,
+    Stop,
+    Reprompt,
+}
 
 pub struct MessageViewer {
     date_num: TextEntry,
@@ -243,7 +269,7 @@ impl IcyBoardState {
                         MASK_COMMAND,
                         &CommandType::ReadMessages.get_help(),
                         None,
-                        display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
+                        display_flags::UPCASE | display_flags::NEWLINE | display_flags::LFBEFORE,
                     )
                     .await?;
                 if text.is_empty() {
@@ -252,64 +278,233 @@ impl IcyBoardState {
                 self.session.push_tokens(&text);
             }
 
-            if let Some(text) = self.session.tokens.pop_front() {
-                match text.as_str() {
-                    "RM" => {
-                        let Some((area, number)) = self.session.memorized_msg else {
-                            self.display_text(IceText::NotMemorized, display_flags::NEWLINE | display_flags::LFBEFORE)
-                                .await?;
-                            return Ok(());
-                        };
-                        if area != self.session.current_message_area {
-                            self.display_text(IceText::NotMemorized, display_flags::NEWLINE | display_flags::LFBEFORE)
-                                .await?;
-                            return Ok(());
-                        }
-                        self.read_message_number(&mut message_base, &viewer, number, number, false, Box::new(|_, _| true))
-                            .await?;
-                    }
-                    "RM+" => {
-                        let Some((area, number)) = self.session.memorized_msg else {
-                            self.display_text(IceText::NotMemorized, display_flags::NEWLINE | display_flags::LFBEFORE)
-                                .await?;
-                            return Ok(());
-                        };
-                        if area != self.session.current_message_area {
-                            self.display_text(IceText::NotMemorized, display_flags::NEWLINE | display_flags::LFBEFORE)
-                                .await?;
-                            return Ok(());
-                        }
-                        self.read_message_number(&mut message_base, &viewer, number, u32::MAX, true, Box::new(|_, _| true))
-                            .await?;
-                    }
-                    "RM-" => {
-                        let Some((area, number)) = self.session.memorized_msg else {
-                            self.display_text(IceText::NotMemorized, display_flags::NEWLINE | display_flags::LFBEFORE)
-                                .await?;
-                            return Ok(());
-                        };
-                        if area != self.session.current_message_area {
-                            self.display_text(IceText::NotMemorized, display_flags::NEWLINE | display_flags::LFBEFORE)
-                                .await?;
-                            return Ok(());
-                        }
-                        self.read_message_number(&mut message_base, &viewer, number, 1, true, Box::new(|_, _| true))
-                            .await?;
-                    }
-                    text => {
-                        if let Ok(number) = text.parse::<u32>() {
-                            if only_personal && !messages.contains(&number) {
-                                self.display_text(IceText::NoMailFound, display_flags::NEWLINE).await?;
-                                continue;
-                            }
-                            self.read_message_number(&mut message_base, &viewer, number, number, false, Box::new(|_, _| true))
-                                .await?;
-                        }
-                    }
+            let tokens: Vec<String> = self.session.tokens.drain(..).collect();
+            let ctx = self.read_parse_context(0).await;
+            let mut cmd = read_command::parse(&tokens, ReadLoop::Outside, &ctx);
+            if cmd.set_last_read {
+                self.set_last_message_read(&cmd, &mut message_base).await?;
+            }
+            match self.resolve_read_command(&mut cmd).await? {
+                Resolution::Stop => break,
+                Resolution::Reprompt => continue,
+                Resolution::Run => {}
+            }
+            read_command::finalize(&mut cmd);
+
+            if cmd.func == MsgFunc::Goodbye {
+                self.goodbye().await?;
+                break;
+            }
+            if cmd.func == MsgFunc::Stop {
+                break;
+            }
+
+            // S picks up where the last-read pointer left off rather than at the
+            // bottom of the base.
+            if cmd.since {
+                let last_read = self.last_read_pointer(&mut message_base)?;
+                let high = base_number.saturating_add(active_messages).saturating_sub(1).max(base_number);
+                if last_read >= high {
+                    self.display_text(IceText::NoMailFound, display_flags::NEWLINE | display_flags::LFAFTER)
+                        .await?;
+                    continue;
+                }
+                if let Some(range) = cmd.numbers.first_mut() {
+                    range.first = last_read as i64 + 1;
+                }
+            }
+
+            if only_personal {
+                cmd.any_msgs = false;
+                cmd.your_msgs = true;
+            }
+            if cmd.do_text_search && !cmd.search_text.is_empty() {
+                self.search_init(cmd.search_text.clone(), false);
+            } else {
+                self.stop_search();
+            }
+            let filter = MessageFilter::new(&cmd, &self.session);
+
+            for range in cmd.numbers.clone() {
+                let (first, last) = self.clamp_range(range, base_number, active_messages);
+                if first == 0 {
+                    continue;
+                }
+                self.read_message_number(&mut message_base, &viewer, first, last, cmd.keep_going, &filter)
+                    .await?;
+            }
+            self.stop_search();
+        }
+        Ok(())
+    }
+
+    /// Where this message base left the current user's last-read pointer.
+    fn last_read_pointer(&mut self, message_base: &mut JamMessageBase) -> Res<u32> {
+        unsafe {
+            let crc = JamMessageBase::get_crc(&bstr::BString::new(self.session.user_name.as_mut_vec().clone()));
+            let last_read = message_base
+                .find_last_read(crc, self.session.cur_user_id as u32)?
+                .unwrap_or(message_base.create_last_read(crc, self.session.cur_user_id as u32)?);
+            Ok(last_read.last_read_msg)
+        }
+    }
+
+    pub(crate) async fn read_parse_context(&mut self, reply_to: i64) -> ParseContext {        ParseContext {
+            cur_msg_number: self.session.current_messagenumber as i64,
+            memorized: self
+                .session
+                .memorized_msg
+                .filter(|(area, _)| *area == self.session.current_message_area)
+                .map(|(_, num)| num as i64),
+            reply_to,
+            may_join: self.session.user_command_level.cmd_j.session_can_access(&self.session),
+            may_quick_scan: self.session.user_command_level.cmd_q.session_can_access(&self.session),
+            may_read_only: false,
+            alias_support: self.session.current_conference.allow_aliases,
+            qwk_support: true,
+            reply_command: false,
+            quick_scan: false,
+            num_conferences: self.get_board().await.conferences.len() as u16,
+        }
+    }
+
+    /// Turn a parsed range into the message numbers this base actually holds.
+    fn clamp_range(&self, range: read_command::MsgRange, base_number: u32, active_messages: u32) -> (u32, u32) {
+        let high = base_number.saturating_add(active_messages).saturating_sub(1).max(base_number);
+        let clamp = |value: i64| -> u32 { value.clamp(base_number as i64, high as i64) as u32 };
+        (clamp(range.first), clamp(range.last))
+    }
+
+    /// The questions PCBoard asks once it has read the whole line
+    /// and finds a search with nothing to search for.
+    async fn resolve_read_command(&mut self, cmd: &mut ReadCommand) -> Res<Resolution> {
+        if cmd.not_memorized {
+            self.display_text(IceText::NotMemorized, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+        }
+
+        if cmd.ask_resume_all {
+            self.input_field(
+                IceText::ResumeAll,
+                1,
+                "",
+                "",
+                Some(self.session.yes_char.to_uppercase().to_string()),
+                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::GUIDE | display_flags::UPCASE | display_flags::YESNO,
+            )
+            .await?;
+        }
+
+        if cmd.do_text_search && cmd.search_text.is_empty() {
+            let text = self
+                .input_field(
+                    IceText::TextToScanFor,
+                    40,
+                    &MASK_ALNUM,
+                    "hlpsrch",
+                    None,
+                    display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE,
+                )
+                .await?;
+            if text.is_empty() {
+                return Ok(Resolution::Stop);
+            }
+            cmd.search_text = text;
+        }
+
+        if cmd.do_user_search {
+            for (flag, text) in [
+                (user_search::TO, IceText::UserSearchToName),
+                (user_search::FROM, IceText::UserSearchFromName),
+                (user_search::USER, IceText::UserSearchName),
+            ] {
+                if cmd.user_search & flag == 0 {
+                    continue;
+                }
+                let target = if flag == user_search::FROM {
+                    &mut cmd.user_name_from
+                } else {
+                    &mut cmd.user_name_to
+                };
+                if !target.is_empty() {
+                    continue;
+                }
+                let answer = self
+                    .input_field(
+                        text,
+                        25,
+                        &MASK_ALNUM,
+                        "",
+                        None,
+                        display_flags::NEWLINE | display_flags::UPCASE | display_flags::FIELDLEN | display_flags::LFBEFORE,
+                    )
+                    .await?;
+                if answer.is_empty() {
+                    return Ok(Resolution::Stop);
+                }
+                if flag == user_search::FROM {
+                    cmd.user_name_from = answer;
+                } else {
+                    cmd.user_name_to = answer;
                 }
             }
         }
-        Ok(())
+
+        if cmd.numbers.is_empty() {
+            if cmd.new_msgs && cmd.new_date.is_none() {
+                let date = self
+                    .input_field(
+                        IceText::DateToSearch,
+                        6,
+                        &MASK_NUM,
+                        "",
+                        Some(self.session.login_date.format("%m%d%y").to_string()),
+                        display_flags::GUIDE | display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                    )
+                    .await?;
+                if date.is_empty() {
+                    return Ok(Resolution::Stop);
+                }
+                cmd.new_date = Some(date);
+            }
+
+            if !cmd.since && cmd.new_date.is_none() && (!cmd.search_text.is_empty() || cmd.do_user_search) {
+                let answer = self
+                    .input_field(
+                        IceText::MessageSearchFrom,
+                        14,
+                        MASK_COMMAND,
+                        "",
+                        None,
+                        display_flags::UPCASE | display_flags::NEWLINE,
+                    )
+                    .await?;
+                if answer.is_empty() {
+                    return Ok(Resolution::Stop);
+                }
+                // a bare number here means "from there forward"
+                let answer = if answer.chars().next().is_some_and(|c| c.is_ascii_digit()) && !answer.contains(['-', '+']) {
+                    format!("{answer}+")
+                } else {
+                    answer
+                };
+                let tokens: Vec<String> = answer.split_whitespace().map(str::to_string).collect();
+                let ctx = self.read_parse_context(0).await;
+                let ranges = read_command::parse(&tokens, ReadLoop::Outside, &ctx);
+                cmd.numbers = ranges.numbers;
+                cmd.keep_going |= ranges.keep_going;
+            }
+        }
+
+        if cmd.func == MsgFunc::None && cmd.numbers.is_empty() && !cmd.all_conf && !cmd.since && !cmd.new_msgs {
+            if !cmd.valid_cmd {
+                self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
+            }
+            return Ok(Resolution::Reprompt);
+        }
+
+        Ok(Resolution::Run)
     }
 
     pub async fn read_message_number(
@@ -319,7 +514,7 @@ impl IcyBoardState {
         mut first: u32,
         mut last: u32,
         mut keep_going: bool,
-        _filter: Box<dyn Fn(&JamMessageHeader, &str) -> bool>,
+        filter: &MessageFilter,
     ) -> Res<()> {
         let mut number = first;
         if number == 0 {
@@ -341,33 +536,52 @@ impl IcyBoardState {
             opt.high_read_msg = opt.high_read_msg.max(number);
             message_base.write_last_read(opt)?;
         }
-        let mut flag = ReadLoopType::InsideReadLoop;
-        let mut _since = false;
+        let last_read = self.session.last_msg_read;
+        let mut reply_to = 0;
         let mut display_msg = true;
+        let mut shown = 0;
         loop {
             if display_msg {
                 display_msg = false;
-                match message_base.read_header(number) {
-                    Ok(header) => {
-                        let text = message_base.read_msg_text(&header)?.to_string();
-                        viewer.display_header(self, message_base, &header).await?;
-                        if header.needs_password() {
-                            if self
-                                .check_password(IceText::PasswordToReadMessage, 0, |pwd| header.is_password_valid(pwd))
-                                .await?
-                            {
-                                viewer.display_body(self, &text).await?;
+                // A message the command did not ask for is skipped without a prompt.
+                let found = loop {
+                    match message_base.read_header(number) {
+                        Ok(header) => {
+                            let text = message_base.read_msg_text(&header)?.to_string();
+                            if filter.matches(&header, &text, last_read) {
+                                break Some((header, text));
                             }
-                        } else {
-                            viewer.display_body(self, &text).await?;
                         }
-                        self.new_line().await?;
+                        Err(err) => {
+                            log::error!("Error reading message header: {}", err);
+                        }
                     }
-                    Err(err) => {
-                        log::error!("Error reading message header: {}", err);
+                    match next_in_range(number, first, last) {
+                        Some(next) => number = next,
+                        None => break None,
+                    }
+                };
+                let Some((header, text)) = found else {
+                    if shown == 0 {
                         self.display_text(IceText::NoMailFound, display_flags::NEWLINE | display_flags::LFAFTER).await?;
                     }
+                    break;
+                };
+                shown += 1;
+                self.session.current_messagenumber = number;
+                reply_to = header.reply_to as i64;
+                viewer.display_header(self, message_base, &header).await?;
+                if header.needs_password() {
+                    if self
+                        .check_password(IceText::PasswordToReadMessage, 0, |pwd| header.is_password_valid(pwd))
+                        .await?
+                    {
+                        viewer.display_body(self, &text).await?;
+                    }
+                } else {
+                    viewer.display_body(self, &text).await?;
                 }
+                self.new_line().await?;
             }
 
             let prompt = if self.session.expert_mode() {
@@ -392,120 +606,75 @@ impl IcyBoardState {
                 }
             } else {
                 self.session.push_tokens(&text);
-                let token = self.session.tokens.pop_front().unwrap_or_default();
-                match token.as_str() {
-                    "-" | "L" => {
-                        if token == "L" {
-                            flag = ReadLoopType::OutsideReadLoop;
-                        }
-                        first = if flag == ReadLoopType::InsideReadLoop { number - 1 } else { number };
-                        last = 1;
-                    }
-                    "+" => {
-                        if flag == ReadLoopType::InsideReadLoop {
-                            first = 1;
-                            last = i32::MAX as u32;
-                        } else {
-                            _since = true;
-                        }
+                let tokens: Vec<String> = self.session.tokens.drain(..).collect();
+                let ctx = self.read_parse_context(reply_to).await;
+                let mut cmd = read_command::parse(&tokens, ReadLoop::Inside, &ctx);
+                if cmd.set_last_read {
+                    self.set_last_message_read(&cmd, message_base).await?;
+                }
+                match self.resolve_read_command(&mut cmd).await? {
+                    Resolution::Stop => break,
+                    Resolution::Reprompt => continue,
+                    Resolution::Run => {}
+                }
 
-                        keep_going = true;
-                    }
-                    // "A" => {}  // Abandon
-                    "Z" | "D" | "C" => {
-                        // let zip_msg = token == "Z";
-                        // let cap_ask = token != "D";
-                        // todo capture!
-                    }
-                    "*" | "S" => {
-                        // Read new messages
-                        _since = true;
-                        keep_going = true;
-                        // todo
-                    }
-                    "E" => {
-                        self.edit_header(message_base, number).await?;
-                    }
-                    "F" => {
-                        // TODO
-                    }
-                    "G" => {
+                if cmd.memorize {
+                    self.session.memorized_msg = Some((self.session.current_message_area, number));
+                    self.display_text(IceText::MessageNumberMemorized, display_flags::LFBEFORE).await?;
+                }
+
+                match cmd.func {
+                    MsgFunc::Stop => break,
+                    MsgFunc::Goodbye => {
                         self.goodbye().await?;
-                    }
-                    "M" => {
-                        // memorize msg
-                        self.session.memorized_msg = Some((self.session.current_message_area, number));
-                        self.display_text(IceText::MessageNumberMemorized, display_flags::LFBEFORE).await?;
-                    }
-                    "N" => {
-                        // STOP
                         break;
                     }
-                    "P" => { // Make cur msg private
-                        // TODO
-                    }
-                    "Q" => { // Quickscan
-                        // TODO
-                    }
-                    "T" => { // Threading
-                        // TODO
-                    }
-
-                    "U" => { // Unprotect
-                        // TODO
-                    }
-
-                    "V" => { // View File
-                        // TODO
-                    }
-
-                    "X" => { // export
-                        // TODO
-                    }
-
-                    "Y" => { // YourMessages
-                        // TODO
-                    }
-                    "/" => {
-                        // Redisplay
+                    MsgFunc::Redisplay => {
                         display_msg = true;
                         continue;
                     }
-                    text => {
-                        if let Ok(new_number) = text.parse::<u32>() {
-                            number = new_number;
-                            continue;
-                        }
+                    MsgFunc::EditHeader => {
+                        self.edit_header(message_base, number).await?;
+                        display_msg = true;
+                        continue;
                     }
+                    _ => {}
+                }
+
+                match self.run_read_action(&cmd, message_base, number).await? {
+                    AfterAction::Prompt => continue,
+                    AfterAction::Redisplay => {
+                        display_msg = true;
+                        continue;
+                    }
+                    AfterAction::Next => {
+                        keep_going = true;
+                    }
+                    AfterAction::NotHandled => {}
+                }
+
+                keep_going |= cmd.keep_going;
+                if let Some(range) = cmd.numbers.first() {
+                    let (lo, hi) = self.clamp_range(*range, self.session.low_msg_num, self.session.high_msg_num - self.session.low_msg_num + 1);
+                    if lo == 0 {
+                        break;
+                    }
+                    number = lo;
+                    first = lo;
+                    last = hi;
+                    display_msg = true;
+                    continue;
                 }
             }
             if keep_going {
-                if last < number {
-                    number -= 1;
-
-                    if number < self.session.low_msg_num {
-                        break;
-                    }
-                } else if number > first {
-                    number += 1;
-
-                    if number > self.session.high_msg_num {
-                        break;
-                    }
+                match next_in_range(number, first, last) {
+                    Some(next) => number = next,
+                    None => break,
                 }
+                display_msg = true;
             }
         }
 
         Ok(())
     }
-
-    async fn edit_header(&self, _message_base: &mut jamjam::jam::JamMessageBase, _number: u32) -> Res<()> {
-        Ok(())
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum ReadLoopType {
-    InsideReadLoop,
-    OutsideReadLoop,
 }

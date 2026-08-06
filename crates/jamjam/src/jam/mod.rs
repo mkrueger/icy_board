@@ -287,10 +287,8 @@ impl JamMessageBase {
         Ok(header)
     }
 
-    /// Sets the delete flag of a given message header
-    /// `read_header` will never return a deleted message. But it's still there and can be recovered.
-    /// The message will be deleted when the message base gets packed.
-    pub fn delete_message(&self, msg_number: u32) -> crate::Result<()> {
+    /// Byte offset of a message header inside the .JHR file.
+    fn header_offset(&self, msg_number: u32) -> crate::Result<u64> {
         if msg_number < self.header_info.base_msg_num || msg_number > self.header_info.active_msgs {
             return Err(JamError::MessageNumberOutOfRange(msg_number, self.header_info.base_msg_num, self.header_info.active_msgs).into());
         }
@@ -302,51 +300,69 @@ impl JamMessageBase {
         }
         let mut offset = [0; 4];
         index_file.read_exact(&mut offset)?;
-        let offset = u32::from_le_bytes(offset);
+        Ok(u32::from_le_bytes(offset) as u64)
+    }
+
+    /// Turns attribute bits on and off without touching the rest of the header.
+    /// Unlike `read_header` this also reaches deleted messages.
+    pub fn set_attributes(&self, msg_number: u32, set: u32, clear: u32) -> crate::Result<()> {
+        let offset = self.header_offset(msg_number)?;
         let header_file_name = self.file_name.with_extension(extensions::HEADER_DATA);
         let mut header_file = File::open(&header_file_name)?;
-        header_file.seek(SeekFrom::Start(offset as u64))?;
+        header_file.seek(SeekFrom::Start(offset))?;
         let mut reader = BufReader::new(header_file);
         let mut header = JamMessageHeader::read(&mut reader)?;
-        if !header.is_deleted() {
-            header.attributes |= attributes::MSG_DELETED;
-            let mut header_file = OpenOptions::new().write(true).open(header_file_name)?;
-            header_file.seek(SeekFrom::Start(offset as u64))?;
-            let mut writer = BufWriter::new(header_file);
-            header.write(&mut writer)?;
-            writer.flush()?;
+
+        let attributes = (header.attributes | set) & !clear;
+        if attributes == header.attributes {
+            return Ok(());
         }
+        header.attributes = attributes;
+
+        let mut header_file = OpenOptions::new().write(true).open(header_file_name)?;
+        header_file.seek(SeekFrom::Start(offset))?;
+        let mut writer = BufWriter::new(header_file);
+        header.write(&mut writer)?;
+        writer.flush()?;
         Ok(())
+    }
+
+    /// Replaces a message header. The subfields can change length, so the new
+    /// record goes to the end of the header file and the index is pointed at it.
+    /// The old record stays behind until the base is packed.
+    pub fn update_header(&self, msg_number: u32, header: &JamMessageHeader) -> crate::Result<()> {
+        if msg_number < self.header_info.base_msg_num || msg_number > self.header_info.active_msgs {
+            return Err(JamError::MessageNumberOutOfRange(msg_number, self.header_info.base_msg_num, self.header_info.active_msgs).into());
+        }
+        let header_path = self.file_name.with_extension(extensions::HEADER_DATA);
+        let header_file = OpenOptions::new().append(true).open(&header_path)?;
+        let offset = header_file.metadata()?.len() as u32;
+        let mut writer = BufWriter::new(header_file);
+        header.write(&mut writer)?;
+        writer.flush()?;
+
+        let record = (msg_number - self.header_info.base_msg_num) as u64;
+        let index_file_name = self.file_name.with_extension(extensions::MESSAGE_INDEX);
+        let mut index_file = OpenOptions::new().write(true).open(index_file_name)?;
+        index_file.seek(SeekFrom::Start(record * 8))?;
+        let crc = if let Some(to) = header.get_to() { Self::get_crc(to) } else { CRC_SEED };
+        index_file.write_all(&crc.to_le_bytes())?;
+        index_file.write_all(&offset.to_le_bytes())?;
+        Ok(())
+    }
+
+    /// Sets the delete flag of a given message header
+    /// `read_header` will never return a deleted message. But it's still there and can be recovered.
+
+    /// The message will be deleted when the message base gets packed.
+    pub fn delete_message(&self, msg_number: u32) -> crate::Result<()> {
+        self.set_attributes(msg_number, attributes::MSG_DELETED, 0)
     }
 
     /// Recovers a deleted message
     /// The opposite of `delete_message`
     pub fn restore_message(&self, msg_number: u32) -> crate::Result<()> {
-        if msg_number < self.header_info.base_msg_num || msg_number > self.header_info.active_msgs {
-            return Err(JamError::MessageNumberOutOfRange(msg_number, self.header_info.base_msg_num, self.header_info.active_msgs).into());
-        }
-        let record = (msg_number - self.header_info.base_msg_num) as u64;
-        let index_file_name = self.file_name.with_extension(extensions::MESSAGE_INDEX);
-        let mut index_file = OpenOptions::new().read(true).open(index_file_name)?;
-        if index_file.seek(SeekFrom::Start(record * 8 + 4)).is_err() {
-            return Err(JamError::IndexFileCorrupt(record, index_file.metadata()?.len()).into());
-        }
-        let mut offset = [0; 4];
-        index_file.read_exact(&mut offset)?;
-        let offset = u32::from_le_bytes(offset);
-        let header_file_name = self.file_name.with_extension(extensions::HEADER_DATA);
-        let mut header_file = File::open(&header_file_name)?;
-        header_file.seek(SeekFrom::Start(offset as u64))?;
-        let mut reader = BufReader::new(header_file);
-        let mut header = JamMessageHeader::read(&mut reader)?;
-        if header.is_deleted() {
-            header.attributes &= !attributes::MSG_DELETED;
-            let mut header_file = OpenOptions::new().write(true).open(header_file_name)?;
-            header_file.seek(SeekFrom::Start(offset as u64))?;
-            let mut writer = BufWriter::new(header_file);
-            header.write(&mut writer)?;
-        }
-        Ok(())
+        self.set_attributes(msg_number, 0, attributes::MSG_DELETED)
     }
 
     pub fn read_last_read_file(&self) -> crate::Result<Vec<JamLastReadStorage>> {
@@ -586,6 +602,11 @@ impl JamMessage {
 
     pub fn with_subject(mut self, subject: BString) -> Self {
         self.header.sub_fields.push(MessageSubfield::new(SubfieldType::Subject, subject));
+        self
+    }
+
+    pub fn with_sub_field(mut self, sub_field: MessageSubfield) -> Self {
+        self.header.sub_fields.push(sub_field);
         self
     }
 

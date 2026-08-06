@@ -1,0 +1,13 @@
+---BEGIN---
+mid_oob=[BC    ]
+mid_neg=[  A]
+mid_zero=[ A]
+mid_past=[  ]
+toint_junk=12
+toint_empty=0
+toint_neg=-5
+toint_space=7
+left_over=[AB   ]
+right_over=[   AB]
+left_neg=[]
+---END---

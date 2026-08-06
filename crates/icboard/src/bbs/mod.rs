@@ -205,6 +205,9 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
                 } else {
                     return Err("User Name not found".into());
                 }
+            } else if !state.board.lock().await.users.is_empty() {
+                // No explicit login: run the PPE as the first user.
+                state.set_current_user(0, true).await?;
             } else {
                 state.join_conference(0, false, false).await?;
             }
@@ -286,6 +289,7 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
                 }
         */
         cmd.state.set_activity(NodeStatus::Available).await;
+        let typed_ahead = cmd.state.ppl_typeahead();
         let command = cmd
             .state
             .input_field(
@@ -317,7 +321,7 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
         }
         press_enter = true;
 
-        match cmd.state.run_single_command(true).await {
+        match cmd.state.run_single_command(!typed_ahead).await {
             Ok(cmd_run) => {
                 if cmd_run {
                     num_tries = 0;

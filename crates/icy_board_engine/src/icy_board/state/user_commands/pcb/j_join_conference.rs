@@ -2,7 +2,9 @@ use crate::Res;
 use crate::icy_board::commands::CommandType;
 use crate::icy_board::state::IcyBoardState;
 use crate::icy_board::state::functions::{MASK_ALNUM, MASK_COMMAND, pwd_flags};
+use crate::icy_board::user_base::ConferenceFlags;
 use crate::icy_board::{icb_text::IceText, state::functions::display_flags};
+use crate::vm::TerminalTarget;
 
 impl IcyBoardState {
     pub async fn join_conference_cmd(&mut self) -> Res<()> {
@@ -170,4 +172,96 @@ impl IcyBoardState {
         }
         Ok(())
     }
+
+    /// The first of the two questions PCBoard asks the first time a
+    /// conference is entered.
+    pub(crate) async fn ask_to_view_conference_members(&mut self, quick_join: bool) -> Res<()> {
+        if !self.session.current_conference.allow_view_conf_members || quick_join {
+            return Ok(());
+        }
+        if self.session.is_sysop && self.session.expert_mode() {
+            return Ok(());
+        }
+        let answer = self
+            .input_field(
+                IceText::ViewConferenceMembers,
+                1,
+                "",
+                "",
+                Some(self.session.no_char.to_uppercase().to_string()),
+                display_flags::YESNO | display_flags::FIELDLEN | display_flags::UPCASE | display_flags::NEWLINE,
+            )
+            .await?;
+        if answer != self.session.yes_char.to_uppercase().to_string() {
+            return Ok(());
+        }
+        self.list_conference_members().await
+    }
+
+    /// The user list narrowed down to the people registered in this conference.
+    async fn list_conference_members(&mut self) -> Res<()> {
+        self.new_line().await?;
+        self.session.disp_options.no_change();
+        self.display_text(IceText::UsersHeader, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::NOTBLANK)
+            .await?;
+        self.display_text(IceText::UserScanLine, display_flags::NEWLINE | display_flags::NOTBLANK)
+            .await?;
+        self.reset_color(TerminalTarget::Both).await?;
+
+        let conference = self.session.current_conference_number as usize;
+        let mut output = String::new();
+        for user in self.get_board().await.users.iter() {
+            let registered = user
+                .conference_flags
+                .get(&conference)
+                .map_or(false, |flags| flags.contains(ConferenceFlags::Registered));
+            if conference == 0 || registered {
+                output.push_str(&format!(
+                    "{:<25} {:<25} {} {}\r\n",
+                    user.get_name(),
+                    user.city_or_state,
+                    self.format_date(user.stats.last_on),
+                    self.format_time(user.stats.last_on)
+                ));
+            }
+        }
+        self.print(TerminalTarget::Both, &output).await
+    }
+
+    /// The second question. The answer is a scan command line,
+    /// not just yes or no, and PCBoard appends the SINCE flag to it.
+    pub(crate) async fn ask_to_scan_message_base(&mut self) -> Res<()> {
+        let sec = self.session.user_command_level.cmd_y.clone();
+        if self.get_board().await.config.message.disable_message_scan_prompt || !sec.session_can_access(&self.session) {
+            return Ok(());
+        }
+        let answer = self
+            .input_field(
+                IceText::ScanMessageBase,
+                8,
+                "ACLQSWZ+-",
+                CommandType::YourMailScan.get_help(),
+                Some(self.session.yes_char.to_uppercase().to_string()),
+                display_flags::YESNO | display_flags::UPCASE | display_flags::STACKED | display_flags::NEWLINE | display_flags::LFBEFORE,
+            )
+            .await?;
+        if answer == self.session.no_char.to_uppercase().to_string() {
+            return Ok(());
+        }
+        let mut command = answer;
+        if answer_is_yes(&command, self.session.yes_char) {
+            command.clear();
+        }
+        command.push_str(" S");
+        if self.get_board().await.config.message.default_scan_all_selected_confs_at_login {
+            command.push_str(" A");
+        }
+        self.session.push_tokens(&command);
+        self.your_mail_scan().await
+    }
+}
+
+/// The default answer carries no scan flags of its own.
+fn answer_is_yes(answer: &str, yes_char: char) -> bool {
+    answer.is_empty() || answer.eq_ignore_ascii_case(&yes_char.to_string())
 }

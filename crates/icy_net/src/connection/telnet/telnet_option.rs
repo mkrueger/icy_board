@@ -1,5 +1,3 @@
-use std::io;
-
 /**
 <http://www.iana.org/assignments/telnet-options/telnet-options.xhtml>
 */
@@ -102,16 +100,6 @@ pub const TEL_OPT_PRAGMA_HEARTBEAT: u8 = 140;
 // 141-254 	Unassigned
 /// <https://www.rfc-editor.org/rfc/rfc861>
 pub const EXTENDED_OPTIONS_LIST: u8 = 0xFF;
-
-pub fn check(byte: u8) -> io::Result<u8> {
-    match byte {
-        0..=49 | 138..=140 | 255 => Ok(byte),
-        _ => Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("unknown option: {byte}/x{byte:02X}"),
-        )),
-    }
-}
 
 pub fn to_string(byte: u8) -> &'static str {
     match byte {

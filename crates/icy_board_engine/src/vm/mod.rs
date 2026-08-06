@@ -180,8 +180,10 @@ impl<'a> VirtualMachine<'a> {
         self.variable_table.set_value(U_EXPERT, VariableValue::new_bool(cur_user.flags.expert_mode));
         match cur_user.flags.fse_mode {
             FSEMode::Yes => {
+                // U_FSE = FSEDefault, U_FSEP = !DontAskFSE. "Yes" means always use the
+                // full screen editor without asking, so U_FSEP (ask) must be false.
                 self.variable_table.set_value(U_FSE, VariableValue::new_bool(true));
-                self.variable_table.set_value(U_FSEP, VariableValue::new_bool(true));
+                self.variable_table.set_value(U_FSEP, VariableValue::new_bool(false));
             }
             FSEMode::Ask => {
                 self.variable_table.set_value(U_FSE, VariableValue::new_bool(false));

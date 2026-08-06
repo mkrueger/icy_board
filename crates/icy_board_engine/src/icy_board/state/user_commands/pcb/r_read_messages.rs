@@ -14,11 +14,16 @@ impl IcyBoardState {
 
     pub async fn read_messages_in_area(&mut self, msg_area: usize) -> Res<()> {
         self.set_activity(NodeStatus::HandlingMail).await;
+        let Some(message_base_file) = self.message_area_path(msg_area) else {
+            self.display_text(IceText::PathErrorInSystemConfiguration, display_flags::NEWLINE | display_flags::LFAFTER)
+                .await?;
+            return Ok(());
+        };
         // loop for recreating the message base without async recursion problem.
         let mut tries = 0;
         while tries < 2 {
             tries += 1;
-            let message_base_file = self.session.current_conference.areas.as_ref().unwrap()[msg_area].path.clone();
+            let message_base_file = message_base_file.clone();
             match JamMessageBase::open(&message_base_file) {
                 Ok(message_base) => {
                     self.read_msgs_from_base(message_base, false).await?;
@@ -44,5 +49,9 @@ impl IcyBoardState {
             }
         }
         return Ok(());
+    }
+
+    pub(crate) fn message_area_path(&self, msg_area: usize) -> Option<std::path::PathBuf> {
+        Some(self.session.current_conference.areas.as_ref()?.get(msg_area)?.path.clone())
     }
 }

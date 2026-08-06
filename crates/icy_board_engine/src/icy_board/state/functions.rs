@@ -307,9 +307,13 @@ impl IcyBoardState {
                 }
                 if result.is_empty() {
                     return Ok(String::new());
-                } else {
-                    self.session.push_tokens(&result);
                 }
+                // Return the whole stuffed line so the caller can tokenize it
+                // (the same way typed input is handled). Returning only the
+                // first token here corrupted the token order when the caller
+                // re-pushed the returned value.
+                self.session.last_answer = Some(result.clone());
+                return Ok(result);
             }
         }
         if let Some(token) = self.session.tokens.pop_front() {

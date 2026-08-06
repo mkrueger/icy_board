@@ -53,7 +53,7 @@ impl IcyBoardState {
         }
     }
 
-    async fn try_to_kill_message(&mut self, message_base: &JamMessageBase, number: u32) -> Res<()> {
+    pub(crate) async fn try_to_kill_message(&mut self, message_base: &JamMessageBase, number: u32) -> Res<()> {
         if let Ok(header) = message_base.read_header(number) {
             if header.needs_password()
                 && !self

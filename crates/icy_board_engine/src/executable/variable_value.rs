@@ -1171,17 +1171,29 @@ impl VariableValue {
     /// Panics if .
     pub fn as_int(&self) -> i32 {
         if let GenericVariableData::String(s) = &self.generic_data {
-            let mut res: i32 = 0;
-            for c in s.chars() {
-                if c.is_digit(10) {
-                    if let Some(c) = c.to_digit(10) {
-                        res = res.wrapping_mul(10).wrapping_add(c as i32);
-                    } else {
-                        break;
-                    }
+            // PCBoard converts strings with atol(): skip leading whitespace, take an
+            // optional sign, then digits up to the first non-digit. Verified against
+            // PCBoard 15.4: "-5x" == -5, "12abc" == 12, " 7" == 7, "" == 0.
+            let mut chars = s.chars().skip_while(|c| c.is_whitespace()).peekable();
+            let negative = match chars.peek() {
+                Some('-') => {
+                    chars.next();
+                    true
                 }
+                Some('+') => {
+                    chars.next();
+                    false
+                }
+                _ => false,
+            };
+            let mut res: i32 = 0;
+            for c in chars {
+                let Some(digit) = c.to_digit(10) else {
+                    break;
+                };
+                res = res.wrapping_mul(10).wrapping_add(digit as i32);
             }
-            return res;
+            return if negative { res.wrapping_neg() } else { res };
         }
 
         match self.vtype {

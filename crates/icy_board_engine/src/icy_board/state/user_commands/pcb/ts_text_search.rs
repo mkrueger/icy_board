@@ -9,7 +9,7 @@ use crate::{
         state::{
             IcyBoardState, NodeStatus,
             functions::{MASK_ASCII, MASK_COMMAND, display_flags},
-            user_commands::mods::messagereader::MessageViewer,
+            user_commands::mods::messagereader::{MessageViewer, message_filter::MessageFilter},
         },
     },
     vm::TerminalTarget,
@@ -94,7 +94,8 @@ impl IcyBoardState {
                     let viewer = MessageViewer::load(&self.display_text)?;
                     match JamMessageBase::open(path) {
                         Ok(mut message_base) => {
-                            self.read_message_number(&mut message_base, &viewer, 1, 1, false, Box::new(|_, _| true)).await?;
+                            self.read_message_number(&mut message_base, &viewer, 1, 1, false, &MessageFilter::default())
+                                .await?;
                             return Ok(());
                         }
                         Err(_err) => {

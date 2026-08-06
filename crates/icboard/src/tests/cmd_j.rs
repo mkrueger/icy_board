@@ -1,11 +1,38 @@
 use crate::tests::{setup_conference, test_output};
 
 #[test]
+fn test_cmd_j_asks_to_view_members_on_the_first_join() {
+    let output = test_output("J 1\n\n\n".to_string(), |board| {
+        setup_conference(board);
+        board.conferences[1].allow_view_conf_members = true;
+    });
+    assert!(output.contains("View other Conference members"), "{output}");
+}
+
+#[test]
+fn test_cmd_j_does_not_ask_to_view_members_again() {
+    let output = test_output("J 1\n\nJ 0\n\nJ 1\n\n\n".to_string(), |board| {
+        setup_conference(board);
+        board.conferences[1].allow_view_conf_members = true;
+    });
+    assert_eq!(output.matches("View other Conference members").count(), 1, "{output}");
+}
+
+#[test]
+fn test_cmd_j_asks_to_scan_the_message_base() {
+    let output = test_output("J 1\nN\n\n\n".to_string(), |board| {
+        setup_conference(board);
+        board.config.message.disable_message_scan_prompt = false;
+    });
+    assert!(output.contains("Scan Message Base Since"), "{output}");
+}
+
+#[test]
 fn test_cmd_j_empty_confs() {
     let output = test_output("J 1\n".to_string(), |_| {});
     assert_eq!(
         output,
-        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mJ 1\n\n.\u{1b}[1;31mSorry, Sysop, no Conferences are presently available!\n\n\u{1b}[32mPress (Enter) to continue? \u{1b}[0m"
+        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mJ 1\n\n\u{7}\u{1b}[1;31mSorry, Sysop, no Conferences are presently available!\n\n\u{1b}[32mPress (Enter) to continue? \u{1b}[0m"
     );
 }
 

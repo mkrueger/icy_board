@@ -10,7 +10,11 @@ use crate::{
     icy_board::{
         icb_config::IcbColor,
         icb_text::IceText,
-        state::{NodeStatus, functions::display_flags},
+        state::{
+            NodeStatus,
+            functions::display_flags,
+            user_commands::mods::messagereader::read_command::{self, ReadLoop},
+        },
     },
     vm::TerminalTarget,
 };
@@ -23,10 +27,11 @@ impl IcyBoardState {
     pub async fn quick_message_scan(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::HandlingMail).await;
 
-        let message_base_file = self.session.current_conference.areas.as_ref().unwrap()[self.session.current_message_area]
-            .path
-            .clone();
-        match JamMessageBase::open(&message_base_file) {
+        let Some(message_base_file) = self.message_area_path(self.session.current_message_area) else {
+            self.display_text(IceText::PathErrorInSystemConfiguration, display_flags::NEWLINE | display_flags::LFAFTER)
+                .await?;
+            return Ok(());
+        };        match JamMessageBase::open(&message_base_file) {
             Ok(message_base) => {
                 self.show_quick_scans(self.session.current_message_area, message_base).await?;
                 Ok(())
@@ -55,7 +60,9 @@ impl IcyBoardState {
         } else {
             IceText::MessageScanCommand
         };
-        self.session.op_text = format!("{}-{}", message_base.base_messagenumber(), message_base.active_messages());
+        let low = message_base.base_messagenumber();
+        let high = low + message_base.active_messages();
+        self.session.op_text = format!("{}-{}", low, high);
 
         let text = self
             .input_field(
@@ -64,19 +71,26 @@ impl IcyBoardState {
                 MASK_COMMAND,
                 CommandType::QuickMessageScan.get_help(),
                 None,
-                display_flags::UPCASE | display_flags::NEWLINE | display_flags::NEWLINE,
+                display_flags::UPCASE | display_flags::NEWLINE | display_flags::LFBEFORE,
             )
             .await?;
         if text.is_empty() {
             return Ok(());
         }
 
-        let number = if let Ok(n) = text.parse::<u32>() {
-            n
-        } else {
+        // Q shares R's command language, and a bare number scans forward from
+        // there rather than showing that one message.
+        let tokens: Vec<String> = text.split_whitespace().map(|t| t.to_ascii_uppercase()).collect();
+        let mut ctx = self.read_parse_context(0).await;
+        ctx.quick_scan = true;
+        let mut cmd = read_command::parse(&tokens, ReadLoop::Outside, &ctx);
+        read_command::finalize(&mut cmd);
+
+        let Some(range) = cmd.numbers.first() else {
             self.display_text(IceText::InvalidEntry, display_flags::NEWLINE).await?;
             return Ok(());
         };
+        let number = range.first.clamp(low as i64, high as i64) as u32;
 
         if number < 1 || number > message_base.active_messages() {
             self.display_text(IceText::NoMailFound, display_flags::NEWLINE).await?;

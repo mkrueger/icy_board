@@ -1,0 +1,17 @@
+' Edge cases captured from real PCBoard 15.4/M via the compat/ oracle.
+' Expected output in the matching .out file is PCBoard's actual behaviour,
+' not ours - do not "fix" it to match icy_board.
+PRINTLN "---BEGIN---"
+PRINTLN "mid_oob=["+MID("ABC",2,6)+"]"
+PRINTLN "mid_neg=["+MID("ABC",-1,3)+"]"
+PRINTLN "mid_zero=["+MID("ABC",0,2)+"]"
+PRINTLN "mid_past=["+MID("ABC",9,2)+"]"
+PRINTLN "toint_junk="+STRING(TOINTEGER("12abc"))
+PRINTLN "toint_empty="+STRING(TOINTEGER(""))
+PRINTLN "toint_neg="+STRING(TOINTEGER("-5x"))
+PRINTLN "toint_space="+STRING(TOINTEGER(" 7"))
+PRINTLN "left_over=["+LEFT("AB",5)+"]"
+PRINTLN "right_over=["+RIGHT("AB",5)+"]"
+PRINTLN "left_neg=["+LEFT("AB",-1)+"]"
+PRINTLN "---END---"
+END
