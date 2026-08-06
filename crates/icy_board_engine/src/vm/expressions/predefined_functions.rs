@@ -42,10 +42,12 @@ const HDR_SUBJ: i32 = 0x0C;
 const HDR_TIME: i32 = 0x06;
 const HDR_TO: i32 = 0x07;
 
+/// A function that is not implemented yet. PCBoard never aborted a PPE over one,
+/// so the call is logged and the given "nothing happened" value is returned.
 macro_rules! unimplemented_function {
-    ($name:expr) => {{
-        log::error!("{} function not implemented", $name);
-        panic!("{} function not implemented", $name);
+    ($name:expr, $default:expr) => {{
+        log::warn!("{} function is not implemented, returning a default", $name);
+        return Ok($default);
     }};
 }
 
@@ -787,61 +789,63 @@ pub async fn callid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
     Ok(VariableValue::new_string(vm.icy_board_state.session.caller_number.to_string()))
 }
 
+/// The register functions report what the last `DOINTR` left behind. There are no
+/// DOS interrupts to issue here, so they all read back as zero.
 pub async fn regal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGAL");
+    unimplemented_function!("REGAL", VariableValue::new_int(0));
 }
 pub async fn regah(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGAH");
+    unimplemented_function!("REGAH", VariableValue::new_int(0));
 }
 
 pub async fn regbl(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGBL");
+    unimplemented_function!("REGBL", VariableValue::new_int(0));
 }
 
 pub async fn regbh(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGBH");
+    unimplemented_function!("REGBH", VariableValue::new_int(0));
 }
 pub async fn regcl(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGCL");
+    unimplemented_function!("REGCL", VariableValue::new_int(0));
 }
 pub async fn regch(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGCH");
+    unimplemented_function!("REGCH", VariableValue::new_int(0));
 }
 pub async fn regdl(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGDL");
+    unimplemented_function!("REGDL", VariableValue::new_int(0));
 }
 pub async fn regdh(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGDH");
+    unimplemented_function!("REGDH", VariableValue::new_int(0));
 }
 pub async fn regax(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGAX");
+    unimplemented_function!("REGAX", VariableValue::new_int(0));
 }
 pub async fn regbx(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGBX");
+    unimplemented_function!("REGBX", VariableValue::new_int(0));
 }
 pub async fn regcx(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGCX");
+    unimplemented_function!("REGCX", VariableValue::new_int(0));
 }
 pub async fn regdx(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGDX");
+    unimplemented_function!("REGDX", VariableValue::new_int(0));
 }
 pub async fn regsi(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGSI");
+    unimplemented_function!("REGSI", VariableValue::new_int(0));
 }
 pub async fn regdi(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGDI");
+    unimplemented_function!("REGDI", VariableValue::new_int(0));
 }
 pub async fn regf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGF");
+    unimplemented_function!("REGF", VariableValue::new_int(0));
 }
 pub async fn regcf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGCF");
+    unimplemented_function!("REGCF", VariableValue::new_int(0));
 }
 pub async fn regds(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGDS");
+    unimplemented_function!("REGDS", VariableValue::new_int(0));
 }
 pub async fn reges(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("REGES");
+    unimplemented_function!("REGES", VariableValue::new_int(0));
 }
 
 pub async fn b2w(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -850,11 +854,12 @@ pub async fn b2w(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     Ok(VariableValue::new_int((low & 0xFF) | ((hi & 0xFF) << 8)))
 }
 
+/// There is no DOS memory to read, so every address reads back as zero.
 pub async fn peekb(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("PEEKB");
+    unimplemented_function!("PEEKB", VariableValue::new_int(0));
 }
 pub async fn peekw(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("PEEKW");
+    unimplemented_function!("PEEKW", VariableValue::new_int(0));
 }
 pub async fn mkaddr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let seg = vm.eval_expr(&args[0]).await?.as_int();
@@ -1527,7 +1532,7 @@ pub async fn meganum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn evttimeadj(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("EVTTIMEADJ");
+    unimplemented_function!("EVTTIMEADJ", VariableValue::new_bool(false));
 }
 
 pub async fn isbitset(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1569,7 +1574,7 @@ pub async fn pplbufsize(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
 }
 
 pub async fn kbdfilusued(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("KBDFILUSUED");
+    unimplemented_function!("KBDFILUSUED", VariableValue::new_bool(false));
 }
 
 pub async fn lomsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1597,7 +1602,7 @@ pub async fn himsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn drivespace(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DRIVESPACE");
+    unimplemented_function!("DRIVESPACE", VariableValue::new(VariableType::Unsigned, VariableData::from_int(0)));
 }
 pub async fn outbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(0))
@@ -1666,44 +1671,47 @@ pub async fn stackerr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     Ok(VariableValue::new_bool(STACK_LIMIT > vm.return_addresses.len() as i32))
 }
 
+/// Without a database layer every channel behaves as if nothing were open: the
+/// operations report failure, and the status functions report an error at both
+/// ends of the file so a record loop stops instead of spinning forever.
 pub async fn dgetalias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DGETALIAS");
+    unimplemented_function!("DGETALIAS", VariableValue::new_string(String::new()));
 }
 pub async fn dbof(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DBOF");
+    unimplemented_function!("DBOF", VariableValue::new_bool(true));
 }
 pub async fn dchanged(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DCHANGED");
+    unimplemented_function!("DCHANGED", VariableValue::new_bool(false));
 }
 pub async fn ddecimals(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DDECIMALS");
+    unimplemented_function!("DDECIMALS", VariableValue::new_int(0));
 }
 pub async fn ddeleted(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DDELETED");
+    unimplemented_function!("DDELETED", VariableValue::new_bool(false));
 }
 pub async fn deof(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DEOF");
+    unimplemented_function!("DEOF", VariableValue::new_bool(true));
 }
 pub async fn derr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DERR");
+    unimplemented_function!("DERR", VariableValue::new_bool(true));
 }
 pub async fn dfields(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DFIELDS");
+    unimplemented_function!("DFIELDS", VariableValue::new_int(0));
 }
 pub async fn dlength(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DLENGTH");
+    unimplemented_function!("DLENGTH", VariableValue::new_int(0));
 }
 pub async fn dname(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DNAME");
+    unimplemented_function!("DNAME", VariableValue::new_int(0));
 }
 pub async fn dreccount(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DRECCOUNT");
+    unimplemented_function!("DRECCOUNT", VariableValue::new_int(0));
 }
 pub async fn drecno(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DRECNO");
+    unimplemented_function!("DRECNO", VariableValue::new_int(0));
 }
 pub async fn dtype(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DTYPE");
+    unimplemented_function!("DTYPE", VariableValue::new_string(String::new()));
 }
 pub async fn fnext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     for i in 1..MAX_FILE_CHANNELS {
@@ -1715,100 +1723,100 @@ pub async fn fnext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 }
 
 pub async fn dnext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DNEXT");
+    unimplemented_function!("DNEXT", VariableValue::new_int(-1));
 }
 pub async fn toddate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("TODDATE");
+    unimplemented_function!("TODDATE", VariableValue::new(VariableType::Date, VariableData::default()));
 }
 pub async fn dcloseall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DCLOSEALL");
+    unimplemented_function!("DCLOSEALL", VariableValue::new_bool(false));
 }
 pub async fn dopen(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DOPEN");
+    unimplemented_function!("DOPEN", VariableValue::new_bool(false));
 }
 pub async fn dclose(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DCLOSE");
+    unimplemented_function!("DCLOSE", VariableValue::new_bool(false));
 }
 pub async fn dsetalias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DSETALIAS");
+    unimplemented_function!("DSETALIAS", VariableValue::new_bool(false));
 }
 pub async fn dpack(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DPACK");
+    unimplemented_function!("DPACK", VariableValue::new_bool(false));
 }
 pub async fn dlockf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DLOCKF");
+    unimplemented_function!("DLOCKF", VariableValue::new_bool(false));
 }
 pub async fn dlock(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DLOCK");
+    unimplemented_function!("DLOCK", VariableValue::new_bool(false));
 }
 pub async fn dlockr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DLOCKR");
+    unimplemented_function!("DLOCKR", VariableValue::new_bool(false));
 }
 pub async fn dunlock(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DUNLOCK");
+    unimplemented_function!("DUNLOCK", VariableValue::new_bool(false));
 }
 pub async fn dnopen(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DNOPEN");
+    unimplemented_function!("DNOPEN", VariableValue::new_bool(false));
 }
 pub async fn dnclose(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DNCLOSE");
+    unimplemented_function!("DNCLOSE", VariableValue::new_bool(false));
 }
 pub async fn dncloseall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DNCLOSEALL");
+    unimplemented_function!("DNCLOSEALL", VariableValue::new_bool(false));
 }
 pub async fn dnew(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DNEW");
+    unimplemented_function!("DNEW", VariableValue::new_bool(false));
 }
 pub async fn dadd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DADD");
+    unimplemented_function!("DADD", VariableValue::new_bool(false));
 }
 pub async fn dappend(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DAPPEND");
+    unimplemented_function!("DAPPEND", VariableValue::new_bool(false));
 }
 pub async fn dtop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DTOP");
+    unimplemented_function!("DTOP", VariableValue::new_bool(false));
 }
 pub async fn dgo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DGO");
+    unimplemented_function!("DGO", VariableValue::new_bool(false));
 }
 pub async fn dbottom(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DBOTTOM");
+    unimplemented_function!("DBOTTOM", VariableValue::new_bool(false));
 }
 pub async fn dskip(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DSKIP");
+    unimplemented_function!("DSKIP", VariableValue::new_bool(false));
 }
 pub async fn dblank(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DBLANK");
+    unimplemented_function!("DBLANK", VariableValue::new_bool(false));
 }
 pub async fn ddelete(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DDELETE");
+    unimplemented_function!("DDELETE", VariableValue::new_bool(false));
 }
 pub async fn drecall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DRECALL");
+    unimplemented_function!("DRECALL", VariableValue::new_bool(false));
 }
 pub async fn dtag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DTAG");
+    unimplemented_function!("DTAG", VariableValue::new_bool(false));
 }
 pub async fn dseek(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DSEEK");
+    unimplemented_function!("DSEEK", VariableValue::new_int(0));
 }
 pub async fn dfblank(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DFBLANK");
+    unimplemented_function!("DFBLANK", VariableValue::new_bool(false));
 }
 pub async fn dget(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DGET");
+    unimplemented_function!("DGET", VariableValue::new_string(String::new()));
 }
 pub async fn dput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DPUT");
+    unimplemented_function!("DPUT", VariableValue::new_bool(false));
 }
 pub async fn dfcopy(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DFCOPY");
+    unimplemented_function!("DFCOPY", VariableValue::new_bool(false));
 }
 pub async fn dselect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DSELECT");
+    unimplemented_function!("DSELECT", VariableValue::new_int(0));
 }
 pub async fn dchkstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DCHKSTAT");
+    unimplemented_function!("DCHKSTAT", VariableValue::new_int(0));
 }
 
 pub async fn pcbaccount(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1862,7 +1870,7 @@ pub async fn pcbaccstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
 }
 
 pub async fn derrmsg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DERRMSG");
+    unimplemented_function!("DERRMSG", VariableValue::new_string(String::new()));
 }
 
 pub async fn account(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1914,7 +1922,7 @@ pub async fn account(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn scanmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("SCANMSGHDR");
+    unimplemented_function!("SCANMSGHDR", VariableValue::new_int(0));
 }
 
 pub async fn checkrip(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -2159,18 +2167,18 @@ pub async fn instrr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 }
 
 pub async fn fdordaka(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("FDORDAKA");
+    unimplemented_function!("FDORDAKA", VariableValue::new_int(0));
 }
 pub async fn fdordorg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("FDORDORG");
+    unimplemented_function!("FDORDORG", VariableValue::new_int(0));
 }
 
 pub async fn fdordarea(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("FDORDAREA");
+    unimplemented_function!("FDORDAREA", VariableValue::new_int(0));
 }
 
 pub async fn fdoqrd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("FDOQRD");
+    unimplemented_function!("FDOQRD", VariableValue::new_int(0));
 }
 
 pub async fn getdrive(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -2374,7 +2382,7 @@ fn get_field(field_num: i32, header: &JamMessageHeader) -> Res<VariableValue> {
 
 pub async fn setmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     vm.cached_msg_header = None;
-    unimplemented_function!("SETMSGHDR");
+    unimplemented_function!("SETMSGHDR", VariableValue::new_int(0));
 }
 
 pub async fn area_id(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

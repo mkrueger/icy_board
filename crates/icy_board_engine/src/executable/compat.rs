@@ -12,7 +12,7 @@ pub enum ImplStatus {
     Implemented,
     /// Deliberately not supported (handler logs a warning and continues).
     Unsupported,
-    /// Stubbed out - calling it aborts the PPE.
+    /// Stubbed out - the call is logged and a neutral result is substituted.
     Unimplemented,
     /// Works, but known to be missing edge case behaviour.
     Partial,

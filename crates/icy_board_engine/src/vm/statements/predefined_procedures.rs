@@ -32,10 +32,13 @@ use crate::{
 };
 
 use super::super::errors::IcyError;
+
+/// A statement that is not implemented yet. PCBoard never aborted a PPE over one,
+/// so the call is logged and skipped rather than killing the session.
 macro_rules! unimplemented_stmt {
     ($name:expr) => {{
-        log::error!("{} statement not implemented", $name);
-        panic!("{} statement not implemented", $name);
+        log::warn!("{} statement is not implemented, ignoring the call", $name);
+        return Ok(());
     }};
 }
 
@@ -1578,7 +1581,7 @@ pub async fn tpaput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     unimplemented_stmt!("TPAPUT");
 }
 pub async fn tpacgea(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("TPACGEA");
+    unimplemented_stmt!("TPACGET");
 }
 pub async fn tpacput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     unimplemented_stmt!("TPACPUT");
