@@ -18,6 +18,7 @@ use crate::icy_board::user_base::{ConferenceFlags, Password};
 use crate::icy_board::user_inf::{BankUserInf, QwkConfigUserInf};
 use crate::parser::CONFERENCE_ID;
 use crate::vm::{MAX_FILE_CHANNELS, TerminalTarget, VirtualMachine, get_file_channel};
+use bstr::BString;
 use chrono::{DateTime, Utc};
 use icy_engine::{Position, TextPane};
 use icy_net::crc::update_crc32;
@@ -1668,7 +1669,7 @@ pub async fn stackleft(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
 /// `STACKERR()`
 /// Returns a boolean value which indicates a stack error has occured
 pub async fn stackerr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_bool(STACK_LIMIT > vm.return_addresses.len() as i32))
+    Ok(VariableValue::new_bool(vm.return_addresses.len() as i32 >= STACK_LIMIT))
 }
 
 /// Without a database layer every channel behaves as if nothing were open: the
@@ -1919,10 +1920,6 @@ pub async fn account(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     };
 
     Ok(VariableValue::new_double(value))
-}
-
-pub async fn scanmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("SCANMSGHDR", VariableValue::new_int(0));
 }
 
 pub async fn checkrip(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -2382,7 +2379,94 @@ fn get_field(field_num: i32, header: &JamMessageHeader) -> Res<VariableValue> {
 
 pub async fn setmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     vm.cached_msg_header = None;
-    unimplemented_function!("SETMSGHDR", VariableValue::new_int(0));
+    let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let msg_num = vm.eval_expr(&args[1]).await?.as_int() as u32;
+    let field_num = vm.eval_expr(&args[2]).await?.as_int();
+    let value = vm.eval_expr(&args[3]).await?.as_string();
+
+    let Some(msg_base) = vm.message_base_path(conf_num, area_num).await else {
+        log::error!("SETMSGHDR: no message base {conf_num}:{area_num}");
+        return Ok(VariableValue::new_int(0));
+    };
+    let base = JamMessageBase::open(msg_base)?;
+    let Ok(mut header) = base.read_header(msg_num) else {
+        return Ok(VariableValue::new_int(0));
+    };
+    if !set_field(field_num, &mut header, &value) {
+        return Ok(VariableValue::new_int(0));
+    }
+    match base.update_header(msg_num, &header) {
+        Ok(()) => Ok(VariableValue::new_int(msg_num as i32)),
+        Err(err) => {
+            log::error!("SETMSGHDR: can't write header {msg_num} in {conf_num}:{area_num} ({err})");
+            Ok(VariableValue::new_int(0))
+        }
+    }
+}
+
+/// Writes one header field. Only the fields a message actually carries can be
+/// changed; the rest are derived and are reported back as a failure.
+fn set_field(field_num: i32, header: &mut JamMessageHeader, value: &str) -> bool {
+    match field_num {
+        HDR_ACTIVE => {
+            // The same 225/226 pair `HDR_ACTIVE` reads back.
+            let deleted = value.trim() == "226";
+            header.set_deleted(deleted);
+            true
+        }
+        HDR_FROM => {
+            header.set_from(BString::from(value));
+            true
+        }
+        HDR_TO => {
+            header.set_to(BString::from(value));
+            true
+        }
+        HDR_SUBJ => {
+            header.set_subject(BString::from(value));
+            true
+        }
+        HDR_PWD => {
+            header.password_crc = JamMessageBase::get_crc(&BString::from(value.to_lowercase()));
+            true
+        }
+        HDR_REPLY | HDR_MSGREF => {
+            header.reply_to = value.trim().parse::<u32>().unwrap_or(0);
+            true
+        }
+        _ => {
+            log::warn!("SETMSGHDR: header field {field_num} cannot be written");
+            false
+        }
+    }
+}
+
+/// `SCANMSGHDR(conf, start_msg, field, test)`
+///
+/// Walks forward from `start_msg` and reports the first message whose header
+/// field contains `test`, or zero when the scan runs off the end.
+pub async fn scanmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let start_msg = vm.eval_expr(&args[1]).await?.as_int().max(0) as u32;
+    let field_num = vm.eval_expr(&args[2]).await?.as_int();
+    let test = vm.eval_expr(&args[3]).await?.as_string().to_uppercase();
+
+    let Some(msg_base) = vm.message_base_path(conf_num, area_num).await else {
+        log::error!("SCANMSGHDR: no message base {conf_num}:{area_num}");
+        return Ok(VariableValue::new_int(0));
+    };
+    let base = JamMessageBase::open(msg_base)?;
+    let last = base.base_messagenumber() + base.active_messages();
+    for number in start_msg.max(base.base_messagenumber())..last {
+        let Ok(header) = base.read_header(number) else {
+            continue;
+        };
+        let field = get_field(field_num, &header)?.as_string();
+        if field.to_uppercase().contains(&test) {
+            return Ok(VariableValue::new_int(number as i32));
+        }
+    }
+    Ok(VariableValue::new_int(0))
 }
 
 pub async fn area_id(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

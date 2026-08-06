@@ -25,7 +25,7 @@ mod doorfile_sr;
 mod dorinfo_x;
 mod exitinfo_bbs;
 mod jumper_dat;
-mod pcboard;
+pub mod pcboard;
 mod sfdoors_dat;
 mod tribbs_sys;
 

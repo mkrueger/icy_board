@@ -7,6 +7,8 @@
 
 #![cfg(test)]
 
+mod message_base;
+
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -61,6 +63,9 @@ pub fn run_ppl_on<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P) -> String {
         let bbs = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
         let mut board = IcyBoard::new();
         board.default_display_text = crate::icy_board::icb_text::DEFAULT_DISPLAY_TEXT.clone();
+        // Relative paths a snippet names resolve into the scratch directory, so
+        // nothing it writes outlives the test.
+        board.root_path = work_dir.clone();
         board.users.new_user(User {
             name: "SYSOP".to_string(),
             security_level: 255,
@@ -122,6 +127,45 @@ fn scratch_dir(kind: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("ppl-test-{kind}-{}-{id}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     dir
+}
+
+/// Runs a snippet against a board whose conference 0 holds the given messages,
+/// each one a `(from, to, subject)` triple numbered from one in order.
+pub fn run_ppl_with_messages(source: &str, messages: &[(&str, &str, &str)]) -> String {
+    use jamjam::jam::{JamMessage, JamMessageBase};
+
+    let path = scratch_dir("base").join("general");
+    let mut base = JamMessageBase::create(&path).expect("can't create the scratch message base");
+    for (from, to, subject) in messages {
+        base.write_message(
+            &JamMessage::default()
+                .with_from(bstr::BString::from(*from))
+                .with_to(bstr::BString::from(*to))
+                .with_subject(bstr::BString::from(*subject))
+                .with_date_time(chrono::Utc::now())
+                .with_text(bstr::BString::from("body")),
+        )
+        .expect("can't write a scratch message");
+    }
+    base.write_jhr_header().unwrap();
+    drop(base);
+
+    run_ppl_on(source, |board| {
+        board.conferences.push(crate::icy_board::conferences::Conference {
+            name: "Main Board".to_string(),
+            areas: Some(AreaList::new(vec![MessageArea {
+                name: "General".to_string(),
+                path: path.clone(),
+                ..Default::default()
+            }])),
+            ..Default::default()
+        });
+        // A second, empty conference, so a snippet has somewhere to move a message to.
+        board.conferences.push(crate::icy_board::conferences::Conference {
+            name: "Elsewhere".to_string(),
+            ..Default::default()
+        });
+    })
 }
 
 fn scratch_message_area() -> AreaList {

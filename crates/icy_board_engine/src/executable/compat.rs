@@ -39,11 +39,6 @@ pub const UNIMPLEMENTED_STATEMENTS: &[&str] = &[
     "POKEB",
     "POKEW",
     "VARADDR",
-    "WRUSYSDOOR",
-    "WRUSYS",
-    "RDUSYS",
-    "OPENCAP",
-    "CLOSECAP",
     "POKEDW",
     "TPAGET",
     "TPAPUT",
@@ -53,8 +48,6 @@ pub const UNIMPLEMENTED_STATEMENTS: &[&str] = &[
     "TPAWRITE",
     "TPACREAD",
     "TPACWRITE",
-    "SETLMR",
-    "STACKABORT",
     "DCREATE",
     "DOPEN",
     "DCLOSE",
@@ -86,7 +79,6 @@ pub const UNIMPLEMENTED_STATEMENTS: &[&str] = &[
     "DGET",
     "DPUT",
     "DFCOPY",
-    "KILLMSG",
     "FDOWRAKA",
     "FDOADDAKA",
     "FDOWRORG",
@@ -94,7 +86,6 @@ pub const UNIMPLEMENTED_STATEMENTS: &[&str] = &[
     "FDOQMOD",
     "FDOQADD",
     "FDOQDEL",
-    "MOVE_MSG",
 ];
 
 /// Statements implemented but known to miss edge cases.
@@ -174,12 +165,10 @@ pub const UNIMPLEMENTED_FUNCTIONS: &[&str] = &[
     "DSELECT",
     "DCHKSTAT",
     "DERRMSG",
-    "SCANMSGHDR",
     "FDORDAKA",
     "FDORDORG",
     "FDORDAREA",
     "FDOQRD",
-    "SETMSGHDR",
 ];
 
 /// Functions implemented but known to miss edge cases.

@@ -153,6 +153,37 @@ impl JamMessageHeader {
         None
     }
 
+    pub fn set_subject(&mut self, subject: BString) {
+        self.set_sub_field(SubfieldType::Subject, subject);
+    }
+
+    pub fn set_from(&mut self, from: BString) {
+        self.set_sub_field(SubfieldType::SenderName, from);
+    }
+
+    pub fn set_to(&mut self, to: BString) {
+        self.set_sub_field(SubfieldType::RecvName, to);
+    }
+
+    /// Replaces the content of the first subfield of that type, or appends one.
+    fn set_sub_field(&mut self, field_type: SubfieldType, content: BString) {
+        for s in &mut self.sub_fields {
+            if s.get_type() == &field_type {
+                s.content = content;
+                return;
+            }
+        }
+        self.sub_fields.push(MessageSubfield::new(field_type, content));
+    }
+
+    pub fn set_deleted(&mut self, deleted: bool) {
+        if deleted {
+            self.attributes |= attributes::MSG_DELETED;
+        } else {
+            self.attributes &= !attributes::MSG_DELETED;
+        }
+    }
+
     /// True, if a password is required to access this msg base
     pub fn needs_password(&self) -> bool {
         self.password_crc != CRC_SEED

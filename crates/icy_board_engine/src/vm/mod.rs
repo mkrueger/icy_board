@@ -2,6 +2,7 @@ use crate::Res;
 use crate::ast::BinOp;
 use crate::ast::Statement;
 use crate::ast::UnaryOp;
+use crate::ast::constant::STACK_LIMIT;
 use crate::compiler::user_data::UserDataValue;
 use crate::datetime::IcbDate;
 use crate::executable::Executable;
@@ -82,6 +83,9 @@ pub enum VMError {
 
     #[error("Object not found (internal VM error) ({0})")]
     NoObjectFound(u8),
+
+    #[error("PPE call stack exhausted")]
+    StackOverflow,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -168,6 +172,10 @@ pub struct VirtualMachine<'a> {
     pub file_list: VecDeque<String>,
     pub user: User,
     pub cached_msg_header: Option<(i32, i32, u32, JamMessageHeader)>,
+
+    /// What `STACKABORT` last asked for. Aborting is the default; a PPE has to
+    /// opt into limping on after it has blown the stack.
+    pub abort_on_stack_error: bool,
 }
 
 impl<'a> VirtualMachine<'a> {
@@ -530,6 +538,10 @@ impl<'a> VirtualMachine<'a> {
                     parameters = proc.value.data.function_value.parameters as usize;
                     return_var_id = proc.value.data.function_value.return_var as usize;
                 }
+                if !self.has_stack_room()? {
+                    // No room to call; the function's return variable keeps whatever it held.
+                    return Ok(self.variable_table.get_value(return_var_id).clone());
+                }
                 self.prepare_call(locals, parameters, first, arguments, 0).await?;
 
                 self.return_addresses.push(ReturnAddress::func_call(self.cur_ptr, *func_id));
@@ -686,8 +698,9 @@ impl<'a> VirtualMachine<'a> {
                 }
                 self.prepare_call(locals, parameters, first, arguments, pass_flags).await?;
 
-                self.return_addresses.push(ReturnAddress::func_call(self.cur_ptr, *proc_id));
-                self.goto(proc_offset)?;
+                if self.push_return_address(ReturnAddress::func_call(self.cur_ptr, *proc_id))? {
+                    self.goto(proc_offset)?;
+                }
             }
 
             PPECommand::PredefinedCall(proc, arguments) => {
@@ -698,8 +711,9 @@ impl<'a> VirtualMachine<'a> {
                 self.goto(*label)?;
             }
             PPECommand::Gosub(label) => {
-                self.return_addresses.push(ReturnAddress::gosub(self.cur_ptr));
-                self.goto(*label)?;
+                if self.push_return_address(ReturnAddress::gosub(self.cur_ptr))? {
+                    self.goto(*label)?;
+                }
             }
             PPECommand::Let(variable, expr) => {
                 let val = self.eval_expr(expr).await?;
@@ -769,6 +783,39 @@ impl<'a> VirtualMachine<'a> {
         } else {
             self.icy_board_state.get_board().await.resolve_file(&file)
         }
+    }
+
+    /// Whether another call fits on the stack.
+    ///
+    /// Once it is exhausted the PPE either ends here or, if it turned
+    /// `STACKABORT` off, skips the call and carries on with the next statement.
+    /// That is as far as "continue after a stack error" can sensibly go.
+    fn has_stack_room(&self) -> Res<bool> {
+        if (self.return_addresses.len() as i32) < STACK_LIMIT {
+            return Ok(true);
+        }
+        if self.abort_on_stack_error {
+            return Err(Box::new(VMError::StackOverflow));
+        }
+        log::warn!("PPE stack exhausted, skipping the call because STACKABORT is off");
+        Ok(false)
+    }
+
+    /// Takes a call, and reports whether there was room for it.
+    fn push_return_address(&mut self, address: ReturnAddress) -> Res<bool> {
+        if !self.has_stack_room()? {
+            return Ok(false);
+        }
+        self.return_addresses.push(address);
+        Ok(true)
+    }
+
+    /// The message base a conference/area pair addresses, or `None` when the
+    /// PPE named one that does not exist.
+    pub async fn message_base_path(&self, conference: i32, area: i32) -> Option<PathBuf> {
+        let board = self.icy_board_state.get_board().await;
+        let conf = board.conferences.get(conference as usize)?;
+        Some(conf.areas.as_ref()?.get(area as usize)?.path.clone())
     }
 
     async fn set_rip_mouseregion(
@@ -843,6 +890,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
                 user,
                 use_lmrs: true,
                 cached_msg_header: None,
+                abort_on_stack_error: true,
             };
 
             vm.run().await?;

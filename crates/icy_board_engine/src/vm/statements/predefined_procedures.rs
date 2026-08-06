@@ -964,14 +964,43 @@ pub async fn freshline(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     Ok(())
 }
 
+/// `WRUSYSDOOR doorname`
+///
+/// The same drop file as `WRUSYS`, but carrying a TPA record naming the door
+/// that is about to be run.
 pub async fn wrusysdoor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("WRUSYSDOOR");
+    let door_name = vm.eval_expr(&args[0]).await?.as_string();
+    write_user_sys(vm, &door_name).await
 }
+
+/// `WRUSYS` - writes USER.SYS so an external program can read the caller.
 pub async fn wrusys(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("WRUSYS");
+    write_user_sys(vm, "").await
 }
+
+async fn write_user_sys(vm: &mut VirtualMachine<'_>, tpa_name: &str) -> Res<()> {
+    let path = user_sys_dir(vm).await;
+    if let Err(err) = crate::icy_board::doors::pcboard::create_user_sys(vm.icy_board_state, &path, tpa_name).await {
+        log::error!("Can't write USER.SYS to {}: {}", path.display(), err);
+    }
+    Ok(())
+}
+
+/// `RDUSYS` - takes back whatever the external program changed in USER.SYS.
 pub async fn rdusys(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("RDUSYS");
+    let path = user_sys_dir(vm).await;
+    if let Err(err) = crate::icy_board::doors::pcboard::read_user_sys(&mut vm.user, &path) {
+        log::error!("Can't read USER.SYS from {}: {}", path.display(), err);
+        return Ok(());
+    }
+    vm.icy_board_state.session.cur_security = vm.user.security_level;
+    vm.icy_board_state.session.page_len = vm.user.page_len;
+    Ok(())
+}
+
+/// USER.SYS lives beside the board, the way a node work directory used to hold it.
+async fn user_sys_dir(vm: &mut VirtualMachine<'_>) -> std::path::PathBuf {
+    vm.icy_board_state.get_board().await.root_path.clone()
 }
 pub async fn newpwd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let new_pwd = vm.eval_expr(&args[0]).await?.as_string();
@@ -979,11 +1008,22 @@ pub async fn newpwd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     vm.set_variable(&args[1], VariableValue::new_bool(was_changed)).await?;
     Ok(())
 }
+/// `OPENCAP file, ocFlag`
+///
+/// Starts teeing everything the caller would see into `file`, and reports
+/// through `ocFlag` whether that worked.
 pub async fn opencap(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("OPENCAP");
+    let file_name = vm.eval_expr(&args[0]).await?.as_string();
+    let path = vm.resolve_file(&file_name).await;
+    let opened = vm.icy_board_state.open_capture(&path);
+    vm.set_variable(&args[1], VariableValue::new_bool(opened)).await?;
+    Ok(())
 }
+
+/// `CLOSECAP` - stops the tee started by `OPENCAP`.
 pub async fn closecap(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("CLOSECAP");
+    vm.icy_board_state.close_capture();
+    Ok(())
 }
 
 pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -1639,8 +1679,44 @@ pub async fn frealtuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
     }
     Ok(())
 }
+/// `SETLMR conf, msg`
+///
+/// Moves the caller's last-message-read pointer. A conference or message number
+/// past the end clamps to the highest one there is, so a PPE can ask for
+/// "everything" without knowing the numbers.
 pub async fn setlmr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("SETLMR");
+    let (conference, area) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let requested = vm.eval_expr(&args[1]).await?.as_int().max(0) as u32;
+
+    let conference = {
+        let highest = vm.icy_board_state.get_board().await.conferences.len() as i32 - 1;
+        conference.min(highest).max(0)
+    };
+    let Some(msg_base) = vm.message_base_path(conference, area).await else {
+        log::error!("SETLMR: no message base {conference}:{area}");
+        return Ok(());
+    };
+    let mut base = match JamMessageBase::open(&msg_base) {
+        Ok(base) => base,
+        Err(err) => {
+            log::error!("SETLMR can't open message base {conference}:{area}: {err}");
+            return Ok(());
+        }
+    };
+
+    let highest = base.base_messagenumber() + base.active_messages();
+    let number = requested.min(highest);
+
+    let crc = JamMessageBase::get_crc(&BString::from(vm.icy_board_state.session.user_name.to_lowercase()));
+    let user_id = vm.icy_board_state.session.cur_user_id as u32;
+    let mut last_read = match base.find_last_read(crc, user_id)? {
+        Some(last_read) => last_read,
+        None => base.create_last_read(crc, user_id)?,
+    };
+    last_read.last_read_msg = number;
+    last_read.high_read_msg = last_read.high_read_msg.max(number);
+    base.write_last_read(last_read)?;
+    Ok(())
 }
 
 pub async fn setenv(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -1660,8 +1736,12 @@ pub async fn fcloseall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     }
     Ok(())
 }
+/// `STACKABORT abort`
+///
+/// Chooses whether a stack error ends the PPE or lets it keep going.
 pub async fn stackabort(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("STACKABORT");
+    vm.abort_on_stack_error = vm.eval_expr(&args[0]).await?.as_bool();
+    Ok(())
 }
 pub async fn dcreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     unimplemented_stmt!("DCREATE");
@@ -2163,8 +2243,28 @@ pub async fn adduser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 
+/// `KILLMSG conf, msgnum`
+///
+/// Deletes a message. A message nobody can delete is not an error the PPE gets
+/// to see; PCBoard simply carries on.
 pub async fn killmsg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("KILLMSG");
+    let (conference, area) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let number = vm.eval_expr(&args[1]).await?.as_int() as u32;
+
+    let Some(msg_base) = vm.message_base_path(conference, area).await else {
+        log::error!("KILLMSG: no message base {conference}:{area}");
+        return Ok(());
+    };
+    match JamMessageBase::open(&msg_base) {
+        Ok(base) => {
+            if let Err(err) = base.delete_message(number) {
+                log::error!("KILLMSG can't delete message {number} in {conference}:{area}: {err}");
+            }
+        }
+        Err(err) => log::error!("KILLMSG can't open message base {conference}:{area}: {err}"),
+    }
+    vm.cached_msg_header = None;
+    Ok(())
 }
 
 pub async fn chdir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -2234,8 +2334,72 @@ pub async fn shortdesc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     Ok(())
 }
 
+/// `MOVE_MSG conf, message, movetype`
+///
+/// Copies a message out of the conference the caller is in and into `conf`, and
+/// deletes the original when `movetype` asks for a move rather than a copy.
 pub async fn move_msg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("MOVE_MSG");
+    let (to_conf, to_area) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let number = vm.eval_expr(&args[1]).await?.as_int() as u32;
+    let moving = vm.eval_expr(&args[2]).await?.as_bool();
+
+    let from_conf = vm.icy_board_state.session.current_conference_number as i32;
+    let from_area = vm.icy_board_state.session.current_message_area as i32;
+
+    let (Some(source_path), Some(target_path)) = (
+        vm.message_base_path(from_conf, from_area).await,
+        vm.message_base_path(to_conf, to_area).await,
+    ) else {
+        log::error!("MOVE_MSG: no message base {from_conf}:{from_area} or {to_conf}:{to_area}");
+        return Ok(());
+    };
+
+    let source = match JamMessageBase::open(&source_path) {
+        Ok(base) => base,
+        Err(err) => {
+            log::error!("MOVE_MSG can't open message base {from_conf}:{from_area}: {err}");
+            return Ok(());
+        }
+    };
+    let Ok(header) = source.read_header(number) else {
+        log::error!("MOVE_MSG: no message {number} in {from_conf}:{from_area}");
+        return Ok(());
+    };
+    let text = source.read_msg_text(&header)?;
+
+    let mut message = JamMessage::default()
+        .with_from(header.get_from().cloned().unwrap_or_default())
+        .with_to(header.get_to().cloned().unwrap_or_default())
+        .with_subject(header.get_subject().cloned().unwrap_or_default())
+        .with_date_time(Utc::now())
+        .with_attributes(header.attributes)
+        .with_text(text);
+    if header.reply_to != 0 {
+        message = message.with_reply_to(header.reply_to);
+    }
+
+    let mut target = match JamMessageBase::open(&target_path) {
+        Ok(base) => base,
+        Err(_) => match JamMessageBase::create(&target_path) {
+            Ok(base) => base,
+            Err(err) => {
+                log::error!("MOVE_MSG can't open message base {to_conf}:{to_area}: {err}");
+                return Ok(());
+            }
+        },
+    };
+    if let Err(err) = target.write_message(&message) {
+        log::error!("MOVE_MSG can't write message into {to_conf}:{to_area}: {err}");
+        return Ok(());
+    }
+    target.write_jhr_header()?;
+
+    // The original only goes away once the copy is safely written.
+    if moving {
+        let _ = source.delete_message(number);
+    }
+    vm.cached_msg_header = None;
+    Ok(())
 }
 
 pub async fn set_bank_bal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {

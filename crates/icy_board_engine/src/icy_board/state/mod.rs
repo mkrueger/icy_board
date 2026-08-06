@@ -549,6 +549,9 @@ pub struct IcyBoardState {
     pub autorun_times: HashMap<usize, u64>,
     pub saved_cmd: String,
     pub file_bases: HashMap<PathBuf, Arc<Mutex<FileBase>>>,
+
+    /// Where `OPENCAP` is teeing everything the caller sees, until `CLOSECAP`.
+    capture_file: Option<std::fs::File>,
 }
 
 impl IcyBoardState {
@@ -600,6 +603,7 @@ impl IcyBoardState {
             saved_cmd: String::new(),
             autorun_times: HashMap::new(),
             file_bases: HashMap::new(),
+            capture_file: None,
         }
     }
     async fn update_language(&mut self) {
@@ -1689,9 +1693,34 @@ impl IcyBoardState {
         Ok(())
     }
 
+    /// Starts capturing everything the caller sees into `path`, replacing any
+    /// capture already running. Reports whether the file could be opened.
+    pub fn open_capture(&mut self, path: &Path) -> bool {
+        match std::fs::File::create(path) {
+            Ok(file) => {
+                self.capture_file = Some(file);
+                true
+            }
+            Err(err) => {
+                log::error!("Can't open capture file {}: {}", path.display(), err);
+                self.capture_file = None;
+                false
+            }
+        }
+    }
+
+    /// Stops the capture. Closing one that was never opened is not an error.
+    pub fn close_capture(&mut self) {
+        self.capture_file = None;
+    }
+
     async fn write_chars_internal(&mut self, target: TerminalTarget, user_bytes: &Vec<u8>, sysop_bytes: &Vec<u8>) -> Res<()> {
         if target != TerminalTarget::Sysop || self.session.is_sysop {
             if !user_bytes.is_empty() {
+                // A capture sees what the caller sees, whether or not the display is on.
+                if let Some(file) = &mut self.capture_file {
+                    let _ = std::io::Write::write_all(file, user_bytes);
+                }
                 self.connection.send(&user_bytes).await?;
             }
         }
