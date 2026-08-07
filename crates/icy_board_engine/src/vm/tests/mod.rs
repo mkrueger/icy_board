@@ -7,6 +7,7 @@
 
 #![cfg(test)]
 
+mod dbase;
 mod message_base;
 mod scalars;
 mod tpa;
@@ -47,7 +48,11 @@ fn compile(source: &str) -> crate::executable::Executable {
     );
     drop(reporter);
 
-    compiler.create_executable().expect("the snippet does not compile")
+    // Round tripping through the on disk form is what fills in the variable table's
+    // array storage, so a snippet with an array behaves the way a real PPE would.
+    let executable = compiler.create_executable().expect("the snippet does not compile");
+    let mut bytes = executable.to_buffer().expect("the snippet does not serialize");
+    crate::executable::Executable::from_buffer(&mut bytes, false).expect("the snippet does not load")
 }
 
 /// Compiles and runs a PPL snippet against a scratch board, and returns
@@ -58,8 +63,21 @@ pub fn run_ppl(source: &str) -> String {
 
 /// The same, with a chance to shape the board the snippet runs against.
 pub fn run_ppl_on<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P) -> String {
+    run_ppl_seeded(source, init_fn, &[])
+}
+
+/// The same again, with files copied into the scratch directory first so a snippet
+/// can be pointed at a fixture.
+pub fn run_ppl_with_files(source: &str, files: &[(&str, &[u8])]) -> String {
+    run_ppl_seeded(source, |_| {}, files)
+}
+
+fn run_ppl_seeded<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&str, &[u8])]) -> String {
     let executable = compile(source);
     let work_dir = scratch_dir("run");
+    for (name, bytes) in files {
+        std::fs::write(work_dir.join(name), bytes).unwrap();
+    }
 
     let output = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
         let bbs = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));

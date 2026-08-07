@@ -65,6 +65,7 @@ async fn test_fmtreal(value: f64, field_width: i32, decimal_places: i32) -> Stri
         use_lmrs: true,
         cached_msg_header: None,
         abort_on_stack_error: true,
+        dbase: Default::default(),
     };
 
     vm.variable_table.push(TableEntry {

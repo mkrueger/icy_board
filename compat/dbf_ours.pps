@@ -1,0 +1,24 @@
+; Has the original PCBoard read back a table our engine wrote.
+INTEGER i
+STRING n
+
+FCREATE 1, "C:\COMPAT\OURS.OUT", 1, 0
+DOPEN 0, "C:\COMPAT\OURS", 0
+FPUTLN 1, "open err=", DERR(0), " cnt=", DRECCOUNT(0), " fields=", DFIELDS(0), " alias=", DGETALIAS(0)
+FOR i = 1 TO DFIELDS(0)
+  LET n = DNAME(0, i)
+  FPUTLN 1, "f", i, "=", n, ",", DTYPE(0, n), ",", DLENGTH(0, n), ",", DDECIMALS(0, n)
+NEXT
+DGO 0, 1
+FPUTLN 1, "r1=[", DGET(0, "NAME"), "][", DGET(0, "AGE"), "][", DGET(0, "RATE"), "][", DGET(0, "BIRTH"), "][", DGET(0, "ACTIVE"), "] del=", DDELETED(0)
+DGO 0, 2
+FPUTLN 1, "r2=[", DGET(0, "NAME"), "][", DGET(0, "AGE"), "][", DGET(0, "RATE"), "][", DGET(0, "BIRTH"), "][", DGET(0, "ACTIVE"), "] del=", DDELETED(0)
+DBOTTOM 0
+FPUTLN 1, "bottom=", DRECNO(0), " eof=", DEOF(0)
+DAPPEND 0
+DPUT 0, "NAME", "XAVIER"
+DPUT 0, "AGE", 3
+FPUTLN 1, "appended cnt=", DRECCOUNT(0), " no=", DRECNO(0)
+DCLOSE 0
+FCLOSE 1
+END

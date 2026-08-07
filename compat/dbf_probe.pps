@@ -1,0 +1,57 @@
+; Probes the dBase behaviour that did not fit on one screen in dbf_fixture.pps.
+; Writes to a file so the pager cannot truncate the answers.
+STRING m(1)
+
+FCREATE 1, "C:\COMPAT\DBF2.OUT", 1, 0
+
+DOPEN 0, "C:\COMPAT\DBTEST", TRUE
+FPUTLN 1, "open=", DERR(0), " cnt=", DRECCOUNT(0)
+
+FPUTLN 1, "alias0=[", DGETALIAS(0), "]"
+DSETALIAS 0, "PEOPLE"
+FPUTLN 1, "alias1=[", DGETALIAS(0), "] sel=", DSELECT("PEOPLE"), " selbad=", DSELECT("NOPE")
+FPUTLN 1, "dnext=", DNEXT(), " fnext=", FNEXT(), " stat=", DCHKSTAT(0)
+FPUTLN 1, "e0=[", DERRMSG(0), "] e1=[", DERRMSG(1), "] e2=[", DERRMSG(2), "] e9=[", DERRMSG(9), "]"
+
+; Seeking with no index open at all.
+FPUTLN 1, "seek_noidx=", DSEEK(0, "CAROL"), " no=", DRECNO(0)
+
+DNCREATE 0, "C:\COMPAT\DBTNAME", "NAME"
+FPUTLN 1, "ncreate=", DERR(0)
+FPUTLN 1, "seek_exact=", DSEEK(0, "CAROL"), " no=", DRECNO(0)
+FPUTLN 1, "seek_part=", DSEEK(0, "BO"), " no=", DRECNO(0)
+FPUTLN 1, "seek_past=", DSEEK(0, "ZZ"), " no=", DRECNO(0), " eof=", DEOF(0)
+FPUTLN 1, "seek_first=", DSEEK(0, "ALICE"), " no=", DRECNO(0)
+
+; Does a deleted record still answer through DGET?
+DGO 0, 3
+FPUTLN 1, "del3=", DDELETED(0), " name3=[", DGET(0, "NAME"), "]"
+DRECALL 0
+FPUTLN 1, "recall=", DERR(0), " del3=", DDELETED(0)
+DDELETE 0
+FPUTLN 1, "redel=", DDELETED(0)
+
+; Errors on things that should fail.
+FPUTLN 1, "badfield=[", DGET(0, "NOSUCH"), "] err=", DERR(0)
+FPUTLN 1, "badchan=", DRECCOUNT(7), " err=", DERR(7)
+FPUTLN 1, "openmiss=", DOPEN(6, "C:\COMPAT\NOPE", TRUE)
+
+; Locking, which has no visible effect on a single node.
+FPUTLN 1, "lock=", DLOCK(0), " lockr=", DLOCKR(0, 1), " unlock=", DUNLOCK(0)
+
+; A memo field in its own table, to confirm it is what DADD chokes on.
+LET m(0) = "NAME,C,10,0"
+LET m(1) = "NOTES,M,10,0"
+DCREATE 2, "C:\COMPAT\DBMEMO", TRUE, m
+FPUTLN 1, "mcreate=", DERR(2), " fields=", DFIELDS(2)
+DAPPEND 2
+FPUTLN 1, "mappend=", DERR(2), " cnt=", DRECCOUNT(2)
+DPUT 2, "NAME", "MEMO1"
+FPUTLN 1, "mput_c=", DERR(2)
+DPUT 2, "NOTES", "hello memo"
+FPUTLN 1, "mput_m=", DERR(2), " get=[", DGET(2, "NOTES"), "]"
+
+DCLOSEALL
+FCLOSE 1
+PRINTLN "diag done"
+END

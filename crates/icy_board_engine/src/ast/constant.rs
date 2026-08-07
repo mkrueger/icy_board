@@ -340,9 +340,12 @@ impl Constant {
                 VariableValue::new(VariableType::Unsigned, data)
             }
             Constant::String(s) => VariableValue::new_string(s.clone()),
+            // PCBoard stores a literal like `12.5` as a four byte REAL, and the variable
+            // table header this constant gets says REAL too, so the value has to agree
+            // or the constant is truncated the moment the executable is written out.
             Constant::Double(i) => {
-                data.double_value = *i;
-                VariableValue::new(VariableType::Double, data)
+                data.float_value = *i as f32;
+                VariableValue::new(VariableType::Float, data)
             }
             Constant::Boolean(b) => VariableValue::new_bool(*b),
             Constant::Builtin(s) => {

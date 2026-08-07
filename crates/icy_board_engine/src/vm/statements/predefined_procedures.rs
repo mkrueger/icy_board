@@ -17,7 +17,7 @@ use crate::{
         user_base::ConferenceFlags,
         user_inf::{BankUserInf, QwkConfigUserInf},
     },
-    vm::{MAX_FILE_CHANNELS, get_file_channel},
+    vm::{MAX_FILE_CHANNELS, dbase, get_file_channel},
 };
 use bstr::BString;
 use chrono::{DateTime, Utc};
@@ -1789,94 +1789,123 @@ pub async fn stackabort(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
     Ok(())
 }
 pub async fn dcreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DCREATE");
+    dbase::ops::dcreate(vm, args).await?;
+    Ok(())
 }
-pub async fn dopen(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DOPEN");
+pub async fn dopen(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dopen(vm, args).await?;
+    Ok(())
 }
-pub async fn dclose(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DCLOSE");
+pub async fn dclose(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dclose(vm, args).await?;
+    Ok(())
 }
-pub async fn dsetalias(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DSETALIAS");
+pub async fn dsetalias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dsetalias(vm, args).await?;
+    Ok(())
 }
-pub async fn dpack(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DPACK");
+pub async fn dpack(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dpack(vm, args).await?;
+    Ok(())
 }
-pub async fn dcloseall(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DCLOSEALL");
+pub async fn dcloseall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dcloseall(vm, args).await?;
+    Ok(())
 }
-pub async fn dlock(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DLOCK");
+pub async fn dlock(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dlock(vm, args).await?;
+    Ok(())
 }
-pub async fn dlockr(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DLOCKR");
+pub async fn dlockr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dlock(vm, args).await?;
+    Ok(())
 }
-pub async fn dlockg(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DLOCKG");
+pub async fn dlockg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dlock(vm, args).await?;
+    Ok(())
 }
-pub async fn dunlock(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DUNLOCK");
+pub async fn dunlock(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dlock(vm, args).await?;
+    Ok(())
 }
-pub async fn dncreate(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DNCREATE");
+pub async fn dncreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dncreate(vm, args).await?;
+    Ok(())
 }
-pub async fn dnopen(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DNOPEN");
+pub async fn dnopen(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dnopen(vm, args).await?;
+    Ok(())
 }
-pub async fn dnclose(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DNCLOSE");
+pub async fn dnclose(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dnclose(vm, args).await?;
+    Ok(())
 }
-pub async fn dncloseall(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DNCLOSEALL");
+pub async fn dncloseall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dncloseall(vm, args).await?;
+    Ok(())
 }
-pub async fn dnew(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DNEW");
+pub async fn dnew(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dnew(vm, args).await?;
+    Ok(())
 }
-pub async fn dadd(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DADD");
+pub async fn dadd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dadd(vm, args).await?;
+    Ok(())
 }
-pub async fn dappend(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DAPPEND");
+pub async fn dappend(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dappend(vm, args).await?;
+    Ok(())
 }
-pub async fn dtop(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DTOP");
+pub async fn dtop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dtop(vm, args).await?;
+    Ok(())
 }
-pub async fn dgo(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DGO");
+pub async fn dgo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dgo(vm, args).await?;
+    Ok(())
 }
-pub async fn dbottom(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DBOTTOM");
+pub async fn dbottom(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dbottom(vm, args).await?;
+    Ok(())
 }
-pub async fn dskip(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DSKIP");
+pub async fn dskip(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dskip(vm, args).await?;
+    Ok(())
 }
-pub async fn dblank(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DBLANK");
+pub async fn dblank(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dblank(vm, args).await?;
+    Ok(())
 }
-pub async fn ddelete(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DDELETE");
+pub async fn ddelete(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::ddelete(vm, args).await?;
+    Ok(())
 }
-pub async fn drecall(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DRECALL");
+pub async fn drecall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::drecall(vm, args).await?;
+    Ok(())
 }
-pub async fn dtag(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DTAG");
+pub async fn dtag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dtag(vm, args).await?;
+    Ok(())
 }
-pub async fn dseek(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DSEEK");
+pub async fn dseek(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dseek(vm, args).await?;
+    Ok(())
 }
-pub async fn dfblank(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DFBLANK");
+pub async fn dfblank(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dfblank(vm, args).await?;
+    Ok(())
 }
-pub async fn dget(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DGET");
+pub async fn dget(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dget_stmt(vm, args).await
 }
-pub async fn dput(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DPUT");
+pub async fn dput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    dbase::ops::dput(vm, args).await?;
+    Ok(())
 }
 pub async fn dfcopy(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("DFCOPY");
+    dbase::ops::dfcopy(vm, args).await?;
+    Ok(())
 }
 
 pub async fn account(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {

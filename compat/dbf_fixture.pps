@@ -1,0 +1,109 @@
+; Generates the dBase fixtures under crates/icy_board_engine/tests/dbase_data.
+; Run it through the real PCBoard so the files carry the original's own layout.
+STRING f(4)
+STRING m(1)
+STRING s
+INTEGER i
+
+LET f(0) = "NAME,C,20,0"
+LET f(1) = "AGE,N,5,0"
+LET f(2) = "RATE,F,12,4"
+LET f(3) = "BIRTH,D,8,0"
+LET f(4) = "ACTIVE,L,1,0"
+
+PRINTLN "---BEGIN---"
+
+DCREATE 0, "C:\COMPAT\DBTEST", TRUE, f
+PRINTLN "cr_err=", DERR(0), " fields=", DFIELDS(0), " cnt=", DRECCOUNT(0)
+
+; Does DCREATE leave the channel usable, or does it need an explicit open?
+DCLOSE 0
+DOPEN 0, "C:\COMPAT\DBTEST", TRUE
+PRINTLN "op_err=", DERR(0), " fields=", DFIELDS(0), " cnt=", DRECCOUNT(0)
+
+FOR i = 1 TO DFIELDS(0)
+  LET s = DNAME(0, i)
+  PRINTLN "f", i, "=", s, ",", DTYPE(0, s), ",", DLENGTH(0, s), ",", DDECIMALS(0, s)
+NEXT
+
+DNEW 0
+PRINTLN "new_err=", DERR(0)
+DPUT 0, "NAME", "ALICE"
+PRINTLN "put_err=", DERR(0)
+DPUT 0, "AGE", 30
+DPUT 0, "RATE", 12.5
+DPUT 0, "BIRTH", TODDATE("19940527")
+DPUT 0, "ACTIVE", TRUE
+DADD 0
+PRINTLN "add_err=", DERR(0), " cnt=", DRECCOUNT(0), " no=", DRECNO(0)
+
+; The other documented way to grow the file.
+DAPPEND 0
+PRINTLN "app_err=", DERR(0), " cnt=", DRECCOUNT(0), " no=", DRECNO(0)
+DPUT 0, "NAME", "BOB"
+DPUT 0, "AGE", 41
+DPUT 0, "RATE", -3.25
+DPUT 0, "BIRTH", TODDATE("20011231")
+DPUT 0, "ACTIVE", FALSE
+PRINTLN "put2_err=", DERR(0), " chg=", DCHANGED(0)
+
+DAPPEND 0
+DPUT 0, "NAME", "CAROL"
+DPUT 0, "AGE", 7
+DPUT 0, "RATE", 0.5
+DPUT 0, "ACTIVE", TRUE
+
+DAPPEND 0
+DPUT 0, "NAME", "DAVE"
+DPUT 0, "AGE", 99
+
+PRINTLN "cnt=", DRECCOUNT(0)
+
+DGO 0, 1
+PRINTLN "r1=[", DGET(0, "NAME"), "][", DGET(0, "AGE"), "][", DGET(0, "RATE"), "][", DGET(0, "BIRTH"), "][", DGET(0, "ACTIVE"), "]"
+DGO 0, 2
+PRINTLN "r2=[", DGET(0, "NAME"), "][", DGET(0, "AGE"), "][", DGET(0, "RATE"), "][", DGET(0, "BIRTH"), "][", DGET(0, "ACTIVE"), "]"
+
+; The third record keeps its deletion flag set so the fixture exercises DDELETED.
+DGO 0, 3
+DDELETE 0
+PRINTLN "del_err=", DERR(0), " del3=", DDELETED(0)
+DGO 0, 4
+PRINTLN "del4=", DDELETED(0)
+
+DTOP 0
+PRINTLN "top=", DRECNO(0), " bof=", DBOF(0)
+DSKIP 0, 2
+PRINTLN "skip2=", DRECNO(0)
+DSKIP 0, -1
+PRINTLN "back1=", DRECNO(0)
+DBOTTOM 0
+PRINTLN "bot=", DRECNO(0), " eof=", DEOF(0)
+DSKIP 0, 1
+PRINTLN "past=", DRECNO(0), " eof=", DEOF(0)
+
+DNCREATE 0, "C:\COMPAT\DBTNAME", "NAME"
+PRINTLN "ndx_err=", DERR(0)
+PRINTLN "seek_carol=", DSEEK(0, "CAROL"), " no=", DRECNO(0)
+PRINTLN "seek_bo=", DSEEK(0, "BO"), " no=", DRECNO(0)
+PRINTLN "seek_zz=", DSEEK(0, "ZZ")
+
+PRINTLN "alias0=[", DGETALIAS(0), "]"
+DSETALIAS 0, "PEOPLE"
+PRINTLN "alias1=[", DGETALIAS(0), "] sel=", DSELECT("PEOPLE"), " dnext=", DNEXT()
+PRINTLN "stat=", DCHKSTAT(0), " e0=[", DERRMSG(0), "] e1=[", DERRMSG(1), "]"
+
+; A memo field in its own table, to see whether it is what DADD chokes on.
+LET m(0) = "NAME,C,10,0"
+LET m(1) = "NOTES,M,10,0"
+DCREATE 1, "C:\COMPAT\DBMEMO", TRUE, m
+DCLOSE 1
+DOPEN 1, "C:\COMPAT\DBMEMO", TRUE
+DAPPEND 1
+DPUT 1, "NAME", "MEMO1"
+DPUT 1, "NOTES", "hello memo"
+PRINTLN "memo_err=", DERR(1), " cnt=", DRECCOUNT(1), " get=[", DGET(1, "NOTES"), "]"
+
+DCLOSEALL
+PRINTLN "---END---"
+END

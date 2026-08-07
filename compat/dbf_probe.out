@@ -1,0 +1,22 @@
+open=0 cnt=4
+alias0=[DBTEST]
+alias1=[PEOPLE] sel=0 selbad=8
+dnext=1 fnext=0 stat=0
+e0=[] e1=[] e2=[] e9=[]
+seek_noidx=1 no=-1
+ncreate=0
+seek_exact=1 no=3
+seek_part=1 no=2
+seek_past=0 no=5 eof=1
+seek_first=1 no=1
+del3=1 name3=[CAROL               ]
+recall=0 del3=0
+redel=1
+badfield=[CAROL               ] err=1
+badchan=0 err=1
+openmiss=0
+lock=0 lockr=0 unlock=0
+mcreate=1 fields=0
+mappend=1 cnt=0
+mput_c=1
+mput_m=1 get=[CAROL               ]

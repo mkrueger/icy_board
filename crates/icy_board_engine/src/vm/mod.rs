@@ -38,6 +38,8 @@ use self::expressions::run_function;
 pub use self::statements::*;
 
 pub mod io;
+
+pub mod dbase;
 pub use self::io::*;
 
 pub mod errors;
@@ -176,6 +178,8 @@ pub struct VirtualMachine<'a> {
     /// What `STACKABORT` last asked for. Aborting is the default; a PPE has to
     /// opt into limping on after it has blown the stack.
     pub abort_on_stack_error: bool,
+
+    pub dbase: dbase::DbaseState,
 }
 
 impl<'a> VirtualMachine<'a> {
@@ -891,6 +895,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
                 use_lmrs: true,
                 cached_msg_header: None,
                 abort_on_stack_error: true,
+                dbase: dbase::DbaseState::default(),
             };
 
             vm.run().await?;

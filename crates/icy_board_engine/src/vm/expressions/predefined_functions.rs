@@ -17,7 +17,7 @@ use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MAS
 use crate::icy_board::user_base::{ConferenceFlags, Password};
 use crate::icy_board::user_inf::{BankUserInf, QwkConfigUserInf};
 use crate::parser::CONFERENCE_ID;
-use crate::vm::{MAX_FILE_CHANNELS, TerminalTarget, VirtualMachine, get_file_channel};
+use crate::vm::{TerminalTarget, VirtualMachine, dbase, get_file_channel};
 use bstr::BString;
 use chrono::{DateTime, Utc};
 use icy_engine::{Position, TextPane};
@@ -1691,152 +1691,144 @@ pub async fn stackerr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     Ok(VariableValue::new_bool(vm.return_addresses.len() as i32 >= STACK_LIMIT))
 }
 
-/// Without a database layer every channel behaves as if nothing were open: the
-/// operations report failure, and the status functions report an error at both
-/// ends of the file so a record loop stops instead of spinning forever.
 pub async fn dgetalias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DGETALIAS", VariableValue::new_string(String::new()));
+    Ok(VariableValue::new_string(dbase::ops::dgetalias(vm, args).await?))
 }
 pub async fn dbof(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DBOF", VariableValue::new_bool(true));
+    Ok(VariableValue::new_bool(dbase::ops::dbof(vm, args).await?))
 }
 pub async fn dchanged(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DCHANGED", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dchanged(vm, args).await?))
 }
 pub async fn ddecimals(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DDECIMALS", VariableValue::new_int(0));
+    Ok(VariableValue::new_int(dbase::ops::ddecimals(vm, args).await?))
 }
 pub async fn ddeleted(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DDELETED", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::ddeleted(vm, args).await?))
 }
 pub async fn deof(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DEOF", VariableValue::new_bool(true));
+    Ok(VariableValue::new_bool(dbase::ops::deof(vm, args).await?))
 }
 pub async fn derr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DERR", VariableValue::new_bool(true));
+    Ok(VariableValue::new_bool(dbase::ops::derr(vm, args).await?))
 }
 pub async fn dfields(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DFIELDS", VariableValue::new_int(0));
+    Ok(VariableValue::new_int(dbase::ops::dfields(vm, args).await?))
 }
 pub async fn dlength(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DLENGTH", VariableValue::new_int(0));
+    Ok(VariableValue::new_int(dbase::ops::dlength(vm, args).await?))
 }
 pub async fn dname(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DNAME", VariableValue::new_int(0));
+    Ok(VariableValue::new_string(dbase::ops::dname(vm, args).await?))
 }
 pub async fn dreccount(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DRECCOUNT", VariableValue::new_int(0));
+    Ok(VariableValue::new_int(dbase::ops::dreccount(vm, args).await?))
 }
 pub async fn drecno(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DRECNO", VariableValue::new_int(0));
+    Ok(VariableValue::new_int(dbase::ops::drecno(vm, args).await?))
 }
 pub async fn dtype(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DTYPE", VariableValue::new_string(String::new()));
+    Ok(VariableValue::new_string(dbase::ops::dtype(vm, args).await?))
 }
 pub async fn fnext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    for i in 1..MAX_FILE_CHANNELS {
-        if !vm.io.is_open(i) {
-            return Ok(VariableValue::new_int(i as i32));
-        }
-    }
-    Ok(VariableValue::new_int(-1))
+    Ok(VariableValue::new_int(dbase::ops::fnext(vm, args).await?))
 }
 
 pub async fn dnext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DNEXT", VariableValue::new_int(-1));
+    Ok(VariableValue::new_int(dbase::ops::dnext(vm, args).await?))
 }
 pub async fn toddate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::DDate))
 }
 pub async fn dcloseall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DCLOSEALL", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dcloseall(vm, args).await?))
 }
 pub async fn dopen(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DOPEN", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dopen(vm, args).await?))
 }
 pub async fn dclose(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DCLOSE", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dclose(vm, args).await?))
 }
 pub async fn dsetalias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DSETALIAS", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dsetalias(vm, args).await?))
 }
 pub async fn dpack(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DPACK", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dpack(vm, args).await?))
 }
 pub async fn dlockf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DLOCKF", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dlock(vm, args).await?))
 }
 pub async fn dlock(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DLOCK", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dlock(vm, args).await?))
 }
 pub async fn dlockr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DLOCKR", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dlock(vm, args).await?))
 }
 pub async fn dunlock(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DUNLOCK", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dlock(vm, args).await?))
 }
 pub async fn dnopen(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DNOPEN", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dnopen(vm, args).await?))
 }
 pub async fn dnclose(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DNCLOSE", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dnclose(vm, args).await?))
 }
 pub async fn dncloseall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DNCLOSEALL", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dncloseall(vm, args).await?))
 }
 pub async fn dnew(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DNEW", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dnew(vm, args).await?))
 }
 pub async fn dadd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DADD", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dadd(vm, args).await?))
 }
 pub async fn dappend(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DAPPEND", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dappend(vm, args).await?))
 }
 pub async fn dtop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DTOP", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dtop(vm, args).await?))
 }
 pub async fn dgo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DGO", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dgo(vm, args).await?))
 }
 pub async fn dbottom(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DBOTTOM", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dbottom(vm, args).await?))
 }
 pub async fn dskip(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DSKIP", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dskip(vm, args).await?))
 }
 pub async fn dblank(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DBLANK", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dblank(vm, args).await?))
 }
 pub async fn ddelete(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DDELETE", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::ddelete(vm, args).await?))
 }
 pub async fn drecall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DRECALL", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::drecall(vm, args).await?))
 }
 pub async fn dtag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DTAG", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dtag(vm, args).await?))
 }
 pub async fn dseek(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DSEEK", VariableValue::new_int(0));
+    Ok(VariableValue::new_int(dbase::ops::dseek(vm, args).await?))
 }
 pub async fn dfblank(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DFBLANK", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dfblank(vm, args).await?))
 }
 pub async fn dget(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DGET", VariableValue::new_string(String::new()));
+    Ok(VariableValue::new_string(dbase::ops::dget(vm, args).await?))
 }
 pub async fn dput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DPUT", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dput(vm, args).await?))
 }
 pub async fn dfcopy(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DFCOPY", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(dbase::ops::dfcopy(vm, args).await?))
 }
 pub async fn dselect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DSELECT", VariableValue::new_int(0));
+    Ok(VariableValue::new_int(dbase::ops::dselect(vm, args).await?))
 }
 pub async fn dchkstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DCHKSTAT", VariableValue::new_int(0));
+    Ok(VariableValue::new_int(dbase::ops::dchkstat(vm, args).await?))
 }
 
 pub async fn pcbaccount(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1890,7 +1882,7 @@ pub async fn pcbaccstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
 }
 
 pub async fn derrmsg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DERRMSG", VariableValue::new_string(String::new()));
+    Ok(VariableValue::new_string(dbase::ops::derrmsg(vm, args).await?))
 }
 
 pub async fn account(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
