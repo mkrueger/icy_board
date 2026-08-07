@@ -11,7 +11,7 @@ use crate::{
     icy_board::{
         icb_config::IcbColor,
         state::{
-            GraphicsMode, NodeState, NodeStatus,
+            GraphicsMode, KeySource, NodeState, NodeStatus,
             functions::{MASK_ALNUM, display_flags},
         },
         user_base::ConferenceFlags,
@@ -326,6 +326,10 @@ pub async fn deluser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 pub async fn adjtime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let min = vm.eval_expr(&args[0]).await?.as_int();
+    // Once an event has trimmed the session there is no room to give any back.
+    if min > 0 && vm.icy_board_state.session.time_adjusted_for_event {
+        return Ok(());
+    }
     vm.icy_board_state.session.time_limit += min;
     Ok(())
 }
@@ -747,9 +751,9 @@ pub async fn kbdstring(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
 }
 pub async fn kbdfile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let file_name = vm.eval_expr(&args[0]).await?.as_string();
-    let fil_name = vm.resolve_file(&file_name).await;
+    let file_name = vm.resolve_file(&file_name).await;
     let contents = fs::read_to_string(file_name)?;
-    vm.icy_board_state.stuff_keyboard_buffer(&contents, false)?;
+    vm.icy_board_state.stuff_keyboard_buffer_from(&contents, KeySource::StuffedFile)?;
 
     Ok(())
 }

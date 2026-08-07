@@ -1533,7 +1533,7 @@ pub async fn meganum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn evttimeadj(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("EVTTIMEADJ", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(vm.icy_board_state.session.time_adjusted_for_event))
 }
 
 pub async fn isbitset(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1575,7 +1575,7 @@ pub async fn pplbufsize(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
 }
 
 pub async fn kbdfilusued(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("KBDFILUSUED", VariableValue::new_bool(false));
+    Ok(VariableValue::new_bool(vm.icy_board_state.kbdfilused()))
 }
 
 pub async fn lomsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1603,7 +1603,26 @@ pub async fn himsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn drivespace(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("DRIVESPACE", VariableValue::new(VariableType::Unsigned, VariableData::from_int(0)));
+    let drivespec = vm.eval_expr(&args[0]).await?.as_string();
+    // A PPE names a DOS drive, which nothing here has. Anything that is not a
+    // path we can look at is answered for the file system the board lives on.
+    let path = if drivespec.len() > 1 && drivespec.as_bytes()[1] == b':' {
+        vm.icy_board_state.get_board().await.root_path.clone()
+    } else {
+        vm.resolve_file(&drivespec).await
+    };
+    let free = match fs4::available_space(&path) {
+        Ok(free) => free,
+        Err(err) => {
+            log::error!("DRIVESPACE can't measure {}: {err}", path.display());
+            0
+        }
+    };
+    let mut data = VariableData::default();
+    // PPL widens an UNSIGNED to a signed 32 bit integer to compare it, so anything
+    // past that would read back as a negative number to the PPE asking.
+    data.unsigned_value = free.min(i32::MAX as u64);
+    Ok(VariableValue::new(VariableType::Unsigned, data))
 }
 pub async fn outbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(0))
@@ -1727,7 +1746,7 @@ pub async fn dnext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     unimplemented_function!("DNEXT", VariableValue::new_int(-1));
 }
 pub async fn toddate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("TODDATE", VariableValue::new(VariableType::Date, VariableData::default()));
+    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::DDate))
 }
 pub async fn dcloseall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     unimplemented_function!("DCLOSEALL", VariableValue::new_bool(false));

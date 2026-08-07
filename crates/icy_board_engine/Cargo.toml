@@ -53,6 +53,7 @@ creditcard = "0.1.0"
 zip = "6.0.0"
 argon2 = "0.5.3"
 bcrypt = "0.17.1"
+fs4 = "1"
 
 # interpreter deps
 [dev-dependencies]

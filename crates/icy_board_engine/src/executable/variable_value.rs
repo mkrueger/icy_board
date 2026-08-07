@@ -1522,9 +1522,10 @@ impl VariableValue {
                         }
                     }
                     VariableType::Unsigned => self.data.unsigned_value.to_string(),
-                    VariableType::Date | VariableType::DDate | VariableType::EDate => {
+                    VariableType::Date | VariableType::EDate => {
                         format!("{}", IcbDate::from_pcboard(self.data.date_value))
                     }
+                    VariableType::DDate => self.data.ddate_value.to_string(),
                     VariableType::Integer => self.data.int_value.to_string(),
                     VariableType::Money => self.data.money_value.to_string(),
                     VariableType::Float => self.data.float_value.to_string(),
@@ -1728,10 +1729,18 @@ impl VariableValue {
                 data.unsigned_value = self.as_int() as u64;
             }
             VariableType::Date => {
-                data.date_value = self.as_int() as u32;
+                data.date_value = if self.vtype == VariableType::DDate {
+                    ddate_to_date(unsafe { self.data.ddate_value }).to_pcboard_date() as u32
+                } else {
+                    self.as_int() as u32
+                };
             }
             VariableType::EDate => {
-                data.edate_value = self.as_int() as u32;
+                data.edate_value = if self.vtype == VariableType::DDate {
+                    ddate_to_date(unsafe { self.data.ddate_value }).to_pcboard_date() as u32
+                } else {
+                    self.as_int() as u32
+                };
             }
             VariableType::Integer => {
                 data.int_value = self.as_int();
@@ -1769,7 +1778,10 @@ impl VariableValue {
                 data.double_value = self.as_double();
             }
             VariableType::DDate => {
-                data.ddate_value = self.as_int();
+                data.ddate_value = match self.vtype {
+                    VariableType::Date | VariableType::EDate => date_to_ddate(&IcbDate::from_pcboard(unsafe { self.data.date_value })),
+                    _ => self.as_int(),
+                };
             }
             VariableType::Table => {
                 panic!("Not supported for tables.")
@@ -1804,6 +1816,21 @@ impl VariableValue {
             generic_data: GenericVariableData::Password(password),
         }
     }
+}
+
+/// A DDATE is a signed long holding the date as the decimal number CCYYMMDD.
+fn date_to_ddate(date: &IcbDate) -> i32 {
+    // A date unpacked from PCBoard's format carries only two year digits.
+    let year = match date.year() {
+        year if year >= 100 => year as i32,
+        year if year < 79 => 2000 + year as i32,
+        year => 1900 + year as i32,
+    };
+    year * 10000 + date.month() as i32 * 100 + date.day() as i32
+}
+
+fn ddate_to_date(ddate: i32) -> IcbDate {
+    IcbDate::new((ddate / 100 % 100) as u8, (ddate % 100) as u8, (ddate / 10000) as u16)
 }
 
 /// .

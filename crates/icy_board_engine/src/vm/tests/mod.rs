@@ -8,6 +8,7 @@
 #![cfg(test)]
 
 mod message_base;
+mod scalars;
 mod tpa;
 
 use std::path::PathBuf;

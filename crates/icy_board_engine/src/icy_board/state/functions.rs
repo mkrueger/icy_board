@@ -19,7 +19,7 @@ use crate::{
     vm::TerminalTarget,
 };
 
-use super::{IcyBoardState, KeySource};
+use super::IcyBoardState;
 
 pub mod display_flags {
     pub const DEFAULT: i32 = 0x00000;
@@ -297,7 +297,7 @@ impl IcyBoardState {
         // we've data from a PPE here, so take that input and return it.
         // ignoring all other settings.
         if let Some(front) = self.char_buffer.front() {
-            if front.source == KeySource::StuffedHidden {
+            if front.source.is_hidden() {
                 let mut result = String::new();
                 while let Some(key) = self.char_buffer.pop_front() {
                     if key.ch == '\n' || key.ch == '\r' {
@@ -346,7 +346,7 @@ impl IcyBoardState {
         // we've data from a PPE here, so take that input and return it.
         // ignoring all other settings.
         if let Some(front) = self.char_buffer.front() {
-            if front.source == KeySource::StuffedHidden {
+            if front.source.is_hidden() {
                 let mut result = String::new();
                 while let Some(key) = self.char_buffer.pop_front() {
                     if key.ch == '\n' || key.ch == '\r' {
@@ -408,7 +408,7 @@ impl IcyBoardState {
             }
             if key_char.ch == '\x08' && !output.is_empty() {
                 output.pop();
-                if key_char.source != KeySource::StuffedHidden {
+                if !key_char.source.is_hidden() {
                     self.print(TerminalTarget::Both, "\x08 \x08").await?;
                 }
                 continue;
@@ -424,7 +424,7 @@ impl IcyBoardState {
                     || (display_flags & display_flags::STACKED) != 0 && " ;".contains(key_char.ch))
             {
                 output.push(key_char.ch);
-                if key_char.source != KeySource::StuffedHidden {
+                if !key_char.source.is_hidden() {
                     if display_flags & display_flags::ECHODOTS != 0 {
                         self.print(TerminalTarget::Both, ".").await?;
                     } else {

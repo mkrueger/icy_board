@@ -203,6 +203,9 @@ pub struct Session {
     pub request_logoff: bool,
 
     pub time_limit: i32,
+    /// Set when a pending event has cut the session short. ADJTIME may then only
+    /// take time away, never give it back.
+    pub time_adjusted_for_event: bool,
     pub security_violations: i32,
 
     /// If true, the keyboard timer is checked.
@@ -287,6 +290,7 @@ impl Session {
             op_text: String::new(),
             use_alias: false,
             time_limit: 1000,
+            time_adjusted_for_event: false,
             keyboard_timer_check: false,
             request_logoff: false,
             tokens: VecDeque::new(),
@@ -501,12 +505,18 @@ pub enum KeySource {
     /// KBDSTUFF: originates from a PPE but is echoed like typed input.
     StuffedVisible,
     StuffedHidden,
+    /// KBDFILE: stuffed from a script file, otherwise identical to StuffedHidden.
+    StuffedFile,
     Sysop,
 }
 
 impl KeySource {
     pub fn is_stuffed(self) -> bool {
-        matches!(self, KeySource::StuffedVisible | KeySource::StuffedHidden)
+        matches!(self, KeySource::StuffedVisible | KeySource::StuffedHidden | KeySource::StuffedFile)
+    }
+
+    pub fn is_hidden(self) -> bool {
+        matches!(self, KeySource::StuffedHidden | KeySource::StuffedFile)
     }
 }
 
@@ -809,9 +819,13 @@ impl IcyBoardState {
     }
 
     pub fn stuff_keyboard_buffer(&mut self, value: &str, is_visible: bool) -> Res<()> {
+        let src = if is_visible { KeySource::StuffedVisible } else { KeySource::StuffedHidden };
+        self.stuff_keyboard_buffer_from(value, src)
+    }
+
+    pub fn stuff_keyboard_buffer_from(&mut self, value: &str, src: KeySource) -> Res<()> {
         let in_chars: Vec<char> = value.chars().collect();
 
-        let src = if is_visible { KeySource::StuffedVisible } else { KeySource::StuffedHidden };
         let mut i = 0;
         while i < in_chars.len() {
             let c = in_chars[i];
@@ -827,8 +841,12 @@ impl IcyBoardState {
                 self.char_buffer.push_back(KeyChar::new(src, c));
             }
         }
-        // self.char_buffer.push_back(KeyChar::new(KeySource::StuffedHidden, '\n'));
         Ok(())
+    }
+
+    /// True while there are keystrokes left that KBDFILE put into the buffer.
+    pub fn kbdfilused(&self) -> bool {
+        self.char_buffer.iter().any(|c| c.source == KeySource::StuffedFile)
     }
 
     /// True when the next command will come out of a PPE's stuffed keyboard buffer.
@@ -2504,7 +2522,7 @@ impl IcyBoardState {
 
     /// Like 'inbytes' but does not count stuffed hidden characters
     pub fn kbdbufsize(&mut self) -> i32 {
-        self.char_buffer.iter().filter(|c| c.source != KeySource::StuffedHidden).count() as i32
+        self.char_buffer.iter().filter(|c| !c.source.is_hidden()).count() as i32
     }
 
     pub fn cur_color(&self) -> IcbColor {
