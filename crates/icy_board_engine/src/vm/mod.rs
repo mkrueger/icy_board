@@ -774,7 +774,9 @@ impl<'a> VirtualMachine<'a> {
     }
 
     pub async fn resolve_file<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
-        let mut file = file.as_ref().to_string_lossy().to_string();
+        // A PPE that built this name with MID or a fixed width field hands us the padding
+        // as well, and PCBoard opens the file regardless. Verified against PCBoard 15.4.
+        let mut file = file.as_ref().to_string_lossy().trim_end().to_string();
         if std::path::MAIN_SEPARATOR == '/' {
             file = file.replace('\\', "/");
         } else if std::path::MAIN_SEPARATOR == '\\' {

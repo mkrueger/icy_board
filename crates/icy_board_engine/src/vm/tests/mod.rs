@@ -8,6 +8,7 @@
 #![cfg(test)]
 
 mod dbase;
+mod file_names;
 mod message_base;
 mod scalars;
 mod tpa;

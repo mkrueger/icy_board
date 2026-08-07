@@ -1,0 +1,26 @@
+; Does the original ignore trailing blanks in a file name?
+STRING s
+
+FCREATE 1, "C:\COMPAT\TRIM.PCB", 1, 0
+FPUTLN 1, "trimmed-file-content"
+FCLOSE 1
+
+FCREATE 2, "C:\COMPAT\TRIM.OUT", 1, 0
+
+LET s = MID("Header=gw-user.pcb", 8, 255)
+FPUTLN 2, "midlen=", LEN(s), " [", s, "]"
+
+FPUTLN 2, "exist_plain=", EXIST("C:\COMPAT\TRIM.PCB")
+FPUTLN 2, "exist_pad=", EXIST("C:\COMPAT\TRIM.PCB     ")
+FPUTLN 2, "exist_mid=", EXIST(MID("x=C:\COMPAT\TRIM.PCB", 3, 60))
+
+FOPEN 3, "C:\COMPAT\TRIM.PCB     ", 0, 0
+FGET 3, s
+FPUTLN 2, "fopen_pad_err=", FERR(3), " read=[", s, "]"
+FCLOSE 3
+
+FPUTLN 2, "fileinf_pad=", FILEINF("C:\COMPAT\TRIM.PCB     ", 4)
+FCLOSE 2
+
+DISPFILE "C:\COMPAT\TRIM.PCB     ", 0
+END
