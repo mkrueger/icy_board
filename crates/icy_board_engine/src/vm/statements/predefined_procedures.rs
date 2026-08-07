@@ -1614,29 +1614,70 @@ pub async fn prfoundln(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     Ok(())
 }
 
+/// `TPAGET keyword, var` - static third party application storage.
 pub async fn tpaget(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("TPAGET");
+    read_tpa(vm, args, None).await
 }
+/// `TPAPUT keyword, expr`
 pub async fn tpaput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("TPAPUT");
+    write_tpa(vm, args, None).await
 }
+/// `TPACGET keyword, var, conf` - the same storage, kept per conference.
 pub async fn tpacgea(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("TPACGET");
+    let conference = vm.eval_expr(&args[2]).await?.as_int();
+    read_tpa(vm, args, Some(conference)).await
 }
+/// `TPACPUT keyword, expr, conf`
 pub async fn tpacput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("TPACPUT");
+    let conference = vm.eval_expr(&args[2]).await?.as_int();
+    write_tpa(vm, args, Some(conference)).await
 }
+/// `TPAREAD keyword, var` - the same record as `TPAGET`, but the value comes
+/// back as whatever type the receiving variable was declared with.
 pub async fn tparead(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("TPAREAD");
+    read_tpa(vm, args, None).await
 }
+/// `TPAWRITE keyword, expr`
 pub async fn tpawrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("TPAWRITE");
+    write_tpa(vm, args, None).await
 }
+/// `TPACREAD keyword, var, conf`
 pub async fn tpacread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("TPACREAD");
+    let conference = vm.eval_expr(&args[2]).await?.as_int();
+    read_tpa(vm, args, Some(conference)).await
 }
+/// `TPACWRITE keyword, expr, conf`
 pub async fn tpacwrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("TPACWRITE");
+    let conference = vm.eval_expr(&args[2]).await?.as_int();
+    write_tpa(vm, args, Some(conference)).await
+}
+
+async fn read_tpa(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], conference: Option<i32>) -> Res<()> {
+    let keyword = vm.eval_expr(&args[0]).await?.as_string();
+    let Some(user) = &vm.icy_board_state.session.current_user else {
+        return Ok(());
+    };
+    let data = match conference {
+        Some(conference) => user.get_conference_tpa(&keyword, conference.max(0) as usize),
+        None => user.get_tpa(&keyword),
+    };
+    // The variable table converts to the declared type, so a numeric record
+    // read into an INTEGER comes back as one.
+    let value = VariableValue::new_string(data.to_string());
+    vm.set_variable(&args[1], value).await
+}
+
+async fn write_tpa(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], conference: Option<i32>) -> Res<()> {
+    let keyword = vm.eval_expr(&args[0]).await?.as_string();
+    let data = vm.eval_expr(&args[1]).await?.as_string();
+    let Some(user) = &mut vm.icy_board_state.session.current_user else {
+        return Ok(());
+    };
+    match conference {
+        Some(conference) => user.set_conference_tpa(&keyword, conference.max(0) as usize, &data),
+        None => user.set_tpa(&keyword, &data),
+    }
+    Ok(())
 }
 
 pub async fn bitset(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {

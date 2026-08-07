@@ -110,6 +110,7 @@ fn create_test_user(name: &str, idx: u8) -> User {
             None
         },
         bank: None,
+        tpa_records: Vec::new(),
         stats: UserStats {
             first_date_on: DateTime::from_timestamp(500000 + idx as i64 * 1000, 0).unwrap(),
             last_on: DateTime::from_timestamp(1600000 + idx as i64 * 1000, 0).unwrap(),

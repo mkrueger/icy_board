@@ -8,6 +8,7 @@
 #![cfg(test)]
 
 mod message_base;
+mod tpa;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};

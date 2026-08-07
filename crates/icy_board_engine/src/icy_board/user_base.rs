@@ -517,6 +517,31 @@ pub struct User {
     #[serde(default)]
     #[serde(with = "lastread_ptr_flags")]
     pub lastread_ptr_flags: HashMap<(usize, usize), LastReadStatus>,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tpa_records: Vec<TpaRecord>,
+}
+
+/// Storage a third party application keeps next to a user, one record per
+/// keyword, plus one per conference the application wrote for.
+#[derive(Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct TpaRecord {
+    pub keyword: String,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub data: String,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub conferences: Vec<TpaConferenceRecord>,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct TpaConferenceRecord {
+    pub conference: usize,
+    pub data: String,
 }
 
 #[bitflag(u8)]
@@ -655,6 +680,54 @@ mod conference_flags_format {
 impl User {
     pub fn get_name(&self) -> &String {
         &self.name
+    }
+
+    /// A keyword a third party application never wrote reads back as empty.
+    pub fn get_tpa(&self, keyword: &str) -> &str {
+        match self.find_tpa(keyword) {
+            Some(record) => &record.data,
+            None => "",
+        }
+    }
+
+    pub fn set_tpa(&mut self, keyword: &str, data: &str) {
+        self.tpa_record_mut(keyword).data = data.to_string();
+    }
+
+    pub fn get_conference_tpa(&self, keyword: &str, conference: usize) -> &str {
+        let Some(record) = self.find_tpa(keyword) else {
+            return "";
+        };
+        match record.conferences.iter().find(|c| c.conference == conference) {
+            Some(entry) => &entry.data,
+            None => "",
+        }
+    }
+
+    pub fn set_conference_tpa(&mut self, keyword: &str, conference: usize, data: &str) {
+        let record = self.tpa_record_mut(keyword);
+        match record.conferences.iter_mut().find(|c| c.conference == conference) {
+            Some(entry) => entry.data = data.to_string(),
+            None => record.conferences.push(TpaConferenceRecord {
+                conference,
+                data: data.to_string(),
+            }),
+        }
+    }
+
+    fn find_tpa(&self, keyword: &str) -> Option<&TpaRecord> {
+        self.tpa_records.iter().find(|r| r.keyword.eq_ignore_ascii_case(keyword))
+    }
+
+    fn tpa_record_mut(&mut self, keyword: &str) -> &mut TpaRecord {
+        if let Some(index) = self.tpa_records.iter().position(|r| r.keyword.eq_ignore_ascii_case(keyword)) {
+            return &mut self.tpa_records[index];
+        }
+        self.tpa_records.push(TpaRecord {
+            keyword: keyword.to_string(),
+            ..Default::default()
+        });
+        self.tpa_records.last_mut().unwrap()
     }
 
     pub fn get_first_name(&self) -> String {
@@ -846,6 +919,7 @@ impl User {
             qwk_config,
             account,
             bank,
+            tpa_records: Vec::new(),
 
             bus_data_phone: u.user.bus_data_phone.clone(),
             home_voice_phone: u.user.home_voice_phone.clone(),
