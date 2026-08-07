@@ -1302,8 +1302,9 @@ pub async fn u_inconf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     Ok(VariableValue::new_bool(false))
 }
 
+/// There is no memory to read, and a PPE polling a VGA register here spins until the
+/// value changes, so it gets a fresh number rather than a constant it would wait on.
 pub async fn peekdw(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    log::error!("simulating not implementable function 'peekdw' (random number)!");
     Ok(VariableValue::new_int(fastrand::i32(..)))
 }
 

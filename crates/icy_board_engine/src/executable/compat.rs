@@ -53,7 +53,7 @@ pub const UNIMPLEMENTED_STATEMENTS: &[&str] = &[
 pub const PARTIAL_STATEMENTS: &[&str] = &["DLOCK", "DLOCKR", "DLOCKG", "DUNLOCK"];
 
 /// Functions that exist but intentionally return a placeholder.
-pub const UNSUPPORTED_FUNCTIONS: &[&str] = &["GETDRIVE", "SETDRIVE", "MODEM"];
+pub const UNSUPPORTED_FUNCTIONS: &[&str] = &["GETDRIVE", "SETDRIVE", "MODEM", "PEEKDW"];
 
 /// Functions stubbed with `unimplemented_function!`.
 pub const UNIMPLEMENTED_FUNCTIONS: &[&str] = &[
