@@ -5,7 +5,14 @@ use std::{
 };
 
 use argh::FromArgs;
-use dizbase::file_base::{FileBase, file_header::FileHeader};
+use dizbase::{
+    file_base::{FileBase, file_header::FileHeader},
+    file_base_scanner::{
+        bbstro_fingerprint::FingerprintData,
+        repack::{RepackOptions, Repacked, repack_file},
+        scan_file,
+    },
+};
 use icy_board_engine::icy_board::{IcyBoardSerializer, file_directory::DirectoryList};
 
 mod listing;
@@ -31,6 +38,8 @@ enum Command {
     Import(Import),
     Export(Export),
     Set(Set),
+    Repack(Repack),
+    Fingerprints(Fingerprints),
 }
 
 #[derive(FromArgs)]
@@ -172,6 +181,44 @@ struct Set {
     locked: Option<bool>,
 }
 
+#[derive(FromArgs)]
+#[argh(subcommand, name = "repack")]
+/// rewrite the archives of an area as zip files, without the intros they carry
+struct Repack {
+    #[argh(positional)]
+    /// a file directory, or a file_areas.toml together with --area
+    target: PathBuf,
+
+    #[argh(option, short = 'a')]
+    /// area name or index when the target is a file_areas.toml
+    area: Option<String>,
+
+    #[argh(option, short = 'p')]
+    /// fingerprints of the intros to drop, as written by the fingerprints command
+    fingerprints: Option<PathBuf>,
+
+    #[argh(switch, short = 'n')]
+    /// report what would change without writing anything
+    dry_run: bool,
+
+    #[argh(switch)]
+    /// leave the case of the file names as it is
+    keep_case: bool,
+}
+
+#[derive(FromArgs)]
+#[argh(subcommand, name = "fingerprints")]
+/// record the files in a directory so that repack can recognise them again
+struct Fingerprints {
+    #[argh(positional)]
+    /// the directory holding the intros
+    input: PathBuf,
+
+    #[argh(option, short = 'o', default = "PathBuf::from(\"bbstros.toml\")")]
+    /// where to write the fingerprints
+    output: PathBuf,
+}
+
 enum Format {
     Auto,
     PcBoard,
@@ -219,6 +266,8 @@ fn run(cli: Cli) -> Res<()> {
         Command::Import(cmd) => import(&cmd),
         Command::Export(cmd) => export(open(&cmd.target, &cmd.area)?, cmd.output.as_deref()),
         Command::Set(cmd) => set(&cmd),
+        Command::Repack(cmd) => repack(&cmd),
+        Command::Fingerprints(cmd) => fingerprints(&cmd),
     }
 }
 
@@ -501,5 +550,110 @@ fn set(cmd: &Set) -> Res<()> {
     }
     base.save()?;
     println!("updated {}", cmd.file);
+    Ok(())
+}
+
+fn repack(cmd: &Repack) -> Res<()> {
+    let fingerprints = match &cmd.fingerprints {
+        Some(path) => FingerprintData::load(path).map_err(|err| format!("can't read {}: {}", path.display(), err))?,
+        None => FingerprintData::default(),
+    };
+    if fingerprints.is_empty() {
+        println!("no fingerprints given, archives are only converted");
+    }
+    let options = RepackOptions {
+        lowercase_names: !cmd.keep_case,
+        dry_run: cmd.dry_run,
+    };
+
+    let mut base = open(&cmd.target, &cmd.area)?;
+    let headers: Vec<FileHeader> = base.to_vec();
+    let (mut converted, mut stripped) = (0, 0);
+    let (mut before, mut after) = (0u64, 0u64);
+
+    for header in &headers {
+        let path = base.full_path(header);
+        if !path.exists() {
+            continue;
+        }
+        let result = match repack_file(&path, &fingerprints, &options) {
+            Ok(result) => result,
+            // One unreadable archive is no reason to leave the rest of the area alone.
+            Err(err) => {
+                eprintln!("{}: {}", header.name, err);
+                continue;
+            }
+        };
+        match result {
+            Repacked::Skipped(reason) => {
+                if reason != "not an archive" {
+                    println!("{}: skipped, {}", header.name, reason);
+                }
+            }
+            Repacked::Unchanged => {}
+            Repacked::Converted {
+                name,
+                removed,
+                before: was,
+                after: is,
+            } => {
+                converted += 1;
+                stripped += removed.len();
+                before += was;
+                after += is;
+                println!("{} -> {} ({} -> {} bytes)", header.name, name, was, is);
+                for member in &removed {
+                    println!("     dropped {}", member);
+                }
+                if !cmd.dry_run {
+                    adopt(&mut base, header, &name)?;
+                }
+            }
+        }
+    }
+
+    println!(
+        "{} archive(s) converted, {} member(s) dropped, {} bytes saved{}",
+        converted,
+        stripped,
+        before.saturating_sub(after),
+        if cmd.dry_run { " (dry run, nothing written)" } else { "" }
+    );
+    Ok(())
+}
+
+/// Carries an entry over to the archive that replaced it, so the area keeps its
+/// descriptions and download counts.
+fn adopt(base: &mut FileBase, old: &FileHeader, name: &str) -> Res<()> {
+    let old_path = base.dir().join(&old.name);
+    let new_path = base.dir().join(name);
+    let described = base.is_authored(&old_path)?.then(|| base.description(&old_path)).transpose()?.flatten();
+
+    if new_path != old_path {
+        base.remove_file(&old_path)?;
+        base.add_file(&new_path, scan_file(&new_path)?)?;
+    } else {
+        base.rescan(&new_path, true)?;
+    }
+    if let Some(described) = described {
+        base.set_description(&new_path, &described)?;
+    }
+    if let Some(header) = base.iter_mut().find(|header| header.name == name) {
+        header.dl_counter = old.dl_counter;
+        header.attribute = old.attribute;
+        header.date = old.date;
+        header.size = fs::metadata(&new_path)?.len();
+    }
+    base.save()?;
+    Ok(())
+}
+
+fn fingerprints(cmd: &Fingerprints) -> Res<()> {
+    if !cmd.input.is_dir() {
+        return Err(format!("{} is not a directory", cmd.input.display()).into());
+    }
+    let data = FingerprintData::scan_fingerprint_dir(&cmd.input)?;
+    data.save(&cmd.output)?;
+    println!("wrote the fingerprints of {} to {}", cmd.input.display(), cmd.output.display());
     Ok(())
 }
