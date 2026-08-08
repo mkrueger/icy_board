@@ -151,6 +151,6 @@ impl Workspace {
                 return language_version;
             }
         }
-        LAST_PPLC
+        self.runtime()
     }
 }

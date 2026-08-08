@@ -185,15 +185,27 @@ fn main() {
 
     let mut ws = Workspace::default();
     ws.hard_coded_files = Some(vec![PathBuf::from(&file_name)]);
+    apply_arguments(&mut ws, &arguments);
 
     compile_files(&arguments, encoding, &ws, &out_file_name);
 }
 
-fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {
-    let mut workspace = Workspace::load(file_name)?;
+/// The command line wins over the manifest, and a package that has none still needs these.
+fn apply_arguments(workspace: &mut Workspace, arguments: &Cli) {
     if let Some(runtime) = arguments.runtime {
         workspace.package.runtime = Some(runtime);
     }
+    if let Some(lang_version) = arguments.lang_version {
+        workspace.compiler.get_or_insert_with(CompilerData::default).language_version = Some(lang_version);
+    }
+    if let Some(defines) = &arguments.defines {
+        workspace.compiler.get_or_insert_with(CompilerData::default).defines = Some(defines.split(';').map(str::to_string).collect());
+    }
+}
+
+fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {
+    let mut workspace = Workspace::load(file_name)?;
+    apply_arguments(&mut workspace, arguments);
 
     let base_path = file_name.parent().unwrap();
     let encoding: Encoding = Encoding::Detect;
