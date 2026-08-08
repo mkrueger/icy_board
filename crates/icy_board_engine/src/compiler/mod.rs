@@ -1,6 +1,7 @@
 pub use ast_transform::*;
 use workspace::Workspace;
 pub mod ast_transform;
+pub mod optimizer;
 pub mod user_data;
 
 use std::{
@@ -23,6 +24,8 @@ use self::expr_compiler::ExpressionCompiler;
 
 pub mod expr_compiler;
 pub mod workspace;
+
+use optimizer::optimize_statements;
 
 #[derive(Error, Debug)]
 pub enum CompilationErrorType {
@@ -172,14 +175,14 @@ impl PPECompiler {
                     AstNode::TopLevelStatement(stmt) => {
                         // may get transformed by the ast transformer.
                         if let Statement::Block(block) = stmt {
-                            for s in block.get_statements() {
-                                self.compile_add_statement(s);
+                            for s in optimize_statements(block.get_statements()) {
+                                self.compile_add_statement(&s);
                             }
                         }
                     }
                     AstNode::Main(block) => {
-                        for s in block.get_statements() {
-                            self.compile_add_statement(s);
+                        for s in optimize_statements(block.get_statements()) {
+                            self.compile_add_statement(&s);
                         }
                     }
                 }
@@ -205,7 +208,7 @@ impl PPECompiler {
                     self.lookup_table.variable_table.get_var_entry_mut(idx).value.data.procedure_value.start_offset = self.cur_offset as u16 * 2;
 
                     self.lookup_table.start_compile_function_body(proc.get_identifier());
-                    proc.get_statements().iter().for_each(|s| {
+                    optimize_statements(proc.get_statements()).iter().for_each(|s| {
                         self.compile_add_statement(s);
                     });
                     self.lookup_table.end_compile_function_body();
@@ -220,7 +223,7 @@ impl PPECompiler {
                     };
                     self.lookup_table.variable_table.get_var_entry_mut(idx).value.data.function_value.start_offset = self.cur_offset as u16 * 2;
                     self.lookup_table.start_compile_function_body(func.get_identifier());
-                    func.get_statements().iter().for_each(|s| {
+                    optimize_statements(func.get_statements()).iter().for_each(|s| {
                         self.compile_add_statement(s);
                     });
                     self.lookup_table.end_compile_function_body();

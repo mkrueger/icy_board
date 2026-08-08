@@ -155,6 +155,49 @@ impl AstVisitorMut for OptimizationVisitor {
     }
 }
 
+/// A named constant is left alone so that it still reads as its name once decompiled.
+fn is_foldable_constant(expr: &Expression) -> bool {
+    match expr {
+        Expression::Const(constant) => !matches!(constant.get_constant_value(), Constant::Builtin(_)),
+        Expression::Parens(parens) => is_foldable_constant(parens.get_expression()),
+        Expression::Unary(unary) => is_foldable_constant(unary.get_expression()),
+        Expression::Binary(binary) => is_foldable_constant(binary.get_left_expression()) && is_foldable_constant(binary.get_right_expression()),
+        _ => false,
+    }
+}
+
+/// Replaces subexpressions that are made of constants with the value they evaluate to.
+/// Unlike `OptimizationVisitor` it touches nothing that still has an operand to evaluate,
+/// because that operand may be a call that the program relies on for its side effect.
+#[derive(Default)]
+pub struct ConstantFolder {}
+
+impl AstVisitorMut for ConstantFolder {
+    fn visit_unary_expression(&mut self, unary: &crate::ast::UnaryExpression) -> Expression {
+        if is_foldable_constant(unary.get_expression()) {
+            if let Some(value) = EvaluationVisitor::default().visit_unary_expression(unary) {
+                if let Some(expr) = value_to_expression(&value) {
+                    return expr;
+                }
+            }
+        }
+        Expression::Unary(UnaryExpression::empty(unary.get_op(), unary.get_expression().visit_mut(self)))
+    }
+
+    fn visit_binary_expression(&mut self, binary: &crate::ast::BinaryExpression) -> Expression {
+        if is_foldable_constant(binary.get_left_expression()) && is_foldable_constant(binary.get_right_expression()) {
+            if let Some(value) = EvaluationVisitor::default().visit_binary_expression(binary) {
+                if let Some(expr) = value_to_expression(&value) {
+                    return expr;
+                }
+            }
+        }
+        let left = binary.get_left_expression().visit_mut(self);
+        let right = binary.get_right_expression().visit_mut(self);
+        Expression::Binary(BinaryExpression::empty(left, binary.get_op(), right))
+    }
+}
+
 fn value_to_expression(value: &VariableValue) -> Option<Expression> {
     match value.get_type() {
         VariableType::Boolean => return Some(ConstantExpression::create_empty_expression(Constant::Boolean(value.as_bool()))),

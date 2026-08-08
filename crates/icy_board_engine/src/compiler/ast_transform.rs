@@ -6,7 +6,7 @@ use crate::{
         FunctionImplementation, GotoStatement, IdentifierExpression, IfStatement, LabelStatement, LetStatement, ReturnStatement, SelectStatement, Statement,
         VariableDeclarationStatement, VariableSpecifier, constant::NumberFormat,
     },
-    decompiler::evaluation_visitor::OptimizationVisitor,
+    decompiler::evaluation_visitor::{ConstantFolder, OptimizationVisitor},
     parser::lexer::{Spanned, Token},
 };
 
@@ -36,6 +36,26 @@ impl AstTransformationVisitor {
 }
 
 impl AstVisitorMut for AstTransformationVisitor {
+    fn visit_unary_expression(&mut self, unary: &crate::ast::UnaryExpression) -> Expression {
+        if self.optimize_output {
+            ConstantFolder::default().visit_unary_expression(unary)
+        } else {
+            Expression::Unary(crate::ast::UnaryExpression::empty(unary.get_op(), unary.get_expression().visit_mut(self)))
+        }
+    }
+
+    fn visit_binary_expression(&mut self, binary: &BinaryExpression) -> Expression {
+        if self.optimize_output {
+            ConstantFolder::default().visit_binary_expression(binary)
+        } else {
+            Expression::Binary(BinaryExpression::empty(
+                binary.get_left_expression().visit_mut(self),
+                binary.get_op(),
+                binary.get_right_expression().visit_mut(self),
+            ))
+        }
+    }
+
     fn visit_continue_statement(&mut self, _continue_stmt: &crate::ast::ContinueStatement) -> Statement {
         if self.continue_break_labels.is_empty() {
             return CommentAstNode::create_empty_statement("no continue block");
@@ -61,7 +81,7 @@ impl AstVisitorMut for AstTransformationVisitor {
         let mut statements = Vec::new();
         let if_exit_label = self.next_label();
         statements.push(IfStatement::create_empty_statement(
-            if_stmt.get_condition().negate_expression(),
+            if_stmt.get_condition().negate_expression().visit_mut(self),
             GotoStatement::create_empty_statement(if_exit_label.clone()),
         ));
         statements.push(if_stmt.get_statement().visit_mut(self));
@@ -76,7 +96,7 @@ impl AstVisitorMut for AstTransformationVisitor {
         let mut if_exit_label = self.next_label();
 
         statements.push(IfStatement::create_empty_statement(
-            if_then.get_condition().negate_expression(),
+            if_then.get_condition().negate_expression().visit_mut(self),
             GotoStatement::create_empty_statement(if_exit_label.clone()),
         ));
         statements.extend(if_then.get_statements().iter().map(|s| s.visit_mut(self)));
@@ -90,7 +110,7 @@ impl AstVisitorMut for AstTransformationVisitor {
 
             if_exit_label = self.next_label();
             statements.push(IfStatement::create_empty_statement(
-                else_if.get_condition().negate_expression(),
+                else_if.get_condition().negate_expression().visit_mut(self),
                 GotoStatement::create_empty_statement(if_exit_label.clone()),
             ));
             statements.extend(else_if.get_statements().iter().map(|s| s.visit_mut(self)));
@@ -120,7 +140,7 @@ impl AstVisitorMut for AstTransformationVisitor {
 
         statements.push(LabelStatement::create_empty_statement(continue_label.clone()));
         statements.push(IfStatement::create_empty_statement(
-            while_stmt.get_condition().negate_expression(),
+            while_stmt.get_condition().negate_expression().visit_mut(self),
             GotoStatement::create_empty_statement(break_label.clone()),
         ));
         statements.push(while_stmt.get_statement().visit_mut(self));
@@ -140,7 +160,7 @@ impl AstVisitorMut for AstTransformationVisitor {
 
         statements.push(LabelStatement::create_empty_statement(continue_label.clone()));
         statements.push(IfStatement::create_empty_statement(
-            while_do.get_condition().negate_expression(),
+            while_do.get_condition().negate_expression().visit_mut(self),
             GotoStatement::create_empty_statement(break_label.clone()),
         ));
         statements.extend(while_do.get_statements().iter().map(|s| s.visit_mut(self)));
@@ -165,7 +185,7 @@ impl AstVisitorMut for AstTransformationVisitor {
         statements.push(LabelStatement::create_empty_statement(continue_label.clone()));
 
         statements.push(IfStatement::create_empty_statement(
-            repeat_until.get_condition().negate_expression(),
+            repeat_until.get_condition().negate_expression().visit_mut(self),
             GotoStatement::create_empty_statement(loop_label.clone()),
         ));
         statements.push(LabelStatement::create_empty_statement(break_label.clone()));
