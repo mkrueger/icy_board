@@ -46,7 +46,11 @@ impl IcyBoardState {
                 let protect = cmd.func == MsgFunc::Protect;
                 let sec = self.get_board().await.config.sysop_command_level.protect_unprotect_messages.clone();
                 if self.check_sec(if protect { "P" } else { "U" }, &sec).await? {
-                    let (set, clear) = if protect { (attributes::MSG_PRIVATE, 0) } else { (0, attributes::MSG_PRIVATE) };
+                    let (set, clear) = if protect {
+                        (attributes::MSG_PRIVATE, 0)
+                    } else {
+                        (0, attributes::MSG_PRIVATE)
+                    };
                     if let Err(err) = message_base.set_attributes(number, set, clear) {
                         log::error!("Error changing the protection of message {number}: {err}");
                         self.display_text(IceText::MessageBaseError, display_flags::NEWLINE).await?;
@@ -147,14 +151,7 @@ impl IcyBoardState {
         }
     }
 
-    async fn copy_message_to_conference(
-        &mut self,
-        message_base: &JamMessageBase,
-        number: u32,
-        conference: u16,
-        area: usize,
-        moving: bool,
-    ) -> Res<bool> {
+    async fn copy_message_to_conference(&mut self, message_base: &JamMessageBase, number: u32, conference: u16, area: usize, moving: bool) -> Res<bool> {
         let Ok(header) = message_base.read_header(number) else {
             self.display_text(IceText::NoSuchMessageNumber, display_flags::NEWLINE).await?;
             return Ok(false);

@@ -22,11 +22,8 @@ impl IcyBoardState {
         if self.session.flagged_files.is_empty() {
             return Ok(true);
         }
-        self.display_text(
-            IceText::FilesAreFlagged,
-            display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL,
-        )
-        .await?;
+        self.display_text(IceText::FilesAreFlagged, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL)
+            .await?;
         let answer = self
             .input_field(
                 IceText::ContinueUpload,

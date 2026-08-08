@@ -36,7 +36,11 @@ impl IcyBoardState {
             return true;
         }
         let now = IcbTime::now().to_pcboard_time();
-        if start <= stop { now >= start && now <= stop } else { now >= start || now <= stop }
+        if start <= stop {
+            now >= start && now <= stop
+        } else {
+            now >= start || now <= stop
+        }
     }
 
     /// PCBoard offers the comment only to users who may leave one, and it goes

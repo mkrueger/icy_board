@@ -20,7 +20,10 @@ fn test_a_while_block_repeats_until_its_condition_fails() {
 
 #[test]
 fn test_break_leaves_a_while_block() {
-    assert_eq!(run_ppl("INTEGER i\ni = 0\nWHILE (TRUE) DO\n  i = i + 1\n  IF (i = 2) BREAK\nENDWHILE\nPRINT i"), "2");
+    assert_eq!(
+        run_ppl("INTEGER i\ni = 0\nWHILE (TRUE) DO\n  i = i + 1\n  IF (i = 2) BREAK\nENDWHILE\nPRINT i"),
+        "2"
+    );
 }
 
 #[test]
@@ -39,7 +42,10 @@ fn test_a_loop_that_starts_the_program_still_loops() {
 
 #[test]
 fn test_a_then_block_runs_only_when_its_condition_holds() {
-    assert_eq!(run_ppl("IF (1 = 1) THEN\n  PRINT \"yes\"\nENDIF\nIF (1 = 2) THEN\n  PRINT \"no\"\nENDIF"), "yes");
+    assert_eq!(
+        run_ppl("IF (1 = 1) THEN\n  PRINT \"yes\"\nENDIF\nIF (1 = 2) THEN\n  PRINT \"no\"\nENDIF"),
+        "yes"
+    );
 }
 
 #[test]

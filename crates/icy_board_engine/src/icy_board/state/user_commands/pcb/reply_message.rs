@@ -3,7 +3,6 @@ use jamjam::jam::attributes;
 
 use crate::icy_board::commands::CommandType;
 use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA};
-use crate::{Res, icy_board::state::IcyBoardState};
 use crate::icy_board::{
     icb_text::IceText,
     state::{
@@ -11,6 +10,7 @@ use crate::icy_board::{
         functions::{MASK_ASCII, display_flags},
     },
 };
+use crate::{Res, icy_board::state::IcyBoardState};
 
 impl IcyBoardState {
     pub async fn get_ret_receipt(&mut self) -> Res<bool> {

@@ -120,10 +120,7 @@ impl DbaseState {
         }
         // dBase opens a table positioned on its first record.
         let _ = db.goto(1);
-        let alias = db
-            .path()
-            .file_stem()
-            .map_or_else(String::new, |s| s.to_string_lossy().to_uppercase());
+        let alias = db.path().file_stem().map_or_else(String::new, |s| s.to_string_lossy().to_uppercase());
         self.channels[index] = Some(Box::new(DbaseChannel {
             db,
             alias,
@@ -438,9 +435,11 @@ impl DbaseState {
             return self.fail(channel);
         };
         let wanted = name.to_uppercase();
-        let Some(at) = slot.indexes.iter().position(|i| {
-            i.name.eq_ignore_ascii_case(&wanted) || i.path.file_stem().is_some_and(|s| s.to_string_lossy().eq_ignore_ascii_case(&wanted))
-        }) else {
+        let Some(at) = slot
+            .indexes
+            .iter()
+            .position(|i| i.name.eq_ignore_ascii_case(&wanted) || i.path.file_stem().is_some_and(|s| s.to_string_lossy().eq_ignore_ascii_case(&wanted)))
+        else {
             return self.fail(channel);
         };
         slot.indexes.remove(at);
@@ -514,5 +513,9 @@ fn format_value(field: &FieldInfo, value: &VariableValue) -> Option<Vec<u8>> {
 
 /// Appends `.DBF` when the PPE left the extension off.
 pub fn table_path(name: &str) -> String {
-    if Path::new(name).extension().is_some() { name.to_string() } else { format!("{name}.DBF") }
+    if Path::new(name).extension().is_some() {
+        name.to_string()
+    } else {
+        format!("{name}.DBF")
+    }
 }

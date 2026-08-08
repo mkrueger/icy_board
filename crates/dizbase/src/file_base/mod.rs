@@ -394,7 +394,8 @@ impl FileBase {
     pub fn rescan(&mut self, path: &Path, force: bool) -> crate::Result<()> {
         let id = self.file_headers[self.header_index(path)?].id;
         if force {
-            self.connection.execute("UPDATE files SET scanned = 0, authored = 0 WHERE id = ?1", params![id])?;
+            self.connection
+                .execute("UPDATE files SET scanned = 0, authored = 0 WHERE id = ?1", params![id])?;
         } else {
             self.connection.execute("UPDATE files SET scanned = 0 WHERE id = ?1", params![id])?;
         }
@@ -420,8 +421,7 @@ impl FileBase {
     pub fn save(&mut self) -> crate::Result<()> {
         let transaction = self.connection.transaction()?;
         {
-            let mut statement =
-                transaction.prepare("UPDATE files SET date = ?2, size = ?3, dl_counter = ?4, attribute = ?5 WHERE id = ?1")?;
+            let mut statement = transaction.prepare("UPDATE files SET date = ?2, size = ?3, dl_counter = ?4, attribute = ?5 WHERE id = ?1")?;
             for header in &self.file_headers {
                 statement.execute(params![
                     header.id,
@@ -663,7 +663,8 @@ mod tests {
 
     /// Two nodes hold the same area open at once, which the old format could not survive.
     #[test]
-    fn test_two_open_bases_can_both_write() {        let dir = TempDir::new().unwrap();
+    fn test_two_open_bases_can_both_write() {
+        let dir = TempDir::new().unwrap();
         write(&dir, "ALPHA.TXT", b"alpha");
         write(&dir, "BETA.TXT", b"beta");
 
@@ -671,14 +672,19 @@ mod tests {
         let mut node2 = base(&dir);
 
         node1
-            .write_metadata(&dir.path().join("ALPHA.TXT"), vec![MetadataHeader::new(MetadataType::Uploader, b"node1".to_vec())])
+            .write_metadata(
+                &dir.path().join("ALPHA.TXT"),
+                vec![MetadataHeader::new(MetadataType::Uploader, b"node1".to_vec())],
+            )
             .unwrap();
         node2
-            .write_metadata(&dir.path().join("BETA.TXT"), vec![MetadataHeader::new(MetadataType::Uploader, b"node2".to_vec())])
+            .write_metadata(
+                &dir.path().join("BETA.TXT"),
+                vec![MetadataHeader::new(MetadataType::Uploader, b"node2".to_vec())],
+            )
             .unwrap();
 
         assert_eq!(node2.read_metadata(&dir.path().join("ALPHA.TXT")).unwrap()[0].data, b"node1");
         assert_eq!(node1.read_metadata(&dir.path().join("BETA.TXT")).unwrap()[0].data, b"node2");
     }
 }
-

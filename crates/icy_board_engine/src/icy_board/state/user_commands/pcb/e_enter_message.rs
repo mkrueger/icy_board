@@ -9,8 +9,8 @@ use crate::icy_board::{
         functions::{MASK_ALPHA, MASK_ASCII, MASK_PWD, display_flags},
     },
 };
-use chrono::{DateTime, Utc};
 use bstr::BString;
+use chrono::{DateTime, Utc};
 use jamjam::jam::{
     attributes,
     msg_header::{MessageSubfield, SubfieldType},
@@ -19,10 +19,7 @@ use jamjam::jam::{
 /// PCBoard treats conference types 3 and 4 as "internet" for the routing,
 /// newsgroup and follow-up questions.
 fn is_usenet(conference_type: &ConferenceType) -> bool {
-    matches!(
-        conference_type,
-        ConferenceType::UsnetModeratedNewsgroup | ConferenceType::UsnetPublicNewsgroup
-    )
+    matches!(conference_type, ConferenceType::UsnetModeratedNewsgroup | ConferenceType::UsnetPublicNewsgroup)
 }
 
 /// Message options gathered from the security/return-receipt/echo prompts.
@@ -139,11 +136,7 @@ impl IcyBoardState {
 
         // Return receipt (getretreceipt) - only for receiver-only messages not addressed
         // to ALL and only if the user's security level allows requesting one.
-        if receiver_only
-            && !to_all
-            && self.session.current_conference.sec_request_rr.session_can_access(&self.session)
-            && self.get_ret_receipt().await?
-        {
+        if receiver_only && !to_all && self.session.current_conference.sec_request_rr.session_can_access(&self.session) && self.get_ret_receipt().await? {
             options.attributes |= attributes::MSG_RECEIPTREQ;
         }
 
@@ -176,14 +169,7 @@ impl IcyBoardState {
             return Ok(());
         }
         let route_to = self
-            .input_field(
-                IceText::RoutedTo,
-                60,
-                &MASK_ASCII,
-                "",
-                None,
-                display_flags::NEWLINE | display_flags::FIELDLEN,
-            )
+            .input_field(IceText::RoutedTo, 60, &MASK_ASCII, "", None, display_flags::NEWLINE | display_flags::FIELDLEN)
             .await?;
         if !route_to.is_empty() {
             options.sub_fields.push(MessageSubfield::new(SubfieldType::AddressD, BString::from(route_to)));

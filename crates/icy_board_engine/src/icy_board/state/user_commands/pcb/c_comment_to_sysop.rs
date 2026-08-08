@@ -54,7 +54,8 @@ impl IcyBoardState {
         if receipt == self.session.yes_char.to_uppercase().to_string() {
             msg_attributes |= attributes::MSG_RECEIPTREQ;
         }
-        self.write_message(-1, -1, &to, &subj, msg_attributes, None, None, Vec::new(), IceText::SavingComment).await?;
+        self.write_message(-1, -1, &to, &subj, msg_attributes, None, None, Vec::new(), IceText::SavingComment)
+            .await?;
 
         Ok(())
     }
@@ -127,7 +128,11 @@ impl IcyBoardState {
     /// preference is "ask".
     async fn prompt_use_fse(&mut self) -> Res<bool> {
         let ansi = self.session.disp_options.grapics_mode != GraphicsMode::Ctty;
-        let default = if self.session.expert_mode() && ansi { self.session.yes_char } else { self.session.no_char };
+        let default = if self.session.expert_mode() && ansi {
+            self.session.yes_char
+        } else {
+            self.session.no_char
+        };
         let mut answer = self
             .input_field(
                 IceText::UseFullScreen,
@@ -142,11 +147,8 @@ impl IcyBoardState {
         // The full screen editor requires ANSI - re-ask if selected without it.
         let yes = self.session.yes_char.to_uppercase().to_string();
         if answer == yes && !ansi {
-            self.display_text(
-                IceText::RequiresAnsi,
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
-            )
-            .await?;
+            self.display_text(IceText::RequiresAnsi, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER)
+                .await?;
             answer = self
                 .input_field(
                     IceText::UseFullScreen,

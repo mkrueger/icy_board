@@ -2420,10 +2420,7 @@ pub async fn move_msg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     let from_conf = vm.icy_board_state.session.current_conference_number as i32;
     let from_area = vm.icy_board_state.session.current_message_area as i32;
 
-    let (Some(source_path), Some(target_path)) = (
-        vm.message_base_path(from_conf, from_area).await,
-        vm.message_base_path(to_conf, to_area).await,
-    ) else {
+    let (Some(source_path), Some(target_path)) = (vm.message_base_path(from_conf, from_area).await, vm.message_base_path(to_conf, to_area).await) else {
         log::error!("MOVE_MSG: no message base {from_conf}:{from_area} or {to_conf}:{to_area}");
         return Ok(());
     };

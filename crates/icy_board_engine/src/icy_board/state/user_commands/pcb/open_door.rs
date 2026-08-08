@@ -115,11 +115,8 @@ impl IcyBoardState {
 
         // Running a door drops the flag list, so give the user a way out.
         if !self.session.flagged_files.is_empty() {
-            self.display_text(
-                IceText::FilesAreFlagged,
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL,
-            )
-            .await?;
+            self.display_text(IceText::FilesAreFlagged, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL)
+                .await?;
             self.session.op_text = door.name.clone();
             let answer = self
                 .input_field(

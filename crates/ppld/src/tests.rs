@@ -178,5 +178,10 @@ fn decompiled_source_settles_after_one_pass() {
     }
 
     assert!(checked > 0, "no .ppe files found in test_data");
-    assert!(failures.is_empty(), "{} of {checked} files did not settle:\n{}", failures.len(), failures.join("\n"));
+    assert!(
+        failures.is_empty(),
+        "{} of {checked} files did not settle:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
 }

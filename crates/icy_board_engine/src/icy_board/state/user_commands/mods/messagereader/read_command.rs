@@ -198,9 +198,9 @@ impl Default for ReadCommand {
 }
 
 const OPTIONS: [&str; 42] = [
-    "ALL", "ALIAS", "BYE", "CHAT", "COPY", "DESELECT", "EDIT", "FF", "FT", "FLAG", "FORWARD", "FROM", "GB", "HELP", "JUMP", "KILL", "LONG", "MOVE",
-    "NEXT", "NET", "PREV", "QWK", "REPLY", "RM", "RM+", "RM-", "RO", "RR", "RR+", "RR-", "SELECT", "SET", "SHORT", "SKIP", "T+", "T-", "TO", "TS",
-    "USER", "WAIT", "WHO", "YA",
+    "ALL", "ALIAS", "BYE", "CHAT", "COPY", "DESELECT", "EDIT", "FF", "FT", "FLAG", "FORWARD", "FROM", "GB", "HELP", "JUMP", "KILL", "LONG", "MOVE", "NEXT",
+    "NET", "PREV", "QWK", "REPLY", "RM", "RM+", "RM-", "RO", "RR", "RR+", "RR-", "SELECT", "SET", "SHORT", "SKIP", "T+", "T-", "TO", "TS", "USER", "WAIT",
+    "WHO", "YA",
 ];
 
 const O_ALL: usize = 0;
@@ -252,9 +252,9 @@ fn option(input: &str) -> Option<usize> {
     if input.is_empty() {
         return None;
     }
-    OPTIONS.iter().position(|word| {
-        word.starts_with(input) && (input.len() + 1 >= word.len() || (input.len() >= 2 && word.len() >= 3))
-    })
+    OPTIONS
+        .iter()
+        .position(|word| word.starts_with(input) && (input.len() + 1 >= word.len() || (input.len() >= 2 && word.len() >= 3)))
 }
 
 /// Digits, with `+` or `-` allowed once a digit
@@ -397,7 +397,11 @@ pub fn parse(tokens: &[String], flag: ReadLoop, ctx: &ParseContext) -> ReadComma
                     cmd.valid_cmd = true;
                 }
                 'E' => {
-                    cmd.func = if flag == ReadLoop::Inside { MsgFunc::EditHeader } else { MsgFunc::EnterMessage };
+                    cmd.func = if flag == ReadLoop::Inside {
+                        MsgFunc::EditHeader
+                    } else {
+                        MsgFunc::EnterMessage
+                    };
                     cmd.valid_cmd = true;
                 }
                 'F' => {
@@ -696,7 +700,10 @@ pub fn parse(tokens: &[String], flag: ReadLoop, ctx: &ParseContext) -> ReadComma
                 cmd.valid_cmd = true;
                 cmd.set_last_read = true;
                 // The next token is only swallowed when it is the number itself.
-                if iter.peek().is_some_and(|(_, next)| !next.is_empty() && next.chars().all(|c| c.is_ascii_digit())) {
+                if iter
+                    .peek()
+                    .is_some_and(|(_, next)| !next.is_empty() && next.chars().all(|c| c.is_ascii_digit()))
+                {
                     let (_, next) = iter.next().unwrap();
                     cmd.new_last_read = next.parse::<i64>().ok();
                 }
@@ -864,11 +871,7 @@ mod tests {
         let cmd = parse_outside("5 9 12");
         assert_eq!(
             cmd.numbers,
-            vec![
-                MsgRange { first: 5, last: 5 },
-                MsgRange { first: 9, last: 9 },
-                MsgRange { first: 12, last: 12 }
-            ]
+            vec![MsgRange { first: 5, last: 5 }, MsgRange { first: 9, last: 9 }, MsgRange { first: 12, last: 12 }]
         );
     }
 
@@ -882,7 +885,13 @@ mod tests {
 
     #[test]
     fn plus_and_minus_are_relative_inside_the_read_loop() {
-        assert_eq!(parse_inside("+").numbers, vec![MsgRange { first: 101, last: LAST_MESSAGE }]);
+        assert_eq!(
+            parse_inside("+").numbers,
+            vec![MsgRange {
+                first: 101,
+                last: LAST_MESSAGE
+            }]
+        );
         assert_eq!(parse_inside("-").numbers, vec![MsgRange { first: 99, last: 1 }]);
     }
 
@@ -1008,7 +1017,13 @@ mod tests {
     fn threading_adds_a_range_in_the_chosen_direction() {
         let cmd = parse_inside("T+");
         assert!(cmd.threading);
-        assert_eq!(cmd.numbers, vec![MsgRange { first: 101, last: LAST_MESSAGE }]);
+        assert_eq!(
+            cmd.numbers,
+            vec![MsgRange {
+                first: 101,
+                last: LAST_MESSAGE
+            }]
+        );
 
         let cmd = parse_inside("T-");
         assert!(cmd.threading);

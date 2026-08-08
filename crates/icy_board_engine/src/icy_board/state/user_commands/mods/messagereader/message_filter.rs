@@ -84,11 +84,7 @@ impl MessageFilter {
         let from = field(header.get_from());
         let subject = field(header.get_subject());
 
-        if !self.any_msgs
-            && !(self.your_msgs && self.is_own(&to)
-                || self.from_msgs && self.is_own(&from)
-                || self.msgs_to_all && to == "ALL")
-        {
+        if !self.any_msgs && !(self.your_msgs && self.is_own(&to) || self.from_msgs && self.is_own(&from) || self.msgs_to_all && to == "ALL") {
             return false;
         }
         if self.unread_only && header.message_number <= last_read {

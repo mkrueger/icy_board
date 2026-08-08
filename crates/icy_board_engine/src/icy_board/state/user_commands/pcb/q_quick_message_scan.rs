@@ -31,7 +31,8 @@ impl IcyBoardState {
             self.display_text(IceText::PathErrorInSystemConfiguration, display_flags::NEWLINE | display_flags::LFAFTER)
                 .await?;
             return Ok(());
-        };        match JamMessageBase::open(&message_base_file) {
+        };
+        match JamMessageBase::open(&message_base_file) {
             Ok(message_base) => {
                 self.show_quick_scans(self.session.current_message_area, message_base).await?;
                 Ok(())

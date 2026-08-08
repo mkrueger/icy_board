@@ -204,9 +204,7 @@ impl IcyBoardState {
         }
 
         if settings.ask_use_short_descr {
-            new_user.flags.use_short_filedescr = self
-                .ask_yes_no(IceText::UseShortDescription, new_user.flags.use_short_filedescr)
-                .await?;
+            new_user.flags.use_short_filedescr = self.ask_yes_no(IceText::UseShortDescription, new_user.flags.use_short_filedescr).await?;
         }
 
         // Only offered to users who may join conferences, and suppressed when

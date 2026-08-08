@@ -297,4 +297,3 @@ fn a_memo_field_is_rejected_like_pcboard_rejects_it() {
     );
     assert_eq!(output, "fields=0 stat=1\n");
 }
-

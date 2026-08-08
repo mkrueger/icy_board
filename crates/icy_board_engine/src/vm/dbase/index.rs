@@ -110,5 +110,9 @@ impl DbaseIndex {
 
 /// Appends `.NDX` when the PPE left the extension off.
 pub fn index_path(name: &str) -> String {
-    if Path::new(name).extension().is_some() { name.to_string() } else { format!("{name}.NDX") }
+    if Path::new(name).extension().is_some() {
+        name.to_string()
+    } else {
+        format!("{name}.NDX")
+    }
 }

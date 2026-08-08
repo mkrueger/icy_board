@@ -37,5 +37,3 @@ pub fn scan_file_contents(path: &std::path::PathBuf) -> crate::Result<Vec<FileIn
 
     Ok(info)
 }
-
-

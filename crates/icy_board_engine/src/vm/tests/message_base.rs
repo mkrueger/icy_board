@@ -1,6 +1,6 @@
 //! The message base opcodes, checked through what a PPE can observe of them.
 
-use super::{run_ppl_with_messages, run_ppl_on};
+use super::{run_ppl_on, run_ppl_with_messages};
 
 const MESSAGES: &[(&str, &str, &str)] = &[
     ("SYSOP", "STAN", "Welcome aboard"),
@@ -44,10 +44,7 @@ fn test_setmsghdr_changes_a_field_that_getmsghdr_reads_back() {
 #[test]
 fn test_setmsghdr_leaves_the_other_messages_alone() {
     assert_eq!(
-        run_ppl_with_messages(
-            "INTEGER n\nn = SETMSGHDR(0, 2, HDR_TO, \"NOBODY\")\nPRINT GETMSGHDR(0, 1, HDR_TO)",
-            MESSAGES
-        ),
+        run_ppl_with_messages("INTEGER n\nn = SETMSGHDR(0, 2, HDR_TO, \"NOBODY\")\nPRINT GETMSGHDR(0, 1, HDR_TO)", MESSAGES),
         "STAN"
     );
 }
@@ -60,18 +57,12 @@ fn test_setmsghdr_reports_zero_for_a_message_that_is_not_there() {
 #[test]
 fn test_killmsg_marks_the_message_inactive() {
     // An active message reads back as 225, a killed one as 226.
-    assert_eq!(
-        run_ppl_with_messages("KILLMSG 0, 2\nPRINT GETMSGHDR(0, 2, HDR_ACTIVE)", MESSAGES),
-        "226"
-    );
+    assert_eq!(run_ppl_with_messages("KILLMSG 0, 2\nPRINT GETMSGHDR(0, 2, HDR_ACTIVE)", MESSAGES), "226");
 }
 
 #[test]
 fn test_a_message_that_was_not_killed_stays_active() {
-    assert_eq!(
-        run_ppl_with_messages("KILLMSG 0, 2\nPRINT GETMSGHDR(0, 1, HDR_ACTIVE)", MESSAGES),
-        "225"
-    );
+    assert_eq!(run_ppl_with_messages("KILLMSG 0, 2\nPRINT GETMSGHDR(0, 1, HDR_ACTIVE)", MESSAGES), "225");
 }
 
 #[test]
@@ -94,38 +85,23 @@ fn test_move_msg_copies_the_message_into_the_other_conference() {
 
 #[test]
 fn test_a_copy_leaves_the_original_where_it_was() {
-    assert_eq!(
-        run_ppl_with_messages("MOVEMSG 1, 2, FALSE\nPRINT GETMSGHDR(0, 2, HDR_ACTIVE)", MESSAGES),
-        "225"
-    );
+    assert_eq!(run_ppl_with_messages("MOVEMSG 1, 2, FALSE\nPRINT GETMSGHDR(0, 2, HDR_ACTIVE)", MESSAGES), "225");
 }
 
 #[test]
 fn test_a_move_takes_the_original_away() {
-    assert_eq!(
-        run_ppl_with_messages("MOVEMSG 1, 2, TRUE\nPRINT GETMSGHDR(0, 2, HDR_ACTIVE)", MESSAGES),
-        "226"
-    );
+    assert_eq!(run_ppl_with_messages("MOVEMSG 1, 2, TRUE\nPRINT GETMSGHDR(0, 2, HDR_ACTIVE)", MESSAGES), "226");
 }
 
 #[test]
 fn test_opencap_reports_a_capture_it_could_not_open() {
     // A directory that does not exist cannot hold a capture file.
-    assert_eq!(
-        run_ppl_on(
-            "BOOLEAN ok\nOPENCAP \"no/such/place/CAP\", ok\nPRINT ok",
-            |_| {}
-        ),
-        "0"
-    );
+    assert_eq!(run_ppl_on("BOOLEAN ok\nOPENCAP \"no/such/place/CAP\", ok\nPRINT ok", |_| {}), "0");
 }
 
 #[test]
 fn test_opencap_captures_what_the_caller_sees() {
-    let output = run_ppl_on(
-        "BOOLEAN ok\nOPENCAP \"CAP\", ok\nPRINT \"captured\"\nCLOSECAP\nPRINTLN\nPRINT ok",
-        |_| {},
-    );
+    let output = run_ppl_on("BOOLEAN ok\nOPENCAP \"CAP\", ok\nPRINT \"captured\"\nCLOSECAP\nPRINTLN\nPRINT ok", |_| {});
     // The capture is a tee, so the caller still sees the text as well.
     assert_eq!(output, "captured\n1");
 }

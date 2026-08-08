@@ -305,8 +305,7 @@ impl IcyBoardState {
                 let last_read = self.last_read_pointer(&mut message_base)?;
                 let high = base_number.saturating_add(active_messages).saturating_sub(1).max(base_number);
                 if last_read >= high {
-                    self.display_text(IceText::NoMailFound, display_flags::NEWLINE | display_flags::LFAFTER)
-                        .await?;
+                    self.display_text(IceText::NoMailFound, display_flags::NEWLINE | display_flags::LFAFTER).await?;
                     continue;
                 }
                 if let Some(range) = cmd.numbers.first_mut() {
@@ -349,7 +348,8 @@ impl IcyBoardState {
         }
     }
 
-    pub(crate) async fn read_parse_context(&mut self, reply_to: i64) -> ParseContext {        ParseContext {
+    pub(crate) async fn read_parse_context(&mut self, reply_to: i64) -> ParseContext {
+        ParseContext {
             cur_msg_number: self.session.current_messagenumber as i64,
             memorized: self
                 .session
@@ -390,7 +390,12 @@ impl IcyBoardState {
                 "",
                 "",
                 Some(self.session.yes_char.to_uppercase().to_string()),
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::GUIDE | display_flags::UPCASE | display_flags::YESNO,
+                display_flags::NEWLINE
+                    | display_flags::LFBEFORE
+                    | display_flags::FIELDLEN
+                    | display_flags::GUIDE
+                    | display_flags::UPCASE
+                    | display_flags::YESNO,
             )
             .await?;
         }

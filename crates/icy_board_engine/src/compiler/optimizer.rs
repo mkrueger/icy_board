@@ -116,8 +116,8 @@ mod tests {
     use super::optimize_statements;
     use crate::{
         ast::{
-            Constant, ConstantExpression, GotoStatement, IfStatement, LabelStatement, PredefinedCallStatement, Statement,
-            VariableDeclarationStatement, VariableSpecifier,
+            Constant, ConstantExpression, GotoStatement, IfStatement, LabelStatement, PredefinedCallStatement, Statement, VariableDeclarationStatement,
+            VariableSpecifier,
         },
         executable::{OpCode, VariableType},
     };

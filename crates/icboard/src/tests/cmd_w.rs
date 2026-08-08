@@ -35,10 +35,7 @@ fn test_cmd_w_prompt_order() {
 #[test]
 fn test_cmd_w_empty_password_skips_confirmation() {
     let output = test_output(format!("W\n{}", "\n".repeat(30)), |_| {});
-    assert!(
-        !output.contains("Re-Enter"),
-        "an empty password must not ask for a confirmation:\n{output}"
-    );
+    assert!(!output.contains("Re-Enter"), "an empty password must not ask for a confirmation:\n{output}");
 }
 
 fn assert_prompt_order(output: &str, prompts: &[&str]) {

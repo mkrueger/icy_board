@@ -250,10 +250,7 @@ fn open(target: &Path, area: &Option<String>) -> Res<FileBase> {
     FileBase::open(&path, metadata_path)
 }
 
-fn select_area<'a>(
-    list: &'a DirectoryList,
-    selector: &str,
-) -> Res<&'a icy_board_engine::icy_board::file_directory::FileDirectory> {
+fn select_area<'a>(list: &'a DirectoryList, selector: &str) -> Res<&'a icy_board_engine::icy_board::file_directory::FileDirectory> {
     if let Ok(index) = selector.parse::<usize>() {
         return list
             .get(index)
@@ -399,7 +396,10 @@ fn import(cmd: &Import) -> Res<()> {
     }
 
     if cmd.dry_run {
-        println!("\ndry run: {} description(s) would be set, {} kept, {} not in the directory", imported, skipped, unknown);
+        println!(
+            "\ndry run: {} description(s) would be set, {} kept, {} not in the directory",
+            imported, skipped, unknown
+        );
     } else {
         base.save()?;
         println!("\nimported {} description(s), kept {}, {} not in the directory", imported, skipped, unknown);
