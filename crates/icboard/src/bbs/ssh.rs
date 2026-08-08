@@ -4,7 +4,6 @@ use crate::Res;
 use async_trait::async_trait;
 use icy_board_engine::icy_board::{IcyBoard, bbs::BBS, login_server::SSH};
 use icy_net::{Connection, ConnectionType};
-use internal_russh_forked_ssh_key::{Certificate, PublicKey};
 use rand::rngs::StdRng;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -14,7 +13,8 @@ use tokio::{
 
 use russh::{
     Channel, ChannelStream, Preferred, cipher, kex,
-    server::{self, Msg, Session},
+    keys::{Certificate, PublicKey},
+    server::{self, ChannelOpenHandle, Msg, Session},
 };
 
 use super::handle_client;
@@ -94,7 +94,7 @@ impl server::Server for Server {
 impl server::Handler for SshSession {
     type Error = russh::Error;
 
-    async fn channel_open_session(&mut self, channel: Channel<Msg>, session: &mut Session) -> Result<bool, Self::Error> {
+    async fn channel_open_session(&mut self, channel: Channel<Msg>, reply: ChannelOpenHandle, session: &mut Session) -> Result<(), Self::Error> {
         let bbs2 = self.bbs.clone();
         let node = self.bbs.lock().await.create_new_node(ConnectionType::SSH).await;
         let node_list = self.bbs.lock().await.get_open_connections().await.clone();
@@ -119,7 +119,8 @@ impl server::Handler for SshSession {
 
         self.bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
 
-        Ok(true)
+        reply.accept().await;
+        Ok(())
     }
 
     async fn auth_password(&mut self, _user: &str, _password: &str) -> Result<server::Auth, Self::Error> {

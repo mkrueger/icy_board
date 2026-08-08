@@ -52,7 +52,7 @@ impl PatternExpr {
                 Err(_) => return Err(Box::new(ParseError::ParseTokenError)),
             }
         }
-        match parser().parse(tokens) {
+        match parser().parse(tokens.as_slice()).into_result() {
             Ok(ok) => Ok(ok),
             Err(_err) => Err(Box::new(ParseError::ParserError)),
         }
@@ -68,11 +68,10 @@ impl PatternExpr {
     }
 }
 
-#[allow(clippy::let_and_return)]
-fn parser() -> impl Parser<Token, PatternExpr, Error = Simple<Token>> {
+fn parser<'a>() -> impl Parser<'a, &'a [Token], PatternExpr, extra::Err<Simple<'a, Token>>> {
     recursive(|p| {
         let atom = {
-            let parenthesized = p.clone().delimited_by(just(Token::LParen), just(Token::RParen));
+            let parenthesized = p.delimited_by(just(Token::LParen), just(Token::RParen));
 
             let identifier = select! {
                 Token::Identifier(n) => PatternExpr::Match(n),
@@ -80,19 +79,14 @@ fn parser() -> impl Parser<Token, PatternExpr, Error = Simple<Token>> {
 
             parenthesized.or(identifier)
         };
-        let unary = just(Token::Not)
-            .repeated()
-            .then(atom)
-            .foldr(|_op, rhs: PatternExpr| PatternExpr::Not(Box::new(rhs)));
-        let binary = unary
+        let unary = just(Token::Not).repeated().foldr(atom, |_op, rhs| PatternExpr::Not(Box::new(rhs)));
+        unary
             .clone()
-            .then(just(Token::And).or(just(Token::Or)).then(unary).repeated())
-            .foldl(|lhs, (op, rhs)| match op {
+            .foldl(just(Token::And).or(just(Token::Or)).then(unary).repeated(), |lhs, (op, rhs)| match op {
                 Token::And => PatternExpr::And(Box::new(lhs), Box::new(rhs)),
                 Token::Or => PatternExpr::Or(Box::new(lhs), Box::new(rhs)),
                 _ => unreachable!(),
-            });
-        binary
+            })
     })
     .then_ignore(end())
 }

@@ -45,5 +45,4 @@ async-recursion = { workspace = true }
 rand = { workspace = true }
 
 russh = { workspace = true }
-internal-russh-forked-ssh-key = { workspace = true }
 async-trait = { workspace = true }

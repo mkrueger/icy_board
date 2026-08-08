@@ -33,7 +33,7 @@ jamjam = { workspace = true }
 bstr = { workspace = true }
 
 strum = { workspace = true }
-strum_macros = "0.27.2"
+strum_macros = { workspace = true }
 serde-inline-default = "1.0.0"
 
 async-recursion =  { workspace = true }
@@ -41,17 +41,19 @@ radix_fmt = "1"
 byteorder = "1.5.0"
 toml = { workspace = true }
 async-trait =  { workspace = true }
-logos = "0.15.0"
+logos = "0.16.1"
 humanize-bytes = "1.0.5"
-reqwest = { version = "0.12", features = ["json", "blocking"] }
+reqwest = { version = "0.13", features = ["json", "blocking"] }
 md5 = "0.8.0"
-temp-file = "0.1.9"
+temp-file = "0.2.0"
 glob = "0.3.2"
-chumsky = "0.9.3"
+chumsky = "0.13.0"
 creditcard = "0.1.0"
 zip = { workspace = true }
 argon2 = "0.5.3"
-bcrypt = "0.17.1"
+# argon2 re-exports OsRng, but only if someone asks rand_core for it.
+rand_core = { version = "0.6", features = ["getrandom"] }
+bcrypt = "0.19.3"
 fs4 = "1"
 
 # interpreter deps

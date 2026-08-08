@@ -15,7 +15,7 @@ regex = { workspace = true }
 
 zip = { workspace = true }
 unarc-rs = { git = "https://github.com/mkrueger/unarc-rs" }
-rusqlite = { version = "0.37", features = ["bundled"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
 twox-hash = { version="2.1.0", features=["xxhash3_64", "std"] }
 
 icy_sauce = { git = "https://github.com/mkrueger/icy_sauce" }

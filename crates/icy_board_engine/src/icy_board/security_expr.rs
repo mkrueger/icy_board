@@ -131,8 +131,8 @@ impl serde::Serialize for SecurityExpression {
 #[logos(skip r"[ \t\n\f]+")] // Ignore this regex pattern between tokens
 enum Token {
     // Tokens can be literal strings, of any length.
-    #[token("true", |_| true, ignore(ascii_case))]
-    #[token("false", |_| false, ignore(ascii_case))]
+    #[token("true", |_| true, ignore(case))]
+    #[token("false", |_| false, ignore(case))]
     Bool(bool),
 
     #[token("!")]
