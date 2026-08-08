@@ -269,7 +269,17 @@ impl<'a> Page for DirsEditor<'a> {
                                             .collect::<Vec<ComboBoxValue>>(),
                                     }),
                                 )
-                                .with_label_width(16),
+                                .with_label_width(16)
+                                .with_update_combobox_value(
+                                    &|(i, list): &(usize, Arc<Mutex<DirectoryList>>), value: &ComboBox| {
+                                        let sort_order = match value.cur_value.value.as_str() {
+                                            "NoSort" => SortOrder::NoSort,
+                                            "FileDate" => SortOrder::FileDate,
+                                            _ => SortOrder::FileName,
+                                        };
+                                        list.lock().unwrap()[*i].sort_order = sort_order;
+                                    },
+                                ),
                             ),
                             ConfigEntry::Item(
                                 ListItem::new(get_text("dirs_edit_sort_asc"), ListValue::Bool(item.sort_direction == SortDirection::Ascending))

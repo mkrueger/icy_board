@@ -34,7 +34,7 @@ pub struct GroupEditor {
     _old_groups: GroupList,
     in_edit_mode: bool,
 
-    conference_config: ConfigMenu<u32>,
+    conference_config: ConfigMenu<(usize, Arc<Mutex<IcyBoard>>)>,
     state: ConfigMenuState,
     edit_conference: usize,
 }
@@ -48,7 +48,10 @@ impl GroupEditor {
             icy_board: icy_board.clone(),
             _old_groups: old_groups,
             in_edit_mode: false,
-            conference_config: ConfigMenu { obj: 0, entry: vec![] },
+            conference_config: ConfigMenu {
+                obj: (0, icy_board.clone()),
+                entry: vec![],
+            },
             state: ConfigMenuState::default(),
             edit_conference: 0,
         }
@@ -177,11 +180,23 @@ impl GroupEditor {
         let ib = self.icy_board.lock().unwrap();
         let group = ib.groups.get(index).unwrap();
         let items = vec![
-            ConfigEntry::Item(ListItem::new("Name".to_string(), ListValue::Text(60, TextFlags::None, group.name.to_string())).with_label_width(14)),
             ConfigEntry::Item(
-                ListItem::new("Members".to_string(), ListValue::Text(60, TextFlags::None, group.members.join(",").to_string())).with_label_width(14),
+                ListItem::new("Name".to_string(), ListValue::Text(60, TextFlags::None, group.name.to_string()))
+                    .with_label_width(14)
+                    .with_update_text_value(&|(i, board): &(usize, Arc<Mutex<IcyBoard>>), value: String| {
+                        board.lock().unwrap().groups[*i].name = value;
+                    }),
+            ),
+            ConfigEntry::Item(
+                ListItem::new("Members".to_string(), ListValue::Text(60, TextFlags::None, group.members.join(",").to_string()))
+                    .with_label_width(14)
+                    .with_update_text_value(&|(i, board): &(usize, Arc<Mutex<IcyBoard>>), value: String| {
+                        board.lock().unwrap().groups[*i].members = value.split(',').map(|m| m.trim().to_string()).filter(|m| !m.is_empty()).collect();
+                    }),
             ),
         ];
+        drop(ib);
+        self.conference_config.obj = (index, self.icy_board.clone());
         self.conference_config.entry = items;
     }
 

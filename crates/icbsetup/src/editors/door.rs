@@ -39,7 +39,7 @@ pub struct DoorEditor<'a> {
     door_list_orig: DoorList,
     door_list: Arc<Mutex<DoorList>>,
 
-    menu: ConfigMenu<u32>,
+    menu: ConfigMenu<Arc<Mutex<DoorList>>>,
     menu_state: ConfigMenuState,
     mode: EditCommandMode,
 
@@ -69,17 +69,37 @@ impl<'a> DoorEditor<'a> {
             "BBSLink credentials".to_string(),
             vec![
                 ConfigEntry::Item(
-                    ListItem::new("System Code".to_string(), ListValue::Text(25, TextFlags::None, bbs_link.system_code.clone())).with_label_width(l),
+                    ListItem::new("System Code".to_string(), ListValue::Text(25, TextFlags::None, bbs_link.system_code.clone()))
+                        .with_label_width(l)
+                        .with_update_text_value(&|list: &Arc<Mutex<DoorList>>, value: String| {
+                            let DoorServerAccount::BBSLink(bbs_link) = &mut list.lock().unwrap().accounts[0];
+                            bbs_link.system_code = value;
+                        }),
                 ),
-                ConfigEntry::Item(ListItem::new("Auth Code".to_string(), ListValue::Text(25, TextFlags::None, bbs_link.auth_code.clone())).with_label_width(l)),
                 ConfigEntry::Item(
-                    ListItem::new("Scheme Code".to_string(), ListValue::Text(25, TextFlags::None, bbs_link.sheme_code.clone())).with_label_width(l),
+                    ListItem::new("Auth Code".to_string(), ListValue::Text(25, TextFlags::None, bbs_link.auth_code.clone()))
+                        .with_label_width(l)
+                        .with_update_text_value(&|list: &Arc<Mutex<DoorList>>, value: String| {
+                            let DoorServerAccount::BBSLink(bbs_link) = &mut list.lock().unwrap().accounts[0];
+                            bbs_link.auth_code = value;
+                        }),
+                ),
+                ConfigEntry::Item(
+                    ListItem::new("Scheme Code".to_string(), ListValue::Text(25, TextFlags::None, bbs_link.sheme_code.clone()))
+                        .with_label_width(l)
+                        .with_update_text_value(&|list: &Arc<Mutex<DoorList>>, value: String| {
+                            let DoorServerAccount::BBSLink(bbs_link) = &mut list.lock().unwrap().accounts[0];
+                            bbs_link.sheme_code = value;
+                        }),
                 ),
             ],
         )];
 
-        let menu = ConfigMenu { obj: 0, entry: items };
         let door_list = Arc::new(Mutex::new(door_list_orig.clone()));
+        let menu = ConfigMenu {
+            obj: door_list.clone(),
+            entry: items,
+        };
         let scroll_state = ScrollbarState::default().content_length(door_list_orig.doors.len());
         let content_length = door_list_orig.doors.len();
         let cmd2 = door_list.clone();
