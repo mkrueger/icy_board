@@ -11,8 +11,8 @@ use crate::{Res, executable::PPEExpr, icy_board::read_data_with_encoding_detecti
 use crate::vm::VMError;
 
 const O_RD: i32 = 0;
-const O_RW: i32 = 2;
 const O_WR: i32 = 1;
+/// Not a PPL access mode; FAPPEND is a statement of its own in PCBoard.
 const O_APPEND: i32 = 4;
 pub const MAX_FILE_CHANNELS: i32 = 8;
 
@@ -203,14 +203,15 @@ impl PCBoardIO for DiskIO {
     }
 
     fn fopen(&mut self, channel: i32, file_name: &str, mode: i32, _sm: i32) -> Res<()> {
-        let file = match mode {
-            O_RD => File::open(file_name),
-            // FOPEN should create the file if it does not exist for every mode
-            // other than O_RD, matching PCBoard PPL behavior.
-            O_WR => File::create(file_name),
-            O_RW => OpenOptions::new().read(true).write(true).create(true).open(file_name),
-            O_APPEND => OpenOptions::new().append(true).create(true).open(file_name),
-            _ => panic!("unsupported mode {mode}"),
+        // PCBoard masks the access mode to two bits, and dosfopen creates a missing file for any write mode.
+        let file = if mode == O_APPEND {
+            OpenOptions::new().append(true).create(true).open(file_name)
+        } else {
+            match mode & 0x03 {
+                O_RD => File::open(file_name),
+                O_WR => File::create(file_name),
+                _ => OpenOptions::new().read(true).write(true).create(true).open(file_name),
+            }
         };
         match file {
             Ok(handle) => {
@@ -488,6 +489,19 @@ mod tests {
         io.fclose(1).unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
         assert_eq!(content, "hello world");
+    }
+
+    /// PCBoard masks the mode to two bits, so 3 is read/write and 8 is plain read.
+    #[test]
+    fn test_fopen_masks_the_access_mode_to_two_bits() {
+        let tmp = TempDir::new().unwrap();
+        let mut io = DiskIO::new(tmp.path().to_str().unwrap(), None);
+
+        let read_write = tmp.path().join("mode3.dat");
+        io.fopen(1, read_write.to_str().unwrap(), 3, 0).unwrap();
+        assert!(read_write.exists());
+
+        assert!(io.fopen(2, tmp.path().join("mode8.dat").to_str().unwrap(), 8, 0).is_err());
     }
 }
 
