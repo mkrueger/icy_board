@@ -186,7 +186,8 @@ fn main() {
                     if !issues.is_empty() {
                         println!("{0} issues found during decompilation", issues.len());
                     }
-                    std::process::exit(0);
+                    // The .ppd is written either way, so the exit code is all a caller has to go on.
+                    std::process::exit(if issues.is_empty() { 0 } else { 1 });
                 }
                 Err(err) => {
                     let _ = execute!(

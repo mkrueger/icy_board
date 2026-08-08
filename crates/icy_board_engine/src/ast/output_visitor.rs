@@ -308,6 +308,17 @@ impl AstVisitor<()> for OutputVisitor {
         self.eol();
     }
 
+    fn visit_case_specifier(&mut self, case_specifier: &super::CaseSpecifier) {
+        match case_specifier {
+            super::CaseSpecifier::Expression(expr) => expr.visit(self),
+            super::CaseSpecifier::FromTo(from, to) => {
+                from.visit(self);
+                self.output.push_str("..");
+                to.visit(self);
+            }
+        }
+    }
+
     fn visit_select_statement(&mut self, select_stmt: &super::SelectStatement) {
         self.output_keyword("Select Case ");
         select_stmt.get_expression().visit(self);
