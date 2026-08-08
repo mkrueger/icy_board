@@ -176,7 +176,7 @@ impl IcyBoardState {
     }
 
     #[async_recursion(?Send)]
-    async fn display_line(&mut self, txt: &str) -> Res<()> {
+    pub async fn display_line(&mut self, txt: &str) -> Res<()> {
         if !txt.is_empty() {
             if let Some(call) = PPECall::try_parse_line(txt) {
                 for sc in call.arguments {

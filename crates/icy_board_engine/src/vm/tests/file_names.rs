@@ -36,3 +36,35 @@ fn a_padded_name_opens_on_a_file_channel() {
     );
     assert_eq!(output, "err=0 [the file was found]\n");
 }
+
+/// DISPSTR takes the same file specs as any other display line, so a leading
+/// `%` names a file to show rather than text to print.
+#[test]
+fn dispstr_shows_the_file_a_percent_names() {
+    let output = run_ppl_with_files(
+        r#"
+        DISPSTR "%found.pcb"
+    "#,
+        &[("found.pcb", CONTENT)],
+    );
+    assert_eq!(output, "the file was found\n");
+}
+
+#[test]
+fn dispstr_prints_a_string_that_names_no_file() {
+    let output = run_ppl_with_files(r#"DISPSTR "plain text""#, &[]);
+    assert_eq!(output, "plain text");
+}
+
+/// The words after the file name are arguments, not part of the name.
+#[test]
+fn dispstr_hands_the_words_after_the_name_over_as_tokens() {
+    let output = run_ppl_with_files(
+        r#"
+        DISPSTR "%found.pcb ONE TWO"
+        PRINTLN "tokens=", TOKCOUNT()
+    "#,
+        &[("found.pcb", CONTENT)],
+    );
+    assert_eq!(output, "the file was found\ntokens=2\n");
+}

@@ -12,7 +12,7 @@ use crate::{
         icb_config::IcbColor,
         state::{
             GraphicsMode, KeySource, NodeState, NodeStatus,
-            functions::{MASK_ALNUM, display_flags},
+            functions::{MASK_ALNUM, PPECall, display_flags},
         },
         user_base::ConferenceFlags,
         user_inf::{BankUserInf, QwkConfigUserInf},
@@ -856,7 +856,12 @@ pub async fn optext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 pub async fn dispstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let value = vm.eval_expr(&args[0]).await?.as_string();
-    vm.icy_board_state.print(TerminalTarget::Both, &value).await
+    // PCBoard looks for a file spec only after stripping the padding, but prints the string as it came.
+    if PPECall::try_parse_line(value.trim_end()).is_some() {
+        vm.icy_board_state.display_line(value.trim_end()).await
+    } else {
+        vm.icy_board_state.print(TerminalTarget::Both, &value).await
+    }
 }
 
 pub async fn rdunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
