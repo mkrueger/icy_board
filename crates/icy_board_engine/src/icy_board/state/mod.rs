@@ -876,28 +876,14 @@ impl IcyBoardState {
     pub async fn try_find_command(&self, command: &str, via_cmd_list: bool) -> Option<super::commands::Command> {
         let command = command.to_ascii_uppercase();
         if via_cmd_list {
-            for cmd in &self.session.current_conference.commands {
-                if cmd.keyword == command {
-                    return Some(cmd.clone());
-                }
-            }
-
-            for cmd in &self.get_board().await.commands.commands {
-                if cmd.keyword == command {
-                    return Some(cmd.clone());
-                }
-            }
-
-            for cmd in &self.session.current_conference.commands {
-                if cmd.keyword.starts_with(&command) {
-                    return Some(cmd.clone());
-                }
-            }
-
-            for cmd in &self.get_board().await.commands.commands {
-                if cmd.keyword.starts_with(&command) {
-                    return Some(cmd.clone());
-                }
+            let conference = &self.session.current_conference.commands;
+            let board = self.get_board().await;
+            let found = super::commands::find_exact(conference, &command)
+                .or_else(|| super::commands::find_exact(&board.commands, &command))
+                .or_else(|| super::commands::find_prefix(conference, &command))
+                .or_else(|| super::commands::find_prefix(&board.commands, &command));
+            if let Some(cmd) = found {
+                return Some(cmd.clone());
             }
         }
 

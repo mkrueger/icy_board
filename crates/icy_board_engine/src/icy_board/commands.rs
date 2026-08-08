@@ -810,6 +810,18 @@ impl CommandList {
     }
 }
 
+/// A keyword comes out of a file a sysop typed, so its case says nothing.
+pub fn find_exact<'a>(commands: &'a [Command], keyword: &str) -> Option<&'a Command> {
+    commands.iter().find(|cmd| cmd.keyword.eq_ignore_ascii_case(keyword))
+}
+
+/// The same, for a keyword the caller has only typed the beginning of.
+pub fn find_prefix<'a>(commands: &'a [Command], keyword: &str) -> Option<&'a Command> {
+    commands
+        .iter()
+        .find(|cmd| cmd.keyword.len() >= keyword.len() && cmd.keyword.as_bytes()[..keyword.len()].eq_ignore_ascii_case(keyword.as_bytes()))
+}
+
 impl PCBoardRecordImporter<Command> for CommandList {
     const RECORD_SIZE: usize = 0x40;
 
@@ -852,4 +864,58 @@ impl PCBoardRecordImporter<Command> for CommandList {
 
 impl IcyBoardSerializer for CommandList {
     const FILE_TYPE: &'static str = "commands";
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Command, find_exact, find_prefix};
+
+    fn list(keywords: &[&str]) -> Vec<Command> {
+        keywords
+            .iter()
+            .map(|keyword| Command {
+                keyword: keyword.to_string(),
+                ..Default::default()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_a_lower_case_keyword_answers_an_upper_case_command() {
+        let commands = list(&["v"]);
+        assert_eq!(find_exact(&commands, "V").unwrap().keyword, "v");
+    }
+
+    #[test]
+    fn test_an_upper_case_keyword_answers_a_lower_case_command() {
+        let commands = list(&["V"]);
+        assert_eq!(find_exact(&commands, "v").unwrap().keyword, "V");
+    }
+
+    #[test]
+    fn test_a_keyword_that_is_not_there_is_not_found() {
+        assert!(find_exact(&list(&["V"]), "W").is_none());
+    }
+
+    #[test]
+    fn test_the_first_of_two_equal_keywords_wins() {
+        let commands = list(&["V", "v"]);
+        assert_eq!(find_exact(&commands, "V").unwrap().keyword, "V");
+    }
+
+    #[test]
+    fn test_a_prefix_finds_the_longer_keyword_whatever_its_case() {
+        let commands = list(&["vote"]);
+        assert_eq!(find_prefix(&commands, "VO").unwrap().keyword, "vote");
+    }
+
+    #[test]
+    fn test_a_command_longer_than_the_keyword_is_no_prefix_of_it() {
+        assert!(find_prefix(&list(&["V"]), "VOTE").is_none());
+    }
+
+    #[test]
+    fn test_a_prefix_search_does_not_split_a_multi_byte_keyword() {
+        assert!(find_prefix(&list(&["ä"]), "A").is_none());
+    }
 }
