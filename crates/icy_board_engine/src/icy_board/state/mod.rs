@@ -887,6 +887,17 @@ impl IcyBoardState {
             }
         }
 
+        // A built-in carries no security of its own, so it answers to the level the
+        // conference set for it.
+        let mut cmd = Self::builtin_command(command)?;
+        if let Some(action) = cmd.actions.first() {
+            cmd.security = self.session.user_command_level.security_for(&action.command_type);
+        }
+        Some(cmd)
+    }
+
+    /// The commands the board answers to when no command list claims the keyword.
+    fn builtin_command(command: String) -> Option<super::commands::Command> {
         return match command.as_str() {
             "A" => convert_cmd(CommandType::AbandonConference),
             "B" => convert_cmd(CommandType::BulletinList),

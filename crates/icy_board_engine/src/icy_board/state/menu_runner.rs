@@ -181,7 +181,7 @@ impl IcyBoardState {
             }
             CommandType::AbandonConference => {
                 let sec = self.session.user_command_level.cmd_a.clone();
-                if !self.check_sec("A", &sec).await? {
+                if check_security && !self.check_sec("A", &sec).await? {
                     return Ok(());
                 }
                 // A

@@ -5,7 +5,7 @@ use icy_engine::Color;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    IcyBoardSerializer, accounting_cfg::AccountingConfig, is_false, is_null_8, is_null_16, is_null_32, login_server::LoginServer,
+    IcyBoardSerializer, accounting_cfg::AccountingConfig, commands::CommandType, is_false, is_null_8, is_null_16, is_null_32, login_server::LoginServer,
     security_expr::SecurityExpression, user_base::Password,
 };
 
@@ -84,6 +84,49 @@ pub struct UserCommandLevels {
 
     pub batch_file_transfer: SecurityExpression,
     pub edit_own_messages: SecurityExpression,
+}
+
+impl UserCommandLevels {
+    /// The level a built-in command answers to. A command that carries no level
+    /// of its own is open to whoever got as far as the prompt.
+    pub fn security_for(&self, command_type: &CommandType) -> SecurityExpression {
+        match command_type {
+            CommandType::AbandonConference => self.cmd_a.clone(),
+            CommandType::BulletinList => self.cmd_b.clone(),
+            CommandType::CommentToSysop => self.cmd_c.clone(),
+            CommandType::Download | CommandType::FlagFiles => self.cmd_d.clone(),
+            CommandType::EnterMessage | CommandType::WriteEmail | CommandType::ReplyMessage => self.cmd_e.clone(),
+            CommandType::FileDirectory => self.cmd_f.clone(),
+            CommandType::Help => self.cmd_h.clone(),
+            CommandType::InitialWelcome => self.cmd_i.clone(),
+            CommandType::JoinConference | CommandType::SelectConferences | CommandType::ChangeMessageArea => self.cmd_j.clone(),
+            CommandType::DeleteMessage => self.cmd_k.clone(),
+            CommandType::LocateFile => self.cmd_l.clone(),
+            CommandType::ToggleGraphics => self.cmd_m.clone(),
+            CommandType::NewFileScan => self.cmd_n.clone(),
+            CommandType::PageSysop => self.cmd_o.clone(),
+            CommandType::SetPageLength => self.cmd_p.clone(),
+            CommandType::QuickMessageScan => self.cmd_q.clone(),
+            CommandType::ReadMessages | CommandType::ReadEmail | CommandType::TextSearch | CommandType::QWK | CommandType::ReadMemorizedMessage(_) => {
+                self.cmd_r.clone()
+            }
+            CommandType::Survey => self.cmd_s.clone(),
+            CommandType::SetTransferProtocol => self.cmd_t.clone(),
+            CommandType::UploadFile => self.cmd_u.clone(),
+            CommandType::ViewSettings => self.cmd_v.clone(),
+            CommandType::WriteSettings => self.cmd_w.clone(),
+            CommandType::ExpertMode => self.cmd_x.clone(),
+            CommandType::YourMailScan => self.cmd_y.clone(),
+            CommandType::ZippyDirectoryScan => self.cmd_z.clone(),
+            CommandType::UserList => self.cmd_show_user_list.clone(),
+            CommandType::WhoIsOnline => self.cmd_who.clone(),
+            CommandType::OpenDoor => self.cmd_open_door.clone(),
+            CommandType::TestFile => self.cmd_test_file.clone(),
+            CommandType::GroupChat => self.cmd_chat.clone(),
+            CommandType::BatchDownload | CommandType::BatchUpload => self.batch_file_transfer.clone(),
+            _ => SecurityExpression::default(),
+        }
+    }
 }
 
 #[derive(Default, Copy, Clone, PartialEq, Serialize, Deserialize, Debug)]
@@ -1046,5 +1089,33 @@ impl Default for QwkSettings {
             max_msgs: Self::default_max_msgs(),
             max_msgs_per_conf: Self::default_max_msgs_per_conf(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CommandType, SecurityExpression, UserCommandLevels};
+
+    #[test]
+    fn test_a_built_in_command_answers_to_the_level_it_was_given() {
+        let levels = UserCommandLevels {
+            cmd_d: SecurityExpression::from_req_security(50),
+            ..Default::default()
+        };
+        assert_eq!(levels.security_for(&CommandType::Download).to_string(), "50");
+    }
+
+    #[test]
+    fn test_flagging_a_file_answers_to_the_download_level() {
+        let levels = UserCommandLevels {
+            cmd_d: SecurityExpression::from_req_security(50),
+            ..Default::default()
+        };
+        assert_eq!(levels.security_for(&CommandType::FlagFiles).to_string(), "50");
+    }
+
+    #[test]
+    fn test_a_command_nobody_set_a_level_for_is_open() {
+        assert_eq!(UserCommandLevels::default().security_for(&CommandType::ShowMenu).to_string(), "0");
     }
 }
