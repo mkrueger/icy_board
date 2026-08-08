@@ -109,7 +109,8 @@ pub enum CompilationWarningType {
 }
 
 struct LabelDescriptor {
-    pub offset: usize,
+    /// None until the label is placed, since offset 0 is a valid position.
+    pub offset: Option<usize>,
 }
 
 pub struct PPECompiler {
@@ -415,7 +416,7 @@ impl PPECompiler {
     fn define_label_at_cur_pos(&mut self, label: &unicase::Ascii<String>) -> usize {
         let idx: usize = self.label_table.len();
         self.label_lookup_table.insert(label.clone(), idx);
-        self.label_table.push(LabelDescriptor { offset: 0 });
+        self.label_table.push(LabelDescriptor { offset: None });
         idx
     }
 
@@ -426,14 +427,14 @@ impl PPECompiler {
         };
         if let Some(idx) = self.label_lookup_table.get_mut(identifier) {
             let label_descr = &mut self.label_table[*idx];
-            if label_descr.offset > 0 {
+            if label_descr.offset.is_some() {
                 log::error!("Label already defined: {}", identifier);
                 return;
             }
-            label_descr.offset = self.cur_offset;
+            label_descr.offset = Some(self.cur_offset);
         } else {
             let idx = self.define_label_at_cur_pos(identifier);
-            self.label_table[idx].offset = self.cur_offset;
+            self.label_table[idx].offset = Some(self.cur_offset);
         }
     }
 
@@ -447,10 +448,10 @@ impl PPECompiler {
             match &mut stmt.command {
                 PPECommand::IfNot(_, idx) | PPECommand::Goto(idx) | PPECommand::Gosub(idx) => {
                     if let Some(label_descr) = self.label_table.get(*idx) {
-                        if label_descr.offset == 0 {
-                            *idx = last;
+                        if let Some(offset) = label_descr.offset {
+                            *idx = offset * 2;
                         } else {
-                            *idx = label_descr.offset as usize * 2;
+                            *idx = last;
                         }
                     } else {
                         panic!("Label {idx} not found only {} labels defined.", self.label_table.len());

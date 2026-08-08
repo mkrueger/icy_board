@@ -7,6 +7,7 @@
 
 #![cfg(test)]
 
+mod control_flow;
 mod dbase;
 mod file_names;
 mod message_base;

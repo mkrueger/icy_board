@@ -68,6 +68,25 @@ fn scan_goto(statements: &[Statement], from: usize, label: &unicase::Ascii<Strin
     None
 }
 
+/// A CONTINUE jumps to the loop head just like the back edge does, so the back edge is
+/// the one the break label follows.
+fn scan_loop_back_edge(statements: &[Statement], from: usize, head: &unicase::Ascii<String>, break_label: &unicase::Ascii<String>) -> Option<usize> {
+    for j in from..statements.len().saturating_sub(1) {
+        let Statement::Goto(goto_stmt) = &statements[j] else {
+            continue;
+        };
+        if goto_stmt.get_label() != head {
+            continue;
+        }
+        if let Statement::Label(label_stmt) = &statements[j + 1] {
+            if label_stmt.get_label() == break_label {
+                return Some(j);
+            }
+        }
+    }
+    None
+}
+
 // scan:
 // IF (COND) GOTO SKIP
 // STMT

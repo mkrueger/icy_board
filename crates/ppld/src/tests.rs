@@ -1,8 +1,13 @@
 use std::env;
+use std::fs;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use icy_board_engine::{
-    ast::{OutputFunc, output_visitor},
+    ast::{Ast, OutputFunc, output_visitor},
+    compiler::{PPECompiler, workspace::Workspace},
     executable::Executable,
+    parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
 };
 
 use crate::decompile;
@@ -92,4 +97,86 @@ fn test_decompiler() {
 
         assert!(are_equal);
     }
+}
+
+fn decompile_to_text(executable: Executable) -> String {
+    let (ast, _) = decompile(executable, false).unwrap();
+    let mut visitor = output_visitor::OutputVisitor::default();
+    visitor.output_func = OutputFunc::Upper;
+    visitor.skip_comments = true;
+    ast.visit(&mut visitor);
+    visitor.output
+}
+
+fn compile_source(source: &str, runtime: u16) -> Result<Executable, String> {
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let reg = UserTypeRegistry::icy_board_registry();
+    let mut workspace = Workspace::default();
+    workspace.hard_coded_files = Some(vec![PathBuf::from("test.pps")]);
+    workspace.package.runtime = Some(runtime);
+
+    let ast = parse_ast(PathBuf::from("test.pps"), errors.clone(), source, &reg, Encoding::Utf8, &workspace);
+    let mut compiler = PPECompiler::new(&workspace, reg, errors.clone());
+    compiler.compile(&[&ast] as &[&Ast]);
+
+    let reporter = errors.lock().unwrap();
+    if reporter.has_errors() {
+        return Err(reporter.errors.iter().map(|e| format!("  {}", e.error)).collect::<Vec<_>>().join("\n"));
+    }
+    drop(reporter);
+
+    // Only the on disk form carries the entry types the decompiler reads, so go through it.
+    let executable = compiler.create_executable().map_err(|e| e.to_string())?;
+    let mut bytes = executable.to_buffer().map_err(|e| e.to_string())?;
+    Executable::from_buffer(&mut bytes, false).map_err(|e| e.to_string())
+}
+
+/// The first pass rewrites whatever layout the original compiler used into the one
+/// our own pplc emits, so it is the passes after that which have to agree. A drift
+/// between them means a construct survives being written out but not being read back.
+#[test]
+fn decompiled_source_settles_after_one_pass() {
+    let mut data_path = env::current_dir().unwrap();
+    data_path.push("test_data");
+
+    let mut checked = 0;
+    let mut failures = Vec::new();
+    let mut entries: Vec<PathBuf> = fs::read_dir(data_path)
+        .expect("Error reading test_data directory.")
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("ppe")))
+        .collect();
+    entries.sort();
+
+    for cur_entry in entries {
+        let name = cur_entry.file_name().unwrap().to_string_lossy().to_string();
+        let executable = Executable::read_file(&cur_entry.as_os_str(), false).unwrap();
+        let runtime = executable.runtime;
+
+        let mut text = decompile_to_text(executable);
+        let mut previous = None;
+        for pass in 1..=2 {
+            match compile_source(&text, runtime) {
+                Ok(rebuilt) => {
+                    previous = Some(text);
+                    text = decompile_to_text(rebuilt);
+                }
+                Err(diagnostics) => {
+                    failures.push(format!("{name}: does not compile after pass {pass}\n{diagnostics}"));
+                    previous = None;
+                    break;
+                }
+            }
+        }
+
+        if let Some(previous) = previous {
+            if previous != text {
+                failures.push(format!("{name}: still moving on the third pass"));
+            }
+        }
+        checked += 1;
+    }
+
+    assert!(checked > 0, "no .ppe files found in test_data");
+    assert!(failures.is_empty(), "{} of {checked} files did not settle:\n{}", failures.len(), failures.join("\n"));
 }

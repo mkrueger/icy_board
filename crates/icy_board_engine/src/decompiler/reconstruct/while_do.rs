@@ -37,7 +37,7 @@ pub fn scan_do_while(visitor: &SemanticVisitor, statements: &mut Vec<Statement>)
             continue;
         };
         // search "loop" goto
-        let Some(matching_goto) = scan_goto(&statements, i + 2, while_continue_label.get_label()) else {
+        let Some(matching_goto) = super::scan_loop_back_edge(&statements, i + 2, while_continue_label.get_label(), break_goto.get_label()) else {
             i += 1;
             continue;
         };
