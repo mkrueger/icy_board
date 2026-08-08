@@ -11,7 +11,7 @@ use icy_board_engine::{
         security_expr::SecurityExpression,
         state::{
             NodeStatus,
-            functions::{MASK_ALNUM, MASK_DATE, MASK_NAME, MASK_PHONE, MASK_WEB, display_flags, pwd_flags},
+            functions::{MASK_ALNUM, MASK_ASCII, MASK_DATE, MASK_NAME, MASK_PHONE, MASK_WEB, display_flags, pwd_flags},
         },
         surveys::Survey,
         user_base::User,
@@ -353,17 +353,12 @@ impl PcbBoardCommand {
             }
 
             if settings.ask_alias && self.state.display_text.has_text(IceText::GetAliasName) {
-                let mask: &str = if self.state.get_board().await.config.switches.disable_registration_edits {
-                    &MASK_ALNUM
-                } else {
-                    &MASK_NAME
-                };
                 new_user.alias = self
                     .state
                     .input_field(
                         IceText::GetAliasName,
                         30,
-                        mask,
+                        &MASK_ASCII,
                         "",
                         None,
                         display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -372,11 +367,6 @@ impl PcbBoardCommand {
             }
 
             if settings.ask_address && self.state.display_text.has_text(IceText::EnterAddress) {
-                let mask: &str = if self.state.get_board().await.config.switches.disable_registration_edits {
-                    &MASK_ALNUM
-                } else {
-                    &MASK_NAME
-                };
                 self.state
                     .display_text(IceText::EnterAddress, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
@@ -387,7 +377,7 @@ impl PcbBoardCommand {
                         .input_field(
                             IceText::Street1,
                             50,
-                            mask,
+                            &MASK_ASCII,
                             "",
                             None,
                             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -400,7 +390,7 @@ impl PcbBoardCommand {
                         .input_field(
                             IceText::Street2,
                             50,
-                            mask,
+                            &MASK_ASCII,
                             "",
                             None,
                             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -413,7 +403,7 @@ impl PcbBoardCommand {
                         .input_field(
                             IceText::City,
                             25,
-                            mask,
+                            &MASK_ASCII,
                             "",
                             None,
                             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -426,7 +416,7 @@ impl PcbBoardCommand {
                         .input_field(
                             IceText::State,
                             15,
-                            mask,
+                            &MASK_ASCII,
                             "",
                             None,
                             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -439,7 +429,7 @@ impl PcbBoardCommand {
                         .input_field(
                             IceText::Zip,
                             10,
-                            mask,
+                            &MASK_ASCII,
                             "",
                             None,
                             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -452,7 +442,7 @@ impl PcbBoardCommand {
                         .input_field(
                             IceText::Country,
                             15,
-                            mask,
+                            &MASK_ASCII,
                             "",
                             None,
                             display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
