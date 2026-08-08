@@ -51,7 +51,7 @@ bitflag = "0.10.1"
 async-trait = "0.1.89"
 async-recursion = "1.1.1"
 rand = "0.10.0"
-zip = "8.4.0"
+zip = "8.6.0"
 
 walkdir = "2.2.6"
 i18n-embed = { version = "0.16.0", features = [
