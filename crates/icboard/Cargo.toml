@@ -33,7 +33,6 @@ unicase = { workspace = true }
 fern = { workspace = true }
 easy_reader = "0.5.2"
 toml = { workspace = true }
-md-to-tui = "0.1.2"
 relative-path = { workspace = true }
 regex = { workspace = true }
 tokio = { workspace = true }

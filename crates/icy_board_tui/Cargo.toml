@@ -25,4 +25,4 @@ i18n-embed-fl = { workspace = true }
 fluent-bundle = { workspace = true }
 rust-embed = { workspace = true }
 once_cell = { workspace = true }
-md-tui = "0.9.1"
+md-tui = "0.10.3"

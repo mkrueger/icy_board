@@ -27,7 +27,6 @@ regex = { workspace = true}
 walkdir = { workspace = true }
 relative-path = { workspace = true }
  
-tui-textarea  = { workspace = true }
 tui-markdown = { workspace = true }
 ariadne = { workspace = true }
 unicase = { workspace = true }

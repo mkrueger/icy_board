@@ -75,10 +75,8 @@ fern = "0.7.0"
 ariadne = "0.6.0"
 relative-path = "2.0.1"
 bitflags = "2.10.0"
-tui-textarea = "0.7.0"
 tui-markdown = "0.3"
-# tui-textarea 0.7 nails ratatui 0.29 to unicode-width 0.2.0, which anything newer will not have.
-tui-input = "0.14.0"
+tui-input = "0.15.3"
 # tui-markdown = { git = "https://github.com/joshka/tui-markdown" }
 
 russh = "0.62.0"
