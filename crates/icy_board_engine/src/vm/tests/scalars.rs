@@ -40,18 +40,18 @@ fn test_adjtime_adds_time_while_no_event_is_pending() {
 
 #[test]
 fn test_no_keyboard_script_is_running_to_start_with() {
-    assert_eq!(run_ppl("PRINT KBDFILUSUED()"), "0");
+    assert_eq!(run_ppl("PRINT KBDFILUSED()"), "0");
 }
 
 #[test]
 fn test_kbdstuff_is_not_a_keyboard_script() {
-    assert_eq!(run_ppl("KBDSTUFF \"X\"\nPRINT KBDFILUSUED()"), "0");
+    assert_eq!(run_ppl("KBDSTUFF \"X\"\nPRINT KBDFILUSED()"), "0");
 }
 
 #[test]
 fn test_kbdfile_is_a_keyboard_script() {
     assert_eq!(
-        run_ppl("FCREATE 1, \"S.KBD\", O_WR, S_DN\nFPUTLN 1, \"HELLO\"\nFCLOSE 1\nKBDFILE \"S.KBD\"\nPRINT KBDFILUSUED()"),
+        run_ppl("FCREATE 1, \"S.KBD\", O_WR, S_DN\nFPUTLN 1, \"HELLO\"\nFCLOSE 1\nKBDFILE \"S.KBD\"\nPRINT KBDFILUSED()"),
         "1"
     );
 }

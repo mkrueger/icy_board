@@ -378,7 +378,7 @@ impl FunctionDefinition {
     }
 }
 lazy_static::lazy_static! {
-    pub static ref FUNCTION_DEFINITIONS: [FunctionDefinition; 309] = [
+    pub static ref FUNCTION_DEFINITIONS: [FunctionDefinition; 308] = [
         FunctionDefinition {
             name: "END",
             version: 100,
@@ -2190,7 +2190,7 @@ lazy_static::lazy_static! {
             signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
-            name: "KBDFilUsued",
+            name: "KBDFilUsed",
             version: 200,
             opcode: FuncOpCode::KBDFILUSED,
             return_type: VariableType::Boolean,
@@ -3156,14 +3156,6 @@ lazy_static::lazy_static! {
             signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
-            name: "KbdFileUsed",
-            version: 100,
-            opcode: FuncOpCode::KBDFILUSED,
-            return_type: VariableType::Boolean,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
             name: "ToDouble",
             version: 100,
             opcode: FuncOpCode::TODREAL,
@@ -3190,8 +3182,8 @@ lazy_static::lazy_static! {
         FunctionDefinition {
             name: "ToShort",
             version: 100,
-            opcode: FuncOpCode::TOSWORD,
-            return_type: VariableType::SWord,
+            opcode: FuncOpCode::TOSBYTE, // Note: This is correct, PCBoard maps ToShort to TOSBYTE and not to TOSWORD.
+            return_type: VariableType::SByte,
             args: None,
             signature: FunctionSignature::FixedParameters(1),
         },
