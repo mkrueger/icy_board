@@ -12,6 +12,9 @@ pub fn scan_for_next(visitor: &SemanticVisitor, statements: &mut Vec<Statement>)
     // LET VAR001 = VAR001 + [STEP]
     // GOTO LABEL002
     // :LABEL001
+    //
+    // Compilers before 3.40 invert the test and jump straight to the exit, which
+    // leaves out the GOTO and the body label.
     if statements.len() < 4 {
         return;
     }
@@ -20,23 +23,26 @@ pub fn scan_for_next(visitor: &SemanticVisitor, statements: &mut Vec<Statement>)
             let Statement::Label(for_loop_label) = &statements[i + 1] else { continue };
             let for_loop_label = for_loop_label.get_label().clone();
             let if_statement = &statements[i + 2];
-            let m: Option<(String, unicase::Ascii<String>, Expression)> = match_for_header(if_statement);
+            let m: Option<(String, unicase::Ascii<String>, Expression, bool)> = match_for_header(if_statement);
 
-            if let Some((index_variable, for_body_label, to_expr)) = m {
-                let Statement::Goto(skip_label_stmt) = &statements[i + 3] else {
-                    continue;
+            if let Some((index_variable, target_label, to_expr, exits_on_match)) = m {
+                let (skip_label, body_start) = if exits_on_match {
+                    (target_label, i + 3)
+                } else {
+                    let Statement::Goto(skip_label_stmt) = &statements[i + 3] else {
+                        continue;
+                    };
+                    let Statement::Label(body_label_stmt) = &statements[i + 4] else {
+                        continue;
+                    };
+                    if body_label_stmt.get_label() != &target_label {
+                        continue;
+                    }
+                    (skip_label_stmt.get_label().clone(), i + 5)
                 };
-                let Statement::Label(body_label_stmt) = &statements[i + 4] else {
-                    continue;
-                };
 
-                let skip_label = skip_label_stmt.get_label().clone();
-
-                if body_label_stmt.get_label() != &for_body_label {
-                    continue;
-                }
                 let mut matching_goto = -1;
-                for j in i + 4..statements.len() - 1 {
+                for j in body_start..statements.len() - 1 {
                     let Statement::Goto(goto_label) = &statements[j] else {
                         continue;
                     };
@@ -78,7 +84,7 @@ pub fn scan_for_next(visitor: &SemanticVisitor, statements: &mut Vec<Statement>)
 
                 let mut for_block: Vec<Statement> = statements.drain(i..matching_goto as usize + 1).collect();
                 // pop for header
-                for_block.drain(0..5);
+                for_block.drain(0..body_start - i);
 
                 // pop goto and label and step
                 let Some(Statement::Goto(continue_label_stmt)) = for_block.pop() else {
@@ -108,13 +114,16 @@ fn match_for_header(
     String,                 // indexName
     unicase::Ascii<String>, // for_label
     Expression,             // to_expr
+    bool,                   // the goto leaves the loop instead of entering the body
 )> {
     match if_statement {
         Statement::If(if_stmt) => {
             if let Expression::Binary(bin_op) = if_stmt.get_condition() {
-                if bin_op.get_op() != BinOp::LowerEq && bin_op.get_op() != BinOp::GreaterEq {
-                    return None;
-                }
+                let exits_on_match = match bin_op.get_op() {
+                    BinOp::LowerEq | BinOp::GreaterEq => false,
+                    BinOp::Greater | BinOp::Lower => true,
+                    _ => return None,
+                };
                 let Expression::Identifier(index_variable) = bin_op.get_left_expression() else {
                     return None;
                 };
@@ -124,7 +133,12 @@ fn match_for_header(
                     return None;
                 };
 
-                return Some((index_variable.get_identifier().to_string(), for_label.get_label().clone(), to_expr));
+                return Some((
+                    index_variable.get_identifier().to_string(),
+                    for_label.get_label().clone(),
+                    to_expr,
+                    exits_on_match,
+                ));
             }
         }
         _ => return None,
