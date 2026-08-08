@@ -6,7 +6,7 @@ use crate::icy_board::{
     icb_text::IceText,
     state::{
         NodeStatus,
-        functions::{MASK_ALNUM, display_flags},
+        functions::{MASK_ASCII, display_flags},
     },
 };
 use crate::{Res, icy_board::state::IcyBoardState};
@@ -96,7 +96,7 @@ impl IcyBoardState {
                     .input_field(
                         IceText::TextToScanFor,
                         79,
-                        &MASK_ALNUM,
+                        &MASK_ASCII,
                         "",
                         None,
                         display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,

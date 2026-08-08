@@ -2,7 +2,7 @@ use jamjam::jam::JamMessageBase;
 use jamjam::jam::attributes;
 
 use crate::icy_board::commands::CommandType;
-use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA};
+use crate::icy_board::state::functions::MASK_ALPHA;
 use crate::icy_board::{
     icb_text::IceText,
     state::{
@@ -44,7 +44,7 @@ impl IcyBoardState {
                 self.input_field(
                     IceText::ReplyToMessages,
                     54,
-                    &MASK_ALNUM,
+                    &MASK_ASCII,
                     CommandType::ReplyMessage.get_help(),
                     None,
                     display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::STACKED,

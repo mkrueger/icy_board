@@ -5,7 +5,7 @@ use crate::{
         icb_text::IceText,
         state::{
             IcyBoardState, NodeStatus,
-            functions::{MASK_ALNUM, display_flags},
+            functions::{MASK_ASCII, display_flags},
         },
     },
     vm::TerminalTarget,
@@ -282,7 +282,7 @@ impl IcyBoardState {
         self.input_field(
             prompt,
             60,
-            &MASK_ALNUM,
+            &MASK_ASCII,
             "hlpchat",
             None,
             display_flags::UPCASE | display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,

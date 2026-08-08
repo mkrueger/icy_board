@@ -7,7 +7,7 @@ use jamjam::jam::{JamMessage, JamMessageBase, attributes};
 use crate::Res;
 use crate::icy_board::icb_text::IceText;
 use crate::icy_board::state::IcyBoardState;
-use crate::icy_board::state::functions::{MASK_ALNUM, MASK_NUM, display_flags};
+use crate::icy_board::state::functions::{MASK_ASCII, MASK_NUM, display_flags};
 use crate::vm::TerminalTarget;
 
 use super::read_command::{MsgFunc, ReadCommand};
@@ -269,7 +269,7 @@ impl IcyBoardState {
                             .input_field(
                                 IceText::SecurityPassword,
                                 12,
-                                &MASK_ALNUM,
+                                &MASK_ASCII,
                                 "hlpe",
                                 None,
                                 display_flags::FIELDLEN | display_flags::UPCASE | display_flags::NEWLINE | display_flags::HIGHASCII,
@@ -298,7 +298,7 @@ impl IcyBoardState {
             .input_field(
                 IceText::NewInfo,
                 len,
-                &MASK_ALNUM,
+                &MASK_ASCII,
                 "",
                 Some(old.clone()),
                 display_flags::FIELDLEN | display_flags::HIGHASCII | display_flags::NEWLINE | display_flags::LFBEFORE,

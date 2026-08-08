@@ -7,7 +7,7 @@ use crate::{
         icb_config::IcbColor,
         icb_text::IceText,
         state::{
-            functions::{MASK_ALNUM, MASK_NUM, MASK_PHONE, MASK_WEB, display_flags},
+            functions::{MASK_ASCII, MASK_NUM, MASK_PHONE, MASK_WEB, display_flags},
             user_commands::pcb::select_conferences::SelectMode,
         },
         user_base::FSEMode,
@@ -40,7 +40,7 @@ impl IcyBoardState {
                 .input_field(
                     IceText::NewPassword,
                     12,
-                    &MASK_ALNUM,
+                    &MASK_ASCII,
                     "",
                     None,
                     display_flags::ECHODOTS
@@ -59,7 +59,7 @@ impl IcyBoardState {
                 .input_field(
                     IceText::ReEnterPassword,
                     12,
-                    &MASK_ALNUM,
+                    &MASK_ASCII,
                     "",
                     None,
                     display_flags::ECHODOTS
@@ -89,7 +89,7 @@ impl IcyBoardState {
                 .input_field(
                     IceText::CityState,
                     24,
-                    &MASK_ALNUM,
+                    &MASK_ASCII,
                     "",
                     Some(new_user.city_or_state.clone()),
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -137,7 +137,7 @@ impl IcyBoardState {
                 .input_field(
                     IceText::CommentFieldPrompt,
                     30,
-                    &MASK_ALNUM,
+                    &MASK_ASCII,
                     "",
                     Some(new_user.user_comment.clone()),
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -192,7 +192,7 @@ impl IcyBoardState {
                 .input_field(
                     IceText::GetAliasName,
                     25,
-                    &MASK_ALNUM,
+                    &MASK_ASCII,
                     "",
                     Some(new_user.alias.clone()),
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -230,7 +230,7 @@ impl IcyBoardState {
                 .input_field(
                     IceText::Street1,
                     50,
-                    &MASK_ALNUM,
+                    &MASK_ASCII,
                     "",
                     Some(new_user.street1.clone()),
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -244,7 +244,7 @@ impl IcyBoardState {
                 .input_field(
                     IceText::Street2,
                     50,
-                    &MASK_ALNUM,
+                    &MASK_ASCII,
                     "",
                     Some(new_user.street2.clone()),
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -258,7 +258,7 @@ impl IcyBoardState {
                 .input_field(
                     IceText::City,
                     25,
-                    &MASK_ALNUM,
+                    &MASK_ASCII,
                     "",
                     Some(new_user.city.clone()),
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -272,7 +272,7 @@ impl IcyBoardState {
                 .input_field(
                     IceText::State,
                     10,
-                    &MASK_ALNUM,
+                    &MASK_ASCII,
                     "",
                     Some(new_user.state.clone()),
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
@@ -286,7 +286,7 @@ impl IcyBoardState {
                 .input_field(
                     IceText::Zip,
                     10,
-                    &MASK_ALNUM,
+                    &MASK_ASCII,
                     "",
                     Some(new_user.zip.clone()),
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
@@ -300,7 +300,7 @@ impl IcyBoardState {
                 .input_field(
                     IceText::Country,
                     15,
-                    &MASK_ALNUM,
+                    &MASK_ASCII,
                     "",
                     Some(new_user.country.clone()),
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
@@ -407,7 +407,7 @@ impl IcyBoardState {
                 .input_field(
                     IceText::EnterVerifyText,
                     25,
-                    &MASK_ALNUM,
+                    &MASK_ASCII,
                     "",
                     Some(new_user.verify_answer.clone()),
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -439,7 +439,7 @@ impl IcyBoardState {
                 .input_field(
                     IceText::EnterBirthdate,
                     8,
-                    &MASK_ALNUM,
+                    &MASK_ASCII,
                     "",
                     None,
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,

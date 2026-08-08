@@ -1,7 +1,7 @@
 use crate::Res;
 use crate::icy_board::commands::CommandType;
 use crate::icy_board::state::IcyBoardState;
-use crate::icy_board::state::functions::{MASK_ALNUM, MASK_COMMAND, pwd_flags};
+use crate::icy_board::state::functions::{MASK_ASCII, MASK_COMMAND, pwd_flags};
 use crate::icy_board::user_base::ConferenceFlags;
 use crate::icy_board::{icb_text::IceText, state::functions::display_flags};
 use crate::vm::TerminalTarget;
@@ -96,7 +96,7 @@ impl IcyBoardState {
                     self.input_field(
                         IceText::TextToScanFor,
                         40,
-                        &MASK_ALNUM,
+                        &MASK_ASCII,
                         CommandType::JoinConference.get_help(),
                         None,
                         display_flags::UPCASE | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,

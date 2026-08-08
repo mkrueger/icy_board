@@ -11,7 +11,7 @@ use icy_board_engine::{
         security_expr::SecurityExpression,
         state::{
             NodeStatus,
-            functions::{MASK_ALNUM, MASK_ASCII, MASK_DATE, MASK_NAME, MASK_PHONE, MASK_WEB, display_flags, pwd_flags},
+            functions::{MASK_ASCII, MASK_DATE, MASK_MESSAGE, MASK_NAME, MASK_PHONE, MASK_WEB, display_flags, pwd_flags},
         },
         surveys::Survey,
         user_base::User,
@@ -80,7 +80,7 @@ impl PcbBoardCommand {
                     .input_field(
                         IceText::YourFirstName,
                         39,
-                        &MASK_ALNUM,
+                        &MASK_ASCII,
                         "",
                         None,
                         display_flags::UPCASE | display_flags::NEWLINE | display_flags::STACKED,
@@ -108,7 +108,7 @@ impl PcbBoardCommand {
                     .input_field(
                         IceText::YourLastName,
                         39,
-                        &MASK_ALNUM,
+                        &MASK_ASCII,
                         "",
                         None,
                         display_flags::UPCASE | display_flags::NEWLINE | display_flags::STACKED,
@@ -233,7 +233,7 @@ impl PcbBoardCommand {
             if tries > 4 {
                 return Ok(false);
             }
-            let Some(pw1) = self.input_required(IceText::NewPassword, &MASK_ALNUM, 20, display_flags::ECHODOTS).await? else {
+            let Some(pw1) = self.input_required(IceText::NewPassword, &MASK_MESSAGE, 20, display_flags::ECHODOTS).await? else {
                 return Ok(false);
             };
             if !self.state.is_valid_password(&pw1).await? {
@@ -254,7 +254,10 @@ impl PcbBoardCommand {
                 }
             }
 
-            let Some(pw2) = self.input_required(IceText::ReEnterPassword, &MASK_ALNUM, 20, display_flags::ECHODOTS).await? else {
+            let Some(pw2) = self
+                .input_required(IceText::ReEnterPassword, &MASK_MESSAGE, 20, display_flags::ECHODOTS)
+                .await?
+            else {
                 return Ok(false);
             };
 
@@ -272,11 +275,11 @@ impl PcbBoardCommand {
         if !self.newask_exists().await || self.state.get_board().await.config.new_user_settings.use_newask_and_builtin {
             if settings.ask_city_or_state && self.state.display_text.has_text(IceText::CityState) {
                 let mask: &str = if self.state.get_board().await.config.switches.disable_registration_edits {
-                    &MASK_ALNUM
+                    &MASK_MESSAGE
                 } else {
                     &MASK_NAME
                 };
-                let Some(city_or_state) = self.input_required(IceText::CityState, mask, 24, 0).await? else {
+                let Some(city_or_state) = self.input_required(IceText::CityState, mask, 24, display_flags::HIGHASCII).await? else {
                     return Ok(false);
                 };
                 new_user.city_or_state = city_or_state;
@@ -284,11 +287,11 @@ impl PcbBoardCommand {
 
             if settings.ask_business_phone && self.state.display_text.has_text(IceText::BusDataPhone) {
                 let mask: &str = if self.state.get_board().await.config.switches.disable_registration_edits {
-                    &MASK_ALNUM
+                    &MASK_MESSAGE
                 } else {
                     &MASK_PHONE
                 };
-                let Some(bus_data_phone) = self.input_required(IceText::BusDataPhone, mask, 13, 0).await? else {
+                let Some(bus_data_phone) = self.input_required(IceText::BusDataPhone, mask, 13, display_flags::HIGHASCII).await? else {
                     return Ok(false);
                 };
                 new_user.bus_data_phone = bus_data_phone;
@@ -296,11 +299,11 @@ impl PcbBoardCommand {
 
             if settings.ask_home_phone && self.state.display_text.has_text(IceText::HomeVoicePhone) {
                 let mask: &str = if self.state.get_board().await.config.switches.disable_registration_edits {
-                    &MASK_ALNUM
+                    &MASK_MESSAGE
                 } else {
                     &MASK_PHONE
                 };
-                let Some(home_voice_phone) = self.input_required(IceText::HomeVoicePhone, mask, 13, 0).await? else {
+                let Some(home_voice_phone) = self.input_required(IceText::HomeVoicePhone, mask, 13, display_flags::HIGHASCII).await? else {
                     return Ok(false);
                 };
                 new_user.home_voice_phone = home_voice_phone;
@@ -312,10 +315,10 @@ impl PcbBoardCommand {
                     .input_field(
                         IceText::CommentFieldPrompt,
                         30,
-                        &MASK_ALNUM,
+                        &MASK_ASCII,
                         "",
                         None,
-                        display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                        display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,
                     )
                     .await?;
             }
@@ -361,7 +364,7 @@ impl PcbBoardCommand {
                         &MASK_ASCII,
                         "",
                         None,
-                        display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                        display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,
                     )
                     .await?;
             }
@@ -380,7 +383,7 @@ impl PcbBoardCommand {
                             &MASK_ASCII,
                             "",
                             None,
-                            display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                            display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,
                         )
                         .await?;
                 }
@@ -393,7 +396,7 @@ impl PcbBoardCommand {
                             &MASK_ASCII,
                             "",
                             None,
-                            display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                            display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,
                         )
                         .await?;
                 }
@@ -406,7 +409,7 @@ impl PcbBoardCommand {
                             &MASK_ASCII,
                             "",
                             None,
-                            display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                            display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,
                         )
                         .await?;
                 }
@@ -419,7 +422,7 @@ impl PcbBoardCommand {
                             &MASK_ASCII,
                             "",
                             None,
-                            display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                            display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,
                         )
                         .await?;
                 }
@@ -432,7 +435,7 @@ impl PcbBoardCommand {
                             &MASK_ASCII,
                             "",
                             None,
-                            display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                            display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,
                         )
                         .await?;
                 }
@@ -445,14 +448,17 @@ impl PcbBoardCommand {
                             &MASK_ASCII,
                             "",
                             None,
-                            display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                            display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,
                         )
                         .await?;
                 }
             }
 
             if settings.ask_verification && self.state.display_text.has_text(IceText::EnterVerifyText) {
-                let Some(verify_answer) = self.input_required(IceText::EnterVerifyText, &MASK_ALNUM, 25, 0).await? else {
+                let Some(verify_answer) = self
+                    .input_required(IceText::EnterVerifyText, &MASK_MESSAGE, 25, display_flags::HIGHASCII)
+                    .await?
+                else {
                     return Ok(false);
                 };
                 new_user.verify_answer = verify_answer;
@@ -693,10 +699,13 @@ impl PcbBoardCommand {
 
     async fn change_password(&mut self) -> Res<()> {
         loop {
-            let Some(pw1) = self.input_required(IceText::NewPassword, &MASK_ALNUM, 20, display_flags::ECHODOTS).await? else {
+            let Some(pw1) = self.input_required(IceText::NewPassword, &MASK_MESSAGE, 20, display_flags::ECHODOTS).await? else {
                 return Ok(());
             };
-            let Some(pw2) = self.input_required(IceText::ReEnterPassword, &MASK_ALNUM, 20, display_flags::ECHODOTS).await? else {
+            let Some(pw2) = self
+                .input_required(IceText::ReEnterPassword, &MASK_MESSAGE, 20, display_flags::ECHODOTS)
+                .await?
+            else {
                 return Ok(());
             };
 

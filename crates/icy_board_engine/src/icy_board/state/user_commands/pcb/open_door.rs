@@ -8,7 +8,7 @@ use crate::icy_board::{
     icb_text::IceText,
     state::{
         NodeStatus,
-        functions::{MASK_ALNUM, display_flags},
+        functions::{MASK_ASCII, display_flags},
     },
 };
 use icy_engine::TextPane;
@@ -49,7 +49,7 @@ impl IcyBoardState {
                     IceText::DOORNumber
                 },
                 20,
-                &MASK_ALNUM,
+                &MASK_ASCII,
                 CommandType::OpenDoor.get_help(),
                 None,
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
@@ -100,7 +100,7 @@ impl IcyBoardState {
                 .input_field(
                     IceText::PasswordForDOOR,
                     12,
-                    &MASK_ALNUM,
+                    &MASK_ASCII,
                     "",
                     None,
                     display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::UPCASE | display_flags::ECHODOTS,

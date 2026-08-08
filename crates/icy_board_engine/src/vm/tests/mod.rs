@@ -10,6 +10,7 @@
 mod control_flow;
 mod dbase;
 mod file_names;
+mod masks;
 mod message_base;
 mod scalars;
 mod tpa;

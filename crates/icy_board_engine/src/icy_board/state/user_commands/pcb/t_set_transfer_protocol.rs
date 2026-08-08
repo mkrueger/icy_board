@@ -3,7 +3,7 @@ use crate::{
     icy_board::{
         icb_config::IcbColor,
         icb_text::IceText,
-        state::functions::{MASK_ALNUM, display_flags},
+        state::functions::{MASK_ASCII, display_flags},
     },
     vm::TerminalTarget,
 };
@@ -71,7 +71,7 @@ impl IcyBoardState {
             .input_field(
                 IceText::DesiredProtocol,
                 1,
-                &MASK_ALNUM,
+                &MASK_ASCII,
                 "",
                 Some(cur_protocol.to_string()),
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE | display_flags::FIELDLEN,

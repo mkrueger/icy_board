@@ -49,13 +49,17 @@ lazy_static::lazy_static! {
     pub static ref MASK_PWD: String = (' '..='~').collect::<String>();
     pub static ref MASK_ALPHA: String = ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str();
     pub static ref MASK_NUM: String = ('0'..='9').collect::<String>();
-    pub static ref MASK_ALNUM: String = (' '..='~').collect::<String>();
-    pub static ref MASK_FILE: String =  ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + ('0'..='9').collect::<String>().as_str() + "!#$%&'()-.:[\\]^_`~";
-    pub static ref MASK_PATH: String =  ('A'..='Z').collect::<String>()
-    + ('a'..='z').collect::<String>().as_str()
-    + ('0'..='9').collect::<String>().as_str()
-    + "!#$%&'()-.:[\\]^_`~";
+    /// PPL's MASK_ALNUM(), which is narrower than the name suggests elsewhere:
+    /// PCBoard's own "alphanumeric" mask is all of printable ASCII.
+    pub static ref MASK_ALNUM: String = ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + ('0'..='9').collect::<String>().as_str();
+    pub static ref MASK_FILE: String =  ('@'..='z').collect::<String>() + ('0'..=':').collect::<String>().as_str() + "!#$%&'()-.~";
+    pub static ref MASK_PATH: String =  ('@'..='z').collect::<String>()
+    + ('0'..=':').collect::<String>().as_str()
+    + "!#$%&'()-.~:\\";
     pub static ref MASK_ASCII: String = (' '..='~').collect::<String>();
+    /// What PCBoard lets through where line noise is not a concern: printable
+    /// ASCII plus the high half, so an accented name survives.
+    pub static ref MASK_MESSAGE: String = (' '..='~').collect::<String>() + ('\u{80}'..='\u{FE}').collect::<String>().as_str();
     pub static ref MASK_WEB: String = ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + ('0'..='9').collect::<String>().as_str() + "@.:!#$%&'*+-/=?^_`{|}~";
 
     pub static ref MASK_PHONE: String = ('0'..='9').collect::<String>() + "/()-+ ";
@@ -379,6 +383,10 @@ impl IcyBoardState {
             self.reset_color(TerminalTarget::Both).await?;
         }
 
+        // PCBoard only opens the high half when the sysop has turned the line noise
+        // filter off, so a noisy modem cannot type its way into a user record.
+        let high_ascii = display_flags & display_flags::HIGHASCII != 0 && self.get_board().await.config.switches.disable_high_ascii_filter;
+
         let mut output = String::new();
         loop {
             if self.session.request_logoff {
@@ -421,6 +429,7 @@ impl IcyBoardState {
                     valid_mask
                 }
                 .contains(key_char.ch)
+                    || high_ascii && key_char.ch >= '\u{80}'
                     || (display_flags & display_flags::STACKED) != 0 && " ;".contains(key_char.ch))
             {
                 output.push(key_char.ch);

@@ -13,7 +13,7 @@ use crate::icy_board::macro_parser::Macro;
 use crate::icy_board::read_with_encoding_detection;
 use crate::icy_board::security_expr::SecurityExpression;
 use crate::icy_board::state::GraphicsMode;
-use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_NUM, MASK_PATH, MASK_PWD};
+use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_MESSAGE, MASK_NUM, MASK_PATH, MASK_PWD};
 use crate::icy_board::user_base::{ConferenceFlags, Password};
 use crate::icy_board::user_inf::{BankUserInf, QwkConfigUserInf};
 use crate::parser::CONFERENCE_ID;
@@ -650,8 +650,14 @@ pub async fn target_inkey(vm: &mut VirtualMachine<'_>, target: TerminalTarget) -
 pub async fn tostring(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_string(vm.eval_expr(&args[0]).await?.as_string()))
 }
-pub async fn mask_pwd(_vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_string(MASK_PWD.to_string()))
+pub async fn mask_pwd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    // PCBoard hands out the wider mask once the logon filter is off.
+    let disable_edits = vm.icy_board_state.get_board().await.config.switches.disable_registration_edits;
+    Ok(VariableValue::new_string(if disable_edits {
+        MASK_MESSAGE.to_string()
+    } else {
+        MASK_PWD.to_string()
+    }))
 }
 pub async fn mask_alpha(_vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_string(MASK_ALPHA.to_string()))

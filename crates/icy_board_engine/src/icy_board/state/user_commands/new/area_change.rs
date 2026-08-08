@@ -1,5 +1,5 @@
 use crate::icy_board::commands::CommandType;
-use crate::icy_board::state::functions::{MASK_ALNUM, MASK_COMMAND};
+use crate::icy_board::state::functions::{MASK_ASCII, MASK_COMMAND};
 use crate::{Res, icy_board::state::IcyBoardState};
 
 use crate::icy_board::{icb_text::IceText, state::functions::display_flags};
@@ -86,7 +86,7 @@ impl IcyBoardState {
                     self.input_field(
                         IceText::TextToScanFor,
                         40,
-                        &MASK_ALNUM,
+                        &MASK_ASCII,
                         CommandType::ChangeMessageArea.get_help(),
                         None,
                         display_flags::UPCASE | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,

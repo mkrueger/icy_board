@@ -16,7 +16,7 @@ use crate::{
         read_with_encoding_detection,
         state::{
             NodeStatus,
-            functions::{MASK_ALNUM, display_flags},
+            functions::{MASK_ASCII, display_flags},
         },
     },
     vm::TerminalTarget,
@@ -184,7 +184,7 @@ impl IcyBoardState {
                                 IcbColor::None,
                                 String::new(),
                                 60,
-                                &MASK_ALNUM,
+                                &MASK_ASCII,
                                 "",
                                 None,
                                 display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::GUIDE | display_flags::LFAFTER,

@@ -1,6 +1,6 @@
 use crate::Res;
 use crate::icy_board::commands::CommandType;
-use crate::icy_board::state::functions::{MASK_ALNUM, MASK_COMMAND, MASK_NUM};
+use crate::icy_board::state::functions::{MASK_ASCII, MASK_COMMAND, MASK_NUM};
 use crate::{
     icy_board::{
         icb_text::{IceText, TextEntry},
@@ -405,7 +405,7 @@ impl IcyBoardState {
                 .input_field(
                     IceText::TextToScanFor,
                     40,
-                    &MASK_ALNUM,
+                    &MASK_ASCII,
                     "hlpsrch",
                     None,
                     display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE,
@@ -438,7 +438,7 @@ impl IcyBoardState {
                     .input_field(
                         text,
                         25,
-                        &MASK_ALNUM,
+                        &MASK_ASCII,
                         "",
                         None,
                         display_flags::NEWLINE | display_flags::UPCASE | display_flags::FIELDLEN | display_flags::LFBEFORE,
