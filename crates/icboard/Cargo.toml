@@ -31,7 +31,6 @@ substring = { workspace = true }
 ariadne = { workspace = true }
 unicase = { workspace = true }
 fern = { workspace = true }
-qfile = { path = "../qfile" }
 easy_reader = "0.5.2"
 toml = { workspace = true }
 md-to-tui = "0.1.2"

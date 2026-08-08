@@ -12,7 +12,7 @@ use self::{
     users::PcbUserRecord,
 };
 
-use super::{IcyBoardError, case_insitive_lookup, icb_text::IcbTextFile};
+use super::{IcyBoardError, icb_text::IcbTextFile, lookup_case_insensitive};
 
 pub mod pcbconferences;
 pub mod pcboard_data;
@@ -91,7 +91,7 @@ impl PcbBoard {
             }
         }
 
-        case_insitive_lookup(PathBuf::from(s)).to_str().unwrap().to_string()
+        lookup_case_insensitive(Path::new(&s)).to_str().unwrap().to_string()
     }
 
     pub fn load(file: &Path) -> Res<PcbBoard> {

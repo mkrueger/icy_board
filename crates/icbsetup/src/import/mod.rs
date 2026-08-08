@@ -47,12 +47,12 @@ use icy_board_engine::{
         icb_config::{
             AccountingOptions, ConfigSwitches, EventOptions, FileTransferOptions, LimitOptions, MessageOptions, SystemControlOptions, UserCommandLevels,
         },
+        lookup_case_insensitive,
         security_expr::SecurityExpression,
         user_base::{PasswordInfo, User},
     },
 };
 use jamjam::util::echmoail::EchomailAddress;
-use qfile::{QFilePath, QTraitSync};
 use relative_path::{PathExt, RelativePathBuf};
 use walkdir::WalkDir;
 
@@ -165,13 +165,7 @@ impl PCBoardImporter {
             }
         }
 
-        if let Ok(mut file_path) = QFilePath::add_path(s.clone()) {
-            if let Ok(file) = file_path.get_path_buf() {
-                return file;
-            }
-        }
-        let res = PathBuf::from(s);
-        res
+        lookup_case_insensitive(Path::new(&s))
     }
 
     pub fn start_import(&mut self) -> Res<()> {

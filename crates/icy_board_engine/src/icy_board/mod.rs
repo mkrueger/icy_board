@@ -1,13 +1,13 @@
 use std::{
+    ffi::{OsStr, OsString},
     fs,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 
 use crate::Res;
 use accounting_cfg::AccountingConfig;
 use bulletins::BullettinList;
 use codepages::tables::write_utf8_with_bom;
-use qfile::QTraitSync;
 use surveys::SurveyList;
 use thiserror::Error;
 
@@ -260,7 +260,7 @@ impl IcyBoard {
                 })
                 .collect();
         */
-        return case_insitive_lookup(s);
+        return lookup_case_insensitive(&s);
     }
 
     pub fn load<P: AsRef<Path>>(path: &P) -> Res<Self> {
@@ -754,13 +754,43 @@ impl IcyBoard {
     }
 }
 
-pub(crate) fn case_insitive_lookup(path: PathBuf) -> PathBuf {
-    if let Ok(mut file_path) = qfile::QFilePath::add_path(path.to_string_lossy()) {
-        if let Ok(file) = file_path.get_path_buf() {
-            return file;
+/// PPEs and PCBoard configurations name their files the way DOS did, so the case of a
+/// path says nothing about what is on disk.
+pub fn lookup_case_insensitive(path: &Path) -> PathBuf {
+    if path.exists() {
+        return path.to_path_buf();
+    }
+    let mut resolved = PathBuf::new();
+    let mut corrected = false;
+    for component in path.components() {
+        let Component::Normal(name) = component else {
+            resolved.push(component.as_os_str());
+            continue;
+        };
+        if resolved.join(name).exists() {
+            resolved.push(name);
+            continue;
+        }
+        match entry_ignoring_case(&resolved, name) {
+            Some(found) => {
+                resolved.push(found);
+                corrected = true;
+            }
+            // Nothing on disk answers to this name, so the rest is taken as written.
+            None => resolved.push(name),
         }
     }
-    path
+    if corrected { resolved } else { path.to_path_buf() }
+}
+
+fn entry_ignoring_case(dir: &Path, name: &OsStr) -> Option<OsString> {
+    let dir = if dir.as_os_str().is_empty() { Path::new(".") } else { dir };
+    let name = name.to_str()?;
+    fs::read_dir(dir)
+        .ok()?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.file_name())
+        .find(|entry| entry.to_str().is_some_and(|entry| entry.eq_ignore_ascii_case(name)))
 }
 
 fn get_path(parent_path: &Path, home_dir: &PathBuf) -> PathBuf {
@@ -973,5 +1003,56 @@ pub trait PCBoardTextImport: PCBoardImport {
                 Err(IcyError::ErrorLoadingFile("PCBOARD TEXT FILE".to_string(), path.as_ref().to_string_lossy().to_string(), err.to_string()).into())
             }
         }
+    }
+}
+
+/// Tests of the path lookup that stands in for the case insensitive file system PCBoard had.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn board(files: &[&str]) -> tempfile::TempDir {
+        let root = tempfile::tempdir().unwrap();
+        for file in files {
+            let path = root.path().join(file);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, "").unwrap();
+        }
+        root
+    }
+
+    #[test]
+    fn test_a_path_that_is_there_is_handed_back_untouched() {
+        let root = board(&["gen/BRDM.PPE"]);
+        let path = root.path().join("gen/BRDM.PPE");
+        assert_eq!(lookup_case_insensitive(&path), path);
+    }
+
+    #[test]
+    fn test_a_dos_name_finds_the_file_it_means() {
+        let root = board(&["gen/brdm.ppe"]);
+        assert_eq!(lookup_case_insensitive(&root.path().join("GEN/BRDM.PPE")), root.path().join("gen/brdm.ppe"));
+    }
+
+    #[test]
+    fn test_every_directory_on_the_way_is_looked_up() {
+        let root = board(&["Ppe/Door/setup.cfg"]);
+        assert_eq!(
+            lookup_case_insensitive(&root.path().join("PPE/DOOR/SETUP.CFG")),
+            root.path().join("Ppe/Door/setup.cfg")
+        );
+    }
+
+    #[test]
+    fn test_a_file_that_is_nowhere_leaves_the_path_as_it_was() {
+        let root = board(&["gen/brdm.ppe"]);
+        let path = root.path().join("GEN/NOTHERE.PPE");
+        assert_eq!(lookup_case_insensitive(&path), root.path().join("gen/NOTHERE.PPE"));
+    }
+
+    #[test]
+    fn test_a_path_no_part_of_which_exists_is_left_alone() {
+        let path = Path::new("/no/such/place/AT/ALL.PPE");
+        assert_eq!(lookup_case_insensitive(path), path);
     }
 }
