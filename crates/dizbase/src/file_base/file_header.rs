@@ -1,23 +1,17 @@
-use std::{
-    fs::File,
-    io::{BufReader, BufWriter, Read, Write},
-};
-
-use chrono::{DateTime, MappedLocalTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 
 #[derive(Clone)]
 pub struct FileHeader {
-    //name_len: u8,
+    /// Row id in the `files` table, 0 until the row is inserted.
+    pub id: i64,
     /// File name (up to 255 bytes long)
     pub name: String,
     /// unix utc timestamp
     pub date: DateTime<Utc>,
     /// size of the file in bytes
     pub size: u64,
-    /// # times of download.self.attribute & attributes::PASSWORD != 0
+    /// # times of download
     pub dl_counter: u64,
-    /// Offset of the metadata
-    pub metadata_offset: u64,
     /// Attributes of the file
     pub attribute: FileAttributes,
 }
@@ -41,7 +35,9 @@ bitflags::bitflags! {
 }
 
 impl FileHeader {
-    pub const HEADER_SIZE: usize = 256 + 8 + 8 + 8 + 4 + 8 + 8 + 1;
+    pub fn id(&self) -> i64 {
+        self.id
+    }
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -54,9 +50,6 @@ impl FileHeader {
 
     pub fn dl_counter(&self) -> u64 {
         self.dl_counter
-    }
-    pub fn metadata_offset(&self) -> u64 {
-        self.metadata_offset
     }
 
     pub fn is_free(&self) -> bool {
@@ -102,57 +95,5 @@ impl FileHeader {
         } else {
             self.attribute &= !FileAttributes::DELETED;
         }
-    }
-
-    pub fn read(file: &mut BufReader<File>) -> crate::Result<Self> {
-        let byte = &mut [0; 1];
-        let byte8 = &mut [0; 8];
-
-        file.read_exact(byte)?;
-        let name_len = byte[0] as usize;
-
-        let mut data = vec![0; name_len];
-        file.read_exact(&mut data)?;
-        let name = std::str::from_utf8(&mut data).unwrap().to_string();
-        file.read_exact(byte8)?;
-
-        let date = if let MappedLocalTime::Single(dt) = Utc.timestamp_millis_opt(i64::from_le_bytes(*byte8)) {
-            dt
-        } else {
-            Utc::now()
-        };
-        file.read_exact(byte8)?;
-        let size = u64::from_le_bytes(*byte8);
-        file.read_exact(byte8)?;
-        let dl_counter = u64::from_le_bytes(*byte8);
-        file.read_exact(byte8)?;
-        let metadata_offset = u64::from_le_bytes(*byte8);
-        file.read_exact(byte)?;
-        let attribute = byte[0];
-
-        Ok(Self {
-            name,
-            date,
-            size,
-            dl_counter,
-            metadata_offset,
-            attribute: FileAttributes::from_bits_truncate(attribute),
-        })
-    }
-    pub fn write(&self, file: &mut BufWriter<File>) -> crate::Result<()> {
-        let mut data = Vec::with_capacity(Self::HEADER_SIZE);
-        if self.name.len() > 255 {
-            return Err(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Name too long")));
-        }
-        data.push(self.name.len() as u8);
-        data.extend(self.name.as_bytes());
-        data.extend(&self.date.timestamp_millis().to_le_bytes());
-
-        data.extend(&self.size.to_le_bytes());
-        data.extend(&self.dl_counter.to_le_bytes());
-        data.extend(&self.metadata_offset.to_le_bytes());
-        data.push(self.attribute.bits());
-        file.write_all(&data)?;
-        Ok(())
     }
 }

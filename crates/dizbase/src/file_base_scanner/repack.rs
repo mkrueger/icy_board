@@ -1,9 +1,10 @@
 use std::{
     fs::{self, File},
-    io::{BufReader, BufWriter, Read, Write},
+    io::{BufReader, BufWriter, Write},
     path::PathBuf,
 };
 
+use unarc_rs::unified::{ArchiveFormat, UnifiedArchive};
 use walkdir::WalkDir;
 use zip::write::ExtendedFileOptions;
 
@@ -15,26 +16,21 @@ pub fn repack_files(scan_dir: &PathBuf, fingerprints: FingerprintData) -> crate:
             continue;
         }
 
-        if let Some(extension) = path.path().extension() {
-            if let Err(err) = repack_file(&path.path(), extension.to_ascii_uppercase(), &fingerprints) {
-                eprintln!("Error while repacking {}:{}", path.path().display(), err);
-                continue;
-            }
+        if let Err(err) = repack_file(path.path(), &fingerprints) {
+            eprintln!("Error while repacking {}:{}", path.path().display(), err);
+            continue;
         }
     }
 
     Ok(())
 }
 
-fn repack_file(path: &std::path::Path, extension: std::ffi::OsString, fingerprints: &FingerprintData) -> crate::Result<()> {
-    let dir = tempfile::tempdir()?;
-
-    match extension.to_str() {
-        Some("ZIP") => unpack_zip(path, dir.path())?,
-        //        Some("LHA") | Some("LZH") => unpack_lha(path, dir.path())?,
-        //         Some("RAR") => unpack_rar(path, dir.path())?,
-        _ => return Ok(()),
+fn repack_file(path: &std::path::Path, fingerprints: &FingerprintData) -> crate::Result<()> {
+    if ArchiveFormat::from_path(path).is_none() {
+        return Ok(());
     }
+    let dir = tempfile::tempdir()?;
+    unpack(path, dir.path())?;
 
     let file = tempfile::NamedTempFile::new()?;
     pack(dir.path(), file.as_file(), fingerprints)?;
@@ -68,26 +64,17 @@ fn pack(src: &std::path::Path, out_file: &File, fingerprints: &FingerprintData) 
     Ok(())
 }
 
-fn unpack_zip(path: &std::path::Path, dest_path: &std::path::Path) -> crate::Result<()> {
-    let file = fs::File::open(path)?;
-    let reader = BufReader::new(file);
+fn unpack(path: &std::path::Path, dest_path: &std::path::Path) -> crate::Result<()> {
+    let Some(format) = ArchiveFormat::from_path(path) else {
+        return Ok(());
+    };
+    let mut archive = UnifiedArchive::open_with_format(BufReader::new(fs::File::open(path)?), format)?;
 
-    let mut archive = zip::ZipArchive::new(reader)?;
-
-    for i in 0..archive.len() {
-        let mut file = archive.by_index(i)?;
-
-        let out_path = if let Some(out_path) = file.enclosed_name() {
-            out_path.to_path_buf()
-        } else {
-            println!("Entry {} has a suspicious path", file.name());
-            return Ok(());
-        };
-        let mut content = Vec::new();
-        file.read_to_end(&mut content)?;
-        let dest_file = dest_path.join(out_path);
-        fs::create_dir_all(path.parent().unwrap())?;
-        fs::write(dest_file, content)?;
+    fs::create_dir_all(dest_path)?;
+    while let Some(entry) = archive.next_entry()? {
+        // Flattening the member name keeps a crafted archive from escaping the temp dir.
+        let content = archive.read(&entry)?;
+        fs::write(dest_path.join(entry.file_name()), content)?;
     }
     Ok(())
 }
