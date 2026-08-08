@@ -16,7 +16,7 @@
     keeping the description and download counter of the entry it replaces.
 - [ ] Finsh/sync commands & help files
 - [x] ICBSETUP needs a "cmd editor"
-- [ ] Rework the mkicbmnu - due to changes in the icbsetup menu system that got broken
+- [x] Rework the mkicbmnu - due to changes in the icbsetup menu system that got broken
 - [x] Look at the NEWS/INTRO feature of PCBOARD how that really works
 - [x] Logon mail scan
 - [x] Finish internal message reader - I don't like it have a message reader PPE going but needs to be finished in any case…
