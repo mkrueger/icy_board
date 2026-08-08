@@ -579,6 +579,9 @@ impl VariableTable {
             }
             if var_type == VariableType::Function || var_type == VariableType::Procedure {
                 let first_var = unsafe { self.entries[i].value.data.procedure_value.first_var_id as usize };
+                if unsafe { self.entries[i].value.data.procedure_value.start_offset } == 0 {
+                    continue;
+                }
                 let last = unsafe {
                     self.entries[i].value.data.procedure_value.local_variables as usize
                         + self.entries[i].value.data.procedure_value.parameters as usize
@@ -883,6 +886,10 @@ impl VariableTable {
         for t in self.entries.clone().iter() {
             if t.header.variable_type == VariableType::Function {
                 unsafe {
+                    // A routine with no start offset owns nothing, its variables stay global.
+                    if t.value.data.function_value.start_offset == 0 {
+                        continue;
+                    }
                     let start = t.value.data.function_value.first_var_id as usize + t.value.data.function_value.parameters as usize + 1;
                     for i in 0..t.value.data.function_value.local_variables {
                         let idx = start + i as usize;
@@ -899,6 +906,9 @@ impl VariableTable {
                 }
             } else if t.header.variable_type == VariableType::Procedure {
                 unsafe {
+                    if t.value.data.procedure_value.start_offset == 0 {
+                        continue;
+                    }
                     let start = t.value.data.procedure_value.first_var_id as usize + t.value.data.procedure_value.parameters as usize + 1;
                     for i in 0..t.value.data.procedure_value.local_variables {
                         let var = self.get_var_entry_mut(start + i as usize);

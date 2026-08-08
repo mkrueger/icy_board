@@ -425,13 +425,9 @@ impl Decompiler {
         unsafe {
             let mut decl = Vec::new();
 
-            let (start, end) = if entry.header.variable_type == VariableType::Function {
-                let start = entry.value.data.function_value.first_var_id as usize + entry.value.data.function_value.parameters as usize + 1;
-                (start, start + entry.value.data.function_value.local_variables as usize - 1)
-            } else {
-                let start = entry.value.data.function_value.first_var_id as usize + entry.value.data.function_value.parameters as usize + 1;
-                (start, start + entry.value.data.function_value.local_variables as usize)
-            };
+            // The return variable sits somewhere in this block and is filtered out below.
+            let start = entry.value.data.function_value.first_var_id as usize + entry.value.data.function_value.parameters as usize + 1;
+            let end = start + entry.value.data.function_value.local_variables as usize;
 
             for i in start..end {
                 let local_var = self.executable.variable_table.get_var_entry(i);
