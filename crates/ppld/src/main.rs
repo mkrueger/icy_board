@@ -1,4 +1,5 @@
 use argh::FromArgs;
+use codepages::tables::write_cp437;
 use crossterm::ExecutableCommand;
 use crossterm::execute;
 use crossterm::style::Attribute;
@@ -43,6 +44,10 @@ struct Cli {
     /// checks a .ppe file for compatibility with the current runtime
     #[argh(switch)]
     check: bool,
+
+    /// write the source as cp437 instead of utf8, for use with the original tooling
+    #[argh(switch)]
+    cp437: bool,
 
     #[argh(option)]
     /// keyword casing style, valid values are u=upper (default), l=lower, c=camel
@@ -130,8 +135,12 @@ fn main() {
                     if arguments.output {
                         println!("{}", output_visitor.output);
                     } else {
-                        let mut output = File::create(&out_file_name).unwrap();
-                        if let Err(err) = write!(output, "{}", output_visitor.output) {
+                        let res = if arguments.cp437 {
+                            write_cp437(&out_file_name, &output_visitor.output)
+                        } else {
+                            File::create(&out_file_name).and_then(|mut output| write!(output, "{}", output_visitor.output))
+                        };
+                        if let Err(err) = res {
                             stdout()
                                 .execute(SetForegroundColor(Color::Red))
                                 .unwrap()
