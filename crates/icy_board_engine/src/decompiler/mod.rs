@@ -199,8 +199,16 @@ impl Decompiler {
         for entry in self.executable.variable_table.get_entries() {
             match entry.entry_type {
                 EntryType::Function | EntryType::Procedure => {
-                    // offset == 0 seems to be a bug used for preventing decompilation
+                    // A zero start offset is used to stop decompilers finding the body.
                     if unsafe { entry.value.data.procedure_value.start_offset } == 0 {
+                        self.issues.push(DecompilerIssue {
+                            byte_offset: 0,
+                            bug: DeserializationErrorType::RoutineWithoutStartOffset(entry.name.clone()),
+                        });
+                        ast.nodes.push(AstNode::TopLevelStatement(CommentAstNode::create_empty_statement(format!(
+                            " {} has no start offset, its body is left inline in the main program",
+                            entry.name
+                        ))));
                         continue;
                     }
                     self.function_lookup

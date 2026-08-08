@@ -89,7 +89,8 @@ impl OutputVisitor {
                         for (j, dim) in variable.get_dimensions().iter().enumerate() {
                             self.output.push_str(dim.get_dimension().to_string().as_str());
                             if j < variable.get_dimensions().len() - 1 {
-                                self.output.push_str(", ");
+                                // PCBoard's PPLC reads dimensions with a constant expression parser that rejects blanks.
+                                self.output.push(',');
                             }
                         }
                         self.output.push(')');
@@ -522,7 +523,8 @@ impl AstVisitor<()> for OutputVisitor {
                 for (j, dim) in var.get_dimensions().iter().enumerate() {
                     self.output.push_str(dim.get_dimension().to_string().as_str());
                     if j < var.get_dimensions().len() - 1 {
-                        self.output.push_str(", ");
+                        // PCBoard's PPLC reads dimensions with a constant expression parser that rejects blanks.
+                        self.output.push(',');
                     }
                 }
                 self.output.push(')');

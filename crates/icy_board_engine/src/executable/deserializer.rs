@@ -41,6 +41,9 @@ pub enum DeserializationErrorType {
     #[error("No variable table entry for {0}")]
     NoVTableEntry(usize),
 
+    #[error("{0} has no start offset, its body stays inline in the main program")]
+    RoutineWithoutStartOffset(String),
+
     #[error("Got procedure call in expression {0}")]
     GotProcedureCallInExpression(i16),
 
