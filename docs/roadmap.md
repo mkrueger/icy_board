@@ -23,7 +23,7 @@
 - [x] Implement RM command
 - [x] Implement SELECT command
 - [x] Implement group chat (CHAT command)
-- [x] Finish SSH/Websocket support - works somewhat but SSH only with icy term so far
+- [x] Finish SSH/Websocket support
 - [ ] Mailer Support (BINKP?) - the spec is under crates/doc/binkp, nothing implements it yet
 - [ ] Go throught the PCBoard options and ensure they're working - atm some do - some don't
   - compat/COMMAND_AUDIT.md tracks where a command still answers differently than PCBoard did
