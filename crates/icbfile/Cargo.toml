@@ -1,0 +1,19 @@
+[package]
+name = "icbfile"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+dizbase = { workspace = true }
+icy_board_engine = { workspace = true }
+codepages = { workspace = true }
+
+argh = { workspace = true }
+chrono = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = { workspace = true }

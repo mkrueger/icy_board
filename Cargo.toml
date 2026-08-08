@@ -18,6 +18,7 @@ members = [
 	"crates/icbsetup",
 	"crates/icbmailer",
 	"crates/icbsysmgr",
+	"crates/icbfile",
 ]
 [workspace.package]
 version = "0.1.7"

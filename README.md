@@ -33,6 +33,7 @@ There are data structures for almost all PCBoard data structures so making a BBS
 * [PCBoard Feature Status](docs/feature_parity.md)
 * [Differences](docs/differences.md)
   * [New @ Macros](docs/new_macros.md)
+* [File areas](docs/icbfile.md)
 * [PPL](docs/ppl.md)
   * [PPLC](docs/pplc.md)
   * [New PPL functions](docs/new_ppl.md)
