@@ -1646,16 +1646,19 @@ impl IcyBoardState {
         let chars = str.chars().collect::<Vec<char>>();
         if let Some(regex) = &self.session.search_pattern.clone() {
             if let Some(find) = regex.find(str) {
-                self.write_raw(target, &chars[..find.start()]).await?;
+                // regex offsets are byte indices; convert them to char indices for `chars`.
+                let start = str[..find.start()].chars().count();
+                let end = str[..find.end()].chars().count();
+                self.write_raw(target, &chars[..start]).await?;
                 let old_color = self.user_screen.buffer.caret.attribute;
                 if old_color.background() == 0 {
                     self.set_color(target, IcbColor::Dos(0x70)).await?;
                 } else {
                     self.set_color(target, IcbColor::Dos(0x07)).await?;
                 }
-                self.write_raw(target, &chars[find.start()..find.end()]).await?;
+                self.write_raw(target, &chars[start..end]).await?;
                 self.set_color(target, IcbColor::Dos(old_color.as_u8(icy_engine::IceMode::Blink))).await?;
-                self.write_raw(target, &chars[find.end()..]).await?;
+                self.write_raw(target, &chars[end..]).await?;
                 return Ok(());
             }
         }
