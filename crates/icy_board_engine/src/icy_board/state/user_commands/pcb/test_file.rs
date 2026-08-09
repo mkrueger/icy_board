@@ -1,5 +1,8 @@
-use dizbase::file_base::{FileBase, metadata::MetadataType};
-use regex::Regex;
+use dizbase::file_base::{
+    FileBase,
+    metadata::MetadataType,
+    pattern::{MatchOptions, Pattern},
+};
 
 use crate::{
     Res,
@@ -40,10 +43,14 @@ impl IcyBoardState {
                 return Ok(());
             }
 
-            let Ok(search_regex) = Regex::new(&search_pattern) else {
+            let Ok(search_glob) = Pattern::new(&search_pattern) else {
                 self.display_text(IceText::PunctuationError, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
                 return Ok(());
+            };
+            let match_options = MatchOptions {
+                case_sensitive: false,
+                ..MatchOptions::new()
             };
 
             self.session.push_tokens(&"A");
@@ -56,7 +63,7 @@ impl IcyBoardState {
                 let header_count = base.lock().await.len();
                 for file in 0..header_count {
                     let file_name = base.lock().await[file].name().to_string();
-                    if !search_regex.is_match(&file_name) {
+                    if !search_glob.matches_with(&file_name, &match_options) {
                         continue;
                     }
                     found = true;

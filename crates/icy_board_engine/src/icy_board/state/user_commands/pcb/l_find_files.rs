@@ -1,4 +1,4 @@
-use regex::Regex;
+use dizbase::file_base::pattern::{MatchOptions, Pattern};
 
 use crate::{
     Res,
@@ -41,10 +41,17 @@ impl IcyBoardState {
             return Ok(());
         }
 
-        let Ok(search_regex) = Regex::new(&search_pattern) else {
+        // The prompt promises DOS wildcards, so match like PCBoard did: '*'/'?' globbing
+        // against the whole name, case insensitively.
+        let Ok(search_pattern) = Pattern::new(&search_pattern) else {
             self.display_text(IceText::PunctuationError, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
             return Ok(());
+        };
+        let search_pattern = std::sync::Arc::new(search_pattern);
+        let match_options = MatchOptions {
+            case_sensitive: false,
+            ..MatchOptions::new()
         };
 
         loop {
@@ -87,7 +94,7 @@ impl IcyBoardState {
                     }
                     self.new_line().await?;
                     self.reset_color(TerminalTarget::Both).await?;
-                    let r = search_regex.clone();
+                    let r = search_pattern.clone();
                     self.display_file_area(
                         &path,
                         &metadata,
@@ -97,10 +104,7 @@ impl IcyBoardState {
                                     return false;
                                 }
                             }
-                            if r.is_match(p.name()) {
-                                return true;
-                            }
-                            false
+                            r.matches_with(p.name(), &match_options)
                         }),
                     )
                     .await?;
