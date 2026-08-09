@@ -10,6 +10,7 @@ use crate::{
     BORDER_SET,
     config_menu::{EditMessage, ResultState},
     get_text,
+    message_box::MessageBox,
     select_menu::{SelectMenu, SelectMenuState},
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
@@ -44,8 +45,11 @@ impl IcbSetupMenuUI {
             height: area.height.saturating_sub(1),
         };
 
-        if let Some(page) = self.sub_pages.last_mut() {
-            page.render(frame, area);
+        if !self.sub_pages.is_empty() {
+            // A modal only paints a small box, so the page below has to be drawn first.
+            for page in self.sub_pages.iter_mut() {
+                page.render(frame, area);
+            }
             return;
         }
 
@@ -150,6 +154,9 @@ impl IcbSetupMenuUI {
                         },
                         None,
                     );
+                }
+                PageMessage::InfoBox(state, message) => {
+                    return (self.open_sup_page(Box::new(MessageBox::new(state, message))), None);
                 }
                 _ => {
                     return (ResultState::default(), None);

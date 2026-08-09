@@ -11,6 +11,7 @@ use icy_board_engine::{
         commands::CommandList,
         conferences::{Conference, ConferenceBase},
         doors::DoorList,
+        events::EventList,
         file_directory::{DirectoryList, FileDirectory},
         ftn::FtnConfig,
         group_list::GroupList,
@@ -260,6 +261,10 @@ impl IcyBoardCreator {
         fs::create_dir_all(&self.destination.join(&ftn.inbound))?;
         fs::create_dir_all(&self.destination.join(&ftn.outbound))?;
         ftn.save(&self.destination.join(&config.paths.ftn_file))?;
+
+        self.logger.start_action("Write default event file".to_string());
+        config.event.event_file = PathBuf::from("main/events.toml");
+        EventList::default().save(&self.destination.join(&config.event.event_file))?;
 
         self.logger.start_action("Create default user (SYSOP)".to_string());
 

@@ -32,6 +32,7 @@ use crate::bbs::await_securewebsocket_connections;
 
 pub mod bbs;
 mod call_wait_screen;
+mod event_scheduler;
 pub mod menu_runner;
 mod node_monitoring_screen;
 mod system_statistics_screen;
@@ -193,6 +194,19 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
 }
 
 async fn start_connections(bbs: &Arc<Mutex<BBS>>, board: &Arc<Mutex<IcyBoard>>, token: CancellationToken) {
+    {
+        let bbs = bbs.clone();
+        let board = board.clone();
+        let token = token.clone();
+        tokio::spawn(async move {
+            tokio::select! {
+                _ = event_scheduler::run_event_scheduler(board, bbs) => {
+                },
+                _ = token.cancelled() => {
+                }
+            }
+        });
+    }
     let telnet_connection: icy_board_engine::icy_board::login_server::Telnet = board.lock().await.config.login_server.telnet.clone();
     if telnet_connection.is_enabled {
         let bbs = bbs.clone();

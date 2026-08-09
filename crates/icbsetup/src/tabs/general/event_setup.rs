@@ -23,7 +23,7 @@ impl EventSetup {
             let sysop_info: Vec<ConfigEntry<Arc<Mutex<IcyBoard>>>> = vec![
                 ConfigEntry::Separator,
                 cfg_entry_bool!("event_enabled", label_width, event, enabled, lock),
-                cfg_entry_path!("event_dat_path", label_width, event, event_dat_path, lock),
+                cfg_entry_path!("event_file", label_width, event, event_file, lock),
                 ConfigEntry::Separator,
                 ConfigEntry::Label(get_text("event_enabled_for_expedited_label")),
                 ConfigEntry::Separator,

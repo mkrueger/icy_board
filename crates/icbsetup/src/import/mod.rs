@@ -13,6 +13,7 @@ use icy_board_engine::{
         bulletins::BullettinList,
         commands::CommandList,
         conferences::ConferenceBase,
+        events::{BoardEvent, EventList, EventMode},
         file_directory::DirectoryList,
         group_list::GroupList,
         icb_config::{
@@ -483,8 +484,8 @@ impl PCBoardImporter {
                 call_log: true,
             },
             event: EventOptions {
-                enabled: false,
-                event_dat_path: PathBuf::new(),
+                enabled: self.data.event_active,
+                event_file: PathBuf::from("main/events.toml"),
                 suspend_minutes: self.data.event_suspend as u16,
                 disallow_uploads: self.data.event_stop_uplds,
                 minutes_uploads_disallowed: self.data.min_prior_to_event as u16,
@@ -511,6 +512,22 @@ impl PCBoardImporter {
         icb_cfg.board.allow_iemsi = false;
         icb_cfg.login_server.telnet.port = 1337;
         icb_cfg.login_server.ssh.port = 1338;
+
+        // PCBOARD.DAT only knows the one daily event, EVENT.DAT is not read.
+        let mut events = EventList::default();
+        if !self.data.event_time.trim().is_empty() {
+            events.push(BoardEvent {
+                description: "Imported from PCBOARD.DAT".to_string(),
+                time: IcbTime::parse(&format!("{}:00", self.data.event_time.trim())),
+                mode: if self.data.event_slide { EventMode::Slide } else { EventMode::Fixed },
+                ..Default::default()
+            });
+        }
+        let event_path = self.output_directory.join(&icb_cfg.event.event_file);
+        if let Some(parent) = event_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        events.save(&event_path)?;
 
         let destination = self.output_directory.join(icy_board_engine::DEFAULT_ICYBOARD_FILE);
         self.output.start_action(format!("Create main configuration {}…", destination.display()));

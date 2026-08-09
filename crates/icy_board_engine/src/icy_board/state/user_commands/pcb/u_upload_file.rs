@@ -42,6 +42,13 @@ impl IcyBoardState {
     }
 
     pub async fn upload_file(&mut self) -> Res<()> {
+        if let Some(window) = self.event_window().await {
+            if window.uploads_blocked(&chrono::Local::now()) {
+                self.display_text(IceText::UploadsDisabled, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
+                return Ok(());
+            }
+        }
         if !self.proceed_with_upload().await? {
             return Ok(());
         }

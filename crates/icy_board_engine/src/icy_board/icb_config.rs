@@ -637,13 +637,13 @@ pub struct BoardOptions {
     pub alarm: bool,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct EventOptions {
     #[serde(default)]
     pub enabled: bool,
 
-    #[serde(default)]
-    pub event_dat_path: PathBuf,
+    #[serde(default, alias = "event_dat_path")]
+    pub event_file: PathBuf,
 
     #[serde(default)]
     pub suspend_minutes: u16,
@@ -1012,7 +1012,7 @@ impl IcbConfig {
             },
             event: EventOptions {
                 enabled: false,
-                event_dat_path: PathBuf::new(),
+                event_file: PathBuf::new(),
                 suspend_minutes: 0,
                 disallow_uploads: false,
                 minutes_uploads_disallowed: 0,

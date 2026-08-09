@@ -17,7 +17,7 @@ Legend:
 - ❌ stored and editable, but nothing reads it
 - 📥 filled in by the `PCBOARD.DAT` importer, but nothing reads it afterwards
 
-**43 of 117 options and 21 of 29 sysop security levels do nothing today.**
+**39 of 117 options and 21 of 29 sysop security levels do nothing today.**
 
 ## board — general information
 
@@ -116,14 +116,16 @@ All four are used: `give_user_password_to_doors`, `call_log`, `page_bell`,
 
 | Option | Status | Note |
 |---|---|---|
-| `enabled` | ✅ | but only as a flag; nothing schedules |
-| `event_dat_path` | ❌ | the event file is never read |
-| `suspend_minutes` | ❌ | |
-| `disallow_uploads` | ❌ | |
-| `minutes_uploads_disallowed` | ❌ | |
+| `enabled` | ✅ | |
+| `event_file` | ✅ | the event list, `events.toml` |
+| `suspend_minutes` | ✅ | turns callers away and caps the session time |
+| `disallow_uploads` | ✅ | |
+| `minutes_uploads_disallowed` | ✅ | |
 
-There is no event scheduler at all, so the whole section is decoration apart
-from the flag.
+The scheduler lives in `crates/icboard/src/event_scheduler.rs`, the event list
+in `crates/icy_board_engine/src/icy_board/events.rs`. PCBoard's binary
+`EVENT.DAT` is not read; the per-node and expedited/fido/mail event modes have
+no equivalent.
 
 ## accounting
 
@@ -196,7 +198,7 @@ That is 47 of the 123, and the honest answer for all of them is no.
 
 | PCBoard option | What it does | Why |
 |---|---|---|
-| `event_active`, `event_time`, `event_slide` | when the nightly event runs, and whether it waits for a caller to hang up | icy_board has an `event` section with no time in it, so the feature cannot be configured even once a scheduler exists |
+| `event_active`, `event_time`, `event_slide` | when the nightly event runs, and whether it waits for a caller to hang up | done - they become `event.enabled` and the single entry the importer writes to `events.toml` |
 | `auto_reg_conf` | register a new user in every conference | otherwise a new user sees one conference and has to find the rest |
 | `force_main` | comments to the sysop always land in the main board | cheap, and stops comments scattering across conferences |
 | `conf_pwrd_adjust` | re-read the conference password on every join | a password changed while a user is online takes effect |
@@ -248,7 +250,7 @@ setting the sysop made:
 | `max_total_msgs` | `qwk_settings.max_msgs` | the whole `qwk_settings` block is imported as default |
 | `max_conf_msgs` | `qwk_settings.max_msgs_per_conf` | as above |
 | `qwk_file` | `qwk_settings.bbs_id` | as above |
-| `event_active` | `event.enabled` | hardcoded to `false` on import |
+| `event_active` | `event.enabled` | done |
 | `account_track` | `accounting.tracking_file` | left empty |
 | `num_areas` | — | conferences are counted, areas are not |
 
@@ -266,9 +268,9 @@ Three answers are defensible per option, and each needs a deliberate choice:
    `file_transfer.disable_drive_size_check`,
    `switches.default_graphics_at_login`,
    `system_control.disable_ns_logon`.
-3. **Mark it.** Where the feature is planned but distant — the whole `event`
-   section, the peak-rate half of `accounting` — ICBSetup should say so rather
-   than presenting a live-looking toggle.
+3. **Mark it.** Where the feature is planned but distant — the peak-rate half
+   of `accounting` — ICBSetup should say so rather than presenting a
+   live-looking toggle.
 
 ## Verification
 

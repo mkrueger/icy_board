@@ -12,7 +12,7 @@ use crate::{
     BORDER_SET,
     config_menu::{ConfigMenu, ConfigMenuState, EditMessage, ListValue, ResultState},
     get_text,
-    tab_page::PageMessage,
+    tab_page::{InfoState, PageMessage},
     theme::get_tui_theme,
 };
 
@@ -42,7 +42,7 @@ impl ICBConfigMenuUI {
         if let Some(item) = self.menu.get_item(self.state.selected) {
             if let ListValue::Path(path) = &item.value {
                 let path = self.menu.obj.lock().unwrap().resolve_file(path);
-                if path.exists() && path.is_file() && item.editable() {
+                if !path.as_os_str().is_empty() && !path.is_dir() && item.editable() {
                     bottom_text = get_text("icb_setup_key_menu_edit_help");
                 }
             }
@@ -97,8 +97,18 @@ impl ICBConfigMenuUI {
             if let ListValue::Path(path) = &item.value {
                 if key.code == crossterm::event::KeyCode::F(2) && item.editable() {
                     let path = self.menu.obj.lock().unwrap().resolve_file(path);
+                    if path.as_os_str().is_empty() {
+                        return PageMessage::InfoBox(InfoState::Warning, get_text("no_file_name_given"));
+                    }
                     if let Some(editor) = &item.path_editor {
                         return editor(self.menu.obj.clone(), path);
+                    }
+                    // A file that is only named in the configuration is created on demand.
+                    if !path.exists() {
+                        if let Err(e) = create_empty_file(&path) {
+                            log::error!("Error creating {}: {}", path.display(), e);
+                            return PageMessage::InfoBox(InfoState::Error, format!("{}\n\n{}", path.display(), e));
+                        }
                     }
 
                     let editor: &String = &self.menu.obj.lock().unwrap().config.sysop.external_editor;
@@ -109,19 +119,13 @@ impl ICBConfigMenuUI {
                             }
                             Err(e) => {
                                 log::error!("Error opening editor: {}", e);
-                                return PageMessage::ResultState(ResultState {
-                                    edit_msg: EditMessage::None,
-                                    status_line: format!("Error: {}", e),
-                                });
+                                return PageMessage::InfoBox(InfoState::Error, format!("{}\n\n{}", editor, e));
                             }
                         },
                         Err(e) => {
                             log::error!("Error opening editor: {}", e);
                             ratatui::init();
-                            return PageMessage::ResultState(ResultState {
-                                edit_msg: EditMessage::None,
-                                status_line: format!("Error: {}", e),
-                            });
+                            return PageMessage::InfoBox(InfoState::Error, format!("{}\n\n{}", editor, e));
                         }
                     }
                 }
@@ -134,4 +138,12 @@ impl ICBConfigMenuUI {
         }
         PageMessage::ResultState(res)
     }
+}
+
+fn create_empty_file(path: &std::path::Path) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::File::create(path)?;
+    Ok(())
 }

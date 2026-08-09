@@ -13,6 +13,7 @@ pub mod help_view;
 pub mod icbconfigmenu;
 pub mod icbsetupmenu;
 pub mod insert_table;
+pub mod message_box;
 pub mod pcb_line;
 pub mod position_editor;
 pub mod save_changes_dialog;

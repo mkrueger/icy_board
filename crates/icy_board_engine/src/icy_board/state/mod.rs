@@ -43,6 +43,7 @@ use super::{
     bbs::{BBS, BBSMessage},
     commands::{AutoRun, Command, CommandAction, CommandType},
     conferences::Conference,
+    events::{self, EventWindow},
     icb_config::{DEFAULT_PCBOARD_DATE_FORMAT, IcbColor, SysopCommandLevels, UserCommandLevels},
     icb_text::{IcbTextFile, IcbTextStyle, IceText},
     macro_parser::{Macro, MacroCommand},
@@ -1246,6 +1247,25 @@ impl IcyBoardState {
         self.board.lock().await
     }
 
+    /// The event the board is heading towards, if any is scheduled.
+    pub async fn event_window(&self) -> Option<EventWindow> {
+        let board = self.board.lock().await;
+        events::next_window(&board.config.event, &board.events, &chrono::Local::now())
+    }
+
+    /// Cuts the session short so that the caller is gone before the event starts.
+    pub async fn limit_time_for_event(&mut self) {
+        let now = chrono::Local::now();
+        let Some(window) = self.event_window().await else {
+            return;
+        };
+        let minutes = window.minutes_until_suspend(&now) as i32;
+        if minutes < self.session.time_limit {
+            self.session.time_limit = minutes;
+            self.session.time_adjusted_for_event = true;
+        }
+    }
+
     pub async fn broadcast(&self, lonode: u16, hinode: u16, message: &str) -> Res<()> {
         for i in lonode..=hinode {
             if i == self.node as u16 {
@@ -2325,6 +2345,9 @@ impl IcyBoardState {
                         Some(BBSMessage::Broadcast(msg)) => {
                             self.show_broadcast(msg).await?;
                         }
+                        Some(BBSMessage::Shutdown(msg)) => {
+                            self.shutdown_for_event(msg).await?;
+                        }
                         Some(BBSMessage::GroupChat(event)) => {
                             self.handle_group_chat_event(event).await?;
                         }
@@ -2387,6 +2410,9 @@ impl IcyBoardState {
                         }
                         Some(BBSMessage::Broadcast(msg)) => {
                             self.show_broadcast(msg).await?;
+                        }
+                        Some(BBSMessage::Shutdown(msg)) => {
+                            self.shutdown_for_event(msg).await?;
                         }
                         Some(BBSMessage::GroupChat(event)) => {
                             self.handle_group_chat_event(event).await?;
@@ -2480,6 +2506,16 @@ impl IcyBoardState {
         }
 
         Ok(Some(ch))
+    }
+
+    /// Says goodbye and drops the line - the caller gets no say in it.
+    async fn shutdown_for_event(&mut self, msg: String) -> Res<()> {
+        self.new_line().await?;
+        self.set_color(TerminalTarget::Both, IcbColor::dos_white()).await?;
+        self.println(TerminalTarget::Both, &msg).await?;
+        self.bell().await?;
+        self.reset_color(TerminalTarget::Both).await?;
+        self.hangup().await
     }
 
     async fn show_broadcast(&mut self, msg: String) -> Res<()> {

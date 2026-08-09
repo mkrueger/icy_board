@@ -1185,9 +1185,9 @@ event_enabled=Is a Timed Event Active
 event_enabled-status=Is a Timed Event Active
 event_enabled-help=TODO
 
-event_dat_path=Name/Location of EVENT.DAT
-event_dat_path-status=Name/Location of EVENT.DAT
-event_dat_path-help=TODO
+event_file=Name/Location of Event File
+event_file-status=Name/Location of the timed event list
+event_file-help=The TOML file that lists the timed events. Press F2 to edit it - the file is created when it does not exist yet.
 
 event_suspend_minutes=Minutes Prior to Suspend All Activity
 event_suspend_minutes-status=Minutes Prior to Suspend All Activity
@@ -1960,3 +1960,9 @@ qwk_goodbye_screen-help=TODO
 qwk_news_sceen=News Screen
 qwk_news_sceen-status=QWK News Screen
 qwk_news_sceen-help=TODO
+
+message_box_info_title= Information 
+message_box_warning_title= Warning 
+message_box_error_title= Error 
+message_box_dismiss= Press ENTER 
+no_file_name_given=No file name has been configured for this entry.

@@ -46,6 +46,16 @@ impl PcbBoardCommand {
         self.state.display_file(&welcome_screen).await?;
         self.state.new_line().await?;
 
+        // An event is about to take the board down - nobody gets in any more.
+        if let Some(window) = self.state.event_window().await {
+            if window.is_suspended(&chrono::Local::now()) {
+                self.state.display_text(IceText::DeniedAccessForEvent, display_flags::NEWLINE).await?;
+                self.state.hangup().await?;
+                return Ok(false);
+            }
+        }
+        self.state.limit_time_for_event().await;
+
         let mut tries = 0;
         if !is_local && self.state.get_board().await.config.board.allow_iemsi {
             let (name, location, operator, notice, caps) = {

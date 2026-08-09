@@ -17,6 +17,7 @@ use self::{
     commands::CommandList,
     conferences::ConferenceBase,
     doors::DoorList,
+    events::EventList,
     file_directory::DirectoryList,
     ftn::FtnConfig,
     group_list::GroupList,
@@ -37,6 +38,7 @@ pub mod bulletins;
 pub mod commands;
 pub mod conferences;
 pub mod doors;
+pub mod events;
 pub mod file_directory;
 pub mod ftn;
 pub mod group_list;
@@ -117,6 +119,7 @@ pub struct IcyBoard {
     pub statistics: Statistics,
     pub commands: CommandList,
     pub ftn: FtnConfig,
+    pub events: EventList,
 }
 
 impl IcyBoard {
@@ -137,6 +140,7 @@ impl IcyBoard {
             statistics: Statistics::default(),
             groups: GroupList::default(),
             ftn: FtnConfig::default(),
+            events: EventList::default(),
         }
     }
 
@@ -176,6 +180,8 @@ impl IcyBoard {
         self.config.paths.pwrd_sec_level_file = get_path(&self.root_path, &self.config.paths.pwrd_sec_level_file);
         self.config.paths.statistics_file = get_path(&self.root_path, &self.config.paths.statistics_file);
         self.config.paths.ftn_file = get_path(&self.root_path, &self.config.paths.ftn_file);
+
+        self.config.event.event_file = get_path(&self.root_path, &self.config.event.event_file);
 
         // Fidonet mail spool
         self.ftn.inbound = get_path(&self.root_path, &self.ftn.inbound);
@@ -370,6 +376,19 @@ impl IcyBoard {
             }
         };
 
+        let events = if config.event.event_file.as_os_str().is_empty() {
+            EventList::default()
+        } else {
+            let load_path = get_path(parent_path, &config.event.event_file);
+            match EventList::load(&load_path) {
+                Ok(events) => events,
+                Err(e) => {
+                    log::error!("Error loading events: {} from {}, generating default.", e, load_path.display());
+                    EventList::default()
+                }
+            }
+        };
+
         let load_path = get_path(parent_path, &config.accounting.cfg_file);
         match AccountingConfig::load(&load_path) {
             Ok(acc) => {
@@ -396,6 +415,7 @@ impl IcyBoard {
             statistics,
             groups,
             ftn,
+            events,
         };
 
         for conf in board.conferences.iter_mut() {

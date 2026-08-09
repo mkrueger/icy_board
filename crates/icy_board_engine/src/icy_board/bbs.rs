@@ -11,6 +11,8 @@ pub enum BBSMessage {
     SysopLogin,
     SysopLogout,
     Broadcast(String),
+    /// Show the text and drop the caller - sent when an event is about to run.
+    Shutdown(String),
     GroupChat(GroupChatEvent),
 }
 

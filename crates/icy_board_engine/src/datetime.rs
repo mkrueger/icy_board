@@ -480,6 +480,18 @@ impl IcbDoW {
     pub fn new(day: u8) -> Self {
         Self { dow: day }
     }
+
+    pub fn all() -> Self {
+        Self { dow: 0b0111_1111 }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.dow & 0b0111_1111 == 0
+    }
+
+    pub fn contains(&self, day: chrono::Weekday) -> bool {
+        self.dow & (1 << day.num_days_from_sunday()) != 0
+    }
 }
 
 impl fmt::Display for IcbDoW {

@@ -15,7 +15,7 @@ pub enum PageMessage {
     ResultState(ResultState),
     OpenSubPage(Box<dyn Page>),
     ExternalProgramStarted,
-    InfoBox(InfoState, String, Box<PageMessage>),
+    InfoBox(InfoState, String),
 }
 
 pub trait Page {
