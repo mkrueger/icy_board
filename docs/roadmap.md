@@ -24,7 +24,7 @@
 - [x] Implement SELECT command
 - [x] Implement group chat (CHAT command)
 - [x] Finish SSH/Websocket support
-- [ ] Mailer Support (BINKP?) - icbmailer polls a link and exchanges files, but nothing packs or unpacks mail yet
+- [ ] Mailer Support (BINKP?) - icbmailer polls, tosses and scans, but nothing calls it on a schedule and nothing answers an incoming call yet
 - [ ] Go throught the PCBoard options and ensure they're working - atm some do - some don't
   - compat/COMMAND_AUDIT.md tracks where a command still answers differently than PCBoard did
 

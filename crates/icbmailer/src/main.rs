@@ -13,6 +13,7 @@ use icy_board_engine::{
             FtnConfig, FtnLink,
             bundle::{is_bundle, unpack},
             packet::Packet,
+            toss::{scan_outbound, toss_inbound},
         },
     },
 };
@@ -32,7 +33,9 @@ struct Cli {
 enum Command {
     Links(Links),
     Poll(Poll),
+    Scan(Scan),
     Show(Show),
+    Toss(Toss),
 }
 
 #[derive(FromArgs)]
@@ -78,6 +81,32 @@ struct Show {
     text: bool,
 }
 
+#[derive(FromArgs)]
+#[argh(subcommand, name = "toss")]
+/// read the mail waiting in the inbound into the message bases
+struct Toss {
+    #[argh(positional)]
+    /// path/file name of the icyboard.toml configuration file
+    config: PathBuf,
+
+    #[argh(switch, short = 'v')]
+    /// report what the tosser is doing
+    verbose: bool,
+}
+
+#[derive(FromArgs)]
+#[argh(subcommand, name = "scan")]
+/// pack the mail written here into bundles for the links that carry its area
+struct Scan {
+    #[argh(positional)]
+    /// path/file name of the icyboard.toml configuration file
+    config: PathBuf,
+
+    #[argh(switch, short = 'v')]
+    /// report what the scanner is doing
+    verbose: bool,
+}
+
 #[tokio::main]
 async fn main() {
     let arguments: Cli = argh::from_env();
@@ -90,6 +119,14 @@ async fn main() {
         Command::Show(arguments) => {
             set_up_logging(false);
             show(&arguments.file, arguments.text)
+        }
+        Command::Toss(arguments) => {
+            set_up_logging(arguments.verbose);
+            toss(&arguments.config)
+        }
+        Command::Scan(arguments) => {
+            set_up_logging(arguments.verbose);
+            scan(&arguments.config)
         }
     };
     if let Err(err) = result {
@@ -213,6 +250,51 @@ async fn poll_link(ftn: &FtnConfig, identity: &BinkpIdentity, link: &FtnLink, ke
 /// An address may be given with or without its network, so both spellings count.
 fn answers_to(link: &FtnLink, wanted: &str) -> bool {
     link.address.to_string().eq_ignore_ascii_case(wanted) || link.to_5d().eq_ignore_ascii_case(wanted)
+}
+
+fn toss(config: &Path) -> Res<()> {
+    let board = load(config)?;
+    let report = toss_inbound(&board.ftn, &echo_areas(&board))?;
+
+    println!(
+        "{} message(s) tossed, {} netmail, {} duplicate(s) dropped",
+        report.imported, report.netmail, report.duplicates
+    );
+    for (tag, count) in &report.unknown {
+        println!("  {} message(s) arrived for {}, which no area carries", count, tag);
+    }
+    for (file, err) in &report.failed {
+        println!("  left in the inbound, {}: {}", file.display(), err);
+    }
+    Ok(())
+}
+
+fn scan(config: &Path) -> Res<()> {
+    let board = load(config)?;
+    let report = scan_outbound(&board.ftn, &echo_areas(&board), &chrono::Local::now().naive_local())?;
+
+    println!("{} message(s) packed into {} bundle(s)", report.exported, report.bundles.len());
+    for bundle in &report.bundles {
+        println!("  {}", bundle.display());
+    }
+    Ok(())
+}
+
+/// The areas that take part in the network, told apart by the tag they carry
+/// there. An area without a tag is one this board keeps to itself.
+fn echo_areas(board: &IcyBoard) -> Vec<(String, PathBuf)> {
+    let mut areas = Vec::new();
+    for conference in board.conferences.iter() {
+        let Some(list) = &conference.areas else {
+            continue;
+        };
+        for area in list.iter() {
+            if !area.ftn_area_tag.is_empty() {
+                areas.push((area.ftn_area_tag.clone(), area.path.clone()));
+            }
+        }
+    }
+    areas
 }
 
 fn identity_for(board: &IcyBoard, link: &FtnLink) -> Res<BinkpIdentity> {

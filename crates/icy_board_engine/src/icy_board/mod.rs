@@ -180,6 +180,7 @@ impl IcyBoard {
         // Fidonet mail spool
         self.ftn.inbound = get_path(&self.root_path, &self.ftn.inbound);
         self.ftn.outbound = get_path(&self.root_path, &self.ftn.outbound);
+        self.ftn.netmail = get_path(&self.root_path, &self.ftn.netmail);
 
         // Trashcan files
         self.config.paths.trashcan_upload_files = get_path(&self.root_path, &self.config.paths.trashcan_upload_files);

@@ -8,6 +8,7 @@ use super::IcyBoardSerializer;
 
 pub mod bundle;
 pub mod packet;
+pub mod toss;
 
 /// The port fidonet technology networks reserved for binkp.
 pub const DEFAULT_BINKP_PORT: u16 = icy_net::binkp::DEFAULT_PORT;
@@ -61,6 +62,12 @@ pub struct FtnLink {
     /// Zero means the link is polled only when the sysop asks for it.
     #[serde(default)]
     pub poll_minutes: u32,
+
+    /// The echo tags this link carries. Mail written here is offered to a link
+    /// only for the areas it asked for, and to every link that asked.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub areas: Vec<String>,
 }
 
 impl FtnLink {
@@ -74,6 +81,10 @@ impl FtnLink {
         }
         format!("{}@{}", self.address, self.domain)
     }
+
+    pub fn carries(&self, tag: &str) -> bool {
+        self.areas.iter().any(|area| area.eq_ignore_ascii_case(tag))
+    }
 }
 
 impl Default for FtnLink {
@@ -85,6 +96,7 @@ impl Default for FtnLink {
             port: DEFAULT_BINKP_PORT,
             password: String::new(),
             poll_minutes: 0,
+            areas: Vec::new(),
         }
     }
 }
@@ -96,6 +108,12 @@ pub struct FtnConfig {
 
     /// Where bundles wait for the next session.
     pub outbound: PathBuf,
+
+    /// The message base arriving netmail is written to. Netmail is addressed to
+    /// a person, but nothing here knows yet which user that is, so it lands in
+    /// one place for the sysop to look at.
+    #[serde(default = "FtnConfig::default_netmail")]
+    pub netmail: PathBuf,
 
     /// Appended to every echomail message this board originates.
     #[serde(default)]
@@ -111,6 +129,10 @@ pub struct FtnConfig {
 }
 
 impl FtnConfig {
+    fn default_netmail() -> PathBuf {
+        PathBuf::from("ftn/netmail")
+    }
+
     /// The address a link is greeted with when it belongs to no known network.
     pub fn primary_aka(&self) -> Option<&FtnAka> {
         self.akas.first()
@@ -143,6 +165,7 @@ impl Default for FtnConfig {
             links: Vec::new(),
             inbound: PathBuf::from("ftn/inbound"),
             outbound: PathBuf::from("ftn/outbound"),
+            netmail: Self::default_netmail(),
             origin: String::new(),
         }
     }
@@ -236,5 +259,22 @@ mod tests {
         .unwrap();
         assert_eq!(config.links[0].port, DEFAULT_BINKP_PORT);
         assert_eq!(config.akas[0].address.node, 100);
+    }
+
+    #[test]
+    fn test_a_link_only_carries_the_areas_it_asked_for() {
+        let config: FtnConfig = toml::from_str(
+            r#"
+            inbound = "ftn/inbound"
+            outbound = "ftn/outbound"
+            [[link]]
+            address = "21:1/1"
+            host = "hub.example.org"
+            areas = ["FSX_GEN", "FSX_BBS"]
+            "#,
+        )
+        .unwrap();
+        assert!(config.links[0].carries("fsx_gen"));
+        assert!(!config.links[0].carries("FSX_MYS"));
     }
 }

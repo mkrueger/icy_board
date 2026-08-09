@@ -561,6 +561,20 @@ impl JamMessage {
         self
     }
 
+    /// Keeps the id a message arrived with instead of making up a new one, which
+    /// is what lets two systems agree that they are looking at the same message.
+    pub fn with_msg_id(mut self, id: BString) -> Self {
+        self.header.msgid_crc = JamMessageBase::get_crc(&id);
+        self.header.sub_fields.push(MessageSubfield::new(SubfieldType::MsgID, id));
+        self
+    }
+
+    pub fn with_reply_id(mut self, id: BString) -> Self {
+        self.header.replycrc = JamMessageBase::get_crc(&id);
+        self.header.sub_fields.push(MessageSubfield::new(SubfieldType::ReplyID, id));
+        self
+    }
+
     pub fn with_date_time(mut self, time: DateTime<Utc>) -> Self {
         self.header.date_written = time.timestamp() as u32;
         self.header
