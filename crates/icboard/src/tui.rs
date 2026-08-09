@@ -218,12 +218,15 @@ impl Tui {
     }
 
     fn ui(&self, frame: &mut Frame, status_bar_info: StatusBarInfo) {
+        let screen = &self.screen.lock().unwrap();
         let width = frame.area().width.min(80);
-        let height = frame.area().height.min(24);
+        // Render the whole terminal viewport. The previous hard-coded 24 hid the terminal's
+        // last line, so the input prompt ended up behind the status bar.
+        let view_height = screen.buffer.terminal_state.height().max(0) as u16;
+        let height = frame.area().height.min(view_height);
 
         let mut area = Rect::new((frame.area().width - width) / 2, (frame.area().height - height) / 2, width, height);
 
-        let screen = &self.screen.lock().unwrap();
         for y in 0..area.height as i32 {
             for x in 0..area.width as i32 {
                 let c = screen.char_at((x, y + screen.first_visible_line()).into());
