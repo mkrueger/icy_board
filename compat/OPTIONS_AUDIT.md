@@ -175,7 +175,7 @@ to its level.
 ## The other direction: PCBoard options with no home here
 
 `PCBOARD.DAT` has 194 top level entries in our model of it. The importer reads
-71 into `icboard.toml`; the remaining 123 have nowhere to go. Most of that is
+74 into `icboard.toml`; the remaining 120 have nowhere to go. Most of that is
 right — half of `PCBOARD.DAT` describes a UART, a swap file or an OS/2 thread
 priority — but not all of it.
 
@@ -192,13 +192,18 @@ The machine underneath is gone, so the setting has no meaning: `eliminate_snow`,
 `auto_make_msgs` (a JAM base creates itself), `encrypt` (passwords are hashed),
 `user_sys_during_bat`, the seven `minimize_*` and the six `priority_*`.
 
-That is 47 of the 123, and the honest answer for all of them is no.
+That is 47 of the 120, and the honest answer for all of them is no.
+
+### Ported since this audit was written
+
+`event_active`, `event_time`, `event_slide` — when the nightly event runs and
+whether it waits for a caller to hang up. They become `event.enabled` and the
+single daily entry the importer writes to `events.toml`.
 
 ### Worth porting
 
 | PCBoard option | What it does | Why |
 |---|---|---|
-| `event_active`, `event_time`, `event_slide` | when the nightly event runs, and whether it waits for a caller to hang up | done - they become `event.enabled` and the single entry the importer writes to `events.toml` |
 | `auto_reg_conf` | register a new user in every conference | otherwise a new user sees one conference and has to find the rest |
 | `force_main` | comments to the sysop always land in the main board | cheap, and stops comments scattering across conferences |
 | `conf_pwrd_adjust` | re-read the conference password on every join | a password changed while a user is online takes effect |
@@ -250,7 +255,6 @@ setting the sysop made:
 | `max_total_msgs` | `qwk_settings.max_msgs` | the whole `qwk_settings` block is imported as default |
 | `max_conf_msgs` | `qwk_settings.max_msgs_per_conf` | as above |
 | `qwk_file` | `qwk_settings.bbs_id` | as above |
-| `event_active` | `event.enabled` | done |
 | `account_track` | `accounting.tracking_file` | left empty |
 | `num_areas` | — | conferences are counted, areas are not |
 
