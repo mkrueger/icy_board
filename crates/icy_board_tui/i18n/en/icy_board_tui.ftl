@@ -354,6 +354,10 @@ allow_one_name_users=Allow One Name Users
 allow_one_name_users-status=Allow single name users
 allow_one_name_users-help=TODO
 
+auto_register_conferences=Register New Users in Public Conferences
+auto_register_conferences-status=A new caller starts out registered in every public conference
+auto_register_conferences-help=Conferences that carry a security requirement of their own are left out.
+
 new_user_groups=New User Default Groups
 new_user_groups-status=Default groups for new users
 new_user_groups-help=TODO
@@ -797,6 +801,14 @@ guard_logoff=Warning on Logoff Command
 guard_logoff-status=Show Warning on 'g' command.
 guard_logoff-help=TODO
 
+confirm_caller_name=Confirm the Caller Name
+confirm_caller_name-status=Show the matched record and let the caller correct a typo
+confirm_caller_name-help=Catches the mistyped name that would otherwise create a second account.
+
+reread_sec_level_on_join=Re-read Security Levels on Join
+reread_sec_level_on_join-status=Apply the level limits again when a conference changes the level
+reread_sec_level_on_join-help=Conferences may raise or lower the security level of the caller.
+
 
 max_msg_lines=Maximum Lines in the Message Editor
 max_msg_lines-status=Maximum number of lines the user is able to edit in the message editor.
@@ -829,6 +841,14 @@ default_scan_all_selected_confs_at_login-help=TODO
 prompt_to_read_mail=Prompt to Read Mail when Mail Waiting
 prompt_to_read_mail-status=Prompt to read a new message addressed to the user.
 prompt_to_read_mail-help=TODO
+
+force_comments_to_main=Force Comments to the Main Board
+force_comments_to_main-status=Comments to the sysop are always entered in the main board
+force_comments_to_main-help=Keeps comments from scattering over the conferences.
+
+update_last_read_pointer=Reading Moves the Last Read Pointer
+update_last_read_pointer-status=Reading a message moves the last read pointer along
+update_last_read_pointer-help=Decides what the next new message scan will show.
 
 keyboard_timeout=Keyboard Timeout (in min)
 keyboard_timeout-status=0=disable
@@ -928,6 +948,22 @@ capture_grp_chat_session-help=TODO
 allow_handle_in_grpchat=Allow Handles in GROUP CHAT
 allow_handle_in_grpchat-status=Allow handles in GROUP CHAT
 allow_handle_in_grpchat-help=TODO
+
+call_log=Write a Caller Log
+call_log-status=Record every logon in the caller log
+call_log-help=The file is named under File Locations - System Files.
+
+log_caller_number=Log the Caller Number
+log_caller_number-status=Write the caller number of the session to the caller log
+log_caller_number-help=TODO
+
+log_connect_string=Log the Connection
+log_connect_string-status=Write how the caller reached the board to the caller log
+log_connect_string-help=TODO
+
+log_security_level=Log the Security Level
+log_security_level-status=Write the security level of the caller to the caller log
+log_security_level-help=TODO
 
 # ICBSETUP -> Configuration Options > Colors
 default_color=Default Color

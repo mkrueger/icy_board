@@ -29,6 +29,7 @@ impl NewUserOptions {
                 ConfigEntry::Separator,
                 cfg_entry_bool!("allow_one_name_users", label_width, new_user_settings, allow_one_name_users, lock),
                 cfg_entry_text!("new_user_groups", label_width, 30, new_user_settings, new_user_groups, lock),
+                cfg_entry_bool!("auto_register_conferences", label_width, new_user_settings, auto_register_conferences, lock),
                 ConfigEntry::Separator,
                 ConfigEntry::Label(get_text("new_user_options_ask_label")),
                 ConfigEntry::Table(

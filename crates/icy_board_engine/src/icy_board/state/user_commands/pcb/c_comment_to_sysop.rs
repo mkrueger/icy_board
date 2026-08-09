@@ -38,6 +38,13 @@ impl IcyBoardState {
 
     pub async fn enter_comment_to_sysop(&mut self) -> Res<()> {
         let to = self.get_board().await.config.sysop.name.clone();
+        // PCBoard's ForceMain keeps every comment in the main board instead of
+        // scattering them over the conferences.
+        let conf = if self.get_board().await.config.message.force_comments_to_main {
+            0
+        } else {
+            -1
+        };
         let subj = format!("COMMENT {}", IcbTime::now().to_string());
         let receipt = self
             .input_field(
@@ -54,7 +61,7 @@ impl IcyBoardState {
         if receipt == self.session.yes_char.to_uppercase().to_string() {
             msg_attributes |= attributes::MSG_RECEIPTREQ;
         }
-        self.write_message(-1, -1, &to, &subj, msg_attributes, None, None, Vec::new(), IceText::SavingComment)
+        self.write_message(conf, -1, &to, &subj, msg_attributes, None, None, Vec::new(), IceText::SavingComment)
             .await?;
 
         Ok(())

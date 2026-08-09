@@ -646,6 +646,39 @@ impl IcyBoard {
         // Line 270
         pcb_dat.skip_alias = !self.config.new_user_settings.ask_alias;
 
+        // Line 72
+        pcb_dat.disable_quick = self.config.system_control.disable_ns_logon;
+        // Line 85
+        pcb_dat.last_read_update = self.config.message.update_last_read_pointer;
+        // Line 107 - dropped in PCBoard 15.0, the flag now lives in the conference record
+        pcb_dat.pub_conf = self
+            .conferences
+            .iter()
+            .take(40)
+            .enumerate()
+            .map(|(i, c)| if i == 0 || c.is_public { 'X' } else { ' ' })
+            .collect();
+        // Line 170
+        pcb_dat.max_total_msgs = self.config.qwk_settings.max_msgs as i32;
+        // Line 171
+        pcb_dat.max_conf_msgs = self.config.qwk_settings.max_msgs_per_conf as i32;
+        // Line 191
+        pcb_dat.log_caller_number = self.config.options.log_caller_number;
+        // Line 192
+        pcb_dat.log_connect_str = self.config.options.log_connect_string;
+        // Line 193
+        pcb_dat.log_sec_level = self.config.options.log_security_level;
+        // Line 194
+        pcb_dat.conf_pwrd_adjust = self.config.system_control.reread_sec_level_on_join;
+        // Line 195
+        pcb_dat.confirm_caller = self.config.system_control.confirm_caller_name;
+        // Line 207
+        pcb_dat.force_main = self.config.message.force_comments_to_main;
+        // Line 215
+        pcb_dat.auto_reg_conf = self.config.new_user_settings.auto_register_conferences;
+        // Line 251
+        pcb_dat.qwk_file = self.config.qwk_settings.bbs_id.clone();
+
         // Line 296 (to prevent \0 char)
         pcb_dat.uucp_high_ascii = 'N';
         let res = pcb_dat.serialize(crate::parser::Encoding::CP437);

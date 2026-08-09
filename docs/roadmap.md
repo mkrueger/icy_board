@@ -30,7 +30,7 @@
       (a timed event can now do the calling)
 - [ ] Go throught the PCBoard options and ensure they're working - atm some do - some don't
   - compat/COMMAND_AUDIT.md tracks where a command still answers differently than PCBoard did
-  - compat/OPTIONS_AUDIT.md tracks the configuration switches - 39 of 117 options and 21 of 29
+  - compat/OPTIONS_AUDIT.md tracks the configuration switches - 38 of 125 options and 21 of 29
     sysop security levels are editable in ICBSetup but read by nobody
 
 -> 1st BETA

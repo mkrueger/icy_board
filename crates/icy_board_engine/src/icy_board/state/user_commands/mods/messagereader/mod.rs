@@ -529,6 +529,8 @@ impl IcyBoardState {
         self.session.low_msg_num = message_base.base_messagenumber();
         self.session.high_msg_num = message_base.base_messagenumber() + message_base.active_messages();
 
+        // PCBoard's LastReadUpdate decides whether reading drags the pointer along.
+        let update_last_read = self.get_board().await.config.message.update_last_read_pointer;
         unsafe {
             let crc = JamMessageBase::get_crc(&bstr::BString::new(self.session.user_name.as_mut_vec().clone()));
             let mut opt = message_base
@@ -537,9 +539,11 @@ impl IcyBoardState {
             self.session.last_msg_read = opt.last_read_msg;
             self.session.highest_msg_read = opt.high_read_msg;
 
-            opt.last_read_msg = number;
-            opt.high_read_msg = opt.high_read_msg.max(number);
-            message_base.write_last_read(opt)?;
+            if update_last_read {
+                opt.last_read_msg = number;
+                opt.high_read_msg = opt.high_read_msg.max(number);
+                message_base.write_last_read(opt)?;
+            }
         }
         let last_read = self.session.last_msg_read;
         let mut reply_to = 0;

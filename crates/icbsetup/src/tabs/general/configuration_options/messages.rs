@@ -36,6 +36,8 @@ impl Messages {
                     lock
                 ),
                 cfg_entry_bool!("prompt_to_read_mail", label_width, message, prompt_to_read_mail, lock),
+                cfg_entry_bool!("force_comments_to_main", label_width, message, force_comments_to_main, lock),
+                cfg_entry_bool!("update_last_read_pointer", label_width, message, update_last_read_pointer, lock),
             ];
             ConfigMenu { obj: icy_board.clone(), entry }
         };

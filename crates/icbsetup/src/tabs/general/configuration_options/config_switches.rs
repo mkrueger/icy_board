@@ -43,6 +43,11 @@ impl ConfigSwitches {
                 cfg_entry_bool!("scan_new_blt", label_width, switches, scan_new_blt, lock),
                 cfg_entry_bool!("capture_grp_chat_session", label_width, switches, capture_grp_chat_session, lock),
                 cfg_entry_bool!("allow_handle_in_grpchat", label_width, switches, allow_handle_in_grpchat, lock),
+                ConfigEntry::Separator,
+                cfg_entry_bool!("call_log", label_width, options, call_log, lock),
+                cfg_entry_bool!("log_caller_number", label_width, options, log_caller_number, lock),
+                cfg_entry_bool!("log_connect_string", label_width, options, log_connect_string, lock),
+                cfg_entry_bool!("log_security_level", label_width, options, log_security_level, lock),
             ];
             ConfigMenu { obj: icy_board.clone(), entry }
         };

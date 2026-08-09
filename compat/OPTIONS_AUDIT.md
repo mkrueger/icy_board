@@ -17,7 +17,7 @@ Legend:
 - ❌ stored and editable, but nothing reads it
 - 📥 filled in by the `PCBOARD.DAT` importer, but nothing reads it afterwards
 
-**39 of 117 options and 21 of 29 sysop security levels do nothing today.**
+**38 of 125 options and 21 of 29 sysop security levels do nothing today.**
 
 ## board — general information
 
@@ -35,11 +35,12 @@ All ten are used: `name`, `allow_iemsi`, `location`, `operator`, `notice`,
 
 ## new_user_settings
 
-Nineteen of twenty are used, both in the new user questionnaire and in the
+Twenty of twenty-one are used, both in the new user questionnaire and in the
 matching questions of the `W` command.
 
 | Option | Status | Note |
 |---|---|---|
+| `auto_register_conferences` | ✅ | new user, registers in every public conference without a security requirement |
 | `new_user_groups` | ❌ | a new user is never put into the group named here |
 
 ## message
@@ -49,6 +50,8 @@ matching questions of the `W` command.
 | `disable_message_scan_prompt` | ✅ | join |
 | `default_scan_all_selected_confs_at_login` | ✅ | join |
 | `prompt_to_read_mail` | ✅ | logon mail scan |
+| `force_comments_to_main` | ✅ | `C` |
+| `update_last_read_pointer` | ✅ | message reader |
 | `max_msg_lines` | 📥 | the editor has its own limit |
 | `allow_esc_codes` | 📥 | ESC is filtered or not without asking this |
 | `scan_all_mail_at_login` | ❌ | |
@@ -80,8 +83,10 @@ most likely to touch.
 | `is_closed_board` | ✅ | login |
 | `guard_logoff` | ✅ | `G` |
 | `password_storage_method` | ✅ | |
+| `confirm_caller_name` | ✅ | login |
+| `reread_sec_level_on_join` | ✅ | join, when the conference changes the level |
+| `disable_ns_logon` | ✅ | login |
 | `allow_alias_change` | 📥 | `W` lets the alias be changed regardless |
-| `disable_ns_logon` | ❌ | the `NS` token is always honoured |
 | `disable_full_record_updating` | ❌ | `W` always asks everything |
 | `is_multi_lingual` | ❌ | `LANG` works whether or not this is set |
 | `enforce_daily_time_limit` | ❌ | only session limits exist |
@@ -109,8 +114,10 @@ connection holds its node until the process is restarted.
 
 ## options
 
-All four are used: `give_user_password_to_doors`, `call_log`, `page_bell`,
-`alarm`.
+All seven are used: `give_user_password_to_doors`, `call_log`, `page_bell`,
+`alarm`, `log_caller_number`, `log_connect_string`, `log_security_level`.
+`call_log` switches the caller log on, the three `log_` options decide what
+goes into it beyond the plain logon line.
 
 ## event
 
@@ -175,7 +182,7 @@ to its level.
 ## The other direction: PCBoard options with no home here
 
 `PCBOARD.DAT` has 194 top level entries in our model of it. The importer reads
-74 into `icboard.toml`; the remaining 120 have nowhere to go. Most of that is
+87 into `icboard.toml`; the remaining 107 have nowhere to go. Most of that is
 right — half of `PCBOARD.DAT` describes a UART, a swap file or an OS/2 thread
 priority — but not all of it.
 
@@ -192,7 +199,7 @@ The machine underneath is gone, so the setting has no meaning: `eliminate_snow`,
 `auto_make_msgs` (a JAM base creates itself), `encrypt` (passwords are hashed),
 `user_sys_during_bat`, the seven `minimize_*` and the six `priority_*`.
 
-That is 47 of the 120, and the honest answer for all of them is no.
+That is 47 of the 107, and the honest answer for all of them is no.
 
 ### Ported since this audit was written
 
@@ -200,21 +207,31 @@ That is 47 of the 120, and the honest answer for all of them is no.
 whether it waits for a caller to hang up. They become `event.enabled` and the
 single daily entry the importer writes to `events.toml`.
 
+`auto_reg_conf`, `force_main`, `conf_pwrd_adjust`, `confirm_caller`,
+`disable_quick`, `last_read_update`, `log_caller_number`, `log_connect_str`,
+`log_sec_level` — imported, written back out by `icbsetup export`, editable in
+ICBSetup and read at runtime. `conf_pwrd_adjust` turned out to be about PWRD,
+the security level file, and not about the conference password: a conference
+may raise or lower the level of the caller, and the option decides whether the
+limits of the new level are applied. `disable_quick` is PCBoard's switch for
+the `NS` token stacked onto the logon prompt, so it landed on the existing
+`system_control.disable_ns_logon`.
+
+`qwk_file`, `cap_file`, `max_total_msgs`, `max_conf_msgs` — `cap_file` no
+longer names a capture file in PCBoard 15, `getqwkroot()` only falls back to it
+when `qwk_file` is empty, so both feed `qwk_settings.bbs_id`.
+
+### No counterpart here
+
+| PCBoard option | Why not |
+|---|---|
+| `stop_clock_on_cap` | there is no session clock to stop; a session is granted a time limit and nothing is charged against it per transfer |
+| `chat_delay` | group chat is pushed over a channel, no node polls for it |
+| `pub_conf` | PCBoard 15 dropped the 40 character mask, the flag lives in the conference record and `Conference::is_public` already carries it. The exporter rebuilds the mask for older readers |
+
 ### Worth porting
 
-| PCBoard option | What it does | Why |
-|---|---|---|
-| `auto_reg_conf` | register a new user in every conference | otherwise a new user sees one conference and has to find the rest |
-| `force_main` | comments to the sysop always land in the main board | cheap, and stops comments scattering across conferences |
-| `conf_pwrd_adjust` | re-read the conference password on every join | a password changed while a user is online takes effect |
-| `confirm_caller` | make the caller confirm the name they typed | catches the typo that creates a second account |
-| `disable_quick` | switch off quick logon | a board that wants every caller to see the welcome files |
-| `last_read_update` | whether reading a new message moves the pointer | affects what the next scan shows |
-| `log_caller_number`, `log_connect_str`, `log_sec_level` | what goes into the caller log | the log is thin without them |
-| `cap_file` | where a session capture is written | the `R` command's capture is unimplemented and will need this |
-| `stop_clock_on_cap` | do not charge time while a capture is downloaded | belongs with the above |
-| `chat_delay` | how often node chat polls | a hard-coded interval today |
-| `pub_conf` | which conferences count as public | used for the "public conferences" display |
+Nothing outside the FidoNet block is left on this list.
 
 ### The FidoNet block — 25 options, newly relevant
 
@@ -252,9 +269,6 @@ setting the sysop made:
 
 | PCBoard option | icy_board field | State |
 |---|---|---|
-| `max_total_msgs` | `qwk_settings.max_msgs` | the whole `qwk_settings` block is imported as default |
-| `max_conf_msgs` | `qwk_settings.max_msgs_per_conf` | as above |
-| `qwk_file` | `qwk_settings.bbs_id` | as above |
 | `account_track` | `accounting.tracking_file` | left empty |
 | `num_areas` | — | conferences are counted, areas are not |
 
@@ -270,8 +284,7 @@ Three answers are defensible per option, and each needs a deliberate choice:
 2. **Remove it.** An option that describes a DOS-era problem the port does not
    have should not be offered. Candidates:
    `file_transfer.disable_drive_size_check`,
-   `switches.default_graphics_at_login`,
-   `system_control.disable_ns_logon`.
+   `switches.default_graphics_at_login`.
 3. **Mark it.** Where the feature is planned but distant — the peak-rate half
    of `accounting` — ICBSetup should say so rather than presenting a
    live-looking toggle.

@@ -487,6 +487,10 @@ pub struct NewUserSettings {
     pub ask_email: bool,
     pub ask_web_address: bool,
     pub ask_use_short_descr: bool,
+
+    /// Register a new user in every public conference they already have access to.
+    #[serde(default = "default_true")]
+    pub auto_register_conferences: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -502,6 +506,18 @@ pub struct MessageOptions {
     pub default_quick_personal_scan: bool,
     pub default_scan_all_selected_confs_at_login: bool,
     pub prompt_to_read_mail: bool,
+
+    /// Comments to the sysop are always entered in the main board.
+    #[serde(default)]
+    pub force_comments_to_main: bool,
+
+    /// Reading a message moves the last read pointer along.
+    #[serde(default = "default_true")]
+    pub update_last_read_pointer: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -544,6 +560,14 @@ pub struct SystemControlOptions {
 
     #[serde(default)]
     pub password_storage_method: PasswordStorageMethod,
+
+    /// Show the caller the record their name matched and let them correct a typo.
+    #[serde(default)]
+    pub confirm_caller_name: bool,
+
+    /// Re-read the security level limits when joining a conference changes the level.
+    #[serde(default)]
+    pub reread_sec_level_on_join: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -635,6 +659,18 @@ pub struct BoardOptions {
 
     #[serde(default)]
     pub alarm: bool,
+
+    /// Write the caller number of the session to the caller log.
+    #[serde(default)]
+    pub log_caller_number: bool,
+
+    /// Write how the caller reached the board to the caller log.
+    #[serde(default)]
+    pub log_connect_string: bool,
+
+    /// Write the security level of the caller to the caller log.
+    #[serde(default)]
+    pub log_security_level: bool,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -947,6 +983,7 @@ impl IcbConfig {
                 ask_web_address: false,
                 ask_use_short_descr: true,
                 ask_fse: true,
+                auto_register_conferences: true,
             },
             message: MessageOptions {
                 max_msg_lines: 100,
@@ -958,6 +995,8 @@ impl IcbConfig {
                 validate_to_name: true,
                 default_quick_personal_scan: true,
                 default_scan_all_selected_confs_at_login: true,
+                force_comments_to_main: false,
+                update_last_read_pointer: true,
             },
             file_transfer: FileTransferOptions {
                 display_uploader: false,
@@ -980,6 +1019,8 @@ impl IcbConfig {
                 is_multi_lingual: false,
                 allow_password_failure_comment: false,
                 password_storage_method: PasswordStorageMethod::default(),
+                confirm_caller_name: false,
+                reread_sec_level_on_join: false,
             },
             switches: ConfigSwitches {
                 display_news_behavior: DisplayNewsBehavior::OnlyNewer,
@@ -1009,6 +1050,9 @@ impl IcbConfig {
                 page_bell: true,
                 alarm: false,
                 call_log: true,
+                log_caller_number: false,
+                log_connect_string: false,
+                log_security_level: false,
             },
             event: EventOptions {
                 enabled: false,

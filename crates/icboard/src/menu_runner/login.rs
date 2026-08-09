@@ -14,7 +14,7 @@ use icy_board_engine::{
             functions::{MASK_ASCII, MASK_DATE, MASK_MESSAGE, MASK_NAME, MASK_PHONE, MASK_WEB, display_flags, pwd_flags},
         },
         surveys::Survey,
-        user_base::User,
+        user_base::{ConferenceFlags, User},
     },
     vm::TerminalTarget,
 };
@@ -104,6 +104,15 @@ impl PcbBoardCommand {
                 continue;
             }
 
+            // PCBoard reads an NS stacked onto the logon prompt as "do not pause",
+            // DisableQuick takes the shortcut away again.
+            if let Some(pos) = self.state.session.tokens.iter().position(|t| t.eq_ignore_ascii_case("NS")) {
+                self.state.session.tokens.remove(pos);
+                if !self.state.get_board().await.config.system_control.disable_ns_logon {
+                    self.state.session.disp_options.force_non_stop();
+                }
+            }
+
             let mut found_user = None;
             for (i, user) in self.state.get_board().await.users.iter().enumerate() {
                 if user.is_valid_loginname(&first_name) {
@@ -151,6 +160,9 @@ impl PcbBoardCommand {
                 self.state.session.user_name = first_name.to_string();
             }
             if let Some(user) = found_user {
+                if !self.confirm_caller(user).await? {
+                    continue;
+                }
                 self.state.set_current_user(user, false).await?;
                 return self.login_user().await;
             } else {
@@ -541,16 +553,69 @@ impl PcbBoardCommand {
         }
         self.newask_questions().await?;
 
+        if self.state.get_board().await.config.new_user_settings.auto_register_conferences {
+            self.register_public_conferences(&mut new_user).await;
+        }
+
         let id = self.state.get_board().await.users.new_user(new_user);
         self.state.get_board().await.save_userbase()?;
         self.state.set_current_user(id, true).await?;
 
         log::info!("NEW USER: '{}'", self.state.session.user_name);
+        self.state.log_logon_to_caller_log().await;
 
         self.state.display_news(false).await?;
         self.logon_questions().await?;
 
         return Ok(true);
+    }
+
+    /// PCBoard's AutoRegConf - a new caller starts out registered in every public
+    /// conference that carries no security requirement of its own.
+    async fn register_public_conferences(&self, user: &mut User) {
+        let board = self.state.get_board().await;
+        for (number, conference) in board.conferences.iter().enumerate() {
+            if !conference.is_public || !conference.required_security.is_empty() {
+                continue;
+            }
+            let flags = user.conference_flags.entry(number).or_insert(ConferenceFlags::None);
+            *flags |= ConferenceFlags::Registered;
+        }
+    }
+
+    /// PCBoard's ConfirmCaller - show the record the name matched so a caller who
+    /// mistyped their name notices before a second account is created.
+    async fn confirm_caller(&mut self, user_number: usize) -> Res<bool> {
+        let board = self.state.get_board().await;
+        if !board.config.system_control.confirm_caller_name {
+            return Ok(true);
+        }
+        let user = board.users[user_number].clone();
+        drop(board);
+
+        self.state.new_line().await?;
+        self.state.println(TerminalTarget::Both, &user.get_name()).await?;
+        if !user.city_or_state.is_empty() {
+            self.state.println(TerminalTarget::Both, &user.city_or_state).await?;
+        }
+        let answer = self
+            .state
+            .input_field(
+                IceText::IsThisCorrect,
+                1,
+                "",
+                "",
+                Some(self.state.session.yes_char.to_string()),
+                display_flags::YESNO | display_flags::FIELDLEN | display_flags::UPCASE | display_flags::NEWLINE | display_flags::LFBEFORE,
+            )
+            .await?;
+        if answer.starts_with(self.state.session.no_char) {
+            self.state
+                .display_text(IceText::ChangeNames, display_flags::NEWLINE | display_flags::LFAFTER)
+                .await?;
+            return Ok(false);
+        }
+        Ok(true)
     }
 
     async fn newask_exists(&self) -> bool {
@@ -668,6 +733,7 @@ impl PcbBoardCommand {
         }
 
         log::warn!("Login from {} at {}", self.state.session.user_name, Local::now().to_rfc2822());
+        self.state.log_logon_to_caller_log().await;
         let last_conference = if let Some(user) = &self.state.session.current_user {
             user.last_conference
         } else {

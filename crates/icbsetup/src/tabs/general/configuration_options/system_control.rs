@@ -72,6 +72,8 @@ impl SystemControl {
                     .with_help(get_text("password_storage_method_help")),
                 ),
                 cfg_entry_bool!("guard_logoff", label_width, system_control, guard_logoff, lock),
+                cfg_entry_bool!("confirm_caller_name", label_width, system_control, confirm_caller_name, lock),
+                cfg_entry_bool!("reread_sec_level_on_join", label_width, system_control, reread_sec_level_on_join, lock),
             ];
             ConfigMenu { obj: icy_board.clone(), entry }
         };

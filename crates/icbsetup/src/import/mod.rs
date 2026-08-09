@@ -420,6 +420,7 @@ impl PCBoardImporter {
                 ask_web_address: true,
                 ask_use_short_descr: true,
                 ask_fse: true,
+                auto_register_conferences: self.data.auto_reg_conf,
             },
             message: MessageOptions {
                 max_msg_lines: self.data.max_msg_lines as u16,
@@ -431,6 +432,8 @@ impl PCBoardImporter {
                 validate_to_name: self.data.validate_to,
                 default_quick_personal_scan: self.data.quick_scan,
                 default_scan_all_selected_confs_at_login: self.data.scan_all,
+                force_comments_to_main: self.data.force_main,
+                update_last_read_pointer: self.data.last_read_update,
             },
             file_transfer: FileTransferOptions {
                 verify_files_uploaded: self.data.test_uploads,
@@ -445,7 +448,7 @@ impl PCBoardImporter {
                 stop_uploads_free_space: self.data.stop_free_space.max(0) as u32,
             },
             system_control: SystemControlOptions {
-                disable_ns_logon: false, // TODO
+                disable_ns_logon: self.data.disable_quick,
                 disable_full_record_updating: self.data.allow_pwrd_only,
                 is_closed_board: self.data.closed_board,
                 guard_logoff: self.data.guard_logoff,
@@ -454,6 +457,8 @@ impl PCBoardImporter {
                 enforce_daily_time_limit: self.data.enforce_time,
                 allow_password_failure_comment: self.data.allow_pwrd_comment,
                 password_storage_method: PasswordStorageMethod::default(),
+                confirm_caller_name: self.data.confirm_caller,
+                reread_sec_level_on_join: self.data.conf_pwrd_adjust,
             },
             switches: ConfigSwitches {
                 display_news_behavior: DisplayNewsBehavior::from_pcb_char(self.data.display_news),
@@ -482,6 +487,9 @@ impl PCBoardImporter {
                 page_bell: true,
                 alarm: false,
                 call_log: true,
+                log_caller_number: self.data.log_caller_number,
+                log_connect_string: self.data.log_connect_str,
+                log_security_level: self.data.log_sec_level,
             },
             event: EventOptions {
                 enabled: self.data.event_active,
@@ -507,7 +515,19 @@ impl PCBoardImporter {
                 logoff_file: accounting_logoff_file,
                 accounting_config: None,
             },
-            qwk_settings: QwkSettings::default(),
+            qwk_settings: QwkSettings {
+                bbs_name: self.data.board_name.clone(),
+                bbs_sysop_name: self.data.sysop_info.sysop.clone(),
+                // PCBoard falls back to CapFile when QwkFile is empty, see getqwkroot().
+                bbs_id: if self.data.qwk_file.trim().is_empty() {
+                    self.data.cap_file.trim().to_string()
+                } else {
+                    self.data.qwk_file.trim().to_string()
+                },
+                max_msgs: self.data.max_total_msgs.clamp(0, u16::MAX as i32) as u16,
+                max_msgs_per_conf: self.data.max_conf_msgs.clamp(0, u16::MAX as i32) as u16,
+                ..QwkSettings::default()
+            },
         };
         icb_cfg.board.allow_iemsi = false;
         icb_cfg.login_server.telnet.port = 1337;

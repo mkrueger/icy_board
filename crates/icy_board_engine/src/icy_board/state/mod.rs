@@ -707,6 +707,36 @@ impl IcyBoardState {
         }
     }
 
+    /// Takes the time limit of the caller from the PWRD security level definitions.
+    async fn apply_security_level_limits(&mut self) {
+        let board = self.get_board().await;
+        let Some(level) = board.sec_levels.iter().find(|l| l.security == self.session.cur_security) else {
+            return;
+        };
+        let time_per_day = level.time_per_day;
+        drop(board);
+        if time_per_day > 0 {
+            self.session.time_limit = time_per_day as i32;
+        }
+    }
+
+    /// A conference may raise or lower the security level of the caller while they
+    /// are in it. PCBoard's ConfPwrdAdjust re-reads PWRD when that happens.
+    async fn apply_conference_security(&mut self) {
+        let Some(user) = &self.session.current_user else {
+            return;
+        };
+        let base = user.security_level as i32;
+        let adjusted = (base + self.session.current_conference.add_conference_security).clamp(0, u8::MAX as i32) as u8;
+        if adjusted == self.session.cur_security {
+            return;
+        }
+        self.session.cur_security = adjusted;
+        if self.get_board().await.config.system_control.reread_sec_level_on_join {
+            self.apply_security_level_limits().await;
+        }
+    }
+
     pub async fn join_conference(&mut self, conference: u16, quick_join: bool, show_intro: bool) -> Res<()> {
         if (conference as usize) >= self.get_board().await.conferences.len() {
             return Ok(());
@@ -736,6 +766,7 @@ impl IcyBoardState {
         if let Some(user) = &mut self.session.current_user {
             user.last_conference = conference;
         }
+        self.apply_conference_security().await;
 
         if show_news {
             self.display_news(only_new).await?;
@@ -1031,6 +1062,57 @@ impl IcyBoardState {
         }
     }
 
+    /// Appends one time stamped line to the caller log, PCBoard's CALLER file.
+    pub async fn write_caller_log(&self, text: &str) {
+        let path = {
+            let board = self.get_board().await;
+            if !board.config.options.call_log {
+                return;
+            }
+            board.resolve_file(&board.config.paths.caller_log)
+        };
+        if path.as_os_str().is_empty() {
+            return;
+        }
+        let line = format!("{} {}\r\n", chrono::Local::now().format("%H:%M"), text);
+        let result = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, line.as_bytes()));
+        if let Err(err) = result {
+            log::error!("Can't write to caller log {}: {}", path.display(), err);
+        }
+    }
+
+    /// Writes the logon block of the caller log, the extra lines are switchable
+    /// exactly like PCBoard's LogCallerNumber, LogConnectStr and LogSecLevel.
+    pub async fn log_logon_to_caller_log(&mut self) {
+        let (log_number, log_connect, log_security, caller_number) = {
+            let board = self.get_board().await;
+            (
+                board.config.options.log_caller_number,
+                board.config.options.log_connect_string,
+                board.config.options.log_security_level,
+                board.statistics.cur_caller_number(),
+            )
+        };
+        let name = self.session.user_name.clone();
+        self.write_caller_log(&format!("{name} logged on node {}", self.node + 1)).await;
+        if log_connect {
+            let connection = self.node_state.lock().await[self.node]
+                .as_ref()
+                .map_or(String::new(), |state| format!("{:?}", state.connection_type));
+            self.write_caller_log(&format!("Connect: {connection}")).await;
+        }
+        if log_number {
+            self.write_caller_log(&format!("Caller Number: {caller_number}")).await;
+        }
+        if log_security {
+            self.write_caller_log(&format!("Security Level: {}", self.session.cur_security)).await;
+        }
+    }
+
     pub async fn set_current_user(&mut self, user_number: usize, join_conference: bool) -> Res<()> {
         self.session.cur_user_id = user_number as i32;
         if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
@@ -1059,6 +1141,7 @@ impl IcyBoardState {
         self.session.fse_mode = user.flags.fse_mode.clone();
 
         self.session.current_user = Some(user);
+        self.apply_security_level_limits().await;
         if self.session.language != old_language {
             self.update_language().await;
         }
