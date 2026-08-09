@@ -13,3 +13,4 @@ tokio = { workspace = true }
 log = { workspace = true }
 argh = { workspace = true }
 fern = { workspace = true }
+tempfile = { workspace = true }

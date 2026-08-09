@@ -9,7 +9,11 @@ use icy_board_engine::{
     Res,
     icy_board::{
         IcyBoard,
-        ftn::{FtnConfig, FtnLink},
+        ftn::{
+            FtnConfig, FtnLink,
+            bundle::{is_bundle, unpack},
+            packet::Packet,
+        },
     },
 };
 use icy_net::binkp::{BinkpIdentity, PollRequest};
@@ -28,6 +32,7 @@ struct Cli {
 enum Command {
     Links(Links),
     Poll(Poll),
+    Show(Show),
 }
 
 #[derive(FromArgs)]
@@ -60,6 +65,19 @@ struct Poll {
     verbose: bool,
 }
 
+#[derive(FromArgs)]
+#[argh(subcommand, name = "show")]
+/// list what is inside a packet or a mail bundle
+struct Show {
+    #[argh(positional)]
+    /// the packet or bundle to look into
+    file: PathBuf,
+
+    #[argh(switch, short = 't')]
+    /// print the message text as well
+    text: bool,
+}
+
 #[tokio::main]
 async fn main() {
     let arguments: Cli = argh::from_env();
@@ -68,6 +86,10 @@ async fn main() {
         Command::Poll(arguments) => {
             set_up_logging(arguments.verbose);
             poll_links(&arguments.config, arguments.address.as_deref(), arguments.keep).await
+        }
+        Command::Show(arguments) => {
+            set_up_logging(false);
+            show(&arguments.file, arguments.text)
         }
     };
     if let Err(err) = result {
@@ -220,4 +242,48 @@ fn outbound_files(directory: &Path) -> Res<Vec<PathBuf>> {
     // Bundles are named so that the oldest sorts first, and that is the order they should travel in.
     files.sort();
     Ok(files)
+}
+
+fn show(file: &Path, with_text: bool) -> Res<()> {
+    let name = file.file_name().and_then(|name| name.to_str()).unwrap_or_default();
+    if !is_bundle(name) {
+        return show_packet(file, with_text);
+    }
+
+    let unpacked = tempfile::tempdir()?;
+    let packets = unpack(file, unpacked.path())?;
+    println!("{} holds {} file(s)", name, packets.len());
+    for packet in packets {
+        println!();
+        show_packet(&packet, with_text)?;
+    }
+    Ok(())
+}
+
+fn show_packet(file: &Path, with_text: bool) -> Res<()> {
+    let packet = Packet::load(file)?;
+    println!(
+        "{}: {} -> {}, written {}, {} message(s)",
+        file.file_name().unwrap_or_default().to_string_lossy(),
+        packet.header.orig,
+        packet.header.dest,
+        packet.header.created.format("%Y-%m-%d %H:%M:%S"),
+        packet.messages.len()
+    );
+    for (index, message) in packet.messages.iter().enumerate() {
+        println!(
+            "  {:>3}. {:<12} {} -> {}: {}",
+            index + 1,
+            message.area().unwrap_or("netmail"),
+            message.from,
+            message.to,
+            message.subject
+        );
+        if with_text {
+            for line in message.text.split('\r') {
+                println!("       {}", line);
+            }
+        }
+    }
+    Ok(())
 }

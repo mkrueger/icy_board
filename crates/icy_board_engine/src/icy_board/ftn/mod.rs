@@ -6,6 +6,9 @@ use serde_with::{DisplayFromStr, serde_as};
 
 use super::IcyBoardSerializer;
 
+pub mod bundle;
+pub mod packet;
+
 /// The port fidonet technology networks reserved for binkp.
 pub const DEFAULT_BINKP_PORT: u16 = icy_net::binkp::DEFAULT_PORT;
 
