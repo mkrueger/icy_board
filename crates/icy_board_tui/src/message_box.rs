@@ -59,6 +59,10 @@ impl Page for MessageBox {
             .render(area, frame.buffer_mut());
     }
 
+    fn is_modal(&self) -> bool {
+        true
+    }
+
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         match key.code {
             KeyCode::Enter | KeyCode::Esc | KeyCode::Char(' ') => PageMessage::Close,

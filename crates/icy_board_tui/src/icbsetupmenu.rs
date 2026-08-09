@@ -3,7 +3,7 @@ use ratatui::{
     Frame,
     layout::{Margin, Rect},
     text::{Line, Span},
-    widgets::{Block, Borders, Padding, Widget},
+    widgets::{Block, Borders, Clear, Padding, Widget},
 };
 
 use crate::{
@@ -45,9 +45,15 @@ impl IcbSetupMenuUI {
             height: area.height.saturating_sub(1),
         };
 
-        if !self.sub_pages.is_empty() {
-            // A modal only paints a small box, so the page below has to be drawn first.
-            for page in self.sub_pages.iter_mut() {
+        // A page paints only the cells it uses, so what the frame before left
+        // there has to go first.
+        Clear.render(area, frame.buffer_mut());
+        Block::new().style(get_tui_theme().background).render(area, frame.buffer_mut());
+
+        // Everything under the topmost full page is hidden by it, a modal only
+        // covers a box of its own.
+        if let Some(topmost) = self.sub_pages.iter().rposition(|page| !page.is_modal()) {
+            for page in self.sub_pages[topmost..].iter_mut() {
                 page.render(frame, area);
             }
             return;
@@ -117,6 +123,10 @@ impl IcbSetupMenuUI {
         menu_area.y += 4;
         menu_area.height = menu_area.height.saturating_sub(4);
         self.menu.render(menu_area, frame, &mut self.state);
+
+        for page in self.sub_pages.iter_mut() {
+            page.render(frame, area);
+        }
     }
 
     pub fn with_left_title(mut self, left_title: String) -> Self {

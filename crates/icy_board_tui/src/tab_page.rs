@@ -21,6 +21,11 @@ pub enum PageMessage {
 pub trait Page {
     fn render(&mut self, frame: &mut Frame, area: Rect);
 
+    /// A modal paints a box and leaves the rest of the screen to the page below.
+    fn is_modal(&self) -> bool {
+        false
+    }
+
     fn request_status(&self) -> ResultState {
         ResultState::default()
     }
