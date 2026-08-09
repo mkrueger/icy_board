@@ -102,6 +102,87 @@ impl Default for FtnLink {
     }
 }
 
+/// The decisions the tosser and the mailer would otherwise make on their own.
+/// PCBoard kept the same set in the fido block of `PCBOARD.DAT`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct FtnOptions {
+    /// Read what is waiting in the inbound.
+    pub process_in: bool,
+
+    /// Pack what was written here for the links that carry it.
+    pub process_out: bool,
+
+    /// Toss packets that were addressed to another system as well. A hub does
+    /// this, a leaf node has no business reading someone else's mail.
+    pub process_orphan: bool,
+
+    /// Call the links. A board that is only ever called leaves this off.
+    pub dial_out: bool,
+
+    /// Toss the inbound as soon as a session has ended.
+    pub import_after_xfer: bool,
+
+    /// Drop a message whose id has been seen in the area before.
+    pub check_dupe_msg_id: bool,
+
+    /// Drop a message whose path already names this board. It has come back
+    /// the long way around, and the id check misses it when the id is gone.
+    pub check_dupe_path: bool,
+
+    /// How many message ids per area the duplicate check looks back over, zero
+    /// for all of them. A busy area makes that list long.
+    pub msgs_to_track: u32,
+
+    /// Netmail for a name nobody here carries goes to a base of its own.
+    pub secure: bool,
+
+    /// Netmail addressed to "Sysop" is handed to the name the sysop reads
+    /// under, which is what the rest of the board delivers to.
+    pub sysop_change: bool,
+
+    /// A tag no area carries becomes an area of its own instead of being
+    /// counted and dropped.
+    pub auto_add: bool,
+
+    /// The conference an area added that way is attached to.
+    pub auto_add_conference: usize,
+
+    /// A tag no area carries is passed on to the links that asked for it. A
+    /// hub feeds an area it does not read itself this way.
+    pub pass_thru: bool,
+
+    /// The zone and net a two dimensional packet header is completed with.
+    pub default_zone: u16,
+    pub default_net: u16,
+
+    /// Say what the mailer is doing rather than only what went wrong.
+    pub verbose_log: bool,
+}
+
+impl Default for FtnOptions {
+    fn default() -> Self {
+        Self {
+            process_in: true,
+            process_out: true,
+            process_orphan: false,
+            dial_out: true,
+            import_after_xfer: true,
+            check_dupe_msg_id: true,
+            check_dupe_path: false,
+            msgs_to_track: 0,
+            secure: false,
+            sysop_change: true,
+            auto_add: false,
+            auto_add_conference: 0,
+            pass_thru: false,
+            default_zone: 0,
+            default_net: 0,
+            verbose_log: false,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct FtnConfig {
     /// Where a session drops the bundles it received.
@@ -116,12 +197,24 @@ pub struct FtnConfig {
     #[serde(default = "FtnConfig::default_netmail")]
     pub netmail: PathBuf,
 
+    /// Where netmail for a name this board does not carry goes when
+    /// `options.secure` is set.
+    #[serde(default = "FtnConfig::default_bad_netmail")]
+    pub bad_netmail: PathBuf,
+
+    /// Where the base of an area added by `options.auto_add` is created.
+    #[serde(default = "FtnConfig::default_new_areas")]
+    pub new_areas: PathBuf,
+
     /// Appended to every echomail message this board originates.
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub origin: String,
 
     // Toml demands that the tables come last.
+    #[serde(default)]
+    pub options: FtnOptions,
+
     #[serde(rename = "aka", default)]
     pub akas: Vec<FtnAka>,
 
@@ -132,6 +225,20 @@ pub struct FtnConfig {
 impl FtnConfig {
     fn default_netmail() -> PathBuf {
         PathBuf::from("ftn/netmail")
+    }
+
+    fn default_bad_netmail() -> PathBuf {
+        PathBuf::from("ftn/badmail")
+    }
+
+    fn default_new_areas() -> PathBuf {
+        PathBuf::from("ftn/areas")
+    }
+
+    /// One of the addresses this board answers to, which is what tells mail
+    /// meant for it from mail that only passes through.
+    pub fn answers_to(&self, address: &EchomailAddress) -> bool {
+        self.akas.iter().any(|aka| aka.address == *address)
     }
 
     /// The address a link is greeted with when it belongs to no known network.
@@ -167,7 +274,10 @@ impl Default for FtnConfig {
             inbound: PathBuf::from("ftn/inbound"),
             outbound: PathBuf::from("ftn/outbound"),
             netmail: Self::default_netmail(),
+            bad_netmail: Self::default_bad_netmail(),
+            new_areas: Self::default_new_areas(),
             origin: String::new(),
+            options: FtnOptions::default(),
         }
     }
 }

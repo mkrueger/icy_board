@@ -182,7 +182,8 @@ to its level.
 ## The other direction: PCBoard options with no home here
 
 `PCBOARD.DAT` has 194 top level entries in our model of it. The importer reads
-87 into `icboard.toml`; the remaining 107 have nowhere to go. Most of that is
+87 into `icboard.toml` and a further 16 into `ftn.toml`; the remaining 91 have
+nowhere to go. Most of that is
 right — half of `PCBOARD.DAT` describes a UART, a swap file or an OS/2 thread
 priority — but not all of it.
 
@@ -199,7 +200,7 @@ The machine underneath is gone, so the setting has no meaning: `eliminate_snow`,
 `auto_make_msgs` (a JAM base creates itself), `encrypt` (passwords are hashed),
 `user_sys_during_bat`, the seven `minimize_*` and the six `priority_*`.
 
-That is 47 of the 107, and the honest answer for all of them is no.
+That is 47 of the 91, and the honest answer for all of them is no.
 
 ### Ported since this audit was written
 
@@ -231,28 +232,53 @@ when `qwk_file` is empty, so both feed `qwk_settings.bbs_id`.
 
 ### Worth porting
 
-Nothing outside the FidoNet block is left on this list.
+Nothing is left on this list.
 
-### The FidoNet block — 25 options, newly relevant
+### The FidoNet block — 25 options, 16 of them ported
 
-PCBoard grew a whole FidoNet configuration; icy_board's `ftn.toml` has six
-keys. Now that the tosser exists, several of these describe decisions the
-tosser is currently making on its own with no way to change them:
+PCBoard grew a whole FidoNet configuration. The addresses and the links it
+kept in the files under `FidoLoc`, in no documented format, so those cannot be
+imported; what `PCBOARD.DAT` holds is the set of decisions the tosser and the
+mailer make, and those now live in the `[options]` table of `ftn.toml`. They
+are read by the tosser and by `icbmailer`, they are editable under ICBSetup →
+Message Networking → FidoNet Settings, the importer fills them in and the
+`PCBOARD.DAT` exporter writes them back out.
 
-`fido_check_dupe_msg_id`, `fido_check_dupe_path`, `fido_num_msgs_to_track`
-(the duplicate window — currently every MSGID ever seen is kept),
-`fido_secure` (where mail for an unknown user goes), `fido_auto_add`
-(create an area for an unknown tag instead of counting it),
-`fido_sysop_change`, `fido_make_response`, `fido_crash_sec`,
-`fido_enable_area_fix`, `fido_enable_pass_thru`, `fido_route_echo_mail`,
-`fido_re_address`, `fido_enable_routing`, `fido_import_after_xfer`,
-`fido_pkt_freq`/`fido_export_freq`/`fido_mail_freq` (the scheduler that does
-not exist), `fido_default_zone`/`fido_default_net`, `fido_log_level`,
-`fido_process_in`/`_out`/`_orphan`, `fido_dial_out`, `fido_create_msg`.
+| `PCBOARD.DAT` | `ftn.toml` |
+| --- | --- |
+| `enable_fido` | the presence of `paths.ftn_file` in `icboard.toml` |
+| `fido_process_in` | `options.process_in` |
+| `fido_process_out` | `options.process_out` |
+| `fido_process_orphan` | `options.process_orphan` |
+| `fido_dial_out` | `options.dial_out` |
+| `fido_import_after_xfer` | `options.import_after_xfer` |
+| `fido_check_dupe_msg_id` | `options.check_dupe_msg_id` |
+| `fido_check_dupe_path` | `options.check_dupe_path` |
+| `fido_num_msgs_to_track` | `options.msgs_to_track` |
+| `fido_secure` | `options.secure`, with `bad_netmail` for the base |
+| `fido_sysop_change` | `options.sysop_change` |
+| `fido_auto_add` | `options.auto_add`, with `new_areas` for the bases |
+| `fido_enable_pass_thru` | `options.pass_thru` |
+| `fido_default_zone` | `options.default_zone` |
+| `fido_default_net` | `options.default_net` |
+| `fido_log_level` | `options.verbose_log` |
 
-Not all of these are worth having, but the duplicate window, the unknown-area
-policy and the unknown-user policy are decisions the code makes today by
-accident rather than by configuration.
+The nine that were left out, and why:
+
+| Option | Why not |
+| --- | --- |
+| `fido_enable_area_fix` | AreaFix, subscribing to an area by netmail, is a feature of its own that does not exist here. A flag for it would switch nothing on |
+| `fido_make_response` | The responses it means are AreaFix replies and return receipts, and neither exists |
+| `fido_crash_sec` | Nothing lets a user write netmail here, so there is nobody to refuse the crash flag to |
+| `fido_create_msg` | `*.MSG` is the DOS one file per message netmail format. The netmail base here is JAM |
+| `fido_enable_routing` | Routing netmail on behalf of a system that is not a direct link needs a route table this board does not have |
+| `fido_route_echo_mail` | The same for echomail. `pass_thru` covers the part of it a leaf or a small hub needs |
+| `fido_re_address` | Rewriting the addresses of a routed packet only matters once routing exists |
+| `fido_pkt_freq` | Nothing runs the tosser on a timer. `icbmailer` is started by the sysop or by cron |
+| `fido_export_freq`, `fido_mail_freq` | The same, and each link already carries its own `poll_minutes` |
+
+The `[options]` table is not counted in the totals at the top of this file,
+which are about `icboard.toml`.
 
 ### The UUCP block — 22 options, a whole missing feature
 

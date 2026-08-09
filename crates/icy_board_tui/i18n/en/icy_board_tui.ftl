@@ -1959,6 +1959,103 @@ command_editor_command_type=Command Type
 
 msg_networking_title=Message Networking
 msg_networking_qwk=QWK Settings
+msg_networking_ftn=FidoNet Settings
+
+ftn_settings_title=FidoNet Settings
+
+ftn_run_label=Mailer and Tosser
+
+ftn_process_in=Toss Inbound
+ftn_process_in-status=Read the mail waiting in the inbound
+ftn_process_in-help=When this is off nothing is read out of the inbound, which is how a board is taken out of the network without losing what arrives.
+
+ftn_process_out=Scan Outbound
+ftn_process_out-status=Pack what was written here for the links
+ftn_process_out-help=When this is off nothing written on this board leaves it.
+
+ftn_process_orphan=Toss Orphans
+ftn_process_orphan-status=Read packets addressed to another system
+ftn_process_orphan-help=A hub reads mail that is not addressed to it, a leaf node has no business doing so. Packets for somebody else are left in the inbound while this is off.
+
+ftn_dial_out=Call Links
+ftn_dial_out-status=Allow this board to call the links
+ftn_dial_out-help=A board that is only ever called leaves this off.
+
+ftn_import_after_xfer=Toss After Call
+ftn_import_after_xfer-status=Toss the inbound when a call has ended
+ftn_import_after_xfer-help=What the link handed over is read into the message bases straight away instead of waiting for the next toss.
+
+ftn_verbose_log=Verbose Log
+ftn_verbose_log-status=Say what the mailer is doing, not only what went wrong
+ftn_verbose_log-help=TODO
+
+ftn_dupes_label=Duplicates
+
+ftn_check_dupe_msg_id=Check Message ID
+ftn_check_dupe_msg_id-status=Drop a message whose id was seen in the area before
+ftn_check_dupe_msg_id-help=A message travels several ways through a network and arrives more than once. The message id is what tells the copies apart.
+
+ftn_check_dupe_path=Check Path
+ftn_check_dupe_path-status=Drop a message whose path already names this board
+ftn_check_dupe_path-help=A message that has been here before has come back the long way around, which the id check misses when the message carries no id.
+
+ftn_msgs_to_track=Messages Tracked
+ftn_msgs_to_track-status=How far back the duplicate check looks, 0 for the whole area
+ftn_msgs_to_track-help=A busy area holds a long list of message ids, and reading all of them costs time on every run.
+
+ftn_areas_label=Areas
+
+ftn_auto_add=Add Unknown Areas
+ftn_auto_add-status=Make an area out of a tag no area carries
+ftn_auto_add-help=Without this a message for an unknown tag is counted and dropped.
+
+ftn_auto_add_conference=Add To Conference
+ftn_auto_add_conference-status=The conference an area added that way belongs to
+ftn_auto_add_conference-help=TODO
+
+ftn_pass_thru=Pass Through
+ftn_pass_thru-status=Hand an area on without storing it here
+ftn_pass_thru-help=A hub feeds its downlinks areas it does not read itself. The message is offered to every link that asked for the tag and has not seen it yet.
+
+ftn_mail_label=Netmail
+
+ftn_secure=Secure Netmail
+ftn_secure-status=Keep netmail for an unknown name apart
+ftn_secure-help=Netmail addressed to a name no user carries goes to a base of its own instead of the netmail the sysop reads.
+
+ftn_sysop_change=Deliver To Sysop
+ftn_sysop_change-status=Netmail to "Sysop" goes to the name the sysop reads under
+ftn_sysop_change-help=TODO
+
+ftn_default_zone=Default Zone
+ftn_default_zone-status=The zone a two dimensional packet is completed with
+ftn_default_zone-help=An old packet leaves the zone at zero and only the sysop knows which network it meant.
+
+ftn_default_net=Default Net
+ftn_default_net-status=The net a two dimensional packet is completed with
+ftn_default_net-help=TODO
+
+ftn_paths_label=Directories
+
+ftn_inbound=Inbound
+ftn_inbound-status=Where a call drops what it received
+ftn_inbound-help=TODO
+
+ftn_outbound=Outbound
+ftn_outbound-status=Where mail waits for the next call
+ftn_outbound-help=TODO
+
+ftn_netmail=Netmail Base
+ftn_netmail-status=The message base arriving netmail is written to
+ftn_netmail-help=TODO
+
+ftn_bad_netmail=Unknown Netmail
+ftn_bad_netmail-status=Where netmail for an unknown name goes
+ftn_bad_netmail-help=Only used while Secure Netmail is on.
+
+ftn_new_areas=New Areas
+ftn_new_areas-status=Where the base of an added area is created
+ftn_new_areas-help=Only used while Add Unknown Areas is on.
 
 qwk_settings_title=QWK Settings
 

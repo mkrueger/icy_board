@@ -11,6 +11,7 @@ use icy_board_tui::{
 };
 use ratatui::{Frame, layout::Rect};
 
+mod ftn;
 mod qwk;
 
 pub struct MsgNetworking {
@@ -23,7 +24,7 @@ impl MsgNetworking {
         Self {
             page: IcbSetupMenuUI::new(SelectMenu::new(vec![
                 MenuItem::new(0, 'A', get_text("msg_networking_qwk")),
-                MenuItem::new(1, 'B', "FTN TODO".to_string()),
+                MenuItem::new(1, 'B', get_text("msg_networking_ftn")),
                 MenuItem::new(2, 'C', "UUCP TODO".to_string()),
             ]))
             .with_center_title(get_text("msg_networking_title")),
@@ -50,9 +51,7 @@ impl Page for MsgNetworking {
         if let Some(selected) = opt {
             return match selected {
                 0 => PageMessage::OpenSubPage(Box::new(qwk::QwkSettings::new(self.icy_board.clone()))),
-                //                1 => PageMessage::OpenSubPage(Box::new(ssh::SSH::new(self.icy_board.clone()))),
-                //2 => PageMessage::OpenSubPage(Box::new(Websockets::new(self.icy_board.clone()))),
-                //                2 => PageMessage::OpenSubPage(Box::new(SecureWebsockets::new(self.icy_board.clone()))),
+                1 => PageMessage::OpenSubPage(Box::new(ftn::FtnSettings::new(self.icy_board.clone()))),
                 _ => PageMessage::None,
             };
         }

@@ -187,6 +187,8 @@ impl IcyBoard {
         self.ftn.inbound = get_path(&self.root_path, &self.ftn.inbound);
         self.ftn.outbound = get_path(&self.root_path, &self.ftn.outbound);
         self.ftn.netmail = get_path(&self.root_path, &self.ftn.netmail);
+        self.ftn.bad_netmail = get_path(&self.root_path, &self.ftn.bad_netmail);
+        self.ftn.new_areas = get_path(&self.root_path, &self.ftn.new_areas);
 
         // Trashcan files
         self.config.paths.trashcan_upload_files = get_path(&self.root_path, &self.config.paths.trashcan_upload_files);
@@ -528,6 +530,9 @@ impl IcyBoard {
     pub fn save(&self) -> Res<()> {
         self.config.save(&self.file_name)?;
         self.conferences.save(&self.resolve_file(&self.config.paths.conferences))?;
+        if !self.config.paths.ftn_file.as_os_str().is_empty() {
+            self.ftn.save(&self.resolve_file(&self.config.paths.ftn_file))?;
+        }
         Ok(())
     }
 
@@ -678,6 +683,26 @@ impl IcyBoard {
         pcb_dat.auto_reg_conf = self.config.new_user_settings.auto_register_conferences;
         // Line 251
         pcb_dat.qwk_file = self.config.qwk_settings.bbs_id.clone();
+
+        // The fido block, lines 173-177, 232-236 and 336-347. PCBoard keeps the
+        // addresses and the links in the files under FidoLoc, only the options
+        // that steer the tosser are in here.
+        pcb_dat.enable_fido = self.ftn.is_configured();
+        pcb_dat.fido_process_in = self.ftn.options.process_in;
+        pcb_dat.fido_process_out = self.ftn.options.process_out;
+        pcb_dat.fido_process_orphan = self.ftn.options.process_orphan;
+        pcb_dat.fido_dial_out = self.ftn.options.dial_out;
+        pcb_dat.fido_import_after_xfer = self.ftn.options.import_after_xfer;
+        pcb_dat.fido_check_dupe_msg_id = self.ftn.options.check_dupe_msg_id;
+        pcb_dat.fido_check_dupe_path = self.ftn.options.check_dupe_path;
+        pcb_dat.fido_num_msgs_to_track = self.ftn.options.msgs_to_track.min(i32::MAX as u32) as i32;
+        pcb_dat.fido_secure = self.ftn.options.secure;
+        pcb_dat.fido_sysop_change = self.ftn.options.sysop_change;
+        pcb_dat.fido_auto_add = self.ftn.options.auto_add;
+        pcb_dat.fido_enable_pass_thru = self.ftn.options.pass_thru;
+        pcb_dat.fido_default_zone = self.ftn.options.default_zone as i32;
+        pcb_dat.fido_default_net = self.ftn.options.default_net as i32;
+        pcb_dat.fido_log_level = self.ftn.options.verbose_log as i32;
 
         // Line 296 (to prevent \0 char)
         pcb_dat.uucp_high_ascii = 'N';

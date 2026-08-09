@@ -8,13 +8,14 @@ use argh::FromArgs;
 use icy_board_engine::{
     Res,
     icy_board::{
-        IcyBoard,
+        IcyBoard, IcyBoardSerializer,
         ftn::{
             FtnConfig, FtnLink,
             bundle::{is_bundle, unpack},
             packet::Packet,
-            toss::{scan_outbound, toss_inbound},
+            toss::{TossReport, TossTarget, scan_outbound, toss_inbound},
         },
+        message_area::MessageArea,
     },
 };
 use icy_net::binkp::{BinkpIdentity, PollRequest};
@@ -112,27 +113,35 @@ async fn main() {
     let arguments: Cli = argh::from_env();
     let result = match arguments.command {
         Command::Links(arguments) => list_links(&arguments.config),
-        Command::Poll(arguments) => {
-            set_up_logging(arguments.verbose);
-            poll_links(&arguments.config, arguments.address.as_deref(), arguments.keep).await
-        }
+        Command::Poll(arguments) => match load_and_log(&arguments.config, arguments.verbose) {
+            Ok(mut board) => poll_links(&mut board, arguments.address.as_deref(), arguments.keep).await,
+            Err(err) => Err(err),
+        },
         Command::Show(arguments) => {
             set_up_logging(false);
             show(&arguments.file, arguments.text)
         }
-        Command::Toss(arguments) => {
-            set_up_logging(arguments.verbose);
-            toss(&arguments.config)
-        }
-        Command::Scan(arguments) => {
-            set_up_logging(arguments.verbose);
-            scan(&arguments.config)
-        }
+        Command::Toss(arguments) => match load_and_log(&arguments.config, arguments.verbose) {
+            Ok(mut board) => toss(&mut board),
+            Err(err) => Err(err),
+        },
+        Command::Scan(arguments) => match load_and_log(&arguments.config, arguments.verbose) {
+            Ok(board) => scan(&board),
+            Err(err) => Err(err),
+        },
     };
     if let Err(err) = result {
         eprintln!("{}", err);
         exit(1);
     }
+}
+
+/// The board has to be read before the logging can be set up, because it is
+/// `ftn.toml` that says how much of it the sysop wants to see.
+fn load_and_log(config: &Path, verbose: bool) -> Res<IcyBoard> {
+    let board = load(config)?;
+    set_up_logging(verbose || board.ftn.options.verbose_log);
+    Ok(board)
 }
 
 fn set_up_logging(verbose: bool) {
@@ -174,11 +183,13 @@ fn list_links(config: &Path) -> Res<()> {
     Ok(())
 }
 
-async fn poll_links(config: &Path, address: Option<&str>, keep: bool) -> Res<()> {
-    let board = load(config)?;
-    let selected: Vec<&FtnLink> = match address {
-        Some(wanted) => board.ftn.links.iter().filter(|link| answers_to(link, wanted)).collect(),
-        None => board.ftn.links.iter().collect(),
+async fn poll_links(board: &mut IcyBoard, address: Option<&str>, keep: bool) -> Res<()> {
+    if !board.ftn.options.dial_out {
+        return Err("This board is set not to call out, see dial_out in ftn.toml".into());
+    }
+    let selected: Vec<FtnLink> = match address {
+        Some(wanted) => board.ftn.links.iter().filter(|link| answers_to(link, wanted)).cloned().collect(),
+        None => board.ftn.links.clone(),
     };
     if selected.is_empty() {
         return Err(match address {
@@ -188,11 +199,18 @@ async fn poll_links(config: &Path, address: Option<&str>, keep: bool) -> Res<()>
     }
 
     let mut failed = 0;
-    for link in selected {
-        if let Err(err) = poll_link(&board.ftn, &identity_for(&board, link)?, link, keep).await {
-            eprintln!("{}: {}", link.to_5d(), err);
-            failed += 1;
+    let mut received = false;
+    for link in &selected {
+        match poll_link(&board.ftn, &identity_for(board, link)?, link, keep).await {
+            Ok(files) => received |= files,
+            Err(err) => {
+                eprintln!("{}: {}", link.to_5d(), err);
+                failed += 1;
+            }
         }
+    }
+    if received && board.ftn.options.import_after_xfer {
+        toss(board)?;
     }
     if failed > 0 {
         return Err(format!("{} of the calls did not get through", failed).into());
@@ -200,7 +218,9 @@ async fn poll_links(config: &Path, address: Option<&str>, keep: bool) -> Res<()>
     Ok(())
 }
 
-async fn poll_link(ftn: &FtnConfig, identity: &BinkpIdentity, link: &FtnLink, keep: bool) -> Res<()> {
+/// Answers whether the call brought anything back, which is what decides
+/// whether there is a point in tossing afterwards.
+async fn poll_link(ftn: &FtnConfig, identity: &BinkpIdentity, link: &FtnLink, keep: bool) -> Res<bool> {
     let outbound = outbound_files(&ftn.outbound_for(link))?;
     println!(
         "Calling {} at {}:{} with {} file(s) to hand over",
@@ -244,7 +264,7 @@ async fn poll_link(ftn: &FtnConfig, identity: &BinkpIdentity, link: &FtnLink, ke
     for path in &result.batch.skipped {
         println!("  held back for the next call: {}", path.display());
     }
-    Ok(())
+    Ok(!result.batch.received.is_empty())
 }
 
 /// An address may be given with or without its network, so both spellings count.
@@ -252,26 +272,59 @@ fn answers_to(link: &FtnLink, wanted: &str) -> bool {
     link.address.to_string().eq_ignore_ascii_case(wanted) || link.to_5d().eq_ignore_ascii_case(wanted)
 }
 
-fn toss(config: &Path) -> Res<()> {
-    let board = load(config)?;
-    let report = toss_inbound(&board.ftn, &echo_areas(&board))?;
+fn toss(board: &mut IcyBoard) -> Res<()> {
+    let target = TossTarget {
+        sysop: board.config.sysop.name.clone(),
+        users: board.users.iter().map(|user| user.get_name().to_string()).collect(),
+    };
+    let report = toss_inbound(&board.ftn, &echo_areas(board), &target)?;
 
     println!(
         "{} message(s) tossed, {} netmail, {} duplicate(s) dropped",
         report.imported, report.netmail, report.duplicates
     );
+    if report.passed_through > 0 {
+        println!("  {} message(s) handed on in {} bundle(s)", report.passed_through, report.bundles.len());
+    }
+    if report.orphans > 0 {
+        println!("  {} packet(s) for another system left in the inbound", report.orphans);
+    }
     for (tag, count) in &report.unknown {
         println!("  {} message(s) arrived for {}, which no area carries", count, tag);
     }
     for (file, err) in &report.failed {
         println!("  left in the inbound, {}: {}", file.display(), err);
     }
+    register_new_areas(board, &report)?;
     Ok(())
 }
 
-fn scan(config: &Path) -> Res<()> {
-    let board = load(config)?;
-    let report = scan_outbound(&board.ftn, &echo_areas(&board), &chrono::Local::now().naive_local())?;
+/// An area the tosser created for a tag nobody carried is of no use until a
+/// conference offers it to the users.
+fn register_new_areas(board: &mut IcyBoard, report: &TossReport) -> Res<()> {
+    if report.added.is_empty() {
+        return Ok(());
+    }
+    let number = board.ftn.options.auto_add_conference;
+    let Some(conference) = board.conferences.get_mut(number) else {
+        return Err(format!("Conference {}, which new areas are added to, does not exist", number).into());
+    };
+    let areas = conference.areas.get_or_insert_with(Default::default);
+    for (tag, path) in &report.added {
+        println!("  {} is new, added to {}", tag, conference.name);
+        areas.push(MessageArea {
+            name: tag.clone(),
+            ftn_area_tag: tag.clone(),
+            path: path.clone(),
+            ..Default::default()
+        });
+    }
+    areas.save(&conference.area_file)?;
+    Ok(())
+}
+
+fn scan(board: &IcyBoard) -> Res<()> {
+    let report = scan_outbound(&board.ftn, &echo_areas(board), &chrono::Local::now().naive_local())?;
 
     println!("{} message(s) packed into {} bundle(s)", report.exported, report.bundles.len());
     for bundle in &report.bundles {
