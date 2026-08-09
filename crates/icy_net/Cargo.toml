@@ -39,6 +39,7 @@ rustls = { version = "0.23.0", features = [
 rustls-pemfile = "2"
 webpki-roots = "1.0.3"
 futures-util = { version = "0.3.30", default-features = false, features = ["sink", "std"] }
+md5 = "0.8"
 
 [target.'cfg(unix)'.dependencies]
 libc_unix = { package = "libc", version = "0.2" }

@@ -46,4 +46,16 @@ pub enum NetError {
 
     #[error("Unknown binkp command id {0}")]
     UnknownBinkpCommand(u8),
+
+    #[error("Binkp session refused by the remote: {0}")]
+    BinkpRemoteError(String),
+
+    #[error("Binkp remote is busy: {0}")]
+    BinkpRemoteBusy(String),
+
+    #[error("Called {0} but reached {1}")]
+    BinkpWrongSystem(String, String),
+
+    #[error("Binkp sent a {0} frame during session setup")]
+    BinkpUnexpectedFrame(String),
 }
