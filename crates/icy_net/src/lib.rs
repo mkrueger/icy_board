@@ -58,4 +58,10 @@ pub enum NetError {
 
     #[error("Binkp sent a {0} frame during session setup")]
     BinkpUnexpectedFrame(String),
+
+    #[error("{0}: cannot parse args")]
+    BinkpBadArgument(String, String),
+
+    #[error("Binkp session timed out")]
+    BinkpTimeout,
 }

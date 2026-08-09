@@ -101,22 +101,72 @@ impl Frame {
             }
             let mut data = vec![0u8; size];
             connection.read_exact(&mut data).await?;
-
-            if !is_command {
-                return Ok(Frame::Data(data));
-            }
-            let Some(command) = BinkpCommand::from_u8(data[0]) else {
-                return Err(NetError::UnknownBinkpCommand(data[0]).into());
-            };
-            let argument = &data[1..];
-            // The argument may or may not be terminated; a trailing null is not part of it.
-            let argument = argument.strip_suffix(&[0]).unwrap_or(argument);
-            return Ok(Frame::Command(command, String::from_utf8_lossy(argument).to_string()));
+            return Frame::from_parts(is_command, data);
         }
+    }
+
+    fn from_parts(is_command: bool, data: Vec<u8>) -> crate::Result<Frame> {
+        if !is_command {
+            return Ok(Frame::Data(data));
+        }
+        let Some(command) = BinkpCommand::from_u8(data[0]) else {
+            return Err(NetError::UnknownBinkpCommand(data[0]).into());
+        };
+        let argument = &data[1..];
+        // The argument may or may not be terminated; a trailing null is not part of it.
+        let argument = argument.strip_suffix(&[0]).unwrap_or(argument);
+        Ok(Frame::Command(command, String::from_utf8_lossy(argument).to_string()))
     }
 
     pub async fn send(&self, connection: &mut dyn Connection) -> crate::Result<()> {
         connection.send(&self.to_bytes()?).await
+    }
+}
+
+/// Collects octets as they arrive so the transfer stage can look for a frame
+/// without having to stop sending while it waits for one.
+#[derive(Default)]
+pub struct FrameReader {
+    buffer: Vec<u8>,
+}
+
+impl FrameReader {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Returns the next complete frame, or nothing if the remote has not sent one yet.
+    pub async fn poll(&mut self, connection: &mut dyn Connection) -> crate::Result<Option<Frame>> {
+        loop {
+            if let Some(frame) = self.take_frame()? {
+                return Ok(Some(frame));
+            }
+            let mut chunk = [0u8; 8192];
+            let size = connection.try_read(&mut chunk).await?;
+            if size == 0 {
+                return Ok(None);
+            }
+            self.buffer.extend_from_slice(&chunk[..size]);
+        }
+    }
+
+    fn take_frame(&mut self) -> crate::Result<Option<Frame>> {
+        loop {
+            if self.buffer.len() < 2 {
+                return Ok(None);
+            }
+            let header = u16::from_be_bytes([self.buffer[0], self.buffer[1]]);
+            let size = (header & 0x7fff) as usize;
+            if size == 0 {
+                self.buffer.drain(..2);
+                continue;
+            }
+            if self.buffer.len() < 2 + size {
+                return Ok(None);
+            }
+            let data = self.buffer.drain(..2 + size).skip(2).collect();
+            return Frame::from_parts(header & 0x8000 != 0, data).map(Some);
+        }
     }
 }
 
